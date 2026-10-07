@@ -66,6 +66,9 @@ def build(root: Path, cache: Path, name: str, jobs: int,
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_FLAGS=' + flags]
+        if os.name == 'nt':
+            # PE link timestamps otherwise differ even with identical object bytes.
+            command.append('-DCMAKE_EXE_LINKER_FLAGS=-Wl,--no-insert-timestamp')
         execute(command, environment, root / (name + '-configure.log'))
     subprocess.run(['ccache', '--zero-stats'], env=environment, check=True)
     elapsed: float = execute(
