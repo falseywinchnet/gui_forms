@@ -26,6 +26,8 @@ int main() { gui_forms::Event<int> event; Owner owner;
         ('gui_forms::on(event, owner, &Owner::large, std::array<int, 5>{});', 'must total at most 16 bytes'),
         ('gui_forms::on(event, owner, &Owner::click, 1, 2, 3);', 'at most two bound values'),
     ]
+    body: str = ""
+    expected: str = ""
     for body, expected in cases:
         source: str = prefix + body + '\n}\n'
         result: subprocess.CompletedProcess[str] = subprocess.run(
