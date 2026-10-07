@@ -1,6 +1,7 @@
+#include "display_link_trace.hpp"
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <CoreVideo/CoreVideo.h>
+#import <QuartzCore/CADisplayLink.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 
 #include "macos_host.hpp"
@@ -12,7 +13,6 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -774,6 +774,16 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 } // namespace
 
 @class GUIFormsAccessibilityElement;
+@class GUIFormsView;
+
+// CADisplayLink retains its target. This proxy observes the view weakly, so a
+// paused link cannot keep an otherwise closed window's view alive.
+@interface GUIFormsDisplayTarget : NSObject {
+    __weak GUIFormsView* _view;
+}
+- (instancetype)initWithView:(GUIFormsView*)view;
+- (void)tick:(CADisplayLink*)sender;
+@end
 
 @interface GUIFormsView : NSView <NSTextInputClient, NSDraggingDestination> {
     std::unique_ptr<Window> _model;
@@ -789,8 +799,8 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     NSRange _selectedRange;
     NSTrackingArea* _trackingArea;
     dispatch_source_t _wakeSource;
-    CVDisplayLinkRef _displayLink;
-    std::atomic<bool> _displayTickQueued;
+    std::unique_ptr<MacDisplayLinkTrace> _displayTrace;
+    CADisplayLink* _displayLink;
     BOOL _hostOccluded;
     std::vector<LiveSurfacePresentation> _pendingLivePresentations;
     // Objective-C++ constructs these vectors empty with the view. Reuse storage
@@ -847,8 +857,9 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (void)scheduledWake;
 - (void)startDisplayLinkIfNeeded;
 - (void)stopDisplayLink;
-- (void)queueDisplayLinkTick;
 - (void)displayLinkTick;
+- (void)setDisplayTraceEnabled:(BOOL)enabled;
+- (MacDisplayLinkTrace)displayTraceSnapshot;
 - (void)recordNativeCallbackFault:(const char*)operation
                           message:(const char*)message;
 - (void)drawRetainedRect:(NSRect)dirtyRect;
@@ -871,15 +882,21 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
                         value:(NSString*)value;
 @end
 
-static CVReturn gui_forms_display_link_callback(
-    CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
-    CVOptionFlags, CVOptionFlags*, void* context) {
-    @autoreleasepool {
-        GUIFormsView* view = (__bridge GUIFormsView*)context;
-        if (view != nil) [view queueDisplayLinkTick];
-    }
-    return kCVReturnSuccess;
+@implementation GUIFormsDisplayTarget
+- (instancetype)initWithView:(GUIFormsView*)view {
+    self = [super init];
+    if (self != nil) _view = view;
+    return self;
 }
+- (void)tick:(CADisplayLink*)sender {
+    GUIFormsView* view = _view;
+    if (view == nil) {
+        [sender invalidate];
+        return;
+    }
+    [view displayLinkTick];
+}
+@end
 
 @interface GUIFormsAccessibilityElement : NSAccessibilityElement {
     __weak GUIFormsView* _owner;
@@ -1186,17 +1203,8 @@ private:
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
         _selectedRange = NSMakeRange(NSNotFound, 0);
-        _displayLink = nullptr;
-        _displayTickQueued.store(false, std::memory_order_relaxed);
+        _displayLink = nil;
         _hostOccluded = NO;
-        if (CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink) ==
-            kCVReturnSuccess) {
-            CVDisplayLinkSetOutputCallback(
-                _displayLink, gui_forms_display_link_callback,
-                (__bridge void*)self);
-        } else {
-            _displayLink = nullptr;
-        }
         _wakeSource = dispatch_source_create(
             DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
         __weak GUIFormsView* weakSelf = self;
@@ -1211,6 +1219,7 @@ private:
                                   DISPATCH_TIME_FOREVER, 0);
         (*_model).set_dispatch_wake_handler(DrainPostedWorkWake(self));
         (*_model).set_paint_wake_handler(CollectDamageWake(self));
+        (*_model).set_live_surface_idle_wake_handler(CollectDamageWake(self));
         [self setWantsLayer:NO];
         [self registerForDraggedTypes:@[
             NSPasteboardTypeString, NSPasteboardTypeFileURL, @"public.data"]];
@@ -1463,17 +1472,18 @@ private:
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
     }
-    if (newWindow == nil) [self stopDisplayLink];
+    if (newWindow == nil) {
+        [_displayLink invalidate];
+        _displayLink = nil;
+    }
     [super viewWillMoveToWindow:newWindow];
 }
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [self stopDisplayLink];
-    if (_displayLink != nullptr) {
-        CVDisplayLinkRelease(_displayLink);
-        _displayLink = nullptr;
-    }
+    [_displayLink invalidate];
+    _displayLink = nil;
     if (_wakeSource != nil) {
         dispatch_source_cancel(_wakeSource);
         _wakeSource = nil;
@@ -1651,56 +1661,84 @@ private:
 }
 
 - (void)startDisplayLinkIfNeeded {
-    if (_displayLink == nullptr || !_model || self.window == nil ||
-        _hostOccluded == YES || !(*_model).has_live_surface_presentations() ||
-        CVDisplayLinkIsRunning(_displayLink)) {
-        return;
+    if (!_model || self.window == nil || _hostOccluded == YES ||
+        !(*_model).has_live_surface_presentations()) return;
+    if (_displayLink == nil) {
+        GUIFormsDisplayTarget* target = [[GUIFormsDisplayTarget alloc] initWithView:self];
+        _displayLink = [self displayLinkWithTarget:target selector:@selector(tick:)];
+        [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
     }
-    CVDisplayLinkStart(_displayLink);
+    (*_model).set_live_surface_idle_waiting(false);
+    _displayLink.paused = NO;
 }
 
 - (void)stopDisplayLink {
-    if (_displayLink != nullptr && CVDisplayLinkIsRunning(_displayLink)) {
-        CVDisplayLinkStop(_displayLink);
-    }
-    _displayTickQueued.store(false, std::memory_order_release);
+    _displayLink.paused = YES;
+    if (_model) (*_model).set_live_surface_idle_waiting(false);
 }
 
-- (void)queueDisplayLinkTick {
-    if (_displayTickQueued.exchange(true, std::memory_order_acq_rel)) return;
-    __weak GUIFormsView* weakSelf = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        GUIFormsView* strongSelf = weakSelf;
-        if (strongSelf == nil) return;
-        strongSelf->_displayTickQueued.store(false, std::memory_order_release);
-        [strongSelf displayLinkTick];
-    });
+- (void)setDisplayTraceEnabled:(BOOL)enabled {
+    _displayTrace.reset();
+    if (enabled) _displayTrace = std::make_unique<MacDisplayLinkTrace>();
+}
+
+- (MacDisplayLinkTrace)displayTraceSnapshot {
+    if (_displayTrace) return *_displayTrace;
+    return MacDisplayLinkTrace{};
 }
 
 - (void)displayLinkTick {
-    ++_displayTickCount;
-    if (!_model || self.window == nil || _hostOccluded == YES) return;
-    // A failed batch needs a fresh composition, including unchanged surfaces.
-    // Reusing cached clips could cover a newly opened popup or hidden control.
-    const bool retry = !_pendingLivePresentations.empty();
-    std::vector<LiveSurfacePresentation> updates =
-        (*_model).take_live_surface_presentations(retry);
-    _pendingLivePresentations = std::move(updates);
-    if (!(*_model).has_live_surface_presentations()) {
+    if (_displayTrace) {
+        MacDisplayLinkTrace& trace = *_displayTrace;
+        if (trace.count < trace.timestamps.size()) {
+            const std::chrono::steady_clock::duration time =
+                std::chrono::steady_clock::now().time_since_epoch();
+            const std::chrono::nanoseconds nanoseconds =
+                std::chrono::duration_cast<std::chrono::nanoseconds>(time);
+            trace.timestamps[trace.count] = static_cast<std::uint64_t>(nanoseconds.count());
+            ++trace.count;
+        } else trace.overflow = true;
+    }
+    try {
+        ++_displayTickCount;
+        if (!_model || self.window == nil || _hostOccluded == YES) {
+            [self stopDisplayLink];
+            return;
+        }
+        // A failed batch needs a fresh composition, including unchanged surfaces.
+        // Reusing cached clips could cover a newly opened popup or hidden control.
+        const bool retry = !_pendingLivePresentations.empty();
+        std::vector<LiveSurfacePresentation> updates =
+            (*_model).take_live_surface_presentations(retry);
+        _pendingLivePresentations = std::move(updates);
+        if (!(*_model).has_live_surface_presentations()) {
+            [self stopDisplayLink];
+            return;
+        }
+        if (_pendingLivePresentations.empty()) {
+            // Publication posts CollectDamageWake, which restarts this paused link.
+            // Arm after pausing, then recheck generations to avoid a lost wake.
+            [self stopDisplayLink];
+            (*_model).set_live_surface_idle_waiting(true);
+            return;
+        }
+        const double scale = self.window.backingScaleFactor;
+        for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
+            const GFRect clip = gui_forms::detail::align_damage_outward(
+                update.clip, scale);
+            [self setNeedsDisplayInRect:
+                NSMakeRect(clip.x, clip.y, clip.width, clip.height)];
+        }
+        // AppKit calls on the main run loop, following this view's screen. Keep
+        // its default variable refresh policy; sample only the newest frame.
+        [self displayIfNeeded];
+    } catch (const std::exception& error) {
+        [self recordNativeCallbackFault:"display-link" message:error.what()];
         [self stopDisplayLink];
-        return;
+    } catch (...) {
+        [self recordNativeCallbackFault:"display-link" message:"unknown"];
+        [self stopDisplayLink];
     }
-    if (_pendingLivePresentations.empty()) return;
-    const double scale = self.window.backingScaleFactor;
-    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
-        const GFRect clip = gui_forms::detail::align_damage_outward(
-            update.clip, scale);
-        [self setNeedsDisplayInRect:
-            NSMakeRect(clip.x, clip.y, clip.width, clip.height)];
-    }
-    // This is the terminal display-clock release. Ticks coalesce before the
-    // main queue, and each release samples only the newest published frame.
-    [self displayIfNeeded];
 }
 
 - (void)drainPostedWork {
@@ -1792,6 +1830,7 @@ private:
                                   DISPATCH_TIME_FOREVER, 0);
     }
     if (_model) {
+        (*_model).set_live_surface_idle_wake_handler({});
         (*_model).set_paint_wake_handler({});
         (*_model).shutdown_dispatcher();
     }

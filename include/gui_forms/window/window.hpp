@@ -5,6 +5,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
 #include "gui_forms/host/cursor_interaction/cursor_interaction.hpp"
@@ -43,6 +44,7 @@ class BindingContext;
 class LiveSurface;
 class PaintFramebuffer;
 namespace detail {
+struct LiveSurfaceIdleWake;
 class PopupAttachment;
 class AcceleratorAttachment;
 }
@@ -325,6 +327,13 @@ public:
     [[nodiscard]] bool has_live_surface_presentations() const noexcept {
         return !live_surface_registrations_.empty();
     }
+
+    // Native host idle handshake. Install/arm on the UI thread. The handler
+    // may run on a producer thread and must only schedule lifetime-safe UI work.
+    // One publication wakes each armed idle period; arm also checks generations
+    // to cover a publication racing the host's final empty presentation drain.
+    void set_live_surface_idle_wake_handler(std::function<void()> wake);
+    void set_live_surface_idle_waiting(bool waiting);
 
     [[nodiscard]] DamageRegion take_damage();
     [[nodiscard]] DamageRegion take_damage(PaintPlane plane);
@@ -756,6 +765,7 @@ private:
         std::uint64_t sampled_epoch{};
         std::uint64_t sampled_generation{};
         bool sampled_with_overlay_clip{};
+        LiveSurfaceWakeConnection idle_wake{};
     };
     using LiveSurfaceRegistrationMap =
         std::unordered_map<std::uint64_t, LiveSurfaceRegistration>;
@@ -779,6 +789,7 @@ private:
     [[nodiscard]] static std::vector<Rect> subtract_rectangle(
         Rect source, Rect cover);
     LiveSurfaceRegistrationMap live_surface_registrations_;
+    std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
     ImageRegistry image_resources_;
     std::uint64_t display_generation_{};

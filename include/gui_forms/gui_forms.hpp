@@ -50,3 +50,5 @@
 #include "gui_forms/visual_inspection.hpp"
 
 #include "gui_forms/value.hpp"
+
+#include "gui_forms/threading.hpp"

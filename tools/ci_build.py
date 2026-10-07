@@ -5,7 +5,6 @@ import argparse
 import os
 from pathlib import Path
 import platform
-import shutil
 import subprocess
 
 ROOT: Path = Path(__file__).resolve().parents[2]
@@ -42,27 +41,22 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
         if host == 'linux':
             run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)
         else:
-            skia_out.mkdir(exist_ok=True)
-            shutil.copy2(ROOT / 'gui_forms/third_party/skia_cpu_args.gn', skia_out / 'args.gn')
-            if os.environ.get('CMAKE_CXX_COMPILER_LAUNCHER') == 'ccache':
-                arguments: Path = skia_out / 'args.gn'
-                arguments.write_text(arguments.read_text(encoding='utf-8') + '\ncc_wrapper = "ccache"\n', encoding='utf-8')
-            skia_root: Path = ROOT / 'gui_forms/third_party/skia'
-            run(skia_root / 'bin/gn', 'gen', skia_out, '--root=' + str(skia_root))
-            run(skia_root / 'third_party/ninja/ninja', '-C', skia_out, '-j', jobs, 'skia')
+            run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu.sh', skia_out)
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
                         '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
     run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
+        '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
         '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DGUI_FORMS_BUILD_GALLERY=OFF',
-        '-DGUI_FORMS_BUILD_TESTS=ON', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
+        '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
     run('cmake', '--build', toolkit, '--parallel', jobs)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
     run('cmake', '--install', toolkit)
     examples: Path = build / 'installed-reference-examples'
     run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples,
-        '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_PREFIX_PATH={sdk}')
+        '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_PREFIX_PATH={sdk}',
+        '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'))
     run('cmake', '--build', examples, '--parallel', jobs)
     run('ctest', '--test-dir', examples, '--output-on-failure')
 

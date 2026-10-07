@@ -8,11 +8,32 @@
 #include "../popup/popup_attachment.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <stdexcept>
 #include <utility>
 #include <vector>
 
 namespace gui_forms {
+namespace detail {
+struct LiveSurfaceIdleWake final {
+    explicit LiveSurfaceIdleWake(std::function<void()> callback) : handler(std::move(callback)) {}
+    std::atomic<bool> waiting{false};
+    const std::function<void()> handler;
+};
+
+class WakeIdleLiveSurface final {
+public:
+    explicit WakeIdleLiveSurface(const std::shared_ptr<LiveSurfaceIdleWake>& state) : state_(state) {}
+    void operator()() const noexcept {
+        const std::shared_ptr<LiveSurfaceIdleWake> state = state_.lock();
+        if (!state || !(*state).waiting.exchange(false, std::memory_order_acq_rel)) return;
+        try { (*state).handler(); }
+        catch (...) { (*state).waiting.store(true, std::memory_order_release); }
+    }
+private:
+    std::weak_ptr<LiveSurfaceIdleWake> state_{};
+};
+} // namespace detail
 
 void Window::set_framebuffer_painter(Painter* const painter) {
     require_ui_thread("set_framebuffer_painter");
@@ -319,7 +340,48 @@ bool Window::queue_live_surface_presentation(
         (*entry).second.control = control;
         (*entry).second.surface = std::move(surface);
     }
+    LiveSurfaceRegistration& registration = (*entry).second;
+    if (live_surface_idle_wake_ && !registration.idle_wake.connected()) {
+        registration.idle_wake = (*registration.surface).connect_presentation_wake(
+            detail::WakeIdleLiveSurface(live_surface_idle_wake_));
+        const detail::WakeIdleLiveSurface wake(live_surface_idle_wake_);
+        wake();
+    }
     return true;
+}
+
+void Window::set_live_surface_idle_wake_handler(std::function<void()> wake) {
+    require_ui_thread("live-surface idle handler");
+    std::shared_ptr<detail::LiveSurfaceIdleWake> replacement{};
+    if (wake) replacement = std::make_shared<detail::LiveSurfaceIdleWake>(std::move(wake));
+    if (live_surface_idle_wake_)
+        (*live_surface_idle_wake_).waiting.store(false, std::memory_order_release);
+    live_surface_idle_wake_ = std::move(replacement);
+    for (LiveSurfaceRegistrationMap::value_type& entry : live_surface_registrations_) {
+        LiveSurfaceRegistration& registration = entry.second;
+        registration.idle_wake.disconnect();
+        if (live_surface_idle_wake_) {
+            registration.idle_wake = (*registration.surface).connect_presentation_wake(
+                detail::WakeIdleLiveSurface(live_surface_idle_wake_));
+        }
+    }
+}
+
+void Window::set_live_surface_idle_waiting(const bool waiting) {
+    require_ui_thread("live-surface idle handshake");
+    if (!live_surface_idle_wake_) return;
+    (*live_surface_idle_wake_).waiting.store(waiting, std::memory_order_release);
+    if (!waiting) return;
+    for (const LiveSurfaceRegistrationMap::value_type& entry : live_surface_registrations_) {
+        const LiveSurfaceRegistration& registration = entry.second;
+        const LiveSurfaceSnapshot snapshot = (*registration.surface).snapshot();
+        if (snapshot.has_frame && (snapshot.epoch != registration.sampled_epoch ||
+            snapshot.published_generation != registration.sampled_generation)) {
+            const detail::WakeIdleLiveSurface wake(live_surface_idle_wake_);
+            wake();
+            return;
+        }
+    }
 }
 
 void Window::collect_visible_overlay_rectangles(

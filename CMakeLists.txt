@@ -1,5 +1,23 @@
 cmake_minimum_required(VERSION 3.25)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 14.0 CACHE STRING "Minimum supported macOS")
+    set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Supported Apple architecture")
+    if(NOT CMAKE_OSX_ARCHITECTURES STREQUAL "arm64")
+        message(FATAL_ERROR "GUI.Forms supports Apple silicon arm64 only")
+    endif()
+endif()
 project(GUIForms VERSION 0.1.0 LANGUAGES C CXX)
+
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR
+   NOT CMAKE_CXX_COMPILER_VERSION MATCHES "^22\\.1\\.")
+    message(FATAL_ERROR "GUI.Forms requires LLVM 22.1.x; use cmake/llvm22.cmake")
+endif()
+if(APPLE)
+    add_compile_options(-Werror=unguarded-availability -Werror=unguarded-availability-new)
+endif()
+if(WIN32)
+    add_compile_definitions(_WIN32_WINNT=0x0A00 WINVER=0x0A00)
+endif()
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -35,6 +53,7 @@ option(GUI_FORMS_TEXT_LAYOUT_GEOMETRY_TRACE "Record private run directions for g
 option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
        "Build the deterministic native File Manager first-party consumer" OFF)
 
+find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
@@ -55,6 +74,8 @@ if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
 endif()
 
 add_library(gui_forms_core STATIC
+    src/core/threading/atomic_pool/atomic_pool.c
+    src/core/threading/worker.cpp
     src/core/application/application.cpp
     src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
@@ -124,6 +145,11 @@ add_library(gui_forms_core STATIC
     src/core/control/static_tree/control_factory/control_factory.cpp
     src/core/window/window.cpp
 )
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads)
+if(WIN32)
+    target_compile_definitions(gui_forms_core PUBLIC _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+    target_link_libraries(gui_forms_core PUBLIC winpthread)
+endif()
 target_include_directories(gui_forms_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
@@ -770,7 +796,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     enable_language(OBJCXX)
     find_library(GUI_FORMS_APPKIT AppKit REQUIRED)
     find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
-    find_library(GUI_FORMS_COREVIDEO CoreVideo REQUIRED)
+    find_library(GUI_FORMS_QUARTZCORE QuartzCore REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
     add_library(gui_forms_host_macos STATIC
@@ -784,7 +810,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     target_compile_options(gui_forms_host_macos PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_host_macos
         PUBLIC gui_forms_core gui_forms_skia
-        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_IMAGEIO} ${GUI_FORMS_COREVIDEO}
+        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_IMAGEIO} ${GUI_FORMS_QUARTZCORE}
                 ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
@@ -823,7 +849,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         gui_forms_png_archive
         gui_forms_zlib_archive
         ${GUI_FORMS_APPKIT}
-        ${GUI_FORMS_COREVIDEO}
+        ${GUI_FORMS_QUARTZCORE}
         ${GUI_FORMS_COREGRAPHICS}
         ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
@@ -909,7 +935,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/windows
     )
     target_compile_definitions(gui_forms_host_windows PRIVATE
-        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )
     if(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         target_sources(gui_forms_host_windows PRIVATE
@@ -962,7 +988,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     )
     target_compile_features(gui_forms_win32_compat PRIVATE cxx_std_20)
     target_compile_definitions(gui_forms_win32_compat PRIVATE
-        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )
     target_link_libraries(gui_forms_win32_compat PRIVATE user32 gdi32)
     set_target_properties(gui_forms_win32_compat PROPERTIES
@@ -972,7 +998,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         tools/windows_automation_probe.cpp
     )
     target_compile_definitions(gui_forms_windows_probe PRIVATE
-        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )
     target_link_options(gui_forms_windows_probe PRIVATE
         -static
@@ -981,7 +1007,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         tests/drawing_windows_probe.c
     )
     target_compile_definitions(gui_drawing_windows_probe PRIVATE
-        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )
     target_link_libraries(gui_drawing_windows_probe PRIVATE
         gui_drawing_c_api gdi32 user32
@@ -995,7 +1021,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         )
         target_compile_definitions(
             gui_forms_windows_live_surface_endpoint_tests PRIVATE
-            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
         )
         target_link_libraries(gui_forms_windows_live_surface_endpoint_tests PRIVATE
             gui_forms_host_windows
@@ -1010,7 +1036,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         )
         target_compile_definitions(
             gui_forms_windows_gdi_compat_shim_tests PRIVATE
-            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
         )
         target_link_libraries(gui_forms_windows_gdi_compat_shim_tests PRIVATE
             gui_forms_c_api gdi32 user32
@@ -1727,7 +1753,7 @@ if(GUI_FORMS_BUILD_TESTS)
             target_include_directories(gui_forms_windows_dib_frame_store_tests PRIVATE
                 include src/host/windows/raster)
             target_compile_definitions(gui_forms_windows_dib_frame_store_tests PRIVATE
-                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1)
             target_link_libraries(gui_forms_windows_dib_frame_store_tests PRIVATE gdi32 user32)
             add_test(NAME gui_forms_windows_dib_frame_store_tests
@@ -1742,7 +1768,7 @@ if(GUI_FORMS_BUILD_TESTS)
             target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 include src/host/windows)
             target_compile_definitions(gui_forms_windows_dib_lifecycle_tests PRIVATE
-                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
             target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 gui_forms_core user32 gdi32 ole32 oleaut32 oleacc uuid
@@ -1762,7 +1788,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 target_include_directories(gui_forms_windows_prepared_text_tests PRIVATE
                     include src/host/windows)
                 target_compile_definitions(gui_forms_windows_prepared_text_tests PRIVATE
-                    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601
+                    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                     GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
@@ -1848,13 +1874,13 @@ if(GUI_FORMS_BUILD_TESTS)
     if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         add_executable(gui_forms_windows_canvas_raster_tests tests/windows_canvas_raster_tests.cpp)
         target_compile_definitions(gui_forms_windows_canvas_raster_tests PRIVATE
-            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601)
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
         target_link_libraries(gui_forms_windows_canvas_raster_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_canvas_raster_tests COMMAND gui_forms_windows_canvas_raster_tests)
         add_executable(gui_forms_windows_text_tests tests/windows_text_tests.cpp)
         target_compile_definitions(gui_forms_windows_text_tests PRIVATE
-            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0601)
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
         target_link_libraries(gui_forms_windows_text_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
@@ -1932,6 +1958,16 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_delegate_event_tests tests/delegate_event_tests.cpp)
     target_link_libraries(gui_forms_delegate_event_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_delegate_event_tests COMMAND gui_forms_delegate_event_tests)
+
+    add_executable(gui_forms_live_surface_idle_wake_tests tests/live_surface_idle_wake_tests.cpp)
+    target_link_libraries(gui_forms_live_surface_idle_wake_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_live_surface_idle_wake_tests COMMAND gui_forms_live_surface_idle_wake_tests)
+    set_tests_properties(gui_forms_live_surface_idle_wake_tests PROPERTIES TIMEOUT 15)
+
+    add_executable(gui_forms_threading_tests tests/threading_tests.cpp)
+    target_link_libraries(gui_forms_threading_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_threading_tests COMMAND gui_forms_threading_tests)
+    set_tests_properties(gui_forms_threading_tests PROPERTIES TIMEOUT 15)
 
     add_executable(gui_forms_owned_event_tests tests/owned_event_tests.cpp)
     target_link_libraries(gui_forms_owned_event_tests PRIVATE gui_forms_controls)
@@ -2518,6 +2554,12 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_macos_exposure_tests PRIVATE gui_forms_host_macos)
         add_test(NAME gui_forms_macos_exposure_tests COMMAND gui_forms_macos_exposure_tests)
 
+        add_executable(gui_forms_macos_display_link_tests tests/macos_display_link_tests.mm)
+        target_compile_options(gui_forms_macos_display_link_tests PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_macos_display_link_tests PRIVATE gui_forms_host_macos gui_forms_controls)
+        add_test(NAME gui_forms_macos_display_link_tests COMMAND gui_forms_macos_display_link_tests)
+        set_tests_properties(gui_forms_macos_display_link_tests PROPERTIES TIMEOUT 45)
+
         add_executable(gui_forms_macos_idle_visibility_tests tests/macos_idle_visibility_tests.mm)
         target_compile_options(gui_forms_macos_idle_visibility_tests PRIVATE -fobjc-arc)
         target_link_libraries(gui_forms_macos_idle_visibility_tests PRIVATE
@@ -2694,6 +2736,8 @@ if(GUI_FORMS_BUILD_AUDIO)
     include(cmake/Audio.cmake)
 endif()
 
+install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
+install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)

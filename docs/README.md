@@ -117,3 +117,6 @@ In this project, “assembly” can mean either a future managed facade assembly
 a compiled data-only theme/language assembly. It never means that the native
 GUI.Forms runtime depends on .NET. The library guide keeps those meanings
 separate.
+
+- [LLVM 22 compiler/cache matching and platform minimums](COMPILER_CACHE.md)
+- [Cooperative cancellation and workers](THREADING.md)
