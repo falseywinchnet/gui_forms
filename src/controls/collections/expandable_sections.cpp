@@ -71,9 +71,10 @@ void ExpandableSections::set_expanded(const int index, const bool expanded) {
 }
 Control* ExpandableSections::part(const std::string_view name, const int index) const {
     const Entry& item = entry(index);
-    if (name == "header") return item.heading.get();
-    if (name == "body") return item.content.get();
-    return nullptr;
+    Control* control = nullptr;
+    if (name == "header") control = item.heading.get();
+    else if (name == "body") control = item.content.get();
+    return control;
 }
 void ExpandableSections::set_single_open(const bool enabled) {
     require_mutable();

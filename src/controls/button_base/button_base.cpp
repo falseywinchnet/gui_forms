@@ -39,7 +39,10 @@ public:
         }
     }
 
-    [[nodiscard]] bool connected() const noexcept { return state_.connected(); }
+    [[nodiscard]] bool connected() const noexcept {
+        const bool connected = state_.connected();
+        return connected;
+    }
     void synchronize() { apply(command_.state()); }
     void disconnect() noexcept {
         state_.disconnect();

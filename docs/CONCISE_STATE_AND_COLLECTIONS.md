@@ -27,7 +27,7 @@ the active connection remains retained until return. This does not keep the
 callback's owner alive: do not access an owner after deleting it. A derived
 owner whose destructor emits events must dispose before tearing down handler
 state. The compiler's `gui_forms::on` assertions explain signature, count, size
-and trivial-copy violations; the build runs four deliberate-failure fixtures.
+and trivial-copy violations; the build runs five deliberate-failure fixtures.
 
 ## State and input notifications
 

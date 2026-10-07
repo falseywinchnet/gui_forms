@@ -139,6 +139,8 @@ public:
     void clicked(gf::ButtonBase&) { ++total_; }
     void text_changed(const std::string&) { ++total_; }
     void tick() { ++total_; }
+    void overload() { total_ += 100; }
+    void overload(const int value) { total_ += value; }
 
 private:
     int& total_;
@@ -268,6 +270,7 @@ struct RetainUntilDisconnected final {
 
 void test_signatures_and_natural_destruction() {
     gf::Event<int> event{};
+    gf::Event<int> overloaded{};
     gf::Event<std::string&, const int&> references{};
     int total = 0;
     std::string text{};
@@ -278,6 +281,8 @@ void test_signatures_and_natural_destruction() {
         gf::on(event, owner, &Recorder::add_noexcept);
         gf::on(event, owner, &Recorder::add_const_noexcept);
         gf::on(references, owner, &Recorder::change);
+        gf::on(overloaded, owner, static_cast<void (Recorder::*)(int)>(&Recorder::overload));
+        overloaded.emit(0);
         event.emit(2);
         references.emit(text, total);
         require(total == 10 && text == "10",
@@ -683,6 +688,10 @@ void test_command_bar_rebuild_and_keyboard() {
     require((*bar).item(0).arranged_bounds().width == 150.0 &&
                 (*bar).item(1).arranged_bounds().x == 150.0,
             "collection geometry must survive Window layout-slot traversal");
+    run.set_enabled(false);
+    require(!(*bar).item(0).tab_stop() && (*bar).item(1).tab_stop(),
+            "disabling the tab-stop command must leave an available bar entry reachable");
+    run.set_enabled(true);
     gf::Button* const reused = &(*bar).item(0);
     (*bar).item(0).perform_click();
     require(observer.commands == 1 && observer.last_id == 1 && command_observer.invocations == 1,
@@ -821,6 +830,103 @@ void test_mixed_revocation_order() {
             "caller-held and owner-held tokens must revoke in reverse acquisition order");
 }
 
+class CheckDuringEnableChange final : public gf::Component {
+public:
+    explicit CheckDuringEnableChange(gf::Command& command) : command_(command) {}
+    void change(bool) { command_.set_checked(true); }
+private:
+    gf::Command& command_;
+};
+void test_nested_command_change_keeps_latest_state() {
+    gf::Command command{};
+    command.set_checked(false);
+    gf::CheckBox button(gf::StableId("nested-command"));
+    button.bind(command);
+    CheckDuringEnableChange observer(command);
+    gf::on(button.enabled_changed(), observer, &CheckDuringEnableChange::change);
+    command.set_enabled(false);
+    require(command.state().checked && button.checked() && !button.enabled(),
+            "a nested command update must not be overwritten by an older projection");
+}
+
+class DestroyCommand final : public gf::Component {
+public:
+    explicit DestroyCommand(std::unique_ptr<gf::Command>& command) : command_(command) {}
+    void destroy() { command_.reset(); }
+private:
+    std::unique_ptr<gf::Command>& command_;
+};
+class DestroySlider final : public gf::Component {
+public:
+    explicit DestroySlider(std::shared_ptr<gf::TrackBar>& slider) : slider_(slider) {}
+    void destroy() { slider_.reset(); }
+private:
+    std::shared_ptr<gf::TrackBar>& slider_;
+};
+void test_command_and_bound_control_destruction_during_dispatch() {
+    gf::Button button(gf::StableId("surviving-button"));
+    std::unique_ptr<gf::Command> command = std::make_unique<gf::Command>();
+    DestroyCommand destroy(command);
+    StateObserver later{};
+    gf::on((*command).invoked(), destroy, &DestroyCommand::destroy);
+    gf::on((*command).invoked(), later, &StateObserver::command);
+    button.bind(*command);
+    button.perform_click();
+    require(!command && later.invocations == 0 && !button.command_connected(),
+            "destroying a command in invocation cancels later observers and control access");
+    button.perform_click();
+    gf::Value<double> model(10.0);
+    std::shared_ptr<gf::TrackBar> slider = gf::make_control<gf::TrackBar>(gf::StableId("destroying-slider"));
+    DestroySlider destroy_slider(slider);
+    (*slider).bind(model);
+    gf::on((*slider).value_changed(), destroy_slider, &DestroySlider::destroy);
+    model.set(20.0);
+    require(!slider && model.get() == 20.0, "a bound control can be destroyed during propagation");
+    model.set(30.0);
+}
+
+void test_command_shortcut_lifetime_and_enabled_state() {
+    const gf::Control::Ptr root = gf::make_control<gf::Control>(gf::StableId("shortcut-root"));
+    gf::Window window(root, {100.0, 100.0});
+    std::unique_ptr<gf::Command> command = std::make_unique<gf::Command>();
+    StateObserver observer{};
+    gf::on((*command).invoked(), observer, &StateObserver::command);
+    const gf::AcceleratorToken shortcut = (*command).bind_shortcut(window,
+        {gf::PhysicalKey::r, gf::Modifier::control});
+    const gf::KeyEvent key{.physical_key = gf::PhysicalKey::r, .modifiers = gf::Modifier::control};
+    require(window.dispatch_key(key) && observer.invocations == 1,
+            "keyboard invokes the same command authority");
+    (*command).set_enabled(false);
+    require(!window.dispatch_key(key) && observer.invocations == 1,
+            "disabled commands are also disabled through shortcuts");
+    command.reset();
+    require(!shortcut.connected() && !window.dispatch_key(key),
+            "command destruction revokes the window's shortcut");
+}
+
+void test_choice_images_and_section_keyboard() {
+    const std::shared_ptr<gf::ChoiceGroup> choices = gf::make_control<gf::ChoiceGroup>(gf::StableId("image-choices"));
+    gf::Window window(choices, {100.0, 60.0});
+    const std::array<std::byte, 4U> pixel{std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255}};
+    const gf::ImageLoadResult loaded = window.load_bgra32_premultiplied(1U, 1U, 4U, pixel);
+    require(static_cast<bool>(loaded), "image fixture must load");
+    (*choices).set_items({{.id = 1, .label = "Red", .image = loaded.image, .accessible_name = "Red tile"}});
+    require((*choices).item(0).image() == loaded.image &&
+                (*choices).item(0).semantic_descriptor().name == "Red tile",
+            "choice images and accessible names reach the retained item control");
+    const std::shared_ptr<gf::ExpandableSections> sections = gf::make_control<gf::ExpandableSections>(gf::StableId("keyboard-sections"));
+    const gf::Control::Ptr body = gf::make_control<gf::Control>(gf::StableId("keyboard-body"));
+    (*sections).set_items({{.id = 1, .label = "Section", .content = body}});
+    gf::Window section_window(sections, {200.0, 120.0});
+    gf::Control& header = *(*sections).part("header", 0);
+    section_window.flush();
+    static_cast<void>(section_window.request_focus(header.shared_from_this()));
+    static_cast<void>(section_window.dispatch_key({.action = gf::KeyAction::down, .physical_key = gf::PhysicalKey::space}));
+    static_cast<void>(section_window.dispatch_key({.action = gf::KeyAction::up, .physical_key = gf::PhysicalKey::space}));
+    require((*sections).expanded(0) && (*body).visible(),
+            "keyboard activation must expand the section through its retained state");
+}
+
 void test_unlink_middle_subscription() {
     gf::Event<int> first{};
     std::unique_ptr<gf::Event<int>> middle = std::make_unique<gf::Event<int>>();
@@ -914,6 +1020,10 @@ int main() {
         test_explicit_token_transfer_and_legacy_lifetime();
         test_short_lived_publishers_release_owner_storage();
         test_unlink_middle_subscription();
+        test_nested_command_change_keeps_latest_state();
+        test_command_and_bound_control_destruction_during_dispatch();
+        test_command_shortcut_lifetime_and_enabled_state();
+        test_choice_images_and_section_keyboard();
         test_mixed_revocation_order();
         test_command_bar_rebuild_and_keyboard();
         test_choice_group_state_and_rebuild();

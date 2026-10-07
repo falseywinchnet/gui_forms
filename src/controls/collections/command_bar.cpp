@@ -12,6 +12,9 @@ struct CommandBar::Entry final {
     int id{};
     std::shared_ptr<Button> button{};
     SubscriptionToken click{};
+    SubscriptionToken enabled{};
+    SubscriptionToken visible{};
+    SubscriptionToken focus{};
     AcceleratorToken shortcut{};
 };
 
@@ -25,6 +28,28 @@ struct CommandBar::ItemClick final {
     int id;
     void operator()(ButtonBase&) const { bar.invoke_item(id); }
 };
+
+struct CommandBar::ItemAvailability final {
+    CommandBar& group;
+    void operator()(bool) const { group.refresh_tab_stop(); }
+};
+
+void CommandBar::refresh_tab_stop() {
+    if (!revision_ || replacing_) return;
+    const Control::Ptr retained = shared_from_this();
+    const std::shared_ptr<Revision> revision = revision_;
+    const Control::Ptr focused = window() == nullptr ? Control::Ptr{} : (*window()).focused_control();
+    int selected = -1;
+    for (std::size_t index = 0U; index < (*revision).entries.size(); ++index) {
+        const std::shared_ptr<Button> button = (*(*revision).entries[index]).button;
+        if (!(*button).enabled() || !(*button).visible()) continue;
+        if (selected < 0 || (*button).tab_stop()) selected = static_cast<int>(index);
+        if (button == focused) { selected = static_cast<int>(index); break; }
+    }
+    for (std::size_t index = 0U; index < (*revision).entries.size(); ++index) {
+        (*(*(*revision).entries[index]).button).set_tab_stop(static_cast<int>(index) == selected);
+    }
+}
 
 CommandBar::CommandBar(StableId id) : Panel(std::move(id)) {
     set_focusable(false);
@@ -102,6 +127,9 @@ void CommandBar::set_items(std::vector<CommandItem> items) {
                     std::find((*next).entries.begin(), (*next).entries.end(), entry);
                 if (found == (*next).entries.end()) {
                     (*entry).click.disconnect();
+                    (*entry).enabled.disconnect();
+                    (*entry).visible.disconnect();
+                    (*entry).focus.disconnect();
                     (*(*entry).button).unbind_command();
                     static_cast<void>(remove_child((*(*entry).button).runtime_id()));
                 }
@@ -128,7 +156,14 @@ void CommandBar::set_items(std::vector<CommandItem> items) {
         }
         install_shortcuts();
         invalidate(Dirty::measure | Dirty::layout | Dirty::paint | Dirty::semantics);
+        for (const std::shared_ptr<Entry>& entry : (*next).entries) {
+            Button& button = *(*entry).button;
+            (*entry).enabled = button.enabled_changed().subscribe(*this, ItemAvailability{*this});
+            (*entry).visible = button.visible_changed().subscribe(*this, ItemAvailability{*this});
+            (*entry).focus = button.focus_observed().subscribe(*this, ItemAvailability{*this});
+        }
         replacing_ = false;
+        refresh_tab_stop();
     } catch (...) {
         replacing_ = false;
         throw;

@@ -43,6 +43,8 @@ private:
     struct Entry;
     struct Revision;
     struct ItemClick;
+    struct ItemAvailability;
+    void refresh_tab_stop();
     void invoke_item(int id);
     void install_shortcuts();
     void clear_shortcuts() noexcept;

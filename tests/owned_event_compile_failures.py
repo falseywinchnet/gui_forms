@@ -13,12 +13,14 @@ def main() -> int:
 struct Owner : gui_forms::Component {
     void click() {}
     void index(int) {}
+    void mutate(int&) {}
     void text(std::string) {}
     void large(std::array<int, 5>) {}
 };
 int main() { gui_forms::Event<int> event; Owner owner;
 '''
     cases: list[tuple[str, str]] = [
+        ('gui_forms::on(event, owner, &Owner::mutate);', 'handler must accept bound values'),
         ('gui_forms::on(event, owner, &Owner::text);', 'handler must accept bound values'),
         ('gui_forms::on(event, owner, &Owner::text, std::string("x"));', 'must be trivially copyable'),
         ('gui_forms::on(event, owner, &Owner::large, std::array<int, 5>{});', 'must total at most 16 bytes'),
@@ -32,7 +34,7 @@ int main() { gui_forms::Event<int> event; Owner owner;
         if result.returncode == 0 or expected not in result.stderr:
             print(result.stderr, file=sys.stderr)
             raise RuntimeError('missing deliberate-failure diagnostic: ' + expected)
-    print('4 deliberate-failure diagnostics passed')
+    print('5 deliberate-failure diagnostics passed')
     return 0
 
 

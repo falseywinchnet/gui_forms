@@ -43,7 +43,8 @@ struct MemberArgumentPrefix final {
             std::make_index_sequence<std::tuple_size_v<BoundTuple>>{},
             std::make_index_sequence<Count>{});
         if constexpr (accepted) {
-            return static_cast<int>(Count);
+            constexpr int count = static_cast<int>(Count);
+            return count;
         } else if constexpr (Count > 0U) {
             constexpr int smaller = MemberArgumentPrefix<Owner, Method,
                 BoundTuple, ArgumentTuple, Count - 1U>::select();
@@ -196,8 +197,12 @@ private:
     struct MemberSlot final : Slot {
         using BoundTuple = std::tuple<Bound...>;
         using ArgumentTuple = std::tuple<Arguments&...>;
+        // Value events do not grant mutation of the dispatch argument shared
+        // by later listeners. Explicit reference events retain that authority.
+        using ContractTuple = std::tuple<std::conditional_t<
+            std::is_reference_v<Arguments>, Arguments, const Arguments&>...>;
         static constexpr int argument_count = detail::MemberArgumentPrefix<
-            Owner, Method, BoundTuple, ArgumentTuple,
+            Owner, Method, BoundTuple, ContractTuple,
             sizeof...(Arguments)>::select();
         static_assert(argument_count >= 0,
             "gui_forms::on handler must accept bound values followed by a leading prefix of event arguments (or none)");

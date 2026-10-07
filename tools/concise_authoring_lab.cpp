@@ -67,7 +67,8 @@ std::int64_t elapsed(const std::chrono::steady_clock::time_point start) {
     const std::chrono::steady_clock::time_point finish = std::chrono::steady_clock::now();
     const std::chrono::nanoseconds duration =
         std::chrono::duration_cast<std::chrono::nanoseconds>(finish - start);
-    return duration.count();
+    const std::int64_t nanoseconds = duration.count();
+    return nanoseconds;
 }
 } // namespace
 

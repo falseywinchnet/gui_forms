@@ -1817,6 +1817,7 @@ if(GUI_FORMS_BUILD_TESTS)
         examples/reference/bound_values.cpp
         examples/reference/shared_state.cpp
         examples/reference/collection_state.cpp
+        examples/reference/collection_gallery.cpp
     )
     target_link_libraries(gui_forms_reference_examples PRIVATE gui_forms_core)
 

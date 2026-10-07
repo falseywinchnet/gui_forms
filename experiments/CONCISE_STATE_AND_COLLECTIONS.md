@@ -29,8 +29,8 @@ All observed steady-state counts are zero. Registration failure injection now
 covers two fresh registration allocations, versus five in #57. This is a count
 of C++ allocator calls in the named fixture, not a whole-process memory profile.
 
-Four deliberate C++ compilation failures check signature mismatch, a nontrivial
-bound value, more than 16 payload bytes, and more than two values. Four installed
+Five deliberate C++ compilation failures check signature mismatch, a nontrivial
+bound value, more than 16 payload bytes, more than two values, and mutation of a value event argument. Four installed
 SDK examples demonstrate ownership, bound values, state and collections.
 
 ## Validation record
