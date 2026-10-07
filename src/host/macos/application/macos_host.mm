@@ -1708,8 +1708,9 @@ private:
         // A failed batch needs a fresh composition, including unchanged surfaces.
         // Reusing cached clips could cover a newly opened popup or hidden control.
         const bool retry = !_pendingLivePresentations.empty();
+        bool publicationChanged = false;
         std::vector<LiveSurfacePresentation> updates =
-            (*_model).take_live_surface_presentations(retry);
+            (*_model).take_live_surface_presentations(retry, &publicationChanged);
         _pendingLivePresentations = std::move(updates);
         if (!(*_model).has_live_surface_presentations()) {
             [self stopDisplayLink];
@@ -1732,6 +1733,12 @@ private:
         // AppKit calls on the main run loop, following this view's screen. Keep
         // its default variable refresh policy; sample only the newest frame.
         [self displayIfNeeded];
+        if (!publicationChanged && _pendingLivePresentations.empty()) {
+            // Unchanged surfaces may still need one composition for an overlay
+            // edit. Once presented, a static overlay must not keep us ticking.
+            [self stopDisplayLink];
+            (*_model).set_live_surface_idle_waiting(true);
+        }
     } catch (const std::exception& error) {
         [self recordNativeCallbackFault:"display-link" message:error.what()];
         [self stopDisplayLink];

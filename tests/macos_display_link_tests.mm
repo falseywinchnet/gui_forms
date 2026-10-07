@@ -182,6 +182,13 @@ int main(const int argc, const char* const* argv) {
         .pixel_format = gui_forms::native_live_surface_pixel_format(), .opaque = true});
     const std::shared_ptr<gui_forms::Control> root =
         gui_forms::make_control<gui_forms::Control>(gui_forms::StableId("live"));
+    if (argc == 2 && std::strcmp(argv[1], "--overlay") == 0) {
+        const std::shared_ptr<gui_forms::Control> overlay =
+            gui_forms::make_control<gui_forms::Control>(gui_forms::StableId("overlay"));
+        (*overlay).set_requested_bounds({20, 20, 100, 100});
+        (*overlay).set_paint_plane(gui_forms::PaintPlane::overlay);
+        (*root).add_child(overlay);
+    }
     gui_forms::host::MacApplicationWindow entry{};
     entry.stable_id = "display-link";
     entry.model = std::make_unique<gui_forms::Window>(root, gui_forms::Size{1060, 618});

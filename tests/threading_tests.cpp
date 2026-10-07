@@ -33,6 +33,20 @@ void fail(const gui_forms::CancellationFlag&, void*) {
     throw std::runtime_error("entry failure");
 }
 
+struct SelfJoin final {
+    std::atomic<gui_forms::Worker*> worker{nullptr};
+};
+
+void try_self_join(const gui_forms::CancellationFlag&, void* const address) {
+    SelfJoin& context = *static_cast<SelfJoin*>(address);
+    gui_forms::Worker* worker = context.worker.load(std::memory_order_acquire);
+    while (worker == nullptr) {
+        std::this_thread::yield();
+        worker = context.worker.load(std::memory_order_acquire);
+    }
+    (*worker).join();
+}
+
 void increment(void* const address) noexcept {
     unsigned int& value = *static_cast<unsigned int*>(address);
     ++value;
@@ -111,6 +125,12 @@ int main() {
         try { gui_forms::Worker worker(nullptr, nullptr); }
         catch (const std::invalid_argument&) { caught = true; }
         require(caught, "null entry accepted");
+        SelfJoin self{};
+        gui_forms::Worker worker(try_self_join, &self);
+        self.worker.store(&worker, std::memory_order_release);
+        caught = false;
+        try { worker.join(); } catch (const std::logic_error&) { caught = true; }
+        require(caught, "self join was not rejected");
         std::cout << "Cancellation, completion, cleanup and failure propagation passed\n";
         return 0;
     } catch (const std::exception& error) {

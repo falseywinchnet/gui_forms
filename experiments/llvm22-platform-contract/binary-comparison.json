@@ -1,0 +1,21 @@
+{
+  "libgui_forms_application.0.1.0.dylib": {
+    "apple_bytes": 10138928,
+    "llvm22_bytes": 10285520,
+    "delta_bytes": 146592,
+    "delta_percent": 1.4458333267580161
+  },
+  "gui_forms_concise_authoring_lab": {
+    "apple_bytes": 7069280,
+    "llvm22_bytes": 7134384,
+    "delta_bytes": 65104,
+    "delta_percent": 0.920942443926397
+  },
+  "gui_forms_macos_display_link_tests": {
+    "apple_bytes": 7040512,
+    "llvm22_bytes": 7065776,
+    "delta_bytes": 25264,
+    "delta_percent": 0.3588375390880663
+  },
+  "bundled_runtime_bytes": 1603872
+}

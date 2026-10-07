@@ -65,6 +65,12 @@ int main() {
             worker.join();
             require(wakes.load() == index + 3, "racing publication lost or duplicated wake");
         }
+        (*root).set_visible(false);
+        publish(*surface);
+        static_cast<void>(window.take_live_surface_presentations());
+        window.set_live_surface_idle_waiting(true);
+        require(wakes.load() == 102, "hidden generation continuously rearmed idle");
+        window.set_live_surface_idle_waiting(false);
         window.set_live_surface_idle_wake_handler({});
         window.set_live_surface_idle_waiting(true);
         publish(*surface);

@@ -1,0 +1,5 @@
+display-link-environment|scale=1.0|screen_max_fps=60|pixels=1060x618|producer=main_queue_4ms_full_fill
+display-link|phase=active|wall_s=4.005870|process_cpu_ms=1087.527000|cpu_percent=27.148337|ticks=241|median_ms=16.667333|p95_ms=18.054625|max_ms=18.652042|overflow=0
+display-link|phase=attached_idle|wall_s=3.150007|process_cpu_ms=16.481000|cpu_percent=0.523205|ticks=189|median_ms=16.668458|p95_ms=18.223667|max_ms=18.669334|overflow=0
+display-link|phase=hidden|wall_s=3.149960|process_cpu_ms=0.430000|cpu_percent=0.013651|ticks=0|median_ms=0.000000|p95_ms=0.000000|max_ms=0.000000|overflow=0
+display-link|phase=resumed|wall_s=2.000456|process_cpu_ms=595.327000|cpu_percent=29.759568|ticks=120|median_ms=16.683875|p95_ms=18.319083|max_ms=18.546916|overflow=0

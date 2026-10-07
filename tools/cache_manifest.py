@@ -39,6 +39,10 @@ def main() -> None:
                             ('Windows 10 (0x0A00)' if sys.argv[1] == 'windows-x64' else 'Ubuntu 24.04'),
         'run_id': os.environ.get('GITHUB_RUN_ID', ''),
         'profile': 'native Release plus separately tested development text/host profiles',
+        'native_options': {'build_type': 'Release', 'cxx_standard': 20, 'pic': True,
+                           'audio': True, 'tests': True, 'gallery': False,
+                           'skia': sys.argv[1] != 'windows-x64',
+                           'harfbuzz': sys.argv[1] != 'windows-x64'},
         'validation': 'provider CTest passed; consumer compilation and tests remain required'}
     if sys.argv[1] == 'macos-arm64':
         manifest['sdk_version'] = subprocess.check_output(['xcrun', '--show-sdk-version'], text=True).strip()

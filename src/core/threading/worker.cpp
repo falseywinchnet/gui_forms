@@ -1,6 +1,7 @@
 #include "gui_forms/threading.hpp"
 #include "atomic_pool/atomic_pool.h"
 
+#include <exception>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -92,6 +93,8 @@ struct Worker::State final {
             throw std::logic_error("Worker cannot join itself");
         const gui_forms_atomic_pool_result_t result = gui_forms_atomic_pool_wait_checked(pool);
         check_pool_result(result);
+        gui_forms_atomic_pool_destroy(pool);
+        pool = nullptr;
         joined = true;
     }
     static void run(void* const address) noexcept {

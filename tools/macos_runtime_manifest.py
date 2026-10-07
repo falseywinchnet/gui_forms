@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import shutil
 from typing import Any
 
 VERSION: str = '22.1.8'
@@ -19,7 +20,13 @@ def payload_hashes(prefix: Path) -> dict[str, str]:
             result['lib/' + library.name] = hashlib.sha256(library.read_bytes()).hexdigest()
     if len(result) != 3:
         raise RuntimeError('Expected exactly three LLVM runtime libraries')
+    link: Path
+    for link in sorted((prefix / 'lib').glob('*.dylib')):
+        if link.is_symlink():
+            result['lib/' + link.name] = hashlib.sha256(str(link.readlink()).encode('utf-8')).hexdigest()
     headers: Path = prefix / 'include/c++/v1'
+    if not (headers / '__config_site').is_file():
+        raise RuntimeError('Configured libc++ headers are missing')
     digest: Any = hashlib.sha256()
     header: Path
     for header in sorted(headers.rglob('*')):
@@ -33,11 +40,15 @@ def payload_hashes(prefix: Path) -> dict[str, str]:
 
 
 def description(prefix: Path) -> dict[str, object]:
+    compiler: str | None = shutil.which('clang++')
+    if compiler is None:
+        raise RuntimeError('clang++ is missing')
     result: dict[str, object] = {
         'llvm_version': VERSION, 'source_sha256': SOURCE_SHA256,
         'architecture': 'arm64', 'deployment_target': '14.0',
         'payload_sha256': payload_hashes(prefix),
         'sdk': subprocess.check_output(['xcrun', '--show-sdk-version'], text=True).strip(),
+        'compiler_sha256': hashlib.sha256(Path(compiler).read_bytes()).hexdigest(),
         'compiler': subprocess.check_output(['clang++', '--version'], text=True)}
     return result
 

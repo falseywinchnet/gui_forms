@@ -14,7 +14,9 @@ algorithm with reused task storage. Named `AtomicTask` entries are `noexcept`,
 borrow contexts through `run`, and must not reenter the same pool. Small batches
 retain its caller execution path; larger batches use atomic range claims across
 pthread workers. The wrapper's methods belong to one owner thread. Windows uses
-MSYS2 CLANG64 winpthreads, macOS and Linux use system pthreads.
+MSYS2 CLANG64 winpthreads, macOS and Linux use system pthreads. Windows consumers
+ship the matching `libwinpthread-1.dll` alongside their existing compiler runtime
+DLLs; the repository staging script already includes it.
 
 `Worker(entry, context)` submits one asynchronous task to the same pool
 implementation with one pthread worker. The adapter separates dispatch and wait

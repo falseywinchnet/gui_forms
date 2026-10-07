@@ -621,7 +621,7 @@ claim about the complete native presentation pipeline.
 Windows 10 and a public cancellation/join utility. **OBSERVED:** the historical
 atomic batch pool moved to backend `orchestrator/third_party/threadpool_atomic_fast`;
 it is not itself a cancellation protocol. GUI.Forms now exposes the bounded
-`CancellationFlag` / `Worker` pattern through Core and its installed header.
+`AtomicThreadPool` / `CancellationFlag` / `Worker` pattern through Core and its installed header.
 This is local in-process execution, with borrowed context and explicit join;
 it adds no Orchestrator service, wire capability, hostile-worker supervision,
 or registry edge. Retained controls remain owned by their UI execution context.

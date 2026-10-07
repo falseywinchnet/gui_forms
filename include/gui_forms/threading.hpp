@@ -1,7 +1,6 @@
 #pragma once
 
 #include <atomic>
-#include <exception>
 #include <memory>
 #include <span>
 #include <cstdint>
@@ -35,6 +34,8 @@ public:
     ~AtomicThreadPool();
     AtomicThreadPool(const AtomicThreadPool&) = delete;
     AtomicThreadPool& operator=(const AtomicThreadPool&) = delete;
+    AtomicThreadPool(AtomicThreadPool&&) = delete;
+    AtomicThreadPool& operator=(AtomicThreadPool&&) = delete;
     [[nodiscard]] std::uint32_t thread_count() const noexcept;
     void run(std::span<const AtomicTask> tasks);
 private:

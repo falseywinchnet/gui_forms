@@ -13,6 +13,9 @@ CMake C/C++/Objective-C++ compiler launchers to `ccache`. A miss compiles the
 source normally. Do not weaken header, compiler or option validation for hits.
 Caches are bounded at 500 MB. The macOS archive additionally carries the matched
 LLVM runtime headers and libraries; only the three dylibs enter an application.
+Runtime restoration verifies the compiler binary, SDK, configured headers,
+dylib bytes and symlink targets against the producer manifest. A mismatch fails
+closed; rebuild the pinned runtime payload or restore its matching release.
 
 The portable proof in `tools/prove_compiler_cache.py` uses a clean source
 snapshot and a new scratch directory. It builds the real retained-control
@@ -54,7 +57,7 @@ same compiler. Equal version strings alone do not establish cache compatibility.
 | macOS arm64 | `macos-15` | Homebrew `llvm@22`, 22.1.8 | macOS 14.0, arm64 only |
 | Linux x64 | `ubuntu-24.04` | apt.llvm.org `llvm-toolchain-noble-22`, clang-22 | Ubuntu 24.04 system ABI |
 | Linux arm64 | `ubuntu-24.04-arm` | same LLVM 22 release series | Ubuntu 24.04 system ABI |
-| Windows x64 | `windows-2022` | MSYS2 CLANG64 clang 22.1.8 | Windows 10 (`0x0A00`) |
+| Windows x64 | `windows-2022` | MSYS2 CLANG64 clang 22.1.8 | Windows 10 (`0x0A00`), MSYS2 winpthreads |
 
 Put the selected compiler's `bin` first in PATH. Set `CC=clang`, `CXX=clang++`,
 `OBJCXX=clang++` explicitly. In particular, Windows `cc.exe`/`c++.exe` are not

@@ -375,8 +375,8 @@ void Window::set_live_surface_idle_waiting(const bool waiting) {
     for (const LiveSurfaceRegistrationMap::value_type& entry : live_surface_registrations_) {
         const LiveSurfaceRegistration& registration = entry.second;
         const LiveSurfaceSnapshot snapshot = (*registration.surface).snapshot();
-        if (snapshot.has_frame && (snapshot.epoch != registration.sampled_epoch ||
-            snapshot.published_generation != registration.sampled_generation)) {
+        if (snapshot.has_frame && (snapshot.epoch != registration.observed_epoch ||
+            snapshot.published_generation != registration.observed_generation)) {
             const detail::WakeIdleLiveSurface wake(live_surface_idle_wake_);
             wake();
             return;
@@ -427,8 +427,10 @@ std::vector<Rect> Window::subtract_rectangle(Rect source, Rect cover) {
 }
 
 std::vector<LiveSurfacePresentation>
-Window::take_live_surface_presentations(const bool include_unchanged) {
+Window::take_live_surface_presentations(const bool include_unchanged,
+                                        bool* const publication_changed) {
     require_ui_thread("live-surface presentation drain");
+    if (publication_changed != nullptr) *publication_changed = false;
     std::vector<LiveSurfacePresentation> result;
     result.reserve(live_surface_registrations_.size());
 
@@ -454,13 +456,23 @@ Window::take_live_surface_presentations(const bool include_unchanged) {
             iterator = live_surface_registrations_.erase(iterator);
             continue;
         }
+        const LiveSurfaceSnapshot snapshot = (*(*iterator).second.surface).snapshot();
+        LiveSurfaceRegistration& registration = (*iterator).second;
+        if (publication_changed != nullptr && snapshot.has_frame &&
+            (registration.observed_epoch != snapshot.epoch ||
+             registration.observed_generation != snapshot.published_generation)) {
+            *publication_changed = true;
+        }
+        // Observation is independent of visibility and successful sampling.
+        // Hidden/covered generations must not cause an endless idle rearm.
+        registration.observed_epoch = snapshot.epoch;
+        registration.observed_generation = snapshot.published_generation;
         if (occluded_ || !popups_.empty() || !(*control).visible_ ||
             !(*control).effectively_visible()) {
             ++iterator;
             continue;
         }
 
-        const LiveSurfaceSnapshot snapshot = (*(*iterator).second.surface).snapshot();
         if (!snapshot.has_frame) {
             ++iterator;
             continue;
