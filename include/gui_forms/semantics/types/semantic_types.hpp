@@ -15,7 +15,7 @@ enum class SemanticRole : std::uint8_t {
     scroll_bar, progress_bar, image, tab_group, tab, split_pane,
     numeric_field, tool_tip, date_picker, calendar, date_cell, property_grid,
     property_group, property_row, menu_bar, menu_bar_item, menu, menu_item,
-    separator,
+    separator, toolbar, radio_group,
 };
 
 enum class SemanticState : std::uint32_t {

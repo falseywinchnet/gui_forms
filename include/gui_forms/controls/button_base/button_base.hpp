@@ -14,6 +14,8 @@
 
 namespace gui_forms {
 
+class Command;
+
 enum class ContentAlignment : std::uint8_t {
     top_left,
     top_center,
@@ -43,6 +45,10 @@ enum class ChoiceIndicatorStyle : std::uint8_t {
 class ButtonBase : public Control {
 public:
     explicit ButtonBase(StableId stable_id, std::string text = {});
+    ~ButtonBase() override;
+    virtual void bind(Command& command);
+    void unbind_command() noexcept;
+    [[nodiscard]] bool command_connected() const noexcept;
 
     [[nodiscard]] const std::string& text() const noexcept { return text_; }
     virtual void set_text(std::string text);
@@ -122,6 +128,9 @@ public:
         return expanded_state_;
     }
     void set_expanded_state(std::optional<bool> expanded);
+    [[nodiscard]] Event<std::optional<bool>>& expanded_changed() noexcept {
+        return expanded_changed_;
+    }
     [[nodiscard]] Event<ButtonBase&>& clicked() noexcept { return clicked_; }
     [[nodiscard]] Event<const std::string&>& text_changed() noexcept {
         return text_changed_;
@@ -168,6 +177,8 @@ protected:
     bool process_mnemonic_self(char32_t character) override;
 
 private:
+    class CommandConnection;
+    std::shared_ptr<CommandConnection> command_connection_{};
     [[nodiscard]] bool should_serialize_image() const noexcept;
     void on_image_list_changed(const ImageListChange& change);
 
@@ -197,6 +208,7 @@ private:
     bool hovered_{};
     bool use_mnemonic_{true};
     std::optional<bool> expanded_state_;
+    Event<std::optional<bool>> expanded_changed_{};
 };
 
 } // namespace gui_forms

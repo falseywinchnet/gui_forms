@@ -19,6 +19,7 @@ struct CommandState final {
     bool default_action{};
     bool destructive{};
     std::uint64_t generation{};
+    bool checkable{};
 };
 
 struct CommandInvocation final {

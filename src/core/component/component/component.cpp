@@ -1,29 +1,11 @@
 #include "gui_forms/component/component/component.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
 namespace gui_forms {
-namespace {
-
-struct ExpiredRevocable final {
-    [[nodiscard]] bool operator()(
-        const std::weak_ptr<detail::Revocable>& candidate) const noexcept {
-        const bool expired = candidate.expired();
-        return expired;
-    }
-};
-
-struct DisconnectedSubscription final {
-    [[nodiscard]] bool operator()(const SubscriptionToken& token) const noexcept {
-        const bool disconnected = !token.connected();
-        return disconnected;
-    }
-};
-
-} // namespace
-
 Component::~Component() {
     // Natural C++ destruction ends subscriptions just as explicit disposal
     // does. Do not call virtual disposal hooks after derived members are gone.
@@ -51,11 +33,17 @@ void Component::own_revocable(
         }
         return;
     }
-    const std::vector<std::weak_ptr<detail::Revocable>>::iterator retained_end =
-        std::remove_if(owned_revocables_.begin(), owned_revocables_.end(),
-                       ExpiredRevocable{});
+    struct Expired final {
+        [[nodiscard]] bool operator()(const ObservedRevocable& entry) const noexcept {
+            const bool expired = entry.work.expired();
+            return expired;
+        }
+    };
+    const std::vector<ObservedRevocable>::iterator retained_end = std::remove_if(
+        owned_revocables_.begin(), owned_revocables_.end(), Expired{});
     owned_revocables_.erase(retained_end, owned_revocables_.end());
-    owned_revocables_.push_back(revocable);
+    const std::uint64_t order = acquire_work_order();
+    owned_revocables_.push_back(ObservedRevocable{revocable, order});
 }
 
 void Component::verify_dispose_thread() {}
@@ -64,32 +52,82 @@ void Component::own_subscription(SubscriptionToken subscription) {
     if (!is_alive() || !subscription.connected()) {
         return;
     }
-    if (!owned_subscriptions_) {
-        owned_subscriptions_ = std::make_unique<std::vector<SubscriptionToken>>();
+    const std::uint64_t order = acquire_work_order();
+    const std::shared_ptr<detail::Revocable> work =
+        std::move(subscription.revocable_);
+    detail::Revocable& entry = *work;
+    entry.subscription_owner_ = this;
+    entry.subscription_order_ = order;
+    entry.next_subscription_ = std::move(owned_subscriptions_);
+    if (entry.next_subscription_) {
+        (*entry.next_subscription_).previous_subscription_ = &entry;
     }
-    std::vector<SubscriptionToken>& subscriptions = *owned_subscriptions_;
-    const std::vector<SubscriptionToken>::iterator retained_end = std::remove_if(
-        subscriptions.begin(), subscriptions.end(),
-        DisconnectedSubscription{});
-    subscriptions.erase(retained_end, subscriptions.end());
-    own_revocable(subscription.revocable_);
-    subscriptions.push_back(std::move(subscription));
+    owned_subscriptions_ = work;
+}
+
+std::size_t Component::owned_subscription_count() const noexcept {
+    std::size_t count = 0U;
+    const detail::Revocable* entry = owned_subscriptions_.get();
+    while (entry != nullptr) {
+        ++count;
+        entry = (*entry).next_subscription_.get();
+    }
+    return count;
+}
+
+void Component::release_subscription(detail::Revocable& entry) noexcept {
+    std::shared_ptr<detail::Revocable> retained{};
+    if (entry.previous_subscription_ != nullptr) {
+        retained = std::move((*entry.previous_subscription_).next_subscription_);
+        (*entry.previous_subscription_).next_subscription_ =
+            std::move(entry.next_subscription_);
+    } else {
+        retained = std::move(owned_subscriptions_);
+        owned_subscriptions_ = std::move(entry.next_subscription_);
+    }
+    const std::shared_ptr<detail::Revocable>& next =
+        entry.previous_subscription_ != nullptr
+            ? (*entry.previous_subscription_).next_subscription_
+            : owned_subscriptions_;
+    if (next) {
+        (*next).previous_subscription_ = entry.previous_subscription_;
+    }
+    entry.previous_subscription_ = nullptr;
+    entry.subscription_owner_ = nullptr;
+}
+
+void detail::Revocable::release_subscription_owner() noexcept {
+    if (subscription_owner_ != nullptr) {
+        (*subscription_owner_).release_subscription(*this);
+    }
 }
 
 void Component::on_dispose() noexcept {}
 
+std::uint64_t Component::acquire_work_order() {
+    if (next_work_order_ == std::numeric_limits<std::uint64_t>::max()) {
+        throw std::overflow_error("Component revocation order exhausted");
+    }
+    ++next_work_order_;
+    return next_work_order_;
+}
+
 void Component::revoke_owned_work() noexcept {
-    std::vector<std::weak_ptr<gui_forms::detail::Revocable>> owned = std::exchange(owned_revocables_, {});
-    // Revocables form an acquisition stack, so tear them down in strict
-    // reverse order and never callback into a disposing owner.
-    for (std::vector<std::weak_ptr<gui_forms::detail::Revocable>>::reverse_iterator
-             item = owned.rbegin();
-         item != owned.rend(); ++item) {
-        if (std::shared_ptr<gui_forms::detail::Revocable> revocable = (*item).lock()) {
-            (*revocable).disconnect();
+    std::vector<ObservedRevocable> observed = std::exchange(owned_revocables_, {});
+    // Merge the two acquisition stacks, retaining strict reverse order across
+    // caller-held revocation authority and transferred subscription tokens.
+    while (!observed.empty() || owned_subscriptions_) {
+        if (owned_subscriptions_ && (observed.empty() ||
+            (*owned_subscriptions_).subscription_order_ > observed.back().order)) {
+            const std::shared_ptr<detail::Revocable> work = owned_subscriptions_;
+            release_subscription(*work);
+            (*work).disconnect();
+        } else {
+            const std::shared_ptr<detail::Revocable> work = observed.back().work.lock();
+            observed.pop_back();
+            if (work) (*work).disconnect();
         }
     }
-    owned_subscriptions_.reset();
 }
 
 } // namespace gui_forms

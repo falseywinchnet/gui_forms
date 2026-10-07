@@ -68,6 +68,8 @@ const char* semantic_role_name(SemanticRole role) noexcept {
     case SemanticRole::button: return "button";
     case SemanticRole::check_box: return "check_box";
     case SemanticRole::radio_button: return "radio_button";
+    case SemanticRole::toolbar: return "toolbar";
+    case SemanticRole::radio_group: return "radio_group";
     case SemanticRole::link: return "link";
     case SemanticRole::text_box: return "text_box";
     case SemanticRole::list: return "list";

@@ -32,6 +32,7 @@ public:
     void set_visual_style(ButtonVisualStyle style);
     [[nodiscard]] bool selected() const noexcept { return selected_; }
     void set_selected(bool selected);
+    [[nodiscard]] Event<bool>& selected_changed() noexcept { return selected_changed_; }
     [[nodiscard]] double flat_border_width() const noexcept {
         return flat_border_width_;
     }
@@ -41,6 +42,7 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
+    Event<bool> selected_changed_{};
     void notify_default(bool value) override;
     void on_activate() override;
     [[nodiscard]] DialogResult command_dialog_result() const noexcept override {

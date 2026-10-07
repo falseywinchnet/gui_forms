@@ -60,6 +60,11 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
     run('cmake', '--install', toolkit)
+    examples: Path = build / 'installed-reference-examples'
+    run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples,
+        '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_PREFIX_PATH={sdk}')
+    run('cmake', '--build', examples, '--parallel', jobs)
+    run('ctest', '--test-dir', examples, '--output-on-failure')
 
 
 def main() -> None:

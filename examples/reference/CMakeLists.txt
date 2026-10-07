@@ -11,3 +11,11 @@ set_target_properties(owned_events PROPERTIES NO_SYSTEM_FROM_IMPORTED TRUE)
 
 enable_testing()
 add_test(NAME owned_events COMMAND owned_events)
+
+foreach(example_name IN ITEMS bound_values shared_state collection_state)
+    add_executable(${example_name} ${example_name}.cpp)
+    target_compile_features(${example_name} PRIVATE cxx_std_20)
+    target_link_libraries(${example_name} PRIVATE GUIForms::Controls)
+    set_target_properties(${example_name} PROPERTIES NO_SYSTEM_FROM_IMPORTED TRUE)
+    add_test(NAME ${example_name} COMMAND ${example_name})
+endforeach()

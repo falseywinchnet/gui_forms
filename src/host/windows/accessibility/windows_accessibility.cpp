@@ -55,6 +55,8 @@ LONG role(SemanticRole value) noexcept {
     case SemanticRole::button: return ROLE_SYSTEM_PUSHBUTTON;
     case SemanticRole::check_box: case SemanticRole::check_list_item: return ROLE_SYSTEM_CHECKBUTTON;
     case SemanticRole::radio_button: return ROLE_SYSTEM_RADIOBUTTON;
+    case SemanticRole::toolbar: return ROLE_SYSTEM_TOOLBAR;
+    case SemanticRole::radio_group: return ROLE_SYSTEM_GROUPING;
     case SemanticRole::text_box: return ROLE_SYSTEM_TEXT;
     case SemanticRole::numeric_field: return ROLE_SYSTEM_SPINBUTTON;
     case SemanticRole::combo_box: return ROLE_SYSTEM_COMBOBOX;

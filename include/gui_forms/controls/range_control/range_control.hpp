@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gui_forms/detail/scalar_binding.hpp"
+
 #include "gui_forms/animation.hpp"
 #include "gui_forms/basic_controls.hpp"
 
@@ -33,6 +35,8 @@ struct RangeScrollEvent final {
 class RangeControl : public Control {
 public:
     explicit RangeControl(StableId stable_id);
+    void bind(Value<double>& model);
+    void unbind() noexcept;
 
     [[nodiscard]] double minimum() const noexcept { return minimum_; }
     [[nodiscard]] double maximum() const noexcept { return maximum_; }
@@ -68,6 +72,8 @@ protected:
     bool set_value_from_input(double value, RangeAction action);
 
 private:
+    void validate_bound_value(double value) const;
+    std::unique_ptr<detail::ScalarBinding<RangeControl, double>> value_binding_{};
     double minimum_{};
     double maximum_{100.0};
     double value_{};

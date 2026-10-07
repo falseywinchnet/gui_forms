@@ -9,10 +9,52 @@
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 namespace gui_forms {
+
+namespace detail {
+
+// The longest accepted leading event-argument prefix follows the bound values.
+// Argument selection is compile-time only; dispatch stores no erased payload.
+template <typename Owner, typename Method, typename BoundTuple,
+          typename ArgumentTuple, std::size_t Count>
+struct MemberArgumentPrefix final {
+    template <std::size_t... BoundIndices, std::size_t... ArgumentIndices>
+    static constexpr bool accepts(std::index_sequence<BoundIndices...>,
+                                  std::index_sequence<ArgumentIndices...>) {
+        if constexpr (std::is_invocable_v<Method, Owner&,
+            const std::tuple_element_t<BoundIndices, BoundTuple>&...,
+            std::tuple_element_t<ArgumentIndices, ArgumentTuple>...>) {
+            using Result = std::invoke_result_t<Method, Owner&,
+                const std::tuple_element_t<BoundIndices, BoundTuple>&...,
+                std::tuple_element_t<ArgumentIndices, ArgumentTuple>...>;
+            constexpr bool accepted = std::is_same_v<Result, void>;
+            return accepted;
+        } else {
+            return false;
+        }
+    }
+
+    static constexpr int select() {
+        constexpr bool accepted = accepts(
+            std::make_index_sequence<std::tuple_size_v<BoundTuple>>{},
+            std::make_index_sequence<Count>{});
+        if constexpr (accepted) {
+            return static_cast<int>(Count);
+        } else if constexpr (Count > 0U) {
+            constexpr int smaller = MemberArgumentPrefix<Owner, Method,
+                BoundTuple, ArgumentTuple, Count - 1U>::select();
+            return smaller;
+        } else {
+            return -1;
+        }
+    }
+};
+
+} // namespace detail
 
 struct EventStatistics {
     std::uint64_t subscriptions_connected{};
@@ -90,12 +132,10 @@ public:
     }
 
 private:
-    template <typename Owner, typename Target, typename... EventArguments>
+    template <typename Owner, typename Method, typename... Bound,
+              typename... EventArguments>
     friend void on(Event<EventArguments...>& event, Owner& owner,
-                   void (Target::*const method)(EventArguments...));
-    template <typename Owner, typename Target, typename... EventArguments>
-    friend void on(Event<EventArguments...>& event, Owner& owner,
-                   void (Target::*const method)(EventArguments...) const);
+                   Method method, Bound... bound);
 
     struct State;
 
@@ -113,6 +153,7 @@ private:
                 return;
             }
             connected_ = false;
+            release_subscription_owner();
             callback = {};
             delegate = {};
             const std::shared_ptr<State> event_state = state.lock();
@@ -151,19 +192,41 @@ private:
     // as its slot. emit() holds the slot across revocation, so invoking the
     // member neither copies an owning callable nor allocates. The owner is
     // borrowed: registration never extends its lifetime or forms a cycle.
-    template <typename Owner, typename Method>
+    template <typename Owner, typename Method, typename... Bound>
     struct MemberSlot final : Slot {
+        using BoundTuple = std::tuple<Bound...>;
+        using ArgumentTuple = std::tuple<Arguments&...>;
+        static constexpr int argument_count = detail::MemberArgumentPrefix<
+            Owner, Method, BoundTuple, ArgumentTuple,
+            sizeof...(Arguments)>::select();
+        static_assert(argument_count >= 0,
+            "gui_forms::on handler must accept bound values followed by a leading prefix of event arguments (or none)");
+
         MemberSlot(const std::shared_ptr<State>& event_state, Owner& owner,
-                   const Method method)
+                   const Method method, Bound... bound)
             : Slot(event_state, DelegateCallback{}), owner_(owner),
-              method_(method) {}
+              method_(method), bound_(bound...) {}
+
+        template <std::size_t... BoundIndices, std::size_t... ArgumentIndices>
+        void invoke_member(ArgumentTuple& arguments,
+                           std::index_sequence<BoundIndices...>,
+                           std::index_sequence<ArgumentIndices...>) {
+            (owner_.*method_)(std::get<BoundIndices>(bound_)...,
+                             std::get<ArgumentIndices>(arguments)...);
+        }
 
         void invoke(Arguments&... arguments) override {
-            (owner_.*method_)(arguments...);
+            if constexpr (argument_count >= 0) {
+                ArgumentTuple event_arguments(arguments...);
+                invoke_member(event_arguments,
+                    std::index_sequence_for<Bound...>{},
+                    std::make_index_sequence<static_cast<std::size_t>(argument_count)>{});
+            }
         }
 
         Owner& owner_;
         Method method_;
+        const BoundTuple bound_;
     };
 
     struct State final {
@@ -212,11 +275,12 @@ private:
         return token;
     }
 
-    template <typename Owner, typename Method>
+    template <typename Owner, typename Method, typename... Bound>
     [[nodiscard]] SubscriptionToken subscribe_member(Owner& owner,
-                                                      const Method method) {
+                                                      const Method method,
+                                                      Bound... bound) {
         const std::shared_ptr<Slot> slot =
-            std::make_shared<MemberSlot<Owner, Method>>(state_, owner, method);
+            std::make_shared<MemberSlot<Owner, Method, Bound...>>(state_, owner, method, bound...);
         SubscriptionToken token(slot);
         connect(nullptr, slot);
         return token;
@@ -256,13 +320,19 @@ private:
 // owner is a no-op; a null member is rejected even for a disposed owner.
 // Registration may allocate/throw. Emission adds no allocation or idle work.
 // Owner and publisher obey the existing Event execution-thread contract.
-template <typename Owner, typename Target, typename... Arguments>
-void on(Event<Arguments...>& event, Owner& owner,
-        void (Target::*const method)(Arguments...)) {
+template <typename Owner, typename Method, typename... Bound,
+          typename... Arguments>
+void on(Event<Arguments...>& event, Owner& owner, Method method, Bound... bound) {
     static_assert(std::is_base_of_v<Component, Owner>,
                   "gui_forms::on requires a Component owner");
-    static_assert(std::is_base_of_v<Target, Owner>,
-                  "the handler must belong to the owner or one of its bases");
+    static_assert(std::is_member_function_pointer_v<Method>,
+                  "gui_forms::on requires a named member function");
+    static_assert(sizeof...(Bound) <= 2U,
+                  "gui_forms::on accepts at most two bound values");
+    static_assert((std::is_trivially_copyable_v<Bound> && ...),
+                  "gui_forms::on bound values must be trivially copyable; use an owner-data index");
+    static_assert((0U + ... + sizeof(Bound)) <= 16U,
+                  "gui_forms::on bound values must total at most 16 bytes");
     if (method == nullptr) {
         throw std::invalid_argument("gui_forms::on requires a non-null member");
     }
@@ -270,25 +340,7 @@ void on(Event<Arguments...>& event, Owner& owner,
     if (!component.is_alive()) {
         return;
     }
-    SubscriptionToken token = event.subscribe_member(owner, method);
-    component.own_subscription(std::move(token));
-}
-
-template <typename Owner, typename Target, typename... Arguments>
-void on(Event<Arguments...>& event, Owner& owner,
-        void (Target::*const method)(Arguments...) const) {
-    static_assert(std::is_base_of_v<Component, Owner>,
-                  "gui_forms::on requires a Component owner");
-    static_assert(std::is_base_of_v<Target, Owner>,
-                  "the handler must belong to the owner or one of its bases");
-    if (method == nullptr) {
-        throw std::invalid_argument("gui_forms::on requires a non-null member");
-    }
-    Component& component = owner;
-    if (!component.is_alive()) {
-        return;
-    }
-    SubscriptionToken token = event.subscribe_member(owner, method);
+    SubscriptionToken token = event.subscribe_member(owner, method, bound...);
     component.own_subscription(std::move(token));
 }
 

@@ -1,5 +1,28 @@
 # Orchestrator ↔ GUI.Forms interface negotiation
 
+## State and collection development reply — 2026-10-07
+
+**GIVEN:** the owner supplied the required PlaySuite sibling follow-up to #57.
+GUI.Forms implements provider capabilities only. The canonical family remains
+ORC-GUI-001 development consumption; no frozen C ABI, service edge, host wire
+protocol or Web.Forms grammar is changed.
+
+**OBSERVED source additions:** immediate owner-token reclamation, omitted
+trailing event arguments, inline small bound values, application-owned scalar
+Value state, non-owning control Command/Value bindings and Command shortcuts,
+CommandBar, ChoiceGroup and ExpandableSections. ListBox already exposes item
+activation. All four requested parts remain required in the availability plan.
+Exact ownership, errors, model precedence, semantic roles and named skin parts
+are in `CONCISE_STATE_AND_COLLECTIONS.md`. Qualification is recorded separately
+in the matching experiment report; unrun host tests are not implied.
+
+Component/Revocable, templated Event slots, CommandState and affected control
+layouts change. Rebuild the library and **every C++ consumer** against the same
+headers; do not mix this SDK with cached objects from the previous ABI. Normal
+compiler-cache header hashing provides invalidation, not binary ABI adaptation.
+This reply awaits canonical availability reconciliation; it does not rewrite the
+backend registry or promote the frozen FM0 package.
+
 ## Concise authoring development reply — 2026-10-07
 
 **GIVEN:** the owner directed GUI.Forms to work toward availability of the

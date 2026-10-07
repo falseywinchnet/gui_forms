@@ -55,6 +55,7 @@ void Button::assign_cancel_dialog_result() {
 }
 
 void Button::on_activate() {
+    const Control::Ptr retained = weak_from_this().lock();
     Window* owner = attached_window();
     ButtonBase::on_activate();
     // Read the value after Click: a handler may deliberately replace or clear
@@ -79,6 +80,7 @@ void Button::set_selected(bool selected) {
     if (selected_ == selected) return;
     selected_ = selected;
     invalidate(Dirty::style | Dirty::paint | Dirty::semantics);
+    publish_change(selected_changed_, selected);
 }
 
 void Button::set_flat_border_width(double width) {

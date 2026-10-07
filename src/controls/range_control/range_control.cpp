@@ -11,6 +11,26 @@
 namespace gui_forms {
 using namespace range_control_detail;
 
+void RangeControl::bind(Value<double>& model) {
+    require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
+    std::unique_ptr<detail::ScalarBinding<RangeControl, double>> binding =
+        std::make_unique<detail::ScalarBinding<RangeControl, double>>(
+            *this, model, value_changed_, &RangeControl::value, &RangeControl::set_value,
+            &RangeControl::validate_bound_value);
+    // Retire the old model before the initial model-wins publication.
+    value_binding_ = std::move(binding);
+    (*value_binding_).synchronize();
+}
+
+void RangeControl::validate_bound_value(const double value) const {
+    if (value < minimum_ || value > maximum_) {
+        throw std::out_of_range("bound value is outside the control range");
+    }
+}
+
+void RangeControl::unbind() noexcept { value_binding_.reset(); }
+
 RangeControl::RangeControl(StableId stable_id)
     : Control(std::move(stable_id)) {
     define_bindable_property({
@@ -31,6 +51,7 @@ double RangeControl::normalized_value() const noexcept {
 
 void RangeControl::set_range(double minimum_value, double maximum_value) {
     require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
     require_finite(minimum_value, "range minimum must be finite");
     require_finite(maximum_value, "range maximum must be finite");
     if (minimum_value >= maximum_value) {
@@ -40,9 +61,12 @@ void RangeControl::set_range(double minimum_value, double maximum_value) {
         return;
     }
     const double old_value = value_;
+    const double next_value = std::clamp(value_, minimum_value, maximum_value);
+    if (value_binding_) (*value_binding_).validate_update(next_value);
+    if (!is_alive()) return;
     minimum_ = minimum_value;
     maximum_ = maximum_value;
-    value_ = std::clamp(value_, minimum_, maximum_);
+    value_ = next_value;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(range_changed_, minimum_, maximum_);
     if (is_alive() && old_value != value_) {
@@ -60,6 +84,7 @@ void RangeControl::set_maximum(double maximum_value) {
 
 void RangeControl::set_value(double value) {
     require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
     require_finite(value, "range value must be finite");
     if (value < minimum_ || value > maximum_) {
         throw std::out_of_range("range value is outside minimum and maximum");
@@ -67,6 +92,8 @@ void RangeControl::set_value(double value) {
     if (value_ == value) {
         return;
     }
+    if (value_binding_) (*value_binding_).validate_update(value);
+    if (!is_alive()) return;
     value_ = value;
     invalidate(Dirty::paint | Dirty::semantics);
     publish_change(value_changed_, value_);
@@ -129,11 +156,14 @@ Rect RangeControl::local_bounds() const noexcept {
 
 bool RangeControl::set_value_from_input(double value, RangeAction action) {
     require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
     require_finite(value, "input range value must be finite");
     const double next = std::clamp(value, minimum_, maximum_);
     if (next == value_) {
         return false;
     }
+    if (value_binding_) (*value_binding_).validate_update(next);
+    if (!is_alive()) return false;
     const RangeScrollEvent event{value_, next, action};
     value_ = next;
     invalidate(Dirty::paint | Dirty::semantics);

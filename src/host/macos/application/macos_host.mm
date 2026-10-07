@@ -731,6 +731,8 @@ NSString* native_accessibility_role(SemanticRole role) {
     case SemanticRole::button: return NSAccessibilityButtonRole;
     case SemanticRole::check_box: return NSAccessibilityCheckBoxRole;
     case SemanticRole::radio_button: return NSAccessibilityRadioButtonRole;
+    case SemanticRole::toolbar: return NSAccessibilityToolbarRole;
+    case SemanticRole::radio_group: return NSAccessibilityRadioGroupRole;
     case SemanticRole::link: return NSAccessibilityLinkRole;
     case SemanticRole::text_box:
     case SemanticRole::numeric_field: return NSAccessibilityTextFieldRole;

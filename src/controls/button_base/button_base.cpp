@@ -1,4 +1,7 @@
 #include "gui_forms/controls/button_base/button_base.hpp"
+#include "gui_forms/controls/button_base/button/button.hpp"
+#include "gui_forms/controls/button_base/check_box/check_box.hpp"
+#include "gui_forms/commands.hpp"
 #include "gui_forms/connected_controls.hpp"
 #include "../basic/basic_control_rendering.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
@@ -14,6 +17,94 @@
 #include <vector>
 
 namespace gui_forms {
+
+class ButtonBase::CommandConnection final
+    : public std::enable_shared_from_this<CommandConnection> {
+public:
+    CommandConnection(ButtonBase& button, Command& command)
+        : button_(button), command_(command) {
+        if (!command.is_alive()) throw std::invalid_argument("cannot bind a disposed Command");
+        const Delegate<const CommandState&> changed =
+            Delegate<const CommandState&>::bind<CommandConnection,
+                &CommandConnection::apply>(*this);
+        state_ = command.state_changed().subscribe(button, changed);
+        const Delegate<ButtonBase&> clicked = Delegate<ButtonBase&>::bind<
+            CommandConnection, &CommandConnection::invoke>(*this);
+        click_ = button.clicked().subscribe(button, clicked);
+        CheckBox* const check_box = dynamic_cast<CheckBox*>(&button);
+        if (check_box != nullptr) {
+            const Delegate<bool> checked = Delegate<bool>::bind<
+                CommandConnection, &CommandConnection::publish_checked>(*this);
+            checked_ = (*check_box).checked_changed().subscribe(button, checked);
+        }
+    }
+
+    [[nodiscard]] bool connected() const noexcept { return state_.connected(); }
+    void synchronize() { apply(command_.state()); }
+    void disconnect() noexcept {
+        state_.disconnect();
+        click_.disconnect();
+        checked_.disconnect();
+    }
+
+private:
+    void apply(const CommandState& state) {
+        const std::shared_ptr<CommandConnection> connection = shared_from_this();
+        const Control::Ptr retained = button_.weak_from_this().lock();
+        const bool enabled = state.enabled;
+        const bool checked = state.checked;
+        const bool checkable = state.checkable;
+        const std::uint64_t generation = state.generation;
+        ButtonBase& button = button_;
+        button.set_enabled(enabled);
+        // set_enabled may remove this connection; use only the retained control.
+        if (!button.is_alive() || !state_.connected()) return;
+        if (command_.state().generation != generation) return;
+        CheckBox* const check_box = dynamic_cast<CheckBox*>(&button);
+        if (check_box != nullptr && checkable) {
+            if ((*check_box).checked() != checked) (*check_box).set_checked(checked);
+            return;
+        }
+        Button* const push_button = dynamic_cast<Button*>(&button);
+        if (push_button != nullptr) (*push_button).set_selected(checkable && checked);
+    }
+    void publish_checked(const bool checked) {
+        if (!state_.connected()) return;
+        command_.set_checked(checked);
+    }
+    void invoke(ButtonBase& source) {
+        if (!state_.connected()) return;
+        static_cast<void>(command_.execute(source.stable_id().value()));
+    }
+    ButtonBase& button_;
+    Command& command_;
+    SubscriptionToken state_{};
+    SubscriptionToken click_{};
+    SubscriptionToken checked_{};
+};
+
+ButtonBase::~ButtonBase() = default;
+
+void ButtonBase::bind(Command& command) {
+    require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
+    std::shared_ptr<CommandConnection> connection =
+        std::make_shared<CommandConnection>(*this, command);
+    unbind_command();
+    command_connection_ = std::move(connection);
+    (*command_connection_).synchronize();
+}
+
+bool ButtonBase::command_connected() const noexcept {
+    const bool connected = command_connection_ && (*command_connection_).connected();
+    return connected;
+}
+
+void ButtonBase::unbind_command() noexcept {
+    if (command_connection_) (*command_connection_).disconnect();
+    command_connection_.reset();
+}
+
 
 namespace {
 std::vector<std::string_view> button_text_lines(std::string_view text) {
@@ -341,6 +432,7 @@ std::string ButtonBase::display_text() const {
 }
 
 bool ButtonBase::perform_click() {
+    const Control::Ptr retained = weak_from_this().lock();
     if (!prepare_command_activation()) return false;
     on_activate();
     return true;
@@ -363,6 +455,7 @@ void ButtonBase::set_expanded_state(std::optional<bool> expanded) {
     if (expanded_state_ == expanded) return;
     expanded_state_ = expanded;
     invalidate(Dirty::paint | Dirty::semantics);
+    publish_change(expanded_changed_, expanded);
 }
 
 Size ButtonBase::measure(Size available) {

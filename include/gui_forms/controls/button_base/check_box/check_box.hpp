@@ -1,5 +1,7 @@
 #pragma once
 
+#include "gui_forms/detail/scalar_binding.hpp"
+
 #include "gui_forms/controls/button_base/button_base.hpp"
 
 #include <cstdint>
@@ -20,6 +22,9 @@ enum class CheckBoxAppearance : std::uint8_t {
 class CheckBox : public ButtonBase {
 public:
     explicit CheckBox(StableId stable_id, std::string text = {});
+    void bind(Command& command) override;
+    void bind(Value<bool>& model);
+    void unbind() noexcept;
 
     [[nodiscard]] CheckState check_state() const noexcept { return check_state_; }
     void set_check_state(CheckState state);
@@ -54,6 +59,7 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
 
 private:
+    std::unique_ptr<detail::ScalarBinding<CheckBox, bool>> value_binding_{};
     CheckState check_state_{CheckState::unchecked};
     Event<CheckState> check_state_changed_;
     Event<bool> checked_changed_;

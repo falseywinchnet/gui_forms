@@ -9,10 +9,17 @@
 
 namespace gui_forms {
 
+class Window;
+struct KeyGesture;
+class AcceleratorToken;
+
 // Shared authority for menu, shortcut, context, semantic, and test surfaces.
 class Command final : public Component {
 public:
+    Command();
     Command(std::string stable_id, std::string text);
+    void clear_checked();
+    [[nodiscard]] AcceleratorToken bind_shortcut(Window& window, KeyGesture gesture);
 
     [[nodiscard]] const std::string& stable_id() const noexcept {
         return stable_id_;
@@ -41,6 +48,7 @@ public:
 
 private:
     void publish_state();
+    void on_dispose() noexcept override;
 
     std::string stable_id_;
     CommandState state_;

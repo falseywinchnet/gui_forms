@@ -17,7 +17,7 @@ public:
     [[nodiscard]] unsigned runs() const noexcept { return runs_; }
 
 private:
-    void on_run(ButtonBase&) { ++runs_; }
+    void on_run() { ++runs_; }
 
     unsigned runs_{};
 };
