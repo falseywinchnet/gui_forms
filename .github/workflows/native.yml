@@ -10,7 +10,16 @@ concurrency:
   group: gui-forms-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
+  house-style:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check scanner fixtures and corrected authoring scope
+        run: |
+          python3 -B -m unittest discover -s tools -p test_house_style.py
+          python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp tools/owned_event_lab.cpp
   native:
+    needs: house-style
     strategy:
       fail-fast: false
       matrix:
@@ -85,7 +94,8 @@ jobs:
           path: .ccache
           key: gui-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ github.sha }}
           restore-keys: gui-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: dependencies
         if: runner.os != 'Windows'
         with:
           path: |
@@ -146,6 +156,15 @@ jobs:
         run: |
           cmake --build .build/native-macos-arm64/gui-forms --target gui_forms_macos_exposure_tests gui_forms_macos_idle_visibility_tests gui_forms_macos_prepared_text_host_tests --parallel 4
           ctest --test-dir .build/native-macos-arm64/gui-forms -R '^gui_forms_macos_(exposure|idle_visibility|prepared_text_host)_tests$' --output-on-failure
+      - uses: actions/cache/save@v4
+        if: always() && runner.os != 'Windows' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true'
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-${{ matrix.platform }}/skia
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose
@@ -172,3 +191,25 @@ jobs:
             .build/native-${{ matrix.platform }}/**/Testing/Temporary/*LastTest.log
             cache-proof/receipt.json
             cache-proof/**/*.log
+
+  publish:
+    needs: native
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-cache-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish tested immutable build inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="build-${GITHUB_SHA}"
+          gh release create "$tag" release-assets/* --target "$GITHUB_SHA" \
+            --prerelease --title "$tag" \
+            --notes "Tested build inputs for source $GITHUB_SHA. Native validation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Not an application release or capability promotion."

@@ -25,3 +25,17 @@ History was extracted from `falseywinchnet/file_manager` at
 repository root. First-party changes follow `planning/PROGRAMMING_HOUSE_STYLE.md`.
 Current shared/static target choices are preserved. ThinLTO and static Application
 linking remain separate, unmeasured candidates, not consequences of caching.
+
+The macOS and Linux Skia GN builds also use `cc_wrapper = "ccache"` when
+the CMake C++ launcher is ccache. Provider main builds publish all three tested
+cache archives as a `build-<full-source-SHA>` prerelease. File Manager's dependency
+lock pins that release and each archive digest; cache absence falls back to source
+compilation. No arbitrary release archive is treated as a cache entry.
+
+Local M4 proof receipt: `experiments/compiler-cache/macos-m4.json` (cold 67.63 s,
+relocated warm 1.25 s, 176 reused compilations, identical 1,672,184-byte executable).
+The retained rejected trial used an unused preprocessor definition as its supposed
+invalidating option. Ccache correctly reused equivalent preprocessed source; the
+accepted proof changes `-fno-inline-functions` instead. These are fixture timings.
+
+`docs/FILE_MANAGER_COMMIT_MAP.txt` maps original commits to this filtered history.

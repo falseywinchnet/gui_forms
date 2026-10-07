@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import platform
 import subprocess
+from typing import TextIO
 
 
 def main() -> None:
@@ -18,6 +19,7 @@ def main() -> None:
     text: str = '\n'.join(values)
     digest: str = hashlib.sha256(text.encode('utf-8')).hexdigest()
     destination: Path = Path(os.environ['GITHUB_OUTPUT'])
+    stream: TextIO
     with destination.open('a', encoding='utf-8') as stream:
         stream.write('identity=' + digest + '\n')
 

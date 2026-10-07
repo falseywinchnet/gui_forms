@@ -44,6 +44,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
         else:
             skia_out.mkdir(exist_ok=True)
             shutil.copy2(ROOT / 'gui_forms/third_party/skia_cpu_args.gn', skia_out / 'args.gn')
+            if os.environ.get('CMAKE_CXX_COMPILER_LAUNCHER') == 'ccache':
+                arguments: Path = skia_out / 'args.gn'
+                arguments.write_text(arguments.read_text(encoding='utf-8') + '\ncc_wrapper = "ccache"\n', encoding='utf-8')
             skia_root: Path = ROOT / 'gui_forms/third_party/skia'
             run(skia_root / 'bin/gn', 'gen', skia_out, '--root=' + str(skia_root))
             run(skia_root / 'third_party/ninja/ninja', '-C', skia_out, '-j', jobs, 'skia')

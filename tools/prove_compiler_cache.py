@@ -15,10 +15,11 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
-from typing import Callable
+from typing import Callable, TextIO
 
 
 def execute(command: list[str], environment: dict[str, str], log: Path) -> float:
+    stream: TextIO
     start: float = time.monotonic()
     with log.open('w', encoding='utf-8') as stream:
         subprocess.run(command, env=environment, stdout=stream,
@@ -120,13 +121,14 @@ def main() -> None:
     hits: int = int(stats.get('direct_cache_hit', 0)) + int(stats.get('preprocessed_cache_hit', 0))
     if hits == 0 or stats.get('cache_miss', 0) != 0:
         raise RuntimeError('Relocated build did not fully reuse cacheable compilations')
+    stream: TextIO
     source: Path = consumer / 'gui_forms/src/core/component/component/component.cpp'
     with source.open('a', encoding='utf-8') as stream:
-        stream.write('\nint cache_proof_revision() noexcept { return 1; }\n')
+        stream.write('\nint cache_proof_revision() noexcept { int value = 1; return value; }\n')
     records.append(build(consumer, cache, 'implementation-change', args.jobs, False))
     header: Path = consumer / 'gui_forms/include/gui_forms/component/component/component.hpp'
     with header.open('a', encoding='utf-8') as stream:
-        stream.write('\ninline int cache_proof_header_revision() noexcept { return 2; }\n')
+        stream.write('\ninline int cache_proof_header_revision() noexcept { int value = 2; return value; }\n')
     records.append(build(consumer, cache, 'header-change', args.jobs, False))
     records.append(build(consumer, cache, 'option-change', args.jobs, True,
                          '-fno-inline-functions'))
