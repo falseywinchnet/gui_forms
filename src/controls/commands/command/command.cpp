@@ -1,11 +1,14 @@
 #include "gui_forms/commands/command/command.hpp"
 
 #include "gui_forms/text.hpp"
+#include "gui_forms/window.hpp"
 
 #include <stdexcept>
 #include <utility>
 
 namespace gui_forms {
+
+Command::Command() = default;
 
 Command::Command(std::string stable_id, std::string text)
     : stable_id_(std::move(stable_id)) {
@@ -14,6 +17,11 @@ Command::Command(std::string stable_id, std::string text)
         throw std::invalid_argument("Command identity and text must be valid UTF-8");
     }
     state_.text = std::move(text);
+}
+
+void Command::on_dispose() noexcept {
+    state_changed_.disconnect_all();
+    invoked_.disconnect_all();
 }
 
 void Command::publish_state() {
@@ -72,9 +80,33 @@ void Command::set_visible(bool visible) {
 }
 
 void Command::set_checked(bool checked) {
-    if (state_.checked == checked) return;
+    if (state_.checkable && state_.checked == checked) return;
+    state_.checkable = true;
     state_.checked = checked;
     publish_state();
+}
+
+void Command::clear_checked() {
+    if (!state_.checkable) return;
+    state_.checkable = false;
+    state_.checked = false;
+    publish_state();
+}
+
+namespace {
+struct InvokeShortcut final {
+    Command& command;
+    bool operator()() const {
+        const bool invoked = command.execute("shortcut");
+        return invoked;
+    }
+};
+} // namespace
+
+AcceleratorToken Command::bind_shortcut(Window& window, KeyGesture gesture) {
+    AcceleratorToken token = window.register_accelerator(
+        *this, gesture, InvokeShortcut{*this});
+    return token;
 }
 
 void Command::set_default_action(bool is_default) {

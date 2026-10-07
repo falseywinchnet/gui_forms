@@ -10,6 +10,10 @@ namespace {
 class Counter final : public gui_forms::Component {
 public:
     void add(const std::uint64_t value) noexcept { total_ += value; }
+    void increment() noexcept { ++total_; }
+    void add_pair(const std::uint64_t first, const std::uint64_t second) noexcept {
+        total_ += first + second;
+    }
     [[nodiscard]] std::uint64_t total() const noexcept { return total_; }
 
 private:
@@ -68,6 +72,21 @@ int main() {
     gui_forms::Event<std::uint64_t> owned_event{};
     gui_forms::on(owned_event, owned_owner, &Counter::add);
     static_cast<void>(measure(owned_event, owned_owner, 10000000U));
+#ifndef GUI_FORMS_EVENT_LAB_UNBOUND_ONLY
+    Counter omitted_owner{};
+    Counter bound_owner{};
+    Counter pair_owner{};
+    gui_forms::Event<std::uint64_t> omitted_event{};
+    gui_forms::Event<std::uint64_t> bound_event{};
+    gui_forms::Event<std::uint64_t> pair_event{};
+    gui_forms::on(omitted_event, omitted_owner, &Counter::increment);
+    gui_forms::on(bound_event, bound_owner, &Counter::add, std::uint64_t{1U});
+    gui_forms::on(pair_event, pair_owner, &Counter::add_pair,
+                  std::uint64_t{1U}, std::uint64_t{0U});
+    static_cast<void>(measure(omitted_event, omitted_owner, 10000000U));
+    static_cast<void>(measure(bound_event, bound_owner, 10000000U));
+    static_cast<void>(measure(pair_event, pair_owner, 10000000U));
+#endif
 #endif
 
     std::cout << "component_bytes," << sizeof(gui_forms::Component) << '\n';
@@ -86,6 +105,16 @@ int main() {
         if (owned_sample.callbacks != iterations) {
             return 1;
         }
+#ifndef GUI_FORMS_EVENT_LAB_UNBOUND_ONLY
+        const DispatchSample omitted_sample = measure(omitted_event, omitted_owner, iterations);
+        const DispatchSample bound_sample = measure(bound_event, bound_owner, iterations);
+        const DispatchSample pair_sample = measure(pair_event, pair_owner, iterations);
+        print_sample("omitted_arguments", trial, iterations, omitted_sample);
+        print_sample("one_bound_value", trial, iterations, bound_sample);
+        print_sample("two_bound_values", trial, iterations, pair_sample);
+        if (omitted_sample.callbacks != iterations || bound_sample.callbacks != iterations ||
+            pair_sample.callbacks != iterations) return 1;
+#endif
 #endif
     }
     if (!token.connected()) {

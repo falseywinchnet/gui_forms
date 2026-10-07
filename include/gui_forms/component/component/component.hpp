@@ -37,6 +37,7 @@ public:
     // A dead component disconnects immediately. Failure also disconnects the
     // transferred token. Like event dispatch, this is execution-thread confined.
     void own_subscription(SubscriptionToken subscription);
+    [[nodiscard]] std::size_t owned_subscription_count() const noexcept;
 
 protected:
     virtual void verify_dispose_thread();
@@ -44,10 +45,19 @@ protected:
     void revoke_owned_work() noexcept;
 
 private:
+    friend class detail::Revocable;
+    void release_subscription(detail::Revocable& subscription) noexcept;
+
+    struct ObservedRevocable final {
+        std::weak_ptr<detail::Revocable> work{};
+        std::uint64_t order{};
+    };
+    [[nodiscard]] std::uint64_t acquire_work_order();
     ComponentState state_{ComponentState::alive};
-    std::vector<std::weak_ptr<detail::Revocable>> owned_revocables_{};
-    // Components that only use caller-owned tokens do not allocate this store.
-    std::unique_ptr<std::vector<SubscriptionToken>> owned_subscriptions_{};
+    std::uint64_t next_work_order_{};
+    std::vector<ObservedRevocable> owned_revocables_{};
+    // Slots carry their links. No separate token store or retained capacity.
+    std::shared_ptr<detail::Revocable> owned_subscriptions_{};
 };
 
 } // namespace gui_forms

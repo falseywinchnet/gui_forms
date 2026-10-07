@@ -1,6 +1,10 @@
 #include "gui_forms/event.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/timer.hpp"
+#include "gui_forms/commands.hpp"
+#include "gui_forms/range_controls.hpp"
+#include "gui_forms/value.hpp"
+#include "gui_forms/collection_controls.hpp"
 #include "gui_forms/window.hpp"
 
 #include <array>
@@ -19,6 +23,7 @@
 #endif
 
 namespace owned_event_allocation_probe {
+thread_local std::ptrdiff_t live_allocations{};
 thread_local bool enabled{};
 thread_local bool fired{};
 thread_local std::size_t fail_at{};
@@ -39,6 +44,7 @@ void* allocate(const std::size_t bytes) {
     const std::size_t extent = bytes == 0U ? 1U : bytes;
     void* memory = std::malloc(extent);
     if (!memory) throw std::bad_alloc();
+    ++live_allocations;
     return memory;
 }
 
@@ -53,10 +59,17 @@ void* allocate_aligned(const std::size_t bytes, const std::size_t alignment) {
     if (status != 0) throw std::bad_alloc();
 #endif
     if (!memory) throw std::bad_alloc();
+    ++live_allocations;
     return memory;
 }
 
+void release(void* const memory) noexcept {
+    if (memory != nullptr) --live_allocations;
+    std::free(memory);
+}
+
 void release_aligned(void* const memory) noexcept {
+    if (memory != nullptr) --live_allocations;
 #ifdef _WIN32
     _aligned_free(memory);
 #else
@@ -89,10 +102,10 @@ void* operator new[](const std::size_t bytes) {
     void* const memory = owned_event_allocation_probe::allocate(bytes);
     return memory;
 }
-void operator delete(void* const memory) noexcept { std::free(memory); }
-void operator delete[](void* const memory) noexcept { std::free(memory); }
-void operator delete(void* const memory, std::size_t) noexcept { std::free(memory); }
-void operator delete[](void* const memory, std::size_t) noexcept { std::free(memory); }
+void operator delete(void* const memory) noexcept { owned_event_allocation_probe::release(memory); }
+void operator delete[](void* const memory) noexcept { owned_event_allocation_probe::release(memory); }
+void operator delete(void* const memory, std::size_t) noexcept { owned_event_allocation_probe::release(memory); }
+void operator delete[](void* const memory, std::size_t) noexcept { owned_event_allocation_probe::release(memory); }
 void* operator new(const std::size_t bytes, const std::align_val_t alignment) {
     void* memory = owned_event_allocation_probe::allocate_aligned(bytes, static_cast<std::size_t>(alignment));
     return memory;
@@ -126,6 +139,8 @@ public:
     void clicked(gf::ButtonBase&) { ++total_; }
     void text_changed(const std::string&) { ++total_; }
     void tick() { ++total_; }
+    void overload() { total_ += 100; }
+    void overload(const int value) { total_ += value; }
 
 private:
     int& total_;
@@ -255,6 +270,7 @@ struct RetainUntilDisconnected final {
 
 void test_signatures_and_natural_destruction() {
     gf::Event<int> event{};
+    gf::Event<int> overloaded{};
     gf::Event<std::string&, const int&> references{};
     int total = 0;
     std::string text{};
@@ -265,6 +281,8 @@ void test_signatures_and_natural_destruction() {
         gf::on(event, owner, &Recorder::add_noexcept);
         gf::on(event, owner, &Recorder::add_const_noexcept);
         gf::on(references, owner, &Recorder::change);
+        gf::on(overloaded, owner, static_cast<void (Recorder::*)(int)>(&Recorder::overload));
+        overloaded.emit(0);
         event.emit(2);
         references.emit(text, total);
         require(total == 10 && text == "10",
@@ -425,6 +443,511 @@ void test_explicit_token_transfer_and_legacy_lifetime() {
     require(total == 5, "a dead owner must immediately disconnect a transferred token");
 }
 
+void test_short_lived_publishers_release_owner_storage() {
+    int total = 0;
+    Recorder owner(total);
+    // Prime unrelated control metadata before measuring retained allocations.
+    {
+        gf::Button button(gf::StableId("warmup"));
+        gf::on(button.clicked(), owner, &Recorder::clicked);
+    }
+    const std::ptrdiff_t before = owned_event_allocation_probe::live_allocations;
+    for (int index = 0; index < 1000; ++index) {
+        {
+            gf::Button button(gf::StableId("short-lived"));
+            gf::on(button.clicked(), owner, &Recorder::clicked);
+            require(owner.owned_subscription_count() == 1U,
+                    "a live button must retain exactly one owner subscription");
+            button.perform_click();
+        }
+        require(owner.owned_subscription_count() == 0U,
+                "publisher destruction must immediately unlink its owner token");
+    }
+    require(total == 1000, "all short-lived buttons must invoke their handler");
+    require(owned_event_allocation_probe::live_allocations == before,
+            "publisher destruction must release all registration allocations");
+}
+
+class BoundOwner final : public gf::Component {
+public:
+    void fixed() { ++calls; }
+    void indexed(const int index) { total += index; }
+    void cell(const int row, const int choice, gf::ButtonBase& sender) {
+        total += row * 10 + choice;
+        last = &sender;
+    }
+    void prefix(const int index, const int first) { total += index + first; }
+    int calls{};
+    int total{};
+    gf::ButtonBase* last{};
+};
+
+void test_bound_values_and_omitted_arguments() {
+    gf::Button button(gf::StableId("bound"));
+    gf::Event<int, bool> event{};
+    BoundOwner owner{};
+    gf::on(button.clicked(), owner, &BoundOwner::fixed);
+    gf::on(button.clicked(), owner, &BoundOwner::indexed, 7);
+    gf::on(button.clicked(), owner, &BoundOwner::cell, 2, 3);
+    gf::on(event, owner, &BoundOwner::prefix, 5);
+    std::size_t allocations = 0U;
+    {
+        owned_event_allocation_probe::FaultScope probe(
+            std::numeric_limits<std::size_t>::max());
+        for (int index = 0; index < 10000; ++index) {
+            button.clicked().emit(button);
+            event.emit(11, true);
+        }
+        allocations = owned_event_allocation_probe::attempts;
+    }
+    require(owner.calls == 10000 && owner.total == 460000 &&
+                owner.last == &button && allocations == 0U,
+            "bound values precede accepted event prefixes without dispatch allocation");
+    owner.dispose();
+    button.clicked().emit(button);
+    require(owner.calls == 10000, "bound handlers must obey owner lifetime");
+}
+
+class StateObserver final : public gf::Component {
+public:
+    void value(const double) { ++changes; }
+    void scroll(const gf::RangeScrollEvent&) { ++inputs; }
+    void command() { ++invocations; }
+    int changes{};
+    int inputs{};
+    int invocations{};
+};
+
+class CountedTrackBar final : public gf::TrackBar {
+public:
+    explicit CountedTrackBar(gf::StableId id) : gf::TrackBar(std::move(id)) {}
+    void set_value(const double value) override {
+        ++writes;
+        gf::TrackBar::set_value(value);
+    }
+    int writes{};
+};
+
+class DestroyValue final : public gf::Component {
+public:
+    explicit DestroyValue(std::unique_ptr<gf::Value<int>>& value) : value_(value) {}
+    void destroy() { value_.reset(); }
+private:
+    std::unique_ptr<gf::Value<int>>& value_;
+};
+
+void test_shared_scalar_state() {
+    gf::Value<double> volume(15.0);
+    CountedTrackBar first(gf::StableId("first"));
+    CountedTrackBar second(gf::StableId("second"));
+    StateObserver observer{};
+    first.bind(volume);
+    second.bind(volume);
+    gf::on(first.value_changed(), observer, &StateObserver::value);
+    gf::on(second.value_changed(), observer, &StateObserver::value);
+    gf::on(first.scroll(), observer, &StateObserver::scroll);
+    require(first.value() == 15.0 && second.value() == 15.0,
+            "model must win at bind time");
+    first.writes = 0;
+    second.writes = 0;
+    first.set_value(20.0);
+    require(volume.get() == 20.0 && second.value() == 20.0 &&
+                first.writes == 1 && second.writes == 1 &&
+                observer.changes == 2 && observer.inputs == 0,
+            "programmatic writes synchronize once without user input or origin reentry");
+    std::size_t allocations = 0U;
+    {
+        owned_event_allocation_probe::FaultScope probe(
+            std::numeric_limits<std::size_t>::max());
+        for (int index = 0; index < 10000; ++index) {
+            volume.set(static_cast<double>(index % 100));
+        }
+        allocations = owned_event_allocation_probe::attempts;
+    }
+    require(allocations == 0U && first.value() == 99.0 && second.value() == 99.0,
+            "steady state scalar propagation must allocate nothing");
+    const gf::SemanticDescriptor semantic = first.semantic_descriptor();
+    require(semantic.numeric_value == 99.0,
+            "accessibility must observe the bound value");
+    gf::KeyEvent input{.action = gf::KeyAction::down,
+                      .physical_key = gf::PhysicalKey::left};
+    first.on_key(input);
+    require(input.handled && observer.inputs == 1 && volume.get() == first.value(),
+            "keyboard input must update the shared model and emit the input event");
+    second.set_maximum(50.0);
+    const double prior = first.value();
+    bool rejected = false;
+    try { first.set_value(75.0); } catch (const std::out_of_range&) { rejected = true; }
+    require(rejected && first.value() == prior && volume.get() == prior,
+            "another control constraint must reject before the originating control changes");
+    volume.dispose();
+    first.set_value(30.0);
+    require(second.value() != 30.0, "disposed model must detach its bindings");
+}
+
+void test_model_and_control_lifetimes() {
+    gf::TrackBar control(gf::StableId("survivor"));
+    {
+        gf::Value<double> value(17.0);
+        control.bind(value);
+    }
+    control.set_value(18.0);
+    gf::Value<double> retained(12.0);
+    {
+        gf::TrackBar temporary(gf::StableId("temporary"));
+        temporary.bind(retained);
+    }
+    retained.set(19.0);
+    std::unique_ptr<gf::Value<int>> value = std::make_unique<gf::Value<int>>();
+    DestroyValue destroy(value);
+    int total = 0;
+    Recorder observer(total);
+    gf::on((*value).changed(), destroy, &DestroyValue::destroy);
+    gf::on((*value).changed(), observer, &Recorder::add);
+    (*value).set(5);
+    require(!value && total == 0 && observer.owned_subscription_count() == 0U,
+            "model destruction during dispatch must cancel later observers and release tokens");
+}
+
+void test_shared_commands() {
+    gf::Command music{};
+    music.set_checked(true);
+    gf::CheckBox first(gf::StableId("first-music"));
+    gf::CheckBox second(gf::StableId("second-music"));
+    StateObserver observer{};
+    gf::on(music.invoked(), observer, &StateObserver::command);
+    first.bind(music);
+    second.bind(music);
+    require(first.checked() && second.checked(), "command checked state wins on binding");
+    first.perform_click();
+    require(!music.state().checked && !second.checked() && observer.invocations == 1,
+            "one click invokes once and synchronizes every presentation");
+    std::size_t allocations = 0U;
+    {
+        owned_event_allocation_probe::FaultScope probe(
+            std::numeric_limits<std::size_t>::max());
+        for (int index = 0; index < 10000; ++index) {
+            music.set_checked(index % 2 == 0);
+            music.set_enabled(index % 2 == 0);
+        }
+        allocations = owned_event_allocation_probe::attempts;
+    }
+    require(allocations == 0U && !first.enabled() && !second.enabled(),
+            "command state propagation must allocate nothing");
+    require(!first.perform_click() && observer.invocations == 1,
+            "disabled bound commands cannot be invoked");
+    music.set_enabled(true);
+    music.set_checked(true);
+    require(gf::has_semantic_state(second.semantic_descriptor().states,
+                                  gf::SemanticState::checked),
+            "bound command check state must reach accessibility");
+    music.dispose();
+    first.perform_click();
+    require(observer.invocations == 1, "disposed commands cannot be invoked by a surviving button");
+}
+
+class CollectionObserver final : public gf::Component {
+public:
+    void command(const gf::CommandItem& item) { last_id = item.id; ++commands; }
+    void choice(const int index) { last_index = index; ++choices; }
+    void toggle(const int index, const bool expanded) {
+        last_index = index;
+        last_expanded = expanded;
+        ++toggles;
+    }
+    int last_id{};
+    int last_index{-1};
+    int commands{};
+    int choices{};
+    int toggles{};
+    bool last_expanded{};
+};
+
+class ReplaceCommandItems final : public gf::Component {
+public:
+    explicit ReplaceCommandItems(gf::CommandBar& bar) : bar_(bar) {}
+    void replace(const gf::CommandItem&) {
+        bar_.set_items({{.id = 9, .label = "Replacement"}});
+    }
+private:
+    gf::CommandBar& bar_;
+};
+
+void test_command_bar_rebuild_and_keyboard() {
+    const std::shared_ptr<gf::CommandBar> bar =
+        gf::make_control<gf::CommandBar>(gf::StableId("commands"));
+    gf::Command run("run", "Run");
+    gf::Window window(bar, {300.0, 40.0});
+    CollectionObserver observer{};
+    StateObserver command_observer{};
+    gf::on(run.invoked(), command_observer, &StateObserver::command);
+    gf::on((*bar).invoked(), observer, &CollectionObserver::command);
+    (*bar).set_items({{.id = 1, .label = "Run", .shortcut = gf::KeyGesture{gf::PhysicalKey::r, gf::Modifier::control}, .command = &run},
+                     {.id = 2, .label = "Help"}});
+    window.flush();
+    require((*bar).item(0).arranged_bounds().width == 150.0 &&
+                (*bar).item(1).arranged_bounds().x == 150.0,
+            "collection geometry must survive Window layout-slot traversal");
+    run.set_enabled(false);
+    require(!(*bar).item(0).tab_stop() && (*bar).item(1).tab_stop(),
+            "disabling the tab-stop command must leave an available bar entry reachable");
+    run.set_enabled(true);
+    gf::Button* const reused = &(*bar).item(0);
+    (*bar).item(0).perform_click();
+    require(observer.commands == 1 && observer.last_id == 1 && command_observer.invocations == 1,
+            "command bar invokes the bound command and reports its item");
+    (*bar).set_items({{.id = 2, .label = "Help"}, {.id = 1, .label = "Run", .command = &run}});
+    require(&(*bar).item(1) == reused, "reordering must reuse the same item control");
+    (*bar).item(1).perform_click();
+    require(observer.commands == 2 && command_observer.invocations == 2,
+            "group subscription survives replacement without duplicate commands");
+    require((*bar).semantic_descriptor().role == gf::SemanticRole::toolbar &&
+                (*bar).part("item", 1) == reused,
+            "command bar must publish toolbar semantics and named item parts");
+    static_cast<void>(window.request_focus((*bar).item(0).shared_from_this()));
+    gf::KeyEvent right{.physical_key = gf::PhysicalKey::right};
+    (*bar).on_key(right);
+    require(right.handled && window.focused_control().get() == reused &&
+                !(*bar).item(0).tab_stop() && (*bar).item(1).tab_stop(),
+            "arrow navigation must maintain a single tab stop");
+    gf::KeyEvent tab{.physical_key = gf::PhysicalKey::tab};
+    (*bar).on_key(tab);
+    require(!tab.handled, "Tab must leave command-bar traversal to the Window");
+
+    const std::shared_ptr<gf::CommandBar> rebuilding =
+        gf::make_control<gf::CommandBar>(gf::StableId("rebuilding"));
+    (*rebuilding).set_items({{.id = 7, .label = "Original"}});
+    ReplaceCommandItems replace(*rebuilding);
+    CollectionObserver later{};
+    gf::on((*rebuilding).invoked(), replace, &ReplaceCommandItems::replace);
+    gf::on((*rebuilding).invoked(), later, &CollectionObserver::command);
+    (*rebuilding).item(0).perform_click();
+    require(later.last_id == 7 && (*rebuilding).items()[0].id == 9,
+            "dispatch must retain the original item across list replacement");
+}
+
+void test_choice_group_state_and_rebuild() {
+    const std::shared_ptr<gf::ChoiceGroup> group =
+        gf::make_control<gf::ChoiceGroup>(gf::StableId("choices"));
+    (*group).set_items({{.id = 10, .label = "First"}, {.id = 20, .label = "Second"}});
+    gf::Value<int> model(0);
+    (*group).bind(model);
+    CollectionObserver observer{};
+    gf::on((*group).changed(), observer, &CollectionObserver::choice);
+    gf::Button* const first = &(*group).item(0);
+    (*group).item(1).perform_click();
+    require(model.get() == 1 && (*group).selected_index() == 1 && observer.choices == 1,
+            "choice activation must synchronize the selection model once");
+    require((*group).semantic_descriptor().role == gf::SemanticRole::radio_group &&
+                (*group).item(1).semantic_descriptor().role == gf::SemanticRole::radio_button &&
+                gf::has_semantic_state((*group).item(1).semantic_descriptor().states, gf::SemanticState::checked),
+            "choice semantics must expose a checked radio item");
+    bool rejected = false;
+    try { model.set(9); } catch (const std::out_of_range&) { rejected = true; }
+    require(rejected && model.get() == 1, "invalid bound selection must fail before model mutation");
+    std::size_t allocations = 0U;
+    {
+        owned_event_allocation_probe::FaultScope probe(std::numeric_limits<std::size_t>::max());
+        for (int index = 0; index < 10000; ++index) model.set(index % 2);
+        allocations = owned_event_allocation_probe::attempts;
+    }
+    require(allocations == 0U, "choice changes must allocate nothing after configuration");
+    (*group).set_items({{.id = 10, .label = "Only"}});
+    require(&(*group).item(0) == first && model.get() == -1,
+            "shrinking a choice list reuses controls and clears a removed selection");
+    const int before = observer.choices;
+    gf::KeyEvent right{.physical_key = gf::PhysicalKey::right};
+    (*group).on_key(right);
+    require(right.handled && model.get() == 0 && observer.choices == before + 1,
+            "arrow keys select choices through the shared model");
+}
+
+void test_expandable_sections_state() {
+    const std::shared_ptr<gf::ExpandableSections> sections =
+        gf::make_control<gf::ExpandableSections>(gf::StableId("sections"));
+    const gf::Control::Ptr first = gf::make_control<gf::Control>(gf::StableId("first-body"));
+    const gf::Control::Ptr second = gf::make_control<gf::Control>(gf::StableId("second-body"));
+    gf::Value<bool> first_open(true);
+    gf::Value<bool> second_open(false);
+    (*sections).set_single_open(true);
+    (*sections).set_items({{.id = 1, .label = "First", .content = first, .expanded = &first_open},
+                          {.id = 2, .label = "Second", .content = second, .expanded = &second_open}});
+    CollectionObserver observer{};
+    gf::on((*sections).toggled(), observer, &CollectionObserver::toggle);
+    require((*first).visible() && !(*second).visible(), "section model wins at attachment");
+    second_open.set(true);
+    require(!first_open.get() && second_open.get() && !(*first).visible() && (*second).visible(),
+            "single-open sections must close the other model and retained body");
+    const gf::SemanticDescriptor header = (*(*sections).part("header", 1)).semantic_descriptor();
+    require(gf::has_semantic_state(header.states, gf::SemanticState::expanded),
+            "disclosure accessibility state must follow its shared model");
+    std::size_t allocations = 0U;
+    {
+        owned_event_allocation_probe::FaultScope probe(std::numeric_limits<std::size_t>::max());
+        for (int index = 0; index < 10000; ++index) second_open.set(index % 2 == 0);
+        allocations = owned_event_allocation_probe::attempts;
+    }
+    require(allocations == 0U, "section changes must allocate nothing after configuration");
+    (*sections).set_items({{.id = 1, .label = "First", .content = second, .expanded = &first_open},
+                          {.id = 2, .label = "Second", .content = first, .expanded = &second_open}});
+    require((*first).parent() == sections && (*second).parent() == sections,
+            "swapping section contents must preserve both tree attachments");
+    gf::Control* const reused = (*sections).part("header", 0);
+    (*sections).set_items({{.id = 1, .label = "Renamed", .content = first, .expanded = &first_open}});
+    require((*sections).part("header", 0) == reused, "section replacement reuses headers");
+    const int before = observer.toggles;
+    (*sections).set_expanded(0, true);
+    require(observer.toggles == before + 1 && first_open.get(),
+            "group toggle subscription survives replacement");
+}
+
+struct ReleaseRecord final {
+    std::array<int, 3U>& order;
+    std::size_t& count;
+    int id;
+    ~ReleaseRecord() { order[count] = id; ++count; }
+};
+struct RetainRecord final {
+    std::shared_ptr<ReleaseRecord> record;
+    void operator()() const noexcept {}
+};
+void test_mixed_revocation_order() {
+    gf::Component owner{};
+    gf::Event<> first{};
+    gf::Event<> middle{};
+    gf::Event<> last{};
+    std::array<int, 3U> order{};
+    std::size_t count = 0U;
+    const gf::SubscriptionToken first_token = first.subscribe(owner,
+        RetainRecord{std::make_shared<ReleaseRecord>(order, count, 1)});
+    owner.own_subscription(middle.subscribe(
+        RetainRecord{std::make_shared<ReleaseRecord>(order, count, 2)}));
+    const gf::SubscriptionToken last_token = last.subscribe(owner,
+        RetainRecord{std::make_shared<ReleaseRecord>(order, count, 3)});
+    owner.dispose();
+    const std::array<int, 3U> expected{3, 2, 1};
+    require(count == 3U && order == expected,
+            "caller-held and owner-held tokens must revoke in reverse acquisition order");
+}
+
+class CheckDuringEnableChange final : public gf::Component {
+public:
+    explicit CheckDuringEnableChange(gf::Command& command) : command_(command) {}
+    void change(bool) { command_.set_checked(true); }
+private:
+    gf::Command& command_;
+};
+void test_nested_command_change_keeps_latest_state() {
+    gf::Command command{};
+    command.set_checked(false);
+    gf::CheckBox button(gf::StableId("nested-command"));
+    button.bind(command);
+    CheckDuringEnableChange observer(command);
+    gf::on(button.enabled_changed(), observer, &CheckDuringEnableChange::change);
+    command.set_enabled(false);
+    require(command.state().checked && button.checked() && !button.enabled(),
+            "a nested command update must not be overwritten by an older projection");
+}
+
+class DestroyCommand final : public gf::Component {
+public:
+    explicit DestroyCommand(std::unique_ptr<gf::Command>& command) : command_(command) {}
+    void destroy() { command_.reset(); }
+private:
+    std::unique_ptr<gf::Command>& command_;
+};
+class DestroySlider final : public gf::Component {
+public:
+    explicit DestroySlider(std::shared_ptr<gf::TrackBar>& slider) : slider_(slider) {}
+    void destroy() { slider_.reset(); }
+private:
+    std::shared_ptr<gf::TrackBar>& slider_;
+};
+void test_command_and_bound_control_destruction_during_dispatch() {
+    gf::Button button(gf::StableId("surviving-button"));
+    std::unique_ptr<gf::Command> command = std::make_unique<gf::Command>();
+    DestroyCommand destroy(command);
+    StateObserver later{};
+    gf::on((*command).invoked(), destroy, &DestroyCommand::destroy);
+    gf::on((*command).invoked(), later, &StateObserver::command);
+    button.bind(*command);
+    button.perform_click();
+    require(!command && later.invocations == 0 && !button.command_connected(),
+            "destroying a command in invocation cancels later observers and control access");
+    button.perform_click();
+    gf::Value<double> model(10.0);
+    std::shared_ptr<gf::TrackBar> slider = gf::make_control<gf::TrackBar>(gf::StableId("destroying-slider"));
+    DestroySlider destroy_slider(slider);
+    (*slider).bind(model);
+    gf::on((*slider).value_changed(), destroy_slider, &DestroySlider::destroy);
+    model.set(20.0);
+    require(!slider && model.get() == 20.0, "a bound control can be destroyed during propagation");
+    model.set(30.0);
+}
+
+void test_command_shortcut_lifetime_and_enabled_state() {
+    const gf::Control::Ptr root = gf::make_control<gf::Control>(gf::StableId("shortcut-root"));
+    gf::Window window(root, {100.0, 100.0});
+    std::unique_ptr<gf::Command> command = std::make_unique<gf::Command>();
+    StateObserver observer{};
+    gf::on((*command).invoked(), observer, &StateObserver::command);
+    const gf::AcceleratorToken shortcut = (*command).bind_shortcut(window,
+        {gf::PhysicalKey::r, gf::Modifier::control});
+    const gf::KeyEvent key{.physical_key = gf::PhysicalKey::r, .modifiers = gf::Modifier::control};
+    require(window.dispatch_key(key) && observer.invocations == 1,
+            "keyboard invokes the same command authority");
+    (*command).set_enabled(false);
+    require(!window.dispatch_key(key) && observer.invocations == 1,
+            "disabled commands are also disabled through shortcuts");
+    command.reset();
+    require(!shortcut.connected() && !window.dispatch_key(key),
+            "command destruction revokes the window's shortcut");
+}
+
+void test_choice_images_and_section_keyboard() {
+    const std::shared_ptr<gf::ChoiceGroup> choices = gf::make_control<gf::ChoiceGroup>(gf::StableId("image-choices"));
+    gf::Window window(choices, {100.0, 60.0});
+    const std::array<std::byte, 4U> pixel{std::byte{0}, std::byte{0}, std::byte{255}, std::byte{255}};
+    const gf::ImageLoadResult loaded = window.load_bgra32_premultiplied(1U, 1U, 4U, pixel);
+    require(static_cast<bool>(loaded), "image fixture must load");
+    (*choices).set_items({{.id = 1, .label = "Red", .image = loaded.image, .accessible_name = "Red tile"}});
+    require((*choices).item(0).image() == loaded.image &&
+                (*choices).item(0).semantic_descriptor().name == "Red tile",
+            "choice images and accessible names reach the retained item control");
+    const std::shared_ptr<gf::ExpandableSections> sections = gf::make_control<gf::ExpandableSections>(gf::StableId("keyboard-sections"));
+    const gf::Control::Ptr body = gf::make_control<gf::Control>(gf::StableId("keyboard-body"));
+    (*sections).set_items({{.id = 1, .label = "Section", .content = body}});
+    gf::Window section_window(sections, {200.0, 120.0});
+    gf::Control& header = *(*sections).part("header", 0);
+    section_window.flush();
+    static_cast<void>(section_window.request_focus(header.shared_from_this()));
+    static_cast<void>(section_window.dispatch_key({.action = gf::KeyAction::down, .physical_key = gf::PhysicalKey::space}));
+    static_cast<void>(section_window.dispatch_key({.action = gf::KeyAction::up, .physical_key = gf::PhysicalKey::space}));
+    require((*sections).expanded(0) && (*body).visible(),
+            "keyboard activation must expand the section through its retained state");
+}
+
+void test_unlink_middle_subscription() {
+    gf::Event<int> first{};
+    std::unique_ptr<gf::Event<int>> middle = std::make_unique<gf::Event<int>>();
+    gf::Event<int> last{};
+    int total = 0;
+    Recorder owner(total);
+    gf::on(first, owner, &Recorder::add);
+    gf::on(*middle, owner, &Recorder::add);
+    gf::on(last, owner, &Recorder::add);
+    middle.reset();
+    require(owner.owned_subscription_count() == 2U,
+            "unlinking a middle token must preserve both neighbors");
+    first.emit(1);
+    last.emit(2);
+    owner.dispose();
+    first.emit(4);
+    last.emit(8);
+    require(total == 3 && owner.owned_subscription_count() == 0U,
+            "remaining subscriptions must invoke and revoke correctly");
+}
+
 void test_registration_failure_rollback() {
     std::size_t failure_count = 0U;
     bool reached_success = false;
@@ -495,6 +1018,20 @@ int main() {
         test_publisher_and_target_destruction();
         test_exception_recovery_and_null_member();
         test_explicit_token_transfer_and_legacy_lifetime();
+        test_short_lived_publishers_release_owner_storage();
+        test_unlink_middle_subscription();
+        test_nested_command_change_keeps_latest_state();
+        test_command_and_bound_control_destruction_during_dispatch();
+        test_command_shortcut_lifetime_and_enabled_state();
+        test_choice_images_and_section_keyboard();
+        test_mixed_revocation_order();
+        test_command_bar_rebuild_and_keyboard();
+        test_choice_group_state_and_rebuild();
+        test_expandable_sections_state();
+        test_shared_scalar_state();
+        test_model_and_control_lifetimes();
+        test_shared_commands();
+        test_bound_values_and_omitted_arguments();
         test_registration_failure_rollback();
         test_allocation_free_emission();
         std::cout << "owned event tests passed\n";

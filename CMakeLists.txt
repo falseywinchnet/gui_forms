@@ -335,6 +335,9 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/card/card.cpp
     src/controls/panel/card/review_card/review_card.cpp
     src/controls/container/master_detail_view/master_detail_view.cpp
+    src/controls/collections/expandable_sections.cpp
+    src/controls/collections/choice_group.cpp
+    src/controls/collections/command_bar.cpp
     src/controls/commands/command/command.cpp
     src/controls/commands/command_binding/command_binding.cpp
     src/controls/menu/context_menu/context_menu.cpp
@@ -1811,12 +1814,20 @@ if(GUI_FORMS_BUILD_TESTS)
     add_library(gui_forms_reference_examples OBJECT
         examples/reference/clipboard_image.cpp
         examples/reference/owned_events.cpp
+        examples/reference/bound_values.cpp
+        examples/reference/shared_state.cpp
+        examples/reference/collection_state.cpp
+        examples/reference/collection_gallery.cpp
     )
     target_link_libraries(gui_forms_reference_examples PRIVATE gui_forms_core)
 
     find_package(Python3 COMPONENTS Interpreter QUIET)
     find_program(GUI_FORMS_REFERENCE_CLANG NAMES clang++)
     if(Python3_Interpreter_FOUND AND GUI_FORMS_REFERENCE_CLANG)
+        add_test(NAME gui_forms_owned_event_compile_failures
+            COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/owned_event_compile_failures.py
+                ${GUI_FORMS_REFERENCE_CLANG} ${CMAKE_CURRENT_SOURCE_DIR}/include)
         add_test(NAME gui_forms_api_reference_tests
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_reference_tests.py)
         add_custom_target(gui_forms_api_reference
@@ -1911,6 +1922,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_callback_lab tools/callback_lab.cpp)
     target_link_libraries(gui_forms_callback_lab PRIVATE gui_forms_core)
 
+    if(TARGET gui_forms_skia)
+        add_executable(gui_forms_concise_authoring_lab tools/concise_authoring_lab.cpp)
+        target_link_libraries(gui_forms_concise_authoring_lab PRIVATE gui_forms_controls gui_forms_skia)
+    endif()
     add_executable(gui_forms_owned_event_lab tools/owned_event_lab.cpp)
     target_link_libraries(gui_forms_owned_event_lab PRIVATE gui_forms_core)
 

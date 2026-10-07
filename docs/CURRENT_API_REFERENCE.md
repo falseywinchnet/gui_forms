@@ -126,7 +126,8 @@ Windows qualification and Linux host packaging remain open.
 Available from `<gui_forms/event.hpp>` and the main umbrella. The owner must
 derive from `Component`. The event arguments and member target type are deduced;
 ordinary, `const`, `noexcept`, and inherited members are supported. The member
-returns `void` and matches the event's argument types, including references.
+returns `void` and accepts a leading prefix of the event's argument types,
+including references. A handler may omit all unused trailing event arguments.
 
 ```cpp
 gui_forms::on(run.clicked(), *this, &Actions::on_run);
@@ -162,10 +163,36 @@ allocate; member dispatch does not allocate or add idle scheduler work.
 `Component::own_subscription(SubscriptionToken)` is the explicit transfer seam
 when a caller already has a token. Pass `std::move(token)`; the former token
 becomes empty. A dead component, or a failed transfer, disconnects that token.
-Disconnected retained tokens are reclaimed on the next transfer or owner
-disposal. Ordinary `subscribe(...)` remains caller-owned: dropping its returned
+Disconnected owner-held tokens are unlinked immediately, including on publisher
+destruction. `owned_subscription_count()` reports the current live entries; no
+separate token-store capacity remains after the last entry is removed. Ordinary `subscribe(...)` remains caller-owned: dropping its returned
 token still disconnects immediately. Use it for an independently cancellable
 connection; `on` deliberately returns no second cancellation owner.
+
+One or two small typed values may follow the member pointer:
+
+```cpp
+gui_forms::on(tile.clicked(), *this, &Settings::choose, row, choice);
+// void Settings::choose(int row, int choice);
+// or void Settings::choose(int row, int choice, gui_forms::ButtonBase& sender);
+```
+
+Bound parameters come first; the longest compatible leading event-argument
+prefix follows them. Values must be trivially copyable and total at most 16
+bytes. They are stored inline in the connection slot retained by the token,
+without a separate payload allocation. They are immutable copies, not captured
+references; use indices for application-owned strings and objects. A pointer
+value is still a borrow and does not extend its referent's lifetime.
+The compiler diagnoses an invalid signature, more than two values, nontrivial
+values or an oversized payload with a `gui_forms::on` static assertion.
+
+### Shared state and item-reporting controls
+
+See [state and collection contracts](CONCISE_STATE_AND_COLLECTIONS.md) for
+`Value<T>`, `ButtonBase::bind(Command&)`, `CheckBox::bind(Value<bool>&)`,
+`RangeControl::bind(Value<double>&)`, Command shortcuts, CommandBar, ChoiceGroup
+and ExpandableSections. Their installed examples are `shared_state.cpp` and
+`collection_state.cpp`; `bound_values.cpp` demonstrates typed handler values.
 
 This development C++ addition changes `Component` layout and private event
 storage. Rebuild GUI.Forms and all C++ consumers together. It does not add a C

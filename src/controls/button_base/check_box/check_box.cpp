@@ -13,6 +13,25 @@
 
 namespace gui_forms {
 
+void CheckBox::bind(Command& command) {
+    unbind();
+    ButtonBase::bind(command);
+}
+
+void CheckBox::bind(Value<bool>& model) {
+    require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
+    std::unique_ptr<detail::ScalarBinding<CheckBox, bool>> binding =
+        std::make_unique<detail::ScalarBinding<CheckBox, bool>>(
+            *this, model, checked_changed_, &CheckBox::checked, &CheckBox::set_checked);
+    // Retire the old model before the initial model-wins publication.
+    unbind_command();
+    value_binding_ = std::move(binding);
+    (*value_binding_).synchronize();
+}
+
+void CheckBox::unbind() noexcept { value_binding_.reset(); }
+
 CheckBox::CheckBox(StableId stable_id, std::string text)
     : ButtonBase(std::move(stable_id), std::move(text)) {
     set_text_alignment(ContentAlignment::middle_left);
@@ -31,6 +50,7 @@ CheckBox::CheckBox(StableId stable_id, std::string text)
 
 void CheckBox::set_check_state(CheckState state) {
     require_mutable();
+    const Control::Ptr retained = weak_from_this().lock();
     if (state != CheckState::unchecked && state != CheckState::checked &&
         state != CheckState::indeterminate) {
         throw std::invalid_argument("invalid check state");
@@ -41,6 +61,8 @@ void CheckBox::set_check_state(CheckState state) {
     if (check_state_ == state) {
         return;
     }
+    if (value_binding_) (*value_binding_).validate_update(state == CheckState::checked);
+    if (!is_alive()) return;
     const bool previous_checked = checked();
     check_state_ = state;
     invalidate(Dirty::paint | Dirty::semantics);
@@ -199,6 +221,7 @@ Insets CheckBox::visual_outsets() const noexcept {
 }
 
 void CheckBox::on_activate() {
+    const Control::Ptr retained = weak_from_this().lock();
     if (auto_check_) {
         CheckState next = CheckState::unchecked;
         if (check_state_ == CheckState::unchecked) {

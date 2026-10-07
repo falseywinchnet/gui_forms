@@ -48,3 +48,5 @@
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 #include "gui_forms/visual_inspection.hpp"
+
+#include "gui_forms/value.hpp"

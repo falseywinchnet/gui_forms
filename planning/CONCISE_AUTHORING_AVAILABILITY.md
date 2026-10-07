@@ -2,7 +2,7 @@
 
 Date: 2026-10-07.
 
-Status: **GIVEN owner direction; implemented event foundation; CANDIDATE grid,
+Status: **GIVEN owner direction; event, state and collection development implementation; CANDIDATE grid,
 form and skin contracts.** This record does not accept a new architecture or
 advertise the unimplemented capabilities as available.
 
@@ -36,6 +36,12 @@ language system model and ORC-GUI-002; this proposal does not reopen them.
 | Capability | Status at this change | Public evidence or remaining requirement |
 |---|---|---|
 | Owner-held `on(event, owner, &Owner::method)` | **Implemented development C++** | `event.hpp`, API reference, compiled `examples/reference/owned_events.cpp`, `owned_event_tests.cpp` |
+| Immediate publisher teardown | **Implemented development C++** | 1,000-button lifetime/allocation test; no retained owner token or store capacity after publisher destruction |
+| Omitted trailing event arguments and inline bound values | **Implemented development C++** | Zero, one or two bound values; 16-byte total; compiler diagnostic fixtures |
+| Shared `Value<T>` and non-owning `control.bind(model)` | **Implemented development C++** | Scalar values, CheckBox, RangeControl, ChoiceGroup; synchronous notifications and validation |
+| Shared Command binding and shortcuts | **Implemented development C++** | `ButtonBase::bind`, checked/enabled projection, `Command::bind_shortcut`; existing owning CommandBinding remains compatible |
+| CommandBar, ChoiceGroup, ExpandableSections | **Implemented development C++** | Retained item controls, group events, public named item/header/body parts; installed examples and lifetime tests |
+| Item list activation | **Existing** | `ListBox::item_activated()` reports `std::size_t`; no duplicate list control introduced |
 | Explicit token transfer | **Implemented development C++** | `Component::own_subscription`; ordinary caller-held tokens remain supported |
 | Retained parent ownership and mandatory stable IDs | **Existing** | `Control`, `make_control`, attachment/lifecycle tests |
 | Table and flow controls | **Existing; not the proposed common grid** | Separate `layout_children` implementations and `layout_panel_tests.cpp` |
@@ -71,10 +77,10 @@ no live connection; an independently cancellable connection still uses a
 caller-held `SubscriptionToken`. No event helper starts a timer, posts work or
 adds an idle poll.
 
-Token storage is lazy: a component that never takes ownership of a token gains
-one pointer-sized field and no allocation. First use creates a token store;
-subsequent registrations reuse its capacity. Expired event connections are
-reclaimed on subsequent registration or disposal. Member emission has no
+Token storage uses links inside the existing connection slots. Publisher
+disconnection immediately unlinks and releases its owner-held connection.
+There is no separately allocated owner token store or retained vector capacity.
+Caller-held and owner-held revocation still share reverse acquisition order. Member emission has no
 `std::function` copy or allocation. This is not a claim about arbitrary legacy
 owning-callable emission or user handler work.
 
@@ -84,6 +90,45 @@ during dispatch; nested registration; null members; exceptions; token transfer;
 allocation failure at every registration allocation; and allocation counting
 over 10,000 emissions. Platform results and the source review are recorded in
 `../experiments/CONCISE_AUTHORING_EVENT_FOUNDATION.md`.
+
+## Required follow-up before form records: events, shared state and collections
+
+**GIVEN:** all requirements in the 2026-10-07 PlaySuite sibling follow-up are
+mandatory GUI.Forms deliverables, not optional extensions. The delivery order
+is publisher cleanup (0), omitted arguments and small typed bound values (1–2),
+shared state (3), and item-reporting collections (4). Form records depend on
+these capabilities. The independent grid work does not remove or replace them.
+No PlaySuite source or adoption work belongs in this task.
+
+The development implementation covers:
+
+- Immediate owner-token reclamation after publisher death, tested with 1,000
+  short-lived buttons and balanced live allocation counts.
+- Named handlers accepting a leading prefix of event arguments, including none;
+  one or two trivial bound values of at most 16 total bytes, inline in the
+  existing connection allocation. Registration allocates; bound payload storage
+  and steady-state dispatch do not introduce separate allocations.
+- Application-owned scalar Value and Command state. Controls borrow models,
+  stop using them after model disposal/destruction, and do not echo matching
+  model state into the originating control. Programmatic setters raise state
+  notifications without input-only notifications. Bind-time model state wins.
+- Command bar item identity and Command/shortcut association; choice-group
+  radio state and Value binding; retained expandable sections with individual
+  model state and optional single-open behavior. Group subscriptions survive
+  replacement. Existing ListBox provides typed item activation.
+- Named retained skin parts: `item` on command/choice groups; `header` and `body`
+  on sections. These expose the existing controls' visual recipes, image/text
+  layout and typography. They are the conserved group anatomy for the later
+  skin tranche, not a claim that two complete new skins have shipped.
+
+Required acceptance remains the complete sibling request: destruction in either
+order and during dispatch; no propagation loops or steady-state allocation;
+item rebuilding, keyboard and accessibility; installed-SDK examples; ownership
+and error contracts; dispatch/idle/paint evidence and coherent C++ rebuild notes.
+See `../docs/CONCISE_STATE_AND_COLLECTIONS.md` for exact semantics and limits,
+and `../experiments/CONCISE_STATE_AND_COLLECTIONS.md` for measured qualification.
+All platform claims must follow actual results; source availability alone is
+not native-host qualification.
 
 ## Delivery B: one retained grid and compatibility migration
 

@@ -31,6 +31,8 @@ AtkRole native_role(SemanticRole role) {
     case SemanticRole::button: return ATK_ROLE_PUSH_BUTTON;
     case SemanticRole::check_box: case SemanticRole::check_list_item: return ATK_ROLE_CHECK_BOX;
     case SemanticRole::radio_button: return ATK_ROLE_RADIO_BUTTON;
+    case SemanticRole::toolbar: return ATK_ROLE_TOOL_BAR;
+    case SemanticRole::radio_group: return ATK_ROLE_PANEL;
     case SemanticRole::text_box: return ATK_ROLE_ENTRY;
     case SemanticRole::numeric_field: return ATK_ROLE_SPIN_BUTTON;
     case SemanticRole::list: return ATK_ROLE_LIST;

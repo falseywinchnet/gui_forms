@@ -708,11 +708,16 @@ protected:
     void publish_change(Event<EventArguments...>& event, Values&&... values) {
         using Publication = detail::DeferredEventPublication<
             Event<EventArguments...>, std::decay_t<Values>...>;
-        publish_change(
-            static_cast<const void*>(&event),
-            Publication(event,
-                        std::decay_t<Values>(
-                            std::forward<Values>(values))...));
+        Publication publication(event,
+            std::decay_t<Values>(std::forward<Values>(values))...);
+        if (initialization_depth_ == 0U) {
+            // Keep the same argument snapshot without wrapping a synchronous
+            // publication in std::function. Its small-buffer policy differs
+            // between standard libraries and may allocate even for scalars.
+            publication();
+            return;
+        }
+        publish_change(static_cast<const void*>(&event), std::move(publication));
     }
     // Language/object adapters may use Control solely as the retained lifetime
     // and PropertyGrid owner. They clear the stock visual schema before
