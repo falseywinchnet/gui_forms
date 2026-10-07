@@ -26,7 +26,8 @@ Publisher or owner destruction during dispatch cancels later callbacks, while
 the active connection remains retained until return. This does not keep the
 callback's owner alive: do not access an owner after deleting it. A derived
 owner whose destructor emits events must dispose before tearing down handler
-state. The compiler's `gui_forms::on` assertions explain signature, count, size
+state. Overloaded member names require an explicit member-pointer cast when
+deduction is ambiguous. The compiler's `gui_forms::on` assertions explain signature, count, size
 and trivial-copy violations; the build runs five deliberate-failure fixtures.
 
 ## State and input notifications
@@ -159,6 +160,8 @@ rule. No strong rollback guarantee is claimed across application callbacks.
 The standalone `examples/reference` CMake project uses only the installed SDK.
 It compiles/runs `owned_events`, `bound_values`, `shared_state` and
 `collection_state`; native CI runs these after installation on each platform.
+The optional `collection_gallery` executable demonstrates the same contracts
+through an interactive native Window.
 
 Component/Revocable, Event slot, CommandState and affected control layouts
 change. Rebuild GUI.Forms and every C++ consumer together. Existing source APIs
