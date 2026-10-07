@@ -54,6 +54,12 @@ The first `macos-15` CI preparation (download, configure, build and audit) took
 **56 s**. Runtime cache keys include compiler binary/SDK/image identity and the
 build/integrity recipe. Restores check configured headers, libraries and symlink
 integrity; the main cache archive carries the same ready-to-use runtime prefix.
+An independently restored prefix passed the native cancellation/join tests with
+all three relocated dylibs loaded via the application's rpath. An initial global
+`DYLD_LIBRARY_PATH` trial was rejected: it also replaced Apple's system-framework
+runtime and failed on an Apple-specific typed-allocation symbol. The supported
+per-image rpath leaves system dependencies alone. CI now tests archive extraction,
+integrity, minimums and native execution before publishing the macOS archive.
 
 ## Minimum-version audit
 
@@ -105,5 +111,13 @@ reuse of batch and diagnostic storage. The spelling scanner reports no findings
 in new C++/Objective-C++ files. Existing unrelated Objective-C blocks, arrow
 spelling and other legacy code are not claimed compliant. The inherited C11
 pool uses C pointer syntax; the C++ spelling table is not applied to C syntax.
+
+The builds are not warning-free. The reviewed macOS/Windows logs retain the
+vendored stb_vorbis tautological pointer comparison and an existing development
+inspection switch missing `draw_prepared_text`. macOS additionally reports an
+existing CoreGraphics enum conversion, duplicate static library link arguments,
+and upstream runtime format-attribute/deprecated linker-option diagnostics.
+These do not report newer OS API requirements; they are not hidden by blanket
+warning suppression. No HarfBuzz memcpy warning appeared in those logs.
 
 Four-platform CI and final release asset verification are recorded on PR #3.

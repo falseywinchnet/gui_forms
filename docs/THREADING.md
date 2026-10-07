@@ -39,7 +39,7 @@ self-join throws `std::logic_error` before waiting.
 Worker code must not mutate retained controls. Publish immutable results through
 the application's existing UI posting boundary, with a lifetime-valid recipient.
 Cancellation does not revoke an already posted callback or extend its owner's
-lifetime. This utility does not add a task pool or an Orchestrator service edge.
+lifetime. This utility does not add a global executor or an Orchestrator service edge.
 
 **OBSERVED provenance:** the historical reference remains in
 [`falseywinchnet/backend`](https://github.com/falseywinchnet/backend)

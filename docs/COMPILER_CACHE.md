@@ -118,6 +118,12 @@ remove the build-workspace runtime rpath before signing. Sign the copied librari
 before signing the enclosing app. Never copy a newer-minimum Homebrew dylib and
 change only its load-command version.
 
+Use these per-image rpaths, not a global `DYLD_LIBRARY_PATH` override: Apple's
+system frameworks must continue to load their own system C++ runtime. CI extracts
+the actual cache archive into a fresh directory, verifies its manifest and minimums,
+rewrites a native threading test's rpath, signs it and requires successful execution
+with all three restored dylibs loaded before uploading the archive.
+
 Run `python tools/audit_macos_minimum.py <bundle-or-library-directory>` to reject
 non-arm64 images, minimums above 14.0, and absolute/system libc++ dependencies.
 The provider audits runtimes, its installed SDK and reference executables.

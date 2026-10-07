@@ -209,6 +209,9 @@ jobs:
           else
             tar -czf gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache cache-manifest.json
           fi
+      - name: Prove archived macOS runtimes after relocation
+        if: runner.os == 'macOS'
+        run: python gui_forms/tools/prove_macos_runtime_restore.py --archive gui-forms-cache-macos-arm64.tar.gz --executable .build/native-macos-arm64/gui-forms/gui_forms_threading_tests
       - uses: actions/upload-artifact@v4
         with:
           name: gui-forms-cache-${{ matrix.platform }}
