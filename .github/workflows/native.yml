@@ -1,0 +1,215 @@
+name: GUI.Forms source and compiler cache
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gui-forms-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  house-style:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check scanner fixtures and corrected authoring scope
+        run: |
+          python3 -B -m unittest discover -s tools -p test_house_style.py
+          python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp tools/owned_event_lab.cpp
+  native:
+    needs: house-style
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            platform: macos-arm64
+            shell: bash
+          - runner: ubuntu-24.04
+            platform: linux-x64
+            shell: bash
+          - runner: windows-2022
+            platform: windows-x64
+            shell: 'msys2 {0}'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      CC: clang
+      CXX: clang++
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      CMAKE_OBJCXX_COMPILER_LAUNCHER: ccache
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: gui_forms
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja ccache
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          # Ubuntu 24.04's default Clang 18 rejects the existing in-class
+          # friend exception specifications. Use the LLVM 22 release series.
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
+          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
+          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils
+          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: CLANG64
+          update: true
+          path-type: inherit
+          install: >-
+            mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python mingw-w64-clang-x86_64-ccache git
+      - name: Prove relocated cache and invalidation
+        run: python gui_forms/tools/prove_compiler_cache.py --source gui_forms --scratch cache-proof --jobs 4
+      - name: Configure compiler cache
+        id: compiler
+        run: |
+          cache_dir="$PWD/.ccache"
+          cache_base="$PWD"
+          if command -v cygpath >/dev/null; then
+            cache_dir="$(cygpath -m "$cache_dir")"
+            cache_base="$(cygpath -m "$cache_base")"
+          fi
+          echo "CCACHE_DIR=$cache_dir" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$cache_base" >> "$GITHUB_ENV"
+          echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+          python gui_forms/tools/compiler_identity.py
+      - uses: actions/cache/restore@v4
+        id: objects
+        with:
+          path: .ccache
+          key: gui-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ github.sha }}
+          restore-keys: gui-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
+      - uses: actions/cache/restore@v4
+        id: dependencies
+        if: runner.os != 'Windows'
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-${{ matrix.platform }}/skia
+          key: gui-deps-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}
+      - name: Build and test native toolkit
+        run: |
+          ccache --zero-stats
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4
+          else
+            python gui_forms/tools/ci_build.py --jobs 4
+          fi
+      - name: Test development text-mask ownership on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          sh gui_forms/third_party/fetch_text_stack.sh
+          sh gui_forms/third_party/fetch_linebreak.sh
+          if [ -f .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log ]; then
+            cp .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/SDKLastTest.log
+          fi
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON -DGUI_FORMS_BUILD_TEXT_MASKS=ON -DGUI_FORMS_BUILD_PREPARED_TEXT=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests gui_forms_text_mask_native_tests gui_forms_text_mask_wrapping_tests gui_forms_linebreak_conformance_tests gui_forms_prepared_text_service_tests gui_forms_prepared_window_input_tests gui_forms_prepared_window_batch_tests gui_forms_prepared_window_shape_tests gui_forms_prepared_window_session_tests --parallel 4
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_(text_mask_(lifecycle|native|wrapping)_tests|linebreak_conformance|prepared_text_service_tests|prepared_window_(input|batch|shape|session)_tests)$' --output-on-failure
+      - name: Test Windows DIB ownership and exact brush replay
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          cp .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/DevelopmentTextLastTest.log
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_windows_dib_frame_store_tests gui_forms_windows_dib_lifecycle_tests --parallel 4
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_windows_dib_(frame_store|lifecycle)_tests$' --output-on-failure
+      - name: Test development text-mask ownership on macOS and Linux
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          sh gui_forms/third_party/fetch_text_stack.sh
+          sh gui_forms/third_party/fetch_linebreak.sh
+          if [ -f .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log ]; then
+            cp .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/SDKLastTest.log
+          fi
+          cmake -S gui_forms -B .build/native-${{ matrix.platform }}/gui-forms -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON -DGUI_FORMS_BUILD_TEXT_MASKS=ON -DGUI_FORMS_BUILD_PREPARED_TEXT=ON
+          cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests gui_forms_text_mask_native_tests gui_forms_text_mask_wrapping_tests gui_forms_linebreak_conformance_tests gui_forms_prepared_text_service_tests gui_forms_prepared_text_raster_tests gui_forms_prepared_display_tests gui_forms_prepared_text_skia_tests gui_forms_opaque_live_surface_raster_tests gui_forms_prepared_window_input_tests gui_forms_prepared_window_batch_tests gui_forms_prepared_window_shape_tests gui_forms_prepared_window_session_tests --parallel 4
+          ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_(text_mask_(lifecycle|native|wrapping)_tests|linebreak_conformance|prepared_text_(service|raster|skia)_tests|prepared_display_tests|opaque_live_surface_raster_tests|prepared_window_(input|batch|shape|session)_tests)$' --output-on-failure
+      - name: Verify Linux prepared frames through X11
+        if: runner.os == 'Linux'
+        run: |
+          cmake --build .build/native-linux-x64/gui-forms --target gui_forms_linux_prepared_text_host_tests --parallel 4
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --test-dir .build/native-linux-x64/gui-forms -R '^gui_forms_linux_prepared_text_host_tests$' --output-on-failure
+      - name: Verify Mac prepared-frame native exposure and visibility
+        if: runner.os == 'macOS'
+        # Run after OFF diagnostics; development-only host rebuilding must not
+        # change the binary used by the recorded baseline or exported SDK.
+        run: |
+          cmake --build .build/native-macos-arm64/gui-forms --target gui_forms_macos_exposure_tests gui_forms_macos_idle_visibility_tests gui_forms_macos_prepared_text_host_tests --parallel 4
+          ctest --test-dir .build/native-macos-arm64/gui-forms -R '^gui_forms_macos_(exposure|idle_visibility|prepared_text_host)_tests$' --output-on-failure
+      - uses: actions/cache/save@v4
+        if: always() && runner.os != 'Windows' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true'
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-${{ matrix.platform }}/skia
+          key: ${{ steps.dependencies.outputs.cache-primary-key }}
+      - name: Report cache statistics
+        if: always()
+        run: ccache --show-stats --verbose
+      - uses: actions/cache/save@v4
+        if: always() && steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: ${{ steps.objects.outputs.cache-primary-key }}
+      - name: Archive consumer cache seed
+        run: |
+          python gui_forms/tools/cache_manifest.py "${{ matrix.platform }}" "${{ steps.compiler.outputs.identity }}"
+          tar -czf gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache cache-manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-forms-cache-${{ matrix.platform }}
+          path: gui-forms-cache-${{ matrix.platform }}.tar.gz
+          compression-level: 0
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-forms-evidence-${{ matrix.platform }}
+          path: |
+            .build/native-${{ matrix.platform }}/**/Testing/Temporary/*LastTest.log
+            cache-proof/receipt.json
+            cache-proof/**/*.log
+
+  publish:
+    needs: native
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-cache-*
+          merge-multiple: true
+          path: release-assets
+      - name: Publish tested immutable build inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          tag="build-${GITHUB_SHA}"
+          gh release create "$tag" release-assets/* --target "$GITHUB_SHA" \
+            --prerelease --title "$tag" \
+            --notes "Tested build inputs for source $GITHUB_SHA. Native validation: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. Not an application release or capability promotion."

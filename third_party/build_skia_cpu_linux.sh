@@ -24,5 +24,8 @@ skia_enable_fontmgr_custom_embedded = true
 skia_enable_fontmgr_custom_empty = true
 extra_cflags = [ "-fPIC" ]
 ARGS
+if [ "${CMAKE_CXX_COMPILER_LAUNCHER:-}" = ccache ]; then
+    printf '\ncc_wrapper = "ccache"\n' >> "$output_dir/args.gn"
+fi
 gn gen "$output_dir" --root="$skia_dir"
 ninja -C "$output_dir" -j "${BUILD_JOBS:-2}" skia
