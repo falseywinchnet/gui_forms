@@ -32,6 +32,9 @@ jobs:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
       CMAKE_OBJCXX_COMPILER_LAUNCHER: ccache
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,11 +64,9 @@ jobs:
             mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake
             mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python mingw-w64-clang-x86_64-ccache git
       - name: Prove relocated cache and invalidation
-        shell: ${{ matrix.shell }}
         run: python gui_forms/tools/prove_compiler_cache.py --source gui_forms --scratch cache-proof --jobs 4
       - name: Configure compiler cache
         id: compiler
-        shell: ${{ matrix.shell }}
         run: |
           cache_dir="$PWD/.ccache"
           cache_base="$PWD"
@@ -94,7 +95,6 @@ jobs:
             .build/native-${{ matrix.platform }}/skia
           key: gui-deps-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}
       - name: Build and test native toolkit
-        shell: ${{ matrix.shell }}
         run: |
           ccache --zero-stats
           if [ "$RUNNER_OS" = Linux ]; then
@@ -148,7 +148,6 @@ jobs:
           ctest --test-dir .build/native-macos-arm64/gui-forms -R '^gui_forms_macos_(exposure|idle_visibility|prepared_text_host)_tests$' --output-on-failure
       - name: Report cache statistics
         if: always()
-        shell: ${{ matrix.shell }}
         run: ccache --show-stats --verbose
       - uses: actions/cache/save@v4
         if: always() && steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true'
@@ -156,7 +155,6 @@ jobs:
           path: .ccache
           key: ${{ steps.objects.outputs.cache-primary-key }}
       - name: Archive consumer cache seed
-        shell: ${{ matrix.shell }}
         run: |
           python gui_forms/tools/cache_manifest.py "${{ matrix.platform }}" "${{ steps.compiler.outputs.identity }}"
           tar -czf gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache cache-manifest.json
