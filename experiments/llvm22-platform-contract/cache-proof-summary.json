@@ -1,0 +1,42 @@
+[
+  {
+    "name": "cold",
+    "seconds": 52.27650316711515,
+    "bytes": 2132568,
+    "sha256": "18b731bf4dd03d9578f16eaf750de317b74b4cd5f4620f501909dd5a6221026a",
+    "hits": 0,
+    "misses": 181
+  },
+  {
+    "name": "relocated",
+    "seconds": 1.0032014171592891,
+    "bytes": 2132568,
+    "sha256": "18b731bf4dd03d9578f16eaf750de317b74b4cd5f4620f501909dd5a6221026a",
+    "hits": 181,
+    "misses": 0
+  },
+  {
+    "name": "implementation-change",
+    "seconds": 0.4668672503903508,
+    "bytes": 2132632,
+    "sha256": "22f5c767880e888557ef36a66f5b181fd4ffd7e2e2f028a0ee08d1aef4675d8d",
+    "hits": 0,
+    "misses": 1
+  },
+  {
+    "name": "header-change",
+    "seconds": 40.92064170911908,
+    "bytes": 2132632,
+    "sha256": "22f5c767880e888557ef36a66f5b181fd4ffd7e2e2f028a0ee08d1aef4675d8d",
+    "hits": 0,
+    "misses": 128
+  },
+  {
+    "name": "option-change",
+    "seconds": 49.825840457808226,
+    "bytes": 7193736,
+    "sha256": "9606471e005f2c6a7dd5946dc602e23cb9c6b50a1f5e3e966ac3dfe378d324ab",
+    "hits": 0,
+    "misses": 180
+  }
+]

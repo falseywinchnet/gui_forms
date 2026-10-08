@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import time
 from typing import Callable, TextIO
 
@@ -54,11 +55,15 @@ def build(root: Path, cache: Path, name: str, jobs: int,
     environment.pop('CCACHE_SLOPPINESS', None)
     if configure:
         flags: str = '-ffile-prefix-map=' + str(root) + '=.'
+        if sys.platform == 'darwin':
+            runtime: str = environment['GUI_FORMS_LLVM_RUNTIME']
+            flags += ' -stdlib=libc++ -nostdinc++ -isystem \"' + runtime + '/include/c++/v1\"'
         if extra_flag:
             flags += ' ' + extra_flag
         command: list[str] = [
             'cmake', '-S', str(source), '-B', str(output), '-G', 'Ninja',
             '-DCMAKE_BUILD_TYPE=Release', '-DGUI_FORMS_ENABLE_SKIA=OFF',
+            '-DCMAKE_TOOLCHAIN_FILE=' + str(source / 'cmake/llvm22.cmake'),
             '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF',
             '-DGUI_FORMS_ENABLE_MACOS_HOST=OFF',
             '-DGUI_FORMS_ENABLE_WINDOWS_HOST=OFF',
@@ -103,8 +108,8 @@ def main() -> None:
     producer: Path = scratch / 'provider'
     consumer: Path = scratch / 'consumer' / 'different-checkout'
     ignored: Callable[[str, list[str]], set[str]] = shutil.ignore_patterns('.git', '.build', 'build', '__pycache__')
-    shutil.copytree(args.source, producer / 'gui_forms', ignore=ignored)
-    shutil.copytree(args.source, consumer / 'gui_forms', ignore=ignored)
+    shutil.copytree(args.source, producer / 'gui_forms', ignore=ignored, symlinks=True)
+    shutil.copytree(args.source, consumer / 'gui_forms', ignore=ignored, symlinks=True)
     records: list[dict[str, object]] = []
     cold: dict[str, object] = build(producer, cache, 'cold', args.jobs, True)
     records.append(cold)

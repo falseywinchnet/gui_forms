@@ -1,0 +1,18 @@
+{
+  "apple-paired-a": {
+    "retained_skia_paint": 697107.0,
+    "idle_poll": 8.84488
+  },
+  "apple-paired-d": {
+    "retained_skia_paint": 710327.0,
+    "idle_poll": 8.87771
+  },
+  "llvm22-paired-b": {
+    "retained_skia_paint": 698411.0,
+    "idle_poll": 8.8665
+  },
+  "llvm22-paired-c": {
+    "retained_skia_paint": 705191.0,
+    "idle_poll": 8.97762
+  }
+}

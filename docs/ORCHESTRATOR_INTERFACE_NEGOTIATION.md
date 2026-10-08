@@ -613,3 +613,17 @@ updated comparison with `cmake --build <build> --target
 gui_forms_live_surface_benchmark` then `<build>/gui_forms_live_surface_benchmark`.
 These are draw-only measurements, not PlaySuite/Stillwater frame timings or a
 claim about the complete native presentation pipeline.
+
+
+## 2026-10-07 LLVM 22 and cooperative worker availability
+
+**GIVEN:** owner requests LLVM 22.1.x on four native targets, macOS arm64 14.0,
+Windows 10 and a public cancellation/join utility. **OBSERVED:** the historical
+atomic batch pool moved to backend `orchestrator/third_party/threadpool_atomic_fast`;
+it is not itself a cancellation protocol. GUI.Forms now exposes the bounded
+`AtomicThreadPool` / `CancellationFlag` / `Worker` pattern through Core and its installed header.
+This is local in-process execution, with borrowed context and explicit join;
+it adds no Orchestrator service, wire capability, hostile-worker supervision,
+or registry edge. Retained controls remain owned by their UI execution context.
+Compiler/cache and native pacing validation are recorded separately from
+application and API/ABI negotiation. See `COMPILER_CACHE.md` and `THREADING.md`.

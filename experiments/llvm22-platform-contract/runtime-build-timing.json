@@ -1,0 +1,17 @@
+{
+  "llvm_version": "22.1.8",
+  "scope": "libcxx, libcxxabi, libunwind; prebuilt compiler",
+  "command": "cmake --build <runtime-build> --clean-first --parallel 6",
+  "wall_seconds": 6.47,
+  "user_seconds": 23.92,
+  "system_seconds": 8.21,
+  "excludes": "source download, extraction and CMake configuration",
+  "ci_cold_preparation_seconds": 56,
+  "ci_runner": "macos-15",
+  "ci_run": 37654917323,
+  "final_unified_sdk_rebuild": {
+    "real": 6.56,
+    "user": 24.05,
+    "sys": 8.34
+  }
+}

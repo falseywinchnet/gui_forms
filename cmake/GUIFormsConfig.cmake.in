@@ -1,5 +1,8 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
 include("${CMAKE_CURRENT_LIST_DIR}/GUIFormsTargets.cmake")
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/GUIFormsApplicationTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/GUIFormsApplicationTargets.cmake")
