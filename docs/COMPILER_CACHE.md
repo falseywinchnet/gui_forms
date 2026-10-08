@@ -97,7 +97,7 @@ same compiler. Equal version strings alone do not establish cache compatibility.
 | macOS arm64 | `macos-15` | Homebrew `llvm@22`, 22.1.8 | macOS 14.0, arm64 only |
 | Linux x64 | `ubuntu-24.04` | apt.llvm.org `llvm-toolchain-noble-22`, clang-22 | Ubuntu 24.04 system ABI |
 | Linux arm64 | `ubuntu-24.04-arm` | same LLVM 22 release series | Ubuntu 24.04 system ABI |
-| Windows x64 | `windows-2022` | MSYS2 CLANG64 clang 22.1.8 | Windows 10 (`0x0A00`), MSYS2 winpthreads |
+| Windows x64 | `windows-2022` | MSYS2 CLANG64 clang 22.1.8, published as the Windows toolchain archive | Windows 10 (`0x0A00`), MSYS2 winpthreads |
 
 Put the selected compiler's `bin` first in PATH. Set `CC=clang`, `CXX=clang++`,
 `OBJCXX=clang++` explicitly. In particular, Windows `cc.exe`/`c++.exe` are not
@@ -170,8 +170,43 @@ The provider audits runtimes, its installed SDK and reference executables.
 Actual execution on macOS 14 still requires a macOS 14 machine; a newer runner
 plus availability diagnostics and Mach-O checks is not that runtime test.
 
-A fully passing main build eventually publishes **four** archives in
-`build-<full-SHA>`; an absent platform has not yet been published.
+### Windows toolchain archive
+
+Windows publishes `gui-forms-toolchain-windows-x64.tar.zst` and its
+`gui-forms-toolchain-windows-x64.json` manifest beside the Windows cache, before
+the cache itself. The archive is the MSYS2 tree the cache was compiled with,
+rooted at `msys64/` (`usr/`, `clang64/`, `etc/`, pacman's local database). It
+omits pacman's package cache and sync databases, `doc`/`man`/`info`
+documentation, `home/`, `tmp/` and the local pacman signing secret. The
+specification is `tools/windows_toolchain.json` (CLANG64 clang, lld,
+llvm-tools, cmake, ninja, ccache, winpthreads, python, nsis and MSYS git).
+
+The manifest records the archive SHA-256 and size, every installed package
+with its exact version, the specification digest, and `compiler_sha256` for
+`msys64/clang64/bin/clang.exe`. The Windows `cache-manifest.json` carries the
+same values under `toolchain`. CI refuses a cache whose compiler differs from
+its toolchain, and refuses to publish a toolchain other than the recorded one.
+
+Consumer contract: verify the archive digest, extract it, prepend
+`msys64/clang64/bin` and `msys64/usr/bin` to PATH and build without network
+access. For cache **hits**, extract so `msys64/` lands at the manifest's
+`producer.msys_root` (`D:\a\_temp\msys64` on hosted `windows-2022`, the
+setup-msys2 default). System header paths enter preprocessed output, and
+`CCACHE_BASEDIR` covers only the workspace; another location compiles
+correctly but misses. Extraction uses Python 3.14's standard-library zstd.
+
+The provider's Windows job restores the newest published toolchain whose
+specification digest matches, verifies it, and writes the same `msys2.cmd`
+wrapper that setup-msys2 writes. It contacts the MSYS2 mirrors only when no
+published toolchain matches, which normally means the specification changed
+(an LLVM bump). That job packages the fresh tree before building and uploads it
+as an artifact; main publication promotes it with the validated cache. A
+promoted cache whose toolchain is neither published nor in an unexpired
+artifact fails closed; rerun with `force_validation`.
+
+A fully passing main build eventually publishes **four** cache archives in
+`build-<full-SHA>`, plus the Windows toolchain and its manifest; an absent
+platform has not yet been published.
 The relocated cache proof checks source relocation plus implementation, header
 and compiler-option invalidation; it is not a promise that another distribution's
 clang, SDK, or flags will hit. Consumers still build and test their applications.

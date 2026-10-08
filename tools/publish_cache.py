@@ -10,6 +10,7 @@ import tempfile
 from typing import Any
 
 from ci_reuse import api, file_digest
+import windows_toolchain
 
 
 def ensure_release(repository: str, revision: str) -> str:
@@ -36,7 +37,7 @@ def ensure_release(repository: str, revision: str) -> str:
 
 def publish(repository: str, revision: str, archive: Path) -> None:
     if not archive.is_file() or archive.stat().st_size == 0:
-        raise ValueError('Missing platform archive')
+        raise ValueError('Missing platform archive: ' + archive.name)
     tag: str = ensure_release(repository, revision)
     uploaded: subprocess.CompletedProcess[str] = subprocess.run(
         ['gh', 'release', 'upload', tag, str(archive), '--repo', repository], capture_output=True, text=True)
@@ -58,8 +59,15 @@ def main() -> None:
     identity: dict[str, Any] = json.loads(Path('.ci/inputs.json').read_text())
     if identity['platform'] != args.platform or identity['revision'] != os.environ['GITHUB_SHA']:
         raise ValueError('Publication identity mismatch')
-    archive: Path = Path('gui-forms-cache-' + args.platform + '.tar.gz')
-    publish(os.environ['GITHUB_REPOSITORY'], identity['revision'], archive)
+    archives: list[Path] = []
+    if args.platform == windows_toolchain.PLATFORM:
+        # Publish the toolchain first: a consumer never sees a Windows cache
+        # without the exact compiler tree that filled it.
+        archives.extend(windows_toolchain.publication_files(Path('.')))
+    archives.append(Path('gui-forms-cache-' + args.platform + '.tar.gz'))
+    archive: Path
+    for archive in archives:
+        publish(os.environ['GITHUB_REPOSITORY'], identity['revision'], archive)
 
 
 if __name__ == '__main__':

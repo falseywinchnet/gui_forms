@@ -10,6 +10,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import windows_toolchain
+
 
 def main() -> None:
     source: Path = Path(__file__).resolve().parents[1]
@@ -49,6 +51,13 @@ def main() -> None:
         runtime: Path = Path(os.environ['GUI_FORMS_LLVM_RUNTIME'])
         manifest['runtime'] = json.loads((runtime / 'runtime-manifest.json').read_text(encoding='utf-8'))
         manifest['runtime_layout'] = '.build/toolchain/llvm-22.1.8-macos14'
+    if sys.argv[1] == 'windows-x64':
+        # The packaged MSYS2 tree must contain the compiler that filled this cache.
+        toolchain: dict[str, object] = json.loads(
+            (source.parent / '.ci/windows-toolchain.json').read_text(encoding='utf-8'))
+        if toolchain['compiler_sha256'] != manifest['compiler_sha256']:
+            raise RuntimeError('Cache compiler differs from the packaged Windows toolchain')
+        manifest['toolchain'] = windows_toolchain.cache_record(toolchain)
     destination: Path = source.parent / 'cache-manifest.json'
     reused: Path = source.parent / '.ci/reused.json'
     inputs: Path = source.parent / '.ci/inputs.json'
