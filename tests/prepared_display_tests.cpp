@@ -1,4 +1,5 @@
 #include "prepared_text_test_support.hpp"
+#include "gui_forms/window.hpp"
 #include "../src/core/display/recording_painter/recording_painter.hpp"
 #include "../src/core/display/replay/replay_display_chunk.hpp"
 #include "../src/core/text/prepared/prepared_storage.hpp"
@@ -107,6 +108,65 @@ void test_ignored_recording_failure() {
     catch (const detail::PreparedTextPaintFailure&) { rejected = true; }
     require(rejected, "ignoring refusal cannot publish an incomplete chunk");
 }
+
+class InspectedPreparedControl final : public Control {
+public:
+    explicit InspectedPreparedControl(const StableId id) : Control(id) {}
+    PreparedTextLayout layout{};
+protected:
+    void on_paint(Painter& painter, const Rect) override {
+        const PreparedTextPaintResult result = painter.draw_prepared_text(
+            layout, layout.authority(), {10, 20}, {20, 30, 40, 255});
+        require(result.status == PreparedTextStatus::success, "inspection command records");
+    }
+};
+
+const VisualPaintOperationSnapshot& prepared_operation(const VisualInspectionSnapshot& snapshot) {
+    for (const VisualControlInspection& control : snapshot.controls) {
+        for (const VisualPaintOperationSnapshot& operation : control.display_operations) {
+            if (std::string_view(visual_paint_operation_name(operation.operation)) == "draw_prepared_text") {
+                return operation;
+            }
+        }
+    }
+    throw std::runtime_error("prepared operation missing from inspection");
+}
+
+void test_visual_inspection(const std::span<const std::byte> bytes) {
+    PreparedTextService service{};
+    EncodedFontLease bank = make_bank(service, bytes);
+    std::unique_ptr<PreparedTextSession> session{};
+    const PreparedTextStatus status = service.open_session(bank, nullptr, session);
+    require(status == PreparedTextStatus::success, "inspection session");
+    const std::string_view text = "Private prepared witness";
+    const PreparedTextKey key = make_key(service, bank, text, 23.0);
+    const std::shared_ptr<InspectedPreparedControl> root =
+        make_control<InspectedPreparedControl>(StableId("prepared-inspection"));
+    prepare(service, *session, key, text, (*root).layout);
+    Window window(root, Size{200, 100});
+    detail::RecordingPainter painter{};
+    static_cast<void>(window.paint(painter, {0, 0, 200, 100}));
+    (*root).layout = PreparedTextLayout{};
+
+    const VisualInspectionSnapshot redacted = window.visual_inspection_snapshot();
+    const VisualPaintOperationSnapshot& hidden = prepared_operation(redacted);
+    require(hidden.text.empty() && hidden.text_byte_count == text.size(), "prepared inspection redacts text but retains byte count");
+    require(hidden.font == key.font, "prepared inspection uses recorded font");
+    require(hidden.first == Point{10, 20} && hidden.color == Color{20, 30, 40, 255}, "prepared inspection retains draw parameters");
+    require(!hidden.resolved_text.has_value(), "prepared inspection does not reshape through the ordinary provider");
+    require(redacted.to_json().find(text) == std::string::npos, "prepared JSON is redacted by default");
+
+    VisualInspectionOptions options{};
+    options.include_text = true;
+    const VisualInspectionSnapshot readable = window.visual_inspection_snapshot(options);
+    require(prepared_operation(readable).text == text, "prepared text opt-in reads the retained payload");
+    const std::string json = readable.to_json();
+    require(json.find("draw_prepared_text") != std::string::npos && json.find(text) != std::string::npos,
+        "prepared JSON retains operation identity and opt-in text");
+    (*session).cancel();
+    const VisualInspectionSnapshot stale = window.visual_inspection_snapshot(options);
+    require(prepared_operation(stale).text == text, "inspection can diagnose retained commands after authority revocation");
+}
 } // namespace
 
 int main(const int argc, char** const argv) {
@@ -116,6 +176,7 @@ int main(const int argc, char** const argv) {
         test_retention(bytes);
         test_command_generation_budget(bytes);
         test_ignored_recording_failure();
+        test_visual_inspection(bytes);
         std::cout << "prepared display checks passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

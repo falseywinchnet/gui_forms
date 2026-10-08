@@ -424,6 +424,9 @@ const char* visual_paint_operation_name(VisualPaintOperation operation) noexcept
         return "draw_image_region_sampled";
     case VisualPaintOperation::fill_image_pattern: return "fill_image_pattern";
     case VisualPaintOperation::draw_live_surface: return "draw_live_surface";
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    case VisualPaintOperation::draw_prepared_text: return "draw_prepared_text";
+#endif
     }
     return "unknown";
 }

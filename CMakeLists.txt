@@ -178,6 +178,12 @@ target_include_directories(gui_forms_core PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(gui_forms_core PUBLIC cxx_std_20)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    # Inspection must account for every retained operation, including optional
+    # development profiles. A missing case otherwise becomes a runtime throw.
+    set_source_files_properties(src/core/window/inspection/window_visual_inspection.cpp
+        PROPERTIES COMPILE_OPTIONS "-Werror=switch")
+endif()
 set_target_properties(gui_forms_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)

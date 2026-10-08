@@ -3,6 +3,9 @@
 #include "../../display/chunk/display_chunk.hpp"
 #include "../../display/command/display_command.hpp"
 #include "../popup/popup_attachment.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "../../text/prepared/prepared_storage.hpp"
+#endif
 
 #include <algorithm>
 #include <stdexcept>
@@ -37,6 +40,10 @@ VisualPaintOperation public_operation(detail::DisplayOperation operation) {
         return VisualPaintOperation::draw_inset_box_shadow;
     case Private::draw_line: return VisualPaintOperation::draw_line;
     case Private::draw_text_utf8: return VisualPaintOperation::draw_text;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    case Private::draw_prepared_text:
+        return VisualPaintOperation::draw_prepared_text;
+#endif
     case Private::draw_image: return VisualPaintOperation::draw_image;
     case Private::draw_image_region:
         return VisualPaintOperation::draw_image_region;
@@ -72,6 +79,19 @@ VisualPaintOperationSnapshot inspect_operation(
     result.image_sampling = command.image_sampling;
     result.text_byte_count = command.text.size();
     if (include_text) result.text = command.text;
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    if (command.operation == detail::DisplayOperation::draw_prepared_text &&
+        command.prepared_text && (*command.prepared_text).input) {
+        const detail::PreparedInputStorage& input = *(*command.prepared_text).input;
+        result.font = input.key.font;
+        result.text_byte_count = input.text_bytes;
+        if (include_text && input.text_bytes != 0U) {
+            result.text.assign(input.text.get(), input.text_bytes);
+        }
+        // Inspect the retained payload even if its paint authority is stale.
+        // Do not reshape it through a potentially different ordinary provider.
+    }
+#endif
     if (include_resolved_text && provider != nullptr &&
         command.operation == detail::DisplayOperation::draw_text_utf8) {
         result.resolved_text = (*provider).resolve_text_layout_utf8(
