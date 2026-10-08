@@ -68,6 +68,7 @@ std::atomic<std::uint64_t> clip_bytes{0};
 #ifdef GUI_FORMS_AUDIO_TESTING
 thread_local std::size_t test_arena_bytes = vorbis_arena_bytes;
 thread_local std::stop_source* test_cancel_after_chunk = nullptr;
+thread_local CancellationFlag* test_flag_after_chunk = nullptr;
 thread_local std::uint64_t test_clip_budget = clip_budget;
 #endif
 bool charge_clip(std::uint64_t bytes) {
@@ -141,13 +142,14 @@ struct OggExtent final {
 };
 // Validate complete framing before passing packets to the codec. Reject chained
 // streams, missing end pages, damaged checksums and inconsistent continuation.
-OggExtent inspect_ogg(std::span<const unsigned char> bytes, std::stop_token cancellation) {
+template<class Cancellation>
+OggExtent inspect_ogg(std::span<const unsigned char> bytes, const Cancellation& cancellation) {
     std::size_t offset = 0;
     std::uint32_t serial = 0, sequence = 0;
     std::uint64_t previous_granule = 0;
     bool continued = false;
     while (offset < bytes.size()) {
-        if (cancellation.stop_requested()) { return {0, AudioStatus::cancelled}; }
+        if (cancellation.requested()) { return {0, AudioStatus::cancelled}; }
         if (bytes.size() - offset < 27) { return {}; }
         const unsigned char* header = bytes.data() + offset;
         const unsigned flags = header[5];
@@ -315,11 +317,12 @@ AudioClipResult AudioClip::load_wav(const std::filesystem::path& path, std::uint
     }
 }
 
-AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop_token cancellation) {
+template<class Cancellation>
+AudioClipResult AudioClip::load_ogg_impl(const std::filesystem::path& path, const Cancellation& cancellation) {
     std::uint64_t reserved_bytes = 0;
     bool owned_charge = false;
     try {
-        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
         std::error_code error{};
         const std::uint64_t file_bytes = std::filesystem::file_size(path, error);
         if (error) { return {{}, AudioStatus::file_error}; }
@@ -329,7 +332,7 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
         std::ifstream file(path, std::ios::binary);
         std::size_t offset = 0;
         while (offset < file_bytes) {
-            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
             const std::size_t count = std::min<std::size_t>(65536, static_cast<std::size_t>(file_bytes) - offset);
             file.read(reinterpret_cast<char*>(owner.input.get() + offset), static_cast<std::streamsize>(count));
             if (!file) { return {{}, AudioStatus::file_error}; }
@@ -349,7 +352,7 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
         int decoder_error = 0;
         {
             std::lock_guard<std::mutex> lock(vorbis_open_mutex);
-            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
             owner.decoder = stb_vorbis_open_memory(owner.input.get(), static_cast<int>(file_bytes), &decoder_error, &allocation);
         }
         if (owner.decoder == nullptr) {
@@ -358,7 +361,7 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
         }
         const stb_vorbis_info info = stb_vorbis_get_info(owner.decoder);
         if (info.channels != 2 || info.sample_rate != 48000) { return {{}, AudioStatus::invalid_format}; }
-        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
         reserved_bytes = extent.frames * 2 * sizeof(float);
         const bool accepted = charge_clip(reserved_bytes);
         if (!accepted) { reserved_bytes = 0; return {{}, AudioStatus::quota_exceeded}; }
@@ -371,7 +374,7 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
         std::array<float, 8192> block{};
         std::uint64_t decoded_frames = 0;
         for (;;) {
-            if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+            if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
             const int frames = stb_vorbis_get_samples_float_interleaved(owner.decoder, 2, block.data(), static_cast<int>(block.size()));
             decoder_error = stb_vorbis_get_error(owner.decoder);
             if (decoder_error != VORBIS__no_error || frames < 0 || frames > 4096) { return {{}, AudioStatus::invalid_format}; }
@@ -389,10 +392,11 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
             decoded_frames += count;
 #ifdef GUI_FORMS_AUDIO_TESTING
             if (test_cancel_after_chunk != nullptr) { (*test_cancel_after_chunk).request_stop(); }
+            if (test_flag_after_chunk != nullptr) { (*test_flag_after_chunk).request(); }
 #endif
         }
         if (decoded_frames != extent.frames) { return {{}, AudioStatus::invalid_format}; }
-        if (cancellation.stop_requested()) { return {{}, AudioStatus::cancelled}; }
+        if (cancellation.requested()) { return {{}, AudioStatus::cancelled}; }
         AudioClipResult result{std::move(clip), AudioStatus::ok};
         return result;
     } catch (const std::bad_alloc&) {
@@ -403,6 +407,24 @@ AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path, std::stop
     } catch (const std::ios_base::failure&) {
         return {{}, AudioStatus::file_error};
     }
+}
+
+namespace {
+struct LegacyAudioCancellation final {
+    const std::stop_token& token;
+    [[nodiscard]] bool requested() const noexcept { return token.stop_requested(); }
+};
+} // namespace
+
+AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path,
+                                  const std::stop_token cancellation) {
+    const LegacyAudioCancellation view{cancellation};
+    return load_ogg_impl(path, view);
+}
+
+AudioClipResult AudioClip::load_ogg(const std::filesystem::path& path,
+                                  const CancellationFlag& cancellation) {
+    return load_ogg_impl(path, cancellation);
 }
 
 struct AudioEngineState final {
@@ -539,6 +561,9 @@ void audio_test_decode_limits(std::size_t arena_bytes, std::uint64_t budget,
     test_arena_bytes = std::min(arena_bytes, vorbis_arena_bytes);
     test_clip_budget = std::min(budget, clip_budget);
     test_cancel_after_chunk = cancel_after_chunk;
+}
+void audio_test_cancel_flag_after_chunk(CancellationFlag* const flag) noexcept {
+    test_flag_after_chunk = flag;
 }
 std::uint64_t audio_test_clip_bytes() {
     const std::uint64_t result = clip_bytes.load();

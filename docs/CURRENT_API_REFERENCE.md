@@ -12,6 +12,44 @@ Umbrella include:
 
 Language level: C++20. Public platform objects and renderer types are absent.
 
+## Audio loading and cancellation
+
+Include `<gui_forms/audio/audio.hpp>` and link `GUIForms::Audio`. Ogg Vorbis
+decoding uses the pinned `stb_vorbis` v1.22 source distributed with miniaudio;
+the accepted clip profile remains stereo, 48 kHz, interleaved float PCM.
+The preferred cancellation overload is:
+
+```cpp
+static AudioClipResult load_ogg(const std::filesystem::path& path,
+                                const CancellationFlag& cancellation);
+```
+
+The flag is borrowed until the synchronous call returns. Pass a Worker's entry
+parameter directly. Cancellation is checked before file access, between bounded
+reads, during Ogg page inspection, around decoder open, between decode blocks
+(at most 4096 frames), and before publication. Blocking I/O, the serialized
+decoder-open wait, and an individual codec call cannot be interrupted.
+An observed request returns `AudioStatus::cancelled` with an empty clip, releases
+all decode storage and PCM budget reservations, and never publishes partial PCM.
+A request after the last cancellation check can race successful completion;
+requesting cancellation after success does not revoke or mutate the returned clip.
+Join the worker before inspecting its result.
+
+The original `load_ogg(path, std::stop_token cancellation = {})` form is
+**deprecated in this API reference**, retained without a compiler deprecation
+attribute for migration. Existing one-argument and explicitly typed stop-token
+calls still work. When explicitly supplying an empty token, write
+`std::stop_token{}` rather than an untyped `{}`, which is ambiguous between
+the two overloads. Both forms share the same decode implementation, fixed codec
+arena, PCM quota and cancellation checkpoints. The flag view adds no allocation.
+
+Public-header audit (2026-10-07): this compatibility overload is the only public
+`std::stop_token` parameter, and there are no public `std::jthread` parameters.
+Text and image loaders expose no stop-token APIs requiring alternate forms.
+UI transaction cancellation and audio transport command cancellation retain
+their existing, separate meanings. See [THREADING.md](THREADING.md) and the
+installed-SDK Ogg worker examples for the shared cancellation/join pattern.
+
 ## Live surfaces
 
 `LiveSurfaceDescription` describes width, height, premultiplied sRGB BGRA32

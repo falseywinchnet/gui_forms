@@ -72,6 +72,11 @@ def build(root: Path, cache: Path, name: str, jobs: int,
             '-DCMAKE_C_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache',
             '-DCMAKE_CXX_FLAGS=' + flags]
+        if sys.platform == 'darwin':
+            command.extend(['-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON',
+                            '-DCMAKE_INSTALL_RPATH=@loader_path'])
+        elif os.name != 'nt':
+            command.append('-DCMAKE_BUILD_RPATH_USE_ORIGIN=ON')
         if os.name == 'nt':
             # PE link timestamps otherwise differ even with identical object bytes.
             command.append('-DCMAKE_EXE_LINKER_FLAGS=-Wl,--no-insert-timestamp')
