@@ -59,3 +59,63 @@ the root/workflow target wiring. C++ uses explicit initialized types, named
 execution, retained owners and explicit session shutdown. CMake has named
 target setup and explicit configuration steps. No vendor implementation is
 modified or certified by this review.
+
+## Windows adoption receipt — 2026-10-08
+
+**MEASURED:** GUI.Forms implementation `d5ca1e3a013a63704e4f57d2701a6121adce2097`
+with PlaySuite `cbd768021fded1d511ee8391bc96090ba715717c`
+(`codex-handoff/stx-adoption`), Windows x64, LLVM 22.1.8, Ninja, Release, two
+compiler jobs. PlaySuite's actual top-level project configured and built its
+complete application and UI tests. No consumer source or dependency pin changed.
+The separate prepared-text option was also enabled. A local CMake project hook
+enabled GUI.Forms' provider tests in this integration build; it did not modify
+PlaySuite's source. Native CI separately tests the standalone provider profiles.
+
+The source snapshot and products are preserved under
+`C:/Users/Shadow/gui_forms/.build/playsuite-cbd7680-source` and
+`C:/Users/Shadow/gui_forms/.build/playsuite-cbd7680`. The matching runtime artifact
+from PlaySuite run `37714300260` passed its source inventory verification:
+496 audio files, 15 font/license files. Test saves use a separate generated root.
+
+The combined run passed 168 of 170 tests initially. The provider clipboard-file
+readback assertion passed on its isolated rerun, accounting for all 99 provider
+tests. PlaySuite passed 70 of 71; `game_catalog` failed before its path-rejection
+assertion because Windows refused symlink creation with `WinError 1314`.
+That pure Python fixture and catalog implementation are unchanged from its main
+branch. No test was disabled and no system privileges were changed.
+The three Application/text consumer checks were rebuilt and passed again against
+the exact committed source, including the required mixed-Core rejection.
+
+### Core ownership audit
+
+`ninja -t commands games.exe` shows the Application import library and Audio's
+archives; the executable link contains no static Core, text-mask implementation
+or prepared-text implementation archive. `llvm-nm --defined-only` finds the
+out-of-line Window and text-mask service implementations in
+`libgui_forms_application.dll`. The executable's same-name text symbols are
+import thunks, verified with `llvm-objdump -d --demangle`:
+
+- `Window::request_focus`: DLL implementation `0x18009c1d0`; executable thunk
+  `0x14071fb70` jumps through `__imp_...Window13request_focus` at `0x140805af0`.
+- `TextMaskService::open_session`: DLL implementation `0x18027c1c0`; executable
+  thunk `0x140721140` jumps through its import pointer at `0x140805940`.
+- The PE import table names one `libgui_forms_application.dll` and the shared
+  `libgui_forms_threading.dll`. There is one Core implementation in Application;
+  the executable imports it. C++ constructor aliases and import thunks are not
+  additional Core instances.
+
+Audited SHA-256 values:
+
+```text
+games.exe
+99b5cc7eaa90baa5cb47b70052b0bc7e026e53a24844c422d6639e75e20e65a0
+libgui_forms_application.dll
+09102be493630bb412efe19c8e52ec1dcd588bccc6176fe59eef07712ed46581
+```
+
+Logs, JUnit results, link command, symbol tables and thunk disassembly are
+preserved as `.build/playsuite-adoption-*`. The implementation commit passed
+all four native PR jobs (macOS arm64, Windows x64, Linux x64 and Linux arm64)
+and the house-style job in GUI.Forms run `37749792055`. This receipt changes
+documentation only; it does not claim a packaged PlaySuite release or native
+macOS PlaySuite dogfooding.

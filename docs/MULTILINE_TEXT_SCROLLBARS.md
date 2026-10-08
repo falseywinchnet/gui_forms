@@ -72,8 +72,8 @@ code outside the changed behavior is not certified by this review.
 
 Native validation: Shadow Windows x64, LLVM 22.1.8, Release, renderer-neutral
 controls with the Windows host enabled. The 79-test suite passed 78 tests on its
-first run; `windows_canvas_raster_tests` failed at `OpenClipboard(owner)` while
-the desktop clipboard was unavailable. Its focused rerun passed. All scrollbar,
+first run; `windows_canvas_raster_tests` failed at its clipboard-file readback
+status assertion. Its focused rerun passed. All scrollbar,
 multiline editing, input, layout and semantic tests passed. The updated multiline
 test including retained overlay/clip assertions also passed separately. This is
 automated native/provider verification, not a claim of interactive SwiftEdit
