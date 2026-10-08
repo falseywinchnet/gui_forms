@@ -85,6 +85,7 @@ target_include_directories(gui_forms_threading PUBLIC
 target_compile_features(gui_forms_threading PUBLIC cxx_std_20)
 target_link_libraries(gui_forms_threading PRIVATE Threads::Threads)
 if(WIN32)
+    target_compile_definitions(gui_forms_threading PUBLIC _WIN32_WINNT=0x0A00 WINVER=0x0A00)
     target_link_libraries(gui_forms_threading PRIVATE winpthread)
     target_link_options(gui_forms_threading PRIVATE "-Wl,--export-all-symbols")
 endif()
