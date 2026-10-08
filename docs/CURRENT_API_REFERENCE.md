@@ -444,6 +444,25 @@ outsets in damage while retaining parent-client clipping.
 
 ## Containers
 
+### Multiline `TextBox` document scrolling
+
+Call `set_multiline(true)` and `set_auto_scroll(true)` to expose automatic
+document scrollbars. The text extent supplies the inherited `ScrollableControl`
+ranges. `scroll_offset()`, `scroll_position()`, `scroll_snapshot()` and axis
+values describe the same viewport. Thumb/arrow/page input, wheel scrolling,
+semantic scrollbar actions and caret reveal share that position. Explicit
+scrolling preserves text, selection and undo history, and does not snap back
+to an offscreen caret on the next paint.
+
+Unwrapped text can scroll both axes. Word wrapping suppresses horizontal text
+overflow and measures against the space remaining beside the vertical bar.
+Text paint and hit testing use that viewport; chrome is painted as an overlay.
+Layout clamps positions and updates visibility after content, font, device-scale
+and size changes. Cached rows survive scrolling and unchanged paints. Single-line
+behavior and multiline editing without auto-scroll remain available unchanged.
+Consumers must rebuild against the new headers and matching provider libraries.
+See [the SwiftEdit integration record](MULTILINE_TEXT_SCROLLBARS.md).
+
 ### `ScrollableControl` and `ScrollProperties`
 
 `Panel` and `ContainerControl` share a renderer-neutral retained scrolling

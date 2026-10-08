@@ -34,6 +34,7 @@ void ScrollableControl::validate_axis_value(double value,
 void ScrollableControl::set_auto_scroll(bool enabled) {
     require_mutable();
     if (auto_scroll_ == enabled) return;
+    const Point previous_position = scroll_position_;
     auto_scroll_ = enabled;
     if (enabled) scroll_state_ |= scroll_state_auto_scrolling;
     else {
@@ -44,6 +45,7 @@ void ScrollableControl::set_auto_scroll(bool enabled) {
     }
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics | Dirty::accessibility);
+    if (previous_position != scroll_position_) on_scroll_position_changed();
 }
 
 void ScrollableControl::set_auto_scroll_margin(Size margin) {
@@ -259,15 +261,18 @@ void ScrollableControl::arrange_scroll_viewport(Size client_size, Size measured_
         invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics |
                    Dirty::accessibility);
     }
+    if (previous_position != scroll_position_) on_scroll_position_changed();
 }
 
 void ScrollableControl::adjust_scrollbars(bool display_scrollbars) {
     if (!display_scrollbars) {
+        const Point previous_position = scroll_position_;
         horizontal_scroll_.visible_ = false;
         vertical_scroll_.visible_ = false;
         scroll_position_ = {};
         scroll_state_ &= ~(scroll_state_hscroll_visible |
                            scroll_state_vscroll_visible);
+        if (previous_position != scroll_position_) on_scroll_position_changed();
     }
 }
 
@@ -322,6 +327,7 @@ bool ScrollableControl::apply_axis_value(ScrollOrientation orientation,
     if (notify) scroll_state_ |= scroll_state_user_has_scrolled;
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics | Dirty::accessibility);
+    on_scroll_position_changed();
     if (notify) notify_scroll(orientation, type, old_value, next);
     return true;
 }
@@ -634,6 +640,7 @@ void ScrollableControl::on_pointer_bubble(PointerEvent& event) {
 void ScrollableControl::axis_properties_changed(
     ScrollOrientation orientation, bool position_changed) {
     require_mutable();
+    const Point previous_position = scroll_position_;
     ScrollProperties& axis = orientation == ScrollOrientation::horizontal
         ? horizontal_scroll_ : vertical_scroll_;
     if (position_changed) {
@@ -647,6 +654,7 @@ void ScrollableControl::axis_properties_changed(
     }
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics | Dirty::accessibility);
+    if (previous_position != scroll_position_) on_scroll_position_changed();
 }
 
 void ScrollableControl::paint_axis(Painter& painter,
