@@ -53,9 +53,12 @@ HostClipboardImageResult decode_native_image(NSData* data) {
     result.image.pixels.resize(static_cast<std::size_t>(width * height * 4U));
     const CFScoped<CGColorSpaceRef> color_space(CGColorSpaceCreateWithName(kCGColorSpaceSRGB));
     if (color_space.get() == nullptr) return result;
+    const std::uint32_t bitmap_info =
+        static_cast<std::uint32_t>(kCGImageAlphaPremultipliedLast) |
+        static_cast<std::uint32_t>(kCGBitmapByteOrder32Big);
     const CFScoped<CGContextRef> context(CGBitmapContextCreate(
         result.image.pixels.data(), width, height, 8, width * 4U, color_space.get(),
-        kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big));
+        bitmap_info));
     if (context.get() == nullptr) return result;
     CGContextSetBlendMode(context.get(), kCGBlendModeCopy);
     CGContextDrawImage(context.get(), CGRectMake(0, 0, width, height), native.get());

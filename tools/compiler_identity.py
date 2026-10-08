@@ -27,11 +27,22 @@ def main() -> None:
         values.append(subprocess.check_output(command, text=True))
     text: str = '\n'.join(values)
     digest: str = hashlib.sha256(text.encode('utf-8')).hexdigest()
+    environment_commands: list[list[str]] = [['cmake', '--version'], ['ninja', '--version']]
+    if platform.system() == 'Darwin':
+        environment_commands.append(['brew', 'list', '--versions'])
+    elif platform.system() == 'Windows':
+        environment_commands.append(['pacman', '-Q'])
+    else:
+        environment_commands.append(['dpkg-query', '-W', '-f=${binary:Package}=${Version}\n'])
+    for command in environment_commands:
+        values.append(subprocess.check_output(command, text=True))
+    environment: str = hashlib.sha256('\n'.join(values).encode('utf-8')).hexdigest()
     destination: Path = Path(os.environ['GITHUB_OUTPUT'])
     stream: TextIO
     with destination.open('a', encoding='utf-8') as stream:
         stream.write('identity=' + digest + '\n')
         stream.write('version=22.1.8\n')
+        stream.write('environment=' + environment + '\n')
 
 
 if __name__ == '__main__':

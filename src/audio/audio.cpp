@@ -565,6 +565,21 @@ void audio_test_decode_limits(std::size_t arena_bytes, std::uint64_t budget,
 void audio_test_cancel_flag_after_chunk(CancellationFlag* const flag) noexcept {
     test_flag_after_chunk = flag;
 }
+bool audio_test_vorbis_seek_bounds() noexcept {
+    std::array<unsigned char, 4> bytes{};
+    stb_vorbis decoder{};
+    decoder.stream_start = bytes.data();
+    decoder.stream_end = bytes.data() + bytes.size();
+    decoder.stream = bytes.data();
+    if (set_file_offset(&decoder, 0U) != 1 || decoder.stream != bytes.data()) return false;
+    if (set_file_offset(&decoder, 3U) != 1 || decoder.stream != bytes.data() + 3U) return false;
+    if (set_file_offset(&decoder, 4U) != 0 || decoder.stream != decoder.stream_end || !decoder.eof) return false;
+    if (set_file_offset(&decoder, std::numeric_limits<unsigned int>::max()) != 0 ||
+        decoder.stream != decoder.stream_end || !decoder.eof) return false;
+    decoder.stream_end = decoder.stream_start;
+    const bool empty_rejected = set_file_offset(&decoder, 0U) == 0 && decoder.eof;
+    return empty_rejected;
+}
 std::uint64_t audio_test_clip_bytes() {
     const std::uint64_t result = clip_bytes.load();
     return result;

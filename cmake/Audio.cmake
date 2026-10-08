@@ -18,10 +18,25 @@ endif()
 file(READ "${gui_forms_miniaudio_SOURCE_DIR}/extras/stb_vorbis.c" _gui_vorbis_source)
 string(REPLACE "\r\n" "\n" _gui_vorbis_source "${_gui_vorbis_source}")
 string(SHA256 _gui_vorbis_hash "${_gui_vorbis_source}")
-unset(_gui_vorbis_source)
 if(NOT _gui_vorbis_hash STREQUAL "4c7cb2ff1f7011e9d67950446b7eb9ca044f2e464d76bfbb0b84dd2e23e65636")
     message(FATAL_ERROR "The pinned stb_vorbis source hash differs")
 endif()
+# Preserve the pinned upstream tree. Apply this single bounds correction to a
+# generated include projection: validate the integer offset before forming a
+# pointer. The upstream wraparound comparison itself invokes undefined behavior.
+string(REPLACE
+    "f->stream_start + loc >= f->stream_end || f->stream_start + loc < f->stream_start"
+    "(size_t) loc >= (size_t) (f->stream_end - f->stream_start)"
+    _gui_vorbis_patched "${_gui_vorbis_source}")
+if(_gui_vorbis_patched STREQUAL _gui_vorbis_source)
+    message(FATAL_ERROR "The pinned Vorbis bounds patch did not apply")
+endif()
+set(_gui_audio_projection "${CMAKE_CURRENT_BINARY_DIR}/third_party/audio")
+file(MAKE_DIRECTORY "${_gui_audio_projection}/extras")
+file(CONFIGURE OUTPUT "${_gui_audio_projection}/extras/stb_vorbis.c"
+    CONTENT "${_gui_vorbis_patched}" @ONLY NEWLINE_STYLE UNIX)
+unset(_gui_vorbis_source)
+unset(_gui_vorbis_patched)
 add_library(gui_forms_audio STATIC "${_gui_audio_root}/src/audio/audio.cpp")
 option(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT "Build the development audio loop transport" OFF)
 if(GUI_FORMS_BUILD_AUDIO_LOOP_TRANSPORT)
@@ -37,7 +52,7 @@ set_target_properties(gui_forms_audio PROPERTIES EXPORT_NAME Audio)
 target_compile_features(gui_forms_audio PUBLIC cxx_std_20)
 target_include_directories(gui_forms_audio PUBLIC
     $<BUILD_INTERFACE:${_gui_audio_root}/include> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-    PRIVATE "${gui_forms_miniaudio_SOURCE_DIR}")
+    PRIVATE "${_gui_audio_projection}" "${gui_forms_miniaudio_SOURCE_DIR}")
 target_compile_definitions(gui_forms_audio PRIVATE MA_NO_DECODING MA_NO_ENCODING
     MA_NO_RESOURCE_MANAGER MA_NO_GENERATION MA_ENABLE_ONLY_SPECIFIC_BACKENDS)
 target_link_libraries(gui_forms_audio PUBLIC GUIForms::Threading PRIVATE Threads::Threads ${CMAKE_DL_LIBS})

@@ -174,3 +174,38 @@ Each passing main build publishes **four** archives in `build-<full-SHA>`.
 The relocated cache proof checks source relocation plus implementation, header
 and compiler-option invalidation; it is not a promise that another distribution's
 clang, SDK, or flags will hit. Consumers still build and test their applications.
+
+## Reusing CI work
+
+The native workflow now separates three kinds of reuse:
+
+- **Object cache:** ccache still verifies compiler contents, headers and options.
+  A platform-level fallback can restore objects from an earlier compiler/runner
+  cache; ccache decides which entries remain valid. This does not weaken its checks.
+- **Cache-mechanism proof:** the expensive cold/relocated/invalidation experiment
+  has a receipt keyed by compiler/build environment and the proof, workflow and
+  CMake contract. Ordinary implementation edits do not repeat this experiment;
+  they still run native compilation and tests. `force_cache_proof` repeats it.
+- **Native validation:** an identical complete Git tree, platform, compiler, SDK,
+  runner image, build-tool versions and package inventory can reuse a successful
+  native job's receipt and cache archive. This permits PR-to-main reuse despite
+  their different commit IDs and GitHub's branch-scoped object caches. A changed
+  tree or environment runs native tests again. `force_validation` bypasses reuse.
+
+Receipts come only from this repository's native workflow and a successful native
+job. The producer's actual Git tree is checked through GitHub's API, as well as
+receipt fields, artifact ownership, artifact digest, cache-archive digest and
+manifest identity. Fork-produced artifacts are excluded. Missing, expired or
+rejected receipts fall back to fresh validation. A bad downloaded payload fails
+validation. Later runs wait up to 30 minutes for an older matching job; they never
+wait on newer runs or themselves. After timeout or failure they build normally.
+
+Reuse is reported explicitly in the job summary and `cache-manifest.json`, with
+original validation run/revision provenance. The archive manifest is regenerated
+for the current commit; the object cache and matched LLVM runtime are retained.
+All four archives are still published by a successful main workflow. Artifact
+retention is 30 days, so eviction is a normal cache miss, not a build dependency.
+There is no promise of zero CI startup, transfer or packaging time.
+
+Windows now caches the fetched text-stack and audio dependencies too. The native
+archive remains a compilation accelerator, not a reusable consumer test result.

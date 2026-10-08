@@ -50,6 +50,16 @@ def main() -> None:
         manifest['runtime'] = json.loads((runtime / 'runtime-manifest.json').read_text(encoding='utf-8'))
         manifest['runtime_layout'] = '.build/toolchain/llvm-22.1.8-macos14'
     destination: Path = source.parent / 'cache-manifest.json'
+    reused: Path = source.parent / '.ci/reused.json'
+    inputs: Path = source.parent / '.ci/inputs.json'
+    if inputs.exists():
+        manifest['validation_environment'] = json.loads(inputs.read_text(encoding='utf-8'))['environment']
+    if reused.exists():
+        receipt: dict[str, object] = json.loads(reused.read_text(encoding='utf-8'))
+        manifest['validation'] = 'reused successful provider validation for identical tracked tree and build environment'
+        manifest['validation_provenance'] = {
+            'tree': receipt['tree'], 'run_id': receipt['validation_run'],
+            'revision': receipt['validation_revision'], 'receipt_run_id': receipt['run_id']}
     destination.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
 
