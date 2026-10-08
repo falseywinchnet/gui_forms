@@ -66,6 +66,17 @@ class PromotionTests(unittest.TestCase):
             ci_reuse.write_json(root / 'inputs.json', {'compiler': 'other-compiler'})
             self.assertFalse(self.discover(fixture, root, seed=True))
 
+    def test_legacy_receipts_do_not_trigger_expensive_provenance_lookup(self) -> None:
+        fixture: PromotionAPI = PromotionAPI()
+        fixture.receipt['schema'] = 1
+        fixture.data = zipped_receipt(fixture.receipt)
+        with tempfile.TemporaryDirectory() as directory:
+            root: Path = Path(directory)
+            ci_reuse.write_json(root / 'inputs.json', fixture.identity)
+            with patch.object(ci_reuse, 'lookup') as lookup:
+                self.assertFalse(self.discover(fixture, root, seed=True))
+                lookup.assert_not_called()
+
     def test_promotes_without_publishing_runner_compiler_or_environment(self) -> None:
         fixture: PromotionAPI = PromotionAPI()
         with tempfile.TemporaryDirectory() as directory:
