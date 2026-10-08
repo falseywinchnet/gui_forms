@@ -72,6 +72,21 @@ struct Fixture {
     void paint() { editor.on_paint(painter, {0, 0, 110, 68}); }
 };
 
+class ScrollbarPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(const Rect bounds) override { clips.push_back(bounds); }
+    void fill_rect(const Rect bounds, Color) override { fills.push_back(bounds); }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_image(ImageId, Rect, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    std::vector<Rect> clips{};
+    std::vector<Rect> fills{};
+};
+
 void exact_editing() {
     Fixture f{};
     const std::string source = "alpha\r\nbeta\rgamma\n";
@@ -110,6 +125,155 @@ void exact_editing() {
     f.editor.select(Utf8Offset(1), Utf8Offset(2));
     const bool deleted_newline = f.editor.delete_selection();
     require(deleted_newline && f.caret() == 3, "deletion joining combining mark snaps caret");
+}
+
+void document_scrollbars() {
+    Fixture f{};
+    f.window.resize({360.0, 240.0});
+    f.editor.set_auto_scroll(true);
+    f.editor.set_text("short");
+    f.window.perform_layout();
+    require(!f.editor.hscroll() && !f.editor.vscroll(), "fitting text has no bars");
+    std::string source{};
+    for (unsigned int row = 0; row < 80; ++row) {
+        source.append(140, 'x');
+        source.append("\n");
+    }
+    f.editor.set_text(source);
+    f.editor.select(Utf8Offset(0), Utf8Offset(4));
+    f.window.perform_layout();
+    require(f.editor.hscroll() && f.editor.vscroll(), "text extent exposes both scrollbars");
+    const TextSelection selection = f.editor.selection();
+    const bool undo = f.editor.can_undo();
+    const std::size_t measured = f.metrics.calls;
+    const bool moved = f.editor.scroll_to({120.0, 300.0}, ScrollEventType::thumb_track, true);
+    require(moved && f.editor.scroll_offset() == Point{120.0, 300.0} &&
+            f.editor.scroll_offset() == f.editor.scroll_position(), "API scroll moves text immediately");
+    f.window.perform_layout();
+    f.paint();
+    require(f.editor.scroll_offset() == Point{120.0, 300.0}, "paint does not undo explicit scrolling");
+    require(f.metrics.calls == measured, "scrolling reuses retained text measurements");
+    require(f.editor.text() == source && f.editor.selection() == selection &&
+            f.editor.can_undo() == undo, "scroll preserves document selection and history");
+    ScrollbarPainter painter{};
+    f.editor.invalidate(Dirty::paint);
+    const DamageRegion damage = f.window.take_damage();
+    const std::optional<PaintReceipt> receipt = f.window.paint(painter, damage.bounds());
+    require(receipt.has_value(), "retained document paint completes");
+    const Rect viewport = f.editor.viewport_rectangle();
+    const Rect clip{6.0, 4.0, viewport.width - 10.0, viewport.height - 8.0};
+    const Rect horizontal_bar{0.0, viewport.height, viewport.width, 16.0};
+    const Rect vertical_bar{viewport.width, 0.0, 16.0, viewport.height};
+    require(std::find(painter.clips.begin(), painter.clips.end(), clip) != painter.clips.end(),
+            "text paint clips to the viewport beside both scrollbars");
+    require(std::find(painter.fills.begin(), painter.fills.end(), horizontal_bar) != painter.fills.end() &&
+            std::find(painter.fills.begin(), painter.fills.end(), vertical_bar) != painter.fills.end(),
+            "retained overlay paints both document scrollbars");
+
+    f.editor.set_word_wrap(true);
+    f.window.perform_layout();
+    const std::size_t wrapped = f.editor.visual_line_count();
+    require(f.editor.vscroll() && !f.editor.hscroll() && f.editor.scroll_offset().x == 0.0,
+            "wrap removes horizontal overflow");
+    require(wrapped == 401, "wrap uses width remaining beside the vertical scrollbar");
+    f.editor.set_word_wrap(false);
+    f.window.perform_layout();
+    require(f.editor.hscroll(), "unwrapping restores horizontal bar");
+    f.window.resize({2400.0, 2400.0});
+    f.window.perform_layout();
+    require(!f.editor.vscroll() && !f.editor.hscroll() && f.editor.scroll_offset() == Point{},
+            "resize clamps both offsets when content fits");
+    f.window.resize({360.0, 240.0});
+    f.window.perform_layout();
+    require(f.editor.vscroll() && f.editor.hscroll(), "shrinking restores overflow");
+    f.editor.set_text("short again");
+    f.window.perform_layout();
+    require(!f.editor.vscroll() && !f.editor.hscroll() && f.editor.scroll_offset() == Point{},
+            "short replacement clears text scroll ranges");
+}
+
+void document_scrollbar_input() {
+    Fixture f{};
+    f.window.resize({360.0, 240.0});
+    f.editor.set_auto_scroll(true);
+    std::string source{};
+    for (unsigned int row = 0; row < 80; ++row) source.append("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\n");
+    f.editor.set_text(source);
+    f.caret(0);
+    f.window.perform_layout();
+    f.paint();
+    const TextSelection selection = f.editor.selection();
+    const Rect viewport = f.editor.viewport_rectangle();
+    const double bar_x = viewport.right() + 8.0;
+    const double bar_y = viewport.bottom() + 8.0;
+    f.pointer({.action = PointerAction::down, .button = PointerButton::primary, .position = {bar_x, 24.0}});
+    require(f.editor.has_pointer_capture(), "vertical thumb captures pointer");
+    f.pointer({.action = PointerAction::move, .position = {bar_x, 124.0}});
+    f.pointer({.action = PointerAction::up, .button = PointerButton::primary, .position = {bar_x, 124.0}});
+    require(!f.editor.has_pointer_capture() && f.editor.scroll_offset().y > 0.0,
+            "vertical thumb drag changes document position and releases capture");
+    f.pointer({.action = PointerAction::down, .button = PointerButton::primary, .position = {24.0, bar_y}});
+    f.pointer({.action = PointerAction::move, .position = {124.0, bar_y}});
+    f.pointer({.action = PointerAction::up, .button = PointerButton::primary, .position = {124.0, bar_y}});
+    require(f.editor.scroll_offset().x > 0.0 && f.editor.selection() == selection,
+            "horizontal thumb moves text without selecting it");
+    static_cast<void>(f.editor.scroll_to({}));
+    f.pointer({.action = PointerAction::wheel, .position = {20.0, 20.0}, .wheel_delta = {0.0, -1.0}});
+    require(f.editor.scroll_offset().y > 0.0 && f.editor.scroll_offset() == f.editor.scroll_position(),
+            "wheel and scrollbar positions agree");
+    f.paint();
+    require(f.editor.scroll_offset().y > 0.0, "wheel scroll survives paint");
+    const bool semantic = f.editor.on_semantic_child_action("multiline.vertical-scroll", SemanticAction::set_value, "200");
+    require(semantic && f.editor.scroll_offset().y == 200.0, "accessibility scrollbar moves text");
+    f.caret(source.size());
+    f.paint();
+    require(f.editor.scroll_offset().y > 200.0 && f.editor.scroll_offset() == f.editor.scroll_position(),
+            "caret reveal updates the retained scrollbar position");
+    f.editor.set_auto_scroll(false);
+    f.window.perform_layout();
+    require(!f.editor.hscroll() && !f.editor.vscroll(), "opting out removes document bars");
+}
+
+void document_scrollbar_reflow() {
+    Fixture f{};
+    f.editor.set_auto_scroll(true);
+    f.editor.set_word_wrap(true);
+    f.editor.set_text("abcdefghijklmnopqrst");
+    f.caret(0);
+    f.window.perform_layout();
+    require(!f.editor.hscroll() && !f.editor.vscroll(), "two wrapped rows fit initial viewport");
+    f.metrics.advance = 20.0;
+    f.metrics.line_height = 30.0;
+    f.window.set_scale(1.5);
+    f.window.perform_layout();
+    const std::size_t lines = f.editor.visual_line_count();
+    require(lines == 5 && f.editor.vscroll() && !f.editor.hscroll(),
+            "DPI transition reflows against narrower scrollbar viewport");
+    f.caret(20);
+    f.paint();
+    require(f.editor.scroll_offset().y > 0.0, "DPI geometry reveals final line");
+    f.metrics.advance = 10.0;
+    f.metrics.line_height = 20.0;
+    FontSpec font = f.editor.font();
+    font.size += 1.0;
+    f.editor.set_font(font);
+    f.window.perform_layout();
+    require(!f.editor.hscroll() && !f.editor.vscroll() && f.editor.scroll_offset() == Point{},
+            "font reflow can remove a previously visible bar without oscillation");
+    f.window.resize({12.0, 12.0});
+    f.window.perform_layout();
+    const std::size_t narrow = f.editor.visual_line_count();
+    require(narrow == 20 && !f.editor.hscroll() && f.editor.vscroll(),
+            "a grapheme wider than the wrapped viewport never enables horizontal scrolling");
+    f.paint();
+    const Point offset = f.editor.scroll_offset();
+    require(std::isfinite(offset.x) && std::isfinite(offset.y), "tiny viewport retains finite positions");
+    f.editor.set_multiline(false);
+    f.window.resize({110.0, 68.0});
+    f.window.perform_layout();
+    require(!f.editor.hscroll() && !f.editor.vscroll(), "single-line mode removes document bars");
+    f.paint();
+    require(f.editor.scroll_offset().x > 0.0, "single-line caret scrolling retains its existing behavior");
 }
 
 void navigation() {
@@ -565,6 +729,9 @@ void caret_geometry_fallbacks() {
 int main() {
     try {
         exact_editing();
+        document_scrollbars();
+        document_scrollbar_input();
+        document_scrollbar_reflow();
         navigation();
         wrapping_metrics_and_hit_testing();
         tab_wrap_and_reused_rows();

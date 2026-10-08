@@ -263,16 +263,16 @@ if(GUI_FORMS_BUILD_PREPARED_TEXT)
     find_package(Threads REQUIRED)
     target_compile_definitions(gui_forms_core PUBLIC
         $<BUILD_INTERFACE:GUI_FORMS_PREPARED_TEXT>)
-    add_library(gui_forms_prepared_text STATIC
+    add_library(gui_forms_prepared_text_impl STATIC
         src/render/text/prepared_service.cpp
         src/render/text/prepared_window_shape.cpp
         src/render/text/prepared_window_session.cpp
         src/render/text/prepared_raster.cpp)
-    target_link_libraries(gui_forms_prepared_text
+    target_link_libraries(gui_forms_prepared_text_impl
         PUBLIC gui_forms_core
         PRIVATE gui_forms_text_engine freetype Threads::Threads)
-    target_compile_features(gui_forms_prepared_text PUBLIC cxx_std_20)
-    set_target_properties(gui_forms_prepared_text PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_features(gui_forms_prepared_text_impl PUBLIC cxx_std_20)
+    set_target_properties(gui_forms_prepared_text_impl PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 if(GUI_FORMS_BUILD_TEXT_MASKS)
@@ -281,7 +281,7 @@ if(GUI_FORMS_BUILD_TEXT_MASKS)
     endif()
     find_package(Threads REQUIRED)
     include(cmake/TextMaskLineBreak.cmake)
-    add_library(gui_forms_text_masks STATIC
+    add_library(gui_forms_text_masks_impl STATIC
         src/core/text/text_mask/text_mask_budget.cpp
         src/core/text/text_mask/text_mask_storage.cpp
         src/core/text/text_mask/text_mask_queue.cpp
@@ -290,11 +290,11 @@ if(GUI_FORMS_BUILD_TEXT_MASKS)
         src/render/text/text_mask/text_mask_shape.cpp
         src/render/text/text_mask/text_mask_raster.cpp
         src/render/text/text_mask/text_mask_layout.cpp)
-    target_link_libraries(gui_forms_text_masks
+    target_link_libraries(gui_forms_text_masks_impl
         PUBLIC gui_forms_core
         PRIVATE Threads::Threads freetype harfbuzz gui_forms_bidi gui_forms_linebreak)
-    target_compile_features(gui_forms_text_masks PUBLIC cxx_std_20)
-    set_target_properties(gui_forms_text_masks PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_features(gui_forms_text_masks_impl PUBLIC cxx_std_20)
+    set_target_properties(gui_forms_text_masks_impl PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()
 
 # GUI.Drawing is a renderer-free compatibility substrate.  It deliberately
@@ -426,6 +426,7 @@ add_library(gui_forms_controls STATIC
     src/controls/typography_specimen/typography_specimen.cpp
     src/controls/easing_preview/easing_preview.cpp
     src/controls/panel/text_box/text_box.cpp
+    src/controls/panel/text_box/text_box_scroll.cpp
     src/controls/panel/list_box/list_box.cpp
     src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
     src/controls/panel/combo_box/drop_down_layer.cpp
@@ -714,10 +715,10 @@ if(GUI_FORMS_ENABLE_SKIA)
         target_compile_definitions(gui_forms_skia PRIVATE
             GUI_FORMS_HAS_HARFBUZZ_TEXT=1)
     endif()
-    if(TARGET gui_forms_prepared_text)
+    if(TARGET gui_forms_prepared_text_impl)
         target_sources(gui_forms_skia PRIVATE
             src/render/skia/raster/prepared_skia_frame.cpp)
-        target_link_libraries(gui_forms_skia PRIVATE gui_forms_prepared_text)
+        target_link_libraries(gui_forms_skia PRIVATE gui_forms_prepared_text_impl)
     endif()
     if(APPLE)
         find_library(GUI_FORMS_COREFOUNDATION CoreFoundation REQUIRED)
@@ -973,10 +974,10 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             src/host/windows/raster/dib_frame_store.cpp)
         target_compile_definitions(gui_forms_host_windows PRIVATE
             GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1)
-        if(TARGET gui_forms_prepared_text)
+        if(TARGET gui_forms_prepared_text_impl)
             target_sources(gui_forms_host_windows PRIVATE
                 src/host/windows/raster/prepared_text_compositor.cpp)
-            target_link_libraries(gui_forms_host_windows PRIVATE gui_forms_prepared_text)
+            target_link_libraries(gui_forms_host_windows PRIVATE gui_forms_prepared_text_impl)
             target_compile_definitions(gui_forms_host_windows PRIVATE
                 GUI_FORMS_WINDOWS_PREPARED_TEXT=1)
         endif()
@@ -1688,29 +1689,29 @@ endif()
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
-    if(TARGET gui_forms_text_masks)
+    if(TARGET gui_forms_text_masks_impl)
         add_executable(gui_forms_text_mask_cost_probe EXCLUDE_FROM_ALL tests/text_mask_cost_probe.cpp)
-        target_link_libraries(gui_forms_text_mask_cost_probe PRIVATE gui_forms_text_masks)
+        target_link_libraries(gui_forms_text_mask_cost_probe PRIVATE gui_forms_text_masks_impl)
         add_executable(gui_forms_text_mask_native_tests tests/text_mask_native_tests.cpp)
         target_link_libraries(gui_forms_text_mask_native_tests PRIVATE
-            gui_forms_text_masks freetype harfbuzz gui_forms_bidi)
+            gui_forms_text_masks_impl freetype harfbuzz gui_forms_bidi)
         add_test(NAME gui_forms_text_mask_native_tests
             COMMAND gui_forms_text_mask_native_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/fonts/amiri/Amiri-Regular.ttf")
         set_tests_properties(gui_forms_text_mask_native_tests PROPERTIES TIMEOUT 30)
         add_executable(gui_forms_text_mask_wrapping_tests tests/text_mask_wrapping_tests.cpp)
-        target_link_libraries(gui_forms_text_mask_wrapping_tests PRIVATE gui_forms_text_masks)
+        target_link_libraries(gui_forms_text_mask_wrapping_tests PRIVATE gui_forms_text_masks_impl)
         add_test(NAME gui_forms_text_mask_wrapping_tests
             COMMAND gui_forms_text_mask_wrapping_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts"
                 "${CMAKE_CURRENT_SOURCE_DIR}/tests/fonts/amiri/Amiri-Regular.ttf")
         set_tests_properties(gui_forms_text_mask_wrapping_tests PROPERTIES TIMEOUT 30)
         add_executable(gui_forms_text_mask_lifecycle_tests tests/text_mask_lifecycle_tests.cpp)
-        target_link_libraries(gui_forms_text_mask_lifecycle_tests PRIVATE gui_forms_text_masks)
+        target_link_libraries(gui_forms_text_mask_lifecycle_tests PRIVATE gui_forms_text_masks_impl)
         add_test(NAME gui_forms_text_mask_lifecycle_tests
             COMMAND gui_forms_text_mask_lifecycle_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         set_tests_properties(gui_forms_text_mask_lifecycle_tests PROPERTIES TIMEOUT 30)
     endif()
-    if(TARGET gui_forms_prepared_text)
+    if(TARGET gui_forms_prepared_text_impl)
         add_executable(gui_forms_prepared_window_input_tests tests/prepared_window_input_tests.cpp)
         target_link_libraries(gui_forms_prepared_window_input_tests PRIVATE gui_forms_core)
         add_test(NAME gui_forms_prepared_window_input_tests COMMAND gui_forms_prepared_window_input_tests)
@@ -1718,20 +1719,20 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_prepared_window_batch_tests PRIVATE gui_forms_core)
         add_test(NAME gui_forms_prepared_window_batch_tests COMMAND gui_forms_prepared_window_batch_tests)
         add_executable(gui_forms_prepared_window_shape_tests tests/prepared_window_shape_tests.cpp)
-        target_link_libraries(gui_forms_prepared_window_shape_tests PRIVATE gui_forms_prepared_text gui_forms_text_engine freetype)
+        target_link_libraries(gui_forms_prepared_window_shape_tests PRIVATE gui_forms_prepared_text_impl gui_forms_text_engine freetype)
         add_test(NAME gui_forms_prepared_window_shape_tests
             COMMAND gui_forms_prepared_window_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_prepared_window_session_tests tests/prepared_window_session_tests.cpp)
-        target_link_libraries(gui_forms_prepared_window_session_tests PRIVATE gui_forms_prepared_text gui_forms_text_engine)
+        target_link_libraries(gui_forms_prepared_window_session_tests PRIVATE gui_forms_prepared_text_impl gui_forms_text_engine)
         add_test(NAME gui_forms_prepared_window_session_tests
             COMMAND gui_forms_prepared_window_session_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         set_tests_properties(gui_forms_prepared_window_session_tests PROPERTIES TIMEOUT 60)
         add_executable(gui_forms_prepared_text_service_tests tests/prepared_text_service_tests.cpp)
-        target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text)
+        target_link_libraries(gui_forms_prepared_text_service_tests PRIVATE gui_forms_prepared_text_impl)
         add_test(NAME gui_forms_prepared_text_service_tests
             COMMAND gui_forms_prepared_text_service_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         add_executable(gui_forms_prepared_text_raster_tests tests/prepared_text_raster_tests.cpp)
-        target_link_libraries(gui_forms_prepared_text_raster_tests PRIVATE gui_forms_prepared_text)
+        target_link_libraries(gui_forms_prepared_text_raster_tests PRIVATE gui_forms_prepared_text_impl)
         add_test(NAME gui_forms_prepared_text_raster_tests
             COMMAND gui_forms_prepared_text_raster_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
         if(TARGET gui_forms_skia)
@@ -1739,13 +1740,13 @@ if(GUI_FORMS_BUILD_TESTS)
             target_include_directories(gui_forms_prepared_text_skia_tests SYSTEM PRIVATE
                 ${GUI_FORMS_SKIA_ROOT})
             target_link_libraries(gui_forms_prepared_text_skia_tests PRIVATE
-                gui_forms_skia gui_forms_prepared_text)
+                gui_forms_skia gui_forms_prepared_text_impl)
             add_test(NAME gui_forms_prepared_text_skia_tests
                 COMMAND gui_forms_prepared_text_skia_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
             set_tests_properties(gui_forms_prepared_text_skia_tests PROPERTIES TIMEOUT 30)
         endif()
         add_executable(gui_forms_prepared_display_tests tests/prepared_display_tests.cpp)
-        target_link_libraries(gui_forms_prepared_display_tests PRIVATE gui_forms_prepared_text)
+        target_link_libraries(gui_forms_prepared_display_tests PRIVATE gui_forms_prepared_text_impl)
         add_test(NAME gui_forms_prepared_display_tests
             COMMAND gui_forms_prepared_display_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
     endif()
@@ -1807,7 +1808,7 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
-            if(TARGET gui_forms_prepared_text)
+            if(TARGET gui_forms_prepared_text_impl)
                 add_executable(gui_forms_windows_prepared_text_tests
                     tests/windows_prepared_text_tests.cpp
                     src/host/windows/application/windows_host.cpp
@@ -1823,7 +1824,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
-                    gui_forms_prepared_text user32 gdi32 ole32 oleaut32 oleacc uuid
+                    gui_forms_prepared_text_impl user32 gdi32 ole32 oleaut32 oleacc uuid
                     windowscodecs comdlg32 shell32 usp10)
                 add_test(NAME gui_forms_windows_prepared_text_tests
                     COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -1857,11 +1858,11 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_linux_host_tests PRIVATE gui_forms_host_linux X11::X11)
         add_test(NAME gui_forms_linux_host_tests COMMAND gui_forms_linux_host_tests)
         set_tests_properties(gui_forms_linux_host_tests PROPERTIES TIMEOUT 45)
-        if(TARGET gui_forms_prepared_text)
+        if(TARGET gui_forms_prepared_text_impl)
             add_executable(gui_forms_linux_prepared_text_host_tests
                 tests/linux_prepared_text_host_tests.cpp)
             target_link_libraries(gui_forms_linux_prepared_text_host_tests PRIVATE
-                gui_forms_host_linux gui_forms_prepared_text X11::X11)
+                gui_forms_host_linux gui_forms_prepared_text_impl X11::X11)
             add_test(NAME gui_forms_linux_prepared_text_host_tests
                 COMMAND gui_forms_linux_prepared_text_host_tests
                     "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -2630,13 +2631,13 @@ if(GUI_FORMS_BUILD_TESTS)
             target_sources(${native_fixture} PRIVATE
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
         endforeach()
-        if(TARGET gui_forms_prepared_text)
+        if(TARGET gui_forms_prepared_text_impl)
             add_executable(gui_forms_macos_prepared_text_host_tests MACOSX_BUNDLE
                 tests/macos_prepared_text_host_tests.mm
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
             target_compile_options(gui_forms_macos_prepared_text_host_tests PRIVATE -fobjc-arc)
             target_link_libraries(gui_forms_macos_prepared_text_host_tests PRIVATE
-                gui_forms_host_macos gui_forms_prepared_text)
+                gui_forms_host_macos gui_forms_prepared_text_impl)
             add_test(NAME gui_forms_macos_prepared_text_host_tests
                 COMMAND gui_forms_macos_prepared_text_host_tests
                     "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -2773,6 +2774,8 @@ if(TARGET gui_forms_application)
     set_property(TARGET gui_forms_application PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE application)
     set_property(TARGET gui_forms_application APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 endif()
+
+include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)

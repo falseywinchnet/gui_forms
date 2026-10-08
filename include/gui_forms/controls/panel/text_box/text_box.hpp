@@ -65,6 +65,10 @@ public:
     // (LF initially). Tab insertion is separately opt-in.
     [[nodiscard]] bool multiline() const noexcept { return multiline_; }
     void set_multiline(bool enabled);
+    // Multiline opt-in: document extent drives the inherited scrollbars and
+    // scroll_position. Wrapped documents expose only vertical overflow.
+    void set_auto_scroll(bool enabled) override;
+    void arrange(Rect final_bounds) override;
     [[nodiscard]] bool word_wrap() const noexcept { return word_wrap_; }
     void set_word_wrap(bool enabled);
     [[nodiscard]] std::string_view newline_sequence() const noexcept { return newline_; }
@@ -81,6 +85,7 @@ public:
     [[nodiscard]] static MultilineValidation validate_multiline_text(std::string_view text);
     [[nodiscard]] std::size_t visual_line_count();
     [[nodiscard]] Point scroll_offset() const noexcept {
+        if (multiline_ && auto_scroll()) return scroll_position();
         const Point result{.x = horizontal_offset_, .y = vertical_offset_};
         return result;
     }
@@ -150,6 +155,7 @@ public:
                             std::string_view value) override;
 
 protected:
+    void on_scroll_position_changed() override;
     void on_detached_from_window() noexcept override;
 
 private:
@@ -164,6 +170,9 @@ private:
         std::vector<VisualRun> runs{};
     };
     void ensure_multiline_layout();
+    void rebuild_multiline_rows(double width);
+    [[nodiscard]] Rect multiline_text_rectangle() const noexcept;
+    void set_multiline_scroll(Point position);
     [[nodiscard]] Rect paint_multiline(Painter& painter);
     void reveal_multiline_caret();
     [[nodiscard]] std::size_t caret_line() const;
@@ -219,6 +228,8 @@ private:
     std::uint64_t multiline_revision_{};
     FontSpec multiline_font_{};
     double multiline_width_{-1.0};
+    Size multiline_client_size_{-1.0, -1.0};
+    bool multiline_scroll_enabled_{};
     double multiline_device_scale_{};
     const TextMetricsProvider* multiline_provider_{};
     std::size_t maximum_length_{};

@@ -12,6 +12,30 @@ Umbrella include:
 
 Language level: C++20. Public platform objects and renderer types are absent.
 
+## Development text with Application
+
+Source builds enabling `GUI_FORMS_BUILD_TEXT_MASKS` expose
+`GUIForms::TextMasks`. With a native Application target, link:
+
+```cmake
+target_link_libraries(my_application PRIVATE
+    GUIForms::Application GUIForms::TextMasks GUIForms::Audio)
+```
+
+Application contains the mask implementation and its private shaping, bidi and
+line-breaking dependencies. TextMasks exposes Application's single Core;
+`gui_forms_text_masks` is the same consumer interface for existing source builds.
+Enabling `GUI_FORMS_BUILD_PREPARED_TEXT` similarly exposes
+`GUIForms::PreparedText` / `gui_forms_prepared_text`, with the required public
+development compile definition. Application plus static Core remains rejected.
+Audio and its optional loop transport share `GUIForms::Threading` and introduce
+no Core dependency.
+
+These are source-only development targets, not new installed SDK components.
+A hostless source build retains static text/Core ownership. See
+[Application text linkage](APPLICATION_TEXT_LINKAGE.md) for the build and
+validation contract.
+
 ## Audio loading and cancellation
 
 Include `<gui_forms/audio/audio.hpp>` and link `GUIForms::Audio`. Audio-enabled
@@ -443,6 +467,25 @@ layout or hit testing; the compositor includes the current and last-presented
 outsets in damage while retaining parent-client clipping.
 
 ## Containers
+
+### Multiline `TextBox` document scrolling
+
+Call `set_multiline(true)` and `set_auto_scroll(true)` to expose automatic
+document scrollbars. The text extent supplies the inherited `ScrollableControl`
+ranges. `scroll_offset()`, `scroll_position()`, `scroll_snapshot()` and axis
+values describe the same viewport. Thumb/arrow/page input, wheel scrolling,
+semantic scrollbar actions and caret reveal share that position. Explicit
+scrolling preserves text, selection and undo history, and does not snap back
+to an offscreen caret on the next paint.
+
+Unwrapped text can scroll both axes. Word wrapping suppresses horizontal text
+overflow and measures against the space remaining beside the vertical bar.
+Text paint and hit testing use that viewport; chrome is painted as an overlay.
+Layout clamps positions and updates visibility after content, font, device-scale
+and size changes. Cached rows survive scrolling and unchanged paints. Single-line
+behavior and multiline editing without auto-scroll remain available unchanged.
+Consumers must rebuild against the new headers and matching provider libraries.
+See [the SwiftEdit integration record](MULTILINE_TEXT_SCROLLBARS.md).
 
 ### `ScrollableControl` and `ScrollProperties`
 
