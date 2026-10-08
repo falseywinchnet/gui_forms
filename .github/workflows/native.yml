@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
       - name: Check scanner fixtures and corrected authoring scope
         run: |
           python3 -B -m unittest discover -s tools -p test_house_style.py
@@ -27,6 +30,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_reuse.py
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
+          python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp examples/reference/bound_values.cpp examples/reference/shared_state.cpp examples/reference/collection_state.cpp examples/reference/collection_gallery.cpp tools/owned_event_lab.cpp tools/concise_authoring_lab.cpp include/gui_forms/threading.hpp src/core/threading/worker.cpp tests/threading_tests.cpp tests/live_surface_idle_wake_tests.cpp tests/macos_display_link_tests.mm examples/reference/cooperative_worker.cpp examples/reference/audio_worker.cpp examples/reference/audio_worker.hpp examples/reference/ogg_worker.cpp examples/linkage_rejection/main.cpp include/gui_forms/value include/gui_forms/detail/scalar_binding.hpp include/gui_forms/controls/collections src/controls/collections
   native:
     needs: house-style
@@ -47,7 +51,8 @@ jobs:
             platform: windows-x64
             shell: 'msys2 {0}'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # A cold Windows build that also packages a new toolchain needs headroom.
+    timeout-minutes: 40
     permissions:
       contents: write
       actions: read
@@ -89,6 +94,28 @@ jobs:
         if: steps.promotion.outputs.reused == 'true'
         shell: bash
         run: python gui_forms/tools/ci_promote.py archive
+      # Stdlib zstd packs and extracts the Windows toolchain; the build keeps its Python.
+      - uses: actions/setup-python@v5
+        id: toolchain-python
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.14'
+          update-environment: false
+      - name: Fetch the Windows toolchain recorded by the promoted cache
+        if: steps.promotion.outputs.reused == 'true' && runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py fetch-recorded'
+      - name: Restore the published Windows toolchain without MSYS2 mirrors
+        id: toolchain
+        if: steps.promotion.outputs.reused != 'true' && runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
       - name: Install macOS dependencies
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'macOS')
         env:
@@ -108,15 +135,34 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils
           echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+      # Only a changed tools/windows_toolchain.json (an LLVM bump) or an
+      # unpublished specification reaches the MSYS2 mirrors.
       - uses: msys2/setup-msys2@v2
-        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows')
+        id: msys2
+        if: steps.promotion.outputs.reused != 'true' && runner.os == 'Windows' && steps.toolchain.outputs.restored != 'true'
         with:
           msystem: CLANG64
           update: true
           path-type: inherit
-          install: >-
-            mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake
-            mingw-w64-clang-x86_64-winpthreads mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python mingw-w64-clang-x86_64-ccache git
+          install: ${{ steps.toolchain.outputs.packages }}
+      - name: Package the newly installed Windows toolchain before building
+        id: toolchain-package
+        if: steps.msys2.outcome == 'success'
+        shell: bash
+        env:
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+          MSYS2_LOCATION: ${{ steps.msys2.outputs.msys2-location }}
+        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py pack --root "$MSYS2_LOCATION"'
+      - uses: actions/upload-artifact@v4
+        if: steps.toolchain-package.outcome == 'success'
+        with:
+          name: ${{ steps.toolchain-package.outputs.artifact-name }}
+          overwrite: true
+          path: |
+            gui-forms-toolchain-windows-x64.tar.zst
+            gui-forms-toolchain-windows-x64.json
+          compression-level: 0
+          retention-days: 30
       - name: Select macOS 14 runtime prefix
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'macOS')
         run: echo "GUI_FORMS_LLVM_RUNTIME=$PWD/.build/toolchain/llvm-22.1.8-macos14" >> "$GITHUB_ENV"
