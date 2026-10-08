@@ -27,6 +27,7 @@ def find_validation(platform: str, seed: bool = False) -> bool:
         current = json.loads((ci_reuse.STATE / 'inputs.json').read_text())
         prefix = 'gui-validated-' + platform + '-'
     endpoint: str = 'repos/' + repository + '/actions/artifacts'
+    inspected: int = 0
     page: int
     # Bounded discovery; eviction or a busy repository falls back to validation.
     for page in range(1, 6):
@@ -37,9 +38,14 @@ def find_validation(platform: str, seed: bool = False) -> bool:
                 continue
             if artifact['size_in_bytes'] > 256 * 1024:
                 continue
+            if seed and inspected == 8:
+                return False
+            inspected += 1
             data: bytes = subprocess.check_output(
                 ['gh', 'api', endpoint + '/' + str(artifact['id']) + '/zip', '--allow-escape-sequences'])
             receipt: dict[str, Any] = ci_reuse.receipt_from_zip(data, artifact.get('digest', ''))
+            if receipt.get('schema') != 2:
+                continue
             if receipt.get('platform') != platform:
                 continue
             if not seed and receipt.get('tree') != tree:

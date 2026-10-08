@@ -205,7 +205,9 @@ Both reuse paths check the same repository/workflow, producer's actual Git tree,
 completed successful platform job, receipt digest, payload ownership and archive
 SHA-256. Fork artifacts and failed/pending jobs are rejected. Missing, expired or
 rejected receipts fall back to normal native validation; a corrupted downloaded
-payload fails closed. Discovery checks at most 500 recent artifacts. Schema 2
+payload fails closed. Discovery checks at most 500 recent artifact descriptors;
+seed lookup inspects at most eight recent platform receipts and rejects legacy
+schemas before any expensive provenance queries. Schema 2
 receipts separate native validation from the weekly cache experiment.
 `force_validation` bypasses both paths and performs a fresh native validation.
 
