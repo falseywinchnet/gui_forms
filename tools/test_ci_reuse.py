@@ -17,8 +17,8 @@ import ci_reuse
 
 
 def fixture_identity() -> dict[str, Any]:
-    return {'schema': 1, 'tree': 'tree', 'compiler': 'compiler', 'environment': 'environment',
-            'platform': 'linux-x64', 'proof': 'proof', 'revision': 'commit', 'run_id': '10'}
+    return {'schema': 2, 'tree': 'tree', 'compiler': 'compiler', 'environment': 'environment',
+            'platform': 'linux-x64', 'revision': 'commit', 'run_id': '10'}
 
 
 def zipped_receipt(receipt: dict[str, Any]) -> bytes:
@@ -96,7 +96,7 @@ class ReuseTests(unittest.TestCase):
 
     def test_changed_receipt_inputs_are_rejected(self) -> None:
         key: str
-        for key in ('tree', 'compiler', 'environment', 'platform', 'proof'):
+        for key in ('tree', 'compiler', 'environment', 'platform'):
             with self.subTest(key=key):
                 identity: dict[str, Any] = fixture_identity()
                 receipt: dict[str, Any] = identity.copy()
@@ -167,16 +167,6 @@ class ReuseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'bound'):
             ci_reuse.receipt_from_zip(data, 'sha256:' + hashlib.sha256(data).hexdigest())
 
-    def test_proof_changes_for_mechanism_but_not_ordinary_source(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root: Path = Path(directory)
-            (root / 'CMakeLists.txt').write_text('contract')
-            original: str = ci_reuse.proof_contract(root)
-            (root / 'ordinary.cpp').write_text('implementation')
-            self.assertEqual(ci_reuse.proof_contract(root), original)
-            (root / 'CMakeLists.txt').write_text('changed contract')
-            self.assertNotEqual(ci_reuse.proof_contract(root), original)
-
     def test_archive_restore_checks_digest_manifest_and_paths(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root: Path = Path(directory)
@@ -190,13 +180,11 @@ class ReuseTests(unittest.TestCase):
             with tarfile.open(archive, 'w:gz') as payload:
                 payload.addfile(entry, io.BytesIO(data))
             receipt: dict[str, Any] = fixture_identity()
-            receipt.update(archive_sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
-                           cache_proof=[{'name': 'proof fixture'}], proof_identity={'proof': 'proof'})
+            receipt.update(archive_sha256=hashlib.sha256(archive.read_bytes()).hexdigest())
             ci_reuse.write_json(state / 'reused.json', receipt)
             with patch.object(ci_reuse, 'ROOT', root), patch.object(ci_reuse, 'STATE', state):
                 ci_reuse.restore_archive(fixture_identity())
                 self.assertEqual(json.loads((root / 'cache-manifest.json').read_text()), manifest)
-                self.assertTrue((state / 'proof/receipt.json').is_file())
                 archive.write_bytes(archive.read_bytes() + b'corrupt')
                 with self.assertRaisesRegex(ValueError, 'digest mismatch'):
                     ci_reuse.restore_archive(fixture_identity())

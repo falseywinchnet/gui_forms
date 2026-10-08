@@ -7,7 +7,6 @@ import io
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 import subprocess
 import tarfile
 import time
@@ -30,23 +29,6 @@ def file_digest(path: Path) -> str:
     stream: BinaryIO
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
-
-
-def proof_contract(source: Path) -> str:
-    # This is a cache-mechanism test, not a substitute for native source tests.
-    paths: list[Path] = [source / 'CMakeLists.txt', source / '.github/workflows/native.yml',
-                        source / 'tools/prove_compiler_cache.py', source / 'tools/compiler_identity.py',
-                        source / 'tools/ci_reuse.py']
-    paths.extend(sorted((source / 'cmake').glob('*')))
-    digest: Any = hashlib.sha256()
-    path: Path
-    for path in paths:
-        if path.is_file():
-            digest.update(path.relative_to(source).as_posix().encode())
-            digest.update(b'\0')
-            digest.update(path.read_bytes())
-            digest.update(b'\0')
-    return digest.hexdigest()
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -75,10 +57,17 @@ def trusted_run(run: dict[str, Any], repository: str) -> bool:
 
 
 def matching_receipt(receipt: dict[str, Any], identity: dict[str, Any], run_id: int) -> bool:
-    return (receipt.get('schema') == 1 and receipt.get('run_id') == str(run_id)
-            and all(receipt.get(key) == identity[key] for key in ('tree', 'compiler', 'environment', 'platform', 'proof'))
-            and isinstance(receipt.get('archive_sha256'), str) and len(receipt['archive_sha256']) == 64
-            and isinstance(receipt.get('artifact_id'), int) and receipt['artifact_id'] > 0)
+    if receipt.get('schema') != 2 or receipt.get('run_id') != str(run_id):
+        return False
+    key: str
+    for key in ('tree', 'compiler', 'environment', 'platform'):
+        if receipt.get(key) != identity[key]:
+            return False
+    digest: Any = receipt.get('archive_sha256')
+    artifact_id: Any = receipt.get('artifact_id')
+    valid: bool = (isinstance(digest, str) and len(digest) == 64
+                   and type(artifact_id) is int and artifact_id > 0)
+    return valid
 
 
 def receipt_from_zip(data: bytes, digest: str) -> dict[str, Any]:
@@ -172,8 +161,6 @@ def restore_archive(identity: dict[str, Any]) -> None:
     if (manifest['revision'] != receipt['revision'] or manifest['compiler'] != identity['compiler']
             or manifest['platform'] != identity['platform']):
         raise ValueError('Cache manifest does not match successful validation')
-    write_json(STATE / 'proof/receipt.json', receipt['cache_proof'])
-    write_json(STATE / 'proof/identity.json', receipt['proof_identity'])
     if identity['platform'] == 'macos-arm64':
         from macos_runtime_manifest import verify
         verify(Path(os.environ['GUI_FORMS_LLVM_RUNTIME']))
@@ -181,7 +168,7 @@ def restore_archive(identity: dict[str, Any]) -> None:
 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('identity', 'lookup', 'restore', 'record-proof', 'verify-proof', 'record'))
+    parser.add_argument('command', choices=('identity', 'lookup', 'restore', 'record'))
     parser.add_argument('--platform', default=os.environ.get('GUI_FORMS_PLATFORM'))
     parser.add_argument('--compiler', default=os.environ.get('GUI_FORMS_COMPILER_ID'))
     parser.add_argument('--environment')
@@ -189,12 +176,11 @@ def main() -> None:
     parser.add_argument('--wait-seconds', type=int, default=1800)
     args: argparse.Namespace = parser.parse_args()
     if args.command == 'identity':
-        identity: dict[str, Any] = {'schema': 1, 'tree': git_field('%T'), 'revision': git_field('%H'),
-            'platform': args.platform, 'compiler': args.compiler, 'environment': args.environment, 'proof': proof_contract(SOURCE),
+        identity: dict[str, Any] = {'schema': 2, 'tree': git_field('%T'), 'revision': git_field('%H'),
+            'platform': args.platform, 'compiler': args.compiler, 'environment': args.environment,
             'run_id': os.environ['GITHUB_RUN_ID']}
         write_json(STATE / 'inputs.json', identity)
         output('tree', identity['tree'])
-        output('proof', identity['proof'])
         output('inputs-name', artifact_name('inputs', identity))
         output('receipt-name', artifact_name('validated', identity))
         return
@@ -208,22 +194,11 @@ def main() -> None:
         output('reused', str(reused).lower())
     elif args.command == 'restore':
         restore_archive(identity)
-    elif args.command == 'record-proof':
-        write_json(STATE / 'proof/identity.json', {'proof': identity['proof'], 'compiler': identity['compiler'],
-                    'environment': identity['environment'], 'platform': identity['platform'], 'revision': identity['revision'], 'run_id': identity['run_id']})
-        shutil.copyfile(ROOT / 'cache-proof/receipt.json', STATE / 'proof/receipt.json')
-    elif args.command == 'verify-proof':
-        proof: dict[str, Any] = json.loads((STATE / 'proof/identity.json').read_text())
-        if any(proof[key] != identity[key] for key in ('proof', 'compiler', 'environment', 'platform')):
-            raise ValueError('Cache-mechanism proof identity mismatch')
-        print('Cache-mechanism proof verified from run ' + proof['run_id'])
     elif args.command == 'record':
-        receipt = identity.copy()
+        receipt: dict[str, Any] = identity.copy()
         receipt['artifact_id'] = args.artifact_id
-        archive = ROOT / ('gui-forms-cache-' + identity['platform'] + '.tar.gz')
+        archive: Path = ROOT / ('gui-forms-cache-' + identity['platform'] + '.tar.gz')
         receipt['archive_sha256'] = file_digest(archive)
-        receipt['cache_proof'] = json.loads((STATE / 'proof/receipt.json').read_text())
-        receipt['proof_identity'] = json.loads((STATE / 'proof/identity.json').read_text())
         receipt['validation_run'] = identity['run_id']
         receipt['validation_revision'] = identity['revision']
         if (STATE / 'reused.json').exists():
@@ -231,9 +206,12 @@ def main() -> None:
             receipt['validation_run'] = reused_receipt['validation_run']
             receipt['validation_revision'] = reused_receipt['validation_revision']
         write_json(STATE / 'receipt.json', receipt)
+        output('receipt-name', artifact_name('validated', identity))
         summary: str = 'Fresh native validation passed.'
         if (STATE / 'reused.json').exists():
             summary = 'Reused successful native validation; no compilation or native tests repeated.'
+        if (STATE / 'promotion.json').exists():
+            summary = 'Promoted tested bytes; compiler/runtime/environment identity remains that of the validating producer.'
         summary += '\n\nTree: `' + identity['tree'] + '`; validation run: ' + receipt['validation_run']
         summary += '; validated source: `' + receipt['validation_revision'] + '`.\n'
         stream: TextIO
