@@ -12,6 +12,30 @@ Umbrella include:
 
 Language level: C++20. Public platform objects and renderer types are absent.
 
+## Development text with Application
+
+Source builds enabling `GUI_FORMS_BUILD_TEXT_MASKS` expose
+`GUIForms::TextMasks`. With a native Application target, link:
+
+```cmake
+target_link_libraries(my_application PRIVATE
+    GUIForms::Application GUIForms::TextMasks GUIForms::Audio)
+```
+
+Application contains the mask implementation and its private shaping, bidi and
+line-breaking dependencies. TextMasks exposes Application's single Core;
+`gui_forms_text_masks` is the same consumer interface for existing source builds.
+Enabling `GUI_FORMS_BUILD_PREPARED_TEXT` similarly exposes
+`GUIForms::PreparedText` / `gui_forms_prepared_text`, with the required public
+development compile definition. Application plus static Core remains rejected.
+Audio and its optional loop transport share `GUIForms::Threading` and introduce
+no Core dependency.
+
+These are source-only development targets, not new installed SDK components.
+A hostless source build retains static text/Core ownership. See
+[Application text linkage](APPLICATION_TEXT_LINKAGE.md) for the build and
+validation contract.
+
 ## Audio loading and cancellation
 
 Include `<gui_forms/audio/audio.hpp>` and link `GUIForms::Audio`. Audio-enabled
