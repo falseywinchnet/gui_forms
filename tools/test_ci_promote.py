@@ -37,14 +37,34 @@ class PromotionAPI(FixtureAPI):
 
 
 class PromotionTests(unittest.TestCase):
-    def discover(self, fixture: PromotionAPI, root: Path) -> bool:
+    def discover(self, fixture: PromotionAPI, root: Path, seed: bool = False) -> bool:
         with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo', 'GITHUB_RUN_ID': '20'}), \
              patch.object(ci_reuse, 'STATE', root), \
              patch.object(ci_reuse, 'api', side_effect=fixture.request), \
              patch.object(ci_reuse, 'git_field', side_effect=fixture.git_field), \
              patch.object(ci_reuse.subprocess, 'check_output', return_value=fixture.data), \
              patch.object(ci_reuse, 'output'):
-            return ci_promote.find_validation('linux-x64')
+            return ci_promote.find_validation('linux-x64', seed)
+
+    def test_seed_keeps_new_tree_and_never_reuses_native_validation(self) -> None:
+        fixture: PromotionAPI = PromotionAPI()
+        with tempfile.TemporaryDirectory() as directory:
+            root: Path = Path(directory)
+            identity: dict[str, Any] = fixture.identity.copy()
+            identity['tree'] = 'new-source-tree'
+            ci_reuse.write_json(root / 'inputs.json', identity)
+            self.assertTrue(self.discover(fixture, root, seed=True))
+            self.assertTrue((root / 'seed.json').is_file())
+            self.assertFalse((root / 'reused.json').exists())
+            self.assertFalse((root / 'promotion.json').exists())
+            self.assertEqual(json.loads((root / 'inputs.json').read_text()), identity)
+
+    def test_seed_requires_matching_compiler(self) -> None:
+        fixture: PromotionAPI = PromotionAPI()
+        with tempfile.TemporaryDirectory() as directory:
+            root: Path = Path(directory)
+            ci_reuse.write_json(root / 'inputs.json', {'compiler': 'other-compiler'})
+            self.assertFalse(self.discover(fixture, root, seed=True))
 
     def test_promotes_without_publishing_runner_compiler_or_environment(self) -> None:
         fixture: PromotionAPI = PromotionAPI()
