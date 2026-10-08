@@ -40,7 +40,7 @@ target_include_directories(gui_forms_audio PUBLIC
     PRIVATE "${gui_forms_miniaudio_SOURCE_DIR}")
 target_compile_definitions(gui_forms_audio PRIVATE MA_NO_DECODING MA_NO_ENCODING
     MA_NO_RESOURCE_MANAGER MA_NO_GENERATION MA_ENABLE_ONLY_SPECIFIC_BACKENDS)
-target_link_libraries(gui_forms_audio PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(gui_forms_audio PUBLIC GUIForms::Threading PRIVATE Threads::Threads ${CMAKE_DL_LIBS})
 if(WIN32)
     target_compile_definitions(gui_forms_audio PRIVATE MA_ENABLE_WASAPI)
     target_link_libraries(gui_forms_audio PRIVATE ole32)

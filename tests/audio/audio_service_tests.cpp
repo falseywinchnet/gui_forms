@@ -17,6 +17,7 @@ namespace gui_forms {
 AudioStatus audio_test_revoked_callback_status();
 void audio_test_decode_limits(std::size_t arena_bytes, std::uint64_t budget, std::stop_source* cancel_after_chunk);
 std::uint64_t audio_test_clip_bytes();
+void audio_test_cancel_flag_after_chunk(CancellationFlag* flag) noexcept;
 }
 #endif
 
@@ -424,6 +425,43 @@ void vorbis_loader() {
     gui_forms::audio_test_decode_limits(16 * 1024 * 1024, 512ULL * 1024 * 1024, nullptr);
     const std::uint64_t after_failure = gui_forms::audio_test_clip_bytes();
     require(after_failure == held_bytes, "failure and cancellation release reservations");
+    gui_forms::CancellationFlag pre_cancelled{};
+    pre_cancelled.request();
+    const gui_forms::AudioClipResult pre_flag = gui_forms::AudioClip::load_ogg(root / "absent.ogg", pre_cancelled);
+    require(pre_flag.status == AudioStatus::cancelled && !pre_flag.clip, "flag cancellation precedes file access");
+    require(gui_forms::audio_test_clip_bytes() == held_bytes, "pre-cancel reserves no PCM");
+
+    gui_forms::CancellationFlag flag{};
+    gui_forms::audio_test_cancel_flag_after_chunk(&flag);
+    const gui_forms::AudioClipResult mid_flag = gui_forms::AudioClip::load_ogg(path, flag);
+    gui_forms::audio_test_cancel_flag_after_chunk(nullptr);
+    require(flag.requested(), "flag requested after a decoded block");
+    require(mid_flag.status == AudioStatus::cancelled && !mid_flag.clip, "mid-decode flag publishes no partial clip");
+    require(gui_forms::audio_test_clip_bytes() == held_bytes, "flag cancellation releases PCM reservation");
+
+    gui_forms::CancellationFlag completed{};
+    gui_forms::audio_test_decode_limits(64, 512ULL * 1024 * 1024, nullptr);
+    const gui_forms::AudioClipResult flag_arena = gui_forms::AudioClip::load_ogg(path, completed);
+    require(flag_arena.status == AudioStatus::allocation_failed && !flag_arena.clip, "flag retains codec arena limit");
+    gui_forms::audio_test_decode_limits(16 * 1024 * 1024, held_bytes, nullptr);
+    const gui_forms::AudioClipResult flag_quota = gui_forms::AudioClip::load_ogg(path, completed);
+    require(flag_quota.status == AudioStatus::quota_exceeded && !flag_quota.clip, "flag retains pre-allocation quota");
+    require(gui_forms::audio_test_clip_bytes() == held_bytes, "flag failures release reservations");
+    gui_forms::audio_test_decode_limits(16 * 1024 * 1024, 512ULL * 1024 * 1024, nullptr);
+    {
+        const gui_forms::AudioClipResult complete_flag = gui_forms::AudioClip::load_ogg(path, completed);
+        require(complete_flag.status == AudioStatus::ok && complete_flag.clip, "flag decode completes");
+        require(gui_forms::audio_test_clip_bytes() == held_bytes + (*original.clip).frames() * 2 * sizeof(float),
+                "flag retains exact PCM budget accounting");
+        completed.request();
+        const std::span<const float> expected = (*original.clip).samples();
+        const std::span<const float> actual = (*complete_flag.clip).samples();
+        require(expected.size() == actual.size(), "flag decoder preserves sample count");
+        for (std::size_t index = 0; index < expected.size(); ++index) {
+            require(expected[index] == actual[index], "late cancellation leaves published PCM unchanged");
+        }
+    }
+    require(gui_forms::audio_test_clip_bytes() == held_bytes, "completed flag clip releases its reservation");
     require((*original.clip).frames() == 5760 && (*original.clip).samples()[100] != 0, "existing owner survives failed load");
 #endif
     const gui_forms::AudioClipResult retry = gui_forms::AudioClip::load_ogg(path);

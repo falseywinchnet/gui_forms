@@ -38,6 +38,9 @@ enum class VisualPaintOperation : std::uint8_t {
     draw_image_region_sampled,
     fill_image_pattern,
     draw_live_surface,
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    draw_prepared_text,
+#endif
 };
 
 [[nodiscard]] const char* visual_paint_operation_name(

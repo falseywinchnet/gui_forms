@@ -627,3 +627,38 @@ it adds no Orchestrator service, wire capability, hostile-worker supervision,
 or registry edge. Retained controls remain owned by their UI execution context.
 Compiler/cache and native pacing validation are recorded separately from
 application and API/ABI negotiation. See `COMPILER_CACHE.md` and `THREADING.md`.
+
+## 2026-10-07 Audio cancellation and shared worker ownership
+
+**GIVEN:** the owner requests a CancellationFlag Ogg overload, retained legacy
+stop-token compatibility, and a single Worker implementation for both component
+and Application consumers. **OBSERVED:** Worker and the atomic pool now belong
+to shared `GUIForms::Threading`. Audio, Core and Application link that same target;
+Audio does not pull in Core. This supersedes Core as the primary worker target
+in the preceding entry. The change adds no Orchestrator protocol or service edge.
+
+**OBSERVED:** both Ogg overloads use the same decode algorithm and cancellation
+checkpoints. The public-header audit found only the retained Audio stop-token
+overload and no public jthread parameters. The API reference deprecates the old
+form without adding compiler warnings. The consumer note specifies runtime
+packaging and forbids mixing static Core with Application; installed-SDK tests
+exercise valid component/Application adapters and rejected mixed dependencies.
+
+**MEASURED locally:** LLVM 22.1.8, M4 arm64, macOS 26.5, deployment target 14.0:
+92/92 native tests and 10/10 installed-reference tests pass. The audio tests cover
+pre-start, between-block and post-completion flag requests, empty cancelled
+results, codec-arena failure and unchanged PCM quota/reservation accounting.
+The relocated threading test loads the copied Threading library and all three
+restored LLVM dylibs. Threading is 40,816 bytes before stripping on this build;
+Core and Application no longer define Worker, CancellationFlag or AtomicThreadPool
+implementation symbols. This is packaging/ownership evidence, not a new
+throughput, idle-CPU or total application-size benchmark.
+
+House-style source review covers the changed Audio declarations, cancellation
+adapter/template and polling substitutions, private test seam, added audio tests,
+four new reference C++ files, CMake ownership/tests, and changed Python cache
+proofs. Reviewed explicit types, named execution, borrowed flag/context lifetimes,
+join-before-read ordering, allocation cleanup, failure results, unchanged block
+storage and polling, and no callback allocation. The new C++ fixtures pass the
+spelling scanner. No violations were identified in this changed scope; legacy
+Audio code and third-party decoder/pool source are not claimed wholly compliant.
