@@ -14,9 +14,14 @@ Language level: C++20. Public platform objects and renderer types are absent.
 
 ## Audio loading and cancellation
 
-Include `<gui_forms/audio/audio.hpp>` and link `GUIForms::Audio`. Ogg Vorbis
-decoding uses the pinned `stb_vorbis` v1.22 source distributed with miniaudio;
-the accepted clip profile remains stereo, 48 kHz, interleaved float PCM.
+Include `<gui_forms/audio/audio.hpp>` and link `GUIForms::Audio`. Audio-enabled
+builds default to `GUI_FORMS_AUDIO_VORBIS_BACKEND=stx`, whose automatic synthesis
+uses the bundled, bounded BFFT BODFT adapter. The installed target resolves its
+codec archives without a separate BFFT package. An explicit `stb` producer
+configuration retains the pinned stb_vorbis v1.22 fallback. See
+[build selection](COMPILER_CACHE.md#choosing-the-ogg-decoder) and
+[PlaySuite adoption](../stx_vorbis/docs/PRODUCTION.md).
+The accepted clip profile remains stereo, 48 kHz, interleaved float PCM.
 The preferred cancellation overload is:
 
 ```cpp

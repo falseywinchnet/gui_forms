@@ -232,5 +232,9 @@ against both choices, together with the installed Worker/Ogg examples in CI.
 The internal stb seek-boundary test applies only to stb; stx's own seek tests live
 in its standalone suite. CI builds and installs the default stx SDK, exercises
 stb as the alternate, then restores stx for subsequent checks and publication.
-This default selects the shipping stx decoder; it does not enable the separate
-experimental BFFT/BODFT transform adapter.
+The shipping stx decoder now uses the prepared BFFT/BODFT transform for its
+automatic synthesis mode. Its pinned source subset is compiled privately into
+the codec archive, with no separate consumer BFFT dependency. The SDK installs
+the BFFT license and provenance under `share/licenses/stx_vorbis/`.
+Explicit scalar/NEON/SSE2/AVX2 stx modes retain the original complex FFT for
+controlled comparisons. See [production integration](../stx_vorbis/docs/PRODUCTION.md).
