@@ -19,8 +19,11 @@ ROOT: Path = SOURCE.parent
 STATE: Path = ROOT / '.ci'
 
 
-def git_value(expression: str) -> str:
-    return subprocess.check_output(['git', '-C', str(SOURCE), 'rev-parse', expression], text=True).strip()
+def git_field(format_code: str) -> str:
+    # Avoid revision operators containing braces: MSYS2's native-process
+    # argument conversion can turn HEAD^{tree} into HEAD^tree.
+    return subprocess.check_output(
+        ['git', '-C', str(SOURCE), 'show', '-s', '--format=' + format_code, 'HEAD'], text=True).strip()
 
 
 def file_digest(path: Path) -> str:
@@ -186,7 +189,7 @@ def main() -> None:
     parser.add_argument('--wait-seconds', type=int, default=1800)
     args: argparse.Namespace = parser.parse_args()
     if args.command == 'identity':
-        identity: dict[str, Any] = {'schema': 1, 'tree': git_value('HEAD^{tree}'), 'revision': git_value('HEAD'),
+        identity: dict[str, Any] = {'schema': 1, 'tree': git_field('%T'), 'revision': git_field('%H'),
             'platform': args.platform, 'compiler': args.compiler, 'environment': args.environment, 'proof': proof_contract(SOURCE),
             'run_id': os.environ['GITHUB_RUN_ID']}
         write_json(STATE / 'inputs.json', identity)

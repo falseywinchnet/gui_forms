@@ -43,3 +43,18 @@ explicit types, ownership of extracted files, bounds before pointer formation,
 immutable artifact identities, acyclic waits, and no partial validation receipts.
 The source projection preserves upstream C spelling; legacy/vendor files outside
 the changed scope are not claimed compliant.
+
+**GIVEN follow-up:** prepare one build switch for stx_vorbis from merged PR #6,
+without promoting it to the default or modifying its SIMD implementation.
+`GUI_FORMS_AUDIO_VORBIS_BACKEND=stb|stx` selects exactly one decoder. The stx
+choice links its compatibility adapter, installs its package dependencies, and
+leaves the public Audio/Worker API unchanged. The four native CI jobs run Audio
+and installed Worker/Ogg consumers with stx before restoring the default stb SDK.
+Local macOS Audio tests pass with both choices. House-style review additionally
+covers the backend selection, SDK dependency discovery and named CI test helper.
+
+**OBSERVED failed CI trial:** the first Windows fingerprint step received
+`HEAD^tree` instead of `HEAD^{tree}`. The helper now uses `git show -s --format=%T
+HEAD`; its real-Git regression fixture runs on every native platform before the
+fingerprint step. This failure happened before compilation; retain the failed run
+as evidence rather than treating it as successful validation.

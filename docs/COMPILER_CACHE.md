@@ -209,3 +209,23 @@ There is no promise of zero CI startup, transfer or packaging time.
 
 Windows now caches the fetched text-stack and audio dependencies too. The native
 archive remains a compilation accelerator, not a reusable consumer test result.
+
+## Choosing the Ogg decoder
+
+`GUI_FORMS_AUDIO_VORBIS_BACKEND` is the single producer build switch:
+
+```sh
+cmake -S gui_forms -B .build/native-macos-arm64/gui-forms -DGUI_FORMS_BUILD_AUDIO=ON -DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx
+```
+
+The default is `stb`; `stx` opts into the development decoder from `stx_vorbis/`.
+Switch back with `-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stb`. Rebuild and reinstall the
+SDK after changing it. Consumers continue linking `GUIForms::Audio`: an stx SDK
+installs its decoder/compatibility archives and resolves those dependencies in
+`find_package(GUIForms)`. No consumer API or extra manual library list is needed.
+Only the selected decoder is linked; miniaudio remains the audio-device backend.
+The existing cancellation, bounded arena, clip quota and publication tests run
+against both choices, together with the installed Worker/Ogg examples in CI.
+The internal stb seek-boundary test applies only to stb; stx's own seek tests live
+in its standalone suite. This switch prepares integration and dogfooding; it does
+not promote stx to the default or replace its outstanding platform/SIMD validation.

@@ -18,7 +18,9 @@ AudioStatus audio_test_revoked_callback_status();
 void audio_test_decode_limits(std::size_t arena_bytes, std::uint64_t budget, std::stop_source* cancel_after_chunk);
 std::uint64_t audio_test_clip_bytes();
 void audio_test_cancel_flag_after_chunk(CancellationFlag* flag) noexcept;
+#ifndef GUI_FORMS_AUDIO_VORBIS_STX
 bool audio_test_vorbis_seek_bounds() noexcept;
+#endif
 }
 #endif
 
@@ -535,7 +537,9 @@ void vorbis_loader() {
 int main() {
     try {
 #ifdef GUI_FORMS_AUDIO_TESTING
+#ifndef GUI_FORMS_AUDIO_VORBIS_STX
         require(gui_forms::audio_test_vorbis_seek_bounds(), "Vorbis seek checks integer bounds before pointer arithmetic");
+#endif
         const gui_forms::AudioStatus revoked = gui_forms::audio_test_revoked_callback_status();
         require(revoked == gui_forms::AudioStatus::closed, "late callback cannot replace closed status");
 #endif

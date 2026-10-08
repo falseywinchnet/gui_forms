@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import tarfile
@@ -70,6 +71,15 @@ class FixtureAPI:
 
 
 class ReuseTests(unittest.TestCase):
+    def test_git_fingerprints_match_raw_commit_without_revision_operators(self) -> None:
+        commit: str = subprocess.check_output(
+            ['git', '-C', str(ci_reuse.SOURCE), 'cat-file', '-p', 'HEAD'], text=True)
+        tree: str = commit.splitlines()[0].removeprefix('tree ')
+        self.assertEqual(ci_reuse.git_field('%T'), tree)
+        revision: str = subprocess.check_output(
+            ['git', '-C', str(ci_reuse.SOURCE), 'rev-parse', 'HEAD'], text=True).strip()
+        self.assertEqual(ci_reuse.git_field('%H'), revision)
+
     def lookup(self, fixture: FixtureAPI) -> bool:
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo', 'GITHUB_RUN_ID': '20'}), \

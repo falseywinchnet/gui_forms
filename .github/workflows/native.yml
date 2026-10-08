@@ -99,7 +99,9 @@ jobs:
         run: python gui_forms/tools/compiler_identity.py
       - name: Fingerprint all tracked inputs and cache mechanism
         id: inputs
-        run: python gui_forms/tools/ci_reuse.py identity --platform "${{ matrix.platform }}" --compiler "${{ steps.compiler.outputs.identity }}" --environment "${{ steps.compiler.outputs.environment }}"
+        run: |
+          python -B -m unittest discover -s gui_forms/tools -p test_ci_reuse.py
+          python gui_forms/tools/ci_reuse.py identity --platform "${{ matrix.platform }}" --compiler "${{ steps.compiler.outputs.identity }}" --environment "${{ steps.compiler.outputs.environment }}"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.inputs.outputs.inputs-name }}
