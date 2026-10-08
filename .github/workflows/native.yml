@@ -4,8 +4,18 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      force_validation:
+        description: Run native validation even if an identical successful receipt exists
+        type: boolean
+        default: false
+      force_cache_proof:
+        description: Repeat the cold relocation/invalidation proof
+        type: boolean
+        default: false
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: gui-forms-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
@@ -18,6 +28,7 @@ jobs:
         run: |
           python3 -B -m unittest discover -s tools -p test_house_style.py
           python3 -B -m unittest discover -s tools -p test_macos_runtime_manifest.py
+          python3 -B -m unittest discover -s tools -p test_ci_reuse.py
           python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp examples/reference/bound_values.cpp examples/reference/shared_state.cpp examples/reference/collection_state.cpp examples/reference/collection_gallery.cpp tools/owned_event_lab.cpp tools/concise_authoring_lab.cpp include/gui_forms/threading.hpp src/core/threading/worker.cpp tests/threading_tests.cpp tests/live_surface_idle_wake_tests.cpp tests/macos_display_link_tests.mm examples/reference/cooperative_worker.cpp examples/reference/audio_worker.cpp examples/reference/audio_worker.hpp examples/reference/ogg_worker.cpp examples/linkage_rejection/main.cpp include/gui_forms/value include/gui_forms/detail/scalar_binding.hpp include/gui_forms/controls/collections src/controls/collections
   native:
     needs: house-style
@@ -86,21 +97,72 @@ jobs:
       - name: Identify and verify LLVM release compiler
         id: compiler
         run: python gui_forms/tools/compiler_identity.py
+      - name: Fingerprint all tracked inputs and cache mechanism
+        id: inputs
+        run: |
+          python -B -m unittest discover -s gui_forms/tools -p test_ci_reuse.py
+          python gui_forms/tools/ci_reuse.py identity --platform "${{ matrix.platform }}" --compiler "${{ steps.compiler.outputs.identity }}" --environment "${{ steps.compiler.outputs.environment }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.inputs.outputs.inputs-name }}
+          path: .ci/inputs.json
+          include-hidden-files: true
+          overwrite: true
+          retention-days: 30
+      - name: Reuse identical successful native validation
+        id: reuse
+        if: inputs.force_validation != true && inputs.force_cache_proof != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_reuse.py lookup
+      - uses: actions/download-artifact@v4
+        if: steps.reuse.outputs.reused == 'true'
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.reuse.outputs.producer-run }}
+          artifact-ids: ${{ steps.reuse.outputs.artifact-id }}
+          path: .ci/download
+          merge-multiple: true
+      - name: Verify and restore the validated cache payload
+        if: steps.reuse.outputs.reused == 'true'
+        run: python gui_forms/tools/ci_reuse.py restore
+      - name: Retain reused macOS runtimes in this branch cache
+        uses: actions/cache/save@v4
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused == 'true'
+        with:
+          path: .build/toolchain/llvm-22.1.8-macos14
+          key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/tools/build_macos_runtimes.py', 'gui_forms/tools/macos_runtime_manifest.py') }}
       - uses: actions/cache@v4
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         with:
           path: .build/toolchain/llvm-22.1.8-macos14
           key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/tools/build_macos_runtimes.py', 'gui_forms/tools/macos_runtime_manifest.py') }}
       - name: Build minimum-compatible macOS runtimes
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         run: |
           if [ ! -f "$GUI_FORMS_LLVM_RUNTIME/runtime-manifest.json" ]; then
             python gui_forms/tools/build_macos_runtimes.py --work "$RUNNER_TEMP/llvm-runtimes" --prefix "$GUI_FORMS_LLVM_RUNTIME" --jobs 4
           fi
           python gui_forms/tools/macos_runtime_manifest.py "$GUI_FORMS_LLVM_RUNTIME"
           python gui_forms/tools/audit_macos_minimum.py "$GUI_FORMS_LLVM_RUNTIME/lib"
-      - name: Prove relocated cache and invalidation
-        run: python gui_forms/tools/prove_compiler_cache.py --source gui_forms --scratch cache-proof --jobs 4
+      - uses: actions/cache/restore@v4
+        id: proof
+        if: steps.reuse.outputs.reused != 'true' && inputs.force_cache_proof != true
+        with:
+          path: .ci/proof
+          key: gui-proof-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.environment }}-${{ steps.inputs.outputs.proof }}
+      - name: Prove relocated cache and invalidation when its contract changes
+        if: steps.reuse.outputs.reused != 'true' && steps.proof.outputs.cache-hit != 'true'
+        run: |
+          python gui_forms/tools/prove_compiler_cache.py --source gui_forms --scratch cache-proof --jobs 4
+          python gui_forms/tools/ci_reuse.py record-proof
+      - name: Verify cache-mechanism receipt
+        run: python gui_forms/tools/ci_reuse.py verify-proof
+      - uses: actions/cache/save@v4
+        if: steps.proof.outputs.cache-hit != 'true'
+        with:
+          path: .ci/proof
+          key: gui-proof-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.environment }}-${{ steps.inputs.outputs.proof }}
       - name: Configure compiler cache
         run: |
           cache_dir="$PWD/.ccache"
@@ -115,21 +177,28 @@ jobs:
           echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
       - uses: actions/cache/restore@v4
         id: objects
+        if: steps.reuse.outputs.reused != 'true'
         with:
           path: .ccache
-          key: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ github.sha }}
-          restore-keys: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
+          key: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ steps.inputs.outputs.tree }}
+          restore-keys: |
+            gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
+            gui-objects-v2-${{ matrix.platform }}-
       - uses: actions/cache/restore@v4
         id: dependencies
-        if: runner.os != 'Windows'
+        if: steps.reuse.outputs.reused != 'true'
         with:
           path: |
             gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
+            gui_forms/third_party/libunibreak
+            .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
             .build/native-${{ matrix.platform }}/skia
-          key: gui-deps-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}
+          key: gui-deps-v3-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
+          restore-keys: gui-deps-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}
       - name: Build and test native toolkit
+        if: steps.reuse.outputs.reused != 'true'
         run: |
           ccache --zero-stats
           if [ "$RUNNER_OS" = Linux ]; then
@@ -138,7 +207,7 @@ jobs:
             python gui_forms/tools/ci_build.py --jobs 4
           fi
       - name: Test development text-mask ownership on Windows
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.reuse.outputs.reused != 'true'
         shell: msys2 {0}
         run: |
           sh gui_forms/third_party/fetch_text_stack.sh
@@ -150,7 +219,7 @@ jobs:
           cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests gui_forms_text_mask_native_tests gui_forms_text_mask_wrapping_tests gui_forms_linebreak_conformance_tests gui_forms_prepared_text_service_tests gui_forms_prepared_display_tests gui_forms_prepared_window_input_tests gui_forms_prepared_window_batch_tests gui_forms_prepared_window_shape_tests gui_forms_prepared_window_session_tests --parallel 4
           ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_(text_mask_(lifecycle|native|wrapping)_tests|linebreak_conformance|prepared_text_service_tests|prepared_display_tests|prepared_window_(input|batch|shape|session)_tests)$' --output-on-failure
       - name: Test Windows DIB ownership and exact brush replay
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && steps.reuse.outputs.reused != 'true'
         shell: msys2 {0}
         run: |
           cp .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/DevelopmentTextLastTest.log
@@ -158,7 +227,7 @@ jobs:
           cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_windows_dib_frame_store_tests gui_forms_windows_dib_lifecycle_tests --parallel 4
           ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_windows_dib_(frame_store|lifecycle)_tests$' --output-on-failure
       - name: Test development text-mask ownership on macOS and Linux
-        if: runner.os != 'Windows'
+        if: runner.os != 'Windows' && steps.reuse.outputs.reused != 'true'
         shell: bash
         run: |
           sh gui_forms/third_party/fetch_text_stack.sh
@@ -170,37 +239,39 @@ jobs:
           cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_text_mask_lifecycle_tests gui_forms_text_mask_native_tests gui_forms_text_mask_wrapping_tests gui_forms_linebreak_conformance_tests gui_forms_prepared_text_service_tests gui_forms_prepared_text_raster_tests gui_forms_prepared_display_tests gui_forms_prepared_text_skia_tests gui_forms_opaque_live_surface_raster_tests gui_forms_prepared_window_input_tests gui_forms_prepared_window_batch_tests gui_forms_prepared_window_shape_tests gui_forms_prepared_window_session_tests --parallel 4
           ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_(text_mask_(lifecycle|native|wrapping)_tests|linebreak_conformance|prepared_text_(service|raster|skia)_tests|prepared_display_tests|opaque_live_surface_raster_tests|prepared_window_(input|batch|shape|session)_tests)$' --output-on-failure
       - name: Verify Linux prepared frames through X11
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && steps.reuse.outputs.reused != 'true'
         run: |
           cmake --build .build/native-${{ matrix.platform }}/gui-forms --target gui_forms_linux_prepared_text_host_tests --parallel 4
           xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --test-dir .build/native-${{ matrix.platform }}/gui-forms -R '^gui_forms_linux_prepared_text_host_tests$' --output-on-failure
       - name: Verify Mac prepared-frame native exposure and visibility
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         # Run after OFF diagnostics; development-only host rebuilding must not
         # change the binary used by the recorded baseline or exported SDK.
         run: |
           cmake --build .build/native-macos-arm64/gui-forms --target gui_forms_macos_exposure_tests gui_forms_macos_idle_visibility_tests gui_forms_macos_display_link_tests gui_forms_macos_prepared_text_host_tests --parallel 4
           ctest --test-dir .build/native-macos-arm64/gui-forms -R '^gui_forms_macos_(exposure|idle_visibility|display_link(_overlay)?|prepared_text_host)_tests$' --output-on-failure
       - name: Audit installed macOS binary minimums
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         run: python gui_forms/tools/audit_macos_minimum.py .build/native-macos-arm64/gui-forms-sdk .build/native-macos-arm64/installed-reference-examples
       - uses: actions/cache/save@v4
-        if: always() && runner.os != 'Windows' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true'
+        if: always() && steps.reuse.outputs.reused != 'true' && steps.dependencies.outputs.cache-primary-key != '' && steps.dependencies.outputs.cache-hit != 'true'
         with:
           path: |
             gui_forms/third_party/skia
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
+            gui_forms/third_party/libunibreak
+            .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
             .build/native-${{ matrix.platform }}/skia
           key: ${{ steps.dependencies.outputs.cache-primary-key }}
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose
       - uses: actions/cache/save@v4
-        if: always() && steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true'
+        if: always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true'))
         with:
           path: .ccache
-          key: ${{ steps.objects.outputs.cache-primary-key }}
+          key: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ steps.inputs.outputs.tree }}
       - name: Archive consumer cache seed
         run: |
           python gui_forms/tools/cache_manifest.py "${{ matrix.platform }}" "${{ steps.compiler.outputs.identity }}"
@@ -210,20 +281,35 @@ jobs:
             tar -czf gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache cache-manifest.json
           fi
       - name: Prove archived macOS runtimes after relocation
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         run: python gui_forms/tools/prove_macos_runtime_restore.py --archive gui-forms-cache-macos-arm64.tar.gz --executable .build/native-macos-arm64/gui-forms/gui_forms_threading_tests
       - uses: actions/upload-artifact@v4
+        id: cache-artifact
         with:
           name: gui-forms-cache-${{ matrix.platform }}
+          overwrite: true
           path: gui-forms-cache-${{ matrix.platform }}.tar.gz
           compression-level: 0
+          retention-days: 30
+      - name: Record successful native validation and cache provenance
+        run: python gui_forms/tools/ci_reuse.py record --artifact-id "${{ steps.cache-artifact.outputs.artifact-id }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.inputs.outputs.receipt-name }}
+          path: .ci/receipt.json
+          include-hidden-files: true
+          overwrite: true
           retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: gui-forms-evidence-${{ matrix.platform }}
+          include-hidden-files: true
+          overwrite: true
           path: |
             .build/native-${{ matrix.platform }}/**/Testing/Temporary/*LastTest.log
+            .ci/*.json
+            .ci/proof/*.json
             cache-proof/receipt.json
             cache-proof/**/*.log
 

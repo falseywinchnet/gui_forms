@@ -48,7 +48,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
         '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DGUI_FORMS_BUILD_GALLERY=OFF',
-        '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
+        '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON',
+        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stb', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
     run('cmake', '--build', toolkit, '--parallel', jobs)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
@@ -59,6 +60,28 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'))
     run('cmake', '--build', examples, '--parallel', jobs)
     run('ctest', '--test-dir', examples, '--output-on-failure')
+
+
+
+def check_alternate_audio(build: Path, jobs: int) -> None:
+    """Exercise the opt-in decoder through Audio and an installed SDK consumer."""
+    toolkit: Path = build / 'gui-forms'
+    examples: Path = build / 'installed-reference-examples'
+    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit,
+        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx')
+    run('cmake', '--build', toolkit, '--target', 'gui_forms_audio_tests', '--parallel', jobs)
+    run('ctest', '--test-dir', toolkit, '-R', '^gui_forms_audio_tests$', '--output-on-failure')
+    run('cmake', '--install', toolkit)
+    run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples)
+    run('cmake', '--build', examples, '--target', 'ogg_worker', 'application_audio_worker', '--parallel', jobs)
+    run('ctest', '--test-dir', examples, '-R', '^(ogg_worker|application_audio_worker)$', '--output-on-failure')
+    # Retain the default backend in the SDK and baseline build for later checks.
+    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit,
+        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stb')
+    run('cmake', '--build', toolkit, '--target', 'gui_forms_audio_tests', '--parallel', jobs)
+    run('cmake', '--install', toolkit)
+    run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples)
+    run('cmake', '--build', examples, '--target', 'ogg_worker', 'application_audio_worker', '--parallel', jobs)
 
 
 def main() -> None:
@@ -76,6 +99,7 @@ def main() -> None:
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs)
+    check_alternate_audio(build, args.jobs)
 
 
 if __name__ == '__main__':
