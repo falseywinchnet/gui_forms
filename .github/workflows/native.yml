@@ -126,6 +126,12 @@ jobs:
       - name: Verify and restore the validated cache payload
         if: steps.reuse.outputs.reused == 'true'
         run: python gui_forms/tools/ci_reuse.py restore
+      - name: Retain reused macOS runtimes in this branch cache
+        uses: actions/cache/save@v4
+        if: runner.os == 'macOS' && steps.reuse.outputs.reused == 'true'
+        with:
+          path: .build/toolchain/llvm-22.1.8-macos14
+          key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/tools/build_macos_runtimes.py', 'gui_forms/tools/macos_runtime_manifest.py') }}
       - uses: actions/cache@v4
         if: runner.os == 'macOS' && steps.reuse.outputs.reused != 'true'
         with:
