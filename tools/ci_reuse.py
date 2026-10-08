@@ -142,8 +142,10 @@ def lookup(identity: dict[str, Any], wait_seconds: int) -> bool:
         time.sleep(min(30, max(0, deadline - time.monotonic())))
 
 
-def restore_archive(identity: dict[str, Any]) -> None:
-    receipt: dict[str, Any] = json.loads((STATE / 'reused.json').read_text())
+def restore_archive(identity: dict[str, Any], receipt_path: Path | None = None) -> None:
+    if receipt_path is None:
+        receipt_path = STATE / 'reused.json'
+    receipt: dict[str, Any] = json.loads(receipt_path.read_text())
     archive: Path = STATE / 'download' / ('gui-forms-cache-' + identity['platform'] + '.tar.gz')
     if file_digest(archive) != receipt['archive_sha256']:
         raise ValueError('Reused cache archive digest mismatch')

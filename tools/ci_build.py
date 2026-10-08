@@ -23,6 +23,12 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
     """Build, test, then install only into the explicitly supplied build SDK."""
     toolkit: Path = build / 'gui-forms'
     options: list[str] = []
+    miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
+    if (miniaudio / 'miniaudio.h').is_file():
+        # Source was restored from the pinned dependency cache. Audio.cmake
+        # checks both decoder/header digests before compiling it. A missing
+        # FetchContent stamp must not discard and clone these same bytes again.
+        options.append(f'-DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO={miniaudio}')
     hosts: dict[str, str] = {'WINDOWS': 'windows', 'MACOS': 'macos', 'LINUX': 'linux'}
     name: str
     for name in hosts:

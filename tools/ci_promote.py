@@ -18,10 +18,14 @@ import zipfile
 import ci_reuse
 
 
-def find_validation(platform: str) -> bool:
+def find_validation(platform: str, seed: bool = False) -> bool:
     repository: str = os.environ['GITHUB_REPOSITORY']
     tree: str = ci_reuse.git_field('%T')
     prefix: str = 'gui-validated-' + platform + '-' + tree + '-'
+    current: dict[str, Any] = {}
+    if seed:
+        current = json.loads((ci_reuse.STATE / 'inputs.json').read_text())
+        prefix = 'gui-validated-' + platform + '-'
     endpoint: str = 'repos/' + repository + '/actions/artifacts'
     page: int
     # Bounded discovery; eviction or a busy repository falls back to validation.
@@ -36,12 +40,22 @@ def find_validation(platform: str) -> bool:
             data: bytes = subprocess.check_output(
                 ['gh', 'api', endpoint + '/' + str(artifact['id']) + '/zip', '--allow-escape-sequences'])
             receipt: dict[str, Any] = ci_reuse.receipt_from_zip(data, artifact.get('digest', ''))
-            if receipt.get('tree') != tree or receipt.get('platform') != platform:
+            if receipt.get('platform') != platform:
+                continue
+            if not seed and receipt.get('tree') != tree:
+                continue
+            if seed and receipt.get('compiler') != current['compiler']:
                 continue
             # Reuse the full trust gate: repository/workflow, actual Git tree,
             # completed platform job, receipt/payload digests and ownership.
             if not ci_reuse.lookup(receipt, 0):
                 continue
+            if seed:
+                # This is only a ccache seed. Do not leave a reused-validation
+                # marker, change current source identity, or skip native tests.
+                (ci_reuse.STATE / 'reused.json').replace(ci_reuse.STATE / 'seed.json')
+                print('Using verified objects only; current-source native tests remain required', flush=True)
+                return True
             identity: dict[str, Any] = {
                 'schema': 2, 'tree': tree, 'platform': platform,
                 'revision': ci_reuse.git_field('%H'), 'run_id': os.environ['GITHUB_RUN_ID'],
@@ -113,18 +127,26 @@ def promote_archive() -> None:
 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('lookup', 'archive'))
+    parser.add_argument('command', choices=('lookup', 'archive', 'seed', 'restore-seed'))
     parser.add_argument('--platform')
     args: argparse.Namespace = parser.parse_args()
     if args.command == 'archive':
         promote_archive()
         return
+    if args.command == 'restore-seed':
+        identity: dict[str, Any] = json.loads((ci_reuse.STATE / 'inputs.json').read_text())
+        ci_reuse.restore_archive(identity, ci_reuse.STATE / 'seed.json')
+        return
     found: bool = False
+    seed: bool = args.command == 'seed'
     try:
-        found = find_validation(args.platform)
+        found = find_validation(args.platform, seed)
     except (subprocess.CalledProcessError, ValueError, KeyError, OSError, zipfile.BadZipFile) as error:
         print('Promotion unavailable; run native validation: ' + str(error), flush=True)
-    ci_reuse.output('reused', str(found).lower())
+    field: str = 'reused'
+    if seed:
+        field = 'seeded'
+    ci_reuse.output(field, str(found).lower())
 
 
 if __name__ == '__main__':

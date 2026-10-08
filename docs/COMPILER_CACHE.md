@@ -182,7 +182,10 @@ The native workflow separates object caching, validation and publication:
 
 - **Object cache:** ccache verifies compiler contents, headers and options.
   A fallback can restore an earlier compiler/runner cache; ccache decides which
-  entries remain valid. Cache hits never replace consumer compilation/tests.
+  entries remain valid. Fresh native jobs also discover recent validated archives
+  across branches for the same compiler identity. They seed objects without
+  changing the current tree identity or leaving a reused-validation marker.
+  Cache hits never replace consumer compilation/tests.
 - **Cache-mechanism proof:** `.github/workflows/cache-proof.yml` runs the full
   cold/relocation/source/header/option experiment weekly on Linux x64, or on
   manual dispatch. It is no longer repeated inside ordinary native jobs.
@@ -218,9 +221,11 @@ The five-minute ordinary native-job target is measured against actual Actions
 job timings. Cold toolchains/dependencies and runner queue delays are reported
 separately; no speed claim follows merely from changing a workflow.
 
-The source-consumer linkage configure tests use the parent's already fetched,
-pinned miniaudio source. They still generate separate accepted and rejected
-consumer projects, without cloning that dependency twice per platform.
+The primary build uses miniaudio source restored by the dependency cache;
+Audio.cmake still checks its pinned header/decoder digests. Missing FetchContent
+stamps no longer cause another clone. The source-consumer linkage configure
+tests use that same pinned source. They still generate separate accepted and
+rejected consumer projects, without cloning the dependency twice per platform.
 
 ## Choosing the Ogg decoder
 
