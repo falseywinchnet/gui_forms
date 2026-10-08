@@ -73,9 +73,24 @@ if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT GUI_FORMS_ENABLE_SKIA)
     message(FATAL_ERROR "The current macOS proving host requires the private Skia adapter")
 endif()
 
-add_library(gui_forms_core STATIC
+add_library(gui_forms_threading SHARED
     src/core/threading/atomic_pool/atomic_pool.c
-    src/core/threading/worker.cpp
+    src/core/threading/worker.cpp)
+add_library(GUIForms::Threading ALIAS gui_forms_threading)
+set_target_properties(gui_forms_threading PROPERTIES
+    EXPORT_NAME Threading OUTPUT_NAME gui_forms_threading VERSION 0.1.0 SOVERSION 0)
+target_include_directories(gui_forms_threading PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+target_compile_features(gui_forms_threading PUBLIC cxx_std_20)
+target_link_libraries(gui_forms_threading PRIVATE Threads::Threads)
+if(WIN32)
+    target_compile_definitions(gui_forms_threading PUBLIC _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+    target_link_libraries(gui_forms_threading PRIVATE winpthread)
+    target_link_options(gui_forms_threading PRIVATE "-Wl,--export-all-symbols")
+endif()
+
+add_library(gui_forms_core STATIC
     src/core/application/application.cpp
     src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
@@ -145,7 +160,15 @@ add_library(gui_forms_core STATIC
     src/core/control/static_tree/control_factory/control_factory.cpp
     src/core/window/window.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
+set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
+set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
+# Compatibility properties alone do not traverse LINK_ONLY dependencies of
+# private static adapters. Link options do. Deliberately diagnose the forbidden
+# combination at generation by querying a named, nonexistent diagnostic target.
+# This contributes no linker option to valid Core or Application consumers.
+target_link_options(gui_forms_core INTERFACE
+    "$<$<STREQUAL:$<TARGET_PROPERTY:GUI_FORMS_CORE_LINKAGE>,application>:$<TARGET_PROPERTY:GUIForms::ERROR_do_not_link_static_Core_with_Application,TYPE>>")
 if(WIN32)
     target_compile_definitions(gui_forms_core PUBLIC _WIN32_WINNT=0x0A00 WINVER=0x0A00)
     target_link_libraries(gui_forms_core PUBLIC winpthread)
@@ -489,7 +512,7 @@ endif()
 if(GUI_FORMS_BUILD_TEXT_MASKS)
     install(CODE "message(FATAL_ERROR \"The development text-mask interface is not admitted for SDK installation\")")
 endif()
-install(TARGETS gui_forms_core gui_forms_controls gui_drawing_core
+install(TARGETS gui_forms_threading gui_forms_core gui_forms_controls gui_drawing_core
         EXPORT GUIFormsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -2741,6 +2764,12 @@ endif()
 # Installed consumers need the notices for the code incorporated in the library.
 if(GUI_FORMS_BUILD_AUDIO)
     include(cmake/Audio.cmake)
+endif()
+
+if(TARGET gui_forms_application)
+    target_link_libraries(gui_forms_application PUBLIC GUIForms::Threading)
+    set_property(TARGET gui_forms_application PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE application)
+    set_property(TARGET gui_forms_application APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 endif()
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)

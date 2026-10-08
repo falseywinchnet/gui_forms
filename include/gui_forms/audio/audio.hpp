@@ -1,4 +1,5 @@
 #pragma once
+#include "gui_forms/threading.hpp"
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -40,9 +41,15 @@ public:
     // codec open/decode calls and the serialized open wait cannot be interrupted.
     [[nodiscard]] static AudioClipResult load_ogg(const std::filesystem::path& path,
                                   std::stop_token cancellation = {});
+    // Preferred cancellation form; borrows the flag until this call returns.
+    [[nodiscard]] static AudioClipResult load_ogg(const std::filesystem::path& path,
+                                  const CancellationFlag& cancellation);
     std::span<const float> samples() const noexcept;
     std::uint64_t frames() const noexcept;
 private:
+    template<class Cancellation>
+    static AudioClipResult load_ogg_impl(const std::filesystem::path& path,
+                                       const Cancellation& cancellation);
     AudioClip() = default;
     std::unique_ptr<float[]> samples_{};
     std::size_t sample_count_{};
