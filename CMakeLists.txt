@@ -426,6 +426,7 @@ add_library(gui_forms_controls STATIC
     src/controls/typography_specimen/typography_specimen.cpp
     src/controls/easing_preview/easing_preview.cpp
     src/controls/panel/text_box/text_box.cpp
+    src/controls/panel/text_box/text_box_scroll.cpp
     src/controls/panel/list_box/list_box.cpp
     src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
     src/controls/panel/combo_box/drop_down_layer.cpp

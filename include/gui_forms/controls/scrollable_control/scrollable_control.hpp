@@ -92,6 +92,9 @@ public:
                                   std::string_view value) override;
 
 protected:
+    // Called after the retained position changes, including silent API writes
+    // and layout clamping. This does not publish a public Scroll event.
+    virtual void on_scroll_position_changed() {}
     // Layout containers supply their measured content rather than authored child
     // coordinates. This keeps viewport, bars and hit-test clipping in one owner.
     void arrange_scroll_viewport(Size client_size, Size measured_content);

@@ -484,10 +484,8 @@ std::string TextBox::display_text() const {
     return result;
 }
 
-void TextBox::ensure_multiline_layout() {
+void TextBox::rebuild_multiline_rows(const double width) {
     const FontSpec font = effective_font(font_);
-    const Rect bounds = local_bounds();
-    const double width = std::max(1.0, bounds.width - 10.0);
     // Device-pixel rounding can change logical advances/ascent while the
     // provider address, authored font and logical viewport remain unchanged.
     const Window* owner = window();
@@ -654,38 +652,39 @@ Utf8Offset TextBox::position_in_line(std::size_t line, double x) const {
 
 Utf8Offset TextBox::multiline_position_at(double x, double y) {
     ensure_multiline_layout();
-    const double row = std::max(0.0, std::floor((y - 4.0 + vertical_offset_) / line_height_));
+    const Point offset = scroll_offset();
+    const double row = std::max(0.0, std::floor((y - 4.0 + offset.y) / line_height_));
     const std::size_t index = std::min(static_cast<std::size_t>(row), visual_lines_.size() - 1);
-    const Utf8Offset position = position_in_line(index, x - text_left_ + horizontal_offset_);
+    const Utf8Offset position = position_in_line(index, x - text_left_ + offset.x);
     next_upstream_ = position.value() == visual_lines_[index].offsets.back();
     return position;
 }
 
 void TextBox::reveal_multiline_caret() {
-    const double width = std::max(1.0, local_bounds().width - 10.0);
-    const double height = std::max(1.0, local_bounds().height - 8.0);
+    const Rect viewport = multiline_text_rectangle();
+    const double width = std::max(1.0, viewport.width);
+    const double height = std::max(1.0, viewport.height);
+    Point offset = scroll_offset();
     if (reveal_pending_) {
         const std::size_t row = caret_line();
         const double x = multiline_boundary_x(row, selection_.caret);
         const double y = static_cast<double>(row) * line_height_;
-        if (y < vertical_offset_) vertical_offset_ = y;
-        if (y + line_height_ > vertical_offset_ + height) vertical_offset_ = y + line_height_ - height;
-        if (x < horizontal_offset_) horizontal_offset_ = x;
-        if (x > horizontal_offset_ + width - 1.0) horizontal_offset_ = x - width + 1.0;
+        if (y < offset.y) offset.y = y;
+        if (y + line_height_ > offset.y + height) offset.y = y + line_height_ - height;
+        if (x < offset.x) offset.x = x;
+        if (x > offset.x + width - 1.0) offset.x = x - width + 1.0;
         reveal_pending_ = false;
     }
-    vertical_offset_ = std::clamp(vertical_offset_, 0.0,
-        std::max(0.0, static_cast<double>(visual_lines_.size()) * line_height_ - height));
-    horizontal_offset_ = word_wrap_ ? 0.0 : std::clamp(horizontal_offset_, 0.0,
-        std::max(0.0, document_width_ - width + 1.0));
+    set_multiline_scroll(offset);
 }
 
 Rect TextBox::paint_multiline(Painter& painter) {
     ensure_multiline_layout();
     reveal_multiline_caret();
-    const Rect bounds = local_bounds();
-    const double width = std::max(0.0, bounds.width - 10.0);
-    const double height = std::max(0.0, bounds.height - 8.0);
+    const Rect viewport = multiline_text_rectangle();
+    const double width = viewport.width;
+    const double height = viewport.height;
+    const Point offset = scroll_offset();
     const FontSpec font = effective_font(font_);
     const bool themed = !has_background_override() && !has_style_override();
     const ControlVisualRecipe& editor = effective_theme().resolve(ControlVisualRole::editor,
@@ -695,13 +694,13 @@ Rect TextBox::paint_multiline(Painter& painter) {
     const Color foreground = themed ? editor.text : enabled() ? style().text : style().disabled_text;
     painter.save();
     painter.clip_rect({text_left_, 4.0, width, height});
-    const std::size_t first = static_cast<std::size_t>(vertical_offset_ / line_height_);
+    const std::size_t first = static_cast<std::size_t>(offset.y / line_height_);
     const std::size_t last = std::min(visual_lines_.size(), first +
         static_cast<std::size_t>(std::ceil(height / line_height_)) + 1);
     for (std::size_t i = first; i < last; ++i) {
         const VisualLine& row = visual_lines_[i];
-        const double y = 4.0 + static_cast<double>(i) * line_height_ - vertical_offset_;
-        const double origin = text_left_ - horizontal_offset_;
+        const double y = 4.0 + static_cast<double>(i) * line_height_ - offset.y;
+        const double origin = text_left_ - offset.x;
         const bool selected = focused_ && !selection_.empty() &&
             selection_.start().value() <= row.offsets.back() &&
             selection_.end().value() > row.offsets.front();
@@ -733,8 +732,8 @@ Rect TextBox::paint_multiline(Painter& painter) {
     Rect caret_bounds{};
     if (focused_) {
         const std::size_t row = caret_line();
-        const double x = text_left_ - horizontal_offset_ + multiline_boundary_x(row, selection_.caret);
-        const double y = 4.0 + static_cast<double>(row) * line_height_ - vertical_offset_;
+        const double x = text_left_ - offset.x + multiline_boundary_x(row, selection_.caret);
+        const double y = 4.0 + static_cast<double>(row) * line_height_ - offset.y;
         caret_bounds = {x, y, 0.0, line_height_};
         if (caret_visible_) {
             painter.draw_line({x, y}, {x, y + line_height_}, foreground, 1.0);
@@ -790,8 +789,7 @@ void TextBox::on_paint(Painter& painter, Rect damage) {
     }
     if (multiline_) {
         const Rect caret_bounds = paint_multiline(painter);
-        const Rect text_clip{text_left_, 4.0, std::max(0.0, bounds.width - 10.0),
-                             std::max(0.0, bounds.height - 8.0)};
+        const Rect text_clip = multiline_text_rectangle();
         retain_caret_damage(caret_bounds, text_clip);
         return;
     }
@@ -911,6 +909,13 @@ void TextBox::on_pointer(PointerEvent& event) {
     const Rect absolute = absolute_bounds();
     const double local_x = event.position.x - absolute.x;
     const double local_y = event.position.y - absolute.y;
+    if (multiline_ && auto_scroll() && (!selecting_ || event.action == PointerAction::wheel)) {
+        ensure_multiline_layout();
+        Panel::on_pointer(event);
+        if (event.handled || event.action == PointerAction::wheel) return;
+        const Point local{local_x, local_y};
+        if (!viewport_rectangle().contains(local)) return;
+    }
     if (multiline_ && event.action == PointerAction::wheel) {
         ensure_multiline_layout();
         vertical_offset_ = std::clamp(vertical_offset_ - event.wheel_delta.y * line_height_ * 3.0,
@@ -986,7 +991,7 @@ void TextBox::on_key(KeyEvent& event) {
             const bool page = event.physical_key == PhysicalKey::page_up ||
                               event.physical_key == PhysicalKey::page_down;
             const std::size_t step = page ? static_cast<std::size_t>(std::max(1.0,
-                std::floor((local_bounds().height - 8.0) / line_height_))) : 1U;
+                std::floor(multiline_text_rectangle().height / line_height_))) : 1U;
             const std::size_t target = up ? row - std::min(row, step)
                 : std::min(visual_lines_.size() - 1, row + step);
             next = position_in_line(target, goal);
@@ -1201,7 +1206,7 @@ void TextBox::retain_caret_damage(const Rect line_bounds, const Rect clip) {
     candidate.bounds = local_bounds();
     candidate.font = effective_font(font_);
     candidate.selection = selection_;
-    candidate.scroll = {horizontal_offset_, vertical_offset_};
+    candidate.scroll = scroll_offset();
     candidate.provider = (*owner).text_metrics_provider();
     candidate.revision = store_.revision();
     candidate.scale = scale;
@@ -1213,7 +1218,7 @@ bool TextBox::caret_damage_current() const {
     const Window* owner = window();
     if (!caret_damage_.valid || owner == nullptr || (multiline_ && reveal_pending_) ||
         has_dirty(dirty(), Dirty::measure | Dirty::arrange | Dirty::paint)) return false;
-    const Point scroll{horizontal_offset_, vertical_offset_};
+    const Point scroll = scroll_offset();
     const bool current = caret_damage_.bounds == local_bounds() &&
         caret_damage_.font == effective_font(font_) &&
         caret_damage_.selection == selection_ && caret_damage_.scroll == scroll &&
