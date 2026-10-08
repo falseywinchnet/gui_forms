@@ -47,6 +47,10 @@ if(GUI_FORMS_BUILD_TESTS AND TARGET GUIForms::Application AND
                 "set(${variable} [==[${${variable}}]==] CACHE STRING \"Consumer configuration\" FORCE)\n")
         endif()
     endforeach()
+    # Both nested generations consume the already fetched, pinned source.
+    # Otherwise each config test clones miniaudio into a fresh _deps directory.
+    file(APPEND "${application_text_cache}"
+        "set(FETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO [==[${gui_forms_miniaudio_SOURCE_DIR}]==] CACHE PATH \"Pinned parent source\" FORCE)\n")
     foreach(link_case IN ITEMS accepted static_core)
         add_test(NAME gui_forms_application_text_configure_${link_case}
             COMMAND "${CMAKE_COMMAND}"
