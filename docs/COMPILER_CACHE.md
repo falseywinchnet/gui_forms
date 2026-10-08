@@ -27,7 +27,7 @@ The owner approved independent source/cache publication on 2026-10-07.
 History was extracted from `falseywinchnet/file_manager` at
 `0dc39f989f2d077d5485027dba9046f884e43bc7`; its `gui_forms/` subtree became this
 repository root. First-party changes follow `planning/PROGRAMMING_HOUSE_STYLE.md`.
-Current shared/static target choices are preserved. ThinLTO and static Application
+ThinLTO and static Application
 linking remain separate, unmeasured candidates, not consequences of caching.
 
 The macOS and Linux Skia GN builds also use `cc_wrapper = "ccache"` when
@@ -43,6 +43,46 @@ invalidating option. Ccache correctly reused equivalent preprocessed source; the
 accepted proof changes `-fno-inline-functions` instead. These are fixture timings.
 
 `docs/FILE_MANAGER_COMMIT_MAP.txt` maps original commits to this filtered history.
+
+## Consumer linking rule
+
+`GUIForms::Threading` is a small shared library containing Worker,
+CancellationFlag and the atomic pthread pool. `GUIForms::Audio` stays static and
+links Threading publicly, **without Core**. Application and static Core also
+link the same Threading library. A component adapter therefore needs only:
+
+```cmake
+find_package(GUIForms CONFIG REQUIRED COMPONENTS Audio Application)
+add_library(audio_adapter STATIC audio_adapter.cpp)
+target_link_libraries(audio_adapter PRIVATE GUIForms::Audio)
+target_link_libraries(audio_tests PRIVATE audio_adapter)
+target_link_libraries(my_application PRIVATE GUIForms::Application audio_adapter)
+```
+
+For workers alone, request the Threading component and link
+`GUIForms::Threading`. For a renderer-free retained-tree consumer, use static
+Core/Controls/Drawing. For a native Application consumer, use Application:
+**never also link static Core, Controls or Drawing**, including through an
+adapter. Application already contains their implementation. CMake rejects this
+mixed ownership during generation, including private static-adapter and
+interface-adapter dependencies. A private static adapter produces a generation
+diagnostic naming `ERROR_do_not_link_static_Core_with_Application`; this is an
+intentional rejection, not a missing SDK component. Raw archive filenames or
+hand-written linker commands bypass the CMake check.
+
+Ship the matching Threading shared library alongside GUI.Forms: on macOS,
+`libgui_forms_threading.0.dylib` in the app's Frameworks directory; on Linux,
+`libgui_forms_threading.so.0` in the application's runtime library directory;
+on Windows, `libgui_forms_threading.dll` beside the executable (plus the matching
+winpthreads/compiler runtimes). Use the same copy for Audio and Application.
+The macOS rpath/signing instructions below apply to Threading too. The installed
+reference fixtures stage Windows runtime DLLs using CMake's transitive target
+list. Rebuild consumers against matching headers and libraries when upgrading.
+
+The installed examples test Threading alone, an Audio-only static adapter, the
+same adapter with Application, and three rejected static-Core combinations.
+This fixes Worker ownership without changing Audio's existing static packaging;
+applications should still share their one audio service across their components.
 
 ## LLVM 22 matching contract
 

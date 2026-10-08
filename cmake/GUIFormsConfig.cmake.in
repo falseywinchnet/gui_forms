@@ -17,7 +17,7 @@ set(GUIForms_FONT_DIR "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_DATADIR@/GUIForms/fo
 
 # Components describe installed targets, not the producer's build options.
 # Set these explicitly so REQUIRED COMPONENTS works and missing hosts fail here.
-foreach(_gui_forms_component IN ITEMS Core Controls Drawing Application Audio)
+foreach(_gui_forms_component IN ITEMS Core Controls Drawing Threading Application Audio)
     if(TARGET GUIForms::${_gui_forms_component})
         set(GUIForms_${_gui_forms_component}_FOUND TRUE)
     else()
@@ -27,7 +27,7 @@ endforeach()
 foreach(_gui_forms_component IN LISTS GUIForms_FIND_COMPONENTS)
     if(NOT GUIForms_${_gui_forms_component}_FOUND)
         set(GUIForms_NOT_FOUND_MESSAGE
-            "Requested GUIForms component '${_gui_forms_component}' is not installed. Core, Controls and Drawing are portable components. Application requires a supported native host build; Audio requires an audio-enabled build.")
+            "Requested GUIForms component '${_gui_forms_component}' is not installed. Core, Controls, Drawing and Threading are portable components. Application requires a supported native host build; Audio requires an audio-enabled build.")
     endif()
 endforeach()
 unset(_gui_forms_component)

@@ -15,6 +15,7 @@ second UI engine.
 
 | Build object | Current role | Public-boundary status |
 |---|---|---|
+| `gui_forms_threading` / `GUIForms::Threading` | shared atomic pool, cancellation flag and Worker implementation | public C++20 utility, shared by Audio, Core and Application |
 | `gui_forms_core` | retained tree, lifetime, events, invalidation, display chunks, scheduling, resources, portable host protocol | renderer-free C++ proving API; not frozen |
 | `gui_forms_controls` | reusable basic, container, lifecycle, range, and raster-canvas controls | renderer-neutral C++ proving API; incomplete |
 | `gui_forms_host_headless` | deterministic host/service oracle | test and automation adapter |
@@ -28,6 +29,11 @@ second UI engine.
 
 The native core does not link .NET, AppKit, Win32, Wayland, X11, Skia types, or
 platform control objects into its public contract.
+
+Application consumers link `GUIForms::Application`, which already contains Core.
+Audio adapters link `GUIForms::Audio`, which exposes Threading without pulling in
+static Core. See [the consumer linking rule](COMPILER_CACHE.md#consumer-linking-rule)
+for packaging and the configure-time mixed-Core rejection.
 
 ## 2. Intended delivery layers
 

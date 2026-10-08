@@ -2,7 +2,11 @@
 
 **GIVEN:** consumers need one atomic cancellation and join pattern without
 `std::jthread` or `std::stop_token`. Include `<gui_forms/threading.hpp>` and link
-`GUIForms::Core`. The installed SDK exports this utility and its thread dependency.
+`GUIForms::Threading`. This small shared library owns the implementation once
+for both component and Application consumers. `GUIForms::Audio`, `GUIForms::Core`
+and `GUIForms::Application` expose the same Threading target transitively.
+Do not add static Core to an Application consumer for Worker. See the linking
+and packaging rule in [COMPILER_CACHE.md](COMPILER_CACHE.md#consumer-linking-rule).
 
 `CancellationFlag::request()` permanently sets a release/acquire atomic flag.
 `requested()` is safe on the worker thread. A request does not interrupt I/O,
@@ -52,10 +56,15 @@ are prefixed to avoid collisions with a consumer linking the backend too. The
 only algorithm extension is split async dispatch/wait for the one-worker utility;
 the measured synchronous small-batch/range-claim paths are retained. No original
 pool performance claim is transferred without a new measurement.
-Existing optional audio APIs retain their separate source-compatible stop-token
-signature. New consumer workers can use this utility without that dependency.
+`AudioClip::load_ogg(path, cancellation)` accepts the worker's borrowed
+`const CancellationFlag&` directly. The previous `std::stop_token` overload
+remains for compatibility but is deprecated in the API reference. No stop source
+or cancellation callback allocation is needed for the flag overload.
 
 The executable installed-SDK example is `examples/reference/cooperative_worker.cpp`.
+`examples/reference/audio_worker.cpp` additionally demonstrates cancelling an Ogg
+load and joining before reading its result, through an adapter that links only
+Audio. Both the audio-only executable and the Application executable use it.
 `tests/threading_tests.cpp` covers repeated 10,000-task batches, empty/small/invalid batches, cancellation, normal completion, destructor
 join, repeated join, invalid entry and exception propagation. CTest bounds a
 broken cancellation/join regression with a timeout.

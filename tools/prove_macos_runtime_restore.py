@@ -31,6 +31,12 @@ def main() -> None:
             if not library.is_symlink():
                 if not audit(library):
                     raise RuntimeError('Restored runtime is not a Mach-O image: ' + str(library))
+        threading_name: str = 'libgui_forms_threading.0.dylib'
+        threading: Path = scratch / threading_name
+        shutil.copy2(executable.parent / threading_name, threading)
+        subprocess.run(['install_name_tool', '-rpath', str(original / 'lib'),
+                        '@loader_path/' + payload + '/lib', str(threading)], check=True)
+        subprocess.run(['codesign', '--force', '--sign', '-', str(threading)], check=True)
         copied: Path = scratch / executable.name
         shutil.copy2(executable, copied)
         # Match application packaging: change only this executable's runtime
@@ -38,6 +44,7 @@ def main() -> None:
         # used by Apple's system frameworks and tests a different configuration.
         subprocess.run(['install_name_tool', '-rpath', str(original / 'lib'),
                         '@executable_path/' + payload + '/lib', str(copied)], check=True)
+        subprocess.run(['install_name_tool', '-rpath', str(executable.parent), '@executable_path', str(copied)], check=True)
         subprocess.run(['codesign', '--force', '--sign', '-', str(copied)], check=True)
         environment: dict[str, str] = os.environ.copy()
         environment.pop('DYLD_LIBRARY_PATH', None)
@@ -50,6 +57,8 @@ def main() -> None:
             if not library.is_symlink():
                 if str(library) not in result.stderr:
                     raise RuntimeError('Restored library was not loaded: ' + str(library))
+        if str(threading) not in result.stderr:
+            raise RuntimeError('Relocated Threading library was not loaded')
         print(result.stdout, end='')
         print('Archived runtime restored; all three relocated dylibs loaded; native test passed')
 
