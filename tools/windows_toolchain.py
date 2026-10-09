@@ -33,7 +33,7 @@ ARCHIVE_ROOT: str = 'msys64'
 COMPILER_MEMBER: str = 'msys64/clang64/bin/clang.exe'
 # Changing what the archive omits or how it is laid out requires a new
 # toolchain even when the package specification is unchanged.
-LAYOUT: int = 1
+LAYOUT: int = 2
 ZSTD_LEVEL: int = 10
 # Bounded discovery: recent releases only, and few manifest downloads.
 RELEASE_PAGES: int = 3
@@ -50,6 +50,10 @@ EXCLUDED_DIRECTORIES: tuple[str, ...] = (
 EXCLUDED_FILES: tuple[str, ...] = (
     'etc/pacman.d/gnupg/secring.gpg', 'etc/pacman.d/gnupg/random_seed')
 GNUPG_DIRECTORY: str = 'etc/pacman.d/gnupg'
+# Runtime directories whose contents are omitted but which must exist: the
+# MSYS2 login profile points TMP and TEMP at /tmp, and std::filesystem's
+# temp_directory_path() rejects a missing directory.
+EMPTY_DIRECTORIES: tuple[str, ...] = ('tmp', 'var/tmp', 'home')
 
 
 def file_digest(path: Path) -> str:
@@ -133,6 +137,9 @@ def write_archive(msys_root: Path, archive: Path) -> None:
                 relative_directory: PurePosixPath = PurePosixPath(
                     (base / directory).relative_to(msys_root).as_posix())
                 if excluded(relative_directory):
+                    if relative_directory.as_posix() in EMPTY_DIRECTORIES:
+                        output.add(base / directory, arcname=ARCHIVE_ROOT + '/' + relative_directory.as_posix(),
+                                   recursive=False, filter=normalized_member)
                     continue
                 kept.append(directory)
                 output.add(base / directory, arcname=ARCHIVE_ROOT + '/' + relative_directory.as_posix(),
@@ -196,6 +203,10 @@ def extract(archive: Path, manifest: dict[str, Any], destination: Path) -> Path:
                     or not (member.isfile() or member.isdir() or member.islnk() or member.issym())):
                 raise ValueError('Unexpected toolchain archive member: ' + member.name)
         payload.extractall(destination, filter='data')
+    # Layout 1 archives omitted these directories entirely.
+    empty: str
+    for empty in EMPTY_DIRECTORIES:
+        (msys_root / empty).mkdir(parents=True, exist_ok=True)
     if file_digest(destination / COMPILER_MEMBER) != manifest['compiler_sha256']:
         raise ValueError('Extracted clang.exe differs from the toolchain manifest')
     return msys_root

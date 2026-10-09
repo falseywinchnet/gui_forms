@@ -187,6 +187,11 @@ with its exact version, the specification digest, and `compiler_sha256` for
 same values under `toolchain`. CI refuses a cache whose compiler differs from
 its toolchain, and refuses to publish a toolchain other than the recorded one.
 
+Archives keep empty `tmp/`, `var/tmp/` and `home/` directories: the MSYS2
+login profile points `TMP` at `/tmp`, and `std::filesystem::temp_directory_path`
+rejects a missing directory. The first published archive (`build-56e194f…`,
+layout 1) lacks them; create `msys64/tmp` after extracting it.
+
 Consumer contract: verify the archive digest, extract it, prepend
 `msys64/clang64/bin` and `msys64/usr/bin` to PATH and build without network
 access. For cache **hits**, extract so `msys64/` lands at the manifest's
