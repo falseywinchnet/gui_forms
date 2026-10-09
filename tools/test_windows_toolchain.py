@@ -38,6 +38,7 @@ def make_tree(msys_root: Path, spec: dict[str, Any]) -> None:
     write_file(msys_root / 'usr/share/doc/git/README', b'documentation')
     write_file(msys_root / 'clang64/share/man/man1/clang.1', b'manual')
     write_file(msys_root / 'home/runneradmin/.bash_history', b'history')
+    write_file(msys_root / 'tmp/runner-scratch.txt', b'scratch')
     name: str
     for name in spec['packages']:
         write_package(msys_root, name, '1.0-1')
@@ -98,6 +99,9 @@ class ArchiveTests(unittest.TestCase):
         self.assertIn('msys64/clang64/bin/clang.exe', names)
         self.assertIn('msys64/usr/bin/bash.exe', names)
         self.assertIn('msys64/etc/pacman.d/gnupg/pubring.gpg', names)
+        # Runtime directories survive empty: TMP points at /tmp.
+        self.assertIn('msys64/tmp', names)
+        self.assertIn('msys64/home', names)
         omitted: list[str] = ['msys64/etc/pacman.d/gnupg/private-keys-v1.d/local.key',
                               'msys64/etc/pacman.d/gnupg/secring.gpg',
                               'msys64/etc/pacman.d/gnupg/S.gpg-agent',
@@ -105,7 +109,8 @@ class ArchiveTests(unittest.TestCase):
                               'msys64/var/lib/pacman/sync/clang64.db',
                               'msys64/usr/share/doc/git/README',
                               'msys64/clang64/share/man/man1/clang.1',
-                              'msys64/home/runneradmin/.bash_history']
+                              'msys64/home/runneradmin/.bash_history',
+                              'msys64/tmp/runner-scratch.txt']
         name: str
         for name in omitted:
             self.assertNotIn(name, names)
@@ -120,6 +125,8 @@ class ArchiveTests(unittest.TestCase):
         consumer.mkdir()
         restored: Path = windows_toolchain.extract(self.output / windows_toolchain.ARCHIVE_NAME, manifest, consumer)
         self.assertEqual((restored / 'clang64/bin/clang.exe').read_bytes(), b'clang 22.1.8 fixture')
+        self.assertTrue((restored / 'tmp').is_dir())
+        self.assertTrue((restored / 'var/tmp').is_dir())
         self.assertEqual(windows_toolchain.file_digest(restored / 'clang64/bin/clang.exe'),
                          manifest['compiler_sha256'])
         with self.assertRaisesRegex(ValueError, 'existing'):
