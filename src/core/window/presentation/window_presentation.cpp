@@ -329,13 +329,13 @@ bool Window::queue_live_surface_presentation(
         std::unordered_map<std::uint64_t, LiveSurfaceRegistration>::iterator,
         bool> insertion = live_surface_registrations_.try_emplace(
             (*control).runtime_id().value,
-            LiveSurfaceRegistration{control, surface, 0U, 0U, false});
+            LiveSurfaceRegistration{control, surface});
     std::unordered_map<std::uint64_t, LiveSurfaceRegistration>::iterator entry =
         insertion.first;
     const bool inserted = insertion.second;
     if (!inserted && (*entry).second.surface != surface) {
         (*entry).second =
-            LiveSurfaceRegistration{control, std::move(surface), 0U, 0U, false};
+            LiveSurfaceRegistration{control, std::move(surface)};
     } else {
         (*entry).second.control = control;
         (*entry).second.surface = std::move(surface);
@@ -469,11 +469,14 @@ Window::take_live_surface_presentations(const bool include_unchanged,
         registration.observed_generation = snapshot.published_generation;
         if (occluded_ || !popups_.empty() || !(*control).visible_ ||
             !(*control).effectively_visible()) {
+            // Retained painting owns these pixels until the next presentation.
+            registration.placed = false;
             ++iterator;
             continue;
         }
 
         if (!snapshot.has_frame) {
+            registration.placed = false;
             ++iterator;
             continue;
         }
@@ -497,15 +500,20 @@ Window::take_live_surface_presentations(const bool include_unchanged,
                        ancestor_bounds.y + viewport.y,
                        viewport.width, viewport.height});
         }
+        if (!valid || clip.empty()) registration.placed = false;
         if (valid && !clip.empty()) {
-            std::vector<Rect> clips{clip};
-            bool clipped_by_overlay = false;
+            // Overlays crossing this clip, in tree order. Their pixels belong
+            // to retained painting, which also draws the live frame beneath.
+            std::vector<Rect> overlays;
             for (const Rect& overlay : overlay_rectangles) {
+                if (!Rect::intersection(clip, overlay).empty()) {
+                    overlays.push_back(overlay);
+                }
+            }
+            std::vector<Rect> clips{clip};
+            for (const Rect& overlay : overlays) {
                 std::vector<Rect> remaining;
                 for (const Rect& candidate : clips) {
-                    if (!Rect::intersection(candidate, overlay).empty()) {
-                        clipped_by_overlay = true;
-                    }
                     std::vector<Rect> fragments = Window::subtract_rectangle(
                         candidate, overlay);
                     remaining.insert(remaining.end(), fragments.begin(),
@@ -515,20 +523,28 @@ Window::take_live_surface_presentations(const bool include_unchanged,
                 if (clips.empty()) break;
             }
             const bool same_generation =
-                (*iterator).second.sampled_epoch == snapshot.epoch &&
-                (*iterator).second.sampled_generation ==
-                    snapshot.published_generation;
-            if (include_unchanged || !same_generation || clipped_by_overlay ||
-                (*iterator).second.sampled_with_overlay_clip) {
+                registration.sampled_epoch == snapshot.epoch &&
+                registration.sampled_generation == snapshot.published_generation;
+            const bool same_placement = registration.placed &&
+                registration.placed_destination == destination &&
+                registration.placed_clip == clip &&
+                registration.placed_overlays == overlays;
+            // An unchanged generation is presented again only when its
+            // placement changed; a static overlay does not keep it ticking.
+            if (include_unchanged || !same_generation || !same_placement) {
+                const bool damage_limited = same_placement && !include_unchanged;
                 for (const Rect& visible_clip : clips) {
                     result.push_back(LiveSurfacePresentation{
-                        (*control).runtime_id(), (*iterator).second.surface,
-                        destination, visible_clip});
+                        (*control).runtime_id(), registration.surface,
+                        destination, visible_clip, damage_limited});
                 }
             }
-            (*iterator).second.sampled_epoch = snapshot.epoch;
-            (*iterator).second.sampled_generation = snapshot.published_generation;
-            (*iterator).second.sampled_with_overlay_clip = clipped_by_overlay;
+            registration.sampled_epoch = snapshot.epoch;
+            registration.sampled_generation = snapshot.published_generation;
+            registration.placed = true;
+            registration.placed_destination = destination;
+            registration.placed_clip = clip;
+            registration.placed_overlays = std::move(overlays);
         }
         ++iterator;
     }

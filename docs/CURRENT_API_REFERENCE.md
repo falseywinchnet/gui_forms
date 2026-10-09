@@ -120,6 +120,54 @@ Its default BGRA `memcpy` / `StretchDIBits` path is unchanged; RGBA frames first
 convert into host-owned reusable BGRA storage, including for scaled draws.
 The existing Windows live-surface opacity/composition behavior is unchanged.
 
+`publish(damage)` promises that every pixel outside `damage` equals the previous
+publication; acquire with `preserve_published_contents` or repair the buffer
+completely. An empty or out-of-bounds rectangle means the whole surface. Each
+publish adds its damage to the surface's invalid region, which starts as the
+whole surface. `LiveSurface::acquire_for_presentation(presenter)` is for the
+window presenter alone: it acquires the newest frame and takes and clears that
+region in the same step, as `BeginPaint` takes a window's update region, so the
+frame and region cannot describe different publications. `damage()` of that
+frame is the region (one bounding rectangle). The first call, a call after
+`reconfigure`, and a call from a different presenter receive the whole surface.
+`acquire_latest()` is read-only and keeps reporting the newest publication's
+damage.
+
+`take_live_surface_presentations` returns a surface when its generation
+changed or its placement changed: destination, visible clip, or the overlay
+rectangles crossing it. A static overlay therefore no longer re-presents an
+unchanged surface on every tick. `LiveSurfacePresentation::damage_limited` is
+true when the window last presented that surface at the same placement and
+this is not a retry. On macOS, when it is true, the frame is opaque, the
+raster is reusable and the previous taken region reached a presented raster,
+the host copies only the region, widened by one surface pixel and rounded
+outward to device pixels. Otherwise it copies the complete clip.
+
+macOS draws the rectangles AppKit supplies (`getRectsBeingDrawn:`) rather than
+their bounding box. Opaque live clips cover what they can; only the remainder,
+such as an overlay floating over a live surface, enters retained painting, which
+draws the live frame beneath the overlay through `Painter::draw_live_surface`.
+Live pixels that retained painting reaches are copied again. The AppKit flush
+still covers each presented clip, and prepared-text builds still copy the
+presented raster into each candidate. Windows copies complete clips; the Linux
+host does not present live surfaces.
+
+macOS retained painting is clipped to the pending damage's rectangles
+(`SkiaRaster::clip_damage`), not their bounding box, so overlays in opposite
+corners repaint their own areas rather than the span between them.
+
+A control's `draw_text_utf8` and `draw_box_shadow` calls are recorded into its
+display chunk with a `RetainedDrawCache`. The recording owns that cache: every
+replay copy of the command shares it, and it is released when the control's
+chunk is rebuilt or retired, so it needs no size limit or eviction. Replay passes
+it to `Painter::draw_retained_text_utf8` and `draw_retained_box_shadow`, whose
+defaults draw directly. The Skia raster keeps the HarfBuzz shaping of a command
+until its text engine or registered faces change, and a shadow's blurred
+coverage until the device scale or subpixel phase changes. Kept shadow coverage
+is applied through a shader mask filter, so the color passes through the same
+mask blitter as a direct blur; tests require byte-identical output for both.
+The Windows GDI host and other painters use the defaults.
+
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.

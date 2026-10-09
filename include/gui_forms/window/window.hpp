@@ -317,8 +317,10 @@ public:
 
     [[nodiscard]] bool queue_live_surface_presentation(
         const Control::Ptr& control, std::shared_ptr<LiveSurface> surface);
-    // Failed native batches request unchanged generations too, with current
-    // visibility and overlay clips; callers must not retry stale placements.
+    // Returns surfaces with a new generation or a changed placement
+    // (destination, clip or crossing overlays). Failed native batches request
+    // unchanged generations too, with current visibility and overlay clips;
+    // callers must not retry stale placements.
     // Optional publication_changed reports newly observed producer generations,
     // independently of composition-only updates or hidden control sampling.
     [[nodiscard]] std::vector<LiveSurfacePresentation>
@@ -767,7 +769,12 @@ private:
         std::shared_ptr<LiveSurface> surface;
         std::uint64_t sampled_epoch{};
         std::uint64_t sampled_generation{};
-        bool sampled_with_overlay_clip{};
+        // Placement of the last presentation: destination, visible clip
+        // before overlay subtraction, and the overlays crossing that clip.
+        bool placed{};
+        Rect placed_destination{};
+        Rect placed_clip{};
+        std::vector<Rect> placed_overlays;
         LiveSurfaceWakeConnection idle_wake{};
         std::uint64_t observed_epoch{};
         std::uint64_t observed_generation{};

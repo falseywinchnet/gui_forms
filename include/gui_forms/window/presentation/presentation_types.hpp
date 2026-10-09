@@ -32,6 +32,11 @@ struct LiveSurfacePresentation final {
     std::shared_ptr<LiveSurface> surface;
     Rect destination{};
     Rect clip{};
+    // True when this window last presented the surface at the same
+    // destination, clip and overlays. A host whose raster still holds that
+    // presentation may then copy only the surface's presentation region
+    // (LiveSurface::acquire_for_presentation). False means copy all of clip.
+    bool damage_limited{};
 };
 
 enum class PaintLeaseState : std::uint8_t {
