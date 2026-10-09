@@ -30,6 +30,13 @@ public:
     [[nodiscard]] LiveSurfaceWriteLease try_acquire_write(
         bool preserve_published_contents = false) noexcept;
     [[nodiscard]] LiveSurfaceFrame acquire_latest() const noexcept;
+    // For the window presenter only. Acquires the newest frame and, in the
+    // same step, takes and clears the invalid region published since this
+    // presenter's previous call, as BeginPaint takes the update region; the
+    // frame's damage() is that region. The first call, a call after
+    // reconfigure, and a call from a different presenter receive the whole
+    // surface. acquire_latest() never consumes the region.
+    [[nodiscard]] LiveSurfaceFrame acquire_for_presentation(const void* presenter) noexcept;
     [[nodiscard]] LiveSurfaceSnapshot snapshot() const noexcept;
     [[nodiscard]] LiveSurfaceWakeConnection connect_presentation_wake(
         std::function<void()> wake);

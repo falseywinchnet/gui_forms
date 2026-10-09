@@ -71,6 +71,8 @@ std::uint64_t LiveSurfaceWriteLease::publish(Rect damage) {
         (*state_).published_slot = slot_;
         (*state_).writing_slot = (*state_).buffers.size();
         (*state_).damage = damage.empty() ? bounds : damage;
+        (*state_).presentation_region = Rect::united(
+            (*state_).presentation_region, (*state_).damage);
         ++(*state_).generation;
         ++(*state_).publishes;
         published = (*state_).generation;

@@ -662,3 +662,37 @@ join-before-read ordering, allocation cleanup, failure results, unchanged block
 storage and polling, and no callback allocation. The new C++ fixtures pass the
 spelling scanner. No violations were identified in this changed scope; legacy
 Audio code and third-party decoder/pool source are not claimed wholly compliant.
+
+### Live surfaces under overlays and invalid-region presentation (2026-10-09)
+
+**GIVEN:** the owner directs PlaySuite's revised request: fix overlays over live
+surfaces first, then copy only published damage using an invalid region, not
+generation counters. **MEASURED (PlaySuite, Pen the Sheep, M4, 13 s per run,
+rail beside the scene vs capsule floating over it):** native draws 417/809,
+retained paints 15/809, retained paint time 67/1,935 ms. The live copy itself
+was 156 of about 6,000 samples over 6 s.
+
+A static overlay no longer re-presents an unchanged surface each tick; a
+surface returns only on a new generation or a changed placement (destination,
+clip, crossing overlays). macOS retained-paints only what opaque live clips
+leave uncovered among AppKit's drawn rectangles. `publish` accumulates an
+invalid region that `acquire_for_presentation` takes with the frame, like
+`BeginPaint`; `acquire_latest` stays read-only. A different presenter, first
+take, or reconfiguration yields the whole surface; a taken region that never
+reached a presented raster makes the host copy complete clips next time.
+Additive development C++ (`acquire_for_presentation`,
+`LiveSurfacePresentation::damage_limited`); no stable C ABI change. The
+PlaySuite measurements must be repeated against this revision.
+
+Follow-up the same day: macOS retained painting is clipped to the damage's
+rectangles, not their bounds. Shaping and shadow blur are now cached by GUI.Forms
+because, once recorded into a display chunk, a draw command is GUI.Forms-owned
+and replayed without the application's `on_paint`. Its `RetainedDrawCache`
+lives and dies with that recording; no global key, budget or eviction exists.
+Kept shadow coverage is applied through a shader mask filter, and a raster test
+requires byte-identical output against direct drawing (an alpha-image draw
+differed by one to two levels and was rejected). **MEASURED (PlaySuite, M4,
+capsule floating):** shaping 61 → under 3 samples per 6 s and retained paint
+time down 4–35% across six games. Busy time was unchanged within noise. Set
+aside by the owner: the live raster copy (bounded by producer damage), shadow
+re-application cost, and per-paint fill, gradient and rounded-clip rebuild.

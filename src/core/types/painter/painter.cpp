@@ -221,6 +221,18 @@ void Painter::draw_image_region(ImageId image, Rect source, Rect destination,
     draw_image(image, destination, std::clamp(opacity, 0.0, 1.0));
 }
 
+void Painter::draw_retained_box_shadow(
+    const Rect rect, const double corner_radius, const Point offset, const double blur_radius,
+    const double spread, const Color color, const std::shared_ptr<RetainedDrawCache>&) {
+    draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+}
+
+void Painter::draw_retained_text_utf8(
+    const Point origin, const std::string_view text, const FontSpec font,
+    const Color color, const std::shared_ptr<RetainedDrawCache>&) {
+    draw_text_utf8(origin, text, font, color);
+}
+
 void Painter::draw_live_surface(std::shared_ptr<LiveSurface>, Rect, double) {
     // Platform-neutral and deliberately inert. Terminal CPU renderers consume
     // the retained surface resource directly.

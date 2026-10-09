@@ -60,10 +60,17 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
                 {command.second.x, command.second.y}, command.gradient_stops);
             break;
         case DisplayOperation::draw_box_shadow:
-            painter.draw_box_shadow(
-                command.rect, command.scalar, command.first,
-                command.secondary_scalar, command.tertiary_scalar,
-                command.color);
+            if (command.retained_cache) {
+                painter.draw_retained_box_shadow(
+                    command.rect, command.scalar, command.first,
+                    command.secondary_scalar, command.tertiary_scalar,
+                    command.color, command.retained_cache);
+            } else {
+                painter.draw_box_shadow(
+                    command.rect, command.scalar, command.first,
+                    command.secondary_scalar, command.tertiary_scalar,
+                    command.color);
+            }
             break;
         case DisplayOperation::draw_inset_box_shadow:
             painter.draw_inset_box_shadow(
@@ -76,8 +83,13 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
                               command.scalar);
             break;
         case DisplayOperation::draw_text_utf8:
-            painter.draw_text_utf8(command.first, command.text, command.font,
-                                   command.color);
+            if (command.retained_cache) {
+                painter.draw_retained_text_utf8(command.first, command.text, command.font,
+                                                command.color, command.retained_cache);
+            } else {
+                painter.draw_text_utf8(command.first, command.text, command.font,
+                                       command.color);
+            }
             break;
         case DisplayOperation::draw_image:
             painter.draw_image(command.image, command.rect, command.scalar);

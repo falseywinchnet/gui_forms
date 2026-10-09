@@ -26,6 +26,10 @@ public:
     bool resize(Size logical_size, double scale);
     void begin_frame(const DamageRegion& damage);
     void end_frame();
+    // Intersects the current clip with damage's rectangles, rounded outward
+    // to device pixels, so drawing touches those rectangles and not the span
+    // between them. Bracket with save() and restore().
+    void clip_damage(const DamageRegion& damage);
 #if defined(GUI_FORMS_PREPARED_TEXT)
     // Guarded host transaction. begin expands damage when a full repaint is
     // required; caller paints that updated region. Null receipts and exceptions
@@ -83,6 +87,11 @@ public:
     void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                          double blur_radius, double spread,
                          Color color) override;
+    // Blurs a retained shadow's coverage once per device scale and subpixel
+    // phase, then composites that mask with the shadow color.
+    void draw_retained_box_shadow(Rect rect, double corner_radius, Point offset,
+                                  double blur_radius, double spread, Color color,
+                                  const std::shared_ptr<RetainedDrawCache>& cache) override;
     void draw_inset_box_shadow(Rect rect, double corner_radius, Point offset,
                                double blur_radius, double spread,
                                Color color) override;
@@ -91,6 +100,10 @@ public:
                         std::string_view text,
                         FontSpec font,
                         Color color) override;
+    // Shapes a retained command once and keeps the result in its cache until
+    // this raster's registered faces change.
+    void draw_retained_text_utf8(Point origin, std::string_view text, FontSpec font,
+                                 Color color, const std::shared_ptr<RetainedDrawCache>& cache) override;
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(

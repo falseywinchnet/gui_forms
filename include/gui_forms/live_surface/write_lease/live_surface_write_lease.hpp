@@ -35,6 +35,10 @@ public:
     [[nodiscard]] std::uint32_t height() const noexcept;
     [[nodiscard]] std::uint64_t row_bytes() const noexcept;
     [[nodiscard]] std::span<std::byte> pixels() noexcept;
+    // Damage promises that every pixel outside it equals the previous
+    // publication; a presenter may copy only the damage. Acquire with
+    // preserve_published_contents or repair the buffer completely. Empty or
+    // out-of-bounds damage means the whole surface.
     [[nodiscard]] std::uint64_t publish(Rect damage = {});
     void abandon() noexcept;
 

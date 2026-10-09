@@ -31,6 +31,7 @@
 #include "include/core/SkRRect.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
+#include "include/effects/SkShaderMaskFilter.h"
 #include "include/core/SkTypeface.h"
 #include "include/effects/SkGradient.h"
 #if defined(__APPLE__)
@@ -187,6 +188,12 @@ public:
     std::vector<RegisteredTypeface> registered_typefaces;
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     text::HarfBuzzFontEngine text_engine;
+    // Identity of text_engine for shaped-text memos. A memo holding an
+    // expired or different identity was shaped by another raster.
+    std::shared_ptr<const bool> text_engine_identity{std::make_shared<const bool>(true)};
+    // Draws one shaping result exactly as draw_text_utf8 always has.
+    void draw_shaped_text(SkCanvas& target, const text::ShapedText& shaped, Point origin,
+                          std::string_view text, FontSpec font_spec, Color color);
 #endif
     Size logical_size{};
     double scale{1.0};
@@ -478,6 +485,25 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
         (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
                       static_cast<SkScalar>((*impl_).scale));
     }
+}
+
+void SkiaRaster::clip_damage(const DamageRegion& damage) {
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || damage.empty()) return;
+    SkRegion region;
+    for (const Rect rect : damage.rectangles()) {
+        const SkIRect pixels = SkIRect::MakeLTRB(
+            static_cast<int>(std::floor(rect.x * (*impl_).scale)),
+            static_cast<int>(std::floor(rect.y * (*impl_).scale)),
+            static_cast<int>(std::ceil((rect.x + rect.width) * (*impl_).scale)),
+            static_cast<int>(std::ceil((rect.y + rect.height) * (*impl_).scale)));
+        region.op(pixels, SkRegion::kUnion_Op);
+    }
+    // Regions are in device pixels; restore the logical matrix afterwards.
+    const SkMatrix matrix = (*canvas).getTotalMatrix();
+    (*canvas).resetMatrix();
+    (*canvas).clipRegion(region);
+    (*canvas).setMatrix(matrix);
 }
 
 void SkiaRaster::end_frame() {
@@ -816,6 +842,101 @@ void SkiaRaster::draw_box_shadow(Rect rect, double corner_radius, Point offset,
         shadow, std::max(0.0, corner_radius + spread)), paint);
 }
 
+namespace {
+
+// Blurred coverage of one retained draw_box_shadow command. Its geometry is
+// fixed by the command; the mask depends only on the device scale and the
+// subpixel phase of the shadow's device origin, not on its position.
+class ShadowMaskMemo final : public RetainedDrawMemo {
+public:
+    SkScalar scale_x{};
+    SkScalar scale_y{};
+    SkScalar phase_x{};
+    SkScalar phase_y{};
+    // Mask pixel (0, 0) lies at floor(device origin) - margin.
+    int margin{};
+    sk_sp<SkImage> mask;
+};
+
+} // namespace
+
+void SkiaRaster::draw_retained_box_shadow(const Rect rect, const double corner_radius,
+                                          const Point offset, const double blur_radius,
+                                          const double spread, const Color color,
+                                          const std::shared_ptr<RetainedDrawCache>& cache) {
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || rect.empty() || color.alpha == 0U || blur_radius < 0.0) return;
+    const SkMatrix matrix = (*canvas).getTotalMatrix();
+    // Unblurred shadows, rotations and reflections draw directly.
+    if (!cache || blur_radius == 0.0 || !matrix.isScaleTranslate() ||
+        matrix.getScaleX() <= 0.0F || matrix.getScaleY() <= 0.0F) {
+        draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+        return;
+    }
+    const Rect shadow{rect.x + offset.x - spread, rect.y + offset.y - spread,
+                      rect.width + spread * 2.0, rect.height + spread * 2.0};
+    if (shadow.empty()) return;
+    const SkRRect local = to_sk_rrect(shadow, std::max(0.0, corner_radius + spread));
+    const SkRect device = matrix.mapRect(local.rect());
+    const SkScalar origin_x = std::floor(device.left());
+    const SkScalar origin_y = std::floor(device.top());
+    const SkScalar phase_x = device.left() - origin_x;
+    const SkScalar phase_y = device.top() - origin_y;
+    ShadowMaskMemo* memo = dynamic_cast<ShadowMaskMemo*>((*cache).memo.get());
+    const bool current = memo != nullptr && (*memo).mask &&
+        (*memo).scale_x == matrix.getScaleX() && (*memo).scale_y == matrix.getScaleY() &&
+        (*memo).phase_x == phase_x && (*memo).phase_y == phase_y;
+    if (!current) {
+        // The mask filter's sigma is in device pixels (respectCTM is false).
+        const double sigma = blur_radius * 0.5;
+        const int margin = static_cast<int>(std::ceil(sigma * 3.0)) + 2;
+        const int width = static_cast<int>(std::ceil(device.right() - origin_x)) + margin * 2;
+        const int height = static_cast<int>(std::ceil(device.bottom() - origin_y)) + margin * 2;
+        sk_sp<SkSurface> coverage = SkSurfaces::Raster(SkImageInfo::MakeA8(width, height));
+        if (!coverage) {
+            draw_box_shadow(rect, corner_radius, offset, blur_radius, spread, color);
+            return;
+        }
+        SkCanvas& target = *(*coverage).getCanvas();
+        target.clear(SK_ColorTRANSPARENT);
+        // Same geometry, matrix and blur as draw_box_shadow, moved by whole
+        // pixels so every coverage value is the one it would have produced.
+        SkMatrix placement = matrix;
+        placement.postTranslate(static_cast<SkScalar>(margin) - origin_x,
+                                static_cast<SkScalar>(margin) - origin_y);
+        target.setMatrix(placement);
+        SkPaint opaque{};
+        opaque.setAntiAlias(true);
+        opaque.setColor(SK_ColorWHITE);
+        opaque.setMaskFilter(SkMaskFilter::MakeBlur(
+            kNormal_SkBlurStyle, static_cast<SkScalar>(sigma), false));
+        target.drawRRect(local, opaque);
+        std::unique_ptr<ShadowMaskMemo> replacement = std::make_unique<ShadowMaskMemo>();
+        (*replacement).scale_x = matrix.getScaleX();
+        (*replacement).scale_y = matrix.getScaleY();
+        (*replacement).phase_x = phase_x;
+        (*replacement).phase_y = phase_y;
+        (*replacement).margin = margin;
+        (*replacement).mask = (*coverage).makeImageSnapshot();
+        memo = replacement.get();
+        (*cache).memo = std::move(replacement);
+    }
+    // Apply the kept coverage through a mask filter so the color is blended
+    // by the same mask blitter as draw_box_shadow; an alpha-image draw rounds
+    // differently by one or two levels.
+    const SkScalar left = origin_x - static_cast<SkScalar>((*memo).margin);
+    const SkScalar top = origin_y - static_cast<SkScalar>((*memo).margin);
+    const SkMatrix placement = SkMatrix::Translate(left, top);
+    SkPaint paint = make_paint(color);
+    paint.setMaskFilter(SkShaderMaskFilter::Make(
+        (*(*memo).mask).makeShader(SkSamplingOptions(), &placement)));
+    (*canvas).save();
+    (*canvas).resetMatrix();
+    (*canvas).drawRect(SkRect::MakeXYWH(left, top, static_cast<SkScalar>((*(*memo).mask).width()),
+                                        static_cast<SkScalar>((*(*memo).mask).height())), paint);
+    (*canvas).restore();
+}
+
 void SkiaRaster::draw_inset_box_shadow(
     Rect rect, double corner_radius, Point offset, double blur_radius,
     double spread, Color color) {
@@ -865,6 +986,91 @@ void SkiaRaster::draw_line(Point from, Point to, Color color, double width) {
     }
 }
 
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+void SkiaRaster::Impl::draw_shaped_text(SkCanvas& target, const text::ShapedText& shaped,
+                                        const Point origin, const std::string_view text,
+                                        const FontSpec font_spec, const Color color) {
+    SkCanvas* const canvas = &target;
+    const SkPaint paint = make_paint(color);
+    for (const text::ShapedFontRun& run : shaped.runs) {
+        const sk_sp<SkTypeface> face = typeface(run.face);
+        if (!face || run.glyphs.empty()) continue;
+        SkFont font(face, static_cast<SkScalar>(font_spec.size));
+        font.setEdging(SkFont::Edging::kAntiAlias);
+        font.setSubpixel(true);
+        std::vector<SkGlyphID> glyphs;
+        std::vector<SkPoint> positions;
+        std::vector<std::uint32_t> clusters;
+        glyphs.reserve(run.glyphs.size());
+        positions.reserve(run.glyphs.size());
+        clusters.reserve(run.glyphs.size());
+        for (const text::ShapedGlyph& glyph : run.glyphs) {
+            glyphs.push_back(static_cast<SkGlyphID>(glyph.glyph.value));
+            positions.push_back({glyph.x, glyph.y});
+            clusters.push_back(static_cast<std::uint32_t>(glyph.cluster.value()));
+        }
+        (*canvas).drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
+                           SkSpan<const SkPoint>(positions),
+                           SkSpan<const std::uint32_t>(clusters),
+                           SkSpan<const char>(text.data(), text.size()),
+                           {static_cast<SkScalar>(origin.x),
+                            static_cast<SkScalar>(origin.y)},
+                           font, paint);
+    }
+}
+#endif
+
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+namespace {
+
+// Shaping of one retained draw_text_utf8 command. Text and font are fixed by
+// the command; the result also depends on which faces the engine holds.
+class ShapedTextMemo final : public RetainedDrawMemo {
+public:
+    std::weak_ptr<const bool> engine;
+    std::size_t face_count{};
+    FontSpec font{};
+    std::size_t text_bytes{};
+    text::ShapedText shaped;
+};
+
+} // namespace
+
+void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_view text,
+                                         const FontSpec font_spec, const Color color,
+                                         const std::shared_ptr<RetainedDrawCache>& cache) {
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || text.empty()) return;
+    if (!cache) {
+        draw_text_utf8(origin, text, font_spec, color);
+        return;
+    }
+    const std::size_t face_count = (*impl_).text_engine.face_count();
+    ShapedTextMemo* memo = dynamic_cast<ShapedTextMemo*>((*cache).memo.get());
+    const bool current = memo != nullptr &&
+        (*memo).engine.lock() == (*impl_).text_engine_identity &&
+        (*memo).face_count == face_count && (*memo).font == font_spec &&
+        (*memo).text_bytes == text.size();
+    if (!current) {
+        std::unique_ptr<ShapedTextMemo> replacement = std::make_unique<ShapedTextMemo>();
+        (*replacement).engine = (*impl_).text_engine_identity;
+        (*replacement).face_count = face_count;
+        (*replacement).font = font_spec;
+        (*replacement).text_bytes = text.size();
+        (*replacement).shaped = (*impl_).text_engine.shape(text, font_spec);
+        memo = replacement.get();
+        (*cache).memo = std::move(replacement);
+    }
+    (*impl_).draw_shaped_text(*canvas, (*memo).shaped, origin, text, font_spec, color);
+}
+#else
+void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_view text,
+                                         const FontSpec font_spec, const Color color,
+                                         const std::shared_ptr<RetainedDrawCache>&) {
+    draw_text_utf8(origin, text, font_spec, color);
+}
+#endif
+
 void SkiaRaster::draw_text_utf8(Point origin,
                                 std::string_view text,
                                 FontSpec font_spec,
@@ -872,32 +1078,7 @@ void SkiaRaster::draw_text_utf8(Point origin,
     if (SkCanvas* canvas = (*impl_).canvas(); canvas && !text.empty()) {
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
-        const SkPaint paint = make_paint(color);
-        for (const text::ShapedFontRun& run : shaped.runs) {
-            const sk_sp<SkTypeface> face = (*impl_).typeface(run.face);
-            if (!face || run.glyphs.empty()) continue;
-            SkFont font(face, static_cast<SkScalar>(font_spec.size));
-            font.setEdging(SkFont::Edging::kAntiAlias);
-            font.setSubpixel(true);
-            std::vector<SkGlyphID> glyphs;
-            std::vector<SkPoint> positions;
-            std::vector<std::uint32_t> clusters;
-            glyphs.reserve(run.glyphs.size());
-            positions.reserve(run.glyphs.size());
-            clusters.reserve(run.glyphs.size());
-            for (const text::ShapedGlyph& glyph : run.glyphs) {
-                glyphs.push_back(static_cast<SkGlyphID>(glyph.glyph.value));
-                positions.push_back({glyph.x, glyph.y});
-                clusters.push_back(static_cast<std::uint32_t>(glyph.cluster.value()));
-            }
-            (*canvas).drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
-                               SkSpan<const SkPoint>(positions),
-                               SkSpan<const std::uint32_t>(clusters),
-                               SkSpan<const char>(text.data(), text.size()),
-                               {static_cast<SkScalar>(origin.x),
-                                static_cast<SkScalar>(origin.y)},
-                               font, paint);
-        }
+        (*impl_).draw_shaped_text(*canvas, shaped, origin, text, font_spec, color);
 #else
         SkScalar x = static_cast<SkScalar>(origin.x);
         const SkPaint paint = make_paint(color);

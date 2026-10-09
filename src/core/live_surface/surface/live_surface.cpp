@@ -28,6 +28,7 @@ std::shared_ptr<LiveSurface> LiveSurface::create(
     if (!detail::valid_live_surface_description(description)) return {};
     std::shared_ptr<gui_forms::detail::LiveSurfaceState> state = std::make_shared<detail::LiveSurfaceState>();
     (*state).description = description;
+    (*state).presentation_region = detail::full_live_surface_damage(description);
     (*state).buffers.resize(description.buffer_count);
     (*state).published_slot = (*state).buffers.size();
     (*state).writing_slot = (*state).buffers.size();
@@ -58,6 +59,7 @@ bool LiveSurface::reconfigure(LiveSurfaceDescription description) {
         (*state_).writing_slot = (*state_).buffers.size();
         (*state_).generation = 0U;
         (*state_).damage = {};
+        (*state_).presentation_region = detail::full_live_surface_damage(description);
         ++(*state_).epoch;
         wakes = (*state_).wakes;
     }
@@ -107,6 +109,23 @@ LiveSurfaceFrame LiveSurface::acquire_latest() const noexcept {
     (*state_).last_read_generation = (*state_).generation;
     return {(*state_).buffers[(*state_).published_slot], (*state_).epoch,
             (*state_).generation, (*state_).damage};
+}
+
+LiveSurfaceFrame LiveSurface::acquire_for_presentation(const void* const presenter) noexcept {
+    if (!state_) return {};
+    std::scoped_lock lock((*state_).mutex);
+    if ((*state_).published_slot >= (*state_).buffers.size()) return {};
+    ++(*state_).read_acquires;
+    (*state_).last_read_generation = (*state_).generation;
+    Rect region = (*state_).presentation_region;
+    if (presenter != (*state_).presenter) {
+        // Another presenter took the region since this one last drew.
+        region = detail::full_live_surface_damage((*state_).description);
+        (*state_).presenter = presenter;
+    }
+    (*state_).presentation_region = {};
+    return {(*state_).buffers[(*state_).published_slot], (*state_).epoch,
+            (*state_).generation, region};
 }
 
 LiveSurfaceSnapshot LiveSurface::snapshot() const noexcept {

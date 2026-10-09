@@ -174,6 +174,23 @@ void RecordingPainter::draw_box_shadow(Rect rect, double corner_radius,
     command.scalar = corner_radius;
     command.secondary_scalar = blur_radius;
     command.tertiary_scalar = spread;
+    command.retained_cache = std::make_shared<RetainedDrawCache>();
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::draw_retained_box_shadow(
+    const Rect rect, const double corner_radius, const Point offset, const double blur_radius,
+    const double spread, const Color color, const std::shared_ptr<RetainedDrawCache>& cache) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_box_shadow;
+    command.rect = rect;
+    command.first = offset;
+    command.color = color;
+    command.scalar = corner_radius;
+    command.secondary_scalar = blur_radius;
+    command.tertiary_scalar = spread;
+    command.retained_cache = cache;
+    if (!command.retained_cache) command.retained_cache = std::make_shared<RetainedDrawCache>();
     commands_.push_back(std::move(command));
 }
 
@@ -211,6 +228,21 @@ void RecordingPainter::draw_text_utf8(Point origin,
     command.color = color;
     command.font = font;
     command.text.assign(text);
+    command.retained_cache = std::make_shared<RetainedDrawCache>();
+    commands_.push_back(std::move(command));
+}
+
+void RecordingPainter::draw_retained_text_utf8(
+    const Point origin, const std::string_view text, const FontSpec font,
+    const Color color, const std::shared_ptr<RetainedDrawCache>& cache) {
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_text_utf8;
+    command.first = origin;
+    command.color = color;
+    command.font = font;
+    command.text.assign(text);
+    command.retained_cache = cache;
+    if (!command.retained_cache) command.retained_cache = std::make_shared<RetainedDrawCache>();
     commands_.push_back(std::move(command));
 }
 

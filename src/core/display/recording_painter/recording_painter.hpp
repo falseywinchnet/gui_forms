@@ -33,12 +33,18 @@ public:
     void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                          double blur_radius, double spread,
                          Color color) override;
+    void draw_retained_box_shadow(Rect rect, double corner_radius, Point offset,
+                                  double blur_radius, double spread, Color color,
+                                  const std::shared_ptr<RetainedDrawCache>& cache) override;
     void draw_inset_box_shadow(Rect rect, double corner_radius, Point offset,
                                double blur_radius, double spread,
                                Color color) override;
     void draw_line(Point from, Point to, Color color, double width) override;
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override;
+    // Re-recording a retained command keeps its cache with the new copy.
+    void draw_retained_text_utf8(Point origin, std::string_view text, FontSpec font,
+                                 Color color, const std::shared_ptr<RetainedDrawCache>& cache) override;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     [[nodiscard]] PreparedTextPaintResult draw_prepared_text(const PreparedTextLayout& layout,
         const LayoutAuthority expected, const Point baseline, const Color color) override;

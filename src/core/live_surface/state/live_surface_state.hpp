@@ -36,6 +36,12 @@ struct LiveSurfaceState final {
     std::uint64_t last_read_generation{};
     std::uint64_t next_wake_sequence{1};
     Rect damage{};
+    // Invalid region: everything published since the presenter last took a
+    // frame for presentation, like a window's update region. It starts as
+    // the whole surface and is cleared only by acquire_for_presentation.
+    Rect presentation_region{};
+    // The one presenter that consumes presentation_region. Identity only.
+    const void* presenter{};
     std::vector<std::shared_ptr<LiveSurfaceWake>> wakes;
 };
 

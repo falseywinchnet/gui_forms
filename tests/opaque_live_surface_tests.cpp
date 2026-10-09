@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <limits>
+#include <vector>
 
 namespace {
 using namespace gui_forms;
@@ -156,10 +157,132 @@ void refreshed_presentations(const LiveSurfacePixelFormat format) {
     window.perform_layout();
     require(window.take_live_surface_presentations(true).empty(), "refresh discards newly covered and hidden surfaces");
 }
+void publish_damage(LiveSurface& surface, const Rect damage) {
+    LiveSurfaceWriteLease write = surface.try_acquire_write(true);
+    require(static_cast<bool>(write), "damage write acquired");
+    require(write.publish(damage) != 0U, "damage published");
+}
+
+void presentation_region() {
+    const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+        {.width = 100U, .height = 50U, .opaque = true});
+    require(static_cast<bool>(surface), "region surface created");
+    const Rect full{0.0, 0.0, 100.0, 50.0};
+    const int presenter{};
+    const int other{};
+    publish_damage(*surface, {10.0, 10.0, 5.0, 5.0});
+    require((*surface).acquire_for_presentation(&presenter).damage() == full, "first take is the whole surface");
+    require((*surface).acquire_for_presentation(&presenter).damage().empty(), "nothing published since the take");
+
+    publish_damage(*surface, {10.0, 10.0, 5.0, 5.0});
+    publish_damage(*surface, {40.0, 20.0, 2.0, 3.0});
+    require((*surface).acquire_latest().damage() == Rect(40.0, 20.0, 2.0, 3.0), "acquire_latest reads the newest publication");
+    require((*surface).acquire_latest().damage() == Rect(40.0, 20.0, 2.0, 3.0), "acquire_latest never consumes");
+    const LiveSurfaceFrame merged = (*surface).acquire_for_presentation(&presenter);
+    require(merged.damage() == Rect(10.0, 10.0, 32.0, 13.0), "unpresented publications merge into one region");
+    require(merged.generation() == 3U, "region and frame are taken together");
+    require((*surface).acquire_for_presentation(&presenter).damage().empty(), "taking validates the region");
+
+    publish_damage(*surface, {1.0, 1.0, 1.0, 1.0});
+    require((*surface).acquire_for_presentation(&other).damage() == full, "another presenter copies everything");
+    require((*surface).acquire_for_presentation(&presenter).damage() == full, "so does the presenter it displaced");
+    publish_damage(*surface, {200.0, 0.0, 5.0, 5.0});
+    require((*surface).acquire_for_presentation(&presenter).damage() == full, "outside damage is the whole surface");
+
+    require((*surface).reconfigure({.width = 100U, .height = 50U, .opaque = true}), "reconfigured");
+    require(!(*surface).acquire_for_presentation(&presenter), "no frame before the new epoch publishes");
+    publish_damage(*surface, {1.0, 1.0, 1.0, 1.0});
+    require((*surface).acquire_for_presentation(&presenter).damage() == full, "reconfigured surface is whole");
+}
+
+bool all_damage_limited(const std::vector<LiveSurfacePresentation>& presentations, const bool expected) {
+    for (const LiveSurfacePresentation& presentation : presentations) {
+        if (presentation.damage_limited != expected) return false;
+    }
+    return !presentations.empty();
+}
+
+void overlay_presentations() {
+    const std::shared_ptr<Control> root = make_control<Control>(StableId("scene.root"));
+    const std::shared_ptr<Control> scene = make_control<Control>(StableId("scene"));
+    const std::shared_ptr<Control> capsule = make_control<Control>(StableId("capsule"));
+    (*scene).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    (*capsule).set_requested_bounds({10.0, 10.0, 20.0, 10.0});
+    (*capsule).set_paint_plane(PaintPlane::overlay);
+    (*root).add_child(scene);
+    (*root).add_child(capsule);
+    Window window(root, {100.0, 80.0});
+    window.perform_layout();
+    const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+        {.width = 100U, .height = 80U, .opaque = true});
+    require(static_cast<bool>(surface), "scene surface created");
+    publish_damage(*surface, {});
+    require(window.queue_live_surface_presentation(scene, surface), "scene registered");
+
+    const std::vector<LiveSurfacePresentation> placed = window.take_live_surface_presentations();
+    require(placed.size() == 4U && all_damage_limited(placed, false), "first placement copies complete fragments");
+    require(window.take_live_surface_presentations().empty(), "a static overlay does not re-present an unchanged surface");
+
+    publish_damage(*surface, {50.0, 50.0, 5.0, 5.0});
+    const std::vector<LiveSurfacePresentation> changed = window.take_live_surface_presentations();
+    require(changed.size() == 4U && all_damage_limited(changed, true), "same placement permits region copies");
+
+    (*capsule).set_requested_bounds({30.0, 10.0, 20.0, 10.0});
+    window.perform_layout();
+    const std::vector<LiveSurfacePresentation> moved = window.take_live_surface_presentations();
+    require(moved.size() == 4U && all_damage_limited(moved, false), "a moved overlay re-presents completely");
+    require(window.take_live_surface_presentations().empty(), "the moved overlay settles");
+    require(all_damage_limited(window.take_live_surface_presentations(true), false), "retries copy complete clips");
+
+    (*capsule).set_visible(false);
+    window.perform_layout();
+    const std::vector<LiveSurfacePresentation> uncovered = window.take_live_surface_presentations();
+    require(uncovered.size() == 1U && all_damage_limited(uncovered, false), "a removed overlay re-presents completely");
+
+    (*scene).set_visible(false);
+    require(window.take_live_surface_presentations().empty(), "hidden surface is not presented");
+    (*scene).set_visible(true);
+    const std::vector<LiveSurfacePresentation> shown = window.take_live_surface_presentations();
+    require(shown.size() == 1U && all_damage_limited(shown, false), "a re-shown surface copies completely");
+}
+
+void host_region_helpers() {
+    // 1:1 at scale 2: a 400-pixel surface in a 200-point destination.
+    const Rect destination{10.0, 20.0, 200.0, 100.0};
+    require(detail::live_damage_in_window({100.0, 50.0, 10.0, 4.0}, destination, 400U, 200U, 2.0) ==
+                Rect(59.5, 44.5, 6.0, 3.0), "region maps through destination with one-pixel widening");
+    require(detail::live_damage_in_window({0.0, 0.0, 400.0, 200.0}, destination, 400U, 200U, 2.0) == destination,
+            "whole region is clamped to the destination");
+    require(detail::live_damage_in_window({}, destination, 400U, 200U, 2.0).empty(), "empty region maps to nothing");
+
+    // Live fragments around an overlay leave exactly the overlay uncovered.
+    const std::array<Rect, 4> fragments{{{0.0, 0.0, 10.0, 2.0}, {0.0, 6.0, 10.0, 2.0},
+                                         {0.0, 2.0, 2.0, 4.0}, {8.0, 2.0, 2.0, 4.0}}};
+    std::vector<Rect> uncovered;
+    detail::append_uncovered_live_damage({0.0, 0.0, 10.0, 8.0}, 1.0, fragments, uncovered);
+    require(uncovered.size() == 1U && uncovered[0] == Rect(2.0, 2.0, 6.0, 4.0), "bounding box retains only the overlay");
+    uncovered.clear();
+    detail::append_uncovered_live_damage({0.0, 0.0, 10.0, 2.0}, 1.0, fragments, uncovered);
+    require(uncovered.empty(), "covered dirty rectangle needs no retained painting");
+    detail::append_uncovered_live_damage({0.0, 0.0, 3.0, 3.0}, 1.0, {}, uncovered);
+    require(uncovered.size() == 1U && uncovered[0] == Rect(0.0, 0.0, 3.0, 3.0), "no live clips leave everything");
+    std::vector<Rect> scattered;
+    for (int index = 0; index < 40; ++index) {
+        const double offset = static_cast<double>(index * 2 + 1);
+        scattered.push_back({offset, offset, 1.0, 1.0});
+    }
+    uncovered.clear();
+    detail::append_uncovered_live_damage({0.0, 0.0, 100.0, 100.0}, 1.0, scattered, uncovered);
+    require(uncovered.size() == 1U && uncovered[0] == Rect(0.0, 0.0, 100.0, 100.0),
+            "fragment overflow falls back to the whole dirty rectangle");
+}
 } // namespace
 
 int main() {
     description_and_frame_lifetime();
+    presentation_region();
+    overlay_presentations();
+    host_region_helpers();
     format_and_frame_lifetime();
     damage_coverage();
     refreshed_presentations(LiveSurfacePixelFormat::bgra32_premultiplied_srgb);

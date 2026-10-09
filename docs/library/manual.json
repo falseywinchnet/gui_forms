@@ -2652,7 +2652,7 @@
         "pixel_format": "Returns the admitted BGRA premultiplied-sRGB format for retained and empty leases.",
         "epoch": "Returns the configuration epoch sampled with the publication.",
         "generation": "Returns the monotonically published generation within the sampled epoch.",
-        "damage": "Returns producer-authored damage clipped to surface bounds.",
+        "damage": "Returns the newest publication's damage from acquire_latest, or the invalid region taken by acquire_for_presentation, clipped to surface bounds.",
         "pixels": "Returns a const byte span whose lifetime is protected by the retained shared buffer."
       }
     },
@@ -2685,6 +2685,7 @@
         "reconfigure": "Allocates a complete replacement pool before locking, refuses an active writer, resets generation/frame state, advances epoch, and signals consumers after commit.",
         "try_acquire_write": "Never blocks: selects a nonpublished buffer held only by state, optionally copies newest pixels, or counts and returns a dropped acquisition when no slot is safe.",
         "acquire_latest": "Returns the newest immutable published buffer and records sampling telemetry, or an empty frame before the first publish.",
+        "acquire_for_presentation": "For the one window presenter: acquires the newest frame and takes and clears the invalid region published since its previous call; first, post-reconfigure, and different-presenter calls receive the whole surface.",
         "snapshot": "Copies the complete configuration and protocol counters under the state mutex.",
         "connect_presentation_wake": "Allocates a sequenced revocable callback record and appends it under the state mutex; callbacks are scheduling signals, not paint authority."
       }

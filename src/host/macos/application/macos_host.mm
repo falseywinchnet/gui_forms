@@ -808,6 +808,14 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     // this pass has finished consuming their pixels.
     std::vector<gui_forms::LiveSurfaceFrame> _liveFrames;
     std::vector<GFRect> _opaqueLiveClips;
+    // Per pending presentation: the index of the frame it draws (fragments of
+    // one surface share one acquisition) and the part of its clip to copy.
+    std::vector<std::size_t> _liveFrameSources;
+    std::vector<GFRect> _liveRegions;
+    std::vector<GFRect> _uncoveredDamage;
+    // A presentation region was taken but its pixels never reached a
+    // presented raster. The next pass copies complete clips.
+    BOOL _liveRegionLost;
     NSPanel* _tooltipPanel;
     NSTimer* _tooltipTimer;
     std::uint64_t _lastSemanticGeneration;
@@ -1903,6 +1911,7 @@ private:
     } catch (const std::exception& error) {
         _raster.end_frame();
         _liveFrames.clear();
+        _liveRegionLost = YES;
 #if defined(GUI_FORMS_PREPARED_TEXT)
         _raster.abort_prepared_frame();
 #endif
@@ -1910,6 +1919,7 @@ private:
     } catch (...) {
         _raster.end_frame();
         _liveFrames.clear();
+        _liveRegionLost = YES;
 #if defined(GUI_FORMS_PREPARED_TEXT)
         _raster.abort_prepared_frame();
 #endif
@@ -1940,20 +1950,6 @@ private:
         _pendingDamage.add(GFRect{0.0, 0.0, logicalSize.width, logicalSize.height});
     }
 #endif
-    _liveFrames.clear();
-    _opaqueLiveClips.clear();
-    _liveFrames.reserve(_pendingLivePresentations.size());
-    _opaqueLiveClips.reserve(_pendingLivePresentations.size());
-    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
-        gui_forms::LiveSurfaceFrame frame{};
-        if (update.surface) frame = (*update.surface).acquire_latest();
-        if (frame && frame.opaque()) {
-            const GFRect covered = gui_forms::detail::opaque_live_clip(
-                GFRect::intersection(update.clip, update.destination), scale);
-            if (!covered.empty()) _opaqueLiveClips.push_back(covered);
-        }
-        _liveFrames.push_back(std::move(frame));
-    }
     const GFRect nativeDamage{dirtyRect.origin.x, dirtyRect.origin.y,
                               dirtyRect.size.width, dirtyRect.size.height};
     const bool modelClean = (*_model).paint_lease_snapshot().state ==
@@ -1963,9 +1959,81 @@ private:
     reusableRaster = reusableRaster && _raster.prepared_front_matches(logicalSize, scale);
     const PaintReceipt previousReceipt = _raster.prepared_front_receipt();
 #endif
-    bool liveOnly = gui_forms::detail::opaque_live_damage_covers(
-        nativeDamage, scale, _opaqueLiveClips, reusableRaster, !_pendingDamage.empty());
-    if (!liveOnly) _pendingDamage.add(nativeDamage);
+    // Copying only a presentation region needs a raster that still holds the
+    // previous presentation of that placement.
+    const bool regionsUsable = reusableRaster && _liveRegionLost == NO;
+    _liveFrames.clear();
+    _opaqueLiveClips.clear();
+    _liveFrameSources.clear();
+    _liveRegions.clear();
+    _liveFrames.reserve(_pendingLivePresentations.size());
+    _opaqueLiveClips.reserve(_pendingLivePresentations.size());
+    _liveFrameSources.reserve(_pendingLivePresentations.size());
+    _liveRegions.reserve(_pendingLivePresentations.size());
+    bool regionsTaken{false};
+    bool narrowedAny{false};
+    for (std::size_t index = 0; index < _pendingLivePresentations.size(); ++index) {
+        const LiveSurfacePresentation& update = _pendingLivePresentations[index];
+        // Overlay fragments of one surface share one frame and its one region.
+        std::size_t source = index;
+        for (std::size_t earlier = 0; earlier < index; ++earlier) {
+            if (_pendingLivePresentations[earlier].surface == update.surface) {
+                source = _liveFrameSources[earlier];
+                break;
+            }
+        }
+        gui_forms::LiveSurfaceFrame frame{};
+        if (source == index && update.surface) {
+            // Takes the frame and clears its invalid region in one step.
+            frame = (*update.surface).acquire_for_presentation((__bridge const void*)self);
+            if (frame) regionsTaken = true;
+        }
+        const gui_forms::LiveSurfaceFrame& drawn = source == index ? frame : _liveFrames[source];
+        GFRect region = update.clip;
+        if (regionsUsable && update.damage_limited && drawn && drawn.opaque()) {
+            // Outside the region the frame equals what this raster holds.
+            const GFRect changed = gui_forms::detail::live_damage_in_window(
+                drawn.damage(), update.destination, drawn.width(), drawn.height(), scale);
+            region = GFRect::intersection(update.clip, changed);
+            narrowedAny = true;
+        }
+        if (drawn && drawn.opaque()) {
+            const GFRect covered = gui_forms::detail::opaque_live_clip(
+                GFRect::intersection(update.clip, update.destination), scale);
+            if (!covered.empty()) _opaqueLiveClips.push_back(covered);
+        }
+        _liveFrameSources.push_back(source);
+        _liveRegions.push_back(region);
+        _liveFrames.push_back(std::move(frame));
+    }
+    // Use the rectangles AppKit is drawing, not their bounding box. Live
+    // fragments around an overlay leave only the overlay's share to retained
+    // painting; a bounding box would repaint the whole surface beneath it.
+    const NSRect* drawnRects = nullptr;
+    NSInteger drawnCount = 0;
+    [self getRectsBeingDrawn:&drawnRects count:&drawnCount];
+    _uncoveredDamage.clear();
+    for (NSInteger index = 0; index < drawnCount; ++index) {
+        const NSRect rect = drawnRects[index];
+        const GFRect dirty{rect.origin.x, rect.origin.y, rect.size.width, rect.size.height};
+        if (reusableRaster) {
+            gui_forms::detail::append_uncovered_live_damage(dirty, scale, _opaqueLiveClips, _uncoveredDamage);
+        } else {
+            _uncoveredDamage.push_back(dirty);
+        }
+    }
+    if (drawnCount == 0) _uncoveredDamage.push_back(nativeDamage);
+    for (const GFRect rectangle : _uncoveredDamage) _pendingDamage.add(rectangle);
+    bool liveOnly = _pendingDamage.empty();
+    if (narrowedAny && !liveOnly) {
+        // Retained painting can reach beneath live clips; copy those pixels too.
+        const GFRect retainedBounds = _pendingDamage.bounds();
+        for (std::size_t index = 0; index < _liveRegions.size(); ++index) {
+            const GFRect beneath = GFRect::intersection(
+                _pendingLivePresentations[index].clip, retainedBounds);
+            _liveRegions[index] = GFRect::united(_liveRegions[index], beneath);
+        }
+    }
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
     const bool imagesReady = _raster.synchronize_images((*_model).image_resources());
@@ -1973,8 +2041,14 @@ private:
     static_cast<void>(_raster.synchronize_images((*_model).image_resources()));
 #endif
     DamageRegion frameDamage = _pendingDamage;
-    for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
-        frameDamage.add(update.clip);
+    for (const GFRect region : _liveRegions) frameDamage.add(region);
+    if (narrowedAny && frameDamage.empty()) {
+        // Nothing changed, but empty frame damage means the whole raster.
+        for (std::size_t index = 0; index < _liveRegions.size(); ++index) {
+            _liveRegions[index] = _pendingLivePresentations[index].clip;
+            frameDamage.add(_liveRegions[index]);
+        }
+        narrowedAny = false;
     }
     bool frameReady{true};
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -1983,14 +2057,25 @@ private:
         : gui_forms::PreparedTextStatus::resource_failure;
     frameReady = admission == gui_forms::PreparedTextStatus::success;
     if (frameReady) {
-        // Admission can require a full repaint after resize or revocation.
-        // Keep that damage until this exact candidate reaches native presentation.
-        if (liveOnly) {
-            liveOnly = gui_forms::detail::opaque_live_damage_covers(
-                frameDamage.bounds(), scale, _opaqueLiveClips, reusableRaster, false);
-        }
-        if (!liveOnly) {
-            for (const GFRect rectangle : frameDamage.rectangles()) _pendingDamage.add(rectangle);
+        // Admission clears the candidate instead of copying the presented
+        // front when damage spans the raster (resize, revocation, full live
+        // damage). Then live surfaces draw complete clips and retained
+        // painting fills what they leave uncovered. Keep that damage until
+        // this exact candidate reaches native presentation.
+        const GFRect extent{0.0, 0.0, logicalSize.width, logicalSize.height};
+        if (frameDamage.bounds().contains(extent)) {
+            for (std::size_t index = 0; index < _liveRegions.size(); ++index) {
+                _liveRegions[index] = _pendingLivePresentations[index].clip;
+            }
+            narrowedAny = false;
+            _uncoveredDamage.clear();
+            if (reusableRaster) {
+                gui_forms::detail::append_uncovered_live_damage(extent, scale, _opaqueLiveClips, _uncoveredDamage);
+            } else {
+                _uncoveredDamage.push_back(extent);
+            }
+            for (const GFRect rectangle : _uncoveredDamage) _pendingDamage.add(rectangle);
+            liveOnly = _pendingDamage.empty();
         }
     }
 #else
@@ -2004,7 +2089,12 @@ private:
     if (frameReady && !_pendingDamage.empty()) {
         const std::chrono::steady_clock::time_point paintStarted =
             std::chrono::steady_clock::now();
+        // Clip to the damaged rectangles, not their bounds: overlays in
+        // opposite corners cost their own areas, not the strip between them.
+        _raster.save();
+        _raster.clip_damage(_pendingDamage);
         receipt = (*_model).paint(_raster, _pendingDamage.bounds());
+        _raster.restore();
         const std::chrono::steady_clock::time_point paintEnded =
             std::chrono::steady_clock::now();
         _retainedPaintPhase.record(paintStarted, paintEnded);
@@ -2017,11 +2107,14 @@ private:
             const LiveSurfacePresentation& update = _pendingLivePresentations[index];
             // Reconfiguration can retire the last frame before a replacement
             // is published. Its clip granted no opaque coverage above.
-            if (!_liveFrames[index]) continue;
+            const gui_forms::LiveSurfaceFrame& frame = _liveFrames[_liveFrameSources[index]];
+            if (!frame) continue;
+            // Empty: this fragment's region holds no published change.
+            if (_liveRegions[index].empty()) continue;
             _raster.save();
-            _raster.clip_rect(update.clip);
+            _raster.clip_rect(_liveRegions[index]);
             liveDrawsSucceeded = _raster.draw_live_surface_frame(
-                _liveFrames[index], update.destination, 1.0);
+                frame, update.destination, 1.0);
             _raster.restore();
             if (!liveDrawsSucceeded) break;
         }
@@ -2117,6 +2210,16 @@ private:
 #else
         _pendingLivePresentations.clear();
 #endif
+    }
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    const bool livePresented = presented && committed;
+#else
+    const bool livePresented = presented;
+#endif
+    // A taken region is validated only by a presented raster, as EndPaint
+    // validates an update region. Otherwise the next pass copies everything.
+    if (regionsTaken) _liveRegionLost = livePresented ? NO : YES;
+    if (presented) {
         if (receipt &&
             (*_model).notify_presented(*receipt,
                 static_cast<std::uint64_t>(elapsed.count()))) {

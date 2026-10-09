@@ -3,7 +3,10 @@
 #include "../../../core/damage/device_damage/device_damage.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <span>
+#include <vector>
 
 namespace gui_forms::detail {
 
@@ -50,6 +53,67 @@ namespace gui_forms::detail {
         top = bottom;
     }
     return true;
+}
+
+// A presentation region in surface pixels, as window points. It widens by one
+// surface pixel so a filtered, scaled draw also refreshes neighbours that
+// sample changed pixels, then rounds outward to whole device pixels.
+[[nodiscard]] inline Rect live_damage_in_window(
+    const Rect damage, const Rect destination, const std::uint32_t width,
+    const std::uint32_t height, const double scale) noexcept {
+    if (damage.empty() || width == 0U || height == 0U || destination.empty() ||
+        !destination.finite()) {
+        return {};
+    }
+    const Rect surface{0.0, 0.0, static_cast<double>(width), static_cast<double>(height)};
+    const Rect widened = Rect::intersection(
+        {damage.x - 1.0, damage.y - 1.0, damage.width + 2.0, damage.height + 2.0}, surface);
+    const double horizontal = destination.width / static_cast<double>(width);
+    const double vertical = destination.height / static_cast<double>(height);
+    const Rect mapped{destination.x + widened.x * horizontal, destination.y + widened.y * vertical,
+                      widened.width * horizontal, widened.height * vertical};
+    const Rect result = align_damage_outward(mapped, scale);
+    return result;
+}
+
+// Fragments beyond this fall back to the whole dirty rectangle: retained
+// painting more than needed is slower, never wrong.
+inline constexpr std::size_t maximum_uncovered_live_fragments = 64U;
+
+// Appends the parts of one dirty rectangle that no opaque live clip covers,
+// such as an overlay floating over a live surface. Clips come from
+// opaque_live_clip, so only whole covered device pixels are subtracted.
+inline void append_uncovered_live_damage(const Rect dirty, const double scale,
+                                         const std::span<const Rect> clips,
+                                         std::vector<Rect>& uncovered) {
+    const Rect target = align_damage_outward(dirty, scale);
+    if (target.empty() || !target.finite()) return;
+    std::vector<Rect> fragments{target};
+    for (const Rect clip : clips) {
+        std::vector<Rect> remaining;
+        for (const Rect fragment : fragments) {
+            const Rect overlap = Rect::intersection(fragment, clip);
+            if (overlap.empty()) {
+                remaining.push_back(fragment);
+                continue;
+            }
+            const Rect above{fragment.x, fragment.y, fragment.width, overlap.y - fragment.y};
+            const Rect below{fragment.x, overlap.bottom(), fragment.width, fragment.bottom() - overlap.bottom()};
+            const Rect left{fragment.x, overlap.y, overlap.x - fragment.x, overlap.height};
+            const Rect right{overlap.right(), overlap.y, fragment.right() - overlap.right(), overlap.height};
+            if (!above.empty()) remaining.push_back(above);
+            if (!below.empty()) remaining.push_back(below);
+            if (!left.empty()) remaining.push_back(left);
+            if (!right.empty()) remaining.push_back(right);
+        }
+        if (remaining.size() > maximum_uncovered_live_fragments) {
+            uncovered.push_back(target);
+            return;
+        }
+        fragments = std::move(remaining);
+        if (fragments.empty()) return;
+    }
+    uncovered.insert(uncovered.end(), fragments.begin(), fragments.end());
 }
 
 } // namespace gui_forms::detail

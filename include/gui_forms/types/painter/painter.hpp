@@ -18,6 +18,19 @@ struct LayoutAuthority;
 struct PreparedTextPaintResult;
 #endif
 
+// Renderer-derived data for one retained draw command, such as shaped text.
+// The command's recording owns it: a Window creates it when a control
+// records the command and releases it when that control's display chunk is
+// rebuilt or retired. A renderer fills, validates and replaces the memo.
+class RetainedDrawMemo {
+public:
+    virtual ~RetainedDrawMemo() = default;
+};
+
+struct RetainedDrawCache final {
+    std::unique_ptr<RetainedDrawMemo> memo;
+};
+
 class Painter : public TextMetricsProvider {
 public:
     virtual ~Painter() = default;
@@ -59,6 +72,11 @@ public:
     virtual void draw_box_shadow(Rect rect, double corner_radius, Point offset,
                                  double blur_radius, double spread,
                                  Color color);
+    // Replay of a retained draw_box_shadow. A renderer may keep the blurred
+    // coverage in the cache; the default draws as draw_box_shadow.
+    virtual void draw_retained_box_shadow(
+        Rect rect, double corner_radius, Point offset, double blur_radius,
+        double spread, Color color, const std::shared_ptr<RetainedDrawCache>& cache);
     // Drawn over the owning surface fill and clipped to its interior. The
     // source is the complement of a translated, spread-adjusted inner box, so
     // the recipe relaxes with live owner geometry rather than fixed traces.
@@ -70,6 +88,12 @@ public:
                                 std::string_view text,
                                 FontSpec font,
                                 Color color) = 0;
+    // Replay of a retained draw_text_utf8. The cache lives as long as the
+    // recorded command; a renderer may keep shaped text there. The default
+    // draws as draw_text_utf8 and leaves the cache untouched.
+    virtual void draw_retained_text_utf8(
+        Point origin, std::string_view text, FontSpec font, Color color,
+        const std::shared_ptr<RetainedDrawCache>& cache);
     // Text controls need the same metrics used by the painter for caret hit
     // testing, selection geometry, and horizontal viewport maintenance.  The
     // renderer owns those metrics; controls must not guess a fixed glyph width.
