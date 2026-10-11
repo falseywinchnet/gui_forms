@@ -44,7 +44,7 @@ struct TooltipHostFixture final {
             0, 0, 800, 600, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
         require(state.hwnd_ != nullptr, "tooltip native owner created");
         state.raster_.set_bundled_fonts(fonts);
-        for (const double scale : {1.0, 1.5, 2.0}) {
+        for (const double scale : {1.0, 1.1, 1.25, 1.5, 2.0}) {
             state.scale_ = scale;
             require(state.raster_.resize({800.0, 600.0}, scale), "tooltip metrics surface resized");
             HostTooltipRequest request{.text = "Ag", .anchor = {12.0, 12.0}};
