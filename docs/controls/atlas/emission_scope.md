@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `EmissionScope`
-- Declaration: `include/gui_forms/event/event/event.hpp:248`
+- Declaration: `include/gui_forms/event/event/event.hpp:252`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 4 declaration-derived

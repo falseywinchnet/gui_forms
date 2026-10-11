@@ -80,6 +80,10 @@ public:
     Event(const Event&) = delete;
     Event& operator=(const Event&) = delete;
 
+    // Deprecated authoring seam: observe events with
+    // on(event, owner, &Owner::method). The subscribe overloads and their
+    // caller-held tokens stay compiled for existing code that must cancel one
+    // connection independently; do not write new code against them.
     [[nodiscard]] SubscriptionToken subscribe(Callback callback) {
         SubscriptionToken token = subscribe_impl(nullptr, std::move(callback));
         return token;

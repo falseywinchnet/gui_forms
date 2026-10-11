@@ -46,7 +46,7 @@ return `after_shutdown`.
 Every presenting host follows the same sequence, and the headless host is the
 reference implementation the conformance tests compare against:
 
-1. Construct retained controls and subscribe callbacks.
+1. Construct retained controls and connect handlers with `on(...)`.
 2. Construct the `Window`; its subtree attachment transaction completes.
 3. Begin native surface creation.
 4. Bind the native surface identity privately inside the adapter.

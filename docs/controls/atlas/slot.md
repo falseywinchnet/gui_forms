@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `Revocable → Slot`
-- Declaration: `include/gui_forms/event/event/event.hpp:143`
+- Declaration: `include/gui_forms/event/event/event.hpp:147`
 - Definition: `inline/header-only`
 - Type narrative: hand-reviewed
 - Method narratives: 0 hand-reviewed, 5 declaration-derived

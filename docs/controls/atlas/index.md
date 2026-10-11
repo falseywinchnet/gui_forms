@@ -17,14 +17,14 @@ passed the Screen Sharing crop gate.
 
 | Measure | Count |
 | --- | --- |
-| Types | 813 |
+| Types | 817 |
 | Visual controls | 78 |
 | Visual controls with verified captures | 67 |
 | Visual controls with captures pending | 11 |
 | Types with hand-reviewed narratives | 479 |
-| Types with declaration-derived narratives | 334 |
+| Types with declaration-derived narratives | 338 |
 | Methods with hand-reviewed explanations | 2569 |
-| Methods with declaration-derived explanations | 2168 |
+| Methods with declaration-derived explanations | 2178 |
 | Grouped source migrations pending | 66 |
 | Enumerations | 219 |
 
@@ -1018,6 +1018,7 @@ CalendarPopup <calendar_popup>
 CalendarPopupLayer <calendar_popup_layer>
 CompoundFieldSpec <compound_field_spec>
 ConsecutiveSeparators <consecutive_separators>
+DrawingEffectsPaint <drawing_effects_paint>
 DropDownLayer <drop_down_layer>
 DropDownList <drop_down_list>
 ErrorGlyph <error_glyph>
@@ -1028,6 +1029,7 @@ GalleryMount <gallery_mount>
 GalleryShell <gallery_shell>
 GalleryTree <gallery_tree>
 MenuSnapshot <menu_snapshot>
+PageContext <page_context>
 PropertyEditorDropDownLayer <property_editor_drop_down_layer>
 RackModulePanel <rack_module_panel>
 SlotForRemovedChild <slot_for_removed_child>
@@ -1035,6 +1037,8 @@ SpinButtons <spin_buttons>
 SplitterGrip <splitter_grip>
 ToolTipBubble <tool_tip_bubble>
 ToolTipLayer <tool_tip_layer>
+WeakProgressValueSetter <weak_progress_value_setter>
+WeakRangeValueMirror <weak_range_value_mirror>
 ```
 
 ### core

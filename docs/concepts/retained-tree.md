@@ -42,9 +42,10 @@ Ownership is explicit and runs one way:
 - Handler owners do not own the controls they observe. `on(event, owner,
   &Owner::method)` stores the connection token on the owner `Component`, so
   disposing the owner revokes the handler without touching the control.
-- Event subscriptions are tokenized. A `SubscriptionToken` disconnects on
-  destruction; `Event::subscribe(Component& owner, callback)` lets the owner's
-  disposal revoke it without creating a visual ownership edge.
+- `on(...)` is the only recommended way to observe an event. The older
+  `Event::subscribe(...)`, which returns a caller-held `SubscriptionToken`, is
+  deprecated: it stays compiled for existing code that must cancel one
+  connection independently, and nothing new should be written against it.
 
 Nothing is reference-counted across the host boundary. Native adapters hold
 weak handles and ask the retained window for state; a retained identity is
