@@ -399,6 +399,13 @@ public:
     void set_maximum_size(Size size);
     [[nodiscard]] Rect arranged_bounds() const;
     [[nodiscard]] Rect committed_arranged_bounds() const noexcept { return arranged_bounds_; }
+    // The slot a parent's arrange just assigned, before the window commits
+    // it; the committed bounds when none is pending. A scrolling parent
+    // offsets this, never the committed bounds, which already carry its
+    // previous offset.
+    [[nodiscard]] Rect pending_layout_bounds() const noexcept {
+        return layout_slot_ ? *layout_slot_ : arranged_bounds_;
+    }
     [[nodiscard]] Rect client_rectangle() const noexcept {
         return {0.0, 0.0, arranged_bounds_.width, arranged_bounds_.height};
     }

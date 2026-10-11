@@ -110,6 +110,14 @@ void test_auto_scroll_projection_viewport_and_resize() {
     require((*child).committed_arranged_bounds() ==
                 Rect{-30.0, -30.0, 220.0, 160.0},
             "repeated layout must not accumulate the scroll translation");
+    // A second scroll to a different position re-arranges from the authored
+    // slot, not from the bounds the first scroll already offset.
+    require((*panel).scroll_to({10.0, 5.0}), "second programmatic scroll accepted");
+    window.perform_layout();
+    require((*child).committed_arranged_bounds() == Rect{10.0, 5.0, 220.0, 160.0},
+            "a second scroll must not accumulate the previous scroll translation");
+    require((*panel).scroll_to({50.0, 40.0}), "scroll back accepted");
+    window.perform_layout();
     require(!(*panel).get_child_at_point({10.0, 70.0}) &&
                 window.hit_test({10.0, 70.0}) == panel,
             "children must not receive hits through scrollbar chrome");
