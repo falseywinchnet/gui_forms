@@ -176,6 +176,21 @@ unchanged. This changes measured text widths by a few logical pixels per line;
 layouts that depend on exact widths reflow accordingly. The Windows GDI host
 still shapes through GDI until ADR-004 phase 6.
 
+ADR-004 phase 2 adds the shared text engine pieces. `GlyphRunRasterizer`
+(private, text engine) rasterizes HarfBuzz-shaped runs with FreeType light
+auto-hinting into one grayscale mask, placing glyphs in integer 26.6 device
+units with the baseline snapped to a whole device pixel and the run's
+horizontal phase kept in 1/64 pixel. `composite_text_coverage` (private, core)
+is the one blending rule every host uses: alpha = coverage × colour alpha ×
+clip coverage, rounded once, and each channel
+`(source·α + destination·(255−α) + 127) / 255`. Clip edges at fractional
+device positions give their covered area; rounded clip corners are
+anti-aliased from the pixel centre's distance to the arc. All of it is integer
+or fixed-point arithmetic, so the same input gives the same bytes on macOS,
+Linux and Windows. The Windows prepared-text compositor now delegates to it:
+its output is unchanged for whole-pixel clips, and its rounded clips and
+fractional clip edges are now anti-aliased.
+
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.

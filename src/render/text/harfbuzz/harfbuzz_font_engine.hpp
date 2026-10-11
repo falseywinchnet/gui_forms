@@ -39,6 +39,14 @@ struct ShapedText final {
     bool missing_primary_face{};
 };
 
+// The encoded font a registered face was opened from. A rasterizer opens its
+// own FreeType face from these bytes, at its own size, while owner lives.
+struct FontFaceSource final {
+    std::span<const std::byte> bytes{};
+    std::shared_ptr<const void> owner{};
+    std::uint32_t face_index{};
+};
+
 struct ShapeStorageLimits final {
     std::size_t input_bytes{16'384};
     std::size_t runs{16'384};
@@ -115,6 +123,9 @@ public:
     [[nodiscard]] ResolvedTextLayout resolve(std::string_view utf8,
                                              FontSpec font);
     [[nodiscard]] std::size_t face_count() const noexcept;
+    // Nullopt for an unknown ID. Registered faces are never removed, so the
+    // span stays valid while the returned owner is held.
+    [[nodiscard]] std::optional<FontFaceSource> face_source(FontFaceId id) const;
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
     [[nodiscard]] TextLayoutDiagnostics diagnostics() const noexcept;
     // Executor-confined, consumed at the named point/run. An unreached point

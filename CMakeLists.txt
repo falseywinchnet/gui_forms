@@ -112,6 +112,7 @@ add_library(gui_forms_core STATIC
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
     src/core/text/prepared/prepared_storage.cpp
+    src/core/text/composite/text_composite.cpp
     src/core/document_view/document_view_state.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
@@ -235,6 +236,7 @@ if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     add_library(gui_forms_text_engine STATIC
         src/render/text/harfbuzz/harfbuzz_font_engine.cpp
         src/render/text/harfbuzz/bounded_shape_workspace.cpp
+        src/render/text/glyph_run/glyph_run_raster.cpp
     )
     target_include_directories(gui_forms_text_engine
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/text/harfbuzz
@@ -2018,6 +2020,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_owned_event_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_owned_event_tests COMMAND gui_forms_owned_event_tests)
 
+    add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
+    target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)
     add_executable(gui_forms_live_surface_tests tests/live_surface_tests.cpp)
     target_link_libraries(gui_forms_live_surface_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_live_surface_tests COMMAND gui_forms_live_surface_tests)
@@ -2055,6 +2060,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_text_shaping_tests COMMAND gui_forms_text_shaping_tests)
 
     if(TARGET gui_forms_text_engine)
+        add_executable(gui_forms_glyph_run_raster_tests tests/glyph_run_raster_tests.cpp)
+        target_link_libraries(gui_forms_glyph_run_raster_tests PRIVATE gui_forms_text_engine)
+        target_compile_definitions(gui_forms_glyph_run_raster_tests PRIVATE
+            GUI_FORMS_TEST_RAPIDS_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
+            GUI_FORMS_TEST_CARLITO_REGULAR="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Carlito-Regular.ttf")
+        add_test(NAME gui_forms_glyph_run_raster_tests COMMAND gui_forms_glyph_run_raster_tests)
         add_executable(gui_forms_bounded_shape_tests tests/bounded_shape_tests.cpp)
         target_link_libraries(gui_forms_bounded_shape_tests PRIVATE gui_forms_text_engine)
         add_test(NAME gui_forms_bounded_shape_tests COMMAND gui_forms_bounded_shape_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")

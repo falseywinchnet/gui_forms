@@ -990,6 +990,22 @@ std::size_t HarfBuzzFontEngine::face_count() const noexcept {
     return count;
 }
 
+std::optional<FontFaceSource> HarfBuzzFontEngine::face_source(const FontFaceId id) const {
+    for (const Impl::Face& face : (*impl_).faces) {
+        if (face.id != id) continue;
+        const FT_Face native = face.face;
+        // Every face is opened from memory, so its stream base is the bytes.
+        if (native == nullptr || (*native).stream == nullptr || (*(*native).stream).base == nullptr) return std::nullopt;
+        FontFaceSource source{};
+        source.bytes = std::span<const std::byte>(reinterpret_cast<const std::byte*>((*(*native).stream).base),
+                                                  static_cast<std::size_t>((*(*native).stream).size));
+        source.owner = face.encoded;
+        source.face_index = static_cast<std::uint32_t>((*native).face_index & 0xFFFF);
+        return source;
+    }
+    return std::nullopt;
+}
+
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
 TextLayoutDiagnostics HarfBuzzFontEngine::diagnostics() const noexcept {
     const TextLayoutDiagnostics result = (*impl_).diagnostics;
