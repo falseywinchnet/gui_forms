@@ -1,6 +1,8 @@
 #include "file_manager_demoboard/demoboard.hpp"
 #include "gui_forms/platform/macos_host.hpp"
 
+#include <filesystem>
+#include <system_error>
 #include <utility>
 #include <vector>
 #include <string_view>
@@ -8,6 +10,7 @@
 int main(int argc, const char* argv[]) {
     std::unique_ptr<gui_forms::Window> product_model = file_manager_demoboard::make_product_window();
     bool product_only = false;
+    bool smoke_test = false;
     for (int index = 1; index < argc; ++index) {
         constexpr std::string_view prefix = "--capture-state=";
         const std::string_view argument(argv[index]);
@@ -16,6 +19,8 @@ int main(int argc, const char* argv[]) {
                 *product_model, argument.substr(prefix.size())));
         } else if (argument == "--product-only") {
             product_only = true;
+        } else if (argument == "--smoke-test") {
+            smoke_test = true;
         }
     }
     gui_forms::host::MacApplicationWindow product;
@@ -24,6 +29,14 @@ int main(int argc, const char* argv[]) {
     product.options.title = "File Manager — Demoboard";
     product.options.initial_size = {1450.0, 850.0};
     product.options.minimum_size = {150.0, 150.0};
+    if (smoke_test) {
+        // Present one frame, write it to a temporary file, print the capture
+        // line and the close receipt, exit 0: the packaged-program smoke.
+        std::error_code error;
+        std::filesystem::path directory = std::filesystem::temp_directory_path(error);
+        if (error) directory = ".";
+        product.options.capture_path = (directory / "gui-forms-explore-smoke.png").string();
+    }
 
     std::vector<gui_forms::host::MacApplicationWindow> windows;
     windows.push_back(std::move(product));
