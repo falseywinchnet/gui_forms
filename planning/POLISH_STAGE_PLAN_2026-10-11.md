@@ -331,6 +331,17 @@ with the system compiler and by CI on push. Item A.2 (a `results/` record of
 the text engine benchmark) stays open until a run on an LLVM 22 machine or a
 CI step produces it.
 
+### W9. Paint by damage region, not its bounds (open; from PlaySuite measurements)
+
+PlaySuite's idle counters on 2026-10-11 show games whose per-pass requested
+damage is small (15k–35k pt²) but whose painted area is the whole window,
+because two or three far-apart overlay invalidations in one frame have a
+bounding box the size of the window. `Window::paint` clips to the aggregate
+damage bounds (`paint_bounds = aggregate.bounds()`) and culls controls by
+that rectangle. Painting each compacted damage rectangle as its own pass, or
+culling by the region's rectangles instead of their bounds, would make a
+two-corner invalidation cost two corners. Not started.
+
 ## E. Sequencing
 
 1. W1 and W8 immediately (small, no decisions).
