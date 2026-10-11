@@ -12,7 +12,7 @@
 - Type narrative: hand-reviewed
 - Method narratives: 0 hand-reviewed, 9 declaration-derived
 
-SubscriptionToken is the move-only RAII revocation handle for a retained Event slot; destruction and explicit disconnect are idempotent.
+SubscriptionToken is the move-only RAII revocation handle for a retained Event slot; destruction and explicit disconnect are idempotent. It belongs to the deprecated subscribe(...) seam; new code observes events with on(event, owner, &Owner::method), which keeps its connection on the owner Component instead of a caller-held token.
 
 ## Visual evidence
 

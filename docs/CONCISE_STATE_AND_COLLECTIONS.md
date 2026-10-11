@@ -11,7 +11,8 @@ These are GUI.Forms capabilities; no PlaySuite source changes are required here.
 a Component owner. Publisher destruction/disconnection immediately unlinks the
 entry. No dead token, token-store allocation or capacity remains after the last
 publisher disappears. `owned_subscription_count()` is a diagnostic traversal,
-not a polling API. Caller-held subscriptions retain their existing contract.
+not a polling API. Caller-held `subscribe(...)` tokens are deprecated; they keep
+their existing contract for code that has not moved to `on` yet.
 Both storage forms revoke in reverse acquisition order on owner teardown.
 
 The handler returns void. It takes zero, one or two bound values first, then a
