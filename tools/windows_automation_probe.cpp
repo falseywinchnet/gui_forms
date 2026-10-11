@@ -1,10 +1,12 @@
 #include <windows.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -277,7 +279,7 @@ bool send_automation(HWND window, const std::string& command, DWORD_PTR& result)
 
 } // namespace
 
-int main(int argc, char** argv) {
+int run_probe(const int argc, char** const argv) {
     if (argc < 2) {
         std::fprintf(stderr, "usage: gui_forms_windows_probe <command> [argument]\n");
         return 2;
@@ -572,4 +574,47 @@ int main(int argc, char** argv) {
     std::printf("accepted=%lu command=%s\n",
                 static_cast<unsigned long>(result), command.c_str());
     return result == TRUE ? 0 : 5;
+}
+
+namespace {
+struct LocalArgumentsDeleter final {
+    void operator()(wchar_t** arguments) const noexcept {
+        LocalFree(arguments);
+    }
+};
+
+std::string utf8_argument(const wchar_t* const text) {
+    const int count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+        text, -1, nullptr, 0, nullptr, nullptr);
+    if (count <= 0) return {};
+    std::string result(static_cast<std::size_t>(count), '\0');
+    const int written = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
+        text, -1, result.data(), count, nullptr, nullptr);
+    if (written != count) return {};
+    result.pop_back();
+    return result;
+}
+} // namespace
+
+int main() {
+    // MinGW's narrow argv uses the active ANSI code page. Decode the native
+    // command line explicitly so automation can deliver every fixture script.
+    int count = 0;
+    const std::unique_ptr<wchar_t*, LocalArgumentsDeleter> native_arguments(
+        CommandLineToArgvW(GetCommandLineW(), &count));
+    if (!native_arguments) return 2;
+    std::vector<std::string> strings;
+    strings.reserve(static_cast<std::size_t>(count));
+    for (int index = 0; index < count; ++index) {
+        strings.push_back(utf8_argument(native_arguments.get()[index]));
+    }
+    // The strings own the bytes through run_probe; neither vector grows again.
+    std::vector<char*> arguments;
+    arguments.reserve(static_cast<std::size_t>(count) + 1U);
+    for (std::string& argument : strings) {
+        arguments.push_back(argument.data());
+    }
+    arguments.push_back(nullptr);
+    const int status = run_probe(count, arguments.data());
+    return status;
 }
