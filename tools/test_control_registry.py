@@ -228,10 +228,16 @@ class RenderTests(unittest.TestCase):
         self.assertLess(text.index("`Box`"), text.index("`Zed`"))
         self.assertEqual(sum(1 for line in text.splitlines() if line.startswith("# ")), 1)
 
+    def test_index_names_link_to_their_reference_pages(self) -> None:
+        text: str = cr.render_alphabetical(self._registry())
+        self.assertIn("| [`Box`](../../controls/box.md) | Layout |", text)
+        self.assertIn("[`Alpha`](../../controls/alpha.md)", cr.render_by_function(self._registry()))
+
     def test_readme_table_shape(self) -> None:
         table: str = cr.render_readme_table(self._registry())
         self.assertTrue(table.startswith("| Control | Function | Description |\n|---|---|---|\n"))
         self.assertTrue(table.endswith("\n"))
+        self.assertIn(f"[`Box`]({cr.SITE_URL}controls/box.html)", table)
 
     def test_gallery_catalog_shape_and_escaping(self) -> None:
         registry: cr.Registry = cr.Registry(
