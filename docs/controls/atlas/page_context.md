@@ -7,7 +7,7 @@
 - Scope: source-private header
 - Source layout: demonstration composition
 - Hierarchy: `PageContext`
-- Declaration: `src/controls/gallery/pages/page_context.hpp:70`
+- Declaration: `src/controls/gallery/pages/page_context.hpp:90`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 5 declaration-derived

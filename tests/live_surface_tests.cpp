@@ -104,12 +104,26 @@ int main() {
     assert(!reconfigured.has_frame);
     assert(reconfigured.description.width == 2U);
     assert(reconfigured.description.height == 2U);
+    // Until the new epoch publishes, the previous epoch's last frame is still
+    // acquirable at its own size, whole, so a presenter shows it scaled
+    // rather than nothing.
+    assert(reconfigured.carries_previous_frame);
+    LiveSurfaceFrame carried = (*surface).acquire_latest();
+    assert(carried && carried.epoch() == 1U && carried.width() == 4U &&
+           carried.height() == 3U && carried.pixels().front() == std::byte{0x33});
+    assert((carried.damage() == Rect{0.0, 0.0, 4.0, 3.0}));
+    LiveSurfaceFrame carried_presentation = (*surface).acquire_for_presentation(&wakes);
+    assert((carried_presentation && carried_presentation.epoch() == 1U &&
+            carried_presentation.damage() == Rect{0.0, 0.0, 4.0, 3.0}));
+    carried = {};
+    carried_presentation = {};
 
     LiveSurfaceWriteLease final_write = (*surface).try_acquire_write();
     assert(final_write && final_write.pixels().size() == 16U);
     fill(final_write, std::byte{0x7f});
     assert(final_write.publish() == 1U);
     assert(wakes == 5U);
+    assert(!(*surface).snapshot().carries_previous_frame);
     LiveSurfaceFrame final_frame = (*surface).acquire_latest();
     assert(final_frame && final_frame.epoch() == 2U);
     assert(final_frame.pixels().back() == std::byte{0x7f});

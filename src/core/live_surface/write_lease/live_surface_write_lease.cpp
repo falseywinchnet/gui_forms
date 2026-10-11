@@ -70,6 +70,7 @@ std::uint64_t LiveSurfaceWriteLease::publish(Rect damage) {
         damage = Rect::intersection(damage, bounds);
         (*state_).published_slot = slot_;
         (*state_).writing_slot = (*state_).buffers.size();
+        (*state_).carried.reset();
         (*state_).damage = damage.empty() ? bounds : damage;
         (*state_).presentation_region = Rect::united(
             (*state_).presentation_region, (*state_).damage);

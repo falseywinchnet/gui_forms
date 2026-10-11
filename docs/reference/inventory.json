@@ -27037,6 +27037,21 @@
           "page": "gui-forms-control-committed-arranged-bounds-rect-const-noexcept-cf752f30ea.html"
         },
         {
+          "id": "gui_forms::Control::pending_layout_bounds|Rect () const noexcept",
+          "name": "pending_layout_bounds",
+          "type": "Rect () const noexcept",
+          "namespace": "gui_forms::Control",
+          "kind": "CXXMethodDecl",
+          "access": "public",
+          "parameters": [],
+          "declaration": "[[nodiscard]] Rect pending_layout_bounds() const noexcept",
+          "comment": "",
+          "header": "gui_forms/control/control/control.hpp",
+          "source": "include/gui_forms/control/control/control.hpp",
+          "line": 406,
+          "page": "gui-forms-control-pending-layout-bounds-rect-const-noexcept-bffcdf7b9a.html"
+        },
+        {
           "id": "gui_forms::Control::client_rectangle|Rect () const noexcept",
           "name": "client_rectangle",
           "type": "Rect () const noexcept",
@@ -27048,7 +27063,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 402,
+          "line": 409,
           "page": "gui-forms-control-client-rectangle-rect-const-noexcept-792377d3e4.html"
         },
         {
@@ -27063,7 +27078,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 405,
+          "line": 412,
           "page": "gui-forms-control-display-rectangle-rect-const-noexcept-42a79706ca.html"
         },
         {
@@ -27078,7 +27093,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 408,
+          "line": 415,
           "page": "gui-forms-control-absolute-bounds-rect-const-34b587bd0d.html"
         },
         {
@@ -27099,7 +27114,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 409,
+          "line": 416,
           "page": "gui-forms-control-point-to-window-point-point-const-a23c8ad6cc.html"
         },
         {
@@ -27120,7 +27135,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 410,
+          "line": 417,
           "page": "gui-forms-control-point-from-window-point-point-const-b08b5a1492.html"
         },
         {
@@ -27141,7 +27156,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 411,
+          "line": 418,
           "page": "gui-forms-control-rectangle-to-window-rect-rect-const-d8d71f4e75.html"
         },
         {
@@ -27162,7 +27177,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 412,
+          "line": 419,
           "page": "gui-forms-control-rectangle-from-window-rect-rect-const-c53fde60a3.html"
         },
         {
@@ -27183,7 +27198,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 413,
+          "line": 420,
           "page": "gui-forms-control-contains-bool-const-control-const-noexcept-dca65138d6.html"
         },
         {
@@ -27209,7 +27224,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 414,
+          "line": 421,
           "page": "gui-forms-control-get-child-at-point-ptr-point-getchildatpointskip-const-d628fba0cc.html"
         },
         {
@@ -27235,7 +27250,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 417,
+          "line": 424,
           "page": "gui-forms-control-get-next-control-ptr-const-ptr-bool-const-170f6482c3.html"
         },
         {
@@ -27250,7 +27265,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 418,
+          "line": 425,
           "page": "gui-forms-control-bring-to-front-void-9660a7128e.html"
         },
         {
@@ -27265,7 +27280,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 419,
+          "line": 426,
           "page": "gui-forms-control-send-to-back-void-b5fa227921.html"
         },
         {
@@ -27280,7 +27295,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 420,
+          "line": 427,
           "page": "gui-forms-control-attached-window-window-const-noexcept-41a3f58d99.html"
         },
         {
@@ -27295,7 +27310,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 424,
+          "line": 431,
           "page": "gui-forms-control-effective-text-scale-double-const-noexcept-861b9c345a.html"
         },
         {
@@ -27316,7 +27331,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 425,
+          "line": 432,
           "page": "gui-forms-control-effective-font-fontspec-fontspec-const-noexcept-da1216f2e3.html"
         },
         {
@@ -27342,7 +27357,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 429,
+          "line": 436,
           "page": "gui-forms-control-resolve-text-layout-utf8-resolvedtextlayout-std-string-view-fontspec-const-eb45f20412.html"
         },
         {
@@ -27363,7 +27378,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 431,
+          "line": 438,
           "page": "gui-forms-control-snap-text-baseline-double-double-const-noexcept-a6ccac91ee.html"
         },
         {
@@ -27378,7 +27393,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 432,
+          "line": 439,
           "page": "gui-forms-control-effective-theme-const-theme-const-noexcept-ebec31965e.html"
         },
         {
@@ -27393,7 +27408,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 433,
+          "line": 440,
           "page": "gui-forms-control-theme-override-std-shared-ptr-const-theme-const-noexcept-f5810b489a.html"
         },
         {
@@ -27414,7 +27429,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 436,
+          "line": 443,
           "page": "gui-forms-control-set-theme-override-void-std-shared-ptr-const-theme-e851dd0f2f.html"
         },
         {
@@ -27429,7 +27444,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 437,
+          "line": 444,
           "page": "gui-forms-control-clear-theme-override-void-02ba250a07.html"
         },
         {
@@ -27444,7 +27459,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 439,
+          "line": 446,
           "page": "gui-forms-control-authored-surface-material-const-std-optional-surfacematerial-const-noexcept-338ad240bf.html"
         },
         {
@@ -27465,7 +27480,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 442,
+          "line": 449,
           "page": "gui-forms-control-set-authored-surface-material-void-surfacematerial-6d51af564f.html"
         },
         {
@@ -27480,7 +27495,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 443,
+          "line": 450,
           "page": "gui-forms-control-clear-authored-surface-material-void-974404e29e.html"
         },
         {
@@ -27495,7 +27510,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 445,
+          "line": 452,
           "page": "gui-forms-control-owned-decorations-std-span-const-ownerdecorationrecipe-const-noexcept-b9016a268c.html"
         },
         {
@@ -27521,7 +27536,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 448,
+          "line": 455,
           "page": "gui-forms-control-set-owned-decorations-void-const-ownerdecorationrecipe-std-size-t-134f7cb34e.html"
         },
         {
@@ -27536,7 +27551,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 450,
+          "line": 457,
           "page": "gui-forms-control-clear-owned-decorations-void-c01cdf24cb.html"
         },
         {
@@ -27551,7 +27566,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 451,
+          "line": 458,
           "page": "gui-forms-control-visual-status-controlvisualstatus-const-noexcept-907c2251ee.html"
         },
         {
@@ -27572,7 +27587,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 454,
+          "line": 461,
           "page": "gui-forms-control-set-visual-status-void-controlvisualstatus-15be99f9d8.html"
         },
         {
@@ -27613,7 +27628,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 455,
+          "line": 462,
           "page": "gui-forms-control-visual-context-controlvisualcontext-bool-bool-bool-bool-bool-const-noexcept-19cefea3b3.html"
         },
         {
@@ -27628,7 +27643,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 458,
+          "line": 465,
           "page": "gui-forms-control-invoke-required-bool-const-noexcept-dddc51a6f8.html"
         },
         {
@@ -27649,7 +27664,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 459,
+          "line": 466,
           "page": "gui-forms-control-begin-invoke-dispatchoperation-std-function-void-bbe2102981.html"
         },
         {
@@ -27670,7 +27685,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 463,
+          "line": 470,
           "page": "gui-forms-control-invoke-void-std-function-void-0d98ade3a8.html"
         },
         {
@@ -27685,7 +27700,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 464,
+          "line": 471,
           "page": "gui-forms-control-margin-insets-const-noexcept-dd6122805a.html"
         },
         {
@@ -27706,7 +27721,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 465,
+          "line": 472,
           "page": "gui-forms-control-set-margin-void-insets-655533b39b.html"
         },
         {
@@ -27721,7 +27736,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 466,
+          "line": 473,
           "page": "gui-forms-control-padding-insets-const-noexcept-e70d720495.html"
         },
         {
@@ -27742,7 +27757,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 467,
+          "line": 474,
           "page": "gui-forms-control-set-padding-void-insets-d478334ffe.html"
         },
         {
@@ -27757,7 +27772,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 468,
+          "line": 475,
           "page": "gui-forms-control-auto-scroll-offset-point-const-noexcept-2ffe461331.html"
         },
         {
@@ -27778,7 +27793,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 471,
+          "line": 478,
           "page": "gui-forms-control-set-auto-scroll-offset-void-point-b1417ec8fc.html"
         },
         {
@@ -27793,7 +27808,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 472,
+          "line": 479,
           "page": "gui-forms-control-dock-dockstyle-const-noexcept-a2e135db54.html"
         },
         {
@@ -27814,7 +27829,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 473,
+          "line": 480,
           "page": "gui-forms-control-set-dock-void-dockstyle-31588499d3.html"
         },
         {
@@ -27829,7 +27844,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 474,
+          "line": 481,
           "page": "gui-forms-control-anchor-anchorstyles-const-noexcept-2c0bced1cc.html"
         },
         {
@@ -27850,7 +27865,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 475,
+          "line": 482,
           "page": "gui-forms-control-set-anchor-void-anchorstyles-05d26a440a.html"
         },
         {
@@ -27865,7 +27880,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 476,
+          "line": 483,
           "page": "gui-forms-control-auto-size-bool-const-noexcept-9796f7a769.html"
         },
         {
@@ -27886,7 +27901,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 477,
+          "line": 484,
           "page": "gui-forms-control-set-auto-size-void-bool-59bdf28c30.html"
         },
         {
@@ -27901,7 +27916,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 478,
+          "line": 485,
           "page": "gui-forms-control-auto-size-mode-autosizemode-const-noexcept-e5b08f818a.html"
         },
         {
@@ -27922,7 +27937,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 481,
+          "line": 488,
           "page": "gui-forms-control-set-auto-size-mode-void-autosizemode-f4e145dda6.html"
         },
         {
@@ -27937,7 +27952,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 482,
+          "line": 489,
           "page": "gui-forms-control-auto-size-changed-event-bool-noexcept-6e320641b6.html"
         },
         {
@@ -27958,7 +27973,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 485,
+          "line": 492,
           "page": "gui-forms-control-get-preferred-size-size-size-160a12bdcf.html"
         },
         {
@@ -27973,7 +27988,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 490,
+          "line": 497,
           "page": "gui-forms-control-suspend-layout-void-4cbef3c944.html"
         },
         {
@@ -27994,7 +28009,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 491,
+          "line": 498,
           "page": "gui-forms-control-resume-layout-void-bool-574adb6d90.html"
         },
         {
@@ -28009,7 +28024,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 492,
+          "line": 499,
           "page": "gui-forms-control-perform-layout-void-f1bb5f7d65.html"
         },
         {
@@ -28024,7 +28039,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 493,
+          "line": 500,
           "page": "gui-forms-control-layout-transaction-state-layouttransactionstate-const-noexcept-430f2a7238.html"
         },
         {
@@ -28039,7 +28054,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 495,
+          "line": 502,
           "page": "gui-forms-control-visible-bool-const-noexcept-c54ff4fc50.html"
         },
         {
@@ -28060,7 +28075,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 496,
+          "line": 503,
           "page": "gui-forms-control-set-visible-void-bool-0414b8c028.html"
         },
         {
@@ -28075,7 +28090,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 500,
+          "line": 507,
           "page": "gui-forms-control-layout-collapsed-bool-const-noexcept-472bf52859.html"
         },
         {
@@ -28090,7 +28105,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 503,
+          "line": 510,
           "page": "gui-forms-control-enabled-bool-const-noexcept-2d92d864fd.html"
         },
         {
@@ -28111,7 +28126,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 504,
+          "line": 511,
           "page": "gui-forms-control-set-enabled-void-bool-0cc72b1def.html"
         },
         {
@@ -28126,7 +28141,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 505,
+          "line": 512,
           "page": "gui-forms-control-focusable-bool-const-noexcept-09d92d3d81.html"
         },
         {
@@ -28147,7 +28162,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 506,
+          "line": 513,
           "page": "gui-forms-control-set-focusable-void-bool-0a9cde44cc.html"
         },
         {
@@ -28162,7 +28177,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 507,
+          "line": 514,
           "page": "gui-forms-control-causes-validation-bool-const-noexcept-bc385bc14b.html"
         },
         {
@@ -28183,7 +28198,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 510,
+          "line": 517,
           "page": "gui-forms-control-set-causes-validation-void-bool-f04f156b7e.html"
         },
         {
@@ -28198,7 +28213,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 511,
+          "line": 518,
           "page": "gui-forms-control-causes-validation-changed-event-bool-noexcept-58bfd89abd.html"
         },
         {
@@ -28213,7 +28228,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 514,
+          "line": 521,
           "page": "gui-forms-control-validating-event-controlvalidationevent-noexcept-6e53be0c6b.html"
         },
         {
@@ -28228,7 +28243,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 517,
+          "line": 524,
           "page": "gui-forms-control-validated-event-noexcept-64bd936709.html"
         },
         {
@@ -28243,7 +28258,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 518,
+          "line": 525,
           "page": "gui-forms-control-tab-index-std-uint32-t-const-noexcept-78ca24cd8a.html"
         },
         {
@@ -28264,7 +28279,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 519,
+          "line": 526,
           "page": "gui-forms-control-set-tab-index-void-std-uint32-t-3973562b51.html"
         },
         {
@@ -28279,7 +28294,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 520,
+          "line": 527,
           "page": "gui-forms-control-tab-stop-bool-const-noexcept-8563092adf.html"
         },
         {
@@ -28300,7 +28315,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 521,
+          "line": 528,
           "page": "gui-forms-control-set-tab-stop-void-bool-a7019ee834.html"
         },
         {
@@ -28315,7 +28330,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 522,
+          "line": 529,
           "page": "gui-forms-control-allow-drop-bool-const-noexcept-b3c611d3df.html"
         },
         {
@@ -28336,7 +28351,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 523,
+          "line": 530,
           "page": "gui-forms-control-set-allow-drop-void-bool-a3d4a5d4c7.html"
         },
         {
@@ -28351,7 +28366,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 528,
+          "line": 535,
           "page": "gui-forms-control-hit-test-transparent-bool-const-noexcept-345b78c221.html"
         },
         {
@@ -28372,7 +28387,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 531,
+          "line": 538,
           "page": "gui-forms-control-set-hit-test-transparent-void-bool-44e19fefa9.html"
         },
         {
@@ -28387,7 +28402,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 532,
+          "line": 539,
           "page": "gui-forms-control-styles-controlstyles-const-noexcept-05728d7339.html"
         },
         {
@@ -28408,7 +28423,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 533,
+          "line": 540,
           "page": "gui-forms-control-has-style-bool-controlstyles-const-noexcept-bd38632279.html"
         },
         {
@@ -28434,7 +28449,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 536,
+          "line": 543,
           "page": "gui-forms-control-set-style-void-controlstyles-bool-303ee4fbc3.html"
         },
         {
@@ -28449,7 +28464,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 537,
+          "line": 544,
           "page": "gui-forms-control-double-buffered-bool-const-noexcept-558cb74fda.html"
         },
         {
@@ -28470,7 +28485,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 541,
+          "line": 548,
           "page": "gui-forms-control-set-double-buffered-void-bool-1680c2c606.html"
         },
         {
@@ -28485,7 +28500,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 542,
+          "line": 549,
           "page": "gui-forms-control-cursor-std-optional-cursorkind-const-noexcept-56097330d7.html"
         },
         {
@@ -28506,7 +28521,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 543,
+          "line": 550,
           "page": "gui-forms-control-set-cursor-void-std-optional-cursorkind-998996bcde.html"
         },
         {
@@ -28532,7 +28547,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 545,
+          "line": 552,
           "page": "gui-forms-control-set-custom-cursor-void-cursorimagesptr-cursorkind-ff24bb6a00.html"
         },
         {
@@ -28547,7 +28562,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 546,
+          "line": 553,
           "page": "gui-forms-control-effective-cursor-images-cursorimagesptr-const-noexcept-253df70d04.html"
         },
         {
@@ -28562,7 +28577,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 547,
+          "line": 554,
           "page": "gui-forms-control-accessible-name-const-std-string-const-noexcept-d324b2f184.html"
         },
         {
@@ -28583,7 +28598,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 550,
+          "line": 557,
           "page": "gui-forms-control-set-accessible-name-void-std-string-8aee29bbd6.html"
         },
         {
@@ -28598,7 +28613,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 551,
+          "line": 558,
           "page": "gui-forms-control-accessible-description-const-std-string-const-noexcept-90a9dc05b5.html"
         },
         {
@@ -28619,7 +28634,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 554,
+          "line": 561,
           "page": "gui-forms-control-set-accessible-description-void-std-string-0f3ab6711f.html"
         },
         {
@@ -28634,7 +28649,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 555,
+          "line": 562,
           "page": "gui-forms-control-effective-cursor-cursorkind-const-noexcept-c4301d0145.html"
         },
         {
@@ -28649,7 +28664,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 556,
+          "line": 563,
           "page": "gui-forms-control-effectively-visible-bool-const-noexcept-327c0f8853.html"
         },
         {
@@ -28664,7 +28679,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 557,
+          "line": 564,
           "page": "gui-forms-control-effectively-enabled-bool-const-noexcept-5ce9ed99df.html"
         },
         {
@@ -28679,7 +28694,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 558,
+          "line": 565,
           "page": "gui-forms-control-eligible-for-input-bool-const-noexcept-6b0fa8d451.html"
         },
         {
@@ -28700,7 +28715,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 559,
+          "line": 566,
           "page": "gui-forms-control-set-pointer-capture-void-bool-ec62db660d.html"
         },
         {
@@ -28715,7 +28730,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 560,
+          "line": 567,
           "page": "gui-forms-control-has-pointer-capture-bool-const-noexcept-59cd2008e2.html"
         },
         {
@@ -28730,7 +28745,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 562,
+          "line": 569,
           "page": "gui-forms-control-dirty-dirty-const-noexcept-55e3e02b3f.html"
         },
         {
@@ -28745,7 +28760,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 563,
+          "line": 570,
           "page": "gui-forms-control-subtree-dirty-dirty-const-noexcept-9a4ba94d8c.html"
         },
         {
@@ -28760,7 +28775,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 564,
+          "line": 571,
           "page": "gui-forms-control-paint-plane-paintplane-const-noexcept-4e69619444.html"
         },
         {
@@ -28781,7 +28796,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 565,
+          "line": 572,
           "page": "gui-forms-control-set-paint-plane-void-paintplane-c0866d4931.html"
         },
         {
@@ -28796,7 +28811,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 566,
+          "line": 573,
           "page": "gui-forms-control-display-chunk-info-std-optional-displaychunkinfo-const-noexcept-7f235a69fb.html"
         },
         {
@@ -28817,7 +28832,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 567,
+          "line": 574,
           "page": "gui-forms-control-invalidate-void-dirty-a68c0eedb7.html"
         },
         {
@@ -28838,7 +28853,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 571,
+          "line": 578,
           "page": "gui-forms-control-invalidate-void-rect-2acf945fa5.html"
         },
         {
@@ -28859,7 +28874,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 572,
+          "line": 579,
           "page": "gui-forms-control-invalidate-subtree-void-dirty-8ec7e241ad.html"
         },
         {
@@ -28880,7 +28895,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 573,
+          "line": 580,
           "page": "gui-forms-control-invalidate-declared-void-dirty-45f7687079.html"
         },
         {
@@ -28895,7 +28910,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 575,
+          "line": 582,
           "page": "gui-forms-control-begin-init-void-fa145d2a2f.html"
         },
         {
@@ -28910,7 +28925,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 576,
+          "line": 583,
           "page": "gui-forms-control-end-init-void-1be8eef145.html"
         },
         {
@@ -28925,7 +28940,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 577,
+          "line": 584,
           "page": "gui-forms-control-initializing-bool-const-noexcept-9c3793709c.html"
         },
         {
@@ -28940,7 +28955,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 578,
+          "line": 585,
           "page": "gui-forms-control-initialization-depth-std-uint64-t-const-noexcept-6a97604b85.html"
         },
         {
@@ -28955,7 +28970,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 581,
+          "line": 588,
           "page": "gui-forms-control-initialization-completed-event-dirty-bool-noexcept-a68d3a759f.html"
         },
         {
@@ -28970,7 +28985,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 584,
+          "line": 591,
           "page": "gui-forms-control-pointer-observed-event-const-pointerevent-noexcept-84577b20f5.html"
         },
         {
@@ -28985,7 +29000,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 590,
+          "line": 597,
           "page": "gui-forms-control-pointer-preview-observed-event-const-pointerevent-noexcept-91b691e07d.html"
         },
         {
@@ -29000,7 +29015,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 593,
+          "line": 600,
           "page": "gui-forms-control-focus-observed-event-bool-noexcept-c3dae51b87.html"
         },
         {
@@ -29015,7 +29030,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 596,
+          "line": 603,
           "page": "gui-forms-control-arranged-bounds-changed-event-rect-noexcept-30c540a54f.html"
         },
         {
@@ -29030,7 +29045,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 599,
+          "line": 606,
           "page": "gui-forms-control-help-requested-event-helprequestevent-noexcept-9c77fd9350.html"
         },
         {
@@ -29045,7 +29060,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 602,
+          "line": 609,
           "page": "gui-forms-control-data-bindings-controlbindingscollection-3362f84c49.html"
         },
         {
@@ -29060,7 +29075,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 603,
+          "line": 610,
           "page": "gui-forms-control-data-bindings-const-controlbindingscollection-const-5d2ed67de0.html"
         },
         {
@@ -29081,7 +29096,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 604,
+          "line": 611,
           "page": "gui-forms-control-has-bindable-property-bool-std-string-view-const-989185eab7.html"
         },
         {
@@ -29096,7 +29111,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 605,
+          "line": 612,
           "page": "gui-forms-control-bindable-property-names-std-vector-std-string-const-330932a49e.html"
         },
         {
@@ -29117,7 +29132,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 606,
+          "line": 613,
           "page": "gui-forms-control-property-descriptor-std-optional-propertydescriptor-std-string-view-const-3e04ad9abc.html"
         },
         {
@@ -29132,7 +29147,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 608,
+          "line": 615,
           "page": "gui-forms-control-property-descriptors-std-vector-propertydescriptor-const-01f4920227.html"
         },
         {
@@ -29153,7 +29168,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 609,
+          "line": 616,
           "page": "gui-forms-control-property-value-std-optional-bindingvalue-std-string-view-const-7718b53a58.html"
         },
         {
@@ -29179,7 +29194,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 611,
+          "line": 618,
           "page": "gui-forms-control-set-property-value-void-std-string-view-bindingvalue-770b55e0fe.html"
         },
         {
@@ -29210,7 +29225,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 612,
+          "line": 619,
           "page": "gui-forms-control-subscribe-property-changed-subscriptiontoken-std-string-view-component-std-function-void-f74af73e3f.html"
         },
         {
@@ -29231,7 +29246,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 617,
+          "line": 624,
           "page": "gui-forms-control-reset-property-bool-std-string-view-878e88ac72.html"
         },
         {
@@ -29252,7 +29267,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 618,
+          "line": 625,
           "page": "gui-forms-control-should-serialize-property-bool-std-string-view-const-f15dfdfa8e.html"
         },
         {
@@ -29273,7 +29288,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 619,
+          "line": 626,
           "page": "gui-forms-control-property-value-origin-propertyvalueorigin-std-string-view-const-4fc748f204.html"
         },
         {
@@ -29294,7 +29309,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 622,
+          "line": 629,
           "page": "gui-forms-control-measure-size-size-ab280f374c.html"
         },
         {
@@ -29315,7 +29330,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 623,
+          "line": 630,
           "page": "gui-forms-control-arrange-void-rect-f8163f0c8c.html"
         },
         {
@@ -29341,7 +29356,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 624,
+          "line": 631,
           "page": "gui-forms-control-on-paint-void-painter-rect-864a68ebb7.html"
         },
         {
@@ -29356,7 +29371,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 628,
+          "line": 635,
           "page": "gui-forms-control-visual-outsets-insets-const-noexcept-954897ee80.html"
         },
         {
@@ -29377,7 +29392,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 629,
+          "line": 636,
           "page": "gui-forms-control-hit-test-local-bool-point-const-89b92778fa.html"
         },
         {
@@ -29398,7 +29413,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 631,
+          "line": 638,
           "page": "gui-forms-control-on-pointer-preview-void-pointerevent-e890e7830d.html"
         },
         {
@@ -29419,7 +29434,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 632,
+          "line": 639,
           "page": "gui-forms-control-on-pointer-void-pointerevent-c8e57d8e88.html"
         },
         {
@@ -29440,7 +29455,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 633,
+          "line": 640,
           "page": "gui-forms-control-on-pointer-bubble-void-pointerevent-23c522d48f.html"
         },
         {
@@ -29461,7 +29476,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 634,
+          "line": 641,
           "page": "gui-forms-control-on-key-preview-void-keyevent-8a17ad2f67.html"
         },
         {
@@ -29482,7 +29497,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 635,
+          "line": 642,
           "page": "gui-forms-control-on-key-void-keyevent-e4151cf5a0.html"
         },
         {
@@ -29503,7 +29518,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 636,
+          "line": 643,
           "page": "gui-forms-control-on-key-bubble-void-keyevent-fb112dc23c.html"
         },
         {
@@ -29524,7 +29539,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 637,
+          "line": 644,
           "page": "gui-forms-control-on-text-input-void-textinputevent-fbae75f2bf.html"
         },
         {
@@ -29545,7 +29560,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 641,
+          "line": 648,
           "page": "gui-forms-control-process-mnemonic-bool-char32-t-e94ad25965.html"
         },
         {
@@ -29566,7 +29581,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 642,
+          "line": 649,
           "page": "gui-forms-control-on-frame-void-frametime-0b13f8203f.html"
         },
         {
@@ -29581,7 +29596,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 643,
+          "line": 650,
           "page": "gui-forms-control-semantic-descriptor-semanticdescriptor-const-9385a13c79.html"
         },
         {
@@ -29602,7 +29617,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 648,
+          "line": 655,
           "page": "gui-forms-control-apply-provider-semantics-void-semanticdescriptor-const-738b924c7a.html"
         },
         {
@@ -29617,7 +29632,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 649,
+          "line": 656,
           "page": "gui-forms-control-semantic-virtual-children-std-vector-semanticnode-const-5b3da477e3.html"
         },
         {
@@ -29643,7 +29658,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 650,
+          "line": 657,
           "page": "gui-forms-control-on-semantic-action-bool-semanticaction-std-string-view-3db6d06be9.html"
         },
         {
@@ -29674,7 +29689,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 652,
+          "line": 659,
           "page": "gui-forms-control-on-semantic-child-action-bool-std-string-view-semanticaction-std-string-view-947cf52850.html"
         },
         {
@@ -29695,7 +29710,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 655,
+          "line": 662,
           "page": "gui-forms-control-on-drag-preview-void-dragevent-d648445e5a.html"
         },
         {
@@ -29716,7 +29731,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 656,
+          "line": 663,
           "page": "gui-forms-control-on-drag-void-dragevent-e0148d1856.html"
         },
         {
@@ -29737,7 +29752,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 657,
+          "line": 664,
           "page": "gui-forms-control-on-drag-bubble-void-dragevent-499cb47688.html"
         },
         {
@@ -29758,7 +29773,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 658,
+          "line": 665,
           "page": "gui-forms-control-on-focus-changed-void-bool-8fb99d2812.html"
         },
         {
@@ -29779,7 +29794,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 661,
+          "line": 668,
           "page": "gui-forms-control-on-focus-cue-changed-void-bool-4cb6ad6624.html"
         },
         {
@@ -29794,7 +29809,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 662,
+          "line": 669,
           "page": "gui-forms-control-on-activate-void-184eaec822.html"
         },
         {
@@ -29809,7 +29824,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 665,
+          "line": 672,
           "page": "gui-forms-control-window-window-const-noexcept-17a1f2dd27.html"
         },
         {
@@ -29824,7 +29839,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 666,
+          "line": 673,
           "page": "gui-forms-control-require-mutable-void-const-38bcc3a249.html"
         },
         {
@@ -29839,7 +29854,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 672,
+          "line": 679,
           "page": "gui-forms-control-snapshot-layout-children-std-vector-ptr-const-8e56d6fcb6.html"
         },
         {
@@ -29860,7 +29875,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 673,
+          "line": 680,
           "page": "gui-forms-control-is-current-layout-child-bool-const-ptr-const-noexcept-c8dddffb99.html"
         },
         {
@@ -29886,7 +29901,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 678,
+          "line": 685,
           "page": "gui-forms-control-set-child-layout-void-const-ptr-rect-d62ca48955.html"
         },
         {
@@ -29912,7 +29927,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 679,
+          "line": 686,
           "page": "gui-forms-control-set-child-layout-collapsed-void-const-ptr-bool-7e6847e3c2.html"
         },
         {
@@ -29933,7 +29948,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 683,
+          "line": 690,
           "page": "gui-forms-control-arrange-self-void-rect-noexcept-d30df7f6fc.html"
         },
         {
@@ -29959,7 +29974,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 687,
+          "line": 694,
           "page": "gui-forms-control-on-paint-overlay-void-painter-rect-ae8c518bb8.html"
         },
         {
@@ -29974,7 +29989,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 688,
+          "line": 695,
           "page": "gui-forms-control-child-viewport-rectangle-rect-const-noexcept-e14f3acc5a.html"
         },
         {
@@ -29989,7 +30004,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 691,
+          "line": 698,
           "page": "gui-forms-control-prepare-command-activation-bool-bb8d8b3a74.html"
         },
         {
@@ -30004,7 +30019,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 692,
+          "line": 699,
           "page": "gui-forms-control-focus-next-after-self-bool-bbc55dbc00.html"
         },
         {
@@ -30019,7 +30034,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 693,
+          "line": 700,
           "page": "gui-forms-control-perform-dialog-command-bool-962bd41c0e.html"
         },
         {
@@ -30034,7 +30049,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 694,
+          "line": 701,
           "page": "gui-forms-control-supports-dialog-command-bool-const-noexcept-e02c52e504.html"
         },
         {
@@ -30049,7 +30064,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 695,
+          "line": 702,
           "page": "gui-forms-control-command-dialog-result-dialogresult-const-noexcept-c572426f22.html"
         },
         {
@@ -30064,7 +30079,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 696,
+          "line": 703,
           "page": "gui-forms-control-assign-cancel-dialog-result-void-7c28436ecf.html"
         },
         {
@@ -30085,7 +30100,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 697,
+          "line": 704,
           "page": "gui-forms-control-mnemonic-matches-bool-char32-t-const-noexcept-9c1ff1a1fc.html"
         },
         {
@@ -30106,7 +30121,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 699,
+          "line": 706,
           "page": "gui-forms-control-process-mnemonic-self-bool-char32-t-1669ef8840.html"
         },
         {
@@ -30127,7 +30142,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 700,
+          "line": 707,
           "page": "gui-forms-control-notify-default-void-bool-015e7571c9.html"
         },
         {
@@ -30148,7 +30163,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 701,
+          "line": 708,
           "page": "gui-forms-control-define-bindable-property-void-bindableproperty-39f0c511cc.html"
         },
         {
@@ -30174,7 +30189,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 708,
+          "line": 715,
           "page": "gui-forms-control-publish-change-void-event-eventarguments-values-5529665501.html"
         },
         {
@@ -30189,7 +30204,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 725,
+          "line": 732,
           "page": "gui-forms-control-clear-bindable-properties-void-fd49a514b4.html"
         },
         {
@@ -30204,7 +30219,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 726,
+          "line": 733,
           "page": "gui-forms-control-on-attached-to-window-void-f2a427a9c9.html"
         },
         {
@@ -30219,7 +30234,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 727,
+          "line": 734,
           "page": "gui-forms-control-on-attachment-committed-void-noexcept-589b30c611.html"
         },
         {
@@ -30240,7 +30255,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 730,
+          "line": 737,
           "page": "gui-forms-control-on-detaching-from-window-void-window-noexcept-c5b23fd92f.html"
         },
         {
@@ -30255,7 +30270,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 731,
+          "line": 738,
           "page": "gui-forms-control-on-detached-from-window-void-noexcept-68b554b356.html"
         },
         {
@@ -30270,7 +30285,7 @@
           "comment": "",
           "header": "gui_forms/control/control/control.hpp",
           "source": "include/gui_forms/control/control/control.hpp",
-          "line": 734,
+          "line": 741,
           "page": "gui-forms-control-on-dispose-void-noexcept-09321b85a9.html"
         }
       ],
@@ -42123,7 +42138,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 83,
+          "line": 87,
           "page": "gui-forms-event-subscribe-subscriptiontoken-callback-ff00348fb1.html"
         },
         {
@@ -42144,7 +42159,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 88,
+          "line": 92,
           "page": "gui-forms-event-subscribe-subscriptiontoken-const-delegatecallback-2530a66f85.html"
         },
         {
@@ -42170,7 +42185,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 93,
+          "line": 97,
           "page": "gui-forms-event-subscribe-subscriptiontoken-component-callback-be683541c2.html"
         },
         {
@@ -42196,7 +42211,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 98,
+          "line": 102,
           "page": "gui-forms-event-subscribe-subscriptiontoken-component-const-delegatecallback-020d7225e7.html"
         },
         {
@@ -42217,7 +42232,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 104,
+          "line": 108,
           "page": "gui-forms-event-emit-void-arguments-16d56d2fc8.html"
         },
         {
@@ -42232,7 +42247,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 120,
+          "line": 124,
           "page": "gui-forms-event-disconnect-all-void-noexcept-6ac9694b3d.html"
         },
         {
@@ -42247,7 +42262,7 @@
           "comment": "",
           "header": "gui_forms/event/event/event.hpp",
           "source": "include/gui_forms/event/event/event.hpp",
-          "line": 131,
+          "line": 135,
           "page": "gui-forms-event-statistics-eventstatistics-const-noexcept-6c455048db.html"
         }
       ],
@@ -57763,7 +57778,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 29,
+          "line": 34,
           "page": "gui-forms-livesurface-reconfigure-bool-livesurfacedescription-0603b2cb9f.html"
         },
         {
@@ -57784,7 +57799,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 30,
+          "line": 35,
           "page": "gui-forms-livesurface-try-acquire-write-livesurfacewritelease-bool-noexcept-3cd05794cf.html"
         },
         {
@@ -57799,7 +57814,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 32,
+          "line": 37,
           "page": "gui-forms-livesurface-acquire-latest-livesurfaceframe-const-noexcept-d2f0fdcea9.html"
         },
         {
@@ -57820,7 +57835,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 39,
+          "line": 44,
           "page": "gui-forms-livesurface-acquire-for-presentation-livesurfaceframe-const-void-noexcept-1996ff842b.html"
         },
         {
@@ -57835,7 +57850,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 40,
+          "line": 45,
           "page": "gui-forms-livesurface-snapshot-livesurfacesnapshot-const-noexcept-d907c9f46b.html"
         },
         {
@@ -57856,7 +57871,7 @@
           "comment": "",
           "header": "gui_forms/live_surface/surface/live_surface.hpp",
           "source": "include/gui_forms/live_surface/surface/live_surface.hpp",
-          "line": 41,
+          "line": 46,
           "page": "gui-forms-livesurface-connect-presentation-wake-livesurfacewakeconnection-std-function-void-3a396f08c5.html"
         }
       ],
@@ -58507,6 +58522,21 @@
           "source": "include/gui_forms/live_surface/types/live_surface_types.hpp",
           "line": 48,
           "page": "gui-forms-livesurfacesnapshot-has-frame-bool-72aba796f3.html"
+        },
+        {
+          "id": "gui_forms::LiveSurfaceSnapshot::carries_previous_frame|bool",
+          "name": "carries_previous_frame",
+          "type": "bool",
+          "namespace": "gui_forms::LiveSurfaceSnapshot",
+          "kind": "FieldDecl",
+          "access": "public",
+          "parameters": [],
+          "declaration": "bool carries_previous_frame{}",
+          "comment": "",
+          "header": "gui_forms/live_surface/types/live_surface_types.hpp",
+          "source": "include/gui_forms/live_surface/types/live_surface_types.hpp",
+          "line": 52,
+          "page": "gui-forms-livesurfacesnapshot-carries-previous-frame-bool-7d73ed3361.html"
         }
       ],
       "page": "gui-forms-livesurfacesnapshot-118c408254.html",
@@ -111785,7 +111815,7 @@
       "comment": "",
       "header": "gui_forms/control/control/control.hpp",
       "source": "include/gui_forms/control/control/control.hpp",
-      "line": 1096,
+      "line": 1103,
       "page": "gui-forms-make-control-std-shared-ptr-controltype-stableid-arguments-ab49b15c88.html"
     },
     {
@@ -111893,7 +111923,7 @@
       "comment": "",
       "header": "gui_forms/event/event/event.hpp",
       "source": "include/gui_forms/event/event/event.hpp",
-      "line": 335,
+      "line": 339,
       "page": "gui-forms-on-void-event-arguments-owner-method-bound-7821ac3d76.html"
     },
     {
@@ -111929,7 +111959,7 @@
       "comment": "",
       "header": "gui_forms/event/event/event.hpp",
       "source": "include/gui_forms/event/event/event.hpp",
-      "line": 138,
+      "line": 142,
       "page": "gui-forms-on-void-gui-forms-event-eventarguments-owner-method-bound-3034333574.html",
       "associated_type": "gui_forms::Event"
     },

@@ -7,7 +7,7 @@
 - Scope: source-private header
 - Source layout: demonstration composition
 - Hierarchy: `WeakRangeValueMirror`
-- Declaration: `src/controls/gallery/pages/page_context.hpp:235`
+- Declaration: `src/controls/gallery/pages/page_context.hpp:256`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 2 declaration-derived

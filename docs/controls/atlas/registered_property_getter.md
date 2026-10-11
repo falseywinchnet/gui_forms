@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `RegisteredPropertyGetter`
-- Declaration: `include/gui_forms/control/control/control.hpp:909`
+- Declaration: `include/gui_forms/control/control/control.hpp:916`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 1 declaration-derived

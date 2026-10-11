@@ -53,6 +53,11 @@ bool LiveSurface::reconfigure(LiveSurfaceDescription description) {
     {
         std::scoped_lock lock((*state_).mutex);
         if ((*state_).writing_slot != (*state_).buffers.size()) return false;
+        if ((*state_).published_slot < (*state_).buffers.size()) {
+            (*state_).carried = (*state_).buffers[(*state_).published_slot];
+            (*state_).carried_epoch = (*state_).epoch;
+            (*state_).carried_generation = (*state_).generation;
+        }
         (*state_).description = description;
         (*state_).buffers = std::move(replacement);
         (*state_).published_slot = (*state_).buffers.size();
@@ -104,7 +109,12 @@ LiveSurfaceWriteLease LiveSurface::try_acquire_write(
 LiveSurfaceFrame LiveSurface::acquire_latest() const noexcept {
     if (!state_) return {};
     std::scoped_lock lock((*state_).mutex);
-    if ((*state_).published_slot >= (*state_).buffers.size()) return {};
+    if ((*state_).published_slot >= (*state_).buffers.size()) {
+        if (!(*state_).carried) return {};
+        ++(*state_).read_acquires;
+        return {(*state_).carried, (*state_).carried_epoch, (*state_).carried_generation,
+                detail::full_live_surface_damage((*(*state_).carried).description)};
+    }
     ++(*state_).read_acquires;
     (*state_).last_read_generation = (*state_).generation;
     return {(*state_).buffers[(*state_).published_slot], (*state_).epoch,
@@ -114,7 +124,15 @@ LiveSurfaceFrame LiveSurface::acquire_latest() const noexcept {
 LiveSurfaceFrame LiveSurface::acquire_for_presentation(const void* const presenter) noexcept {
     if (!state_) return {};
     std::scoped_lock lock((*state_).mutex);
-    if ((*state_).published_slot >= (*state_).buffers.size()) return {};
+    if ((*state_).published_slot >= (*state_).buffers.size()) {
+        if (!(*state_).carried) return {};
+        // The carried frame is presented whole; the new epoch's region stays
+        // pending for its first real frame.
+        ++(*state_).read_acquires;
+        (*state_).presenter = presenter;
+        return {(*state_).carried, (*state_).carried_epoch, (*state_).carried_generation,
+                detail::full_live_surface_damage((*(*state_).carried).description)};
+    }
     ++(*state_).read_acquires;
     (*state_).last_read_generation = (*state_).generation;
     Rect region = (*state_).presentation_region;
@@ -135,7 +153,8 @@ LiveSurfaceSnapshot LiveSurface::snapshot() const noexcept {
             (*state_).publishes, (*state_).dropped_acquires,
             (*state_).read_acquires, (*state_).last_read_generation,
             (*state_).writing_slot < (*state_).buffers.size(),
-            (*state_).published_slot < (*state_).buffers.size()};
+            (*state_).published_slot < (*state_).buffers.size(),
+            (*state_).published_slot >= (*state_).buffers.size() && (*state_).carried != nullptr};
 }
 
 LiveSurfaceWakeConnection LiveSurface::connect_presentation_wake(

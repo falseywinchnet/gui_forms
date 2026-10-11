@@ -4,7 +4,7 @@
 
 - Status: **OBSERVED source inventory; declaration-derived narrative**
 - Kind: **enum class / state or value vocabulary**
-- Declaration: `include/gui_forms/control/control/control.hpp:885`
+- Declaration: `include/gui_forms/control/control/control.hpp:892`
 
 This closed vocabulary makes the named state explicit at API boundaries; the
 declaration is authoritative for admitted values.

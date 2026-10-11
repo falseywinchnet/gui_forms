@@ -3501,6 +3501,19 @@
       "search": "drawingcommand include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp drawingcommand owns one complete command kind, sampled graphicsstate, geometry, resource snapshots, points, and text."
     },
     {
+      "name": "DrawingEffectsPaint",
+      "kind": "class",
+      "bases": [],
+      "header": "src/controls/gallery/pages/page_context.hpp",
+      "visual": false,
+      "page": "drawing_effects_paint.md",
+      "status": "OBSERVED source inventory; declaration-derived narrative",
+      "sourceStatus": "demonstration composition",
+      "reviewed": false,
+      "capture": null,
+      "search": "drawingeffectspaint src/controls/gallery/pages/page_context.hpp drawingeffectspaint is a class declared in src/controls/gallery/pages/page_context.hpp."
+    },
+    {
       "name": "DrawingObject",
       "kind": "class",
       "bases": [],
@@ -6644,6 +6657,19 @@
       "search": "ownerdecorationrecipe include/gui_forms/control/control/control.hpp ownerdecorationrecipe is a struct declared in include/gui_forms/control/control/control.hpp."
     },
     {
+      "name": "PageContext",
+      "kind": "struct",
+      "bases": [],
+      "header": "src/controls/gallery/pages/page_context.hpp",
+      "visual": false,
+      "page": "page_context.md",
+      "status": "OBSERVED source inventory; declaration-derived narrative",
+      "sourceStatus": "demonstration composition",
+      "reviewed": false,
+      "capture": null,
+      "search": "pagecontext src/controls/gallery/pages/page_context.hpp pagecontext is a struct declared in src/controls/gallery/pages/page_context.hpp."
+    },
+    {
       "name": "PaintControlCheckpoint",
       "kind": "struct",
       "bases": [],
@@ -9230,7 +9256,7 @@
       "sourceStatus": "header-only or distributed",
       "reviewed": true,
       "capture": null,
-      "search": "subscriptiontoken include/gui_forms/event/subscription_token/subscription_token.hpp subscriptiontoken is the move-only raii revocation handle for a retained event slot; destruction and explicit disconnect are idempotent."
+      "search": "subscriptiontoken include/gui_forms/event/subscription_token/subscription_token.hpp subscriptiontoken is the move-only raii revocation handle for a retained event slot; destruction and explicit disconnect are idempotent. it belongs to the deprecated subscribe(...) seam; new code observes events with on(event, owner, &owner::method), which keeps its connection on the owner component instead of a caller-held token."
     },
     {
       "name": "Surface",
@@ -10214,6 +10240,32 @@
       "reviewed": false,
       "capture": null,
       "search": "wake src/host/linux/application/linux_host_internal.hpp wake is a struct declared in src/host/linux/application/linux_host_internal.hpp."
+    },
+    {
+      "name": "WeakProgressValueSetter",
+      "kind": "class",
+      "bases": [],
+      "header": "src/controls/gallery/pages/page_context.hpp",
+      "visual": false,
+      "page": "weak_progress_value_setter.md",
+      "status": "OBSERVED source inventory; declaration-derived narrative",
+      "sourceStatus": "demonstration composition",
+      "reviewed": false,
+      "capture": null,
+      "search": "weakprogressvaluesetter src/controls/gallery/pages/page_context.hpp weakprogressvaluesetter is a class declared in src/controls/gallery/pages/page_context.hpp."
+    },
+    {
+      "name": "WeakRangeValueMirror",
+      "kind": "class",
+      "bases": [],
+      "header": "src/controls/gallery/pages/page_context.hpp",
+      "visual": false,
+      "page": "weak_range_value_mirror.md",
+      "status": "OBSERVED source inventory; declaration-derived narrative",
+      "sourceStatus": "demonstration composition",
+      "reviewed": false,
+      "capture": null,
+      "search": "weakrangevaluemirror src/controls/gallery/pages/page_context.hpp weakrangevaluemirror is a class declared in src/controls/gallery/pages/page_context.hpp."
     },
     {
       "name": "Window",

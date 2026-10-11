@@ -46,6 +46,10 @@ struct LiveSurfaceSnapshot final {
     std::uint64_t last_read_generation{};
     bool write_active{};
     bool has_frame{};
+    // True between reconfigure and the first publication of the new epoch,
+    // while acquire_latest()/acquire_for_presentation() return the previous
+    // epoch's last frame (at its own size) instead of nothing.
+    bool carries_previous_frame{};
 };
 
 } // namespace gui_forms

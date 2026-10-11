@@ -26,6 +26,11 @@ public:
     LiveSurface(const LiveSurface&) = delete;
     LiveSurface& operator=(const LiveSurface&) = delete;
 
+    // Replaces the buffers at the new description and starts a new epoch. The
+    // previous epoch's last published frame stays acquirable, at its own size,
+    // until the first publication of the new epoch, so a presenter scales it
+    // to the destination instead of showing nothing (snapshot() reports
+    // carries_previous_frame). Fails while a write lease is held.
     [[nodiscard]] bool reconfigure(LiveSurfaceDescription description);
     [[nodiscard]] LiveSurfaceWriteLease try_acquire_write(
         bool preserve_published_contents = false) noexcept;

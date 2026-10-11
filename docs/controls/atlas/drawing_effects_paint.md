@@ -7,7 +7,7 @@
 - Scope: source-private header
 - Source layout: demonstration composition
 - Hierarchy: `DrawingEffectsPaint`
-- Declaration: `src/controls/gallery/pages/page_context.hpp:270`
+- Declaration: `src/controls/gallery/pages/page_context.hpp:291`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 1 declaration-derived

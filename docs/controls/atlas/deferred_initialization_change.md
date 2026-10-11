@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `DeferredInitializationChange`
-- Declaration: `include/gui_forms/control/control/control.hpp:788`
+- Declaration: `include/gui_forms/control/control/control.hpp:795`
 - Definition: `inline/header-only`
 - Type narrative: hand-reviewed
 - Method narratives: no declared methods

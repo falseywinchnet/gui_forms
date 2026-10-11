@@ -190,7 +190,11 @@ void presentation_region() {
     require((*surface).acquire_for_presentation(&presenter).damage() == full, "outside damage is the whole surface");
 
     require((*surface).reconfigure({.width = 100U, .height = 50U, .opaque = true}), "reconfigured");
-    require(!(*surface).acquire_for_presentation(&presenter), "no frame before the new epoch publishes");
+    // The previous epoch's frame carries over, whole, until the new epoch
+    // publishes; a presenter scales it rather than showing nothing.
+    const LiveSurfaceFrame carried = (*surface).acquire_for_presentation(&presenter);
+    require(carried && carried.damage() == full && (*surface).snapshot().carries_previous_frame,
+            "the previous frame carries over whole before the new epoch publishes");
     publish_damage(*surface, {1.0, 1.0, 1.0, 1.0});
     require((*surface).acquire_for_presentation(&presenter).damage() == full, "reconfigured surface is whole");
 }
