@@ -426,10 +426,53 @@ void scoped_window_replacement_damage() {
 
 } // namespace
 
+// A moved-from registry is empty with zero accounting and can be reused up
+// to its limits; both registries take a new revision (sanitizer review,
+// 2026-10-11).
+void move_contract() {
+    const std::vector<std::byte> bytes = valid_bytes();
+    ImageRegistryLimits limits{};
+    limits.maximum_resources = 1;
+    ImageRegistry source(limits);
+    const ImageLoadResult loaded = source.load_png(bytes);
+    require(static_cast<bool>(loaded), "move fixture loads");
+    const std::uint64_t source_revision = source.snapshot().revision;
+
+    ImageRegistry constructed(std::move(source));
+    require(constructed.find(loaded.image).has_value() && constructed.snapshot().resource_count == 1 &&
+                constructed.snapshot().revision > source_revision,
+            "move construction kept the image and advanced the revision");
+    require(source.image_ids().empty() && source.snapshot().resource_count == 0 &&
+                source.snapshot().encoded_bytes == 0 && source.snapshot().decoded_bytes == 0 &&
+                source.snapshot().revision > source_revision,
+            "moved-from registry is empty with zero accounting");
+    require(static_cast<bool>(source.load_png(bytes)), "moved-from registry accepts a load within its limit");
+
+    ImageRegistry assigned(limits);
+    const std::uint64_t replaced_revision = assigned.snapshot().revision;
+    const std::uint64_t moved_revision = constructed.snapshot().revision;
+    assigned = std::move(constructed);
+    require(assigned.find(loaded.image).has_value() && assigned.snapshot().resource_count == 1 &&
+                assigned.snapshot().revision > replaced_revision && assigned.snapshot().revision > moved_revision,
+            "move assignment kept the image and advanced past both revisions");
+    require(constructed.image_ids().empty() && constructed.snapshot().resource_count == 0 &&
+                constructed.snapshot().encoded_bytes == 0 && constructed.snapshot().decoded_bytes == 0,
+            "move-assigned-from registry is empty with zero accounting");
+    require(static_cast<bool>(constructed.load_png(bytes)), "move-assigned-from registry accepts a load");
+
+    ImageRegistry& alias = assigned;
+    const ImageRegistrySnapshot before_self = assigned.snapshot();
+    assigned = std::move(alias);
+    require(assigned.find(loaded.image).has_value() && assigned.snapshot().revision == before_self.revision &&
+                assigned.snapshot().resource_count == 1,
+            "self-move leaves the registry unchanged");
+}
+
 int main() {
     chunk_checksum_matches_bitwise_oracle();
     parser_contract();
     ownership_and_quota_contract();
+    move_contract();
     deterministic_mutation_oracle();
     owned_pixel_surface_contract();
     bounded_patch_stride_and_revision_contract();

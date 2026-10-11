@@ -238,20 +238,23 @@ private:
     bool& invoked_;
 };
 
-// The original callbacks captured a strong handle. Retain that ownership
-// explicitly so callback lifetime remains part of the test, not an accident of
-// a closure capture list.
+// Disposes its control from inside a callback the control itself stores.
+// The stored callback observes the control; holding it strongly made every
+// use an ownership cycle that leaked the control (LeakSanitizer, 2026-10-11).
+// The call locks it, so the control is still strongly held while the
+// callback runs.
 class DisposeCapturedControl final {
 public:
-    explicit DisposeCapturedControl(Control::Ptr control) noexcept
-        : control_(std::move(control)) {}
+    explicit DisposeCapturedControl(const Control::Ptr& control) noexcept
+        : control_(control) {}
 
     void operator()() const {
-        if ((*control_).is_alive()) (*control_).dispose();
+        const Control::Ptr control = control_.lock();
+        if (control && (*control).is_alive()) (*control).dispose();
     }
 
 private:
-    Control::Ptr control_;
+    std::weak_ptr<Control> control_;
 };
 
 class ReplaceChildOnce final {

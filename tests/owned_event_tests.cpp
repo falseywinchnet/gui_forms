@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 #ifdef _WIN32
 #include <malloc.h>
 #endif
@@ -364,6 +365,65 @@ void test_natural_teardown_cannot_resubscribe() {
                 statistics.subscriptions_disconnected == 1U,
             "callback destruction must not register new work on a destructing Component");
     event.emit();
+}
+
+// A subscribed callable keeps its own state across emissions, nested
+// emissions and its own disconnection (sanitizer review, 2026-10-11).
+struct CountingHandler final {
+    gf::Event<int>* event{};
+    std::vector<int>* observed{};
+    gf::SubscriptionToken* token{};
+    int count{};
+    bool nest{};
+    bool disconnect_self{};
+
+    void operator()(const int value) {
+        ++count;
+        (*observed).push_back(count * 100 + value);
+        if (nest) {
+            nest = false;
+            (*event).emit(value + 1);
+        }
+        if (disconnect_self && token != nullptr) {
+            (*token).disconnect();
+            (*observed).push_back(count * 100 + value);
+        }
+    }
+};
+
+void test_callable_state_persists() {
+    gf::Event<int> event;
+    std::vector<int> observed;
+    CountingHandler repeated{};
+    repeated.event = &event;
+    repeated.observed = &observed;
+    const gf::SubscriptionToken counted = event.subscribe(repeated);
+    event.emit(1);
+    event.emit(2);
+    require(observed == std::vector<int>{101, 202}, "repeated emissions share one callable state");
+
+    gf::Event<int> nested_event;
+    std::vector<int> nested_observed;
+    CountingHandler nested{};
+    nested.event = &nested_event;
+    nested.observed = &nested_observed;
+    nested.nest = true;
+    const gf::SubscriptionToken nested_token = nested_event.subscribe(nested);
+    nested_event.emit(1);
+    nested_event.emit(5);
+    require(nested_observed == std::vector<int>{101, 202, 305}, "nested emissions share one callable state");
+
+    gf::Event<int> revoking_event;
+    std::vector<int> revoking_observed;
+    gf::SubscriptionToken revoking_token;
+    CountingHandler revoking{};
+    revoking.observed = &revoking_observed;
+    revoking.token = &revoking_token;
+    revoking.disconnect_self = true;
+    revoking_token = revoking_event.subscribe(revoking);
+    revoking_event.emit(7);
+    revoking_event.emit(8);
+    require(revoking_observed == std::vector<int>{107, 107}, "a callable survives its own disconnection");
 }
 
 void test_nested_emission() {
@@ -1015,6 +1075,7 @@ int main() {
         test_disposal_during_emission();
         test_natural_teardown_cannot_resubscribe();
         test_nested_emission();
+        test_callable_state_persists();
         test_publisher_and_target_destruction();
         test_exception_recovery_and_null_member();
         test_explicit_token_transfer_and_legacy_lifetime();

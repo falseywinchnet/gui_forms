@@ -94,6 +94,9 @@ inline std::uint8_t disabled_color_channel(
 }
 
 class Registry final {
+#if defined(GUI_FORMS_ABI_REGISTRY_TEST)
+    friend struct RegistryLifetimeFixture;
+#endif
 public:
     gf_result create(std::uint32_t kind, gf_string_view stable_id, gf_handle* output) {
         if (output == nullptr || stable_id.data == nullptr || stable_id.size == 0U ||
@@ -1882,27 +1885,32 @@ public:
     }
 
     gf_result release(gf_handle handle) {
-        std::scoped_lock lock(mutex_);
-        std::shared_ptr<ControlRecord> record;
-        if (const gf_result result = control_locked(handle, record); result != GF_OK) {
-            return result;
+        std::vector<gui_forms::SubscriptionToken> revoked;
+        {
+            std::scoped_lock lock(mutex_);
+            std::shared_ptr<ControlRecord> record;
+            if (const gf_result result = control_locked(handle, record); result != GF_OK) {
+                return result;
+            }
+            if (const gf_result result = require_thread(*record); result != GF_OK) {
+                return result;
+            }
+            if ((*record).external_references == 0U) {
+                return fail(GF_ERROR_STALE_HANDLE, "control handle has no external references");
+            }
+            --(*record).external_references;
+            if ((*record).external_references == 0U) {
+                invalidate_control_locked(handle, *record, revoked);
+            }
         }
-        if (const gf_result result = require_thread(*record); result != GF_OK) {
-            return result;
-        }
-        if ((*record).external_references == 0U) {
-            return fail(GF_ERROR_STALE_HANDLE, "control handle has no external references");
-        }
-        --(*record).external_references;
-        if ((*record).external_references == 0U) {
-            invalidate_control_locked(handle, *record);
-        }
+        disconnect_revoked(revoked);
         return GF_OK;
     }
 
     gf_result dispose(gf_handle handle) {
         std::shared_ptr<ControlRecord> record;
         std::vector<std::shared_ptr<ControlRecord>> subtree_records;
+        std::vector<gui_forms::SubscriptionToken> revoked;
         {
             std::scoped_lock lock(mutex_);
             if (const gf_result result = control_locked(handle, record); result != GF_OK) {
@@ -1931,10 +1939,11 @@ public:
                         static_cast<std::uint32_t>(
                             std::distance(slots_.begin(), found) + 1),
                         (*found).generation};
-                    invalidate_control_locked(subtree_handle, *subtree_record);
+                    invalidate_control_locked(subtree_handle, *subtree_record, revoked);
                 }
             }
         }
+        disconnect_revoked(revoked);
         for (const std::shared_ptr<gui_forms::abi::detail::ControlRecord>& subtree_record : subtree_records) {
             cancel_pending(subtree_record);
         }
@@ -2181,17 +2190,27 @@ public:
     }
 
     gf_result disconnect(gf_event_token token) {
-        std::scoped_lock lock(mutex_);
-        std::shared_ptr<SubscriptionRecord> record;
-        if (const gf_result result = subscription_locked(token, record); result != GF_OK) {
-            return result;
+        // The native connection's forwarder holds the record and its sender;
+        // left connected, it keeps the sender's control alive through the
+        // control's own event slot. It is disconnected after the lock is
+        // released, since dropping the forwarder can release the last
+        // reference to a control.
+        gui_forms::SubscriptionToken revoked;
+        {
+            std::scoped_lock lock(mutex_);
+            std::shared_ptr<SubscriptionRecord> record;
+            if (const gf_result result = subscription_locked(token, record); result != GF_OK) {
+                return result;
+            }
+            if ((*record).ui_thread != std::this_thread::get_id()) {
+                return fail(GF_ERROR_WRONG_THREAD,
+                            "event token operation was attempted from a non-owner thread");
+            }
+            (*record).connected = false;
+            revoked = std::move((*record).native_subscription);
+            invalidate_slot_locked(token);
         }
-        if ((*record).ui_thread != std::this_thread::get_id()) {
-            return fail(GF_ERROR_WRONG_THREAD,
-                        "event token operation was attempted from a non-owner thread");
-        }
-        (*record).connected = false;
-        invalidate_slot_locked(token);
+        revoked.disconnect();
         return GF_OK;
     }
 
@@ -3138,16 +3157,26 @@ private:
                 (*found).generation};
     }
 
-    void invalidate_control_locked(gf_handle handle, ControlRecord& record) {
+    // Stales the control and its subscriptions. Their native connections
+    // move to revoked, which the caller disconnects after unlocking (see
+    // disconnect).
+    void invalidate_control_locked(gf_handle handle, ControlRecord& record,
+                                   std::vector<gui_forms::SubscriptionToken>& revoked) {
         for (const gf_event_token token : record.subscriptions) {
             if (RegistrySlot* slot = slot_locked(token);
                 slot != nullptr && (*slot).kind == SlotKind::subscription) {
                 (*(*slot).subscription).connected = false;
+                revoked.push_back(std::move((*(*slot).subscription).native_subscription));
                 invalidate_slot_locked(token);
             }
         }
         record.subscriptions.clear();
         invalidate_slot_locked(handle);
+    }
+
+    static void disconnect_revoked(std::vector<gui_forms::SubscriptionToken>& revoked) noexcept {
+        for (gui_forms::SubscriptionToken& token : revoked) token.disconnect();
+        revoked.clear();
     }
 
     void invalidate_slot_locked(gf_handle handle) {

@@ -362,8 +362,34 @@ struct ImageRegistry::Slot final {
 
 ImageRegistry::ImageRegistry(ImageRegistryLimits limits) : limits_(limits) {}
 ImageRegistry::~ImageRegistry() = default;
-ImageRegistry::ImageRegistry(ImageRegistry&&) noexcept = default;
-ImageRegistry& ImageRegistry::operator=(ImageRegistry&&) noexcept = default;
+ImageRegistry::ImageRegistry(ImageRegistry&& other) noexcept
+    : limits_(other.limits_), slots_(std::move(other.slots_)), revision_(other.revision_ + 1U),
+      resource_count_(other.resource_count_), encoded_bytes_(other.encoded_bytes_),
+      decoded_bytes_(other.decoded_bytes_) {
+    other.release_moved_contents();
+}
+
+ImageRegistry& ImageRegistry::operator=(ImageRegistry&& other) noexcept {
+    if (this == &other) return *this;
+    // Above both previous revisions: a consumer of either must resynchronize.
+    const std::uint64_t revision = std::max(revision_, other.revision_) + 1U;
+    limits_ = other.limits_;
+    slots_ = std::move(other.slots_);
+    revision_ = revision;
+    resource_count_ = other.resource_count_;
+    encoded_bytes_ = other.encoded_bytes_;
+    decoded_bytes_ = other.decoded_bytes_;
+    other.release_moved_contents();
+    return *this;
+}
+
+void ImageRegistry::release_moved_contents() noexcept {
+    slots_.clear();
+    ++revision_;
+    resource_count_ = 0U;
+    encoded_bytes_ = 0U;
+    decoded_bytes_ = 0U;
+}
 
 ImageResourceError ImageRegistry::registry_quota_error(
     std::uint64_t encoded_bytes,
