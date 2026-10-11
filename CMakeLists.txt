@@ -1186,11 +1186,40 @@ endif()
 
 if(GUI_FORMS_BUILD_GALLERY)
     # One demonstration program (decision F.1): the registry-driven Gallery.
-    # gallery_pages.cpp holds the pages migrated from the retired Complete
-    # Showcase and stays under the public-controls-only policy test below.
+    # gallery_pages.cpp holds the shell; the pages migrated from the retired
+    # Complete Showcase live one per file under src/controls/gallery/pages/.
+    # All of them stay under the public-controls-only policy test below.
+    set(gui_forms_gallery_page_sources
+        src/controls/gallery/pages/control-spectrum.cpp
+        src/controls/gallery/pages/ranges-and-progress.cpp
+        src/controls/gallery/pages/containers-and-focus.cpp
+        src/controls/gallery/pages/animation-laboratory.cpp
+        src/controls/gallery/pages/states-and-diagnostics.cpp
+        src/controls/gallery/pages/text-and-input.cpp
+        src/controls/gallery/pages/collections-and-popups.cpp
+        src/controls/gallery/pages/values-and-spinners.cpp
+        src/controls/gallery/pages/images-and-drawing.cpp
+        src/controls/gallery/pages/tabs-and-pages.cpp
+        src/controls/gallery/pages/checked-collections.cpp
+        src/controls/gallery/pages/timing-and-tooltips.cpp
+        src/controls/gallery/pages/dates-and-calendar.cpp
+        src/controls/gallery/pages/dialogs-and-host-services.cpp
+        src/controls/gallery/pages/retained-layout-panels.cpp
+        src/controls/gallery/pages/dock-and-anchor.cpp
+        src/controls/gallery/pages/commands-and-menus.cpp
+        src/controls/gallery/pages/tree-and-object-views.cpp
+        src/controls/gallery/pages/choices-and-sections.cpp
+        src/controls/gallery/pages/value-editors.cpp
+        src/controls/gallery/pages/responsive-layouts.cpp
+        src/controls/gallery/pages/anchored-popups.cpp
+        src/controls/gallery/pages/live-surfaces.cpp
+        src/controls/gallery/pages/typography-and-inspection.cpp
+        src/controls/gallery/pages/semantic-feedback.cpp
+    )
     add_library(gui_forms_gallery_model STATIC
         src/controls/gallery_controls.cpp
         src/controls/gallery_pages.cpp
+        ${gui_forms_gallery_page_sources}
         demo/gallery.cpp
         demo/gallery_model.cpp
     )
@@ -2539,7 +2568,32 @@ if(GUI_FORMS_BUILD_TESTS)
              COMMAND gui_forms_gallery_interaction_tests)
 
         add_executable(gui_forms_gallery_pages_tests
-            tests/gallery_pages_tests.cpp
+            tests/gallery_pages/main.cpp
+            tests/gallery_pages/catalog_tests.cpp
+            tests/gallery_pages/shell_tests.cpp
+            tests/gallery_pages/ranges-and-progress_tests.cpp
+            tests/gallery_pages/containers-and-focus_tests.cpp
+            tests/gallery_pages/animation-laboratory_tests.cpp
+            tests/gallery_pages/text-and-input_tests.cpp
+            tests/gallery_pages/collections-and-popups_tests.cpp
+            tests/gallery_pages/values-and-spinners_tests.cpp
+            tests/gallery_pages/images-and-drawing_tests.cpp
+            tests/gallery_pages/tabs-and-pages_tests.cpp
+            tests/gallery_pages/checked-collections_tests.cpp
+            tests/gallery_pages/timing-and-tooltips_tests.cpp
+            tests/gallery_pages/dates-and-calendar_tests.cpp
+            tests/gallery_pages/dialogs-and-host-services_tests.cpp
+            tests/gallery_pages/states-and-diagnostics_tests.cpp
+            tests/gallery_pages/dock-and-anchor_tests.cpp
+            tests/gallery_pages/commands-and-menus_tests.cpp
+            tests/gallery_pages/tree-and-object-views_tests.cpp
+            tests/gallery_pages/choices-and-sections_tests.cpp
+            tests/gallery_pages/value-editors_tests.cpp
+            tests/gallery_pages/responsive-layouts_tests.cpp
+            tests/gallery_pages/anchored-popups_tests.cpp
+            tests/gallery_pages/live-surfaces_tests.cpp
+            tests/gallery_pages/typography-and-inspection_tests.cpp
+            tests/gallery_pages/semantic-feedback_tests.cpp
         )
         target_include_directories(gui_forms_gallery_pages_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -2550,10 +2604,24 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         add_test(NAME gui_forms_gallery_pages_tests
                  COMMAND gui_forms_gallery_pages_tests)
+        # The policy script takes one comma-separated argument; a CMake list
+        # would be split into separate COMMAND arguments.
+        set(gui_forms_gallery_policy_files
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery/pages/page_context.hpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery/pages/pages.hpp
+        )
+        foreach(gui_forms_gallery_page_source IN LISTS gui_forms_gallery_page_sources)
+            list(APPEND gui_forms_gallery_policy_files
+                ${CMAKE_CURRENT_SOURCE_DIR}/${gui_forms_gallery_page_source})
+        endforeach()
+        string(REPLACE ";" "," gui_forms_gallery_policy_file_list
+            "${gui_forms_gallery_policy_files}")
         add_test(
             NAME gui_forms_gallery_pages_public_control_policy
             COMMAND ${CMAKE_COMMAND}
-                -DGALLERY_PAGE_FILES=${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.cpp,${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.hpp
+                -DGALLERY_PAGE_FILES=${gui_forms_gallery_policy_file_list}
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_pages_public_controls.cmake
         )
         find_package(Python3 COMPONENTS Interpreter QUIET)

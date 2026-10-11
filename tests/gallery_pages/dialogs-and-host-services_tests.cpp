@@ -1,0 +1,56 @@
+#include "support.hpp"
+
+namespace gallery_pages_tests {
+
+void test_dialogs_and_host_services(gui_forms::Window& window,
+                                    gui_forms::host::HeadlessHostServices& services,
+                                    bool& cancel_save) {
+    select_page(window, "dialogs-and-host-services");
+    const std::shared_ptr<gui_forms::Label> status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.host.status"));
+    const std::shared_ptr<gui_forms::TextBox> editor = std::dynamic_pointer_cast<TextBox>(
+        window.find("gallery.host.clipboard.editor"));
+    require(status && editor,
+            "host-services board must expose its public result and clipboard controls");
+
+    click(window, window.find("gallery.host.message.2"));
+    require((*status).text().find("accepted · yes") != std::string::npos,
+            "message dialog must publish its typed accepted choice");
+    click(window, window.find("gallery.host.dialog.1"));
+    require((*status).text().find("2 paths · /tmp/alpha.txt") != std::string::npos,
+            "multi-open must retain all accepted paths through the portable result");
+    cancel_save = true;
+    click(window, window.find("gallery.host.dialog.2"));
+    require((*status).text().find("Cancelled · preserved: 2 paths · /tmp/alpha.txt") !=
+                std::string::npos,
+            "dialog cancellation must not overwrite the last accepted value");
+    click(window, window.find("gallery.host.dialog.4"));
+    require((*status).text().find("#315F89FF") != std::string::npos,
+            "color dialog must publish an exact typed RGBA result");
+
+    const std::string clipboard_probe((*editor).text());
+    click(window, window.find("gallery.host.service.0"));
+    (*editor).set_text("locally replaced");
+    click(window, window.find("gallery.host.service.1"));
+    require((*editor).text() == clipboard_probe &&
+                (*status).text().find("text restored") != std::string::npos,
+            "clipboard write/read must round-trip UTF-8 through HostServices");
+    click(window, window.find("gallery.host.service.2"));
+    require((*status).text().find("headless.primary") != std::string::npos,
+            "monitor inspection must identify the primary host monitor and scale");
+    click(window, window.find("gallery.host.service.3"));
+    require(services.sound_trace().find("sound=operation_complete") !=
+                std::string::npos,
+            "gallery must exercise the complete operation sound cue");
+
+    const HostServicesSnapshot snapshot = services.snapshot();
+    require(snapshot.dialog_requests == 4U &&
+                snapshot.dialog_completions == 4U &&
+                snapshot.dialog_cancellations == 1U &&
+                snapshot.maximum_modal_depth == 1U && snapshot.modal_depth == 0U &&
+                snapshot.clipboard_writes == 1U && snapshot.clipboard_reads == 1U &&
+                snapshot.monitor_queries == 1U && snapshot.sound_playbacks == 1U,
+            "host-services board must leave exact modal and service accounting");
+}
+
+} // namespace gallery_pages_tests
