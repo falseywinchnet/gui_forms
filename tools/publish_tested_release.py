@@ -1,0 +1,232 @@
+#!/usr/bin/env python3
+"""Publish already-tested program packages as one GitHub release.
+
+Workflow job dependencies are the test gate: this runs only after every
+platform built, tested, packaged and smoke-launched its programs. It
+
+  1. checks the packages-<platform>.json receipts against the artifacts and
+     the manifest's required platforms (tools/package_programs.py);
+  2. creates tag v<version> at exactly the tested commit through the API, or
+     verifies an existing tag names that commit;
+  3. creates a DRAFT release titled "GUI.Forms <version>", uploads every
+     artifact, SHA256SUMS.txt and the test receipts, then un-drafts it.
+
+Reruns are idempotent: a published (non-draft) release is never modified; a
+draft accepts an already-uploaded asset only when its bytes are equal
+(tools/publish_cache.py's rule). Notes are a generated header (version, commit,
+programs per platform, signing caveats) followed by packaging/RELEASE_NOTES.md.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+ROOT: Path = Path(__file__).resolve().parents[1]
+MAIN_REF: str = "refs/heads/main"
+RECEIPT_PATTERN: str = r"(packages|smoke)-[a-z0-9-]+\.json|ctest-[a-z0-9-]+\.xml"
+PLATFORM_LABELS: dict[str, str] = {
+    "macos-arm64": "macOS (Apple silicon, macOS 14 or later)",
+    "windows-x64": "Windows x64",
+    "linux-x64": "Linux x64 (Ubuntu 24.04 or compatible)",
+    "linux-arm64": "Linux arm64 (Ubuntu 24.04 or compatible)",
+}
+CAVEATS: tuple[str, ...] = (
+    "macOS bundles are ad hoc signed (`codesign --sign -`), not Developer ID signed or notarized; "
+    "Gatekeeper asks before the first launch (right-click, Open).",
+    "Windows executables and installers are unsigned; SmartScreen shows a warning until publisher reputation exists.",
+    "Linux programs need an X11 display (XWayland works). The DEB declares the X11/ATK dependencies; "
+    "the tar archive needs the same libraries.",
+    "Fonts ship with each program; no host fonts are read.",
+)
+
+
+def gh(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(["gh", *arguments], text=True, capture_output=True)
+    if check and result.returncode != 0:
+        raise RuntimeError(f"gh {' '.join(arguments)} failed: {result.stderr.strip()}")
+    return result
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_receipts(directory: Path, version: str, sha: str) -> dict[str, dict[str, Any]]:
+    receipts: dict[str, dict[str, Any]] = {}
+    for path in sorted(directory.glob("packages-*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("version") != version:
+            raise ValueError(f"{path.name} was packaged as {data.get('version')}, not {version}")
+        if data.get("revision") != sha:
+            raise ValueError(f"{path.name} was packaged from {data.get('revision')}, not the tested commit {sha}")
+        receipts[data["platform"]] = data
+    if not receipts:
+        raise ValueError(f"no packages-*.json receipts under {directory}")
+    return receipts
+
+
+def expected_artifacts(receipts: dict[str, dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for data in receipts.values():
+        for program in data["programs"]:
+            if program["status"] == "packaged":
+                names.extend(program["artifacts"].values())
+    return sorted(names)
+
+
+def check_required(manifest: Any, receipts: dict[str, dict[str, Any]]) -> None:
+    for program in manifest.programs:
+        if not program.enabled:
+            continue
+        for platform in program.required_platforms:
+            data = receipts.get(platform)
+            if data is None:
+                raise ValueError(f"{program.display_name} requires {platform}, which has no packages receipt")
+            record = next((item for item in data["programs"] if item["id"] == program.id), None)
+            if record is None or record["status"] != "packaged":
+                reason = record["reason"] if record else "absent from the receipt"
+                raise ValueError(f"{program.display_name} is required on {platform} but was not packaged: {reason}")
+
+
+def release_notes(version: str, sha: str, repository: str, receipts: dict[str, dict[str, Any]], test_receipts: list[str]) -> str:
+    lines = [f"GUI.Forms {version}, built and tested from [commit `{sha[:12]}`](https://github.com/{repository}/commit/{sha}).", ""]
+    lines += ["## Downloads", "", "| Program | Platform | Archive | Installer |", "|---|---|---|---|"]
+    skipped: list[str] = []
+    for platform in sorted(receipts):
+        for program in receipts[platform]["programs"]:
+            if program["status"] == "packaged":
+                artifacts = program["artifacts"]
+                lines.append(f"| {program['display_name']} | {PLATFORM_LABELS.get(platform, platform)} | "
+                             f"`{artifacts['archive']}` | `{artifacts.get('installer', '-')}` |")
+            elif program.get("target"):
+                skipped.append(f"{program['display_name']} on {PLATFORM_LABELS.get(platform, platform)}: {program['reason']}")
+    lines += ["", "`SHA256SUMS.txt` lists every download's digest."]
+    if skipped:
+        lines += ["", "Not in this release:", ""] + [f"- {item}" for item in skipped]
+    lines += ["", "## Caveats", ""] + [f"- {caveat}" for caveat in CAVEATS]
+    if test_receipts:
+        lines += ["", "Test and smoke receipts attached: " + ", ".join(f"`{name}`" for name in test_receipts) + "."]
+    lines += ["", (ROOT / "packaging/RELEASE_NOTES.md").read_text(encoding="utf-8").strip(), ""]
+    return "\n".join(lines)
+
+
+def upload_assets(tag: str, repository: str, files: list[Path], dry_run: bool) -> None:
+    for path in files:
+        if dry_run:
+            print(f"  would upload {path.name}")
+            continue
+        uploaded = gh("release", "upload", tag, str(path), "--repo", repository, check=False)
+        if uploaded.returncode == 0:
+            continue
+        # A rerun never silently replaces an asset; only equal bytes are accepted.
+        with tempfile.TemporaryDirectory() as directory:
+            gh("release", "download", tag, "--repo", repository, "--pattern", path.name, "--dir", directory)
+            existing = Path(directory) / path.name
+            if not existing.is_file() or sha256_file(existing) != sha256_file(path):
+                raise ValueError(f"refusing to replace the already-uploaded {path.name} with different bytes")
+        print(f"  {path.name}: identical asset already present")
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--artifacts", type=Path, required=True, help="directory with the downloaded platform artifacts")
+    parser.add_argument("--receipts", type=Path, default=None, help="directory with packages-*.json, smoke-*.json, ctest-*.xml (default: --artifacts)")
+    parser.add_argument("--manifest", type=Path, default=ROOT / "packaging/programs.json")
+    parser.add_argument("--dry-run", action="store_true", help="validate and print the plan and notes; call no gh command")
+    args = parser.parse_args(argv)
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from package_programs import load_manifest
+    from publication_version import validate
+
+    repository, sha = os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"]
+    ref = os.environ.get("GITHUB_REF", "")
+    version, tag = os.environ["RELEASE_VERSION"], os.environ["RELEASE_TAG"]
+    validate(version)
+    if tag != "v" + version:
+        raise ValueError(f"release tag {tag} does not match version {version}")
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise ValueError("GITHUB_SHA must be a full commit sha")
+    receipts_dir = args.receipts or args.artifacts
+    receipts = load_receipts(receipts_dir, version, sha)
+    manifest = load_manifest(args.manifest)
+    check_required(manifest, receipts)
+    expected = expected_artifacts(receipts)
+    if not expected:
+        raise ValueError("the receipts list no packaged program on any platform")
+    files = [args.artifacts / name for name in expected]
+    missing = [path.name for path in files if not path.is_file()]
+    if missing:
+        raise ValueError("artifacts named by the receipts are missing: " + ", ".join(missing))
+    unexpected = sorted(path.name for path in args.artifacts.iterdir()
+                        if path.is_file() and path.name not in expected and path.name != "SHA256SUMS.txt"
+                        and not re.fullmatch(RECEIPT_PATTERN, path.name))
+    if unexpected:
+        raise ValueError("unexpected files among the artifacts: " + ", ".join(unexpected))
+    sums = args.artifacts / "SHA256SUMS.txt"
+    sums.write_text("".join(sha256_file(path) + "  " + path.name + "\n" for path in sorted(files, key=lambda p: p.name)), encoding="utf-8")
+    files.append(sums)
+    test_receipts = sorted(path for path in receipts_dir.iterdir() if path.is_file() and re.fullmatch(RECEIPT_PATTERN, path.name))
+    files.extend(test_receipts)
+    notes = release_notes(version, sha, repository, receipts, [path.name for path in test_receipts])
+    title = "GUI.Forms " + version
+    print(f"Release {title} ({tag}) at {sha[:12]} with {len(files)} assets on platforms: {', '.join(sorted(receipts))}")
+    if args.dry_run:
+        print("--- notes ---")
+        print(notes)
+        print("--- assets ---")
+        upload_assets(tag, repository, files, dry_run=True)
+        print(f"would create tag {tag}, a draft release titled {title!r}, upload, then publish"
+              f" (latest={'true' if ref == MAIN_REF else 'false'})")
+        return 0
+
+    # An older, slower main run must not publish over a newer main revision.
+    if ref == MAIN_REF and gh("api", f"repos/{repository}/commits/main", "--jq", ".sha").stdout.strip() != sha:
+        print("A newer main revision exists; this run's tested artifacts stay unpublished.")
+        return 0
+    if gh("api", f"repos/{repository}/commits/{sha}", "--jq", ".sha").stdout.strip() != sha:
+        raise ValueError("the tested commit cannot be resolved in the repository")
+    probe = gh("api", f"repos/{repository}/git/ref/tags/{tag}", check=False)
+    if probe.returncode == 0:
+        if gh("api", f"repos/{repository}/commits/{tag}", "--jq", ".sha").stdout.strip() != sha:
+            raise ValueError(f"existing tag {tag} points at a different, untested commit")
+    elif "404" not in probe.stderr:
+        raise RuntimeError("cannot safely check the release tag: " + probe.stderr.strip())
+    else:
+        gh("api", f"repos/{repository}/git/refs", "--method", "POST", "-f", "ref=refs/tags/" + tag, "-f", "sha=" + sha)
+    if gh("api", f"repos/{repository}/commits/{tag}", "--jq", ".sha").stdout.strip() != sha:
+        raise ValueError("the release tag changed before publication")
+    view = gh("release", "view", tag, "--repo", repository, "--json", "isDraft,targetCommitish", check=False)
+    if view.returncode == 0:
+        existing = json.loads(view.stdout)
+        if not existing["isDraft"]:
+            print(f"{title} is already published; leaving it immutable.")
+            return 0
+        if existing["targetCommitish"] not in (sha, tag, "main"):
+            raise RuntimeError(f"the existing draft targets {existing['targetCommitish']}, not the tested commit")
+        print("Continuing the existing draft.")
+    else:
+        with tempfile.TemporaryDirectory(prefix="gui-forms-release-") as directory:
+            notes_path = Path(directory) / "notes.md"
+            notes_path.write_text(notes, encoding="utf-8")
+            gh("release", "create", tag, "--repo", repository, "--target", sha, "--draft",
+               "--title", title, "--notes-file", str(notes_path))
+    upload_assets(tag, repository, files, dry_run=False)
+    gh("release", "edit", tag, "--repo", repository, "--draft=false", "--latest=" + str(ref == MAIN_REF).lower())
+    print(f"Published {title}.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

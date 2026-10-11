@@ -1,0 +1,23 @@
+{
+  "notes": [
+    "Third-party notices copied into each packaged program's licenses/ directory by tools/package_programs.py.",
+    "Paths are relative to the repository root unless prefixed with $GUI_FORMS_LLVM_RUNTIME (macOS runtime prefix) or $MSYS_PREFIX (the CLANG64 tree on Windows).",
+    "optional=true entries are skipped with a log line when the file is absent (fetched dependencies, platform runtimes); the others fail the package."
+  ],
+  "notices": [
+    {"name": "GUIForms.txt", "source": "LICENSE"},
+    {"name": "Unicode.txt", "source": "third_party/unicode/LICENSE.txt"},
+    {"name": "SheenBidi.txt", "source": "third_party/sheenbidi/LICENSE"},
+    {"name": "HarfBuzz.txt", "source": "third_party/harfbuzz/COPYING", "optional": true},
+    {"name": "FreeType.txt", "source": "third_party/freetype/docs/FTL.TXT", "optional": true},
+    {"name": "libunibreak.txt", "source": "third_party/libunibreak/LICENCE", "optional": true},
+    {"name": "Skia.txt", "source": "third_party/skia/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "libpng.txt", "source": "third_party/skia/third_party/externals/libpng/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "zlib.txt", "source": "third_party/skia/third_party/externals/zlib/LICENSE", "optional": true, "platforms": ["macos-arm64", "linux-x64", "linux-arm64"]},
+    {"name": "LLVM/libcxx-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxx-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libcxxabi-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libcxxabi-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libunwind-LICENSE.TXT", "source": "$GUI_FORMS_LLVM_RUNTIME/share/licenses/llvm-runtimes/libunwind-LICENSE.TXT", "optional": true, "platforms": ["macos-arm64"]},
+    {"name": "LLVM/libc++-LICENSE.TXT", "source": "$MSYS_PREFIX/share/licenses/libc++/LICENSE.TXT", "optional": true, "platforms": ["windows-x64"]},
+    {"name": "winpthreads-COPYING.txt", "source": "$MSYS_PREFIX/share/licenses/winpthreads/COPYING", "optional": true, "platforms": ["windows-x64"]}
+  ]
+}
