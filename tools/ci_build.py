@@ -37,7 +37,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
             enabled = 'ON'
         options.append(f'-DGUI_FORMS_ENABLE_{name}_HOST={enabled}')
     if host == 'windows':
-        options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF'])
+        # ADR-004: the Win32 host draws text with the shared HarfBuzz/FreeType engine.
+        run('sh', ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     else:
         if host == 'linux':
             os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'

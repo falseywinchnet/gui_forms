@@ -15,10 +15,12 @@ The private adapter in `src/host/windows/` provides:
 - an ordinary resizable Win32 top-level window targeting `_WIN32_WINNT=0x0601`;
 - runtime-loaded DPI-awareness calls, with a Windows 7-compatible DPI fallback;
 - top-down 32-bit DIB presentation with software alpha blending;
-- Uniscribe itemization/shaping/placement with GDI glyph output, using privately
-  loaded Portsmouth Rapids, Carlito, Cousine, Noto Sans CJK JP, and monochrome
-  Noto Emoji faces; fallback selection is grapheme-safe and measurement uses
-  the same placed glyph advances as drawing;
+- text through the shared ADR-004 engine: HarfBuzz shaping and FreeType
+  rasterization of the bundled Portsmouth Rapids, Carlito, Cousine, Noto
+  Sans CJK JP, Noto script and monochrome Noto Emoji faces (read from
+  `fonts\` beside the executable, or `GUI_FORMS_FONT_DIR`), blended into the
+  DIB by the shared compositor; no GDI or Uniscribe text, and tooltips use
+  the same engine;
 - WIC decoding of the core's already-validated PNG-only image resources;
 - pointer, wheel, keyboard, UTF-16/UTF-8 committed text, native pointer capture,
   cursor, resize, scale, activation, scheduled wake, and close translation;
@@ -86,8 +88,8 @@ gui_forms/tools/run_windows_showcase_text_smoke.sh \
 
 It requires actual selection of both Noto fallback faces, a non-default
 astral-plane rocket glyph, successful glyph-index output, a captured framebuffer,
-and a clean native close. `GUI_FORMS_TRACE_WIN32_TEXT=1` emits requested/actual
-face and glyph identifiers but never field contents.
+and a clean native close. (`GUI_FORMS_TRACE_WIN32_TEXT` was removed with
+GDI text in ADR-004 phase 6.)
 
 ## Accessibility boundary
 

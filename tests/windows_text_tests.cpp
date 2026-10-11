@@ -2,6 +2,7 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/window.hpp"
 #include "../src/host/windows/application/windows_host.cpp"
+#include "text_identity_scene.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -13,29 +14,13 @@ static void require_text(bool condition, const char* message) {
     if (!condition) { throw std::runtime_error(message); }
 }
 
-class PrivateFonts final {
-public:
-    explicit PrivateFonts(const std::filesystem::path& directory) {
-        for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(directory)) {
-            const std::filesystem::path path = entry.path();
-            if (path.extension() != ".ttf" && path.extension() != ".otf") continue;
-            const std::wstring name = path.wstring();
-            require_text(AddFontResourceExW(name.c_str(), FR_PRIVATE, nullptr) > 0,
-                         "Could not load fixture font");
-            paths_.push_back(name);
-        }
-    }
-    ~PrivateFonts() {
-        for (const std::wstring& path : paths_) RemoveFontResourceExW(path.c_str(), FR_PRIVATE, nullptr);
-    }
-private:
-    std::vector<std::wstring> paths_;
-};
+// The bundled faces, loaded as the host loads them (ADR-004).
+static std::shared_ptr<const host::BundledFonts> fixture_fonts;
 
 static void check_caption(const std::string& text, double scale, std::uint16_t weight) {
     host::DibPainter painter;
     require_text(painter.resize({240, 32}, scale), "DIB allocation failed");
-    painter.set_bundled_fonts_ready(true);
+    painter.set_bundled_fonts(fixture_fonts);
     const FontSpec font{FontRole::control, 14, weight, false, 0.05};
     const ResolvedTextLayout layout = painter.resolve_text_layout_utf8(text, font);
     std::cout << text << " scale=" << scale << " weight=" << weight
@@ -67,7 +52,7 @@ static void check_caption(const std::string& text, double scale, std::uint16_t w
     stream.close();
     host::DibPainter fresh;
     require_text(fresh.resize({240, 32}, scale), "Fresh DIB allocation failed");
-    fresh.set_bundled_fonts_ready(true);
+    fresh.set_bundled_fonts(fixture_fonts);
     fresh.begin_frame();
     (*button).invalidate(Dirty::paint);
     require_text(window.paint(fresh).has_value(), "Cold caption did not paint");
@@ -89,12 +74,40 @@ static void check_caption(const std::string& text, double scale, std::uint16_t w
     std::filesystem::remove("windows-text-test.bmp");
 }
 
+// ADR-004: Windows text is byte-identical to macOS and Linux. The DIB
+// painter clips damage to one rectangle, so the region case is not drawn.
+static void check_cross_platform_identity() {
+    bool mismatch = false;
+    for (std::size_t kind = 0; kind < text_identity::cases.size(); ++kind) {
+        if (text_identity::cases[kind] == text_identity::Case::damage_region) continue;
+        for (std::size_t scale = 0; scale < text_identity::scales.size(); ++scale) {
+            host::DibPainter painter;
+            painter.set_bundled_fonts(fixture_fonts);
+            const std::unique_ptr<PaintFramebuffer> framebuffer =
+                painter.create_framebuffer(text_identity::scene_size, text_identity::scales[scale]);
+            require_text(framebuffer != nullptr, "Identity framebuffer allocation failed");
+            text_identity::paint_scene((*framebuffer).painter(), text_identity::cases[kind]);
+            (*framebuffer).end();
+            const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
+            text_identity::dump_pixels(bytes, (*framebuffer).width(), (*framebuffer).height(), (*framebuffer).row_bytes(),
+                                       kind, scale, text_identity::Order::bgra);
+            const std::uint64_t observed = text_identity::pixel_hash(
+                bytes, (*framebuffer).width(), (*framebuffer).height(), (*framebuffer).row_bytes(),
+                text_identity::Order::bgra);
+            std::printf("text-identity %s %.1f 0x%016llxULL\n", text_identity::case_names[kind],
+                        text_identity::scales[scale], static_cast<unsigned long long>(observed));
+            if (observed != text_identity::expected[kind][scale]) mismatch = true;
+        }
+    }
+    require_text(!mismatch, "Windows text differs from the cross-platform expectation");
+}
+
 static void check_cache_lifetime() {
     const DWORD before = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
     {
         host::DibPainter painter;
         require_text(painter.resize({320, 80}, 1.0), "Cache test DIB allocation failed");
-        painter.set_bundled_fonts_ready(true);
+        painter.set_bundled_fonts(fixture_fonts);
         const FontSpec font{FontRole::content, 13, 400, false, 0.0};
         const ResolvedTextLayout original = painter.resolve_text_layout_utf8("File Manager", font);
         for (int index = 0; index < 520; ++index) {
@@ -113,7 +126,7 @@ static void check_cache_lifetime() {
             painter.resize({320, 80}, scale);
             host::DibPainter fresh;
             fresh.resize({320, 80}, scale);
-            fresh.set_bundled_fonts_ready(true);
+            fresh.set_bundled_fonts(fixture_fonts);
             const FontSpec varied{FontRole::control, 14, 700, false, 0.5};
             const ResolvedTextLayout reused = painter.resolve_text_layout_utf8("Файл 日本語", varied);
             const ResolvedTextLayout expected = fresh.resolve_text_layout_utf8("Файл 日本語", varied);
@@ -129,7 +142,7 @@ static void check_cache_lifetime() {
 static void benchmark_captions() {
     host::DibPainter painter;
     require_text(painter.resize({1340, 850}, 1.0), "DIB allocation failed");
-    painter.set_bundled_fonts_ready(true);
+    painter.set_bundled_fonts(fixture_fonts);
     const FontSpec font{FontRole::content, 13, 400, false, 0.0};
     for (int pass = 0; pass < 4; ++pass) {
         const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
@@ -154,11 +167,13 @@ static void benchmark_captions() {
 int main(int argc, char** argv) {
     try {
         require_text(argc == 2 || argc == 3, "Pass fixture font directory");
-        const PrivateFonts fonts{std::filesystem::path(argv[1])};
+        fixture_fonts = host::load_bundled_fonts(std::filesystem::path(argv[1]));
+        require_text(fixture_fonts != nullptr, "Could not load fixture fonts");
         if (argc == 3 && std::string_view(argv[2]) == "--benchmark") {
             benchmark_captions();
             return 0;
         }
+        check_cross_platform_identity();
         check_cache_lifetime();
         for (const double scale : {1.0, 1.5, 2.0}) {
             for (const std::uint16_t weight : {400, 700}) {

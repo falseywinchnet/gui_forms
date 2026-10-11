@@ -38,9 +38,16 @@ option(GUI_FORMS_ENABLE_WINDOWS_HOST "Build the native Win32 host" ${WIN32})
 option(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB
        "Enable bounded transactional DIB frames in the Windows development host" OFF)
 option(GUI_FORMS_ENABLE_LINUX_HOST "Build the native X11 host with the private CPU renderer" OFF)
+# ADR-004: the Skia painter, the C drawing API and the Win32 host all draw
+# text with the shared HarfBuzz/FreeType engine.
+if(GUI_FORMS_ENABLE_SKIA OR GUI_FORMS_ENABLE_WINDOWS_HOST)
+    set(GUI_FORMS_HARFBUZZ_TEXT_DEFAULT ON)
+else()
+    set(GUI_FORMS_HARFBUZZ_TEXT_DEFAULT OFF)
+endif()
 option(GUI_FORMS_ENABLE_HARFBUZZ_TEXT
        "Build the pinned HarfBuzz/FreeType text engine"
-       ${GUI_FORMS_ENABLE_SKIA})
+       ${GUI_FORMS_HARFBUZZ_TEXT_DEFAULT})
 option(GUI_FORMS_BUILD_FUZZERS "Build libFuzzer entry points" OFF)
 option(GUI_FORMS_BUILD_BENCHMARKS "Build measurement harnesses" OFF)
 option(GUI_FORMS_BUILD_DOCUMENT_VIEW_BENCHMARK "Build the renderer-neutral D1 measurement harness" OFF)
@@ -993,9 +1000,12 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
                 GUI_FORMS_WINDOWS_PREPARED_TEXT=1)
         endif()
     endif()
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "The Win32 host requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT (ADR-004)")
+    endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32 usp10
+        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
@@ -1015,7 +1025,8 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         target_link_libraries(gui_forms_application PRIVATE
             "-Wl,--whole-archive" gui_forms_core gui_drawing_core
             gui_forms_controls gui_forms_host_windows "-Wl,--no-whole-archive"
-            user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32 usp10)
+            gui_forms_text_engine freetype harfbuzz gui_forms_bidi
+            user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32)
         target_link_options(gui_forms_application PRIVATE "-Wl,--export-all-symbols")
         install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -1826,8 +1837,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
             target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
-                gui_forms_core user32 gdi32 ole32 oleaut32 oleacc uuid
-                windowscodecs comdlg32 shell32 usp10)
+                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                windowscodecs comdlg32 shell32)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
@@ -1847,8 +1858,8 @@ if(GUI_FORMS_BUILD_TESTS)
                     GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
-                    gui_forms_prepared_text_impl user32 gdi32 ole32 oleaut32 oleacc uuid
-                    windowscodecs comdlg32 shell32 usp10)
+                    gui_forms_prepared_text_impl gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                    windowscodecs comdlg32 shell32)
                 add_test(NAME gui_forms_windows_prepared_text_tests
                     COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
                 set_tests_properties(gui_forms_windows_prepared_text_tests PROPERTIES TIMEOUT 30)
