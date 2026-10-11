@@ -9,6 +9,13 @@ void test_states_and_diagnostics(gui_forms::Window& window,
         window.find("gallery.dispatcher.status"));
     require(status != nullptr,
             "states page must expose the public dispatcher proving status");
+    for (const char* id : {"gallery.dispatcher.post", "gallery.dispatcher.cancel",
+                           "gallery.dispatcher.invoke"}) {
+        const std::shared_ptr<gui_forms::Button> button =
+            std::dynamic_pointer_cast<Button>(window.find(id));
+        require(button != nullptr && (*button).command_connected(),
+                "dispatcher buttons must bind page-owned Commands");
+    }
 
     click(window, window.find("gallery.dispatcher.post"));
     require((*status).text().find("is pending") != std::string::npos &&
@@ -35,6 +42,8 @@ void test_states_and_diagnostics(gui_forms::Window& window,
     const std::shared_ptr<gui_forms::Button> invoke = std::dynamic_pointer_cast<Button>(
         window.find("gallery.dispatcher.invoke"));
     click(window, invoke);
+    // The Command's disabled state projects to its bound button while the
+    // worker waits; the posted completion step re-enables the Command.
     require(invoke && !(*invoke).enabled() &&
                 (*status).text().find("Worker blocked") != std::string::npos,
             "dispatcher gallery must visibly expose a blocking worker Invoke");
