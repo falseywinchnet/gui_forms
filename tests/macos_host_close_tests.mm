@@ -205,6 +205,70 @@ private:
     std::string& snapshot_;
 };
 
+class ProbeNativeWindow final {
+public:
+    ProbeNativeWindow(
+        std::shared_ptr<NativeWindowProbeState> native_window_probe,
+        std::function<void()> request_close)
+        : native_window_probe_(std::move(native_window_probe)),
+          request_close_(std::move(request_close)) {}
+
+    void operator()() const {
+        // Blocks below copy these locals, so the scheduled work does not
+        // depend on this callable outliving the dispatch.
+        const std::shared_ptr<NativeWindowProbeState> nativeWindowProbe =
+            native_window_probe_;
+        const std::function<void()> requestClose = request_close_;
+        NSWindow* nativeWindow = nil;
+        for (NSWindow* candidate in NSApplication.sharedApplication.windows) {
+            if ([candidate.title isEqualToString:@"GUI.Forms Close Test"]) {
+                nativeWindow = candidate;
+                break;
+            }
+        }
+        if (nativeWindow == nil) return;
+        (*nativeWindowProbe).found = true;
+        [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
+        const NSRect original = nativeWindow.frame;
+        NSRect changed = original;
+        changed.origin.x += 6.0;
+        changed.origin.y -= 6.0;
+        changed.size.width += 12.0;
+        changed.size.height += 12.0;
+        [nativeWindow setFrame:changed display:NO];
+        const NSRect committed = nativeWindow.frame;
+        (*nativeWindowProbe).moved =
+            committed.origin.x != original.origin.x ||
+            committed.origin.y != original.origin.y;
+        (*nativeWindowProbe).resized =
+            committed.size.width != original.size.width ||
+            committed.size.height != original.size.height;
+        [nativeWindow zoom:nil];
+        (*nativeWindowProbe).zoomed = nativeWindow.isZoomed ||
+            !NSEqualRects(nativeWindow.frame, committed);
+        [nativeWindow zoom:nil];
+        [nativeWindow miniaturize:nil];
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+            dispatch_get_main_queue(), ^{
+                (*nativeWindowProbe).minimized = nativeWindow.isMiniaturized;
+                [nativeWindow deminiaturize:nil];
+                dispatch_after(
+                    dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
+                    dispatch_get_main_queue(), ^{
+                        (*nativeWindowProbe).restored =
+                            !nativeWindow.isMiniaturized;
+                        requestClose();
+                        requestClose();
+                    });
+            });
+    }
+
+private:
+    std::shared_ptr<NativeWindowProbeState> native_window_probe_;
+    std::function<void()> request_close_;
+};
+
 class PrepareCloseTestHost final {
 public:
     PrepareCloseTestHost(
@@ -247,51 +311,8 @@ public:
             native_window_probe_;
         const std::function<void()> requestClose =
             (*rearm_state_).request_close;
-        (*rearm_state_).finish = [nativeWindowProbe, requestClose] {
-            NSWindow* nativeWindow = nil;
-            for (NSWindow* candidate in NSApplication.sharedApplication.windows) {
-                if ([candidate.title isEqualToString:@"GUI.Forms Close Test"]) {
-                    nativeWindow = candidate;
-                    break;
-                }
-            }
-            if (nativeWindow == nil) return;
-            nativeWindowProbe->found = true;
-            [nativeWindow setAnimationBehavior:NSWindowAnimationBehaviorNone];
-            const NSRect original = nativeWindow.frame;
-            NSRect changed = original;
-            changed.origin.x += 6.0;
-            changed.origin.y -= 6.0;
-            changed.size.width += 12.0;
-            changed.size.height += 12.0;
-            [nativeWindow setFrame:changed display:NO];
-            const NSRect committed = nativeWindow.frame;
-            nativeWindowProbe->moved =
-                committed.origin.x != original.origin.x ||
-                committed.origin.y != original.origin.y;
-            nativeWindowProbe->resized =
-                committed.size.width != original.size.width ||
-                committed.size.height != original.size.height;
-            [nativeWindow zoom:nil];
-            nativeWindowProbe->zoomed = nativeWindow.isZoomed ||
-                !NSEqualRects(nativeWindow.frame, committed);
-            [nativeWindow zoom:nil];
-            [nativeWindow miniaturize:nil];
-            dispatch_after(
-                dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-                dispatch_get_main_queue(), ^{
-                    nativeWindowProbe->minimized = nativeWindow.isMiniaturized;
-                    [nativeWindow deminiaturize:nil];
-                    dispatch_after(
-                        dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-                        dispatch_get_main_queue(), ^{
-                            nativeWindowProbe->restored =
-                                !nativeWindow.isMiniaturized;
-                            requestClose();
-                            requestClose();
-                        });
-                });
-        };
+        (*rearm_state_).finish =
+            ProbeNativeWindow(nativeWindowProbe, requestClose);
         const std::shared_ptr<RearmProbeState> scheduled_state = rearm_state_;
         const std::shared_ptr<FrameProbe> scheduled_surface = surface_;
         dispatch_after(
@@ -530,15 +551,15 @@ int main() {
     if (!rearm_state || active.connected() || (*rearm_state).replacement.connected()) {
         return 3;
     }
-    if (!native_window_probe->found || !native_window_probe->moved ||
-        !native_window_probe->resized || !native_window_probe->zoomed ||
-        !native_window_probe->minimized || !native_window_probe->restored) {
-        std::cerr << "native_window_probe found=" << native_window_probe->found
-                  << " moved=" << native_window_probe->moved
-                  << " resized=" << native_window_probe->resized
-                  << " zoomed=" << native_window_probe->zoomed
-                  << " minimized=" << native_window_probe->minimized
-                  << " restored=" << native_window_probe->restored << '\n';
+    if (!(*native_window_probe).found || !(*native_window_probe).moved ||
+        !(*native_window_probe).resized || !(*native_window_probe).zoomed ||
+        !(*native_window_probe).minimized || !(*native_window_probe).restored) {
+        std::cerr << "native_window_probe found=" << (*native_window_probe).found
+                  << " moved=" << (*native_window_probe).moved
+                  << " resized=" << (*native_window_probe).resized
+                  << " zoomed=" << (*native_window_probe).zoomed
+                  << " minimized=" << (*native_window_probe).minimized
+                  << " restored=" << (*native_window_probe).restored << '\n';
         return 9;
     }
     if (close_requests != 2) {

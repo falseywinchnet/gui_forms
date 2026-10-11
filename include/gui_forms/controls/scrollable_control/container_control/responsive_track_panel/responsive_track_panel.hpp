@@ -42,7 +42,15 @@ struct ResponsiveTrackSpec final {
     std::optional<std::uint16_t> collapse_priority;
 
     friend bool operator==(const ResponsiveTrackSpec& left,
-                           const ResponsiveTrackSpec& right) = default;
+                           const ResponsiveTrackSpec& right) {
+        return left.size_mode == right.size_mode &&
+               left.minimum == right.minimum &&
+               left.preferred == right.preferred &&
+               left.maximum == right.maximum &&
+               left.remaining_weight == right.remaining_weight &&
+               left.hidden == right.hidden &&
+               left.collapse_priority == right.collapse_priority;
+    }
 };
 
 struct ResponsiveTrackResult final {
@@ -63,7 +71,19 @@ struct ResponsiveTrackResult final {
         return collapse_reason != ResponsiveTrackCollapseReason::none;
     }
     friend bool operator==(const ResponsiveTrackResult& left,
-                           const ResponsiveTrackResult& right) = default;
+                           const ResponsiveTrackResult& right) noexcept {
+        return left.measured_content == right.measured_content &&
+               left.minimum == right.minimum &&
+               left.desired == right.desired &&
+               left.allocated == right.allocated &&
+               left.logical_start == right.logical_start &&
+               left.logical_end == right.logical_end &&
+               left.device_start == right.device_start &&
+               left.device_end == right.device_end &&
+               left.collapse_threshold == right.collapse_threshold &&
+               left.collapse_reason == right.collapse_reason &&
+               left.collapse_protected == right.collapse_protected;
+    }
 };
 
 struct ResponsiveTrackResolution final {
@@ -78,7 +98,17 @@ struct ResponsiveTrackResolution final {
     std::vector<ResponsiveTrackResult> tracks;
 
     friend bool operator==(const ResponsiveTrackResolution& left,
-                           const ResponsiveTrackResolution& right) = default;
+                           const ResponsiveTrackResolution& right) {
+        return left.available_extent == right.available_extent &&
+               left.gap == right.gap &&
+               left.device_scale == right.device_scale &&
+               left.minimum_extent == right.minimum_extent &&
+               left.desired_extent == right.desired_extent &&
+               left.allocated_extent == right.allocated_extent &&
+               left.overflow == right.overflow &&
+               left.collapse_order == right.collapse_order &&
+               left.tracks == right.tracks;
+    }
 };
 
 // Renderer-free one-dimensional solver. Content measurements and protected

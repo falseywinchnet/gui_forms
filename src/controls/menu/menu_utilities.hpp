@@ -114,13 +114,20 @@ inline std::vector<MenuSnapshot> snapshot_items(
 }
 
 [[nodiscard]] inline bool snapshot_enabled(
+    const MenuSnapshot& item) noexcept;
+
+struct EnabledSnapshot final {
+    [[nodiscard]] bool operator()(const MenuSnapshot& child) const noexcept {
+        return snapshot_enabled(child);
+    }
+};
+
+[[nodiscard]] inline bool snapshot_enabled(
     const MenuSnapshot& item) noexcept {
     if (item.kind == MenuItemKind::separator) return false;
     if (item.kind != MenuItemKind::submenu) return item.command_state.enabled;
     return std::any_of(item.children.begin(), item.children.end(),
-                       [](const MenuSnapshot& child) {
-                           return snapshot_enabled(child);
-                       });
+                       EnabledSnapshot{});
 }
 
 inline Color menu_ink(const MenuSnapshot& item,

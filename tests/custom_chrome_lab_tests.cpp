@@ -39,8 +39,8 @@ int main() {
             gui_forms::custom_chrome_lab::make_custom_chrome_lab();
         const std::shared_ptr<Control> initial_title =
             (*window).find("custom-chrome.title-drag");
-        require(initial_title && initial_title->authored_surface_material() &&
-                    initial_title->authored_surface_material()->fills.front().spread ==
+        require(initial_title && (*initial_title).authored_surface_material() &&
+                    (*(*initial_title).authored_surface_material()).fills.front().spread ==
                         GradientSpreadMode::pad,
                 "title material must retain its authored pad spread before paint");
         NullPainter painter;
@@ -51,13 +51,13 @@ int main() {
             (*window).visual_inspection_snapshot();
         const VisualControlInspection* title =
             snapshot.find("custom-chrome.title-drag");
-        require(title && title->layout.absolute_bounds ==
+        require(title && (*title).layout.absolute_bounds ==
                              Rect{0.0, 0.0, 1120.0, 40.0},
                 "title identity must begin at client y=0 and span the window");
-        require(title->authored_material &&
-                    title->authored_material->fills.size() == 4U &&
-                    title->authored_material->keylines.size() == 2U &&
-                    title->display_chunk_current,
+        require((*title).authored_material &&
+                    (*(*title).authored_material).fills.size() == 4U &&
+                    (*(*title).authored_material).keylines.size() == 2U &&
+                    (*title).display_chunk_current,
                 "active title must expose the complete retained material chunk");
 
         const std::array<std::string, 1> drag_regions{
@@ -113,11 +113,11 @@ int main() {
                 "host activation must update portable Window visual state");
         snapshot = (*window).visual_inspection_snapshot();
         title = snapshot.find("custom-chrome.title-drag");
-        require(title && title->authored_material &&
-                    title->authored_material->fills.size() == 2U,
+        require(title && (*title).authored_material &&
+                    (*(*title).authored_material).fills.size() == 2U,
                 "inactive title must retain a distinct restrained material");
-        require((*window).find("custom-chrome.interactive-exclusion")
-                    ->effectively_enabled(),
+        require((*(*window).find("custom-chrome.interactive-exclusion"))
+                    .effectively_enabled(),
                 "window deactivation must not disable retained content");
         require(host.dispatch(HostActivationEvent{true}, 3).accepted() &&
                     (*window).active(),
@@ -136,14 +136,14 @@ int main() {
                 (*window).find("custom-chrome.click-readout"));
         require(pointer_down.accepted() && pointer_up.accepted() &&
                     click_readout &&
-                    click_readout->text() ==
+                    (*click_readout).text() ==
                         "Interactive exclusion received 1 click",
                 "interactive title descendant must receive ordinary pointer dispatch");
 
         (*window).set_scale(2.0);
         (*window).perform_layout();
-        require((*window).find("custom-chrome.title-drag")
-                    ->absolute_bounds() == Rect{0.0, 0.0, 1120.0, 40.0},
+        require((*(*window).find("custom-chrome.title-drag"))
+                    .absolute_bounds() == Rect{0.0, 0.0, 1120.0, 40.0},
                 "device scale must not perturb logical title geometry");
         require((*window).semantic_snapshot().to_json().find(
                     "custom-chrome.interactive-exclusion") !=

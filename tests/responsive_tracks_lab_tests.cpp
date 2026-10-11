@@ -110,9 +110,9 @@ void test_size_matrix_collapse_thresholds_and_bounded_extreme() {
                 (*primary).effectively_visible() &&
                 !(*primary).arranged_bounds().empty() &&
                 (*primary).arranged_bounds().right() <= 150.0 + 1e-9 &&
-                window->metrics_snapshot().bounded_pass_limit_hits == 0U,
+                (*window).metrics_snapshot().bounded_pass_limit_hits == 0U,
             "150x150 surface must remain bounded around one usable current-location/content region");
-    const std::string semantic = window->semantic_snapshot().to_json();
+    const std::string semantic = (*window).semantic_snapshot().to_json();
     require(semantic.find("responsive.content.primary") != std::string::npos &&
                 semantic.find("responsive.selection.action") == std::string::npos,
             "extreme collapse must preserve the primary path and remove collapsed panes from task semantics");
@@ -127,11 +127,11 @@ void test_native_preset_preview_keeps_controller_window_stable() {
         find_as<ResponsiveTrackPanel>(*window, "responsive.surface");
     require(preset && surface && (*preset).perform_click(),
             "the native width/height preset must remain invokable");
-    window->perform_layout();
+    (*window).perform_layout();
     require(near((*surface).arranged_bounds().width, 300.0) &&
                 near((*surface).arranged_bounds().height, 240.0) &&
-                near(window->client_size().width, 1450.0) &&
-                near(window->client_size().height,
+                near((*window).client_size().width, 1450.0) &&
+                near((*window).client_size().height,
                      850.0 + gui_forms::responsive_tracks_lab::controller_height),
             "native presets must preview an exact product surface without losing the stable controller strip");
 }
@@ -144,8 +144,8 @@ void test_text_scale_matrix_reflows_before_row_collapse() {
     resize_surface(*window, {960.0, 680.0});
     std::vector<double> title_allocations;
     for (const double scale : {1.0, 1.25, 1.5, 2.0}) {
-        window->set_text_scale(scale);
-        window->perform_layout();
+        (*window).set_text_scale(scale);
+        (*window).perform_layout();
         const ResponsiveLayoutSnapshot snapshot = (*rows).layout_snapshot();
         require(snapshot.resolution.tracks.size() == 6U,
                 "text-scale surface must keep a complete row diagnostic");
@@ -165,8 +165,8 @@ void test_text_scale_matrix_reflows_before_row_collapse() {
     require(extreme.resolution.collapse_order.size() >= 2U &&
                 extreme.resolution.collapse_order[0] == 2U &&
                 extreme.resolution.collapse_order[1] == 5U &&
-                find_as<Button>(*window, "responsive.content.primary")
-                    ->effectively_visible(),
+                (*find_as<Button>(*window, "responsive.content.primary"))
+                    .effectively_visible(),
             "large text at short height must grow/reflow first, then collapse shelf and status before the primary field");
 }
 
@@ -181,10 +181,10 @@ void test_resize_cycles_inspection_and_revision_stability() {
     }
     const std::uint64_t revision =
         (*columns).layout_snapshot().committed_resolution_revision;
-    window->perform_layout();
+    (*window).perform_layout();
     const ResponsiveLayoutSnapshot settled = (*columns).layout_snapshot();
     const std::string inspection =
-        window->visual_inspection_snapshot().to_json();
+        (*window).visual_inspection_snapshot().to_json();
     require(settled.committed_resolution_revision == revision &&
                 settled.transaction.requested_revision ==
                     settled.transaction.committed_revision &&
@@ -193,7 +193,7 @@ void test_resize_cycles_inspection_and_revision_stability() {
                     std::string::npos &&
                 inspection.find("responsive.layout.diagnostics") !=
                     std::string::npos &&
-                window->metrics_snapshot().bounded_pass_limit_hits == 0U,
+                (*window).metrics_snapshot().bounded_pass_limit_hits == 0U,
             "resize cycles must settle with committed revisions and public inspector-visible layout state");
 }
 

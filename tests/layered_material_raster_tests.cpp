@@ -55,7 +55,7 @@ struct Pixel final {
 
 template <typename Raster>
 Pixel pixel_at(const Raster& raster, int x, int y, int scale = 2) {
-    const auto* pixels = static_cast<const std::uint8_t*>(raster.pixels());
+    const std::uint8_t* pixels = static_cast<const std::uint8_t*>(raster.pixels());
     const std::size_t offset = static_cast<std::size_t>(y * scale) *
             raster.row_bytes() + static_cast<std::size_t>(x * scale) * 4U;
     return {pixels[offset], pixels[offset + 1U], pixels[offset + 2U],

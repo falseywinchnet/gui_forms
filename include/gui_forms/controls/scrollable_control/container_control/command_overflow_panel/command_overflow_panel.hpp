@@ -21,7 +21,12 @@ struct CommandOverflowGroupSpec final {
     std::optional<std::uint16_t> collapse_priority;
 
     friend bool operator==(const CommandOverflowGroupSpec& left,
-                           const CommandOverflowGroupSpec& right) = default;
+                           const CommandOverflowGroupSpec& right) {
+        return left.minimum == right.minimum &&
+               left.preferred == right.preferred &&
+               left.maximum == right.maximum &&
+               left.collapse_priority == right.collapse_priority;
+    }
 };
 
 struct CommandOverflowGroupResult final {
@@ -32,7 +37,13 @@ struct CommandOverflowGroupResult final {
     std::optional<std::uint16_t> collapse_priority;
 
     friend bool operator==(const CommandOverflowGroupResult& left,
-                           const CommandOverflowGroupResult& right) = default;
+                           const CommandOverflowGroupResult& right) {
+        return left.stable_id == right.stable_id &&
+               left.measured == right.measured &&
+               left.allocated == right.allocated &&
+               left.collapsed == right.collapsed &&
+               left.collapse_priority == right.collapse_priority;
+    }
 };
 
 struct CommandOverflowSnapshot final {
@@ -44,7 +55,14 @@ struct CommandOverflowSnapshot final {
     std::vector<CommandOverflowGroupResult> groups;
 
     friend bool operator==(const CommandOverflowSnapshot& left,
-                           const CommandOverflowSnapshot& right) = default;
+                           const CommandOverflowSnapshot& right) {
+        return left.available_extent == right.available_extent &&
+               left.group_gap == right.group_gap &&
+               left.overflow_actuator_visible == right.overflow_actuator_visible &&
+               left.overflow == right.overflow &&
+               left.committed_revision == right.committed_revision &&
+               left.groups == right.groups;
+    }
 };
 
 // Horizontal retained command-group projection. It owns only layout collapse

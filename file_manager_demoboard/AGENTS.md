@@ -19,6 +19,12 @@ Read, in order, before changing code or specifications:
 10. `reference/README.md`
 11. parent `../AGENTS.md`
 
+## Code style
+
+Code here follows `../planning/PROGRAMMING_HOUSE_STYLE.md`, as everywhere in
+GUI.Forms; see "Code style (mandatory)" in the parent `../AGENTS.md`. The
+`house-style` CI job checks this directory.
+
 ## Mission
 
 Build a native, interactive File Manager interface specimen that looks and

@@ -113,24 +113,24 @@ void test_geometry_clip_material_font_and_redaction() {
     const VisualControlInspection* text = snapshot.find("inspection.text");
     require(clip != nullptr && text != nullptr,
             "visual snapshot must resolve controls by stable identity");
-    require(clip->layout.absolute_bounds == Rect{30.0, 20.0, 120.0, 80.0} &&
-                clip->layout.child_viewport == Rect{12.0, 8.0, 96.0, 64.0},
+    require((*clip).layout.absolute_bounds == Rect{30.0, 20.0, 120.0, 80.0} &&
+                (*clip).layout.child_viewport == Rect{12.0, 8.0, 96.0, 64.0},
             "inspection must expose committed absolute bounds and child viewport");
-    require(text->layout.absolute_bounds == Rect{20.0, 32.0, 110.0, 32.0} &&
-                text->layout.effective_clip == Rect{42.0, 32.0, 88.0, 32.0} &&
-                text->layout.clipped_by_ancestor &&
-                !text->layout.fully_clipped &&
-                text->layout.ancestor_clip_count == 2U,
+    require((*text).layout.absolute_bounds == Rect{20.0, 32.0, 110.0, 32.0} &&
+                (*text).layout.effective_clip == Rect{42.0, 32.0, 88.0, 32.0} &&
+                (*text).layout.clipped_by_ancestor &&
+                !(*text).layout.fully_clipped &&
+                (*text).layout.ancestor_clip_count == 2U,
             "inspection must calculate the exact effective ancestor clip");
-    require(clip->authored_material &&
-                (*clip->authored_material).fills.size() == 2U &&
-                (*clip->authored_material).shadows.size() == 1U,
+    require((*clip).authored_material &&
+                (*(*clip).authored_material).fills.size() == 2U &&
+                (*(*clip).authored_material).shadows.size() == 1U,
             "inspection must retain exact authored material layer order");
-    require(clip->display_chunk_current && text->display_chunk_current,
+    require((*clip).display_chunk_current && (*text).display_chunk_current,
             "painted clean controls must report current committed chunks");
 
     bool found_resolved_font = false;
-    for (const VisualPaintOperationSnapshot& operation : text->display_operations) {
+    for (const VisualPaintOperationSnapshot& operation : (*text).display_operations) {
         if (operation.operation != VisualPaintOperation::draw_text) continue;
         found_resolved_font = close(operation.font.size, 13.75) &&
             operation.font.role == FontRole::content &&
@@ -151,7 +151,7 @@ void test_geometry_clip_material_font_and_redaction() {
             "unredacted visual snapshot must retain the requested control");
     bool found_text = false;
     for (const VisualPaintOperationSnapshot& operation :
-         unredacted_text->display_operations) {
+         (*unredacted_text).display_operations) {
         found_text = found_text || operation.text == "Private witness text";
     }
     require(found_text,
@@ -177,16 +177,16 @@ void test_state_damage_staleness_bounds_and_json() {
     VisualInspectionSnapshot active =
         (*fixture.window).visual_inspection_snapshot();
     const VisualControlInspection* button = active.find("inspection.button");
-    require(button && button->state.focused && button->state.hovered &&
-                button->state.pressed && button->state.pointer_captured,
+    require(button && (*button).state.focused && (*button).state.hovered &&
+                (*button).state.pressed && (*button).state.pointer_captured,
             "inspection must expose focused, hovered, pressed, and capture state");
 
     (*fixture.text).set_font({FontRole::content, 16.0, 400, false});
     const VisualInspectionSnapshot stale =
         (*fixture.window).visual_inspection_snapshot();
     const VisualControlInspection* stale_text = stale.find("inspection.text");
-    require(stale_text && stale_text->display_chunk &&
-                !stale_text->display_chunk_current &&
+    require(stale_text && (*stale_text).display_chunk &&
+                !(*stale_text).display_chunk_current &&
                 !stale.pending_damage[paint_plane_index(PaintPlane::control)].empty(),
             "inspection must report a stale chunk and non-destructively retain pending damage");
     require((*fixture.window).needs_frame(),

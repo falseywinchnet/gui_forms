@@ -424,16 +424,17 @@ std::unique_ptr<Window> make_responsive_tracks_lab() {
         (*root).retain((*button).clicked().subscribe(
             *root, SelectTextScale{scale}));
     }
-    for (const auto& [label, reveal] :
+    for (const std::pair<std::string, bool>& choice :
          std::vector<std::pair<std::string, bool>>{
              {"Reveal", true}, {"Auto", false}}) {
         std::shared_ptr<Button> button = make_control<Button>(
-            StableId("responsive.reveal." + std::to_string(reveal)), label);
+            StableId("responsive.reveal." + std::to_string(choice.second)),
+            choice.first);
         (*button).set_font({FontRole::control, 8.0, 700, false});
         (*root).add_child(button);
         (*root).add_controller(button);
         (*root).retain((*button).clicked().subscribe(
-            *root, SelectReveal{workspace, reveal}));
+            *root, SelectReveal{workspace, choice.second}));
     }
 
     std::unique_ptr<Window> window = std::make_unique<Window>(

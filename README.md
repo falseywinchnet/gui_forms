@@ -275,8 +275,11 @@ boundaries.
 ## Contributing
 
 CI ([`native.yml`](.github/workflows/native.yml)) must pass on every platform.
-Run `python3 tools/check_house_style.py <paths>` on first-party C++ files you
-touch, and build the docs with `sphinx-build -W docs <out>` so warnings fail.
+C++ follows [`planning/PROGRAMMING_HOUSE_STYLE.md`](planning/PROGRAMMING_HOUSE_STYLE.md);
+CI fails on any spelling finding from
+`python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis`,
+so run it before you push. Build the docs with `sphinx-build -W docs <out>` so
+warnings fail.
 Boundary violations fail `ctest` before review.
 
 ## License

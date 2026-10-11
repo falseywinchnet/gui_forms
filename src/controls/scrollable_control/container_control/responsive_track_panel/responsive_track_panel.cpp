@@ -75,6 +75,21 @@ void validate_track_specs(std::span<const ResponsiveTrackSpec> specs) {
     return extent;
 }
 
+// Orders track indices by authored collapse priority, then by index.
+struct CollapsePriorityOrder final {
+    std::span<const ResponsiveTrackSpec> specs;
+
+    [[nodiscard]] bool operator()(std::size_t left,
+                                  std::size_t right) const noexcept {
+        if (*specs[left].collapse_priority !=
+            *specs[right].collapse_priority) {
+            return *specs[left].collapse_priority <
+                   *specs[right].collapse_priority;
+        }
+        return left < right;
+    }
+};
+
 [[nodiscard]] std::vector<std::size_t> sorted_collapse_candidates(
     std::span<const ResponsiveTrackSpec> specs,
     std::span<const ResponsiveTrackResult> tracks) {
@@ -87,14 +102,7 @@ void validate_track_specs(std::span<const ResponsiveTrackSpec> specs) {
         candidates.push_back(index);
     }
     std::sort(candidates.begin(), candidates.end(),
-              [specs](std::size_t left, std::size_t right) {
-                  if (*specs[left].collapse_priority !=
-                      *specs[right].collapse_priority) {
-                      return *specs[left].collapse_priority <
-                             *specs[right].collapse_priority;
-                  }
-                  return left < right;
-              });
+              CollapsePriorityOrder{specs});
     return candidates;
 }
 
@@ -348,7 +356,8 @@ void ResponsiveTrackPanel::set_track_specs(
         if ((*entry).first >= track_specs_.size()) entry = focus_fallbacks_.erase(entry);
         else ++entry;
     }
-    for (auto entry = revealed_tracks_.begin(); entry != revealed_tracks_.end();) {
+    for (std::unordered_set<std::size_t>::iterator entry = revealed_tracks_.begin();
+         entry != revealed_tracks_.end();) {
         if (*entry >= track_specs_.size()) entry = revealed_tracks_.erase(entry);
         else ++entry;
     }
@@ -484,9 +493,8 @@ ResponsiveTrackResolution ResponsiveTrackPanel::layout_children(
     std::vector<Item> items;
     std::vector<double> measured(track_specs_.size(), 0.0);
     std::unordered_set<std::size_t> explicitly_used;
-    for (const auto& [runtime_id, track] : child_tracks_) {
-        static_cast<void>(runtime_id);
-        explicitly_used.insert(track);
+    for (const ChildTrackMap::value_type& entry : child_tracks_) {
+        explicitly_used.insert(entry.second);
     }
     std::size_t automatic_track = 0U;
     const std::vector<Control::Ptr> retained = snapshot_layout_children();

@@ -49,6 +49,26 @@ std::vector<std::string> wrap_lines(std::string_view text, double width,
     return lines;
 }
 
+// Resolves one line through the control's attached terminal provider.
+struct ControlLineResolver final {
+    const Control& control;
+    FontSpec effective;
+
+    [[nodiscard]] ResolvedTextLayout operator()(std::string_view line) const {
+        return control.resolve_text_layout_utf8(line, effective);
+    }
+};
+
+// Resolves one line through the painter that will draw it.
+struct PainterLineResolver final {
+    Painter& painter;
+    FontSpec effective;
+
+    [[nodiscard]] ResolvedTextLayout operator()(std::string_view line) const {
+        return painter.resolve_text_layout_utf8(line, effective);
+    }
+};
+
 } // namespace
 
 TypographySpecimen::TypographySpecimen(StableId stable_id, std::string text)
@@ -99,9 +119,7 @@ ResolvedTextLayout TypographySpecimen::resolved_layout() const {
 
 Size TypographySpecimen::measure(Size available) {
     const FontSpec effective = effective_font(font_);
-    const auto resolve = [this, effective](std::string_view line) {
-        return resolve_text_layout_utf8(line, effective);
-    };
+    const ControlLineResolver resolve{*this, effective};
     const std::vector<std::string> lines = wrap_lines(
         text_, std::max(0.0, available.width - 20.0), wrap_text_, resolve);
     double content_width{};
@@ -125,9 +143,7 @@ Size TypographySpecimen::measure(Size available) {
 void TypographySpecimen::on_paint(Painter& painter, Rect) {
     const Rect bounds = client_rectangle();
     const FontSpec effective = effective_font(font_);
-    const auto resolve = [&painter, effective](std::string_view line) {
-        return painter.resolve_text_layout_utf8(line, effective);
-    };
+    const PainterLineResolver resolve{painter, effective};
     const std::vector<std::string> lines = wrap_lines(
         text_, std::max(0.0, bounds.width - 20.0), wrap_text_, resolve);
     std::vector<ResolvedTextLayout> resolved_lines;
