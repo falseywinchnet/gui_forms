@@ -96,3 +96,13 @@ python3 tools/api_reference.py --check            # validates docs/reference/inv
 The `docs` CI job builds the site; the `house-style` job runs the registry
 check and its unit tests. Neither job regenerates files into the tree, so a
 stale generated page fails the check rather than being silently rewritten.
+
+## API reference freshness is checked by maintainers, not CI
+
+`python3 tools/api_reference.py --check` compares the committed
+`docs/reference/inventory.json` byte for byte with a fresh clang AST dump of
+the public headers. That dump differs between compilers (the committed
+inventory comes from the maintainer's clang), so the check is not run on CI
+runners; run it locally after changing a public header and commit the
+regenerated inventory and Markdown. Making the inventory compiler-independent
+is open work (plan W2.3 follow-up).

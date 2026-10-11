@@ -332,6 +332,16 @@ with the system compiler and by CI on push. Item A.2 (a `results/` record of
 the text engine benchmark) stays open until a run on an LLVM 22 machine or a
 CI step produces it.
 
+### W2.3 follow-up. Compiler-independent API inventory (open)
+
+The first CI run showed `tools/api_reference.py --check` failing on Linux x64
+while the build and tests passed: the committed inventory is a clang AST
+dump from the maintainer's compiler and LLVM 22 on Ubuntu emits a different
+dump. The CI step was removed; the check stays a maintainer command (see
+docs/README.md). Open: normalise the inventory to declarations only (names,
+kinds, signatures) so any supported clang reproduces it, then restore the CI
+step on every platform.
+
 ### W9. Paint by damage region, not its bounds (open; from PlaySuite measurements)
 
 PlaySuite's idle counters on 2026-10-11 show games whose per-pass requested
