@@ -73,6 +73,34 @@ target_link_libraries(audio_adapter PRIVATE GUIForms::Audio)
 target_link_libraries(my_forms PRIVATE GUIForms::Application audio_adapter)
 ```
 
+## Development text targets
+
+`GUIForms::TextMasks` (the logical text-mask service) and
+`GUIForms::PreparedText` (the prepared-text service) are development-only.
+They are not package components, and installing a build configured with
+`GUI_FORMS_BUILD_TEXT_MASKS` or `GUI_FORMS_BUILD_PREPARED_TEXT` stops with an
+error. They exist only when your project adds the GUI.Forms source tree with
+`add_subdirectory` and turns those options on; both need
+`GUI_FORMS_ENABLE_HARFBUZZ_TEXT`.
+
+They follow the linking rule. In a build with a native host, each is an
+interface target that links `GUIForms::Application` and nothing else; the
+implementation is already inside the Application library, so link it beside
+Application:
+
+```cmake
+target_link_libraries(my_forms PRIVATE GUIForms::Application GUIForms::TextMasks)
+```
+
+Adding `GUIForms::Core` to that program fails at generation time with a
+Core-linkage diagnostic. With `PreparedText` enabled, Application also passes
+the `GUI_FORMS_PREPARED_TEXT` definition to its consumers, so your code sees
+the declarations the library was built with. In a build without a native host
+the two targets carry a static Core instead, for hostless programs, and
+cannot be combined with an Application library.
+`tests/application_text_consumer/` in the repository is a consumer of this
+shape.
+
 ## Runtime files to ship
 
 `Threading` and `Application` are shared libraries. Ship them beside your

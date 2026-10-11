@@ -116,7 +116,7 @@ Every stock control, grouped by function; the table is generated from
 | `CommandBar` |  | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
 | `DropDownButton` |  | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
 | `LinkLabel` |  | Command presented as underlined link text with retained visited state and link semantics. |
-| `TextBox` | Text editing | Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
+| `TextBox` | Text editing | Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
 | `Label` | Information display | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
 | `PictureBox` |  | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
 | `ProgressBar` |  | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |

@@ -81,10 +81,39 @@ Use the native MSYS2 CLANG64 instructions in [Installation](../user/install). Th
 the current LLVM 22.1.x configure check. It is not a working cross-build
 recipe for the current tree.
 
+Windows builds target the Windows 10 API level (`_WIN32_WINNT=0x0A00`). A
+Windows host build produces `GUI.Forms Gallery.exe` (statically linked),
+`libgui_forms_threading.dll`, the automation client
+`gui_forms_windows_probe.exe` and a `fonts/` directory, all in the build
+directory.
+
+To run a Windows build under Wine, run it from that directory with
+`libwinpthread-1.dll` beside the executable: the threading DLL imports it,
+and without it the program fails to start. A cross-built program also needs
+its compiler runtime DLLs; `tools/stage_mingw_runtime.sh <dir>` copies
+`libwinpthread-1.dll`, `libgcc_s_seh-1.dll` and `libstdc++-6.dll` from
+Homebrew's mingw-w64 toolchain. Then run `wine "GUI.Forms Gallery.exe"`; add
+`--automation` to accept commands from the probe.
+
 `tools/run_windows_wine_smoke.sh <build-dir>` launches the gallery with
-`--automation`, activates controls by stable ID, captures the framebuffer,
-closes through the real `WM_CLOSE` path and asserts on the structured
-snapshot. The native Windows build in MSYS2 uses the same host sources with
+`--automation`, clicks three page rows and three controls by stable ID,
+captures the framebuffer, closes through the real `WM_CLOSE` path and checks
+the structured log: six handled clicks, a saved capture, the Win32 DIB
+renderer with bundled fonts, no rejected host events, exactly one close
+request, and a closed, shut-down host. The log and capture
+(`wine-gallery-smoke.jsonl`, `gallery-automation.bmp`) go to the build
+directory or `GUI_FORMS_EVIDENCE_DIR`. `tools/run_windows_gallery_text_smoke.sh`
+runs the Windows text tests under Wine before driving the text page, and
+`tools/run_windows_gallery_services_smoke.sh` drives the animation,
+dispatcher and host-service pages. The scripts need `wine` (override with
+`WINE_BINARY`) and `rg`. When the build is configured on macOS with `wine`
+found, the `gui_forms_windows_wine_smoke` and
+`gui_forms_windows_gallery_services_smoke` targets run the first and last of
+these against the build directory. With `x86_64-w64-mingw32-objdump`
+available, `gui_forms_windows_boundary_audit` rejects a gallery that imports a
+GPU or managed runtime DLL or lacks `GDI32.dll` and `USER32.dll`.
+
+The native Windows build in MSYS2 uses the same host sources with
 `cmake/llvm22.cmake`.
 
 ## Install prefix and SDK layout

@@ -9,7 +9,7 @@ Generated from `manifests/controls.json` by `python3 tools/control_registry.py r
 |  | `CommandBar` | ToolStrip | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
 |  | `DropDownButton` | ToolStripSplitButton | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
 |  | `LinkLabel` | LinkLabel | Command presented as underlined link text with retained visited state and link semantics. |
-| Text editing | `TextBox` | TextBox | Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
+| Text editing | `TextBox` | TextBox | Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
 | Information display | `Label` | Label | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
 |  | `PictureBox` | PictureBox | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
 |  | `ProgressBar` | ProgressBar | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |

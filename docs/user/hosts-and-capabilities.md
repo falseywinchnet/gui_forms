@@ -52,10 +52,19 @@ macOS (AppKit)
 Windows (Win32)
 : `src/host/windows/`, the only place Win32, COM and WIC types are allowed. An
   ordinary resizable top-level window presents a top-down 32-bit DIB with
-  software alpha blending; DPI awareness is loaded at run time with a fallback
-  for older systems; WIC decodes the PNG resources the core has already
-  validated; text comes from the shared engine, not GDI. An opt-in
-  `WM_COPYDATA` automation channel addresses controls by stable ID.
+  software alpha blending. The process asks for per-monitor DPI awareness
+  (`SetProcessDpiAwarenessContext`, resolved at run time, falling back to
+  `SetProcessDPIAware`); the scale is the window DPI divided by 96, never
+  below 1, and `WM_DPICHANGED` delivers a scale notification and applies the
+  suggested window rectangle. WIC decodes the PNG resources the core has
+  already validated. Text comes from the shared engine, not GDI, using the
+  bundled faces in `fonts\` beside the executable, or in the directory
+  `GUI_FORMS_FONT_DIR` names; with an incomplete font pack the renderer name
+  says so and no text metrics provider is installed. An opt-in `WM_COPYDATA`
+  automation channel, off unless the host options set `automation_enabled`
+  (the gallery sets it from `--automation`), addresses controls by stable
+  ID; it accepts commands of at most 4096 bytes with the prefix
+  `GUI.Forms.Automation/1`.
   MSAA publication is implemented through `IAccessible`; a separate UIA
   provider is not implemented. The adapter advertises `text_composition`, but
   its current input path forwards committed `WM_CHAR` text rather than a TSF

@@ -9,6 +9,9 @@ tested and where the evidence behind the documentation lives.
 :maxdepth: 1
 
 contributing
+style
+tools
+architecture
 decisions
 roadmap
 evidence

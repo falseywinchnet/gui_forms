@@ -125,7 +125,7 @@ Required acceptance remains the complete sibling request: destruction in either
 order and during dispatch; no propagation loops or steady-state allocation;
 item rebuilding, keyboard and accessibility; installed-SDK examples; ownership
 and error contracts; dispatch/idle/paint evidence and coherent C++ rebuild notes.
-See `../docs/CONCISE_STATE_AND_COLLECTIONS.md` for exact semantics and limits,
+See `../docs/user/values-commands-and-binding.md` for exact semantics and limits,
 and `../experiments/CONCISE_STATE_AND_COLLECTIONS.md` for measured qualification.
 All platform claims must follow actual results; source availability alone is
 not native-host qualification.
