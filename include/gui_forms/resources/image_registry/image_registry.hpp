@@ -14,6 +14,9 @@ class ImageRegistry final {
 public:
     explicit ImageRegistry(ImageRegistryLimits limits = {});
     ~ImageRegistry();
+    // A moved-from registry is empty, with zero accounting, and may be
+    // reused. Both registries take a new revision, so a consumer synchronized
+    // to either one's previous revision resynchronizes.
     ImageRegistry(ImageRegistry&&) noexcept;
     ImageRegistry& operator=(ImageRegistry&&) noexcept;
     ImageRegistry(const ImageRegistry&) = delete;
@@ -54,6 +57,8 @@ private:
         std::uint64_t encoded_bytes, std::uint64_t decoded_bytes,
         std::uint64_t replaced_encoded = 0,
         std::uint64_t replaced_decoded = 0) const noexcept;
+    // Empties this registry after its contents moved elsewhere.
+    void release_moved_contents() noexcept;
 
     ImageRegistryLimits limits_;
     std::vector<Slot> slots_;

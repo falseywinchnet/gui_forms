@@ -142,7 +142,8 @@ private:
 
     struct Slot : detail::Revocable {
         Slot(std::weak_ptr<State> event_state, Callback event_callback)
-            : state(std::move(event_state)), callback(std::move(event_callback)),
+            : state(std::move(event_state)),
+              callback(std::make_shared<Callback>(std::move(event_callback))),
               kind(CallbackKind::owning) {}
 
         Slot(std::weak_ptr<State> event_state, const DelegateCallback event_delegate)
@@ -155,7 +156,7 @@ private:
             }
             connected_ = false;
             release_subscription_owner();
-            callback = {};
+            callback.reset();
             delegate = {};
             const std::shared_ptr<State> event_state = state.lock();
             if (event_state != nullptr) {
@@ -171,10 +172,12 @@ private:
                 local_delegate(arguments...);
                 return;
             }
-            // The local owning callable keeps its target alive if this callback
+            // Every emission calls the one subscribed callable, so its state
+            // persists between calls. The local holder keeps it alive if it
             // disposes its owner and revokes the slot while it is executing.
-            const Callback local_callback = callback;
-            local_callback(arguments...);
+            const std::shared_ptr<Callback> local_callback = callback;
+            if (local_callback == nullptr) return;
+            (*local_callback)(arguments...);
         }
 
         enum class CallbackKind : std::uint8_t {
@@ -183,7 +186,9 @@ private:
         };
 
         std::weak_ptr<State> state{};
-        Callback callback{};
+        // Shared so an executing call outlives disconnect; null once
+        // disconnected.
+        std::shared_ptr<Callback> callback;
         DelegateCallback delegate{};
         CallbackKind kind{CallbackKind::owning};
         bool connected_{};

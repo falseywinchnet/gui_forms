@@ -370,6 +370,14 @@ if(APPLE)
     target_link_options(gui_drawing_c_api PRIVATE
         "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/cmake/drawing_c_api_exports_macos.txt"
     )
+elseif(UNIX)
+    # Without this the library also exports Drawing Core's C++ symbols, which
+    # duplicate a static Drawing Core in the same process.
+    target_link_options(gui_drawing_c_api PRIVATE
+        "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cmake/drawing_c_api_exports_linux.map"
+    )
+    set_property(TARGET gui_drawing_c_api APPEND PROPERTY LINK_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/drawing_c_api_exports_linux.map)
 endif()
 
 add_library(gui_forms_host_headless STATIC
@@ -655,6 +663,12 @@ if(APPLE)
     target_link_options(gui_forms_c_api PRIVATE
         "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_api_exports_macos.txt"
     )
+elseif(UNIX)
+    target_link_options(gui_forms_c_api PRIVATE
+        "LINKER:--version-script=${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_api_exports_linux.map"
+    )
+    set_property(TARGET gui_forms_c_api APPEND PROPERTY LINK_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/c_api_exports_linux.map)
 endif()
 
 if(GUI_FORMS_ENABLE_SKIA)
@@ -2434,12 +2448,43 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_c_api_cpp_tests PRIVATE gui_forms_c_api)
     add_test(NAME gui_forms_c_api_cpp_tests COMMAND gui_forms_c_api_cpp_tests)
 
+    # White-box teardown lifetimes: the test compiles the C ABI translation
+    # unit itself (headless host only) with a friend fixture enabled.
+    add_executable(gui_forms_abi_registry_lifetime_tests
+        tests/abi_registry_lifetime_tests.cpp
+        src/abi/control_adapters/input_transparent_control/input_transparent_control.cpp
+        src/abi/control_adapters/form_control/form_control.cpp
+        src/abi/control_adapters/field_control/field_control.cpp
+        src/abi/control_adapters/raster_control/raster_control.cpp
+        src/abi/control_adapters/abi_property_object_control/abi_property_object_control.cpp
+        src/abi/error/abi_error.cpp
+        src/abi/paint_endpoint/windows_compatibility_paint_endpoint.cpp)
+    target_include_directories(gui_forms_abi_registry_lifetime_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_compile_definitions(gui_forms_abi_registry_lifetime_tests PRIVATE GF_C_API_BUILD GUI_FORMS_ABI_REGISTRY_TEST)
+    target_link_libraries(gui_forms_abi_registry_lifetime_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_abi_registry_lifetime_tests COMMAND gui_forms_abi_registry_lifetime_tests)
+
     if(APPLE)
         add_test(
             NAME gui_forms_c_api_export_policy
             COMMAND ${CMAKE_COMMAND}
                 -DC_API_LIBRARY=$<TARGET_FILE:gui_forms_c_api>
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_c_api_exports.cmake
+        )
+    elseif(UNIX)
+        add_test(
+            NAME gui_forms_c_api_export_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DC_API_LIBRARY=$<TARGET_FILE:gui_forms_c_api>
+                -DEXPECTED_SYMBOL=gf_get_api_v0
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_linux_c_api_exports.cmake
+        )
+        add_test(
+            NAME gui_drawing_c_api_export_policy
+            COMMAND ${CMAKE_COMMAND}
+                -DC_API_LIBRARY=$<TARGET_FILE:gui_drawing_c_api>
+                -DEXPECTED_SYMBOL=gd_get_api_v0
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_linux_c_api_exports.cmake
         )
     endif()
 
