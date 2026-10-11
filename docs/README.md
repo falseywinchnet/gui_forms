@@ -1,122 +1,98 @@
-# GUI.Forms documentation
+# GUI.Forms documentation (maintainer notes)
 
-- [`LIFECYCLE_CONTRACT.md`](LIFECYCLE_CONTRACT.md) — authoritative portable
-  initialization, presentation, close, shutdown, retained attachment, and
-  compatibility-handle ordering under ADR-014.
+This directory is the source of the GUI.Forms documentation site: Markdown
+rendered by Sphinx with MyST-Parser and the Furo theme, published on Read the
+Docs and built in CI with warnings treated as errors. These notes are for
+people editing the site. The user-facing entry point is `index.md`.
 
-GUI.Forms is a portable retained GUI library under active construction. These
-documents describe the intended consumer boundary without promoting incomplete
-spike APIs to a frozen compatibility promise.
+## Build locally
 
-## Start here
+From the repository root:
 
-- [`LIBRARY_AND_ASSEMBLY_GUIDE.md`](LIBRARY_AND_ASSEMBLY_GUIDE.md) — package
-  roles, the managed facade direction, trusted retained-subtree extensions,
-  ownership, lifecycle, and the host-owned visual contract.
-- [`CURRENT_API_REFERENCE.md`](CURRENT_API_REFERENCE.md) — implemented C++ and
-  experimental C ABI 0.x types, behavior, event order, and explicit gaps.
-- [`WINDOWS_WINE_HOST.md`](WINDOWS_WINE_HOST.md) — PE64 build, Win32/Wine host,
-  stable-ID instrumentation, measured smoke result, and accessibility boundary.
-- [`../planning/CONTROL_COMPLETENESS_MATRIX.md`](../planning/CONTROL_COMPLETENESS_MATRIX.md)
-  — the authoritative support/defer/exclude ledger for control families.
-- [`../planning/WINFORMS_API_CATALOGUE.md`](../planning/WINFORMS_API_CATALOGUE.md)
-  — pinned LibreWinForms/.NET 10 member-level oversight totals and honest
-  native/partial/missing/excluded states; the generated TSV contains every row.
-- [`../planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md`](../planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md)
-  — cross-cutting behavior and visual-superset gaps that API identities alone
-  cannot prove.
-- [`../planning/MASTER_IMPLEMENTATION_PLAN.md`](../planning/MASTER_IMPLEMENTATION_PLAN.md)
-  — dependency order and release gates.
-- [`../planning/GUI_DRAWING_REVISION_PLAN.md`](../planning/GUI_DRAWING_REVISION_PLAN.md)
-  — captured `System.Drawing` floor, GUI.Drawing ownership/cutover stages, and
-  broader File Manager drawing oversight.
-- [`../experiments/WINDOWS_ORACLE_PREFLIGHT.md`](../experiments/WINDOWS_ORACLE_PREFLIGHT.md)
-  — measured Wine/.NET/MinGW environment and the original Windows-host handoff.
-- [`../experiments/CAPTURE_0_STATIC_COMPATIBILITY_MANIFEST.md`](../experiments/CAPTURE_0_STATIC_COMPATIBILITY_MANIFEST.md)
-  — deterministic non-executing retired compatibility specimen metadata/IL-operand capture, privacy
-  boundary, and measured authoritative manifest.
-- [`../experiments/CAPTURE_1_DISPOSITION_AND_LOADER_LAB.md`](../experiments/CAPTURE_1_DISPOSITION_AND_LOADER_LAB.md)
-  — exhaustive disposition closure, generated facade catalogue, and measured
-  strong-reference interception under host .NET and Wine.
-- [`../experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md`](../experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md)
-  — 796/796 compiled facade identities and the first native ABI-backed managed
-  control/property/tree/disposal spine on host .NET and Wine.
-- [`../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md`](../experiments/M12P17_METADATA_DRIVEN_PROPERTY_GRID.md)
-  — exact property value origins plus the native metadata-driven PropertyGrid,
-  typed stock editors, reset/validation, hostile callback disposal, and native
-  showcase dogfood.
-- [`../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md`](../experiments/M12P18_EXPANDABLE_COMPOUND_PROPERTIES.md)
-  — expandable typed geometry/spacing/color/font fields, precise property-path
-  mutation, real retained Reset controls, semantics, and native dogfood.
-- [`../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md`](../experiments/M12P19_NESTED_PROPERTY_VALUES_AND_COLLECTIONS.md)
-  — bounded immutable object/collection values, recursive member/index editing,
-  atomic collection mutations, stock ComboBox.Items, and native dogfood.
-- [`../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md`](../experiments/M12P20_PROPERTY_CONVERTER_AND_EDITOR_SERVICES.md)
-  — instance-owned TypeConverter/editor analogues, retained custom-editor
-  ownership, default NumericUpDown inspection, and typed commit dogfood.
-- [`../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md`](../experiments/M12P21_SPECIALIZED_FLAGS_AND_COLOR_EDITORS.md)
-  — retained multi-select flags popup, alpha-aware color field/swatch,
-  bounded failure routing, and native-neutral portability gates.
-- [`../experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md`](../experiments/M12P22_NULLABLE_CULTURE_NESTED_AND_ATOMIC_PROPERTIES.md)
-  — nullable payload schemas, finite standard values, per-registry numeric
-  culture, nested service identities, and atomic multiple-owner commit.
-- [`../experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md`](../experiments/M12P23_MANAGED_PROPERTY_GRID_ABI_0_22.md)
-  — additive native PropertyGrid ABI, generated managed control projection,
-  multi-selection/sort/refresh semantics, and exact remaining callback edge.
-- [`../experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md`](../experiments/M12P24_MANAGED_TYPE_DESCRIPTOR_PROXY_ABI_0_23.md)
-  — bounded managed TypeDescriptor proxies, converter/reset/change callbacks,
-  nullable edits, rollback-safe multi-owner commits, and host/Wine evidence.
-- [`../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md`](../experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md)
-  — managed `Application.Run(Form)`, additive ABI 0.3 host projection,
-  deterministic headless evidence, and a captured Win32/Wine surface.
-- [`../experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md`](../experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md)
-  — native-to-managed events, queued live mutation, exception containment,
-  cancelable form close, and application-context lifecycle in ABI 0.4.
-- [`../experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md`](../experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md)
-  — renderer-free GUI.Drawing value/resource/state semantics, independent C
-  ABI, deterministic cross-language traces, and the precise M11f boundary.
-- [`../experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md`](../experiments/M11H_COMPATIBILITY_CATALOGUE_AND_PAINT_LEASES.md)
-  — the 18,097-row nominal-base catalogue and the first revisioned,
-  non-reentrant coherent paint-lease implementation.
-- [`../experiments/M12P5_POPUP_CALLBACK_CONTAINMENT.md`](../experiments/M12P5_POPUP_CALLBACK_CONTAINMENT.md)
-  — deterministic reproduction and correction of stale popup stable IDs plus
-  portable/native foreign-callback exception containment.
-- [`../experiments/M12P5_BINDING_CURRENCY_KERNEL.md`](../experiments/M12P5_BINDING_CURRENCY_KERNEL.md)
-  — retained record currency, explicit control-property descriptors, two-way
-  update modes, format/parse/completion, manager transfer, and lifetime gates.
-- [`../experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md`](../experiments/M12P6_VALIDATION_AND_BOUND_ERRORS.md)
-  — focus-driven cancellable validation, AutoValidate policy, automatic
-  OnValidation binding, and binding-aware ErrorProvider projection.
-- [`../experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md`](../experiments/M12P7_DIALOG_KEYS_AND_MNEMONICS.md)
-  — renderer-free mnemonic text/routing, validated programmatic clicks, and
-  retained accept/cancel dialog commands.
-- [`../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md`](../experiments/M12P8_COMMAND_ARBITRATION_AND_NATIVE_CALLBACKS.md)
-  — stable duplicate mnemonic arbitration, retained DialogResult/menu behavior,
-  and the AppKit dispatch-source exception boundary.
-- [`../experiments/M12P9_CONTROL_GEOMETRY_AND_ORDER.md`](../experiments/M12P9_CONTROL_GEOMETRY_AND_ORDER.md)
-  — exact geometry flags, masked bounds, preferred/AutoSize sizing,
-  direct-child filtering, nested traversal, and coherent topmost-first ordering
-  across the retained core and generated facade.
-- [`../experiments/M12P15_PROPERTY_METADATA_CENTER.md`](../experiments/M12P15_PROPERTY_METADATA_CENTER.md)
-  — native renderer-neutral property descriptors, typed access, defaults,
-  reset/serialization policy, tokenized changes, declared effects, and
-  initialization/thread/lifetime gates.
-- [`../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md`](../experiments/M12P16_COMPOUND_PROPERTY_VALUES.md)
-  — geometry/spacing/color/font/image/enum property values, finite shared enum
-  schemas, descriptor-aware conversion, and real layout/visual registrations.
-- [`../experiments/M4A_UNICODE_TEXT_STORE.md`](../experiments/M4A_UNICODE_TEXT_STORE.md)
-  — strict UTF-8, typed positions, atomic edits, Unicode line indexing, style
-  spans, and deterministic corpus evidence.
-- [`../experiments/M4B_GRAPHEME_SHAPING_SEAM.md`](../experiments/M4B_GRAPHEME_SHAPING_SEAM.md)
-  — Unicode 17 extended grapheme conformance, typed cluster navigation, and the
-  renderer-neutral shaping/fallback contract.
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r docs/requirements.txt
+sphinx-build -W -b html docs docs/_build/html
+```
 
-## Vocabulary
+Open `docs/_build/html/index.html`. `docs/_build/` is ignored by Git. Always
+build with `-W`: Read the Docs (`.readthedocs.yaml`, `fail_on_warning: true`)
+and the `docs` job in `.github/workflows/native.yml` do, so a warning that
+passes locally without `-W` fails everywhere else. Add `--keep-going` to see
+every warning in one run.
 
-In this project, “assembly” can mean either a future managed facade assembly or
-a compiled data-only theme/language assembly. It never means that the native
-GUI.Forms runtime depends on .NET. The library guide keeps those meanings
-separate.
+The project version shown in the site title is read from
+`project(GUIForms VERSION x.y.z)` in the root `CMakeLists.txt` at build time
+(`conf.py`, `read_project_version`). Do not hard-code it anywhere in `docs/`.
 
-- [LLVM 22 compiler/cache matching and platform minimums](COMPILER_CACHE.md)
-- [Cooperative cancellation and workers](THREADING.md)
+## Layout
+
+| Path | Content | Edited by |
+|---|---|---|
+| `index.md` | Landing page and the five toctrees | hand |
+| `start/` | Install, consume the SDK, first window, build from source, download | hand |
+| `controls/index.md` | Controls landing page | hand |
+| `controls/generated/by-function.md`, `controls/generated/alphabetical.md` | Indexes generated from `manifests/controls.json` by `tools/control_registry.py` | generated; do not edit |
+| `controls/atlas/` | Per-type Markdown generated from the headers by `tools/generate_library_docs.py`, with `index.md` | generated; do not edit |
+| `concepts/` | Retained tree, update scopes, layout, painting, text engine, input, threading, lifecycle, hosts | hand |
+| `reference/index.md`, `reference/coverage.md`, `reference/api/` | API reference pages generated by `tools/api_reference.py` from `reference/inventory.json` and `reference/contracts/*.json` | generated; do not edit |
+| `reference/inventory.json`, `reference/contracts/`, `reference/site/` | Inputs and HTML output of `tools/api_reference.py` | generated or reviewed JSON; not Sphinx sources |
+| `project/` | Decisions table, roadmap, contributing, evidence index | hand |
+| `project/adr/ADR-NNN.md` | One-line `{include}` of `../../decisions/ADR-NNN-*.md` | add one when adding an ADR |
+| `notes/` | Dated internal working notes | kept for provenance; excluded |
+| `library/` | The earlier generated HTML atlas and its Markdown mirrors | superseded by `controls/atlas/`; excluded |
+| `*.md` at this level other than `index.md` | Legacy long-form documents | kept in place; excluded |
+
+## The exclude list
+
+`conf.py` lists every path under `docs/` that is not a site page. The list is
+explicit rather than a glob because the build runs with `-W`: a Markdown file
+that Sphinx picks up but that no toctree references is a warning, and so is a
+page with a broken relative link. The excluded groups are:
+
+- `_build` and OS metadata files;
+- this `README.md`;
+- `notes/**`, the dated working notes (interface negotiations, proposals,
+  audits, development records, the commit map). They cite sibling
+  repositories and internal labels, so they are not user pages;
+- `library/**`, the older atlas. Its generator now writes Markdown into
+  `controls/atlas/`; the HTML pages are no longer committed;
+- `reference/site/**`, the generated HTML reference, which is not a Sphinx
+  source;
+- the legacy user documents (`LIBRARY_AND_ASSEMBLY_GUIDE.md`,
+  `LIFECYCLE_CONTRACT.md`, `THREADING.md`, `CONCISE_STATE_AND_COLLECTIONS.md`,
+  `APPLICATION_TEXT_LINKAGE.md`, `COMPILER_CACHE.md`, `WINDOWS_WINE_HOST.md`,
+  `CURRENT_API_REFERENCE.md`). The concept pages supersede them for readers
+  of the site; the files stay where they are because other repository
+  documents link to them.
+
+When you add a page, add it to a toctree. When you add a non-page file, add
+it to the exclude list with a comment saying why.
+
+## Writing rules for site pages
+
+- Present tense, addressed to a user of the library.
+- No milestone numbers, no internal claim labels (the given/observed/measured
+  vocabulary), no agent or role names. Those belong in `planning/`,
+  `experiments/` and `results/`.
+- Link only to pages inside `docs/`. Refer to repository files outside
+  `docs/` in backticks (`planning/...`); MyST treats a relative Markdown link
+  that leaves the source tree as a missing cross-reference, which is an error
+  under `-W`.
+- ADR text is included, not copied. Edit `decisions/ADR-NNN-*.md`.
+- Keep a page to roughly 150 lines; split rather than scroll.
+
+## Generated inputs
+
+Regenerate before building when headers or the registry changed:
+
+```sh
+python3 tools/control_registry.py check          # validates manifests/controls.json
+python3 tools/generate_library_docs.py            # writes docs/controls/atlas/
+python3 tools/api_reference.py --check            # validates docs/reference/inventory.json
+```
+
+The `docs` CI job builds the site; the `house-style` job runs the registry
+check and its unit tests. Neither job regenerates files into the tree, so a
+stale generated page fails the check rather than being silently rewritten.

@@ -1,0 +1,89 @@
+# Roadmap
+
+GUI.Forms is pre-1.0. This page says what is done, what is being worked on
+now, and what has to be true before the API is declared stable. It is a
+summary of the planning documents in the repository's `planning/` directory,
+which remain the detailed source.
+
+## Done and tested
+
+- Retained tree with explicit ownership, stable identity, transactional
+  attachment and synchronous disposal.
+- Typed dirtiness, nested update scopes, bounded flushes, read barriers.
+- Damage-limited CPU painting with coherent paint leases, exact presentation
+  receipts, paint planes, live surfaces and per-frame counters.
+- One text engine (HarfBuzz shaping, FreeType light auto-hinting, shared
+  sRGB blending) with identical output on macOS, Windows and Linux, enforced
+  by a hash-compared identity test. Skia is built without any font backend.
+- Forms-like focus, Tab order, focus scopes, mnemonics, accept/cancel
+  targets, validation, pointer capture, deferred input during paint.
+- One UI thread per window, a bounded FIFO dispatcher, synchronous `invoke`,
+  timers, cooperative workers and cancellation.
+- A portable host protocol with capability discovery; AppKit, Win32 and X11
+  adapters plus a deterministic headless adapter that defines the reference
+  trace.
+- Stock controls: panels and groups, labels and links, buttons, check and
+  radio, text boxes (single and multiline with scrollbars), list, checked
+  list, combo, tree, tab control, track bar, progress bar, numeric up/down,
+  date/time picker, property grid, picture box, image list, menus and context
+  menus, tooltips, error and help providers, split and master/detail
+  containers, flow and table layout, command bar, choice group, expandable
+  sections, breadcrumb trail, object and correspondence views, raster
+  canvas, drawing surface and diagnostic views.
+- Application-owned `Value<T>` and `Command` state with two-way control
+  bindings, record currency and binding-aware validation.
+- An installed CMake SDK consumed by standalone examples on every CI platform,
+  with generation-time rejection of unsafe linking combinations.
+- A compiler-cache pipeline that publishes tested object caches per platform.
+
+## In progress
+
+Documentation and distribution
+: This site; a registry of controls that drives the Gallery navigation, the
+  controls indexes and the README table; the generated API reference wired
+  into the site; per-control pages; screenshots captured by CI rather than by
+  hand.
+
+Demonstration programs
+: One registry-driven Gallery with a live properties panel and an About page
+  showing version, commit, renderer and instrumentation; the fixture-backed
+  Explore preview packaged with its status stated; the Correspondence mail
+  mockup; Linux entry points for all three.
+
+Release pipeline
+: Tagged `v*` releases carrying per-platform archives (zip and pkg on macOS,
+  zip and installer on Windows, tar.gz and deb on Linux), checksums, ad hoc
+  macOS signing and a smoke launch of each installed program on each runner.
+
+## Before 1.0
+
+The API is declared stable only when all of the following hold:
+
+- The C function tables and error model pass a breaking-change audit, and the
+  C++ wrappers are RAII conveniences over them rather than a second contract.
+- Two independent native consumers pass the ownership, thread and callback
+  conformance tests against the installed SDK.
+- A machine-readable manifest lists every control and member as supported,
+  deferred or excluded, and the documentation is generated from it.
+- Windows, macOS and the selected Linux host pass the same normative traces,
+  including lifecycle, input order, focus and paint receipts.
+- Native accessibility publication of the semantic tree exists on every
+  host and is exercised by a test, not only the deterministic snapshot.
+- Packaging is reproducible: licences, integrity metadata and a software bill
+  of materials ship with every artefact.
+
+## Not planned
+
+GPU rendering of any kind; a browser engine, CSS or an HTML runtime; a .NET,
+Java or Godot dependency in the native runtime; immediate-mode controls or a
+perpetual redraw loop; host font discovery; LCD subpixel text; ActiveX,
+browser hosting, printing, MDI and obsolete Forms families; Wayland (the X11
+host runs under XWayland).
+
+## Known gaps
+
+Outbound drag initiation; MSAA/UIA and ATK publication; input-method
+composition on X11; native menu-bar publication; per-monitor DPI policy as a
+host service beyond scale notifications; alignment policy inside table cells;
+designer serialization. Each appears in `planning/CONTROL_COMPLETENESS_MATRIX.md`
+or `planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md` with its current state.

@@ -631,7 +631,7 @@ Layout clamps positions and updates visibility after content, font, device-scale
 and size changes. Cached rows survive scrolling and unchanged paints. Single-line
 behavior and multiline editing without auto-scroll remain available unchanged.
 Consumers must rebuild against the new headers and matching provider libraries.
-See [the SwiftEdit integration record](MULTILINE_TEXT_SCROLLBARS.md).
+See [the SwiftEdit integration record](notes/MULTILINE_TEXT_SCROLLBARS.md).
 
 ### `ScrollableControl` and `ScrollProperties`
 
@@ -828,7 +828,7 @@ pause and disable are quiescent.
 ### `EasingPreview`
 
 `EasingPreview` is a public owner-scheduled animation control rather than
-showcase-private paint code. It owns an `AnimationTimeline`, one bounded frame
+demo-private paint code. It owns an `AnimationTimeline`, one bounded frame
 lease, a complete atomic `MotionPolicy`, configurable one-to-32 labeled easing
 tracks, retained drawing, and image/busy/numeric semantics. Hidden-page
 suspension and pause/reduced/full transitions use the same scheduler contract as
@@ -951,13 +951,15 @@ navigate focus-safely between the decision list and projected detail.
 and exposes the same structured text through group semantics. The application
 does not need to subclass `Control` to show runtime diagnostics.
 
-### Complete Showcase consumer boundary
+### Gallery pages consumer boundary
 
-The independent Complete Showcase is required to be ordinary application
-composition over public GUI.Forms types. It contains no local control subclass.
-A configured CMake policy test rejects `class` or `struct` inheritance in the
-showcase implementation so layout, painting, animation, diagnostics, input, or
-semantic behavior cannot be hidden as demo-only evidence.
+The Gallery's pages (`src/controls/gallery_pages.cpp`, formerly the Complete
+Showcase) are required to be ordinary application composition over public
+GUI.Forms types. They contain no local control subclass. A configured CMake
+policy test (`gui_forms_gallery_pages_public_control_policy`) rejects `class`
+or `struct` inheritance in the page implementation so layout, painting,
+animation, diagnostics, input, or semantic behavior cannot be hidden as
+demo-only evidence.
 
 ## Range controls
 
@@ -985,7 +987,7 @@ vertically shifting repeated phase across the fill with a bright leading edge
 and deterministic sparks. `ProgressBarAnimationAppearance` atomically sets the
 luminance, stripe, phase, edge, and spark colors plus bounded pulse/edge/pitch
 geometry; invalid records leave the prior appearance intact. These are public
-library styles, not showcase painters. The control is
+library styles, not demo-private painters. The control is
 nonfocusable, does not intercept hit testing, becomes scheduler-quiescent when
 paused, disabled by application policy, or effectively hidden, and publishes
 numeric or busy semantics. Reduced motion remains busy and visibly animated at

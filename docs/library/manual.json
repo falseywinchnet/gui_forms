@@ -641,7 +641,6 @@
       "methods": {
         "SplitterGrip": "Constructs a focusable retained seam control with orientation-specific resize cursor policy.",
         "set_orientation": "Validates orientation, updates the resize cursor, and invalidates painting.",
-        "set_visible_width": "Accepts a finite positive visible thickness independent of the Control's enlarged hit bounds.",
         "set_collapse_appearance": "Commits optional first/second collapse-tab direction and current collapsed appearance.",
         "on_focus_changed": "Stores the keyboard-focus cue and invalidates seam painting.",
         "on_paint": "Records the centered visible seam, focused cue, and optional directional collapse tab within the enlarged control bounds."
@@ -3146,6 +3145,7 @@
       }
     },
     "TextMetricsProvider": {
+      "declaration_header": "include/gui_forms/drawing/graphics_recorder/graphics_recorder.hpp",
       "status": "OBSERVED: bundle 009 text-measurement interface review; focused M4 tests pass",
       "summary": "TextMetricsProvider isolates renderer-specific measurement behind renderer-neutral UTF-8, font, and format snapshots.",
       "methods": {
@@ -3447,6 +3447,7 @@
     "CommandInvocation": {"status": "OBSERVED: bundle 010 command invocation review; focused M4 collection tests pass", "summary": "CommandInvocation correlates one admitted execution to command identity, presentation source, and monotonic sequence."},
     "CommandBindingOptions": {"status": "OBSERVED: bundle 010 command customization enhancement; focused M4 collection tests pass", "summary": "CommandBindingOptions independently controls enabled, text, visibility, and accessible-description synchronization; all remain enabled by default."},
     "Command": {
+      "declaration_header": "include/gui_forms/commands/command/command.hpp",
       "status": "OBSERVED: bundle 010 command authority split; focused M4 collection tests pass",
       "summary": "Command is the shared retained authority for multiple presentations, with validated UTF-8 state and ordered enabled-only invocation.",
       "method_scope": "all",
@@ -3555,7 +3556,7 @@
     "EventStatistics": {"status": "OBSERVED: bundle 011 revocable-event review", "summary": "EventStatistics records connected, disconnected, and emitted-callback totals for deterministic lifecycle testing."},
     "Event": {"status": "OBSERVED: bundle 011 revocable-event state-machine review", "summary": "Event owns registration-ordered revocable callback slots, emits a stable snapshot, skips slots revoked before their turn, and compacts disconnected ownership after publication."},
     "Slot": {"status": "OBSERVED: bundle 011 revocable-event state review", "summary": "Event::Slot owns one callback, weakly references shared event state, and guarantees idempotent disconnection plus exact statistics."},
-    "State": {"status": "OBSERVED: bundle 011 revocable-event state review", "summary": "Event::State retains the ordered slot vector and aggregate statistics independently of any individual subscription token."},
+    "State": {"declaration_header": "include/gui_forms/event/event/event.hpp", "status": "OBSERVED: bundle 011 revocable-event state review", "summary": "Event::State retains the ordered slot vector and aggregate statistics independently of any individual subscription token."},
     "PointerEvent": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "PointerEvent is the mutable routed pointer record: device phase, window/local coordinates, buttons, modifiers, wheel deltas, click count, capture request, and handled state."},
     "KeyEvent": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "KeyEvent carries logical/physical key identity, modifier and repeat state, key direction, and mutable handled state through preview/target/bubble routing."},
     "PhysicalKey": {"status": "OBSERVED: bundle 011 normalized-input review", "summary": "PhysicalKey preserves host-independent scan position, extended-key state, and location for shortcut and compatibility logic."},
@@ -3585,7 +3586,7 @@
     "GradientStop": {"status": "OBSERVED: bundle 011 paint-value review", "summary": "GradientStop pairs a normalized monotonic offset with a copied color for retained display-list safety."},
     "FontSpec": {"status": "OBSERVED: bundle 011 typography-value review", "summary": "FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting."},
     "ImageId": {"status": "OBSERVED: bundle 011 image-identity review", "summary": "ImageId is the nonzero renderer-neutral identity returned by a Window image registry."},
-    "Painter": {"status": "OBSERVED: bundle 011 renderer-neutral painting review", "summary": "Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks."},
+    "Painter": {"declaration_header": "include/gui_forms/types/painter/painter.hpp", "status": "OBSERVED: bundle 011 renderer-neutral painting review", "summary": "Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks."},
     "DamageRegion": {"status": "OBSERVED: bundle 011 bounded-damage state-machine review", "summary": "DamageRegion incrementally merges exact rectangular unions, preserves disjoint damage up to 64 rectangles, then collapses to one bound with explicit compaction/collapse telemetry."},
     "MacHostOptions": {"status": "OBSERVED: bundle 011 host-contract review", "summary": "MacHostOptions declares initial native window title, geometry, display scale, and run policy."},
     "MacHostServiceOptions": {"status": "OBSERVED: bundle 011 host-service review", "summary": "MacHostServiceOptions injects bounded dialog, tooltip, clipboard, and semantic-sound services into an AppKit session."},
@@ -3599,7 +3600,6 @@
     "GalleryContext": {"status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit", "summary": "GalleryContext synchronizes shared sample state across the native gallery's source-private demonstration controls."},
     "GalleryControl": {"status": "OBSERVED: bundle 012 hierarchy-isolated demo declaration; retained in one source-private composition unit", "capture": "captures/basic_controls_overview.png", "capture_note": "The native M4 showcase exercises the same retained measurement, arrangement, input, focus, activation, and paint contracts used by GalleryControl specimens.", "summary": "GalleryControl is a source-private demoboard adapter that renders and exercises distinct control kinds without enlarging the public control surface."},
     "GalleryTree": {"status": "OBSERVED: bundle 011 demoboard-composition review", "summary": "GalleryTree retains the typed controls assembled for one gallery window so tests and the host share exact instances."},
-    "ShowcaseTree": {"status": "OBSERVED: bundle 011 demoboard-composition review", "summary": "ShowcaseTree retains the root, navigation, content, status, and indexed board controls of the complete native showcase."},
     "MenuSnapshot": {"status": "OBSERVED: bundle 011 menu-state review", "summary": "MenuSnapshot captures one menu item's enabled/checked/shortcut/text state for deterministic paint, hit testing, and invocation."},
     "CompoundFieldSpec": {"status": "OBSERVED: bundle 011 property-grid editor review", "summary": "CompoundFieldSpec assigns a stable field name and getter/setter pair to one structured property editor subfield."},
     "PixelStorage": {"status": "OBSERVED: bundle 011 drawing-storage review", "summary": "PixelStorage owns aligned bitmap bytes, stride, dimensions, copy-on-write revision, damage, and active lock/edit lease state."},
@@ -3627,7 +3627,7 @@
     "ScrollEvent": {"status": "OBSERVED: bundle 011 scroll event review", "summary": "ScrollEvent reports axis, mutation kind, old/new values, and logical orientation for one admitted scroll transition."},
     "ScrollAxisSnapshot": {"status": "OBSERVED: bundle 011 scroll-state review", "summary": "ScrollAxisSnapshot exposes minimum, maximum, viewport, small/large change, value, effective maximum, and visibility for one axis."},
     "ScrollSnapshot": {"status": "OBSERVED: bundle 011 scroll-state review", "summary": "ScrollSnapshot combines horizontal/vertical axis snapshots with auto-scroll policy, margin, minimum size, offset, and logical position."},
-    "Snapshot": {"status": "OBSERVED: bundle 011 text-box history review", "summary": "TextBox::Snapshot captures UTF-8 content, directional selection, and viewport required for exact undo/redo restoration."},
+    "Snapshot": {"declaration_header": "include/gui_forms/controls/panel/text_box/text_box.hpp", "status": "OBSERVED: bundle 011 text-box history review", "summary": "TextBox::Snapshot captures UTF-8 content, directional selection, and viewport required for exact undo/redo restoration."},
     "SplitChangeEvent": {"status": "OBSERVED: bundle 011 split-container event review", "summary": "SplitChangeEvent reports old/new splitter distance and whether the change originated from pointer interaction."},
     "TabSelectionChange": {"status": "OBSERVED: bundle 011 tab-selection event review", "summary": "TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection."},
     "TableLayoutStyle": {"status": "OBSERVED: bundle 011 table-layout style review", "summary": "TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value."},
@@ -3817,6 +3817,46 @@
         "invalidate_slot_locked": "Disconnects and clears subscription state and advances generation.",
         "emit_changed": "Snapshots matching legacy callbacks and emits state change without holding registry mutation ownership."
       }
+    },
+    "VisualInspectorView": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "VisualInspectorView is a reusable renderer-neutral presentation of a Window's public visual-inspection snapshot for demoboards and local diagnostics; ordinary rendering never requires it."
+    },
+    "VisualInspectorOverlay": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "VisualInspectorOverlay is the transparent companion of VisualInspectorView that draws a target's arranged, visual, and effective clipped bounds in three colors without altering hit testing or the inspected tree."
+    },
+    "TypographySpecimen": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "TypographySpecimen is a renderer-neutral review instrument that draws one committed text run with its logical line box, resolved baseline, and exact provider status."
+    },
+    "ChoiceGroup": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "ChoiceGroup is a Panel-derived collection control that presents authored ChoiceItem records as retained item Buttons forming one exclusive selection; the selected index is a bindable Value<int> with changed and activated events, keyboard traversal, named skin parts, and group semantics."
+    },
+    "ExpandableSections": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "ExpandableSections is a Panel-derived collection control that presents authored SectionItem records as retained expandable headers over caller-owned content controls; per-section expansion may borrow a Value<bool> model, single-open mode is optional, and toggles publish the section index and new state."
+    },
+    "CommandBar": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "CommandBar is a Panel-derived strip of retained item Buttons built from authored CommandItem records with borrowed Command authority and optional key shortcuts; one invoked notification survives list replacement so consumers never resubscribe per item."
+    },
+    "DropDownButton": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "DropDownButton specializes Button with an explicit disclosure actuator: menu mode routes the whole button to the owned popup, while split mode retains a primary Click region and a bounded disclosure region at the trailing edge."
+    },
+    "ResponsiveTrackPanel": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "ResponsiveTrackPanel is a ContainerControl whose direct children occupy authored one-dimensional tracks solved by ResponsiveTrackSolver; automatic collapse is an effective-layout state that removes a subtree from paint, hit testing, focus, and semantics without changing authored visibility."
+    },
+    "CommandOverflowPanel": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "CommandOverflowPanel is a horizontal ContainerControl projection of command groups that owns only layout collapse and the overflow actuator's effective availability; command authority and popup composition stay with the consumer through the stable IDs in layout_snapshot()."
+    },
+    "BreadcrumbTrail": {
+      "status": "OBSERVED declaration inventory; declaration-derived method narrative; capture pending",
+      "summary": "BreadcrumbTrail is a Panel-derived location instrument whose logical segments are virtual semantic children; its exact-path TextBox is the sole retained child and shares the row only while editing."
     }
   }
 }

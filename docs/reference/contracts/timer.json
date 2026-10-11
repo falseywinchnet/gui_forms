@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::Timer": {
+      "reviewed": true,
+      "summary": "Timer schedules coalescing callbacks through the owning Window scheduler and serializes ticks with input, layout, and paint on the UI thread.",
+      "remarks": [
+        "Binds to one live Window and emits `tick` on that Window's UI thread. The interval is at least 1 ms; `start`, deterministic `start_at`, `stop`, and interval mutation are supported.",
+        "Late deadlines coalesce to one callback while preserving cadence and registration order. Rendering occlusion does not suspend component time; disabled timers publish no wake.",
+        "This is not a background worker: stop, component disposal, and Window shutdown synchronously revoke future callbacks."
+      ],
+      "ownership": "A nonvisual `Component`. The application owns it directly or through a `ComponentContainer`; it binds to one live Window and never becomes part of the visual tree. Disposal is synchronous and idempotent and revokes every outstanding callback before teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::Component",
+        "gui_forms::Window"
+      ]
+    },
+    "gui_forms::Timer::Timer|void (Window &, std::chrono::milliseconds)": {
+      "reviewed": false,
+      "summary": "Validates owner affinity and a minimum one-millisecond interval, then creates callback indirection."
+    },
+    "gui_forms::Timer::~Timer|void () noexcept": {
+      "reviewed": false,
+      "summary": "Disconnects the frame request and clears callback ownership."
+    },
+    "gui_forms::Timer::interval|std::chrono::milliseconds () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained interval."
+    },
+    "gui_forms::Timer::set_interval|void (std::chrono::milliseconds)": {
+      "reviewed": false,
+      "summary": "Validates affinity and minimum duration, then reschedules an enabled timer from now."
+    },
+    "gui_forms::Timer::enabled|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Requires both logical enablement and a connected scheduler request."
+    },
+    "gui_forms::Timer::start|void ()": {
+      "reviewed": false,
+      "summary": "Schedules the first deadline at now plus interval unless already active."
+    },
+    "gui_forms::Timer::start_at|void (FrameTime)": {
+      "reviewed": false,
+      "summary": "Replaces any request with an explicit deterministic first deadline."
+    },
+    "gui_forms::Timer::stop|void ()": {
+      "reviewed": false,
+      "summary": "Clears logical enablement and disconnects the request."
+    },
+    "gui_forms::Timer::tick|Event<> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the serialized tick event."
+    }
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::GroupBox": {
+      "reviewed": true,
+      "summary": "GroupBox is a titled Panel specialization with validated typography, mnemonic focus routing, caption-aware border painting, and group semantics.",
+      "remarks": [
+        "Adds caption text and font over `Panel`, with mnemonic focus routing and caption-aware border painting.",
+        "Radio grouping uses logical retained containers; full caption-aware child layout remains later work."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::Panel",
+        "gui_forms::RadioButton"
+      ]
+    },
+    "gui_forms::GroupBox::GroupBox|void (StableId, std::string)": {
+      "reviewed": false,
+      "summary": "Constructs a Panel with authored caption text and the control-caption font policy."
+    },
+    "gui_forms::GroupBox::text|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored caption including any mnemonic marker."
+    },
+    "gui_forms::GroupBox::set_text|void (std::string)": {
+      "reviewed": false,
+      "summary": "Commits caption text and invalidates measurement, painting, and semantics only for a real change."
+    },
+    "gui_forms::GroupBox::font|FontSpec () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the explicit caption FontSpec."
+    },
+    "gui_forms::GroupBox::set_font|void (FontSpec)": {
+      "reviewed": false,
+      "summary": "Validates and commits the caption font, then invalidates size, paint, and semantics."
+    },
+    "gui_forms::GroupBox::use_mnemonic|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether ampersand mnemonic parsing and focus routing are enabled."
+    },
+    "gui_forms::GroupBox::set_use_mnemonic|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles caption mnemonic interpretation and invalidates affected retained phases."
+    },
+    "gui_forms::GroupBox::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Paints the Panel material and a caption-aware border gap before recording the caption text."
+    },
+    "gui_forms::GroupBox::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects the group role and uses the displayed caption as the accessible name when no explicit name exists."
+    }
+  }
+}

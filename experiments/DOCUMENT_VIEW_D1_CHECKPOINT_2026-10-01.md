@@ -8,7 +8,7 @@ for imminent machine shutdown. No SDK, host or application stage was changed.
 
 D1 semantic reconciliation is canonical at
 `../../orchestrator/spec/contracts/GUI_DOCUMENT_VIEW_DEVELOPMENT.md`; provider
-proposal is `../docs/DOCUMENT_VIEW_PROVIDER_PROPOSAL_2026-10-01.md`.
+proposal is `../docs/notes/DOCUMENT_VIEW_PROVIDER_PROPOSAL_2026-10-01.md`.
 
 Authored files:
 

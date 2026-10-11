@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::FlowLayoutPanel": {
+      "reviewed": true,
+      "summary": "FlowLayoutPanel is a retained directional packing algorithm with four flow directions, optional wrapping, explicit bounded inter-item/inter-line spacing, per-child margins, stable flow breaks, and optional content-driven size.",
+      "remarks": [
+        "Orders visible children left-to-right, right-to-left, top-down, or bottom-up, honoring child margins, container padding, optional wrapping, per-child flow breaks, and `AutoSize`. Hidden children leave no gap.",
+        "A deterministic retained layout family, not a CSS flexbox implementation."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::ContainerControl",
+        "gui_forms::TableLayoutPanel"
+      ]
+    },
+    "gui_forms::FlowLayoutPanel::FlowLayoutPanel|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs a left-to-right wrapping ContainerControl with zero explicit inter-item spacing."
+    },
+    "gui_forms::FlowLayoutPanel::flow_direction|FlowDirection () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns left-to-right, right-to-left, top-down, or bottom-up packing order."
+    },
+    "gui_forms::FlowLayoutPanel::set_flow_direction|void (FlowDirection)": {
+      "reviewed": false,
+      "summary": "Validates the closed direction vocabulary and invalidates measurement, arrangement, and semantics."
+    },
+    "gui_forms::FlowLayoutPanel::wrap_contents|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether overflowing items start a new line or column."
+    },
+    "gui_forms::FlowLayoutPanel::set_wrap_contents|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles wrapping and invalidates the retained layout result."
+    },
+    "gui_forms::FlowLayoutPanel::item_spacing|Size () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns explicit main-axis item and cross-axis line separation as logical dimensions."
+    },
+    "gui_forms::FlowLayoutPanel::set_item_spacing|void (Size)": {
+      "reviewed": false,
+      "summary": "Accepts finite zero-to-256 spacing, applies it between items and lines without trailing gaps, and invalidates layout."
+    },
+    "gui_forms::FlowLayoutPanel::auto_size|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns whether desired size follows the packed child extent."
+    },
+    "gui_forms::FlowLayoutPanel::set_auto_size|void (bool)": {
+      "reviewed": false,
+      "summary": "Commits content-driven sizing through the base Control property while preserving flow-specific invalidation."
+    },
+    "gui_forms::FlowLayoutPanel::set_flow_break|void (const Control &, bool)": {
+      "reviewed": false,
+      "summary": "Requires a direct child and records whether it terminates the current line/column after itself."
+    },
+    "gui_forms::FlowLayoutPanel::flow_break|bool (const Control &) const": {
+      "reviewed": false,
+      "summary": "Returns the retained break bit for a current direct child."
+    },
+    "gui_forms::FlowLayoutPanel::measure|Size (Size)": {
+      "reviewed": false,
+      "summary": "Packs stable child snapshots without assignment and returns the bounded flow extent when auto-sized."
+    },
+    "gui_forms::FlowLayoutPanel::arrange|void (Rect)": {
+      "reviewed": false,
+      "summary": "Reconciles removed metadata and assigns each live child a margin-aware directional slot in final bounds."
+    },
+    "gui_forms::FlowLayoutPanel::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects a named flow surface as a group while leaving unnamed structural layout unexposed."
+    }
+  }
+}
