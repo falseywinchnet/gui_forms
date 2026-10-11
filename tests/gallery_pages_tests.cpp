@@ -858,7 +858,8 @@ void test_text_collections_and_popup_lifecycle() {
             "gallery image page must publish image semantics and intrinsic size");
     CountingPainter image_painter;
     window.paint(image_painter, {0.0, 0.0, 1280.0, 820.0});
-    require(image_painter.images == 8U,
+    // Eight PictureBox consumers on the page plus the shell's status badge.
+    require(image_painter.images == 9U,
             "gallery image page must render all eight public PictureBox consumers");
     require(image_painter.image_regions >= 9U,
             "gallery image page must retain source-cropped nine-patch material");

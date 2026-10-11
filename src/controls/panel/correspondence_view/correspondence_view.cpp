@@ -82,6 +82,11 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
         selected_id_, item_index(selected_id_) ? selected_id_ : std::string{}};
     const CorrespondencePinChange pin_change{
         pinned_id_, item_index(pinned_id_) ? pinned_id_ : std::string{}};
+    // A press in progress survives a re-projection when its item identity
+    // does: a consumer that re-projects on selection must not swallow the
+    // release that follows (and the context request it carries).
+    const std::string pressed_id = pressed_index_ && *pressed_index_ < items_.size()
+        ? items_[*pressed_index_].stable_id : std::string{};
     items_ = std::move(items);
     retain_identity(selected_id_);
     retain_identity(focused_id_);
@@ -89,7 +94,8 @@ void CorrespondenceView::set_items(std::vector<CorrespondenceItem> items) {
     hovered_id_.clear();
     hover_expanded_id_.clear();
     pending_hover_id_.clear();
-    pressed_index_.reset();
+    pressed_index_ = pressed_id.empty() ? std::nullopt : item_index(pressed_id);
+    if (!pressed_index_) pressed_button_ = PointerButton::none;
     hover_timer_.disconnect();
     restore_anchor(anchor);
     invalidate(Dirty::measure | Dirty::paint | Dirty::hit_test |
