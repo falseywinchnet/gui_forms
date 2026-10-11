@@ -72,7 +72,7 @@ class ManifestTests(unittest.TestCase):
         self.assert_rejected(lambda d: d["programs"][0]["platforms"]["windows-x64"].__setitem__("fonts", "host"), "fonts must be")
         self.assert_rejected(lambda d: (d["programs"][0]["platforms"]["linux-x64"].__setitem__("planned", True), d["programs"][0].__setitem__("required_platforms", ["linux-x64"])), "planned")
         self.assert_rejected(lambda d: d["programs"][0].pop("automation_flag"), "automation_flag")
-        self.assert_rejected(lambda d: d["programs"][0]["smoke"].__setitem__("mode", "pray"), "smoke.mode")
+        self.assert_rejected(lambda d: d["programs"][0]["smoke"].__setitem__("mode", "pray"), "extra_arguments")
         self.assert_rejected(lambda d: d["programs"][0].__setitem__("enabled", "yes"), "enabled")
 
 

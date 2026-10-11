@@ -9,20 +9,12 @@ exercised. With --install the installer is also applied on this machine and
 the installed copy is launched the same way (macOS `installer -pkg`, Windows
 `setup.exe /S` then the quiet uninstaller, Linux `apt-get install ./x.deb`).
 
-Smoke modes (packaging/programs.json → smoke.mode; "{scratch}" in
-smoke.extra_arguments expands to a per-launch temporary directory):
-  survive  the program must still be running after smoke.seconds, then it is
-           asked to quit: macOS `osascript ... quit`, Windows the automation
-           probe's `close` when gui_forms_windows_probe.exe is available (else
-           taskkill without /F, which posts WM_CLOSE), Linux `xdotool windowquit`
-           when xdotool sees the display. Every host prints a
-           {"window":...,"host":...} receipt on stdout at close; when the quit
-           was graceful the exit code must be 0 and, if smoke.expect_receipt,
-           that line must be present. If no graceful channel exists the process
-           is terminated by signal after surviving and the result is recorded
-           with graceful=false (a liveness check, not a clean-close check).
-  exit     the program exits by itself (a future scheduled-close verb); exit 0
-           within the timeout with the receipt.
+Every program is launched with --smoke-test (plus smoke.extra_arguments from
+packaging/programs.json): it presents one frame, writes a capture to a
+temporary file, prints the capture line and the {"window":...} close receipt
+and exits 0 by itself, as PlaySuite's smoke does. A launch passes when the exit
+code is 0, the capture line reports saved, the receipt reports at least one
+presented frame and the renderer loaded its bundled fonts.
 
 Results are written to smoke-<platform>.json beside the packages receipt and
 the exit status is non-zero when any launch fails.
@@ -131,96 +123,37 @@ class Smoke:
                 return candidate
         return None
 
-    def request_quit(self, process: subprocess.Popen[str], record: dict[str, Any],
-                     bundle_path: Path | None = None) -> tuple[bool, str]:
-        """Ask the program to close through a host-visible channel; return (graceful, how)."""
-        if self.platform.startswith("macos"):
-            # Only a bundle LaunchServices already sees as running may be told to quit:
-            # `tell application ... to quit` launches a second instance otherwise.
-            identifier = record.get("bundle_identifier")
-            running = False
-            if identifier and shutil.which("lsappinfo"):
-                found = subprocess.run(["lsappinfo", "find", f"bundleid={identifier}"], capture_output=True, text=True, timeout=30)
-                running = found.returncode == 0 and found.stdout.strip() != ""
-            if identifier and running and shutil.which("osascript"):
-                result = subprocess.run(["osascript", "-e", f'tell application id "{identifier}" to quit'],
-                                        capture_output=True, text=True, timeout=30)
-                if result.returncode == 0:
-                    return True, "osascript quit by bundle id"
-                self.log("    osascript quit failed: " + result.stderr.strip())
-            elif identifier:
-                self.log(f"    {identifier} ({bundle_path}) is not registered with LaunchServices; no AppleScript quit")
-        elif self.platform.startswith("windows"):
-            probe = self.probe()
-            if probe is not None and record.get("automation_flag"):
-                result = subprocess.run([str(probe), "close"], capture_output=True, text=True, timeout=30)
-                if result.returncode == 0:
-                    return True, "automation probe close"
-                self.log("    probe close failed: " + result.stderr.strip())
-            result = subprocess.run(["taskkill", "/PID", str(process.pid)], capture_output=True, text=True, timeout=30)
-            if result.returncode == 0:
-                return True, "taskkill WM_CLOSE"
-        else:
-            xdotool = shutil.which("xdotool")
-            if xdotool and os.environ.get("DISPLAY"):
-                found = subprocess.run([xdotool, "search", "--pid", str(process.pid)], capture_output=True, text=True, timeout=30)
-                windows = [line for line in found.stdout.split() if line.strip()]
-                if windows:
-                    for window in windows:
-                        subprocess.run([xdotool, "windowquit", window], capture_output=True, text=True, timeout=30)
-                    return True, "xdotool windowquit"
-        process.terminate()
-        return False, "terminated by signal (no graceful close channel on this runner)"
-
     def launch(self, record: dict[str, Any], executable: Path, source: str) -> LaunchResult:
+        """Run the program with --smoke-test the way PlaySuite's smoke does.
+
+        The program presents one frame, writes its capture, prints the capture
+        line and the close receipt, and exits 0 by itself. Nothing here asks the
+        window system to quit it.
+        """
         smoke = record["smoke"]
-        arguments: list[str] = []
-        if record.get("automation_flag"):
-            arguments.append(record["automation_flag"])
-        # "{scratch}" in an extra argument names a per-launch temporary directory,
-        # so a self-exiting program can be asked for --capture <png> there.
-        scratch_root = tempfile.mkdtemp(prefix="gui-forms-smoke-args-")
-        arguments.extend(argument.replace("{scratch}", scratch_root) for argument in smoke.get("extra_arguments", []))
+        arguments = ["--smoke-test", *smoke.get("extra_arguments", [])]
         command = [str(executable), *arguments]
-        if self.platform.startswith("linux") and not os.environ.get("DISPLAY") and shutil.which("xvfb-run"):
-            command = ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24 -noreset", *command]
-        self.log(f"    launch ({source}): {' '.join(command)}")
         if self.dry_run:
-            return LaunchResult(record["id"], source, str(executable), arguments, True, True, None, False, None, 0.0, "dry run")
+            self.log("    would launch: " + " ".join(command))
+            return LaunchResult(record["id"], source, str(executable), arguments, True, True, 0, False, None, 0.0, "dry run")
         if not executable.is_file():
             return LaunchResult(record["id"], source, str(executable), arguments, False, False, None, False, None, 0.0,
                                 "executable missing after extraction/installation")
         environment = clean_environment(self.platform)
-        with tempfile.TemporaryDirectory(prefix="gui-forms-smoke-") as scratch:
-            out_path, err_path = Path(scratch) / "stdout.txt", Path(scratch) / "stderr.txt"
-            with out_path.open("w", encoding="utf-8") as out, err_path.open("w", encoding="utf-8") as err:
-                started = time.monotonic()
-                process = subprocess.Popen(command, stdout=out, stderr=err, env=environment, cwd=str(executable.parent))
-                survive = float(smoke["seconds"])
-                exited_early = False
-                while time.monotonic() - started < survive:
-                    if process.poll() is not None:
-                        exited_early = True
-                        break
-                    time.sleep(0.2)
-                survived = time.monotonic() - started
-                graceful = True
-                how = "exited on its own"
-                if not exited_early:
-                    if smoke["mode"] == "exit":
-                        process.terminate()
-                        graceful, how = False, "did not exit by itself within smoke.seconds"
-                    else:
-                        bundle_path = next((parent for parent in executable.parents if parent.suffix == ".app"), None)
-                        graceful, how = self.request_quit(process, record, bundle_path)
-                try:
-                    exit_code: int | None = process.wait(timeout=self.timeout)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    exit_code = process.wait(timeout=10)
-                    graceful, how = False, how + "; killed after the close timeout"
-            stdout_lines = out_path.read_text(encoding="utf-8", errors="replace").splitlines()
-            stderr_lines = err_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(command, capture_output=True, text=True, env=environment,
+                                       cwd=str(executable.parent), timeout=self.timeout)
+            exit_code: int | None = completed.returncode
+            stdout_lines = completed.stdout.splitlines()
+            stderr_lines = completed.stderr.splitlines()
+            detail = f"exited with code {exit_code} after {time.monotonic() - started:.1f}s"
+        except subprocess.TimeoutExpired as expired:
+            exit_code = None
+            stdout_lines = (expired.stdout or "").splitlines() if isinstance(expired.stdout, str) else []
+            stderr_lines = (expired.stderr or "").splitlines() if isinstance(expired.stderr, str) else []
+            detail = f"did not exit within {self.timeout:.0f}s"
+        capture_saved = any('"automation":"capture"' in line and '"saved":true' in line for line in stdout_lines)
         receipt = receipt_from_output(stdout_lines)
         renderer = None
         presented: int | None = None
@@ -228,28 +161,21 @@ class Smoke:
             renderer = receipt["window"].get("renderer_name")
             frames = receipt["window"].get("frames_presented")
             presented = frames if isinstance(frames, int) else None
-        passed = False
-        detail = how
-        if exited_early:
-            if exit_code == 0 and (receipt is not None or not smoke["expect_receipt"]):
-                passed = True
-                detail = f"exited cleanly after {survived:.1f}s"
-            else:
-                detail = f"exited early after {survived:.1f}s with code {exit_code}" + ("" if receipt else ", no close receipt")
-        elif graceful:
-            if exit_code == 0 and (receipt is not None or not smoke["expect_receipt"]):
-                passed = True
-            else:
-                detail = f"{how}: exit code {exit_code}" + ("" if receipt else ", no close receipt")
-        else:
-            # Survived the liveness period; only termination by our signal is acceptable.
-            passed = smoke["mode"] == "survive" and "killed" not in how
-            detail = how + f" after surviving {survived:.1f}s"
-        if passed and presented == 0:
+        passed = exit_code == 0 and capture_saved and receipt is not None
+        if passed and (presented is None or presented < 1):
             passed = False
             detail += "; the close receipt reports no presented frame"
-        return LaunchResult(record["id"], source, str(executable), arguments, passed, graceful and passed, exit_code,
-                            receipt is not None, renderer, round(survived, 2), detail, stdout_lines[-20:], stderr_lines[-20:])
+        elif passed and renderer and ("incomplete" in renderer or renderer == "fallback"):
+            passed = False
+            detail += f"; renderer {renderer!r} did not load its bundled fonts"
+        elif not passed:
+            if not capture_saved:
+                detail += "; no saved capture line"
+            if receipt is None:
+                detail += "; no close receipt"
+        return LaunchResult(record["id"], source, str(executable), arguments, passed, passed, exit_code,
+                            receipt is not None, renderer, round(time.monotonic() - started, 2), detail,
+                            stdout_lines[-20:], stderr_lines[-20:])
 
     # -- install paths ------------------------------------------------------------
 
@@ -291,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dist", type=Path, required=True, help="directory holding the artifacts and packages-<platform>.json")
     parser.add_argument("--build-dir", type=Path, default=None, help="where gui_forms_windows_probe.exe may be found")
     parser.add_argument("--install", action="store_true", help="also apply the installer and launch the installed copy")
-    parser.add_argument("--timeout", type=float, default=90.0, help="seconds to wait for the close after it is requested")
+    parser.add_argument("--timeout", type=float, default=60.0, help="seconds a program may take to present, capture and exit")
     parser.add_argument("--receipt", type=Path, default=None, help="default <dist>/smoke-<platform>.json")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)

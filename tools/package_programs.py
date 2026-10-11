@@ -39,7 +39,6 @@ MANIFEST_PATH: Path = ROOT / "packaging/programs.json"
 LICENSES_PATH: Path = ROOT / "packaging/licenses.json"
 PLATFORMS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
 FONT_MODES: tuple[str, ...] = ("bundle-resources", "sibling")
-SMOKE_MODES: tuple[str, ...] = ("survive", "exit")
 IDENTIFIER_PATTERN: str = r"[a-z][a-z0-9-]*"
 MACOS_MINIMUM: str = "14.0"
 RECEIPT_SCHEMA: int = 1
@@ -165,9 +164,7 @@ def validate_manifest(data: dict[str, Any]) -> Manifest:
                  where + ": 'automation_flag' must be null or a --flag")
         smoke = record.get("smoke")
         _require(isinstance(smoke, dict), where + ": 'smoke' must be an object")
-        _require(smoke.get("mode") in SMOKE_MODES, f"{where}: smoke.mode must be one of {SMOKE_MODES}")
-        _require(isinstance(smoke.get("seconds"), int) and smoke["seconds"] > 0, where + ": smoke.seconds must be a positive integer")
-        _require(isinstance(smoke.get("expect_receipt"), bool), where + ": smoke.expect_receipt must be a boolean")
+        _require(set(smoke).issubset({"extra_arguments"}), where + ": smoke holds only extra_arguments (every program runs --smoke-test)")
         extra = smoke.get("extra_arguments", [])
         _require(isinstance(extra, list) and all(isinstance(argument, str) for argument in extra),
                  where + ": smoke.extra_arguments must be a list of strings")

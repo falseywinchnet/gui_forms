@@ -4,6 +4,8 @@
 // (Gallery, Correspondence and the labs) on every host:
 //
 //   --automation        Windows: enable the WM_COPYDATA automation channel.
+//   --smoke-test        --capture to a temporary file: present one frame, print
+//                       the capture line and the close receipt, exit 0.
 //                       Other hosts accept and ignore the flag so one CI
 //                       command line works everywhere.
 //   --capture <path>    After the first presented frame that covers the whole
@@ -23,6 +25,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -38,8 +42,8 @@ struct ProgramOptions final {
 
 inline void print_program_usage(const char* program) {
     std::fprintf(stderr,
-                 "usage: %s [--automation] [--capture <path.png>] [--size <W>x<H>] "
-                 "[--scale <factor>]\n",
+                 "usage: %s [--automation] [--smoke-test] [--capture <path.png>] "
+                 "[--size <W>x<H>] [--scale <factor>]\n",
                  program != nullptr && *program != '\0' ? program : "gui-forms-demo");
 }
 
@@ -74,6 +78,19 @@ inline bool parse_size(std::string_view text, Size& size) {
 
 } // namespace detail
 
+// The capture file a --smoke-test run writes: a per-process name under the
+// platform temporary directory, so parallel smokes never collide.
+inline std::string smoke_test_capture_path() {
+    std::error_code error;
+    std::filesystem::path directory = std::filesystem::temp_directory_path(error);
+    if (error) directory = std::filesystem::current_path(error);
+    const std::filesystem::path file =
+        directory / ("gui-forms-smoke-" + std::to_string(static_cast<unsigned long long>(
+                         std::hash<std::string>{}(std::filesystem::current_path(error).string()) ^
+                         static_cast<std::size_t>(std::time(nullptr)))) + ".png");
+    return file.string();
+}
+
 // Returns nullopt after printing usage to stderr when an argument is unknown,
 // a value is missing, or a value is malformed.
 inline std::optional<ProgramOptions> parse_program_options(int argc, char** argv) {
@@ -87,6 +104,12 @@ inline std::optional<ProgramOptions> parse_program_options(int argc, char** argv
         const std::string_view argument(argv[index]);
         if (argument == "--automation") {
             options.automation = true;
+            continue;
+        }
+        if (argument == "--smoke-test") {
+            // A packaged program proves itself the way PlaySuite's does: present
+            // one frame, print the capture line and the close receipt, exit 0.
+            options.capture_path = smoke_test_capture_path();
             continue;
         }
         const bool wants_value = argument == "--capture" || argument == "--size" ||
