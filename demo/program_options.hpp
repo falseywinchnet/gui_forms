@@ -9,6 +9,9 @@
 //                       window once a frame has been presented, the host
 //                       prints its close receipt and main prints
 //                       "GUI.Forms window smoke passed" before exiting 0.
+//                       When no frame was presented within ten seconds the
+//                       window still closes, but main prints a failure line
+//                       to stderr and exits 1.
 //   --capture <path>    After the first presented frame that covers the whole
 //                       window, write the framebuffer as PNG to <path>, print
 //                       {"automation":"capture","saved":true|false,"path":"..."}
@@ -153,12 +156,17 @@ inline void apply_program_options(const ProgramOptions& program, HostOptions& ho
 // it always does; once it reports ready, a UI timer on the window's root
 // control polls the presented-frame count and requests the ordinary close as
 // soon as one frame is on screen (or after the deadline, so a program that
-// never presents still exits and fails on its receipt). main then prints the
-// pass line when the host returned 0.
+// never presents still exits). main then prints the pass line when a frame
+// had been presented and the host returned 0, and a failure line otherwise.
 struct SmokeTest final {
     Window* window{};
     FrameTime started{};
     bool completed{};
+    // Observed when the close was requested. The core declines to paint an
+    // occluded window, so a window the host never reported visible closes at
+    // the deadline with nothing presented.
+    bool presented{};
+    bool occluded{};
     std::function<void()> request_close;
     FrameRequestToken timer;
 };
@@ -177,6 +185,8 @@ struct SmokeTestTick final {
         const bool presented = (*(*live).window).metrics_snapshot().frames_presented >= 1U;
         if ((presented && seconds >= 1.0) || seconds >= 10.0) {
             (*live).completed = true;
+            (*live).presented = presented;
+            (*live).occluded = (*(*live).window).occluded();
             (*live).request_close();
         }
     }
@@ -227,12 +237,17 @@ template <class HostOptions>
 }
 
 // The process exit code after the host returned: unchanged without a smoke;
-// 1 when the smoke never reached its scheduled close; the host's code
-// otherwise, with the pass line printed on 0.
+// 1 when the smoke never reached its scheduled close or closed without a
+// presented frame; the host's code otherwise, with the pass line printed on 0.
 inline int smoke_test_result(const std::shared_ptr<SmokeTest>& state, int exit_code) {
     if (!state) return exit_code;
     if (!(*state).completed) {
         std::fprintf(stderr, "GUI.Forms window smoke did not reach its scheduled close\n");
+        return exit_code == 0 ? 1 : exit_code;
+    }
+    if (!(*state).presented) {
+        std::fprintf(stderr, "GUI.Forms window smoke failed: no frame was presented%s\n",
+                     (*state).occluded ? " (the window was occluded at the deadline)" : "");
         return exit_code == 0 ? 1 : exit_code;
     }
     if (exit_code == 0) {

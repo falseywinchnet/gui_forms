@@ -4,7 +4,8 @@
 // smoke and the GUI.Forms demo programs': the product window runs normally,
 // a UI timer on its root requests the ordinary close once a frame has been
 // presented (or at the deadline), the host prints its close receipt and main
-// prints "GUI.Forms window smoke passed" when the host returned 0.
+// prints "GUI.Forms window smoke passed" when a frame had been presented and
+// the host returned 0, and a failure line to stderr otherwise.
 //
 // Only public GUI.Forms headers are used, as the demoboard boundary requires.
 
@@ -24,6 +25,11 @@ struct SmokeTest final {
     gui_forms::Window* window{};
     gui_forms::FrameTime started{};
     bool completed{};
+    // Observed when the close was requested. The core declines to paint an
+    // occluded window, so a window the host never reported visible closes at
+    // the deadline with nothing presented.
+    bool presented{};
+    bool occluded{};
     std::function<void()> request_close;
     gui_forms::FrameRequestToken timer;
 };
@@ -42,6 +48,8 @@ struct SmokeTestTick final {
         const bool presented = (*(*live).window).metrics_snapshot().frames_presented >= 1U;
         if ((presented && seconds >= 1.0) || seconds >= 10.0) {
             (*live).completed = true;
+            (*live).presented = presented;
+            (*live).occluded = (*(*live).window).occluded();
             (*live).request_close();
         }
     }
@@ -93,6 +101,11 @@ inline int smoke_test_result(const std::shared_ptr<SmokeTest>& state, int exit_c
     if (!state) return exit_code;
     if (!(*state).completed) {
         std::fprintf(stderr, "GUI.Forms window smoke did not reach its scheduled close\n");
+        return exit_code == 0 ? 1 : exit_code;
+    }
+    if (!(*state).presented) {
+        std::fprintf(stderr, "GUI.Forms window smoke failed: no frame was presented%s\n",
+                     (*state).occluded ? " (the window was occluded at the deadline)" : "");
         return exit_code == 0 ? 1 : exit_code;
     }
     if (exit_code == 0) {
