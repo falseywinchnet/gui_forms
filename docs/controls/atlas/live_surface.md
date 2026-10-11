@@ -5,10 +5,10 @@
 - Status: **OBSERVED: bundle 008 high-throughput surface review; focused M4 tests pass**
 - Kind: **class**
 - Scope: public header
-- Source layout: isolated per type
+- Source layout: header-only or distributed
 - Hierarchy: `enable_shared_from_this → LiveSurface`
 - Declaration: `include/gui_forms/live_surface/surface/live_surface.hpp:20`
-- Definition: `src/core/live_surface/surface/live_surface.cpp`
+- Definition: `src/controls/gallery/pages/live-surfaces.cpp, src/core/live_surface/surface/live_surface.cpp`
 - Type narrative: hand-reviewed
 - Method narratives: 11 hand-reviewed, 0 declaration-derived
 

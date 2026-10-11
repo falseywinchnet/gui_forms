@@ -10,7 +10,7 @@
 - Declaration: `src/controls/gallery/pages/page_context.hpp:90`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
-- Method narratives: 0 hand-reviewed, 5 declaration-derived
+- Method narratives: 0 hand-reviewed, 4 declaration-derived
 
 PageContext is a struct declared in src/controls/gallery/pages/page_context.hpp.
 
@@ -19,14 +19,6 @@ PageContext is a struct declared in src/controls/gallery/pages/page_context.hpp.
 Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
-
-### `~PageContext` (public)
-
-```cpp
-~PageContext()
-```
-
-Constructs or tears down the retained PageContext object according to its ownership contract. *(declaration-derived)*
 
 ### `motion_policy` (public)
 

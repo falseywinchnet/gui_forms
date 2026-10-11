@@ -17,14 +17,14 @@ passed the Screen Sharing crop gate.
 
 | Measure | Count |
 | --- | --- |
-| Types | 817 |
+| Types | 815 |
 | Visual controls | 78 |
 | Visual controls with verified captures | 67 |
 | Visual controls with captures pending | 11 |
 | Types with hand-reviewed narratives | 479 |
-| Types with declaration-derived narratives | 338 |
+| Types with declaration-derived narratives | 336 |
 | Methods with hand-reviewed explanations | 2569 |
-| Methods with declaration-derived explanations | 2179 |
+| Methods with declaration-derived explanations | 2174 |
 | Grouped source migrations pending | 66 |
 | Enumerations | 219 |
 
@@ -1037,8 +1037,6 @@ SpinButtons <spin_buttons>
 SplitterGrip <splitter_grip>
 ToolTipBubble <tool_tip_bubble>
 ToolTipLayer <tool_tip_layer>
-WeakProgressValueSetter <weak_progress_value_setter>
-WeakRangeValueMirror <weak_range_value_mirror>
 ```
 
 ### core

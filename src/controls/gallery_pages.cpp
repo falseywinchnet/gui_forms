@@ -140,6 +140,9 @@ private:
 GalleryShell build_gallery_shell(const GalleryTree& compiled) {
     std::shared_ptr<PageContext> context = std::make_shared<PageContext>();
     (*context).compiled = compiled.context;
+    // Pages capture the status line while they are built, so it exists first;
+    // the status strip adopts it below.
+    (*context).status = label("gallery.status.text", "", 11.0, 600, shell_blue_dark);
     std::shared_ptr<gui_forms::ScaledPanel> root = make_control<ScaledPanel>(
         StableId("gallery.shell"), gallery_default_size);
     (*root).set_background(canvas);
@@ -251,7 +254,6 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
         make_control<Panel>(StableId("gallery.status.rule"));
     (*status_rule).set_background(rule);
     (*status_surface).add_at(status_rule, {0.0, 0.0, 1042.0, 1.0});
-    (*context).status = label("gallery.status.text", "", 11.0, 600, shell_blue_dark);
     (*status_surface).add_at((*context).status, {18.0, 10.0, 800.0, 24.0});
     std::shared_ptr<gui_forms::CheckBox> live = make_control<CheckBox>(
         StableId("gallery.status.live"), "Live animation");
@@ -294,239 +296,110 @@ std::string_view selected_gallery_page(const Window& window) {
     return (*context).page_ids[(*context).selected_page];
 }
 
+namespace {
+
+// Window-bound runtime handlers (binding source, providers, tooltips, the
+// shell Timer tick). Created once the Window exists; the page context's
+// ComponentContainer owns it, so disposing the context revokes every handler.
+class RuntimeActions final : public Component {
+public:
+    explicit RuntimeActions(std::weak_ptr<PageContext> context) noexcept
+        : context_(std::move(context)) {}
+
+    void set_persistent_tooltip_target(std::weak_ptr<Button> target) noexcept {
+        persistent_ = std::move(target);
+    }
+
+    void validate_profile_name(BindingConvertEvent& event) {
+        const std::string* text = std::get_if<std::string>(&event.value);
+        if (text == nullptr || (*text).empty()) {
+            throw std::invalid_argument("Profile name may not be empty");
+        }
+    }
+
+    void update_binding_status() {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context || !(*context).binding_source || !(*context).binding_status) return;
+        const BindingSourceSnapshot snapshot = (*(*context).binding_source).snapshot();
+        (*(*context).binding_status).set_text(
+            "Current " + std::to_string(snapshot.position + 1) + " / " +
+            std::to_string(snapshot.count) + " · " + snapshot.current_stable_id +
+            " · text commits on validation · revision " + std::to_string(snapshot.revision));
+    }
+
+    // Bound value: -1 moves to the previous record, +1 to the next.
+    void navigate_binding(const int direction) {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context || !(*context).binding_source) return;
+        if (direction < 0) static_cast<void>((*(*context).binding_source).move_previous());
+        else static_cast<void>((*(*context).binding_source).move_next());
+    }
+
+    void help_requested(HelpRequestEvent& request) {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context) return;
+        (*(*context).status).set_text("Help · " + request.help_string);
+        request.handled = true;
+    }
+
+    void toggle_provider_error() {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context) return;
+        if ((*(*context).error_provider).error(*(*context).provider_error_target).empty()) {
+            (*(*context).error_provider).set_error(
+                (*context).provider_error_target,
+                "Endpoint is intentionally marked invalid for provider dogfood.");
+            (*(*context).provider_error_toggle).set_text("Clear");
+        } else {
+            (*(*context).error_provider).set_error((*context).provider_error_target, {});
+            (*(*context).provider_error_toggle).set_text("Restore");
+        }
+    }
+
+    void timer_tick() {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context) return;
+        ++(*context).timer_ticks;
+        const double cycle = static_cast<double>((*context).timer_ticks % 20U) / 19.0;
+        (*(*context).timer_progress).set_value(cycle * 100.0);
+        constexpr double travel = 98.0;
+        const double eased = 0.5 - std::cos(cycle * 6.283185307179586) * 0.5;
+        (*(*context).timer_motion).set_design_bounds(
+            *(*context).timer_motion_target, {14.0 + travel * eased, 39.0, 168.0, 34.0});
+        (*(*context).timer_status).set_text(
+            "Running · tick " + std::to_string((*context).timer_ticks) + " · " +
+            std::to_string(static_cast<int>((*(*context).ui_timer).interval().count())) +
+            " ms · UI thread");
+    }
+
+    void show_persistent_tooltip() {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        const std::shared_ptr<Button> target = persistent_.lock();
+        if (!context || !target) return;
+        (*(*context).tooltips).show(target, 0ms);
+    }
+
+    void show_disabled_tooltip() {
+        if (const std::shared_ptr<PageContext> context = context_.lock()) {
+            (*(*context).tooltips).show((*context).tooltip_disabled_target, 0ms);
+        }
+    }
+
+private:
+    std::weak_ptr<PageContext> context_;
+    std::weak_ptr<Button> persistent_;
+};
+
+} // namespace
+
 void initialize_gallery_runtime(Window& window) {
-    class ValidateProfileName final {
-    public:
-        void operator()(BindingConvertEvent& event) const
-        {
-            const std::string* text = std::get_if<std::string>(&event.value);
-            if (text == nullptr || (*text).empty()) {
-                throw std::invalid_argument("Profile name may not be empty");
-            }
-        }
-    };
-
-    class BindingStatusUpdater final {
-    public:
-        explicit BindingStatusUpdater(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()() const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context || !(*context).binding_source ||
-                !(*context).binding_status) return;
-            const BindingSourceSnapshot snapshot =
-                (*(*context).binding_source).snapshot();
-            (*(*context).binding_status).set_text(
-                "Current " + std::to_string(snapshot.position + 1) + " / " +
-                std::to_string(snapshot.count) + " · " +
-                snapshot.current_stable_id +
-                " · text commits on validation · revision " +
-                std::to_string(snapshot.revision));
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
-    enum class BindingNavigation {
-        previous,
-        next,
-    };
-
-    class BindingNavigationClick final {
-    public:
-        BindingNavigationClick(std::weak_ptr<PageContext> context,
-                               BindingNavigation direction) noexcept
-            : context_(std::move(context)), direction_(direction) {}
-
-        void operator()(ButtonBase&) const
-        {
-            if (const std::shared_ptr<PageContext> context = context_.lock()) {
-                if (direction_ == BindingNavigation::previous) {
-                    static_cast<void>(
-                        (*(*context).binding_source).move_previous());
-                } else {
-                    static_cast<void>((*(*context).binding_source).move_next());
-                }
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-        BindingNavigation direction_{};
-    };
-
-    class GalleryHelpRequested final {
-    public:
-        explicit GalleryHelpRequested(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()(HelpRequestEvent& request) const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context) return;
-            (*(*context).status).set_text("Help · " + request.help_string);
-            request.handled = true;
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
-    class ToggleProviderErrorClick final {
-    public:
-        explicit ToggleProviderErrorClick(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()(ButtonBase&) const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context) return;
-            if ((*(*context).error_provider).error(
-                    *(*context).provider_error_target).empty()) {
-                (*(*context).error_provider).set_error(
-                    (*context).provider_error_target,
-                    "Endpoint is intentionally marked invalid for provider dogfood.");
-                (*(*context).provider_error_toggle).set_text("Clear");
-            } else {
-                (*(*context).error_provider).set_error(
-                    (*context).provider_error_target, {});
-                (*(*context).provider_error_toggle).set_text("Restore");
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
-    class GalleryTimerTick final {
-    public:
-        explicit GalleryTimerTick(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()() const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context) return;
-            ++(*context).timer_ticks;
-            const double cycle =
-                static_cast<double>((*context).timer_ticks % 20U) / 19.0;
-            (*(*context).timer_progress).set_value(cycle * 100.0);
-            constexpr double travel = 98.0;
-            const double eased =
-                0.5 - std::cos(cycle * 6.283185307179586) * 0.5;
-            (*(*context).timer_motion).set_design_bounds(
-                *(*context).timer_motion_target,
-                {14.0 + travel * eased, 39.0, 168.0, 34.0});
-            (*(*context).timer_status).set_text(
-                "Running · tick " + std::to_string((*context).timer_ticks) +
-                " · " + std::to_string(static_cast<int>(
-                    (*(*context).ui_timer).interval().count())) +
-                " ms · UI thread");
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
-    class TimerIntervalChanged final {
-    public:
-        explicit TimerIntervalChanged(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()(double value) const
-        {
-            if (const std::shared_ptr<PageContext> context = context_.lock()) {
-                (*(*context).ui_timer).set_interval(
-                    std::chrono::milliseconds(
-                        static_cast<int>(std::round(value))));
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
-    enum class TimerCommand {
-        start,
-        stop,
-    };
-
-    class TimerCommandClick final {
-    public:
-        TimerCommandClick(std::weak_ptr<PageContext> context,
-                          TimerCommand command) noexcept
-            : context_(std::move(context)), command_(command) {}
-
-        void operator()(ButtonBase&) const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context) return;
-            if (command_ == TimerCommand::start) {
-                (*(*context).ui_timer).start();
-                (*(*context).timer_status).set_text(
-                    "Running · deadline armed on the UI queue");
-            } else {
-                (*(*context).ui_timer).stop();
-                (*(*context).timer_status).set_text(
-                    "Stopped · zero idle wakeups");
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-        TimerCommand command_{};
-    };
-
-    class ShowPersistentTooltipClick final {
-    public:
-        ShowPersistentTooltipClick(
-            std::weak_ptr<PageContext> context,
-            std::shared_ptr<Button> target) noexcept
-            : context_(std::move(context)), target_(std::move(target)) {}
-
-        void operator()(ButtonBase&) const
-        {
-            if (const std::shared_ptr<PageContext> context = context_.lock()) {
-                (*(*context).tooltips).show(target_, 0ms);
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-        std::shared_ptr<Button> target_;
-    };
-
-    class ShowDisabledTooltipClick final {
-    public:
-        explicit ShowDisabledTooltipClick(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()(ButtonBase&) const
-        {
-            if (const std::shared_ptr<PageContext> context = context_.lock()) {
-                (*(*context).tooltips).show(
-                    (*context).tooltip_disabled_target, 0ms);
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
     const std::shared_ptr<PageContext> context = retained_page_context(window);
     if (!context) {
         throw std::logic_error("gallery runtime requires a retained context tag");
     }
     if ((*context).ui_timer) return;
+    const std::shared_ptr<RuntimeActions> actions = std::make_shared<RuntimeActions>(context);
+    (*context).components.add(actions);
 
     (*context).ui_timer = std::make_shared<Timer>(window, 250ms);
     (*context).tooltips = std::make_shared<ToolTip>(window);
@@ -552,8 +425,7 @@ void initialize_gallery_runtime(Window& window) {
         DataSourceUpdateMode::on_validation;
     const std::shared_ptr<Binding> name_binding = (*(*context).binding_editor).data_bindings().add(
         "Text", (*context).binding_source, "name", validated_binding);
-    (*context).subscriptions.push_back((*name_binding).parse().subscribe(
-        *window.root(), ValidateProfileName()));
+    on((*name_binding).parse(), *actions, &RuntimeActions::validate_profile_name);
     BindingOptions immediate_binding;
     immediate_binding.data_source_update_mode =
         DataSourceUpdateMode::on_property_changed;
@@ -597,41 +469,20 @@ void initialize_gallery_runtime(Window& window) {
             navigation, "Open the " + (*navigation).text() + " Gallery page.");
     }
 
-    const std::weak_ptr<PageContext> weak = context;
-    const BindingStatusUpdater update_binding_status(weak);
-    (*context).subscriptions.push_back(
-        (*(*context).binding_source).current_changed().subscribe(
-            *window.root(), update_binding_status));
-    (*context).subscriptions.push_back(
-        (*(*context).binding_source).current_item_changed().subscribe(
-            *window.root(), update_binding_status));
-    (*context).subscriptions.push_back(
-        (*(*context).binding_previous).clicked().subscribe(
-            *window.root(), BindingNavigationClick(
-                weak, BindingNavigation::previous)));
-    (*context).subscriptions.push_back(
-        (*(*context).binding_next).clicked().subscribe(
-            *window.root(), BindingNavigationClick(
-                weak, BindingNavigation::next)));
-    update_binding_status();
-    (*context).subscriptions.push_back(
-        (*(*context).help_provider).help_requested().subscribe(
-            *window.root(), GalleryHelpRequested(weak)));
-    (*context).subscriptions.push_back(
-        (*(*context).provider_error_toggle).clicked().subscribe(
-            *window.root(), ToggleProviderErrorClick(weak)));
-    (*context).subscriptions.push_back((*(*context).ui_timer).tick().subscribe(
-        *window.root(), GalleryTimerTick(weak)));
-    (*context).subscriptions.push_back((*(*context).timer_interval).value_changed().subscribe(
-        *window.root(), TimerIntervalChanged(weak)));
-    (*context).subscriptions.push_back((*(*context).timer_start).clicked().subscribe(
-        *window.root(), TimerCommandClick(weak, TimerCommand::start)));
-    (*context).subscriptions.push_back((*(*context).timer_stop).clicked().subscribe(
-        *window.root(), TimerCommandClick(weak, TimerCommand::stop)));
-    (*context).subscriptions.push_back((*persistent).clicked().subscribe(
-        *window.root(), ShowPersistentTooltipClick(weak, persistent)));
-    (*context).subscriptions.push_back((*(*context).tooltip_show_disabled).clicked().subscribe(
-        *window.root(), ShowDisabledTooltipClick(weak)));
+    (*actions).set_persistent_tooltip_target(persistent);
+    on((*(*context).binding_source).current_changed(), *actions, &RuntimeActions::update_binding_status);
+    on((*(*context).binding_source).current_item_changed(), *actions,
+       &RuntimeActions::update_binding_status);
+    on((*(*context).binding_previous).clicked(), *actions, &RuntimeActions::navigate_binding, -1);
+    on((*(*context).binding_next).clicked(), *actions, &RuntimeActions::navigate_binding, 1);
+    (*actions).update_binding_status();
+    on((*(*context).help_provider).help_requested(), *actions, &RuntimeActions::help_requested);
+    on((*(*context).provider_error_toggle).clicked(), *actions, &RuntimeActions::toggle_provider_error);
+    // The timing page's own Commands and Value drive start, stop and interval;
+    // the shell keeps only the tick, since the Timer needs the Window.
+    on((*(*context).ui_timer).tick(), *actions, &RuntimeActions::timer_tick);
+    on((*persistent).clicked(), *actions, &RuntimeActions::show_persistent_tooltip);
+    on((*(*context).tooltip_show_disabled).clicked(), *actions, &RuntimeActions::show_disabled_tooltip);
     (*context).select_page((*context).selected_page);
 }
 
