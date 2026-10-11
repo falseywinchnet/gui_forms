@@ -82,8 +82,11 @@ host runs under XWayland).
 
 ## Known gaps
 
-Outbound drag initiation; MSAA/UIA and ATK publication; input-method
-composition on X11; native menu-bar publication; per-monitor DPI policy as a
-host service beyond scale notifications; alignment policy inside table cells;
-designer serialization. Each appears in `planning/CONTROL_COMPLETENESS_MATRIX.md`
-or `planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md` with its current state.
+Outbound drag initiation; a separate Windows UIA provider (MSAA is implemented);
+preedit composition on Windows and X11; native menu-bar publication;
+per-monitor DPI policy as a host service beyond scale notifications;
+designer serialization; preserving sparse damage regions through painting.
+Linux already publishes accessibility through ATK/AT-SPI, and table cells
+already align and stretch children through Dock and Anchor. The detailed
+planning records may describe earlier states; check the current implementation
+and tests when assessing a remaining gap.

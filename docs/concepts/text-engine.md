@@ -71,10 +71,16 @@ inside a Latin label takes the CJK face for exactly that run. The provenance
 of every file, including hashes, is in `assets/fonts/ATTRIBUTION.md` and
 `assets/fonts/language-font-provenance.json`.
 
-At run time the toolkit loads the directory named by `GUI_FORMS_FONT_DIR`, or
-a `fonts/` directory beside the executable (inside the bundle on macOS). The
-installed SDK exports the same directory as `GUIForms_FONT_DIR`. Ship the
-directory, licences included, with your application.
+The native hosts locate fonts differently:
+
+- macOS reads `Contents/Resources/fonts` from the application bundle.
+- Windows reads `GUI_FORMS_FONT_DIR` when set, otherwise `fonts/` beside the executable.
+- Linux reads `GUI_FORMS_FONT_DIR` when set, otherwise `fonts/` beside the
+  executable if present, then `../share/GUIForms/fonts` relative to it.
+
+The native SDK installs fonts and exports their path as the CMake variable
+`GUIForms_FONT_DIR`; that variable does not set the runtime environment.
+Ship the directory, licences included, at the location your host expects.
 
 ## The text store
 
@@ -95,16 +101,19 @@ control:
   under edits.
 - A snapshot of revision, edit, style and rejected-operation counters.
 
-Line breaking follows the Unicode algorithm through libunibreak, and
-bidirectional analysis uses SheenBidi. Both are pinned private dependencies;
-neither appears in a public header.
+Bidirectional analysis in the shared shaping engine uses the vendored
+SheenBidi. Unicode line breaking through libunibreak belongs to the optional
+development text-mask profile (`GUI_FORMS_BUILD_TEXT_MASKS`); it is not part
+of the normal installed text engine. Neither dependency's types appear in
+public headers.
 
 ## Text input
 
 Committed text arrives through `Window::dispatch_text` as UTF-8. Composition
-(IME) is a host capability: the macOS and Windows hosts bridge the platform
-input method and advertise `HostCapability::text_composition`; the X11 host
-does not yet. Multiline `TextBox` reports its document extent through the
+(IME) is a host capability. macOS bridges preedit composition. Windows also
+advertises `HostCapability::text_composition`, but currently forwards committed
+`WM_CHAR` text without a preedit session; the X11 host does not advertise the
+flag. Multiline `TextBox` reports its document extent through the
 shared scrolling base, so it gets real scrollbars, wheel and keyboard paging.
 
 ## Open edges

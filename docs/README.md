@@ -90,12 +90,13 @@ Regenerate before building when headers or the registry changed:
 ```sh
 python3 tools/control_registry.py check          # validates manifests/controls.json
 python3 tools/generate_library_docs.py            # writes docs/controls/atlas/
-python3 tools/api_reference.py --check            # validates docs/reference/inventory.json
+python3 tools/api_reference.py --check            # compiler-dependent freshness check; see below
 ```
 
 The `docs` CI job builds the site; the `house-style` job runs the registry
-check and its unit tests. Neither job regenerates files into the tree, so a
-stale generated page fails the check rather than being silently rewritten.
+checks, its unit tests and `generate_library_docs.py --check`. These checks
+do not rewrite stale output. API inventory freshness is a separate maintainer
+check below and is not enforced by either CI job.
 
 ## API reference freshness is checked by maintainers, not CI
 

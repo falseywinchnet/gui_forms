@@ -41,12 +41,14 @@ struct Greeter final : gf::Component {
 int main() {
     Greeter greeter{};
     std::unique_ptr<gf::Window> window = std::make_unique<gf::Window>(greeter.root, gf::Size{480.0, 140.0});
-    return gf::Application::run(std::move(window), {.title = "First window"}).accepted() ? 0 : 1;
+    return gf::Application::run(std::move(window),
+        {.title = "First window", .initial_size = {480.0, 140.0},
+         .minimum_size = {320.0, 140.0}}).accepted() ? 0 : 1;
 }
 ```
 
 Controls are created once with a `StableId`, the tree owns them, mutation is
-imperative, and only the damaged rectangle repaints. The longer walkthrough is
+imperative, and painting uses accumulated damage bounds. The longer walkthrough is
 in [Your first window](docs/start/first-window.md).
 
 ![GUI.Forms Gallery on macOS](docs/images/gallery-macos.png)
@@ -63,7 +65,7 @@ Three demonstration programs are built from `demo/` and
 
 | Program | What it is | Today |
 |---|---|---|
-| GUI.Forms Gallery | Control catalogue: one page per control, with diagnostics | Builds from source on macOS and Windows |
+| GUI.Forms Gallery | Control catalogue: one page per control, with diagnostics | Builds from source on macOS, Windows and Linux X11 |
 | GUI.Forms Explore (preview) | Fixture-backed file-explorer mockup from `file_manager_demoboard/`; never touches the real filesystem | Builds from source with `-DGUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD=ON`; not packaged yet |
 | GUI.Forms Correspondence | Mail-client mockup over in-memory fixtures (`demo/correspondence/`); no real mail, filesystem or network | Builds from source on macOS and Windows; not packaged yet |
 
@@ -186,29 +188,35 @@ Every stock control, grouped by function; the table is generated from
 | Platform | Host | Status | Notes |
 |---|---|---|---|
 | macOS 14.0+ | AppKit | Native | Apple silicon (arm64) only; builds `GUI.Forms Gallery.app` |
-| Windows 10+ | Win32 DIB | Native | x64; native build in MSYS2 CLANG64, or MinGW-w64 cross-build run under Wine |
+| Windows 10+ | Win32 DIB | Native | x64; native build in MSYS2 CLANG64 with LLVM 22.1.x |
 | Linux | X11 | Opt-in | `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`; Ubuntu 24.04 tested in CI; no packaged programs yet |
 
-The portable core (`Core`, `Controls`, `Drawing`, `Threading`) builds and
-tests wherever a C++20 compiler runs; only the `Application` host is platform
-specific.
+The portable core (`Core`, `Controls`, `Drawing`, `Threading`) is host
+independent; its build still requires LLVM 22.1.x. The `Application` host is
+platform specific.
 
 ## Build from source
 
 Prerequisites: CMake 3.25+, Ninja, LLVM 22.1 (selected by
-[`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. The first
-configure fetches and builds the pinned CPU-only Skia, HarfBuzz, FreeType,
-SheenBidi and libunibreak automatically. CI publishes a compiler cache;
+[`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. Native builds
+require an explicit `sh third_party/fetch_text_stack.sh` before configuration.
+Follow [Install](docs/start/install.md) for the platform-specific renderer,
+host and dependency preparation. CI publishes a compiler cache;
 see [docs/COMPILER_CACHE.md](docs/COMPILER_CACHE.md).
+
+A renderer-free build for core and control tests needs no Skia or text fetch:
 
 ```sh
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake
+    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
+    -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=OFF \
+    -DGUI_FORMS_ENABLE_MACOS_HOST=OFF -DGUI_FORMS_ENABLE_WINDOWS_HOST=OFF \
+    -DGUI_FORMS_ENABLE_LINUX_HOST=OFF -DGUI_FORMS_BUILD_GALLERY=OFF
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Run the Gallery:
+After configuring a native build as described in Install, run the Gallery:
 
 - macOS: `open "build/GUI.Forms Gallery.app"`
 - Windows: `build/GUI.Forms Gallery.exe` (keep `fonts/` beside it)
@@ -263,7 +271,7 @@ boundaries.
 ## Contributing
 
 CI ([`native.yml`](.github/workflows/native.yml)) must pass on every platform.
-Run `python3 tools/check_house_style.py <paths>` on first-party files you
+Run `python3 tools/check_house_style.py <paths>` on first-party C++ files you
 touch, and build the docs with `sphinx-build -W docs <out>` so warnings fail.
 Boundary violations fail `ctest` before review.
 

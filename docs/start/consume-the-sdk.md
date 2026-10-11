@@ -38,7 +38,7 @@ and is built against the installed SDK by CI on every platform.
 
 | Component | Target | Kind | Use it for |
 |---|---|---|---|
-| `Threading` | `GUIForms::Threading` | shared | `Worker`, `CancellationFlag`, the atomic thread pool. Pulled in by every other component. |
+| `Threading` | `GUIForms::Threading` | shared | `Worker`, `CancellationFlag`, the atomic thread pool. Linked by `Core`, `Application` and `Audio`. |
 | `Core` | `GUIForms::Core` | static | The retained tree, events, invalidation, scheduling, resources and the portable host protocol, with no renderer and no native window. |
 | `Controls` | `GUIForms::Controls` | static | Stock controls over `Core`. Exports `Drawing`. |
 | `Drawing` | `GUIForms::Drawing` | static | Renderer-free geometry, colour, paths, raster storage and command recording. |
@@ -80,8 +80,8 @@ program and use the same copy for every component:
 
 | Platform | Files | Location |
 |---|---|---|
-| macOS | `libgui_forms_threading.0.dylib`, `libgui_forms_application.dylib`, plus `libc++.1.dylib`, `libc++abi.1.dylib`, `libunwind.1.dylib` from the runtime prefix | `Your.app/Contents/Frameworks`, with `@executable_path/../Frameworks` rpaths; sign the libraries before the bundle |
-| Linux | `libgui_forms_threading.so.0`, `libgui_forms_application.so` | the application's runtime library directory |
+| macOS | `libgui_forms_threading.0.dylib`, `libgui_forms_application.0.dylib` and their versioned targets, plus `libc++.1.dylib`, `libc++abi.1.dylib`, `libunwind.1.dylib` from the runtime prefix | `Your.app/Contents/Frameworks`, with `@executable_path/../Frameworks` rpaths; sign the libraries before the bundle |
+| Linux | `libgui_forms_threading.so.0`, `libgui_forms_application.so.0` and the versioned files those symlinks resolve to | the application's runtime library directory |
 | Windows | `libgui_forms_threading.dll`, `libgui_forms_application.dll`, `libwinpthread-1.dll` and the compiler runtime DLLs | beside the executable |
 
 The reference examples stage Windows DLLs with `$<TARGET_RUNTIME_DLLS:...>`
@@ -89,12 +89,14 @@ in a post-build step; copy that pattern rather than listing DLL names.
 
 ## Fonts
 
-GUI.Forms never consults the host font catalogue. It loads the bundled faces
-from a directory you point it at: the package exports `GUIForms_FONT_DIR`
-(`share/GUIForms/fonts` under the prefix), and at run time the toolkit reads
-`GUI_FORMS_FONT_DIR` or a `fonts/` directory beside the executable. Copy the
-whole directory, including the licence files, into your package. See
-[Text engine](../concepts/text-engine) for why the set is fixed.
+GUI.Forms never consults the host font catalogue. Native SDK builds install
+the bundled faces at `GUIForms_FONT_DIR` (`share/GUIForms/fonts` under the
+prefix). This CMake variable does not configure the runtime search path.
+Copy the whole directory, including licences, into your package: macOS reads
+`Your.app/Contents/Resources/fonts`; Windows and Linux accept the environment
+override `GUI_FORMS_FONT_DIR` or use `fonts/` beside the executable. Linux also
+falls back to `../share/GUIForms/fonts` relative to the executable. See
+[Text engine](../concepts/text-engine) for the fixed font set.
 
 ## Rebuild consumers with the SDK
 

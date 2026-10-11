@@ -39,11 +39,11 @@ pick the narrowest correct set.
   container.
 
 `invalidate_declared(Dirty)`
-: For custom controls. The control declares the effects its properties have;
-  in a development build an undeclared effect is rejected, and in a production
-  build it is widened to the conservative subtree set and counted in
-  `MetricsSnapshot::undeclared_mutations`. The point is that a property's
-  cost is written down next to the property.
+: For custom controls. Pass the effects of the mutation at the call site.
+  A nonempty mask is forwarded to `invalidate`; there is no separate property
+  declaration against which it is checked. Passing `Dirty::none` increments
+  `MetricsSnapshot::undeclared_mutations` for an attached control and throws
+  without `NDEBUG`; with `NDEBUG`, it invalidates the conservative subtree set.
 
 Marks are coalesced per control. Marking paint twice costs one entry;
 `MetricsSnapshot::dirty_marks` counts the marks and `mutations` counts the
@@ -99,7 +99,8 @@ because shaping determines size.
 ## What a flush produces
 
 After a flush the window holds a `DamageRegion` per paint plane. The host
-asks for it with `take_damage()` and paints only that. If no native host is
+asks for it with `take_damage()`. The current paint API takes a rectangle,
+so a host may paint the region's bounding box, including gaps. If no native host is
 attached (tests, headless automation), the damage simply accumulates until
 something calls `paint`. Painting is described in
 [Painting and damage](painting-and-damage).

@@ -10,9 +10,10 @@ thread, and the toolkit rejects attempts to do so instead of racing.
 
 The thread that constructs a `Window` is its UI thread. `check_access()`
 returns whether the caller is on it; `verify_access()` throws when it is not.
-`Control::invoke_required()` and `Window::invoke_required()` answer the same
-question from a control's point of view. A setter called from the wrong thread
-throws and increments `MetricsSnapshot::rejected_wrong_thread_operations`; it
+`Window::invoke_required()` is the inverse of `check_access()`;
+`Control::invoke_required()` reports whether dispatch to its owner is needed.
+A setter called from the wrong thread throws and increments
+`MetricsSnapshot::rejected_wrong_thread_operations`; it
 never partially applies.
 
 Native hosts drive the UI thread with their own event loop (AppKit's run

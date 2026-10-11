@@ -17,7 +17,9 @@ rest. Tests drive the same entry points with no host attached.
 | `Window::dispatch_drag(...)` | typed drag payload and position; returns the negotiated effect |
 | `Window::perform_semantic_action(stable_id, action, value)` | an accessibility or automation request by stable ID |
 
-Each returns whether the event was handled. Events that arrive while a paint
+Pointer, key, text and semantic dispatch return a boolean. Drag dispatch
+returns a `DragDispatchResult` with `handled`, `accepted_effect`, `deferred`
+and `capacity_rejected` fields. Events that arrive while a paint
 lease is held are queued and delivered after the lease releases; see
 [Painting and damage](painting-and-damage.md#input-during-paint).
 
@@ -32,7 +34,8 @@ state is retained between down and up.
 
 `Window::capture_pointer(control, pointer_id)` routes every later event for
 that pointer to the control until release, regardless of position. Capture is
-synchronous and per pointer; `pointer_capture_changed` reports every change.
+synchronous; a window holds one captured control/pointer-ID pair at a time.
+Capturing another pair replaces it. `pointer_capture_changed` reports changes.
 Disabling, hiding, detaching or entering initialization on the captured
 control revokes capture and increments `capture_revocations`. On macOS the
 host maps capture onto the native implicit drag sequence rather than a global
@@ -115,8 +118,9 @@ channel is this call behind a length-limited, versioned command string.
 
 ## Drag and drop
 
-Typed inbound drag destinations are implemented: text, file lists and
-media-typed byte payloads, negotiated per session with a returned effect.
+The portable drag protocol supports text, file lists and media-typed byte
+payloads, negotiated per session with a returned effect. Native inbound drag
+destinations are advertised on macOS and X11, but not on Windows.
 Outbound drag initiation is not yet available on any host.
 
 ## Counters

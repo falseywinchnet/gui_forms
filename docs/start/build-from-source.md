@@ -2,15 +2,17 @@
 
 [Install](install) gives the shortest route to an installed SDK. This page
 covers the full build: options, dependencies, tests, the demonstration
-programs, the Windows cross-build and the compiler cache that CI publishes.
+programs, Windows build constraints and the compiler cache that CI publishes.
 All commands run from the repository root.
 
 ## Standard native build
 
+First follow [Install](install.md#configure-build-install) to fetch the text
+sources and configure for your platform. Linux requires a separately prepared
+Skia archive and an enabled X11 host; Windows uses `GUI_FORMS_ENABLE_SKIA=OFF`.
+Then:
+
 ```sh
-export CC=clang CXX=clang++ OBJCXX=clang++
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
@@ -43,18 +45,20 @@ probes. They are not installed.
 
 ## Third-party dependencies
 
-Every dependency is pinned to an exact revision and fetched by a script in
-`third_party/`; CMake runs the scripts when the sources are absent.
+Dependencies are pinned. Fetch HarfBuzz and FreeType explicitly before
+configuration. CMake schedules the default Skia fetch/build at build time;
+Linux native builds use the platform-specific script and prebuilt options
+shown in [Install](install). SheenBidi is already vendored in the repository.
 
-| Script | Fetches |
+| Script | Purpose |
 |---|---|
-| `fetch_skia_cpu.sh` | Skia, libpng and zlib at the recorded revisions, with the PNG-only decoder patch applied |
-| `build_skia_cpu.sh`, `build_skia_cpu_linux.sh`, `build_skia_cpu_windows_mingw.sh` | A CPU-only Skia with no font backend and no GPU code, enforced by an archive policy test |
-| `fetch_text_stack.sh` | HarfBuzz, FreeType and SheenBidi |
-| `fetch_linebreak.sh` | libunibreak |
+| `fetch_skia_cpu.sh` | Fetch Skia and its pinned libpng, zlib and FreeType sources, with the PNG-only decoder patch applied |
+| `build_skia_cpu.sh`, `build_skia_cpu_linux.sh` | Build the fetched CPU-only Skia for macOS or Linux; they do not fetch sources |
+| `fetch_text_stack.sh` | HarfBuzz and FreeType |
+| `fetch_linebreak.sh` | libunibreak, required before configuring `GUI_FORMS_BUILD_TEXT_MASKS=ON` |
 
-Audio pulls miniaudio through `FetchContent` with digest checks. Nothing else
-is downloaded, and no package manager is consulted at configure time.
+Audio pulls miniaudio through `FetchContent` with digest checks. No package
+manager is consulted at configure time.
 
 ## Tests
 
@@ -63,28 +67,19 @@ conformance traces, the painter and text-identity tests, the boundary audits
 (no Skia, AppKit, Win32 or X11 type in a public header; no GPU symbol in any
 Skia archive) and, when a native host is enabled, that platform's host tests.
 The text-identity test compares rendered text against checked-in hashes; it is
-the test that proves identical output across platforms.
+the regression check for the covered corpus and rendering profile, not an
+exhaustive proof for all text.
 
 Native host tests that open real windows run in CI on each platform. On a
 development machine without a display, configure with the host option off
 and the renderer-free tests still cover the retained engine.
 
-## Windows cross-build and Wine
+## Windows builds and Wine
 
-The checked-in MinGW-w64 toolchain file produces a PE64 gallery from a macOS or
-Linux machine:
-
-```sh
-cmake -S . -B build-windows-x64 \
-    -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/x86_64-w64-mingw32.cmake \
-    -DGUI_FORMS_ENABLE_SKIA=OFF \
-    -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
-    -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON \
-    -DGUI_FORMS_BUILD_TESTS=OFF \
-    -DCMAKE_BUILD_TYPE=Release
-cmake --build build-windows-x64 --parallel
-wine "build-windows-x64/GUI.Forms Gallery.exe"
-```
+Use the native MSYS2 CLANG64 instructions in [Install](install). The older
+`cmake/toolchains/x86_64-w64-mingw32.cmake` selects GCC and is rejected by
+the current LLVM 22.1.x configure check. It is not a working cross-build
+recipe for the current tree.
 
 `tools/run_windows_wine_smoke.sh <build-dir>` launches the gallery with
 `--automation`, activates controls by stable ID, captures the framebuffer,

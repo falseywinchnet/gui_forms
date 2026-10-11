@@ -3,8 +3,9 @@
 The retained engine knows nothing about AppKit, Win32 or X11. A host adapter
 translates one platform's windows, events and services into the portable host
 protocol, and the engine asks the adapter what it can do rather than
-assuming. Platform differences are reported, never simulated: a capability
-that is absent returns `unsupported`, and your program can decide what to do.
+assuming. Host service requests report `HostServiceStatus`, including
+`unsupported` where a service is unavailable. Capability flags describe the
+advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
@@ -25,10 +26,11 @@ whole record for logs.
 | `text_composition` | input-method composition bridged to the window | yes | yes | no |
 | `pointer_capture` | synchronous capture routed to one control | yes | yes | yes |
 | `cursor` | portable cursor kinds applied natively | yes | yes | yes |
-| `clipboard`, `clipboard_images` | bounded UTF-8 text and PNG images | yes | yes | yes |
+| `clipboard`, `clipboard_images` | bounded UTF-8 text and straight-alpha RGBA8 images | yes | yes | yes |
 | `typed_drag_destination` | inbound text, file-list and media-typed drops | yes | no | yes |
 | `dialogs` | the five portable common-dialog request/result families | yes | yes | yes |
 | `sound_cues` | system alert sounds | yes | yes | yes |
+| `frame_capture` | encode the presented framebuffer as PNG | yes | yes | yes |
 | `menus` | native menu-bar publication | no | no | no |
 | `font_discovery` | host font enumeration | no, by design | no, by design | no, by design |
 | `accessibility` | native accessibility publication of the semantic tree | not yet advertised | not yet advertised | not yet advertised |
@@ -54,22 +56,29 @@ Windows (Win32)
   for older systems; WIC decodes the PNG resources the core has already
   validated; text comes from the shared engine, not GDI. An opt-in
   `WM_COPYDATA` automation channel addresses controls by stable ID.
-  MSAA/UIA providers, TSF composition beyond committed text, OLE drag/drop
-  and native menu publication are not implemented.
+  MSAA publication is implemented through `IAccessible`; a separate UIA
+  provider is not implemented. The adapter advertises `text_composition`, but
+  its current input path forwards committed `WM_CHAR` text rather than a TSF
+  preedit session. OLE drag/drop and native menu publication are not implemented.
 
 Linux (X11)
 : `src/host/linux/`, built with `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`. Xlib
-  window and event handling, Xcursor cursors, Xfixes selection monitoring,
-  XDND drag destinations, and ATK groundwork for accessibility. The CPU
-  raster is presented through X11 images. There is no Wayland adapter;
+  window and event handling, Xcursor cursors, X11 clipboard selections,
+  XDND drag destinations, and native ATK/AT-SPI accessibility publication.
+  The CPU raster is presented through X11 images. There is no Wayland adapter;
   Wayland sessions run the X11 host through XWayland.
 
 Headless
 : `src/host/headless/`, built everywhere and linked by the tests. It emits
   attach, drains one initialization turn, then delivers configured synthetic
   activation and input, producing a byte-stable trace. It is the reference
-  ordering every native adapter must match, and it is what you link for
-  deterministic UI tests of your own.
+  ordering every native adapter must match. This adapter is a private build
+  target, not an installed SDK component. SDK consumers can link
+  `GUIForms::Controls` to test retained models without a native host.
+
+The missing `accessibility` bit does not mean native publication is absent:
+the adapters have accessibility implementations. It means that the current
+capability record does not advertise that integration.
 
 ## What stays portable
 
