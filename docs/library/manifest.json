@@ -5614,7 +5614,7 @@
       "visual": false,
       "page": "live_surface.md",
       "status": "OBSERVED: bundle 008 high-throughput surface review; focused M4 tests pass",
-      "sourceStatus": "isolated per type",
+      "sourceStatus": "header-only or distributed",
       "reviewed": true,
       "capture": null,
       "search": "livesurface include/gui_forms/live_surface/surface/live_surface.hpp livesurface is a renderer-neutral newest-frame exchange with configurable retained buffering, nonblocking producer acquisition, immutable reader leases, bounded configuration, telemetry, and revocable wake signaling. enable_shared_from_this"
@@ -10240,32 +10240,6 @@
       "reviewed": false,
       "capture": null,
       "search": "wake src/host/linux/application/linux_host_internal.hpp wake is a struct declared in src/host/linux/application/linux_host_internal.hpp."
-    },
-    {
-      "name": "WeakProgressValueSetter",
-      "kind": "class",
-      "bases": [],
-      "header": "src/controls/gallery/pages/page_context.hpp",
-      "visual": false,
-      "page": "weak_progress_value_setter.md",
-      "status": "OBSERVED source inventory; declaration-derived narrative",
-      "sourceStatus": "demonstration composition",
-      "reviewed": false,
-      "capture": null,
-      "search": "weakprogressvaluesetter src/controls/gallery/pages/page_context.hpp weakprogressvaluesetter is a class declared in src/controls/gallery/pages/page_context.hpp."
-    },
-    {
-      "name": "WeakRangeValueMirror",
-      "kind": "class",
-      "bases": [],
-      "header": "src/controls/gallery/pages/page_context.hpp",
-      "visual": false,
-      "page": "weak_range_value_mirror.md",
-      "status": "OBSERVED source inventory; declaration-derived narrative",
-      "sourceStatus": "demonstration composition",
-      "reviewed": false,
-      "capture": null,
-      "search": "weakrangevaluemirror src/controls/gallery/pages/page_context.hpp weakrangevaluemirror is a class declared in src/controls/gallery/pages/page_context.hpp."
     },
     {
       "name": "Window",

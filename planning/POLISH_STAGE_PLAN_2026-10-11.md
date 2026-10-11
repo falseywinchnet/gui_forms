@@ -240,29 +240,30 @@ and Outlaw, built from `demo/` and only public seams.
    the instrumentation snapshot (the "diagnostics panel" the proving slice
    already requires), so a download is self-describing.
 
-### W5.7. Gallery pages onto the current authoring (open; next branch)
+### W5.7. Gallery pages onto the current authoring (done 2026-10-11)
 
-Status after the 2026-10-11 rework: the Gallery shell is registry-driven,
-but its sixteen migrated pages are the Showcase bodies unchanged: 62 raw
-subscribe/connect calls, no `gf::on`, no `Value<T>`, no `Command`, and none
-of ChoiceGroup, CommandBar, ExpandableSections, DropDownButton or
-BreadcrumbTrail. Twenty-nine registry records have no page (DropDownButton,
-CommandBar, ReviewCard, TreeView, ObjectView, CorrespondenceView,
-ChoiceGroup, BreadcrumbTrail, ColorValueEditor, FlagsValueEditor,
-PropertyList, InstrumentRack, GroupBox, Card, ExpandableSections,
-ResponsiveTrackPanel, CommandOverflowPanel, MasterDetailView,
-ScrollableControl, MenuStrip, ContextMenu, Command, AnchoredPopupLayer,
-LiveSurface, TypographySpecimen, VisualInspectorView,
-VisualInspectorOverlay, SemanticFeedback, BindingContext). Correspondence is
-the only program written on the current authoring (owned `on(...)`
-subscriptions, Commands, CommandBar).
+Every Gallery page is a `Component` owner whose handlers are named members
+connected with `on(event, owner, &Page::method, bound...)`, with shared state
+in `Value<T>` and `Command` members bound to the controls, and the group
+controls (CommandBar, ChoiceGroup, ExpandableSections) where a page used to
+hand-roll a toolbar, radio row or disclosure group. The shell's navigation,
+live-motion toggle and window-bound runtime (binding source, providers,
+tooltips, Timer tick) follow the same idiom; `PageContext` keeps no
+subscription tokens and no functor helpers. All 72 registry records name a
+page: nine new pages (commands-and-menus, tree-and-object-views,
+choices-and-sections, value-editors, responsive-layouts, anchored-popups,
+live-surfaces, typography-and-inspection, semantic-feedback) demonstrate the
+29 controls the Showcase never showed. The page policy test still rejects
+local Control subclasses and admits Component owners. Each page has a test
+file under tests/gallery_pages/; the sidebar scrolls to hold 29 pages.
 
-Work, one page per commit, built and tested on the M4 through `m4build`:
-rewrite each page body on `gf::on`, `Value<T>` and `Command` as
-`docs/CONCISE_STATE_AND_COLLECTIONS.md` describes; add a page for every
-record above (grouped by registry category) so `gallery_page` is non-null
-for all 72; keep `tests/gallery_pages_tests.cpp` green per page; regenerate
-the catalog, tables and README after each batch.
+Toolkit findings surfaced by the migration, fixed on this branch:
+ScrollableControl offset its children from committed bounds (drift after a
+second scroll); ObjectView requires text on non-available cells (documented
+by the tree page); ColorValueEditor/FlagsValueEditor `set_value` do not
+publish `value_changed` (open: contradicts the state-event rule in
+docs/CONCISE_STATE_AND_COLLECTIONS.md; the value-editors page works around
+it and the discrepancy is recorded here for a follow-up decision).
 
 ### W6. Release pipeline
 

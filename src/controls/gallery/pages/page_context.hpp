@@ -90,7 +90,6 @@ inline void reveal_in_scrollable(const Control::Ptr& row) {
 struct PageContext final {
     std::vector<Control::Ptr> pages;
     std::vector<std::shared_ptr<Button>> navigation;
-    std::vector<SubscriptionToken> subscriptions;
     std::shared_ptr<Label> status;
     std::shared_ptr<EasingBoard> easing;
     std::shared_ptr<Button> motion_pause;
@@ -118,16 +117,7 @@ struct PageContext final {
     std::shared_ptr<Button> binding_previous;
     std::shared_ptr<Button> binding_next;
     std::shared_ptr<Label> binding_status;
-    std::shared_ptr<Label> dispatcher_status;
-    std::shared_ptr<Button> dispatcher_invoke;
-    std::vector<DispatchOperation> dispatcher_operations;
-    std::thread dispatcher_worker;
-    std::string dispatcher_trace;
-    std::uint64_t dispatcher_batch{};
-    std::shared_ptr<Label> host_services_status;
-    std::shared_ptr<TextBox> clipboard_editor;
     std::uint64_t timer_ticks{};
-    std::uint64_t next_host_request_id{1U};
     std::size_t selected_page{};
     // Registry-driven shell state: page ids and titles in navigation order,
     // the index of the page whose UI Timer runs while shown, and the
@@ -136,14 +126,9 @@ struct PageContext final {
     std::vector<std::string_view> page_titles;
     std::size_t timing_page{static_cast<std::size_t>(-1)};
     std::shared_ptr<GalleryContext> compiled;
-    std::string last_dialog_acceptance{"No accepted dialog value yet"};
     bool live_motion{true};
     bool user_paused{};
     bool reduced_motion{};
-
-    ~PageContext() {
-        if (dispatcher_worker.joinable()) dispatcher_worker.join();
-    }
 
     [[nodiscard]] MotionPolicy motion_policy() const noexcept {
         return {live_motion, user_paused, reduced_motion};
@@ -251,42 +236,6 @@ inline DateTimeFormatProvider french_date_provider() {
     provider.pm_designator.clear();
     return provider;
 }
-
-template <typename RangeControlType>
-class WeakRangeValueMirror final {
-public:
-    explicit WeakRangeValueMirror(
-        std::weak_ptr<RangeControlType> target) noexcept
-        : target_(std::move(target)) {}
-
-    void operator()(double value) const
-    {
-        if (const std::shared_ptr<RangeControlType> target = target_.lock();
-            target && (*target).value() != value) {
-            (*target).set_value(value);
-        }
-    }
-
-private:
-    std::weak_ptr<RangeControlType> target_;
-};
-
-class WeakProgressValueSetter final {
-public:
-    explicit WeakProgressValueSetter(
-        std::weak_ptr<ProgressBar> progress) noexcept
-        : progress_(std::move(progress)) {}
-
-    void operator()(double value) const
-    {
-        if (const std::shared_ptr<ProgressBar> progress = progress_.lock()) {
-            (*progress).set_value(value);
-        }
-    }
-
-private:
-    std::weak_ptr<ProgressBar> progress_;
-};
 
 class DrawingEffectsPaint final {
 public:
