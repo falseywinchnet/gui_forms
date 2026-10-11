@@ -18,15 +18,19 @@ void test_dock_and_anchor(gui_forms::Window& window) {
                 (*left).dock() == DockStyle::left &&
                 (*fill).dock() == DockStyle::fill,
             "dock page must use public Dock properties on stock controls");
+    const std::shared_ptr<gui_forms::Button> toggle_left = std::dynamic_pointer_cast<Button>(
+        window.find("gallery.dock.toggle-left"));
     const Rect fill_before = (*fill).arranged_bounds();
-    click(window, window.find("gallery.dock.toggle-left"));
+    click(window, toggle_left);
     window.perform_layout();
     require(!(*left).visible() &&
-                (*fill).arranged_bounds().width > fill_before.width + 70.0,
+                (*fill).arranged_bounds().width > fill_before.width + 70.0 &&
+                (*toggle_left).text() == "Restore left edge",
             "dock visibility command must release the hidden edge into Fill");
-    click(window, window.find("gallery.dock.toggle-left"));
+    click(window, toggle_left);
     window.perform_layout();
-    require((*left).visible() && (*fill).arranged_bounds() == fill_before,
+    require((*left).visible() && (*fill).arranged_bounds() == fill_before &&
+                (*toggle_left).text() == "Hide left edge",
             "dock visibility restore must recover exact retained geometry");
 
     const double first_y = (*top_first).arranged_bounds().y;

@@ -85,6 +85,7 @@ void test_registry_pages_gallery() {
     test_live_surfaces(window);
     test_typography_and_inspection(window);
     test_semantic_feedback(window);
+    test_retained_layout_panels(window);
 }
 
 } // namespace

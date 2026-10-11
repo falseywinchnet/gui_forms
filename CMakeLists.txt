@@ -2585,6 +2585,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/dialogs-and-host-services_tests.cpp
             tests/gallery_pages/states-and-diagnostics_tests.cpp
             tests/gallery_pages/dock-and-anchor_tests.cpp
+            tests/gallery_pages/retained-layout-panels_tests.cpp
             tests/gallery_pages/commands-and-menus_tests.cpp
             tests/gallery_pages/tree-and-object-views_tests.cpp
             tests/gallery_pages/choices-and-sections_tests.cpp
