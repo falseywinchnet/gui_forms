@@ -104,14 +104,19 @@ struct Job {
     std::string result;
 };
 
+// Runs on the UI thread. It carries copies, so nothing is shared with the worker.
+struct ShowResult final {
+    std::shared_ptr<gf::Label> status;
+    std::string text;
+    void operator()() const { (*status).set_text(text); }
+};
+
 void entry(const gf::CancellationFlag& cancel, void* raw) {
     Job& job = *static_cast<Job*>(raw);
     for (int step = 0; step < 100 && !cancel.requested(); ++step) {
         job.result = compute_step(step);        // worker-side state only
     }
-    std::string text = job.result;              // immutable copy crosses threads
-    std::shared_ptr<gf::Label> status = job.status;
-    (void)(*job.window).begin_invoke([status, text] { (*status).set_text(text); });
+    static_cast<void>((*job.window).begin_invoke(ShowResult{job.status, job.result}));
 }
 
 Job job{&window, status, {}};

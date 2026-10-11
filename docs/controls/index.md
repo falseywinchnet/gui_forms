@@ -34,30 +34,32 @@ lab
 - **By function** answers "which control lets the user set a value / pick
   from a list / see progress?". It is the page to read first.
 - **Alphabetical** is the lookup table when you know the name.
-- **Atlas** is the generated per-type reference: every public type and
-  enumeration with its declaration, methods and reviewed narrative, produced
-  by `tools/generate_library_docs.py` from the headers.
+- The [API reference](../api/index.md) lists every public type, member and
+  enumeration, with one page per function category for the controls.
 
 ```{toctree}
 :maxdepth: 1
 
 generated/by-function
 generated/alphabetical
-atlas/index
 ```
 
 ## Conventions shared by every control
 
 - Construct with `make_control<T>(StableId, ...)`; the parent owns the result
   once you `add_child` it.
-- Setting an equal value does nothing; state events fire for every actual
-  change; input events (`clicked`, `scroll`, `item_activated`) fire for user
-  input only and are never synthesized by setters.
+- Setting an equal value does nothing. State events fire for every actual
+  change, whether it came from input or from a setter. Input events
+  (`clicked`, `scroll`, `item_activated`) fire for user input only and are
+  never synthesized by setters.
+- Two editors are currently exceptions to the state-event rule:
+  `ColorValueEditor` and `FlagsValueEditor` raise `value_changed` only when
+  the user commits an edit, not when `set_value` changes the value.
 - Collection controls (`ListBox`, `ComboBox`, `CommandBar`, `ChoiceGroup`,
   `ExpandableSections`) take item records with unique IDs; replacing the
-  list reuses controls with the same ID and keeps your subscriptions.
-- Appearance comes from named roles resolved by the host theme. Named parts
-  (`part("item", index)`, `header`, `body`) expose the retained sub-controls
-  for custom recipes without subclassing.
+  list reuses controls with the same ID and keeps your handlers connected.
+- Appearance comes from named roles resolved by the host theme. `CommandBar`,
+  `ChoiceGroup` and `ExpandableSections` expose their retained sub-controls
+  through `part(name, index)` for custom recipes without subclassing.
 - Accessibility metadata is optional; the default adapter publishes a
   sensible role and name, and authored labels enrich it.

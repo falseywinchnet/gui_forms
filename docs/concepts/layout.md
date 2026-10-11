@@ -51,7 +51,7 @@ are stable: the authored input is still there to measure from.
 `FlowLayoutPanel`
 : Orders visible children left-to-right, right-to-left, top-down or
   bottom-up, honouring child margins, container padding, optional wrapping
-  and per-child `FlowBreak`. Hidden children leave no gap. It is a
+  and per-child flow breaks (`set_flow_break`). Hidden children leave no gap. It is a
   deterministic flow, not flexbox.
 
 `TableLayoutPanel`
@@ -79,14 +79,14 @@ are stable: the authored input is still there to measure from.
 ## Scrolling
 
 `ScrollableControl` is the shared base for `Panel` and `ContainerControl`.
-`AutoScroll`, `AutoScrollMargin`, `AutoScrollMinSize` and the position
-determine a two-axis content extent; child requested bounds stay in content
+`auto_scroll`, `auto_scroll_margin`, `auto_scroll_min_size` and
+`auto_scroll_position` determine a two-axis content extent; child requested bounds stay in content
 coordinates and never drift as the view scrolls. Scrollbars are an overlay
 outside the child viewport, so descendants cannot paint or receive hits
 through them. Notifying scroll operations report type, orientation and
 old/new values; programmatic `scroll_to` and `scroll_by` default to
 `notify = false`. `scroll_control_into_view` honours each
-target's `AutoScrollOffset`. Multiline `TextBox` reports its document extent
+target's `auto_scroll_offset`. Multiline `TextBox` reports its document extent
 through the same base, so a text box gets real scrollbars rather than private
 offsets.
 

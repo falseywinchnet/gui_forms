@@ -89,7 +89,8 @@ in a post-build step; copy that pattern rather than listing DLL names.
 
 ## Fonts
 
-GUI.Forms never consults the host font catalogue. Native SDK builds install
+Controls never consult the host font catalogue; they draw only the bundled
+faces. Native SDK builds install
 the bundled faces at `GUIForms_FONT_DIR` (`share/GUIForms/fonts` under the
 prefix). This CMake variable does not configure the runtime search path.
 Copy the whole directory, including licences, into your package: macOS reads

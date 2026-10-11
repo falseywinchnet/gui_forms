@@ -33,41 +33,39 @@ the Gallery model, DML, or the C ABI.
 
 ## Build
 
-The checked-in MinGW-w64 toolchain generates PE64 artifacts without Skia or
-AppKit:
-
-```sh
-cmake -S gui_forms -B gui_forms/build-windows-x64 \
-  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/x86_64-w64-mingw32.cmake \
-  -DGUI_FORMS_ENABLE_SKIA=OFF \
-  -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
-  -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON \
-  -DGUI_FORMS_BUILD_TESTS=OFF \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build gui_forms/build-windows-x64 --parallel
-```
+Configure accepts only LLVM 22.1.x. The checked-in
+`cmake/toolchains/x86_64-w64-mingw32.cmake` selects MinGW-w64 GCC, so the
+configure step rejects it. A cross-build needs a toolchain file that drives
+LLVM 22 `clang`/`clang++` with `--target=x86_64-w64-mingw32`, the MinGW-w64
+sysroot, and static `libgcc`/`libstdc++`; the native MSYS2 CLANG64 build in
+the installation guide is the supported route. Configure with
+`-DGUI_FORMS_ENABLE_WINDOWS_HOST=ON -DGUI_FORMS_ENABLE_MACOS_HOST=OFF`.
 
 The output directory contains:
 
-- `GUI.Forms Gallery.exe` — statically linked C++ runtime, PE32+ x86-64;
-- `gui_forms_windows_probe.exe` — opt-in automation client; and
-- `fonts/` — exact-hash Portsmouth Rapids, Carlito, Cousine, Noto Sans CJK JP,
-  and monochrome Noto Emoji faces plus their notices.
+- `GUI.Forms Gallery.exe`, a PE32+ x86-64 executable;
+- `libgui_forms_threading.dll`, the shared threading library it imports;
+- `gui_forms_windows_probe.exe`, the opt-in automation client; and
+- `fonts/`, the bundled faces and their notices.
+
+`libgui_forms_threading.dll` imports `libwinpthread-1.dll`. A cross-build does
+not copy it, so place it beside the executable before running under Wine;
+without it the loader fails before `main`.
 
 ## Wine smoke and instrumentation
 
 Run the complete interaction/close gate with:
 
 ```sh
-gui_forms/tools/run_windows_wine_smoke.sh \
-  /Users/quentinkuttenkuler/file_manager/gui_forms/build-windows-x64
+tools/run_windows_wine_smoke.sh <build-directory>
 ```
 
 The runner launches the Gallery with `--automation`, waits for the window,
-activates four controls by stable ID, captures the current framebuffer, requests
-a structured snapshot, closes through the real `WM_CLOSE` path, and asserts:
+clicks six stable IDs (three page rows and three controls on those pages),
+captures the current framebuffer, requests a structured snapshot, closes
+through the real `WM_CLOSE` path, and asserts:
 
-- all four pointer down/up pairs are handled;
+- all six pointer down/up pairs are handled;
 - the WIC/Win32 CPU renderer is active;
 - host event rejection count is zero;
 - exactly one close request is observed; and

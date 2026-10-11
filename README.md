@@ -55,24 +55,26 @@ in [Your first window](docs/start/first-window.md).
 
 ![GUI.Forms Correspondence on macOS](docs/images/correspondence-macos.png)
 
-Both frames were written by the programs themselves with `--capture`, the
-same path the release smoke tests use.
+Both frames were written by the programs themselves with `--capture`, which
+saves the first fully presented frame as a PNG and exits.
 
 ## Downloads
 
 Three demonstration programs are built from `demo/` and
 `file_manager_demoboard/` using only the public headers.
 
-| Program | What it is | Today |
-|---|---|---|
-| GUI.Forms Gallery | Control catalogue: one page per control, with diagnostics | Builds from source on macOS, Windows and Linux X11 |
-| GUI.Forms Explore (preview) | Fixture-backed file-explorer mockup from `file_manager_demoboard/`; never touches the real filesystem | Builds from source with `-DGUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD=ON`; not packaged yet |
-| GUI.Forms Correspondence | Mail-client mockup over in-memory fixtures (`demo/correspondence/`); no real mail, filesystem or network | Builds from source on macOS and Windows; not packaged yet |
+| Program | What it is |
+|---|---|
+| GUI.Forms Gallery | Catalogue of the stock controls on 29 pages grouped by function |
+| GUI.Forms Explore (preview) | Fixture-backed file-explorer interface from `file_manager_demoboard/`; never touches the real filesystem |
+| GUI.Forms Correspondence | Mail-client mockup over in-memory fixtures (`demo/correspondence/`); no real mail, filesystem or network |
 
-The first downloadable builds arrive with the first `v0.1` release at
-[releases/latest](https://github.com/falseywinchnet/gui_forms/releases/latest).
-No application release exists yet; the `build-<sha>` entries on the Releases
-page are compiler-cache publications for CI, not downloads. When builds ship:
+Every push to `main` that passes the build, the tests and a launch of each
+packaged program is published at
+[releases/latest](https://github.com/falseywinchnet/gui_forms/releases/latest):
+one archive and one installer per program for macOS arm64, Windows x64, Linux
+x64 and Linux arm64, plus `SHA256SUMS.txt`. The `build-<sha>` pre-releases are
+compiler-cache archives for CI, not downloads.
 
 - **Linux** builds need an X11 display (XWayland works).
 - **macOS** builds are ad hoc signed, not notarized. Right-click the app and
@@ -189,7 +191,7 @@ Every stock control, grouped by function; the table is generated from
 |---|---|---|---|
 | macOS 14.0+ | AppKit | Native | Apple silicon (arm64) only; builds `GUI.Forms Gallery.app` |
 | Windows 10+ | Win32 DIB | Native | x64; native build in MSYS2 CLANG64 with LLVM 22.1.x |
-| Linux | X11 | Opt-in | `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`; Ubuntu 24.04 tested in CI; no packaged programs yet |
+| Linux | X11 | Opt-in | `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`; Ubuntu 24.04 x64 and arm64 tested in CI; programs packaged as `.deb` and `.tar.gz` |
 
 The portable core (`Core`, `Controls`, `Drawing`, `Threading`) is host
 independent; its build still requires LLVM 22.1.x. The `Application` host is
@@ -251,6 +253,8 @@ in CI.
   site, built from [`docs/index.md`](docs/index.md).
 - [Controls by function](docs/controls/generated/by-function.md): every stock
   control, its WinForms counterpart and a one-line description.
+- [API reference](docs/api/index.md): every public type, member and
+  enumeration, generated from the headers.
 - [`decisions/`](decisions/): architecture decision records.
 - [`planning/`](planning/): internal plans and working notes, kept as records
   rather than user documentation.
@@ -263,7 +267,7 @@ consumer that reproduces a file-explorer interface over deterministic
 in-memory fixtures through public seams only; it never reads the real
 filesystem. Deliberately excluded: GPU rendering (no Ganesh, Graphite, GL,
 Vulkan, Metal, Direct3D or WebGPU), .NET, Java, browser engines, Godot,
-immediate-mode control APIs, host font catalogues and image codecs other than
+immediate-mode control APIs, host font catalogues for control text, and image codecs other than
 PNG. AppKit stays in `src/host/macos/`, Win32 in `src/host/windows/`, X11 in
 `src/host/linux/` and Skia in `src/render/skia/`; tests enforce these
 boundaries.

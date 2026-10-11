@@ -6,7 +6,8 @@
 ## Focus
 
 First downloadable builds of the GUI.Forms demonstration programs: the control
-Gallery, and the fixture-backed Explore preview. These are proving-slice
+Gallery, the fixture-backed Explore preview, and the Correspondence mail
+mockup. These are proving-slice
 programs, not products; they exist so the toolkit can be inspected without a
 compiler.
 
@@ -17,12 +18,16 @@ compiler.
 ## Other changes
 
 ### Gallery
-- Packaged as a signed-ad-hoc macOS bundle and a portable Windows build with
-  an optional per-user installer.
+- Packaged for macOS (an ad hoc signed bundle and a `.pkg`), Windows (a
+  portable folder and a per-user installer) and Linux (`.tar.gz` and `.deb`).
 
 ### Explore (preview)
 - The `file_manager_demoboard` ships as "GUI.Forms Explore (preview)"; its
   STATUS.md state (D0-D6 measured partial, D7/D8/D10 not started) applies.
+
+### Correspondence
+- A mail-client mockup over in-memory fixtures; it reads no real mail,
+  files or network.
 
 ### Release pipeline
 - Builds, tests, packages and smoke-launches each program on macOS, Windows
@@ -37,6 +42,5 @@ compiler.
   "Windows protected your PC" until the publisher reputation exists. Choose
   More info, Run anyway.
 - Linux: X11 is required (XWayland works); the DEB declares X11, Xcursor and
-  ATK dependencies. Linux program mains are still being added, so a release
-  may carry fewer Linux programs than macOS or Windows ones.
+  ATK dependencies.
 - Fonts ship with each program; no host fonts are read.

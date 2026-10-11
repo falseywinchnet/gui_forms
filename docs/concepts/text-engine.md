@@ -46,9 +46,13 @@ pixel on one platform fails that test.
 - **LCD subpixel rendering.** Colour-fringe rendering needs per-display
   subpixel-layout knowledge the toolkit does not have, and current displays
   are high density. Grayscale only.
-- **Host font catalogues.** GUI.Forms never enumerates or loads system fonts.
-  The bundled set is the whole set, which is what makes identical output
-  possible.
+- **Host font catalogues for control text.** Controls never enumerate or
+  load system fonts. The bundled set is the whole set, which is what makes
+  identical output possible. The one exception is the separate GUI.Drawing C
+  API: when a caller names a font family it never registered, the macOS
+  build asks CoreText for that family's bytes, and the Windows build
+  registers the bytes GDI selects for it. Either way the shared engine
+  shapes and rasterizes the text.
 - **Colour emoji.** The bundled emoji face is monochrome.
 - **Coverage gamma other than 1.0, linear-light blending, bytecode hinting.**
   Each was measured and rejected as a stylistic or polarity-dependent change
