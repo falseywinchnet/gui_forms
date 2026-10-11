@@ -63,7 +63,8 @@ PreparedTextStatus load_bitmap(const FT_Face face, const render::text::ShapedGly
     FT_Vector delta{fractional_x, fractional_y};
     FT_Set_Transform(face, nullptr, &delta);
     const FT_UInt id = static_cast<FT_UInt>(glyph.glyph.value);
-    const FT_Error loaded = FT_Load_Glyph(face, id, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
+    // ADR-004 profile light_gray_v2: light auto-hinting, as every text path.
+    const FT_Error loaded = FT_Load_Glyph(face, id, FT_LOAD_NO_BITMAP | FT_LOAD_TARGET_LIGHT | FT_LOAD_FORCE_AUTOHINT);
     if (loaded != 0) return PreparedTextStatus::native_failure;
     FT_GlyphSlot slot = (*face).glyph;
     if (slot == nullptr || (*slot).format != FT_GLYPH_FORMAT_OUTLINE) return PreparedTextStatus::unsupported_profile;

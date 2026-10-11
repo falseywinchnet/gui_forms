@@ -1,11 +1,21 @@
 #pragma once
 
 #include "../../../core/text/prepared/prepared_storage.hpp"
+#include "../../../core/text/composite/text_composite.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/window/presentation/presentation_types.hpp"
 #include "include/core/SkSurface.h"
 
 namespace gui_forms::render {
+
+// Composites prepared-text coverage into a canvas with the shared ADR-004
+// rule and the owner's recorded clips. False when it cannot address the
+// canvas; the frame then draws the mask through Skia.
+class PreparedCoverageSink {
+public:
+    virtual ~PreparedCoverageSink() = default;
+    [[nodiscard]] virtual bool composite(SkCanvas& target, const detail::TextCoverage& coverage, Color color) = 0;
+};
 
 // Private CPU frame owner. All calls/borrows belong to the construction thread.
 // Front pixels remain immutable until commit; candidate pixels are never exposed.
@@ -19,7 +29,8 @@ public:
     [[nodiscard]] PreparedTextStatus commit(const PaintReceipt receipt);
     void abort() noexcept;
     [[nodiscard]] PreparedTextPaintResult draw(const PreparedTextLayout& layout,
-        const LayoutAuthority expected, const Point baseline, const Color color);
+        const LayoutAuthority expected, const Point baseline, const Color color,
+        PreparedCoverageSink* sink = nullptr);
     [[nodiscard]] SkCanvas* canvas() const noexcept;
     [[nodiscard]] SkSurface* front() const noexcept {
         SkSurface* const result = front_.get();

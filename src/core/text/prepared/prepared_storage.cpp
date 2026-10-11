@@ -213,7 +213,7 @@ PreparedTextStatus validate_prepared_key(const PreparedTextKey& key) noexcept {
     }
     if (key.font.size < 4 || key.font.size > 128 || key.scale < 0.5 || key.scale > 4 ||
         key.wrap_width != 0 || key.tab_columns != 4 ||
-        key.raster != PreparedRasterProfile::outline_gray_72dpi_v1) return PreparedTextStatus::unsupported_profile;
+        key.raster != PreparedRasterProfile::light_gray_v2) return PreparedTextStatus::unsupported_profile;
     if (key.display_end.value - key.display_begin.value > PreparedTextLimits::display_bytes) {
         return PreparedTextStatus::budget_exceeded;
     }

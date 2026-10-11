@@ -24,7 +24,10 @@ struct PreparedTextPaintResult final {
 };
 
 enum class PreparedTextSlot { empty, queued, running, ready };
-enum class PreparedRasterProfile : std::uint32_t { outline_gray_72dpi_v1 = 1 };
+// ADR-004: light_gray_v2 is FreeType light auto-hinting, grayscale, the one
+// GUI.Forms text profile. outline_gray_72dpi_v1 (bytecode hinting) is retired
+// and refused as unsupported.
+enum class PreparedRasterProfile : std::uint32_t { outline_gray_72dpi_v1 = 1, light_gray_v2 = 2 };
 
 struct LayoutAuthority final {
     // Process-wide nonreused session identity, with checked exhaustion.
@@ -47,7 +50,7 @@ struct PreparedTextKey final {
     double scale{1.0};
     double wrap_width{};
     std::uint32_t tab_columns{4};
-    PreparedRasterProfile raster{PreparedRasterProfile::outline_gray_72dpi_v1};
+    PreparedRasterProfile raster{PreparedRasterProfile::light_gray_v2};
 };
 
 struct PreparedSourceEndpoint final {

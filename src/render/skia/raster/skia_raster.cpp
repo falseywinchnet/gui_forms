@@ -239,6 +239,24 @@ public:
     // addressed this way; the caller then draws through Skia.
     bool composite_run(SkCanvas& target, const text::ShapedText& shaped, FontSpec font, Point origin, Color color,
                        text::GlyphRunCoverage* kept, double* kept_scale, std::int32_t* kept_phase);
+    // The shared compositing step alone: device coverage into the canvas
+    // pixels under the recorded clips. False when the canvas cannot be
+    // addressed or its clips are unknown.
+    bool composite_coverage(SkCanvas& target, const detail::TextCoverage& source, Color color);
+
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    // Lets prepared text composite through composite_coverage.
+    class PreparedSink final : public PreparedCoverageSink {
+    public:
+        explicit PreparedSink(Impl& owner) : owner_(owner) {}
+        bool composite(SkCanvas& target, const detail::TextCoverage& coverage, const Color color) override {
+            const bool composited = owner_.composite_coverage(target, coverage, color);
+            return composited;
+        }
+    private:
+        Impl& owner_;
+    };
+#endif
 #endif
     Size logical_size{};
     double scale{1.0};
@@ -610,7 +628,8 @@ bool SkiaRaster::prepared_front_matches(const Size logical_size, const double sc
 }
 PreparedTextPaintResult SkiaRaster::draw_prepared_text(const PreparedTextLayout& layout,
     const LayoutAuthority expected, const Point baseline, const Color color) {
-    const PreparedTextPaintResult result = (*impl_).prepared_frame.draw(layout, expected, baseline, color);
+    Impl::PreparedSink sink(*impl_);
+    const PreparedTextPaintResult result = (*impl_).prepared_frame.draw(layout, expected, baseline, color, &sink);
     return result;
 }
 #endif
@@ -1197,7 +1216,25 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
             coverage = kept;
         }
     }
-    if ((*coverage).pixels.empty() || (*state).rect.isEmpty()) return true;
+    if ((*coverage).pixels.empty()) return true;
+    const detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
+                                      .height = (*coverage).height,
+                                      .left = placement.pixel_x + (*coverage).left,
+                                      .top = placement.pixel_y + (*coverage).top};
+    const bool composited = composite_coverage(target, source, color);
+    return composited;
+}
+
+bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCoverage& source, const Color color) {
+    TextClipState* const state = current_text_clip(target);
+    if (state == nullptr) return false;
+    SkPixmap pixmap{};
+    if (!target.peekPixels(&pixmap) || pixmap.alphaType() != kPremul_SkAlphaType ||
+        (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
+        pixmap.rowBytes() % 4U != 0U) {
+        return false;
+    }
+    if ((*state).rect.isEmpty()) return true;
     const std::size_t stride = pixmap.rowBytes() / 4U;
     const std::size_t pixel_count = stride * static_cast<std::size_t>(pixmap.height());
     detail::TextCompositeTarget composite_target{};
@@ -1208,10 +1245,6 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
     composite_target.order = pixmap.colorType() == kRGBA_8888_SkColorType ? detail::TextPixelOrder::rgba
                                                                           : detail::TextPixelOrder::bgra;
     composite_target.opaque = false;
-    const detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
-                                      .height = (*coverage).height,
-                                      .left = placement.pixel_x + (*coverage).left,
-                                      .top = placement.pixel_y + (*coverage).top};
     detail::TextCompositeClip clip{};
     clip.rect = {static_cast<double>((*state).rect.left()), static_cast<double>((*state).rect.top()),
                  static_cast<double>((*state).rect.width()), static_cast<double>((*state).rect.height())};

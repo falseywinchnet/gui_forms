@@ -26,8 +26,12 @@ void validate_mono_bitmap(const FT_Bitmap& bitmap, const std::size_t pitch) {
 
 struct RasterConfiguration final {
     double scale{1.0};
-    FT_Int32 load_flags{FT_LOAD_NO_BITMAP | FT_LOAD_NO_HINTING | FT_LOAD_NO_AUTOHINT};
+    // ADR-004: outline_gray is the shared light auto-hinted grayscale profile.
+    FT_Int32 load_flags{FT_LOAD_NO_BITMAP | FT_LOAD_TARGET_LIGHT | FT_LOAD_FORCE_AUTOHINT};
     FT_Render_Mode render_mode{FT_RENDER_MODE_NORMAL};
+    // Horizontal placement keeps its 1/64 pixel phase (ADR-004 integer 26.6
+    // placement); vertical placement stays on whole pixels. Mono is whole-pixel.
+    bool subpixel_x{true};
     void (*validate_bitmap)(const FT_Bitmap&, std::size_t){validate_gray_bitmap};
     void (*blend_bitmap)(const FT_Bitmap&, std::size_t, std::size_t, TextMaskStorage&){blend_gray};
 };
@@ -38,6 +42,7 @@ RasterConfiguration make_raster_configuration(const MaskOptions& options) {
     if (options.raster == TextMaskRaster::true_mono) {
         result.load_flags = FT_LOAD_NO_BITMAP | FT_LOAD_TARGET_MONO | FT_LOAD_MONOCHROME;
         result.render_mode = FT_RENDER_MODE_MONO;
+        result.subpixel_x = false;
         result.validate_bitmap = validate_mono_bitmap;
         result.blend_bitmap = blend_mono;
     }
@@ -55,9 +60,18 @@ BitmapBorrow load_bitmap(NativeFonts& fonts, const RasterConfiguration& configur
     if (!std::isfinite(device_x) || !std::isfinite(device_y) || std::abs(device_x) > 16'000'000.0 || std::abs(device_y) > 16'000'000.0) {
         throw MaskLimitFailure(TextMaskLimit::mask_dimension);
     }
-    const std::int64_t origin_x = std::llround(device_x);
+    std::int64_t origin_x = std::llround(device_x);
     const std::int64_t origin_y = std::llround(device_y);
-    FT_Set_Transform(face, nullptr, nullptr);
+    if (configuration.subpixel_x) {
+        const std::int64_t fixed_x = std::llround(device_x * 64.0);
+        std::int64_t pixel_x = fixed_x / 64;
+        if (fixed_x % 64 != 0 && fixed_x < 0) --pixel_x;
+        origin_x = pixel_x;
+        FT_Vector delta{static_cast<FT_Pos>(fixed_x - pixel_x * 64), 0};
+        FT_Set_Transform(face, nullptr, &delta);
+    } else {
+        FT_Set_Transform(face, nullptr, nullptr);
+    }
     const FT_Error loaded = FT_Load_Glyph(face, glyph.glyph, configuration.load_flags);
     if (loaded != 0) throw NativeFailure(TextMaskStatus::native_failure);
     const FT_GlyphSlot slot = (*face).glyph;
