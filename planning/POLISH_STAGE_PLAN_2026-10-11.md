@@ -353,6 +353,18 @@ that rectangle. Painting each compacted damage rectangle as its own pass, or
 culling by the region's rectangles instead of their bounds, would make a
 two-corner invalidation cost two corners. Not started.
 
+### W10. Windows frame capture never completes on the CI runner (open)
+
+On 2026-10-11 every packaged Windows program launched with `--capture` on the
+windows-2022 runner ran for the full timeout without writing the capture or
+its receipt, while the same binaries closed normally on `WM_CLOSE`. The
+Windows host completes a capture only from a `WM_PAINT` whose update
+rectangle covers the whole client area after an acknowledged present; on the
+runner that condition is never met. macOS and Linux complete it on the first
+frame. The packaged-program smoke no longer depends on capture (it closes
+itself from a UI timer, as PlaySuite's does), so this is a `--capture`
+defect to reproduce under Wine or on physical Windows, not a release gate.
+
 ## E. Sequencing
 
 1. W1 and W8 immediately (small, no decisions).

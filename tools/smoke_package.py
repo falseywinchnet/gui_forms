@@ -10,11 +10,12 @@ the installed copy is launched the same way (macOS `installer -pkg`, Windows
 `setup.exe /S` then the quiet uninstaller, Linux `apt-get install ./x.deb`).
 
 Every program is launched with --smoke-test (plus smoke.extra_arguments from
-packaging/programs.json): it presents one frame, writes a capture to a
-temporary file, prints the capture line and the {"window":...} close receipt
-and exits 0 by itself, as PlaySuite's smoke does. A launch passes when the exit
-code is 0, the capture line reports saved, the receipt reports at least one
-presented frame and the renderer loaded its bundled fonts.
+packaging/programs.json), as PlaySuite's smoke launches its games: the program
+runs normally, a UI timer inside it requests the ordinary close once a frame
+has been presented, the host prints its {"window":...} close receipt and the
+program prints "GUI.Forms window smoke passed" before exiting 0. A launch
+passes when the exit code is 0, the pass line was printed, the receipt reports
+at least one presented frame and the renderer loaded its bundled fonts.
 
 Results are written to smoke-<platform>.json beside the packages receipt and
 the exit status is non-zero when any launch fails.
@@ -39,6 +40,7 @@ from typing import Any
 ROOT: Path = Path(__file__).resolve().parents[1]
 PLATFORMS: tuple[str, ...] = ("macos-arm64", "windows-x64", "linux-x64", "linux-arm64")
 PROBE_NAME: str = "gui_forms_windows_probe.exe"
+PASS_LINE: str = "GUI.Forms window smoke passed"
 
 
 @dataclass
@@ -126,9 +128,9 @@ class Smoke:
     def launch(self, record: dict[str, Any], executable: Path, source: str) -> LaunchResult:
         """Run the program with --smoke-test the way PlaySuite's smoke does.
 
-        The program presents one frame, writes its capture, prints the capture
-        line and the close receipt, and exits 0 by itself. Nothing here asks the
-        window system to quit it.
+        The program closes itself from a UI timer once it has presented a frame,
+        prints the close receipt and the pass line, and exits 0. Nothing here
+        asks the window system to quit it.
         """
         smoke = record["smoke"]
         arguments = ["--smoke-test", *smoke.get("extra_arguments", [])]
@@ -153,7 +155,7 @@ class Smoke:
             stdout_lines = (expired.stdout or "").splitlines() if isinstance(expired.stdout, str) else []
             stderr_lines = (expired.stderr or "").splitlines() if isinstance(expired.stderr, str) else []
             detail = f"did not exit within {self.timeout:.0f}s"
-        capture_saved = any('"automation":"capture"' in line and '"saved":true' in line for line in stdout_lines)
+        pass_line = any(line.strip() == PASS_LINE for line in stdout_lines)
         receipt = receipt_from_output(stdout_lines)
         renderer = None
         presented: int | None = None
@@ -161,7 +163,7 @@ class Smoke:
             renderer = receipt["window"].get("renderer_name")
             frames = receipt["window"].get("frames_presented")
             presented = frames if isinstance(frames, int) else None
-        passed = exit_code == 0 and capture_saved and receipt is not None
+        passed = exit_code == 0 and pass_line and receipt is not None
         if passed and (presented is None or presented < 1):
             passed = False
             detail += "; the close receipt reports no presented frame"
@@ -169,8 +171,8 @@ class Smoke:
             passed = False
             detail += f"; renderer {renderer!r} did not load its bundled fonts"
         elif not passed:
-            if not capture_saved:
-                detail += "; no saved capture line"
+            if not pass_line:
+                detail += "; no pass line"
             if receipt is None:
                 detail += "; no close receipt"
         return LaunchResult(record["id"], source, str(executable), arguments, passed, passed, exit_code,

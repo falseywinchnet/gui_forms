@@ -1,8 +1,8 @@
 #include "file_manager_demoboard/demoboard.hpp"
+#include "smoke_test.hpp"
 #include "gui_forms/platform/windows_host.hpp"
 
-#include <filesystem>
-#include <system_error>
+#include <memory>
 #include <utility>
 #include <vector>
 #include <string_view>
@@ -29,14 +29,9 @@ int main(int argc, const char* argv[]) {
     product.options.title = "File Manager — Demoboard";
     product.options.initial_size = {1450.0, 850.0};
     product.options.minimum_size = {150.0, 150.0};
-    if (smoke_test) {
-        // Present one frame, write it to a temporary file, print the capture
-        // line and the close receipt, exit 0: the packaged-program smoke.
-        std::error_code error;
-        std::filesystem::path directory = std::filesystem::temp_directory_path(error);
-        if (error) directory = ".";
-        product.options.capture_path = (directory / "gui-forms-explore-smoke.png").string();
-    }
+    // --smoke-test: the packaged-program proof (see smoke_test.hpp).
+    const std::shared_ptr<file_manager_demoboard::SmokeTest> smoke =
+        file_manager_demoboard::arm_smoke_test(smoke_test, product.options, *product.model);
 
     std::vector<gui_forms::host::WindowsApplicationWindow> windows;
     windows.push_back(std::move(product));
@@ -52,5 +47,6 @@ int main(int argc, const char* argv[]) {
         controller.tool_window = true;
         windows.push_back(std::move(controller));
     }
-    return gui_forms::host::run_windows_application(std::move(windows));
+    return file_manager_demoboard::smoke_test_result(
+        smoke, gui_forms::host::run_windows_application(std::move(windows)));
 }
