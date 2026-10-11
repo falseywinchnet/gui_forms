@@ -176,7 +176,7 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
                 "gallery.sidebar.group." + std::to_string(group_index),
                 std::string(entry.group), 10.0, 700, shell_blue_dark);
             (*heading).set_font({FontRole::control, 10.0, 700, false, 0.24});
-            (*heading).set_bounds({18.0, navigation_y, 200.0, 16.0});
+            (*heading).set_bounds({18.0, navigation_y, 180.0, 16.0});
             (*sidebar).add_child(heading);
             navigation_y += 18.0;
             ++group_index;
@@ -187,7 +187,7 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
         (*navigation).set_font({FontRole::control, 12.0, 400, false, 0.24});
         (*navigation).set_visual_style(ButtonVisualStyle::command);
         (*navigation).set_style(page_style());
-        (*navigation).set_bounds({16.0, navigation_y, 205.0, 24.0});
+        (*navigation).set_bounds({16.0, navigation_y, 190.0, 24.0});
         (*sidebar).add_child(navigation);
         navigation_y += 24.0;
         (*context).navigation.push_back(navigation);
@@ -197,8 +197,10 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
             (*context).timing_page = (*context).page_ids.size() - 1U;
         }
     }
-    (*sidebar_paper).set_bounds({0.0, 0.0, 238.0, std::max(742.0, navigation_y + 8.0)});
-    (*sidebar).set_auto_scroll_min_size({238.0, navigation_y + 8.0});
+    // Narrower than the viewport beside the vertical bar, so no horizontal
+    // scrollbar appears; the column's own background shows at the edge.
+    (*sidebar_paper).set_bounds({0.0, 0.0, 206.0, std::max(742.0, navigation_y + 8.0)});
+    (*sidebar).set_auto_scroll_min_size({206.0, navigation_y + 8.0});
 
     std::shared_ptr<gui_forms::ScaledPanel> content = make_control<Surface>(
         StableId("gallery.content"), Size{1042.0, 742.0});
