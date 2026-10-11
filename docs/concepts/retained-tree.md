@@ -12,8 +12,10 @@ the objects that make up that tree and who owns what.
 : The base for anything with a lifetime the toolkit tracks: controls,
   nonvisual providers (`ToolTip`, `ErrorProvider`, `Timer`), binding objects
   and your own handler owners. `dispose()` is synchronous and idempotent;
-  `is_alive()` and `is_disposed()` expose the state. A component revokes the
-  subscriptions and queued work it owns before its subclass tears down.
+  `is_alive()` and `is_disposed()` expose the state. Explicit `dispose()`
+  revokes owned subscriptions and work before calling `on_dispose()`.
+  Natural C++ destruction revokes them in the base destructor, after derived
+  members have been destroyed, and does not call virtual disposal hooks.
 
 `Control`
 : A component with geometry, visibility, enablement, focusability, a paint
@@ -26,8 +28,8 @@ the objects that make up that tree and who owns what.
   its components once.
 
 `Window`
-: Owns one root control and one UI thread. It holds focus, pointer capture,
-  damage, update depth, the frame scheduler, the dispatcher and the metrics.
+: Owns one root control and binds to its constructing thread. It holds focus,
+  pointer capture, damage, update depth, the frame scheduler, the dispatcher and the metrics.
   A `Window` is a complete model without a native window; the native host
   presents it.
 
@@ -100,10 +102,12 @@ Application-owned storage lives on the control too. `Tag` holds any
 
 ## Disposal
 
-Disposing a control detaches it, disposes its children, revokes its
-subscriptions, cancels work it posted to the dispatcher and releases its
-display chunks. Disposal is synchronous: when `dispose()` returns, no callback
-into the disposed object is pending. Disposing a control from inside its own
+Disposing a control revokes its owned subscriptions and dispatcher work,
+detaches it, disposes its children and releases its display chunks. Revocation
+is synchronous, but it does not cancel an unowned `Window::begin_invoke`
+callback merely because that callback captures the control; use
+`Control::begin_invoke` for cancellation tied to the control's lifetime.
+Disposing a control from inside its own
 event handler is allowed; the active emission finishes its current callback
 and skips the rest.
 

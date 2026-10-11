@@ -21,7 +21,9 @@ for a new dependency or a new platform assumption is not.
 - The portable core and host protocol encode no AppKit, Win32, Wayland or X11
   assumption. Honest platform differences are capability-reported adapter
   behaviour.
-- Fonts are the bundled set. Do not consult host fonts.
+- Controls draw only the bundled fonts. Do not add host font lookups; the
+  GUI.Drawing C API's family lookup described in
+  [Text engine](../concepts/text-engine) is the one existing exception.
 
 Boundary tests run under `ctest`, so a violation fails before review.
 

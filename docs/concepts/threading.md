@@ -10,9 +10,10 @@ thread, and the toolkit rejects attempts to do so instead of racing.
 
 The thread that constructs a `Window` is its UI thread. `check_access()`
 returns whether the caller is on it; `verify_access()` throws when it is not.
-`Control::invoke_required()` and `Window::invoke_required()` answer the same
-question from a control's point of view. A setter called from the wrong thread
-throws and increments `MetricsSnapshot::rejected_wrong_thread_operations`; it
+`Window::invoke_required()` is the inverse of `check_access()`;
+`Control::invoke_required()` reports whether dispatch to its owner is needed.
+A setter called from the wrong thread throws and increments
+`MetricsSnapshot::rejected_wrong_thread_operations`; it
 never partially applies.
 
 Native hosts drive the UI thread with their own event loop (AppKit's run
@@ -103,14 +104,19 @@ struct Job {
     std::string result;
 };
 
+// Runs on the UI thread. It carries copies, so nothing is shared with the worker.
+struct ShowResult final {
+    std::shared_ptr<gf::Label> status;
+    std::string text;
+    void operator()() const { (*status).set_text(text); }
+};
+
 void entry(const gf::CancellationFlag& cancel, void* raw) {
     Job& job = *static_cast<Job*>(raw);
     for (int step = 0; step < 100 && !cancel.requested(); ++step) {
         job.result = compute_step(step);        // worker-side state only
     }
-    std::string text = job.result;              // immutable copy crosses threads
-    std::shared_ptr<gf::Label> status = job.status;
-    (void)(*job.window).begin_invoke([status, text] { (*status).set_text(text); });
+    static_cast<void>((*job.window).begin_invoke(ShowResult{job.status, job.result}));
 }
 
 Job job{&window, status, {}};

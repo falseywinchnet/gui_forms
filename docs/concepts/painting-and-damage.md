@@ -1,7 +1,7 @@
 # Painting and damage
 
-GUI.Forms paints on the CPU, only when something changed, and only where it
-changed. There is no GPU path and no redraw loop. This page explains how a
+GUI.Forms paints on the CPU in response to damage or explicit frame requests.
+There is no GPU path and no perpetual redraw loop. This page explains how a
 mutation becomes a damaged rectangle, how a frame is painted and presented
 coherently, and how to read the counters that prove it.
 
@@ -13,22 +13,29 @@ coordinates: the control's arranged bounds plus its `visual_outsets` (focus
 rings and shadows that extend beyond layout without affecting it), plus the
 outsets it had when last painted, clipped to each ancestor's client area.
 Rectangles accumulate in a `DamageRegion` per paint plane. The region
-compacts overlapping rectangles and collapses to a bounding box when its
-fixed capacity is exceeded; `damage_region_compactions` and
+merges rectangles when their union fills its bounding box, and collapses to a
+bounding box when its fixed capacity is exceeded; `damage_region_compactions` and
 `damage_region_collapses` count both events, and `maximum_damage_rectangles`
 records the peak count held.
 
 Paint planes let a control choose where it paints: the ordinary content
-plane, or an overlay plane for popups, tooltips and drag images, so that a
-tooltip appearing does not damage the controls beneath it. A host that
-presents planes separately asks for `take_damage(plane)`.
+plane, or an overlay plane for popups, tooltips and drag images. Damage is
+tracked separately and can be consumed with `take_damage(plane)`, but this
+does not guarantee separate native surfaces or eliminate repainting beneath
+an overlay.
+
+`Window::paint` accepts one requested rectangle. With no explicit rectangle,
+it uses the bounding rectangle of accumulated damage (and bounds per plane),
+so gaps between damaged rectangles can also be repainted. Preserving sparse
+regions through painting remains open work.
 
 ## Display chunks
 
 Each control's paint output is a retained display chunk: a recorded list of
 `Painter` commands with their resolved geometry, text runs and rasterized
-glyphs. Painting a frame replays chunks; it does not call `on_paint` on clean
-controls. Only controls inside the damage have their chunks rebuilt.
+glyphs. Painting replays valid chunks. For controls intersecting the paint
+bounds, it rebuilds a chunk when paint is dirty, the chunk is missing, or its
+paint plane or local bounds changed; rebuilding calls `on_paint`.
 `display_chunks_rebuilt`, `display_chunks_reused` and
 `display_commands_replayed` show the split; a scroll that rebuilds every chunk
 is invalidating text or style when it only moved geometry.
@@ -46,8 +53,10 @@ Skia-based CPU adapter on macOS and Linux and by the DIB compositor on
 Windows. No Skia type is visible to a control, and the renderer can be
 replaced without touching one.
 
-Images are PNG only. The resource registry validates and decodes a PNG once;
-controls refer to it by ID.
+PNG is the supported encoded image format. The resource registry validates
+the PNG structure and retains its encoded bytes; the renderer decodes and
+caches the pixels. Controls refer to resources by `ImageId`. The registry
+also accepts raw pixels through `load_bgra32_premultiplied`.
 
 ## Coherent frames
 
@@ -59,7 +68,8 @@ and republishes the damage so a later pass can retry. A mutation made during
 paint increments `content_revision` and survives as one later pass rather
 than reentering the current one.
 
-`Window::paint(painter, requested_damage)` returns a `PaintReceipt` only after
+`Window::paint(painter, requested_damage)` returns `std::optional<PaintReceipt>`:
+there is no receipt when no frame is produced. A receipt is returned only after
 the backend has replayed every command and the window has re-validated the
 surface epoch. The host presents that exact receipt and then calls
 `notify_presented(receipt, duration)`. Duplicate, backward, forged-future and

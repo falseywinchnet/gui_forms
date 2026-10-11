@@ -8,9 +8,10 @@ loop. Text is shaped by HarfBuzz and rasterized by FreeType from bundled fonts,
 so the same string renders identically on every platform.
 
 Current status, stated plainly: the core is retained and portable; native
-hosts exist for macOS (AppKit) and Windows (Win32); a Linux X11 host builds
-when opted in; and the public API is not yet stable. Binary releases of the
-demonstration programs are planned but have not shipped yet.
+hosts exist for macOS (AppKit), Windows (Win32) and Linux (X11, enabled with
+a configure option); and the public API is not yet stable. The release
+pipeline packages three demonstration programs for all three platforms; see
+[Download](start/download).
 
 ```{toctree}
 :maxdepth: 1
@@ -49,7 +50,7 @@ concepts/hosts-and-capabilities
 :maxdepth: 1
 :caption: Reference
 
-reference/index
+api/index
 ```
 
 ```{toctree}

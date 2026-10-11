@@ -81,18 +81,21 @@ The tree owns the controls
 : The connection token is kept by the `Component`. When `Greeter` is
   disposed or destroyed, the subscription is revoked before the button can
   call back into a dead object. Handlers may take a prefix of the event's
-  arguments; `clicked()` carries none, so `on_run()` takes none.
+  arguments; `clicked()` supplies a `ButtonBase&` sender, which `on_run()`
+  omits because this handler does not need it.
 
 Mutation is imperative and synchronous
-: `set_text` changes the retained label, marks the exact dirtiness that text
-  implies (text, measure, arrange, paint, hit test, semantics) and returns.
-  Nothing repaints until the host's next frame, and only the damaged
-  rectangle is painted then. See
+: `Label::set_text` stores the new text and marks paint, semantics and
+  accessibility dirty. It also requests measure and arrange when the label
+  is auto-sized or has an unspecified dimension; this example's fixed-size
+  label does not need a layout pass for each click.
+  The host paints on a later frame using the accumulated damage
+  bounds, which may include gaps between changed areas. See
   [Update scopes and dirtiness](../concepts/update-scopes-and-dirtiness).
 
 `Window` is the retained model; `Application::run` is the host
-: `Window` owns the root, the UI thread, focus, capture, damage and
-  scheduling, and works without any native window at all, which is how the
+: `Window` binds to the thread that constructs it and owns the root, focus,
+  capture, damage and scheduling. It works without any native window at all, which is how the
   tests run. `Application::run` hands the model to the native host for your
   platform, presents it, pumps events until the window closes, and returns an
   `ApplicationResult` whose `accepted()` is true for an ordinary close.

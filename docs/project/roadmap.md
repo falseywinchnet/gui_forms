@@ -35,25 +35,27 @@ which remain the detailed source.
 - An installed CMake SDK consumed by standalone examples on every CI platform,
   with generation-time rejection of unsafe linking combinations.
 - A compiler-cache pipeline that publishes tested object caches per platform.
+- This documentation site, with control indexes and an API reference
+  generated from the control registry and the public headers.
+- Three demonstration programs (Gallery, Explore preview, Correspondence) on
+  macOS, Windows and Linux, and a release pipeline that builds, tests,
+  packages and launch-tests each of them before publishing archives,
+  installers and checksums.
 
 ## In progress
 
-Documentation and distribution
-: This site; a registry of controls that drives the Gallery navigation, the
-  controls indexes and the README table; the generated API reference wired
-  into the site; per-control pages; screenshots captured by CI rather than by
-  hand.
+Documentation
+: Reviewed descriptions for the public members the API reference still lists
+  by signature only, and screenshots captured by CI rather than by hand.
 
 Demonstration programs
-: One registry-driven Gallery with a live properties panel and an About page
-  showing version, commit, renderer and instrumentation; the fixture-backed
-  Explore preview packaged with its status stated; the Correspondence mail
-  mockup; Linux entry points for all three.
+: The Explore preview's remaining interaction gates, tracked in the
+  demoboard's status file.
 
-Release pipeline
-: Tagged `v*` releases carrying per-platform archives (zip and pkg on macOS,
-  zip and installer on Windows, tar.gz and deb on Linux), checksums, ad hoc
-  macOS signing and a smoke launch of each installed program on each runner.
+Hosts
+: Input-method preedit on Windows and X11, a Windows UI Automation provider,
+  outbound drag on every host, and advertising the accessibility capability
+  where native publication already exists.
 
 ## Before 1.0
 
@@ -76,14 +78,17 @@ The API is declared stable only when all of the following hold:
 
 GPU rendering of any kind; a browser engine, CSS or an HTML runtime; a .NET,
 Java or Godot dependency in the native runtime; immediate-mode controls or a
-perpetual redraw loop; host font discovery; LCD subpixel text; ActiveX,
+perpetual redraw loop; host font discovery for control text; LCD subpixel text; ActiveX,
 browser hosting, printing, MDI and obsolete Forms families; Wayland (the X11
 host runs under XWayland).
 
 ## Known gaps
 
-Outbound drag initiation; MSAA/UIA and ATK publication; input-method
-composition on X11; native menu-bar publication; per-monitor DPI policy as a
-host service beyond scale notifications; alignment policy inside table cells;
-designer serialization. Each appears in `planning/CONTROL_COMPLETENESS_MATRIX.md`
-or `planning/WINFORMS_BEHAVIOR_GAP_CATALOGUE.md` with its current state.
+Outbound drag initiation; a separate Windows UIA provider (MSAA is implemented);
+preedit composition on Windows and X11; native menu-bar publication;
+per-monitor DPI policy as a host service beyond scale notifications;
+designer serialization; preserving sparse damage regions through painting.
+Linux already publishes accessibility through ATK/AT-SPI, and table cells
+already align and stretch children through Dock and Anchor. The detailed
+planning records may describe earlier states; check the current implementation
+and tests when assessing a remaining gap.

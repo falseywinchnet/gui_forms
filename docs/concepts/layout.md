@@ -1,9 +1,10 @@
 # Layout
 
 Layout in GUI.Forms is a two-phase retained pass, measure then arrange, that
-runs only for controls marked dirty and only when an update scope closes or a
-read barrier demands it. There is no constraint solver and no CSS engine;
-there are a small number of deterministic layout containers and a base
+runs for dirty controls when layout is flushed, including when an update scope
+closes, a read barrier demands it, or a paint needs current geometry. There is
+no constraint solver and no CSS engine; there are a small number of
+deterministic layout containers and a base
 `Control` policy they all share.
 
 ## Coordinates and units
@@ -50,14 +51,16 @@ are stable: the authored input is still there to measure from.
 `FlowLayoutPanel`
 : Orders visible children left-to-right, right-to-left, top-down or
   bottom-up, honouring child margins, container padding, optional wrapping
-  and per-child `FlowBreak`. Hidden children leave no gap. It is a
+  and per-child flow breaks (`set_flow_break`). Hidden children leave no gap. It is a
   deterministic flow, not flexbox.
 
 `TableLayoutPanel`
 : Bounded row and column tracks with absolute, auto-size and weighted
   percent sizing; explicit or row-major automatic cell placement; row and
   column spans; fixed, add-rows or add-columns growth; cell borders;
-  resolved-track inspection and overflow reporting.
+  resolved-track inspection and overflow reporting. Dock fills or aligns a
+  child within its cell; with `DockStyle::none`, Anchor determines edge
+  alignment, centering and stretching inside the cell after margins.
 
 `SplitContainer`, `MasterDetailView`
 : Two panes with a draggable seam and stable panel/seam IDs. The seam is a
@@ -76,13 +79,14 @@ are stable: the authored input is still there to measure from.
 ## Scrolling
 
 `ScrollableControl` is the shared base for `Panel` and `ContainerControl`.
-`AutoScroll`, `AutoScrollMargin`, `AutoScrollMinSize` and the position
-determine a two-axis content extent; child requested bounds stay in content
+`auto_scroll`, `auto_scroll_margin`, `auto_scroll_min_size` and
+`auto_scroll_position` determine a two-axis content extent; child requested bounds stay in content
 coordinates and never drift as the view scrolls. Scrollbars are an overlay
 outside the child viewport, so descendants cannot paint or receive hits
-through them. Each real scroll mutation records an exact event with type,
-orientation and old/new values. `scroll_control_into_view` honours each
-target's `AutoScrollOffset`. Multiline `TextBox` reports its document extent
+through them. Notifying scroll operations report type, orientation and
+old/new values; programmatic `scroll_to` and `scroll_by` default to
+`notify = false`. `scroll_control_into_view` honours each
+target's `auto_scroll_offset`. Multiline `TextBox` reports its document extent
 through the same base, so a text box gets real scrollbars rather than private
 offsets.
 
@@ -95,12 +99,15 @@ gf::Size measure(gf::Size available) override;        // report preferred size
 void arrange(gf::Rect final_bounds) override;         // place children
 ```
 
-`measure` must be pure with respect to retained state: it may read children's
-preferred sizes and its own properties, but it must not set properties, or
-the flush's pass bound will stop it and report
-`bounded_pass_limit_hits`. `arrange` positions children by calling their
-`set_bounds`; those calls are recorded as layout-slot assignments, not as
-authored requests.
+Keep `measure` free of retained mutations: read children's preferred sizes
+and your own properties to compute a size. Mutations can request another pass;
+a layout that keeps invalidating itself eventually hits the bounded pass
+limit and reports `bounded_pass_limit_hits`.
+
+In `arrange`, call `arrange_self(final_bounds)` to commit your own geometry,
+then `set_child_layout(child, rect)` to assign each child's layout slot.
+Calling the child's `set_bounds` changes its authored `requested_bounds`
+even during arrangement; it is not a layout-slot assignment.
 
 Declare the layout effects of your properties with `invalidate_declared`
 (see [Update scopes and dirtiness](update-scopes-and-dirtiness)) so that
@@ -119,5 +126,5 @@ widely.
 
 There is no constraint-based or grid-template layout, no CSS, no per-monitor
 DPI policy inside the core (scale is a host fact the window is told), and no
-designer serialization. Alignment and stretch policy inside table cells and
-Dock/Anchor integration with the table and flow families are still open.
+designer serialization. Flow layout uses its packing policy rather than the
+base Dock/Anchor placement rules; table cells support Dock and Anchor.

@@ -11,20 +11,19 @@ every option, the tests and the demonstration programs.
 | Platform | Minimum | Host | Notes |
 |---|---|---|---|
 | macOS | 14.0, Apple silicon (arm64) only | AppKit | Default build on a Mac |
-| Windows | 10 (x64) | Win32 | Native build in MSYS2 CLANG64, or cross-build with MinGW-w64 and run under Wine |
-| Linux | Ubuntu 24.04 (x64, arm64) | X11 | Opt-in; needs X11 and ATK development packages |
+| Windows | 10 (x64) | Win32 | Native build in MSYS2 CLANG64 |
+| Linux | Ubuntu 24.04 CI targets (x64, arm64) | X11 | Opt-in; needs X11 and ATK development packages |
 
-Intel Macs, Wayland-only sessions and other Linux ABIs are not supported
-today. The portable core (`Core`, `Controls`, `Drawing`, `Threading`) builds
-and tests everywhere a C++20 compiler runs; only the native `Application`
-host is platform specific.
+Intel Macs are not supported. Wayland sessions need XWayland for the X11
+host. The portable core (`Core`, `Controls`, `Drawing`, `Threading`) is host
+independent, but its build still requires the pinned LLVM version below.
 
 ## Prerequisites
 
 GUI.Forms requires **LLVM 22.1.x**. The configure step fails with any other
 compiler, including the system Clang, because the compiler identity is part of
-the compiler-cache contract. You also need CMake 3.25 or newer, Ninja, Git
-and, optionally, `ccache`.
+the compiler-cache contract. You also need CMake 3.25 or newer, Ninja, Git,
+Python 3.12 or newer and, optionally, `ccache`.
 
 macOS
 : Install the Xcode command-line tools and `brew install cmake ninja ccache llvm@22`.
@@ -58,25 +57,63 @@ export CC=clang CXX=clang++ OBJCXX=clang++
 
 ## Configure, build, install
 
-From the repository root:
+Run all commands from the repository root. Fetch the text sources before
+configuring any native build; CMake stops if they are absent:
+
+```sh
+sh third_party/fetch_text_stack.sh
+```
+
+Then use the configure command for your platform.
+
+macOS (with `GUI_FORMS_LLVM_RUNTIME` set as above):
 
 ```sh
 cmake -S . -B build -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
     -DCMAKE_INSTALL_PREFIX="$PWD/sdk"
+```
+
+Linux (build Skia with the system GN and Ninja first):
+
+```sh
+export GUI_FORMS_SYSTEM_BUILD_TOOLS=1
+sh third_party/fetch_skia_cpu.sh
+sh third_party/build_skia_cpu_linux.sh "$PWD/build-skia-linux"
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
+    -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
+    -DGUI_FORMS_ENABLE_LINUX_HOST=ON \
+    -DGUI_FORMS_SKIA_PREBUILT=ON \
+    -DGUI_FORMS_SKIA_OUT="$PWD/build-skia-linux"
+```
+
+Windows (in MSYS2 CLANG64, using the DIB renderer):
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake \
+    -DCMAKE_INSTALL_PREFIX="$PWD/sdk" \
+    -DGUI_FORMS_ENABLE_SKIA=OFF -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON
+```
+
+Build, test and install the selected configuration:
+
+```sh
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-The first configure fetches the pinned third-party sources (a CPU-only Skia
-with the PNG-only policy patch, HarfBuzz, FreeType, SheenBidi, libunibreak)
-and builds Skia; expect that step to take several minutes. Later configures
-reuse the checked-out sources.
+On macOS the first build fetches and builds the private CPU-only Skia;
+configure does not build it. HarfBuzz and FreeType come from the explicit text
+fetch above. SheenBidi is vendored; libunibreak is needed only for the optional
+development text-mask profile. Linux native tests need an X11 display;
+use `xvfb-run -a ctest --test-dir build --output-on-failure` on a headless runner.
 
-Pass the same `-DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake` to every consumer
-project. The toolchain file fixes the compiler, the macOS SDK, the arm64
+Pass the absolute path to the same `cmake/llvm22.cmake` to every consumer
+project. On macOS the toolchain also fixes the SDK, the arm64
 architecture, the 14.0 deployment target and the bundled libc++ runtime, and a
 consumer built with different settings is not binary compatible.
 
@@ -85,9 +122,9 @@ consumer built with different settings is not binary compatible.
 | Path under the prefix | Content |
 |---|---|
 | `include/gui_forms/` | Public portable headers |
-| `lib/` | `GUIForms::Core`, `Controls`, `Drawing` (static), `GUIForms::Threading` (shared), `GUIForms::Application` (shared, when a native host is enabled), `GUIForms::Audio` (static, when enabled) |
-| `lib/cmake/GUIForms/` | `GUIFormsConfig.cmake` and exported target files |
-| `share/GUIForms/fonts/` | The bundled font set and licence notices; exported as `GUIForms_FONT_DIR` |
+| `${CMAKE_INSTALL_LIBDIR}/` (usually `lib/`) | `GUIForms::Core`, `Controls`, `Drawing` (static), `GUIForms::Threading` (shared), `GUIForms::Application` (shared, when a native host is enabled), `GUIForms::Audio` (static, when enabled); Windows runtime DLLs go in `bin/` |
+| `${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms/` | `GUIFormsConfig.cmake` and exported target files |
+| `share/GUIForms/fonts/` | Bundled font set and licences, installed with a native host; exported as `GUIForms_FONT_DIR` |
 | `share/licenses/` | Third-party notices |
 
 Nothing from Skia, AppKit, Win32 or X11 appears in the installed headers;
@@ -102,7 +139,7 @@ package. Build them against your prefix:
 cmake -S examples/reference -B build-examples -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_PREFIX_PATH="$PWD/sdk" \
-    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake
+    -DCMAKE_TOOLCHAIN_FILE="$PWD/cmake/llvm22.cmake"
 cmake --build build-examples --parallel
 ctest --test-dir build-examples --output-on-failure
 ```

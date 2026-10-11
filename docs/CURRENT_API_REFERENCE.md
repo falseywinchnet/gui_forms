@@ -169,7 +169,7 @@ until its text engine or registered faces change, and a shadow's blurred
 coverage until the device scale or subpixel phase changes. Kept shadow coverage
 is applied through a shader mask filter, so the color passes through the same
 mask blitter as a direct blur; tests require byte-identical output for both.
-The Windows GDI host and other painters use the defaults.
+The Windows DIB host and other painters use the defaults.
 
 HarfBuzz shaping uses unhinted FreeType advances at the logical size
 (ADR-004): a line's width is linear in its font size and agrees with the

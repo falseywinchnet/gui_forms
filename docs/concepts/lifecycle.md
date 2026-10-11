@@ -98,9 +98,11 @@ honoured before any synthetic or user input is delivered.
 
 ## Disposal
 
-Disposal is synchronous and runs in a fixed order: detach the subtree
-(child first), revoke subscriptions and queued work, release display chunks
-and resources, mark `disposed`. A disposed control rejects mutation. Disposing
+Disposal is synchronous. `Component::dispose()` first marks the object
+`disposing` and revokes its owned subscriptions and work, then calls
+`on_dispose()`. The control hook detaches the subtree, releases retained
+resources and disposes children. Finally the component is marked `disposed`.
+A disposed control rejects mutation. Disposing
 the root after `Application::run` returns is ordinary; disposing it while
 the window is `attached` detaches it from the live window first.
 
