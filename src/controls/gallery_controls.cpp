@@ -1,5 +1,9 @@
 #include "gallery_controls.hpp"
 
+#include "gallery.hpp"
+#include "gallery_catalog.hpp"
+#include "gallery_page_specs.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -7,6 +11,12 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <utility>
+
+#ifndef GUI_FORMS_VERSION_STRING
+// CMake defines this from project(GUIForms VERSION ...); a bare syntax check
+// or an out-of-tree consumer still gets an honest label.
+#define GUI_FORMS_VERSION_STRING "unversioned"
+#endif
 
 namespace gui_forms::gallery {
 namespace {
@@ -121,8 +131,13 @@ void sunken_frame(Painter& painter, Rect rect, Color fill)
 
 [[nodiscard]] std::string metric_text(std::string_view id, const MetricsSnapshot& m)
 {
-    char buffer[192]{};
-    if (id == "gallery.diagnostics.renderer") {
+    char buffer[256]{};
+    if (id == "gallery.diagnostics.about") {
+        std::snprintf(buffer, sizeof(buffer),
+                      "%s %s · %zu pages · %zu registry records · renderer: %s",
+                      std::string(gallery_program_name).c_str(), GUI_FORMS_VERSION_STRING,
+                      gallery_pages.size(), control_catalog.size(), m.renderer_name.c_str());
+    } else if (id == "gallery.diagnostics.renderer") {
         std::snprintf(buffer, sizeof(buffer), "%s", m.renderer_name.c_str());
     } else if (id == "gallery.diagnostics.controls") {
         std::snprintf(buffer, sizeof(buffer), "controls %llu / IDs %llu / cache %llu",
@@ -495,10 +510,6 @@ void GalleryContext::synchronize(std::string_view cause)
         invalidate_gallery_controls(*window,
             {"gallery.radio.classic", "gallery.radio.quiet", "gallery.default-button",
              "gallery.slider"});
-    } else if (cause.starts_with("gallery.category.")) {
-        invalidate_gallery_controls(*window,
-            {"gallery.category.basics", "gallery.category.values",
-             "gallery.category.collections", "gallery.category.instrument"});
     } else if (cause.starts_with("gallery.collection.")) {
         invalidate_gallery_controls(*window,
             {"gallery.collection.alpha", "gallery.collection.beta",
@@ -512,7 +523,8 @@ void GalleryContext::synchronize(std::string_view cause)
     // ensuring every retained interaction is observable on the next frame.
     if (model.state().diagnostics_visible) {
         invalidate_gallery_controls(*window,
-            {"gallery.diagnostics.renderer", "gallery.diagnostics.controls",
+            {"gallery.diagnostics.about",
+             "gallery.diagnostics.renderer", "gallery.diagnostics.controls",
              "gallery.diagnostics.layout", "gallery.diagnostics.paint",
              "gallery.diagnostics.input", "gallery.diagnostics.flush",
              "gallery.diagnostics.present"});
@@ -802,10 +814,7 @@ void GalleryControl::on_paint(Painter& painter, Rect)
                               Color::rgba(31, 91, 151), 1.0);
         }
         painter.draw_text_utf8({7.0, 18.0}, text,
-                               {(*specification_).id.starts_with("gallery.category.")
-                                    ? FontRole::control
-                                    : FontRole::content,
-                                12.0, 400, false},
+                               {FontRole::content, 12.0, 400, false},
                                selected() ? highlight : ink);
         if (focused_) {
             painter.stroke_rect({1.5, 1.5, bounds.width - 3.0, bounds.height - 3.0},
@@ -935,8 +944,7 @@ NodeKind GalleryControl::kind() const noexcept
 
 bool GalleryControl::selected() const
 {
-    return (*context_).model.state().selected_category == (*specification_).id ||
-           (*context_).model.state().selected_collection_row == (*specification_).id;
+    return (*context_).model.state().selected_collection_row == (*specification_).id;
 }
 
 double GalleryControl::value() const
@@ -969,6 +977,16 @@ std::string GalleryControl::display_text() const
     return std::string((*specification_).text);
 }
 
+Control::Ptr GalleryTree::mount(std::string_view id) const
+{
+    for (const GalleryMount& candidate : mounts) {
+        if ((*candidate.specification).id == id) {
+            return candidate.control;
+        }
+    }
+    return nullptr;
+}
+
 GalleryTree build_gallery_tree()
 {
     std::shared_ptr<gui_forms::gallery::GalleryContext> context = std::make_shared<GalleryContext>();
@@ -976,6 +994,10 @@ GalleryTree build_gallery_tree()
     controls.reserve(dml::gallery_nodes.size());
 
     for (const dml::NodeSpec& node : dml::gallery_nodes) {
+        if (node.parent_id.empty()) {
+            // gallery.root is the declared boundary; the shell is the real root.
+            continue;
+        }
         Control::Ptr control;
         if (node.kind == NodeKind::user_control) {
             control = make_control<GalleryLifecycleCard>(
@@ -996,6 +1018,10 @@ GalleryTree build_gallery_tree()
                 (*label).set_font({FontRole::control, 10.0, 600, false});
             } else if (node.id == "gallery.lifecycle-status") {
                 (*label).set_font({FontRole::content, 10.0, 400, false});
+            } else if (node.id == "gallery.diagnostics.about") {
+                (*label).set_font({FontRole::content, 10.0, 400, false});
+                (*label).set_text_wrapping(TextWrapping::word);
+                (*label).set_vertical_alignment(VerticalAlignment::near);
             } else {
                 (*label).set_font({FontRole::content, 12.0, 400, false});
             }
@@ -1028,20 +1054,29 @@ GalleryTree build_gallery_tree()
         }
         controls.emplace(node.id, control);
     }
+    GalleryTree tree;
+    tree.context = std::move(context);
     for (const dml::NodeSpec& node : dml::gallery_nodes) {
         if (node.parent_id.empty()) {
             continue;
         }
         const std::unordered_map<std::string_view, Control::Ptr>::iterator
-            parent = controls.find(node.parent_id);
-        const std::unordered_map<std::string_view, Control::Ptr>::iterator
             child = controls.find(node.id);
-        if (parent == controls.end() || child == controls.end()) {
+        if (child == controls.end()) {
+            throw std::logic_error("compiled gallery DML contains an uninstantiated node");
+        }
+        if (node.parent_id == "gallery.root") {
+            tree.mounts.push_back({&node, (*child).second});
+            continue;
+        }
+        const std::unordered_map<std::string_view, Control::Ptr>::iterator
+            parent = controls.find(node.parent_id);
+        if (parent == controls.end()) {
             throw std::logic_error("compiled gallery DML contains an unresolved parent");
         }
         (*(*parent).second).add_child((*child).second);
     }
-    return {controls.at("gallery.root"), std::move(context)};
+    return tree;
 }
 
 }  // namespace gui_forms::gallery

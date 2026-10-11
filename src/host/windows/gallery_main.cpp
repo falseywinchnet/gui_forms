@@ -1,15 +1,21 @@
 #include "gallery.hpp"
 #include "windows_host.hpp"
+#include "program_options.hpp"
 
-#include <string_view>
+#include <optional>
+#include <string>
+#include <utility>
 
 int main(int argc, char** argv) {
+    const std::optional<gui_forms::demo::ProgramOptions> program =
+        gui_forms::demo::parse_program_options(argc, argv);
+    if (!program) return 2;
     gui_forms::host::WindowsHostOptions options;
-    for (int index = 1; index < argc; ++index) {
-        if (std::string_view(argv[index]) == "--automation") {
-            options.automation_enabled = true;
-        }
-    }
+    options.title = std::string(gui_forms::gallery::gallery_program_name);
+    options.initial_size = gui_forms::gallery::gallery_default_size;
+    options.minimum_size = gui_forms::gallery::gallery_minimum_size;
+    gui_forms::demo::apply_program_options(*program, options);
+    options.automation_enabled = (*program).automation;
     return gui_forms::host::run_windows(gui_forms::gallery::make_gallery(),
                                         std::move(options));
 }

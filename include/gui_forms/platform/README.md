@@ -1,0 +1,65 @@
+# Platform host entry points
+
+The headers in this directory are the public, portable entry points for the
+native hosts: `macos_host.hpp` (`run_macos`, `MacHostOptions`),
+`windows_host.hpp` (`run_windows`, `WindowsHostOptions`) and `linux_host.hpp`
+(`run_linux`, `LinuxHostOptions`). Each takes a retained `Window` model and an
+options struct. Native types never appear here; honest platform differences are
+reported through `HostCapabilities` (`macos_capabilities()`,
+`windows_capabilities()`, `linux_capabilities()`).
+
+## Frame capture contract
+
+Every options struct carries the same two fields with identical semantics:
+
+- `std::string capture_path` — when non-empty, after the first presented frame
+  that covers the whole window the host encodes the presented framebuffer as
+  PNG to that path, prints exactly one JSON line to stdout,
+
+  ```text
+  {"automation":"capture","saved":true,"path":"/abs/or/relative/file.png"}
+  ```
+
+  (`saved` is `false` when encoding or writing failed; `path` is the string
+  that was passed, JSON-escaped), and then requests close through the ordinary
+  close path. The process exit code is `0` when the file was saved and
+  non-zero otherwise, including when the window closed before any frame
+  covered it.
+- `std::optional<Size> capture_size` — when set, the window is created at that
+  logical size instead of `initial_size`.
+
+Hosts that implement the contract set `HostCapability::frame_capture` in their
+capability report. What differs between hosts is only how the adapter reaches
+its framebuffer: the AppKit host and the X11 host encode the private Skia CPU
+front raster (premultiplied RGBA8, written with straight alpha); the Win32
+host encodes its presented 32-bit DIB through the renderer-neutral core PNG
+writer as an opaque image, because GDI leaves the DIB alpha byte undefined.
+Captured pixels are device pixels, so a 2x display yields a 2x image.
+
+## Demo program command line
+
+The Gallery, Correspondence, Explore and lab executables share one parser
+(`demo/program_options.hpp`):
+
+```text
+<program> [--automation] [--capture <path.png>] [--size <W>x<H>] [--scale <factor>]
+```
+
+- `--capture <path>` sets `capture_path`; `--size WxH` sets `capture_size`
+  (positive numbers, e.g. `--size 1280x800`).
+- `--automation` enables the Windows host's `WM_COPYDATA` automation channel
+  (`GUI.Forms.Automation/1 snapshot|capture|close|...`). The macOS and Linux
+  hosts accept and ignore the flag so one CI command line works on every
+  platform.
+- `--scale` is recorded as a hint only; hosts take the device scale from the
+  display.
+- An unknown argument, a missing value or a malformed value prints usage to
+  stderr and exits with code 2 before any window is created.
+
+Example (any platform):
+
+```text
+gui-forms-gallery --capture gallery.png --size 1280x800
+```
+
+prints the capture line, closes, and exits `0` when `gallery.png` was written.

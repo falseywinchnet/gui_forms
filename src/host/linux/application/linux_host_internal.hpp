@@ -73,6 +73,9 @@ public:
   bool drag_message(const XClientMessageEvent &message);
   void action(ActionKind kind);
   void close(HostCloseReason reason, bool force = false);
+  // Portable frame capture (capture_path host option): runs once after the
+  // first presented frame whose damage covered the whole window, then closes.
+  void frame_capture_if_due(bool covers_window);
   HostDispatchResult dispatch(HostEventPayload payload);
   HostDialogResult dialog(const HostDialogRequest &request);
   Runtime &runtime;
@@ -84,6 +87,8 @@ public:
   bool closed{};
   bool visible{};
   bool modal{};
+  bool frame_capture_completed{};
+  bool frame_capture_saved{};
   bool cursor_set{};
   bool fallback_fullscreen{};
   Rect restored_frame;

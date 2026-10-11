@@ -33,7 +33,7 @@ gui_forms/tools/house_policy_check/run_inventory.sh \
 Inventory mode records admitted constructs and violations without failing.
 Closure mode fails if any finding still has `violation` disposition. The
 symbol-bound `O-011-tag` exception is encoded only for the four decided Tag
-owners and the named showcase and File Manager demoboard Tag dogfood functions.
+owners and the named Gallery and File Manager demoboard Tag dogfood functions.
 Set `GUI_FORMS_HOUSE_POLICY_MODE=closure` when invoking the wrapper to turn the
 same exact-compilation-database scan into the fatal closure gate; the default is
 `inventory` so intermediate evidence collection remains non-fatal.

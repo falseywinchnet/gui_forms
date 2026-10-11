@@ -1,4 +1,5 @@
 #include "linux_host_internal.hpp"
+#include "../../../core/host/frame_capture/frame_capture.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 #include <thread>
 #include <X11/XKBlib.h>
@@ -172,7 +173,8 @@ bool present_prepared_front(NativeWindow& window, const Rect requested) {
   return true;
 }
 
-void update_prepared_window(NativeWindow& window) {
+// Returns true when a frame was presented and its damage acknowledged.
+bool update_prepared_window(NativeWindow& window) {
   render::SkiaRaster& raster = window.raster;
   const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
   std::optional<PaintReceipt> committed{};
@@ -196,11 +198,11 @@ void update_prepared_window(NativeWindow& window) {
     // replay cannot terminate the event loop or claim a presentation receipt.
   }
   const PaintReceipt front = raster.prepared_front_receipt();
-  if (!front) return;
+  if (!front) return false;
   bool presented = false;
   try { presented = present_prepared_front(window, window.damage.bounds()); }
-  catch (...) { return; }
-  if (!presented || !committed) return;
+  catch (...) { return false; }
+  if (!presented || !committed) return false;
   const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
   const std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started);
   const std::uint64_t elapsed = static_cast<std::uint64_t>(duration.count());
@@ -213,6 +215,7 @@ void update_prepared_window(NativeWindow& window) {
     if (lease.surface_epoch == front.surface_epoch && lease.content_revision == front.rendered_revision &&
         lease.presented_revision == front.rendered_revision && raster.prepared_front_matches(window.size, 1.0)) window.damage.clear();
   }
+  return window.damage.empty();
 }
 #endif
 std::uint64_t now_ns() {
@@ -482,7 +485,9 @@ std::shared_ptr<NativeWindow> Runtime::add(LinuxApplicationWindow entry,
 }
 NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
     : runtime(host), entry(std::move(source)),
-      size(entry.options.initial_size) {
+      size(entry.options.capture_size.has_value()
+               ? *entry.options.capture_size
+               : entry.options.initial_size) {
   const int screen = DefaultScreen(runtime.display);
   size.height =
       std::min(size.height, std::max(64.0, static_cast<double>(DisplayHeight(
@@ -871,8 +876,14 @@ void NativeWindow::update() {
     damage.add(fresh.rectangles()[i]);
   if (!visible || damage.empty())
     return;
+  const Rect frame_bounds = damage.bounds();
+  const bool covers_window =
+      frame_bounds.x <= 0.0 && frame_bounds.y <= 0.0 &&
+      frame_bounds.x + frame_bounds.width >= size.width &&
+      frame_bounds.y + frame_bounds.height >= size.height;
 #if defined(GUI_FORMS_PREPARED_TEXT)
-  update_prepared_window(*this);
+  const bool prepared_presented = update_prepared_window(*this);
+  frame_capture_if_due(covers_window && prepared_presented);
   return;
 #else
   raster.resize(size, 1.0);
@@ -949,9 +960,23 @@ void NativeWindow::update() {
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now() - started)
           .count());
-  if ((*entry.model).notify_presented(*receipt, elapsed))
+  if ((*entry.model).notify_presented(*receipt, elapsed)) {
     damage.clear();
+    frame_capture_if_due(covers_window);
+  }
 #endif
+}
+void NativeWindow::frame_capture_if_due(bool covers_window) {
+  if (closed || frame_capture_completed || !covers_window ||
+      entry.options.capture_path.empty())
+    return;
+  frame_capture_completed = true;
+  // The Skia front raster is the framebuffer XPutImage just copied; encode it
+  // through the private adapter seam and report through the shared contract.
+  const std::vector<std::byte> encoded = raster.encode_png();
+  frame_capture_saved = gui_forms::host::detail::complete_frame_capture(
+      entry.options.capture_path, encoded);
+  close(HostCloseReason::application);
 }
 void Runtime::dispatch(XEvent &event) {
   if (event.type == SelectionRequest) {
@@ -1053,7 +1078,8 @@ HostDialogResult NativeWindow::dialog(const HostDialogRequest &request) {
 namespace gui_forms::host {
 HostCapabilities linux_capabilities() {
   return {HostCapabilities::current_protocol_version, "linux-x11",
-          HostCapability::lifecycle | HostCapability::monitor_geometry |
+          HostCapability::lifecycle | HostCapability::frame_capture |
+              HostCapability::monitor_geometry |
               HostCapability::occlusion | HostCapability::scheduled_wake |
               HostCapability::pointer_input | HostCapability::keyboard_input |
               HostCapability::pointer_capture | HostCapability::cursor |
@@ -1085,6 +1111,14 @@ int run_linux_application(std::vector<LinuxApplicationWindow> windows) {
             !window.entry.tool_window)
           primary_open = true;
       }
+    }
+    // Portable contract: a requested capture that was never saved fails the
+    // process even when the window closed normally.
+    for (std::size_t i = 0; i < runtime.windows.size(); ++i) {
+      const linux_detail::NativeWindow &window = *runtime.windows[i];
+      if (!window.entry.options.capture_path.empty() &&
+          !window.frame_capture_saved)
+        return 6;
     }
     return 0;
   } catch (const std::exception &error) {

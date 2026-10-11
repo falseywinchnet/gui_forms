@@ -139,6 +139,8 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/image/png_writer.cpp
+    src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
     src/core/host/types/host_services_snapshot/host_services_snapshot.cpp
@@ -646,6 +648,32 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
         endforeach()
     endif()
 
+    if(GUI_FORMS_ENABLE_LINUX_HOST)
+        add_executable(gui_forms_file_manager_demoboard_linux
+            file_manager_demoboard/src/linux_main.cpp)
+        target_link_libraries(gui_forms_file_manager_demoboard_linux PRIVATE
+            gui_forms_file_manager_demoboard_model gui_forms_host_linux)
+        set_target_properties(gui_forms_file_manager_demoboard_linux PROPERTIES
+            OUTPUT_NAME "gui-forms-explore")
+        # The X11 host discovers bundled faces next to the executable (or under
+        # GUI_FORMS_FONT_DIR); mirror the Windows post-build copy.
+        add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts")
+        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
+            get_filename_component(font_name "${font_file}" NAME)
+            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
+                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${font_name}")
+        endforeach()
+        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
+            get_filename_component(notice_name "${notice_file}" NAME)
+            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
+                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${notice_name}")
+        endforeach()
+    endif()
+
     if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_file_manager_demoboard_tests
             file_manager_demoboard/tests/demoboard_tests.cpp)
@@ -1147,6 +1175,7 @@ if(GUI_FORMS_BUILD_GALLERY OR (GUI_FORMS_BUILD_TESTS AND GUI_FORMS_ENABLE_MACOS_
     )
     set(GUI_FORMS_GALLERY_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE-PortsmouthRapids.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
@@ -1156,8 +1185,12 @@ if(GUI_FORMS_BUILD_GALLERY OR (GUI_FORMS_BUILD_TESTS AND GUI_FORMS_ENABLE_MACOS_
 endif()
 
 if(GUI_FORMS_BUILD_GALLERY)
+    # One demonstration program (decision F.1): the registry-driven Gallery.
+    # gallery_pages.cpp holds the pages migrated from the retired Complete
+    # Showcase and stays under the public-controls-only policy test below.
     add_library(gui_forms_gallery_model STATIC
         src/controls/gallery_controls.cpp
+        src/controls/gallery_pages.cpp
         demo/gallery.cpp
         demo/gallery_model.cpp
     )
@@ -1165,17 +1198,9 @@ if(GUI_FORMS_BUILD_GALLERY)
         ${CMAKE_CURRENT_SOURCE_DIR}/demo
         ${CMAKE_CURRENT_SOURCE_DIR}/src/controls
     )
+    target_compile_definitions(gui_forms_gallery_model PRIVATE
+        GUI_FORMS_VERSION_STRING="${PROJECT_VERSION}")
     target_link_libraries(gui_forms_gallery_model PUBLIC gui_forms_controls)
-
-    add_library(gui_forms_showcase_model STATIC
-        src/controls/showcase_controls.cpp
-        demo/showcase.cpp
-    )
-    target_include_directories(gui_forms_showcase_model PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/demo
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/controls
-    )
-    target_link_libraries(gui_forms_showcase_model PUBLIC gui_forms_controls)
 
     add_library(gui_forms_vsync_lab_model STATIC
         demo/vsync_lab.cpp
@@ -1271,24 +1296,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
             MACOSX_BUNDLE_BUNDLE_VERSION "1"
             OUTPUT_NAME "GUI.Forms Gallery"
-        )
-
-        add_executable(gui_forms_showcase MACOSX_BUNDLE
-            src/host/macos/showcase_main.mm
-            ${GUI_FORMS_GALLERY_FONTS}
-            ${GUI_FORMS_GALLERY_FONT_NOTICES}
-        )
-        target_compile_options(gui_forms_showcase PRIVATE -fobjc-arc)
-        target_link_libraries(gui_forms_showcase PRIVATE
-            gui_forms_showcase_model
-            gui_forms_host_macos
-        )
-        set_target_properties(gui_forms_showcase PROPERTIES
-            MACOSX_BUNDLE_BUNDLE_NAME "GUI.Forms Complete Showcase"
-            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.complete-showcase"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.1"
-            MACOSX_BUNDLE_BUNDLE_VERSION "1"
-            OUTPUT_NAME "GUI.Forms Complete Showcase"
         )
 
         add_executable(gui_forms_vsync_lab MACOSX_BUNDLE
@@ -1451,20 +1458,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             OUTPUT_NAME "GUI.Forms Gallery"
         )
 
-        add_executable(gui_forms_showcase_windows
-            src/host/windows/showcase_main.cpp
-        )
-        target_link_libraries(gui_forms_showcase_windows PRIVATE
-            gui_forms_showcase_model
-            gui_forms_host_windows
-        )
-        target_link_options(gui_forms_showcase_windows PRIVATE
-            -static
-        )
-        set_target_properties(gui_forms_showcase_windows PROPERTIES
-            OUTPUT_NAME "GUI.Forms Complete Showcase"
-        )
-
         add_executable(gui_forms_vsync_lab_windows
             src/host/windows/vsync_lab_main.cpp
         )
@@ -1577,11 +1570,13 @@ if(GUI_FORMS_BUILD_GALLERY)
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
         )
         foreach(font_target IN ITEMS
-                gui_forms_showcase_windows gui_forms_gallery_windows
+                gui_forms_gallery_windows
+                gui_forms_vsync_lab_windows
                 gui_forms_visual_inspector_lab_windows
                 gui_forms_layered_material_lab_windows
                 gui_forms_custom_chrome_lab_windows
                 gui_forms_typography_scale_lab_windows
+                gui_forms_responsive_tracks_lab_windows
                 gui_forms_connected_controls_lab_windows
                 gui_forms_seam_proximity_lab_windows)
             add_custom_command(TARGET ${font_target} POST_BUILD
@@ -1635,18 +1630,55 @@ if(GUI_FORMS_BUILD_GALLERY)
                     USES_TERMINAL
                     VERBATIM
                 )
-                add_custom_target(gui_forms_windows_showcase_services_smoke
+                add_custom_target(gui_forms_windows_gallery_services_smoke
                     COMMAND ${CMAKE_COMMAND} -E env
                         WINE_BINARY=${GUI_FORMS_WINE_EXECUTABLE}
-                        ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_windows_showcase_services_smoke.sh
+                        ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_windows_gallery_services_smoke.sh
                         ${CMAKE_CURRENT_BINARY_DIR}
-                    DEPENDS gui_forms_showcase_windows gui_forms_windows_probe
+                    DEPENDS gui_forms_gallery_windows gui_forms_windows_probe
                     USES_TERMINAL
                     VERBATIM
                 )
             endif()
         endif()
     endif()
+
+    if(GUI_FORMS_ENABLE_LINUX_HOST)
+        add_executable(gui_forms_gallery_linux
+            src/host/linux/gallery_main.cpp
+        )
+        target_link_libraries(gui_forms_gallery_linux PRIVATE
+            gui_forms_gallery_model
+            gui_forms_host_linux
+        )
+        set_target_properties(gui_forms_gallery_linux PROPERTIES
+            OUTPUT_NAME "gui-forms-gallery"
+        )
+
+        # The X11 host discovers bundled faces in <executable dir>/fonts (or
+        # GUI_FORMS_FONT_DIR, or ../share/GUIForms/fonts once installed).
+        foreach(font_target IN ITEMS gui_forms_gallery_linux)
+            add_custom_command(TARGET ${font_target} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory
+                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
+            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
+                get_filename_component(font_name "${font_file}" NAME)
+                add_custom_command(TARGET ${font_target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${font_file}"
+                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
+            endforeach()
+            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
+                get_filename_component(notice_name "${notice_file}" NAME)
+                add_custom_command(TARGET ${font_target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${notice_file}"
+                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
+            endforeach()
+        endforeach()
+    endif()
+
+    include(demo/correspondence/correspondence.cmake)
 endif()
 
 if(GUI_FORMS_BUILD_TEXT_LAYOUT_PROBE)
@@ -2038,6 +2070,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_host_image_tests tests/host_image_tests.cpp)
     target_link_libraries(gui_forms_host_image_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_host_image_tests COMMAND gui_forms_host_image_tests)
+
+    add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
+    target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
 
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
@@ -2498,26 +2534,31 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_gallery_interaction_tests
              COMMAND gui_forms_gallery_interaction_tests)
 
-    if(TARGET gui_forms_showcase_model)
-        add_executable(gui_forms_showcase_interaction_tests
-            tests/showcase_interaction_tests.cpp
+        add_executable(gui_forms_gallery_pages_tests
+            tests/gallery_pages_tests.cpp
         )
-        target_include_directories(gui_forms_showcase_interaction_tests PRIVATE
+        target_include_directories(gui_forms_gallery_pages_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
         )
-        target_link_libraries(gui_forms_showcase_interaction_tests PRIVATE
-            gui_forms_showcase_model
+        target_link_libraries(gui_forms_gallery_pages_tests PRIVATE
+            gui_forms_gallery_model
             gui_forms_host_headless
         )
-        add_test(NAME gui_forms_showcase_interaction_tests
-                 COMMAND gui_forms_showcase_interaction_tests)
+        add_test(NAME gui_forms_gallery_pages_tests
+                 COMMAND gui_forms_gallery_pages_tests)
         add_test(
-            NAME gui_forms_showcase_public_control_policy
+            NAME gui_forms_gallery_pages_public_control_policy
             COMMAND ${CMAKE_COMMAND}
-                -DSHOWCASE_FILES=${CMAKE_CURRENT_SOURCE_DIR}/src/controls/showcase_controls.cpp,${CMAKE_CURRENT_SOURCE_DIR}/demo/showcase.cpp,${CMAKE_CURRENT_SOURCE_DIR}/src/controls/showcase_controls.hpp
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_showcase_public_controls.cmake
+                -DGALLERY_PAGE_FILES=${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.cpp,${CMAKE_CURRENT_SOURCE_DIR}/src/controls/gallery_pages.hpp
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_pages_public_controls.cmake
         )
-    endif()
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_EXECUTABLE)
+            add_test(
+                NAME gui_forms_gallery_catalog_current
+                COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/control_registry.py emit-cpp --check
+            )
+        endif()
 
     if(TARGET gui_forms_visual_inspector_lab_model)
         add_executable(gui_forms_visual_inspector_lab_tests
@@ -2619,15 +2660,6 @@ if(GUI_FORMS_BUILD_TESTS)
             NAME gui_forms_gallery_font_policy
             COMMAND ${CMAKE_COMMAND}
                 -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_gallery>/Contents/Resources/fonts
-                -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
-        )
-    endif()
-
-    if(TARGET gui_forms_showcase)
-        add_test(
-            NAME gui_forms_showcase_font_policy
-            COMMAND ${CMAKE_COMMAND}
-                -DFONT_DIRECTORY=$<TARGET_BUNDLE_DIR:gui_forms_showcase>/Contents/Resources/fonts
                 -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_gallery_fonts.cmake
         )
     endif()

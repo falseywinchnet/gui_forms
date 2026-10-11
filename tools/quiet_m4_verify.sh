@@ -4,7 +4,7 @@ set -eu
 repository_root=$(git rev-parse --show-toplevel)
 build_helper=/Users/ultimussecundai/.local/bin/m4build
 build_directory=gui_forms/build
-test_pattern=${GUI_FORMS_TEST_PATTERN:-gui_forms_(composition_controls|showcase_interaction|gallery_interaction)_tests}
+test_pattern=${GUI_FORMS_TEST_PATTERN:-gui_forms_(composition_controls|gallery_pages|gallery_interaction)_tests}
 jobs=${GUI_FORMS_BUILD_JOBS:-10}
 verification_tmp=$(mktemp -d "${TMPDIR:-/tmp}/gui-forms-verify.XXXXXX")
 trap 'rm -rf "$verification_tmp"' EXIT HUP INT TERM

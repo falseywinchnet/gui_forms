@@ -493,7 +493,7 @@ private:
                 return true;
             }
         }
-        return enclosing == "gui_forms::showcase::initialize_showcase_runtime" ||
+        return enclosing == "gui_forms::gallery::(anonymous namespace)::retained_page_context" ||
                enclosing == "file_manager_demoboard::set_product_surface" ||
                enclosing ==
                    "(anonymous namespace)::test_public_drawing_metrics_and_control_tag" ||
