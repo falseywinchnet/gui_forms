@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::CheckBox": {
+      "reviewed": true,
+      "summary": "CheckBox specializes ButtonBase with validated two/three-state selection, optional automatic cycling, three indicator families, ordered state events, and checkable semantics.",
+      "remarks": [
+        "Supports two-state and validated three-state values. The declared activation order is checked-state mutation, `check_state_changed`, `checked_changed`, then click.",
+        "`auto_check` controls whether activation cycles the state automatically; three indicator families select the drawn check appearance."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::ButtonBase",
+        "gui_forms::CheckState"
+      ]
+    },
+    "gui_forms::CheckBox::CheckBox|void (StableId, std::string)": {
+      "reviewed": false,
+      "summary": "Constructs an auto-checking unchecked command with classic indicator policy."
+    },
+    "gui_forms::CheckBox::check_state|CheckState () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns unchecked, checked, or indeterminate retained state."
+    },
+    "gui_forms::CheckBox::set_check_state|void (CheckState)": {
+      "reviewed": false,
+      "summary": "Validates state and three-state policy, commits it, then publishes state and boolean changes in order."
+    },
+    "gui_forms::CheckBox::checked|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Maps retained state to true only for the checked value."
+    },
+    "gui_forms::CheckBox::set_checked|void (bool)": {
+      "reviewed": false,
+      "summary": "Selects checked or unchecked through the authoritative check-state setter."
+    },
+    "gui_forms::CheckBox::three_state|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether indeterminate is admitted and activation cycles three values."
+    },
+    "gui_forms::CheckBox::set_three_state|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles three-state policy and normalizes an existing indeterminate value when disabling it."
+    },
+    "gui_forms::CheckBox::auto_check|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether activation mutates check state before command publication."
+    },
+    "gui_forms::CheckBox::set_auto_check|void (bool)": {
+      "reviewed": false,
+      "summary": "Enables or disables automatic state cycling."
+    },
+    "gui_forms::CheckBox::indicator_style|ChoiceIndicatorStyle () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns classic box, modern box, or toggle-switch presentation."
+    },
+    "gui_forms::CheckBox::set_indicator_style|void (ChoiceIndicatorStyle)": {
+      "reviewed": false,
+      "summary": "Validates indicator vocabulary and invalidates size, paint, and semantics."
+    },
+    "gui_forms::CheckBox::check_state_changed|Event<CheckState> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after the complete CheckState commits."
+    },
+    "gui_forms::CheckBox::checked_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the boolean projection event published when checkedness changes."
+    },
+    "gui_forms::CheckBox::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records the selected indicator family, content, focus, and disabled states."
+    },
+    "gui_forms::CheckBox::visual_outsets|Insets () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports theme material outsets for modern/toggle rendering where applicable."
+    },
+    "gui_forms::CheckBox::on_activate|void ()": {
+      "reviewed": false,
+      "summary": "Cycles state when auto-checking, stops safely after disposal, then publishes the inherited click."
+    },
+    "gui_forms::CheckBox::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects checkbox role, check state including mixed, and press/toggle behavior."
+    }
+  }
+}

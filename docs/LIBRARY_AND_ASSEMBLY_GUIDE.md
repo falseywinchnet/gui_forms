@@ -30,6 +30,15 @@ second UI engine.
 The native core does not link .NET, AppKit, Win32, Wayland, X11, Skia types, or
 platform control objects into its public contract.
 
+### Platform code outside the host adapters
+
+`src/render/skia/executor/core_text_font_bytes.cpp` is CoreText code inside
+the private Skia executor: it rebuilds an installed face's sfnt bytes so the
+shared HarfBuzz/FreeType engine can load it. AGENTS.md admits platform-specific
+CPU details in private Skia extensions, so this placement is deliberate, and it
+is the only Apple-framework file outside `src/host/macos/`. Nothing it exposes
+crosses the portable contract.
+
 Application consumers link `GUIForms::Application`, which already contains Core.
 Audio adapters link `GUIForms::Audio`, which exposes Threading without pulling in
 static Core. See [the consumer linking rule](COMPILER_CACHE.md#consumer-linking-rule)
@@ -284,9 +293,9 @@ grammar.
 - The default direction is professional Windows 7/10 structure interpreted
   through GUI.Forms, not a pixel skin and not whatever the current OS happens
   to prefer.
-- Portsmouth Rapids is the current Gallery control/title face. Lucida Grande
-  or the content/system role is used for field text. This specific font pairing
-  remains a demo policy until font licensing, fallback, and M9 packs close.
+- Portsmouth Rapids is the Gallery control/title face, bundled under MIT
+  (`assets/fonts/LICENSE-PortsmouthRapids.txt`). Carlito is the bundled body
+  face for field text. Body-face coverage and fallback packs remain open.
 - A trusted custom control may paint through renderer-neutral GUI.Forms
   primitives and publish semantic children. It may not acquire the private
   renderer or replace host controls.

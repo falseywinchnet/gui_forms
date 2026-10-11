@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::Label": {
+      "reviewed": true,
+      "summary": "Label is a noninteractive retained text primitive with inherited typography roles, explicit font/color overrides, horizontal and vertical alignment, word wrapping, bounded line count, line spacing, mnemonics, and static-text semantics.",
+      "remarks": [
+        "Text, horizontal and vertical alignment, wrapping, bounded line count, and line spacing are retained; `text_changed` is synchronous outside an initialization transaction.",
+        "`TextStyleRole` selects inherited body, control, caption, heading, title, or monospace typography from the active theme. Font and foreground are independently overridable; `clear_font()` and `clear_foreground()` restore theme authority.",
+        "`use_mnemonic` applies the portable ampersand contract to measure, paint, semantic text, and next-selectable-control focus. The label does not intercept hit testing."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::Control"
+      ]
+    },
+    "gui_forms::Label::Label|void (StableId, std::string)": {
+      "reviewed": false,
+      "summary": "Constructs retained text and reflected Text, Font, ForeColor, and MaximumLines properties."
+    },
+    "gui_forms::Label::text|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored UTF-8 text including any mnemonic marker."
+    },
+    "gui_forms::Label::set_text|void (std::string)": {
+      "reviewed": false,
+      "summary": "Commits text, publishes text_changed, and avoids ancestor layout work for fixed-size telemetry labels."
+    },
+    "gui_forms::Label::font|FontSpec () const noexcept": {
+      "reviewed": false,
+      "summary": "Resolves an explicit font or the active Theme typography token selected by text_style_role."
+    },
+    "gui_forms::Label::has_font_override|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether a caller-owned FontSpec supersedes Theme typography."
+    },
+    "gui_forms::Label::set_font|void (FontSpec)": {
+      "reviewed": false,
+      "summary": "Validates and installs an explicit FontSpec with measure, paint, and semantic invalidation."
+    },
+    "gui_forms::Label::clear_font|void ()": {
+      "reviewed": false,
+      "summary": "Removes the explicit font and resumes inherited role typography."
+    },
+    "gui_forms::Label::text_style_role|TextStyleRole () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the body, control, caption, heading, title, or monospace typography role."
+    },
+    "gui_forms::Label::set_text_style_role|void (TextStyleRole)": {
+      "reviewed": false,
+      "summary": "Validates the role and updates inherited typography without disturbing an explicit font."
+    },
+    "gui_forms::Label::foreground|Color () const noexcept": {
+      "reviewed": false,
+      "summary": "Resolves an explicit color or the active panel-role text color."
+    },
+    "gui_forms::Label::has_foreground_override|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether a caller-owned text color is active."
+    },
+    "gui_forms::Label::set_foreground|void (Color)": {
+      "reviewed": false,
+      "summary": "Installs an explicit foreground color and invalidates paint and semantics."
+    },
+    "gui_forms::Label::clear_foreground|void ()": {
+      "reviewed": false,
+      "summary": "Removes the explicit color and resumes Theme text color."
+    },
+    "gui_forms::Label::alignment|HorizontalAlignment () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns per-line near, center, or far horizontal alignment."
+    },
+    "gui_forms::Label::set_alignment|void (HorizontalAlignment)": {
+      "reviewed": false,
+      "summary": "Validates and commits horizontal alignment without changing measurement."
+    },
+    "gui_forms::Label::vertical_alignment|VerticalAlignment () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns near, center, or far placement for the complete line block."
+    },
+    "gui_forms::Label::set_vertical_alignment|void (VerticalAlignment)": {
+      "reviewed": false,
+      "summary": "Validates and commits vertical block alignment."
+    },
+    "gui_forms::Label::text_wrapping|TextWrapping () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns no-wrap or renderer-neutral word wrapping policy."
+    },
+    "gui_forms::Label::set_text_wrapping|void (TextWrapping)": {
+      "reviewed": false,
+      "summary": "Validates wrapping policy and invalidates size, paint, and semantics."
+    },
+    "gui_forms::Label::line_spacing|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the font-size multiplier used between retained baselines."
+    },
+    "gui_forms::Label::set_line_spacing|void (double)": {
+      "reviewed": false,
+      "summary": "Accepts only finite values from 0.75 through 3.0 and invalidates affected phases."
+    },
+    "gui_forms::Label::maximum_lines|std::size_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns zero for unlimited lines or the positive measure/paint line ceiling."
+    },
+    "gui_forms::Label::set_maximum_lines|void (std::size_t)": {
+      "reviewed": false,
+      "summary": "Accepts zero through 4096, bounds desired height and actual painting, and leaves full semantic text intact."
+    },
+    "gui_forms::Label::use_mnemonic|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether ampersands define a displayed mnemonic."
+    },
+    "gui_forms::Label::set_use_mnemonic|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles mnemonic display parsing and focus-next routing."
+    },
+    "gui_forms::Label::text_changed|Event<const std::string &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after retained text commits."
+    },
+    "gui_forms::Label::measure|Size (Size)": {
+      "reviewed": false,
+      "summary": "Wraps text against the active constraint, applies MaximumLines, and derives content size unless fixed bounds win."
+    },
+    "gui_forms::Label::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records aligned visible lines with the resolved font, foreground, spacing, and line ceiling."
+    },
+    "gui_forms::Label::hit_test_local|bool (Point) const": {
+      "reviewed": false,
+      "summary": "Always declines hits so text labels remain transparent to container interaction."
+    },
+    "gui_forms::Label::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects full displayed text as an exposed static-text node independently of visual line limiting."
+    }
+  }
+}

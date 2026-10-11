@@ -13,3 +13,6 @@
 /tools/facade_load_lab/[sS][dD][rR][sS][hH][aA][rR][pP].Layout.xml
 /tools/run_[sS][dD][rR][sS][hH][aA][rR][pP]_compat_lab.sh
 /field-selection-abi*.bmp
+
+# Sphinx output
+/docs/_build/

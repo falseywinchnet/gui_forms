@@ -1,0 +1,96 @@
+"""Sphinx configuration for the GUI.Forms documentation site.
+
+The site is Markdown (MyST) rendered with the Furo theme and is built with
+``sphinx-build -W`` locally, in CI and on Read the Docs, so every warning is
+an error. See ``docs/README.md`` for maintainer notes.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+DOCS: Path = Path(__file__).resolve().parent
+REPOSITORY: Path = DOCS.parent
+
+
+def read_project_version() -> str:
+    """Return the version declared by the root CMakeLists.txt, or a dev label.
+
+    The version is read at build time so that it is never duplicated here.
+    """
+    cmake_lists: Path = REPOSITORY / "CMakeLists.txt"
+    if not cmake_lists.is_file():
+        return "0.0.0-dev"
+    text: str = cmake_lists.read_text(encoding="utf-8")
+    match: re.Match[str] | None = re.search(
+        r"^\s*project\s*\(\s*\w+\s+VERSION\s+(\d+(?:\.\d+){0,3})",
+        text,
+        re.MULTILINE,
+    )
+    if match is None:
+        return "0.0.0-dev"
+    return match.group(1)
+
+
+project = "GUI.Forms"
+author = "GUI.Forms contributors"
+copyright = "GUI.Forms contributors"
+release = read_project_version()
+version = release
+
+extensions = [
+    "myst_parser",
+]
+
+source_suffix = {
+    ".md": "markdown",
+}
+
+master_doc = "index"
+
+myst_heading_anchors = 3
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+]
+
+# Everything under docs/ that is not part of the published site. Each entry is
+# deliberate: the build runs with -W, so an unlisted stray page is an error.
+exclude_patterns = [
+    # Sphinx output and host metadata files.
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    # Maintainer notes for this directory; not a user page.
+    "README.md",
+    # Maintainer notes for the generated control indexes; not a user page.
+    "controls/generated/README.md",
+    # Dated internal working notes moved out of the user tree (W2.4).
+    "notes/**",
+    # The older generated atlas (HTML plus Markdown mirrors). Its Markdown now
+    # lands under controls/atlas/ through tools/generate_library_docs.py.
+    "library/**",
+    # Clang-derived reference inputs and any generated HTML site produced by
+    # tools/api_reference.py. Only reference/index.md (and generated Markdown
+    # pages placed beside it) are Sphinx sources.
+    "reference/site/**",
+    # Legacy long-form user documents superseded by the concept pages. They
+    # stay in place for readers of the repository but are not rebuilt here.
+    "LIBRARY_AND_ASSEMBLY_GUIDE.md",
+    "LIFECYCLE_CONTRACT.md",
+    "THREADING.md",
+    "CONCISE_STATE_AND_COLLECTIONS.md",
+    "APPLICATION_TEXT_LINKAGE.md",
+    "COMPILER_CACHE.md",
+    "WINDOWS_WINE_HOST.md",
+    "CURRENT_API_REFERENCE.md",
+]
+
+html_theme = "furo"
+html_title = f"GUI.Forms {release}"
+html_theme_options = {
+    "source_repository": "https://github.com/falseywinchnet/gui_forms/",
+    "source_branch": "main",
+    "source_directory": "docs/",
+}

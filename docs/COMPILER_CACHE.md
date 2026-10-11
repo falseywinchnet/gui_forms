@@ -42,7 +42,7 @@ The retained rejected trial used an unused preprocessor definition as its suppos
 invalidating option. Ccache correctly reused equivalent preprocessed source; the
 accepted proof changes `-fno-inline-functions` instead. These are fixture timings.
 
-`docs/FILE_MANAGER_COMMIT_MAP.txt` maps original commits to this filtered history.
+`docs/notes/FILE_MANAGER_COMMIT_MAP.txt` maps original commits to this filtered history.
 
 ## Consumer linking rule
 

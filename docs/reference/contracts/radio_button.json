@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::RadioButton": {
+      "reviewed": true,
+      "summary": "RadioButton specializes ButtonBase with retained checked state, container-scoped named exclusion groups, optional automatic checking, three indicator families, ordered events, and radio semantics.",
+      "remarks": [
+        "Checked state is retained; a named group within the same logical container is exclusive, so checking one radio button unchecks its group peers.",
+        "`auto_check` controls automatic checking on activation; `checked_changed` follows the mutation."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::ButtonBase",
+        "gui_forms::CheckBox"
+      ]
+    },
+    "gui_forms::RadioButton::RadioButton|void (StableId, std::string)": {
+      "reviewed": false,
+      "summary": "Constructs an unchecked auto-checking radio command with classic indicator policy."
+    },
+    "gui_forms::RadioButton::checked|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns retained group selection state."
+    },
+    "gui_forms::RadioButton::set_checked|void (bool)": {
+      "reviewed": false,
+      "summary": "Commits selection and synchronously clears matching live peers within the exclusion scope."
+    },
+    "gui_forms::RadioButton::group_name|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the optional named exclusion key; an empty key uses the ordinary container scope."
+    },
+    "gui_forms::RadioButton::set_group_name|void (std::string)": {
+      "reviewed": false,
+      "summary": "Validates bounded UTF-8, updates group identity, and reconciles exclusion when already checked."
+    },
+    "gui_forms::RadioButton::auto_check|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether activation selects the radio automatically."
+    },
+    "gui_forms::RadioButton::set_auto_check|void (bool)": {
+      "reviewed": false,
+      "summary": "Enables or disables automatic selection during activation."
+    },
+    "gui_forms::RadioButton::indicator_style|ChoiceIndicatorStyle () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns classic disc, modern disc, or toggle-switch presentation."
+    },
+    "gui_forms::RadioButton::set_indicator_style|void (ChoiceIndicatorStyle)": {
+      "reviewed": false,
+      "summary": "Validates indicator vocabulary and invalidates size, paint, and semantics."
+    },
+    "gui_forms::RadioButton::checked_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after retained selection commits."
+    },
+    "gui_forms::RadioButton::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records the selected indicator family, text, focus, hover, press, and disabled cues."
+    },
+    "gui_forms::RadioButton::visual_outsets|Insets () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports material outsets for the active visual recipe where applicable."
+    },
+    "gui_forms::RadioButton::on_activate|void ()": {
+      "reviewed": false,
+      "summary": "Selects through the group law when auto-checking, then publishes inherited click if still alive."
+    },
+    "gui_forms::RadioButton::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects radio-button role, checked state, group-aware selection, and press action."
+    }
+  }
+}

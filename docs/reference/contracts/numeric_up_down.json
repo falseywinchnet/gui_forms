@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::NumericUpDown": {
+      "reviewed": true,
+      "summary": "NumericUpDown is a retained composite numeric editor over an owned TextBox and source-private SpinButtons. It enforces ordered ranges, bounded step/precision/button geometry, decimal or hexadecimal formatting, commit synchronization, semantic range actions, and one authoritative value event.",
+      "remarks": [
+        "A composite numeric editor over an owned `TextBox` and source-private spin buttons.",
+        "Enforces an ordered range and bounded step, precision, and button geometry; decimal or hexadecimal formatting is selectable."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::TextBox"
+      ]
+    },
+    "gui_forms::NumericUpDown::NumericUpDown|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs owned editor and spin controls while deferring child attachment until shared ownership exists."
+    },
+    "gui_forms::NumericUpDown::initialize_control_tree|void ()": {
+      "reviewed": false,
+      "summary": "Attaches owned children and subscriptions exactly once, then synchronizes presentation."
+    },
+    "gui_forms::NumericUpDown::minimum|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the inclusive lower value bound."
+    },
+    "gui_forms::NumericUpDown::maximum|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the inclusive upper value bound."
+    },
+    "gui_forms::NumericUpDown::set_range|void (double, double)": {
+      "reviewed": false,
+      "summary": "Validates finite ordered bounds, constrains the current value, and refreshes editor and semantics atomically."
+    },
+    "gui_forms::NumericUpDown::value|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authoritative constrained numeric value."
+    },
+    "gui_forms::NumericUpDown::set_value|void (double)": {
+      "reviewed": false,
+      "summary": "Validates finiteness, clamps to the range, synchronizes text, and publishes a real value change."
+    },
+    "gui_forms::NumericUpDown::increment|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the positive step magnitude."
+    },
+    "gui_forms::NumericUpDown::set_increment|void (double)": {
+      "reviewed": false,
+      "summary": "Accepts a finite positive increment and refreshes semantic range metadata."
+    },
+    "gui_forms::NumericUpDown::decimal_places|std::uint8_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the bounded fixed-point precision used outside hexadecimal mode."
+    },
+    "gui_forms::NumericUpDown::set_decimal_places|void (std::uint8_t)": {
+      "reviewed": false,
+      "summary": "Accepts supported precision and reformats the owned editor."
+    },
+    "gui_forms::NumericUpDown::hexadecimal|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether integral hexadecimal presentation and parsing are active."
+    },
+    "gui_forms::NumericUpDown::set_hexadecimal|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles hexadecimal policy and synchronizes editor projection."
+    },
+    "gui_forms::NumericUpDown::button_width|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the logical allocation reserved for the spin-button column."
+    },
+    "gui_forms::NumericUpDown::set_button_width|void (double)": {
+      "reviewed": false,
+      "summary": "Accepts a finite 12–64 logical-pixel width and invalidates composite layout."
+    },
+    "gui_forms::NumericUpDown::editor|std::shared_ptr<TextBox> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the owned TextBox for composition-aware inspection and focus routing."
+    },
+    "gui_forms::NumericUpDown::value_changed|Event<double> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after authoritative value commits."
+    },
+    "gui_forms::NumericUpDown::arrange|void (Rect)": {
+      "reviewed": false,
+      "summary": "Allocates the editor and trailing button column from current button-width policy."
+    },
+    "gui_forms::NumericUpDown::on_key_preview|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Handles Up/Down stepping before the focused TextBox consumes the key."
+    },
+    "gui_forms::NumericUpDown::on_pointer_preview|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Initializes the owned control tree before routed pointer interaction."
+    },
+    "gui_forms::NumericUpDown::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects a spin-button role with numeric range, current value, step actions, and formatted text."
+    },
+    "gui_forms::NumericUpDown::on_semantic_action|bool (SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Routes increment, decrement, and set-value through common validation and commit logic."
+    }
+  }
+}

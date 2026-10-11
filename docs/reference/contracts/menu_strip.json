@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::MenuStrip": {
+      "reviewed": true,
+      "summary": "MenuStrip is the retained top-level menu coordinator. It lays out root items, tracks hot and active identities, transfers navigation across an owned ContextMenu, supports mnemonic and semantic entry, and exposes caller-controlled item padding while keeping invocation and open-state events ordered.",
+      "remarks": [
+        "A retained focusable menu bar. Root items are laid out by the strip; popup rows share `Command` authority with pointer, keyboard, and semantic activation through an owned `ContextMenu`.",
+        "`use_mnemonic` removes markers from top-level width, paint, and semantics; duplicate top-level mnemonics cycle deterministically.",
+        "Overflow and hosted ToolStrip controls remain open."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::ContextMenu",
+        "gui_forms::Command"
+      ]
+    },
+    "gui_forms::MenuStrip::MenuStrip|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs a focusable menu bar and its lifetime-bound ContextMenu coordinator."
+    },
+    "gui_forms::MenuStrip::~MenuStrip|void () noexcept": {
+      "reviewed": false,
+      "summary": "Closes transient state and disconnects owned menu subscriptions before destruction."
+    },
+    "gui_forms::MenuStrip::items|const std::vector<MenuStripItemSpec> &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored top-level menu records and submenu trees."
+    },
+    "gui_forms::MenuStrip::set_items|void (std::vector<MenuStripItemSpec>)": {
+      "reviewed": false,
+      "summary": "Validates and replaces menu topology, closes stale transient state, and refreshes geometry and semantics."
+    },
+    "gui_forms::MenuStrip::use_mnemonic|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether ampersand-style access keys participate in activation and painting."
+    },
+    "gui_forms::MenuStrip::set_use_mnemonic|void (bool)": {
+      "reviewed": false,
+      "summary": "Toggles mnemonic parsing, remeasures labels, and refreshes keyboard routing."
+    },
+    "gui_forms::MenuStrip::item_padding|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the logical horizontal inset applied around each top-level label."
+    },
+    "gui_forms::MenuStrip::set_item_padding|void (double)": {
+      "reviewed": false,
+      "summary": "Validates bounded padding and invalidates menu measurement, paint, and hit testing."
+    },
+    "gui_forms::MenuStrip::active_index|std::optional<std::size_t> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the currently open top-level item index, if any."
+    },
+    "gui_forms::MenuStrip::open|bool (const std::size_t, const MenuOpenMode)": {
+      "reviewed": false,
+      "summary": "Validates and opens an enabled top-level item's submenu with root-navigation handoff."
+    },
+    "gui_forms::MenuStrip::close|void () noexcept": {
+      "reviewed": false,
+      "summary": "Closes the owned ContextMenu and clears active and hot root state."
+    },
+    "gui_forms::MenuStrip::is_open|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the owned menu popup currently has transient ownership."
+    },
+    "gui_forms::MenuStrip::item_invoked|Event<const MenuStripInvocation &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event forwarding a committed leaf invocation from the owned context menu."
+    },
+    "gui_forms::MenuStrip::open_changed|Event<std::optional<std::size_t>> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event forwarding real changes to the menu strip's open state."
+    },
+    "gui_forms::MenuStrip::measure|Size (Size)": {
+      "reviewed": false,
+      "summary": "Computes desired menu-bar width from labels, mnemonics, font metrics, and item padding."
+    },
+    "gui_forms::MenuStrip::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records menu-bar background, hot/active states, labels, access-key cues, disabled state, and focus."
+    },
+    "gui_forms::MenuStrip::on_pointer|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Handles hover transfer, root switching, outside routing, press qualification, and dismissal."
+    },
+    "gui_forms::MenuStrip::on_key|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Implements root traversal, open/close, submenu handoff, activation, and Escape behavior."
+    },
+    "gui_forms::MenuStrip::on_focus_changed|void (bool)": {
+      "reviewed": false,
+      "summary": "Clears transient hot state when focus leaves unless the owned popup retains the interaction scope."
+    },
+    "gui_forms::MenuStrip::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects the control as a menu bar with expanded state."
+    },
+    "gui_forms::MenuStrip::semantic_virtual_children|std::vector<SemanticNode> () const": {
+      "reviewed": false,
+      "summary": "Exposes stable root menu items with enabled, focused, and expanded metadata."
+    },
+    "gui_forms::MenuStrip::on_semantic_child_action|bool (std::string_view, SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Maps virtual focus, expand, collapse, and press to the normal menu coordinator."
+    }
+  }
+}

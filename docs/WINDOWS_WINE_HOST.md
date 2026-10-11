@@ -79,11 +79,10 @@ the process is launched with `--automation`; commands are capped at 4096 bytes,
 accept only the versioned prefix `GUI.Forms.Automation/1`, and resolve controls
 through the retained stable-ID registry.
 
-The complete-showcase fallback gate additionally runs:
+The Gallery text fallback gate additionally runs:
 
 ```sh
-gui_forms/tools/run_windows_showcase_text_smoke.sh \
-  /Users/quentinkuttenkuler/file_manager/gui_forms/build-windows-x64-strict
+tools/run_windows_gallery_text_smoke.sh build-windows-x64
 ```
 
 It requires actual selection of both Noto fallback faces, a non-default

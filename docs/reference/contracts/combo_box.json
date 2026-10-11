@@ -1,0 +1,124 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::ComboBox": {
+      "reviewed": true,
+      "summary": "ComboBox is a retained noneditable choice field with authoritative item selection, placeholder projection, keyboard cycling, a source-private transient ListBox, bounded item count, independent popup width, focus-safe lifetime handling, and option semantics.",
+      "remarks": [
+        "A noneditable choice field. Item selection is authoritative; placeholder text is projected when nothing is selected; keyboard cycling changes the selection without opening the popup.",
+        "The drop-down list is a source-private transient `ListBox` with an independently bounded popup width and item count."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::ListBox",
+        "gui_forms::Panel"
+      ]
+    },
+    "gui_forms::ComboBox::ComboBox|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs a focusable choice field with handoff-ready transient popup ownership."
+    },
+    "gui_forms::ComboBox::items|std::span<const std::string> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authoritative ordered option strings."
+    },
+    "gui_forms::ComboBox::set_items|void (std::vector<std::string>)": {
+      "reviewed": false,
+      "summary": "Replaces options, repairs selection, synchronizes any open popup, and publishes coherent changes."
+    },
+    "gui_forms::ComboBox::add_item|void (std::string)": {
+      "reviewed": false,
+      "summary": "Appends one option, synchronizes the open popup, and invalidates retained state."
+    },
+    "gui_forms::ComboBox::selected_index|std::optional<std::size_t> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the selected option index or no value."
+    },
+    "gui_forms::ComboBox::set_selected_index|void (std::optional<std::size_t>)": {
+      "reviewed": false,
+      "summary": "Validates the optional index, commits selection, synchronizes popup state, and publishes a real change."
+    },
+    "gui_forms::ComboBox::selected_text|std::string_view () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns selected option text or an empty view when nothing is selected."
+    },
+    "gui_forms::ComboBox::placeholder_text|std::string_view () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the hint shown when no option is selected."
+    },
+    "gui_forms::ComboBox::set_placeholder_text|void (std::string)": {
+      "reviewed": false,
+      "summary": "Commits placeholder text and invalidates field paint and semantics."
+    },
+    "gui_forms::ComboBox::dropped_down|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether this control currently owns its transient popup lease."
+    },
+    "gui_forms::ComboBox::set_dropped_down|void (bool)": {
+      "reviewed": false,
+      "summary": "Opens or closes through the common transient-owner state machine."
+    },
+    "gui_forms::ComboBox::maximum_drop_down_items|std::size_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the positive cap on visible popup rows."
+    },
+    "gui_forms::ComboBox::set_maximum_drop_down_items|void (std::size_t)": {
+      "reviewed": false,
+      "summary": "Accepts a bounded positive row count and rebuilds popup geometry when open."
+    },
+    "gui_forms::ComboBox::drop_down_width|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns zero for field-tracking width or an explicit logical popup width."
+    },
+    "gui_forms::ComboBox::set_drop_down_width|void (double)": {
+      "reviewed": false,
+      "summary": "Accepts zero or a bounded finite width and repositions an open popup within client bounds."
+    },
+    "gui_forms::ComboBox::font|FontSpec () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained field and popup FontSpec."
+    },
+    "gui_forms::ComboBox::set_font|void (FontSpec)": {
+      "reviewed": false,
+      "summary": "Validates typography, synchronizes the popup, and invalidates size, paint, and semantics."
+    },
+    "gui_forms::ComboBox::selected_index_changed|Event<std::optional<std::size_t>> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after selected option commits."
+    },
+    "gui_forms::ComboBox::drop_down_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after transient ownership opens or closes."
+    },
+    "gui_forms::ComboBox::items_changed|Event<> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published after option collection mutation."
+    },
+    "gui_forms::ComboBox::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records framed field, selected/placeholder text, focus cue, and disclosure arrow."
+    },
+    "gui_forms::ComboBox::on_pointer|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Acquires focus and toggles popup ownership for a qualified primary click."
+    },
+    "gui_forms::ComboBox::on_key|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Handles open/close, option cycling, commit, and cancellation keys."
+    },
+    "gui_forms::ComboBox::on_focus_changed|void (bool)": {
+      "reviewed": false,
+      "summary": "Updates focus painting while transient closure follows owner/revocation policy."
+    },
+    "gui_forms::ComboBox::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects a combo-box role, current option, expanded state, and selection actions."
+    },
+    "gui_forms::ComboBox::on_semantic_action|bool (SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Routes press/expand/collapse and set-value through ordinary selection and popup state."
+    }
+  }
+}

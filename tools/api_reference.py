@@ -331,12 +331,39 @@ def extract(compiler: str) -> Inventory:
     return result
 
 
+def markdown_differences(expected: Path, actual: Path) -> list[str]:
+    """Relative Markdown paths that differ between the committed and fresh trees."""
+    problems: list[str] = []
+    names: set[str] = set()
+    path: Path
+    for path in actual.rglob('*.md'):
+        names.add(path.relative_to(actual).as_posix())
+    for path in expected.rglob('*.md'):
+        names.add(path.relative_to(expected).as_posix())
+    name: str
+    for name in sorted(names):
+        fresh: Path = actual / name
+        committed: Path = expected / name
+        if not committed.is_file():
+            problems.append('missing from committed tree: ' + name)
+        elif not fresh.is_file():
+            problems.append('only in committed tree: ' + name)
+        elif committed.read_text(encoding='utf-8') != fresh.read_text(encoding='utf-8'):
+            problems.append('content differs: ' + name)
+    return problems
+
+
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--clang', default='clang++')
     parser.add_argument('--ast', type=Path, help='Read an already captured Clang AST')
-    parser.add_argument('--output', type=Path, default=REFERENCE / 'site', help='Generated HTML directory')
-    parser.add_argument('--check', action='store_true', help='Check the committed declaration inventory and contract schema')
+    parser.add_argument('--output', type=Path, default=None,
+        help='Also render the standalone HTML site into this directory (off by default)')
+    parser.add_argument('--markdown', type=Path, default=REFERENCE,
+        help='Directory for the MyST Markdown pages (index.md, coverage.md, api/*.md); default docs/reference')
+    parser.add_argument('--no-markdown', action='store_true', help='Skip the Markdown pages')
+    parser.add_argument('--check', action='store_true',
+        help='Fail if the committed declaration inventory or Markdown pages are stale or a contract is invalid')
     parser.add_argument('--inventory-only', action='store_true')
     args: argparse.Namespace = parser.parse_args()
     data: Inventory
@@ -353,12 +380,29 @@ def main() -> None:
             raise SystemExit('API inventory is stale; run tools/api_reference.py')
     else:
         inventory_path.write_text(encoded, encoding='utf-8')
-    from api_reference_render import load_contracts, render
+    from api_reference_render import load_contracts, render, render_markdown
     contracts: dict[str, Contract] = load_contracts(REFERENCE / 'contracts', data, ROOT)
-    if not args.inventory_only and not args.check:
-        coverage: Coverage = render(data, contracts, args.output, ROOT)
-        print(str(coverage['reviewed_contracts']) + ' reviewed contracts / ' + str(coverage['symbols']) + ' declarations')
-        print('Reference: ' + str(args.output / 'index.html'))
+    coverage: Coverage
+    if args.check and not args.inventory_only:
+        scratch: str
+        with tempfile.TemporaryDirectory(prefix='gui-forms-api-check-') as scratch:
+            fresh: Path = Path(scratch)
+            render_markdown(data, contracts, fresh, ROOT)
+            problems: list[str] = markdown_differences(REFERENCE, fresh)
+        if problems:
+            problem: str
+            for problem in problems[:50]:
+                print('  ' + problem)
+            raise SystemExit('API reference Markdown is stale; run tools/api_reference.py')
+        print('API reference check: PASS (inventory, contracts and Markdown pages are current)')
+    elif not args.inventory_only and not args.check:
+        if not args.no_markdown:
+            coverage = render_markdown(data, contracts, args.markdown, ROOT)
+            print(str(coverage['reviewed_contracts']) + ' reviewed contracts / ' + str(coverage['symbols']) + ' declarations')
+            print('Markdown reference: ' + str(args.markdown / 'index.md'))
+        if args.output is not None:
+            coverage = render(data, contracts, args.output, ROOT)
+            print('HTML reference: ' + str(args.output / 'index.html'))
     member_count: int = 0
     record: Symbol
     for record in data['types']:

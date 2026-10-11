@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::ListBox": {
+      "reviewed": true,
+      "summary": "ListBox is a retained virtual-row selector with single, multi-simple, and multi-extended policies; stable item identities; scroll-window projection; keyboard/pointer range selection; activation; and virtual child semantics.",
+      "remarks": [
+        "Virtual-row selector with single, multi-simple, and multi-extended selection policies over stable item identities.",
+        "Projects a scroll window, supports keyboard and pointer range selection and activation, and publishes list semantics."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::CheckedListBox",
+        "gui_forms::Panel"
+      ]
+    },
+    "gui_forms::ListBox::ListBox|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs a focusable clipped row surface with vertical scrolling and collection semantics."
+    },
+    "gui_forms::ListBox::items|std::span<const std::string> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authoritative ordered display strings."
+    },
+    "gui_forms::ListBox::set_items|void (std::vector<std::string>)": {
+      "reviewed": false,
+      "summary": "Replaces the collection, repairs identity/selection/scroll state, and publishes only real selection changes."
+    },
+    "gui_forms::ListBox::add_item|void (std::string)": {
+      "reviewed": false,
+      "summary": "Appends one display item with a deterministic identity and invalidates layout, paint, and semantics."
+    },
+    "gui_forms::ListBox::remove_item|void (std::size_t)": {
+      "reviewed": false,
+      "summary": "Removes a valid row, shifts selection and identity state, and reports whether removal occurred."
+    },
+    "gui_forms::ListBox::clear_items|void ()": {
+      "reviewed": false,
+      "summary": "Clears rows, identities, selection, active anchor, and scroll position atomically."
+    },
+    "gui_forms::ListBox::set_item_stable_ids|void (std::vector<std::string>)": {
+      "reviewed": false,
+      "summary": "Installs caller-provided unique nonzero row identities after exact cardinality validation."
+    },
+    "gui_forms::ListBox::item_stable_id|std::string (std::size_t) const": {
+      "reviewed": false,
+      "summary": "Returns the durable semantic identity for a valid row."
+    },
+    "gui_forms::ListBox::selection_mode|ListSelectionMode () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the active none, single, multi-simple, or multi-extended policy."
+    },
+    "gui_forms::ListBox::set_selection_mode|void (ListSelectionMode)": {
+      "reviewed": false,
+      "summary": "Validates policy and reconciles existing selection to its admitted cardinality."
+    },
+    "gui_forms::ListBox::selected_indices|std::span<const std::size_t> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns selected row indexes in ascending order."
+    },
+    "gui_forms::ListBox::selected_index|std::optional<std::size_t> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the active selected row or no value when selection is empty."
+    },
+    "gui_forms::ListBox::select_index|void (std::size_t, bool, bool)": {
+      "reviewed": false,
+      "summary": "Applies programmatic selection using the current selection-mode law."
+    },
+    "gui_forms::ListBox::clear_selection|void ()": {
+      "reviewed": false,
+      "summary": "Clears selected rows and publishes a typed old/new selection transition."
+    },
+    "gui_forms::ListBox::top_index|std::size_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the first row projected into the viewport."
+    },
+    "gui_forms::ListBox::set_top_index|void (std::size_t)": {
+      "reviewed": false,
+      "summary": "Constrains a requested first row to the available collection and viewport."
+    },
+    "gui_forms::ListBox::item_height|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the logical fixed row height."
+    },
+    "gui_forms::ListBox::set_item_height|void (double)": {
+      "reviewed": false,
+      "summary": "Accepts a finite bounded positive height and invalidates scrolling, layout, and paint."
+    },
+    "gui_forms::ListBox::font|FontSpec () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained row FontSpec."
+    },
+    "gui_forms::ListBox::set_font|void (FontSpec)": {
+      "reviewed": false,
+      "summary": "Validates row typography and invalidates measurement, paint, and semantics."
+    },
+    "gui_forms::ListBox::selection_changed|Event<const ListSelectionChange &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns typed old/new index collections after selection commits."
+    },
+    "gui_forms::ListBox::item_activated|Event<std::size_t> &() noexcept": {
+      "reviewed": false,
+      "summary": "Returns the event published for qualified double-click or keyboard activation."
+    },
+    "gui_forms::ListBox::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Records only visible rows with alternating, hover, selection, focus, text, and extension adornment states."
+    },
+    "gui_forms::ListBox::arrange|void (Rect)": {
+      "reviewed": false,
+      "summary": "Updates viewport geometry and vertical scroll extent from row count and fixed height."
+    },
+    "gui_forms::ListBox::on_pointer|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Maps pointer gestures to rows, focus, selection-mode modifiers, scrolling, and activation."
+    },
+    "gui_forms::ListBox::on_key|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Implements navigation, home/end/page movement, range extension, toggling, activation, and type-independent selection."
+    },
+    "gui_forms::ListBox::on_focus_changed|void (bool)": {
+      "reviewed": false,
+      "summary": "Commits the focus cue and invalidates active-row painting."
+    },
+    "gui_forms::ListBox::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Projects a list role with selection cardinality and active value."
+    },
+    "gui_forms::ListBox::semantic_virtual_children|std::vector<SemanticNode> () const": {
+      "reviewed": false,
+      "summary": "Exposes every logical row as a stable selectable virtual option independent of viewport realization."
+    },
+    "gui_forms::ListBox::on_semantic_child_action|bool (std::string_view, SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Maps row select/press actions to the same selection and activation state machine."
+    }
+  }
+}

@@ -1,0 +1,775 @@
+{
+  "schema": 1,
+  "symbols": {
+    "gui_forms::Control": {
+      "reviewed": true,
+      "summary": "Control is the retained visual root and invariant owner for stable/runtime identity, hierarchy, geometry, layout transactions, initialization batching, style/theme resolution, typed invalidation, input eligibility and routing hooks, validation, binding, semantic projection, dispatch, focus, lifetime, and provider extensions.",
+      "remarks": [
+        "Every control has a nonempty immutable `StableId` and a process-local `RuntimeId`; the mutable `name` is distinct from both and publishes a tokenized change event.",
+        "Requested bounds reject nonfinite or negative extents and honor retained minimum/maximum size. Reading arranged or absolute geometry may execute the declared layout read barrier; it is not a raw field read.",
+        "`invalidate(Dirty)` marks the affected control or path, `invalidate_subtree` marks every descendant, and `invalidate_declared` rejects undeclared effects in development builds. The dirty vocabulary distinguishes measure, arrange, paint, hit test, text, style, resource, semantics, and accessibility.",
+        "`begin_init()` and `end_init()` nest. Stock property events remain synchronous outside initialization and coalesce by event identity inside it; the final payloads publish in first-event order after the outer commit, and `initialization_completed` reports the combined dirty flags.",
+        "Subclass hooks `measure`, `arrange`, `on_paint`, `visual_outsets`, `hit_test_local`, the pointer/key/text/drag route hooks, focus notification, and `on_activate` define a custom control. Drawing uses the renderer-neutral `Painter` vocabulary.",
+        "Portable coordinate conversion terminates at Window client coordinates; a native desktop-screen origin remains host-contract work."
+      ],
+      "ownership": "Created by the application as a `Control::Ptr` (`std::shared_ptr<Control>`). A parent holds its children strongly and a child holds its parent weakly; cycles, duplicate stable IDs, cross-window reparenting, and disposed children are rejected. Disposal through `Component::dispose()` is synchronous and idempotent and revokes owned subscriptions before subclass teardown.",
+      "threading": "UI-thread affine. Read and mutate on the owning Window's UI thread; wrong-thread mutation is rejected by the Window access guards (`Window::check_access` and `Window::verify_access`). The type is not internally synchronized.",
+      "availability": "Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms core builds: the macOS AppKit host, the Windows Win32 host, and the opt-in Linux X11 host. The public API is not yet stable.",
+      "see_also": [
+        "gui_forms::Component",
+        "gui_forms::Window",
+        "gui_forms::StableId",
+        "gui_forms::Dirty",
+        "gui_forms::Painter"
+      ]
+    },
+    "gui_forms::Control::Ptr|std::shared_ptr<Control>": {
+      "reviewed": false,
+      "summary": "Shared ownership handle (`std::shared_ptr<Control>`) used for every control in the tree."
+    },
+    "gui_forms::Control::WeakPtr|std::weak_ptr<Control>": {
+      "reviewed": false,
+      "summary": "Non-owning handle (`std::weak_ptr<Control>`) used for child-to-parent and observer references."
+    },
+    "gui_forms::Control::initialize_tree_after_construction|const bool": {
+      "reviewed": false,
+      "summary": "Compile-time trait; `false` for the base Control, which has no internal control tree to initialize after construction."
+    },
+    "gui_forms::Control::Control|void (StableId)": {
+      "reviewed": false,
+      "summary": "Constructs a retained control with the given nonempty immutable stable identity."
+    },
+    "gui_forms::Control::~Control|void () noexcept": {
+      "reviewed": false,
+      "summary": "Tears down the control; disposal has already revoked owned subscriptions and detached children."
+    },
+    "gui_forms::Control::Control|void (const Control &)": {
+      "reviewed": false,
+      "summary": "Deleted; controls are neither copied nor assigned."
+    },
+    "gui_forms::Control::operator=|Control &(const Control &)": {
+      "reviewed": false,
+      "summary": "Deleted; controls are neither copied nor assigned."
+    },
+    "gui_forms::Control::runtime_id|RuntimeId () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the process-local runtime identity assigned at construction."
+    },
+    "gui_forms::Control::stable_id|const StableId &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the immutable authored stable identity."
+    },
+    "gui_forms::Control::name|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the mutable diagnostic name, distinct from the stable identity."
+    },
+    "gui_forms::Control::set_name|void (std::string)": {
+      "reviewed": false,
+      "summary": "Sets the mutable name and publishes `name_changed` (synchronously outside initialization)."
+    },
+    "gui_forms::Control::name_changed|Event<const std::string &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the name changes."
+    },
+    "gui_forms::Control::visible_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the retained visible flag changes."
+    },
+    "gui_forms::Control::enabled_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the retained enabled flag changes."
+    },
+    "gui_forms::Control::tag|const std::any &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the application-owned `std::any` tag with exact type retention."
+    },
+    "gui_forms::Control::set_tag|void (std::any)": {
+      "reviewed": false,
+      "summary": "Stores application-owned data; it is released synchronously during disposal."
+    },
+    "gui_forms::Control::parent|Ptr () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the weakly held parent, or null when detached from any parent."
+    },
+    "gui_forms::Control::children|std::span<const Ptr> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the strongly held direct children in z-order (index zero topmost)."
+    },
+    "gui_forms::Control::attached|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the control currently belongs to a Window."
+    },
+    "gui_forms::Control::add_child|void (Ptr)": {
+      "reviewed": false,
+      "summary": "Appends a child, rejecting cycles, duplicate stable IDs, disposed children, cross-window reparenting, and mutation during lifecycle notification."
+    },
+    "gui_forms::Control::remove_child|Ptr (RuntimeId)": {
+      "reviewed": false,
+      "summary": "Removes the direct child with the given runtime identity and returns it."
+    },
+    "gui_forms::Control::set_child_index|bool (RuntimeId, std::size_t)": {
+      "reviewed": false,
+      "summary": "Moves a direct child to a new z-order index and reports whether the move applied."
+    },
+    "gui_forms::Control::child_index|std::optional<std::size_t> (RuntimeId) const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the z-order index of a direct child (index zero is topmost)."
+    },
+    "gui_forms::Control::clear_children|void ()": {
+      "reviewed": false,
+      "summary": "Removes every direct child."
+    },
+    "gui_forms::Control::requested_bounds|Rect () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored requested bounds in parent coordinates."
+    },
+    "gui_forms::Control::set_requested_bounds|void (Rect)": {
+      "reviewed": false,
+      "summary": "Sets the authored bounds, rejecting nonfinite or negative extents and honoring minimum/maximum size."
+    },
+    "gui_forms::Control::set_bounds|void (Rect, BoundsSpecified)": {
+      "reviewed": false,
+      "summary": "Atomically applies the parts of a rectangle selected by a `BoundsSpecified` mask."
+    },
+    "gui_forms::Control::left|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested left edge."
+    },
+    "gui_forms::Control::top|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested top edge."
+    },
+    "gui_forms::Control::width|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested width."
+    },
+    "gui_forms::Control::height|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested height."
+    },
+    "gui_forms::Control::right|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested right edge."
+    },
+    "gui_forms::Control::bottom|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the requested bottom edge."
+    },
+    "gui_forms::Control::minimum_size|Size () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained minimum size constraint."
+    },
+    "gui_forms::Control::set_minimum_size|void (Size)": {
+      "reviewed": false,
+      "summary": "Sets the minimum size constraint applied to requested bounds and preferred size."
+    },
+    "gui_forms::Control::maximum_size|Size () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained maximum size constraint; zero means unbounded."
+    },
+    "gui_forms::Control::set_maximum_size|void (Size)": {
+      "reviewed": false,
+      "summary": "Sets the maximum size constraint; zero means unbounded."
+    },
+    "gui_forms::Control::arranged_bounds|Rect () const": {
+      "reviewed": false,
+      "summary": "Returns the bounds committed by the last arrange pass; may execute the layout read barrier."
+    },
+    "gui_forms::Control::committed_arranged_bounds|Rect () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the arranged bounds last committed to the presentation."
+    },
+    "gui_forms::Control::client_rectangle|Rect () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the local client rectangle inside borders and padding."
+    },
+    "gui_forms::Control::display_rectangle|Rect () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the logical display rectangle available to children."
+    },
+    "gui_forms::Control::absolute_bounds|Rect () const": {
+      "reviewed": false,
+      "summary": "Returns bounds in Window client coordinates; may execute the layout read barrier."
+    },
+    "gui_forms::Control::point_to_window|Point (Point) const": {
+      "reviewed": false,
+      "summary": "Converts a local point to Window client coordinates through retained ancestry."
+    },
+    "gui_forms::Control::point_from_window|Point (Point) const": {
+      "reviewed": false,
+      "summary": "Converts a Window client point to local coordinates."
+    },
+    "gui_forms::Control::rectangle_to_window|Rect (Rect) const": {
+      "reviewed": false,
+      "summary": "Converts a local rectangle to Window client coordinates."
+    },
+    "gui_forms::Control::rectangle_from_window|Rect (Rect) const": {
+      "reviewed": false,
+      "summary": "Converts a Window client rectangle to local coordinates."
+    },
+    "gui_forms::Control::contains|bool (const Control &) const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the given control is this control or one of its descendants."
+    },
+    "gui_forms::Control::get_child_at_point|Ptr (Point, GetChildAtPointSkip) const": {
+      "reviewed": false,
+      "summary": "Returns the topmost direct child at a point, optionally skipping invisible, disabled, or hit-transparent children."
+    },
+    "gui_forms::Control::get_next_control|Ptr (const Ptr &, bool) const": {
+      "reviewed": false,
+      "summary": "Returns the preceding or following live descendant in stable nested TabIndex order without wrapping."
+    },
+    "gui_forms::Control::bring_to_front|void ()": {
+      "reviewed": false,
+      "summary": "Moves this control to the top of its parent's z-order."
+    },
+    "gui_forms::Control::send_to_back|void ()": {
+      "reviewed": false,
+      "summary": "Moves this control to the bottom of its parent's z-order."
+    },
+    "gui_forms::Control::attached_window|Window *() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the owning Window, or null when detached."
+    },
+    "gui_forms::Control::effective_text_scale|double () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the resolved text scale inherited from the Window."
+    },
+    "gui_forms::Control::effective_font|FontSpec (FontSpec) const noexcept": {
+      "reviewed": false,
+      "summary": "Resolves an authored `FontSpec` against the inherited theme typography and text scale."
+    },
+    "gui_forms::Control::resolve_text_layout_utf8|ResolvedTextLayout (std::string_view, FontSpec) const": {
+      "reviewed": false,
+      "summary": "Resolves a shaped text layout for UTF-8 text through the Window text engine."
+    },
+    "gui_forms::Control::snap_text_baseline|double (double) const noexcept": {
+      "reviewed": false,
+      "summary": "Snaps a text baseline to device pixels at the current scale."
+    },
+    "gui_forms::Control::effective_theme|const Theme &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the theme in effect after override and inheritance resolution."
+    },
+    "gui_forms::Control::theme_override|std::shared_ptr<const Theme> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the explicit theme override, if any."
+    },
+    "gui_forms::Control::set_theme_override|void (std::shared_ptr<const Theme>)": {
+      "reviewed": false,
+      "summary": "Installs an explicit theme for this subtree and invalidates style."
+    },
+    "gui_forms::Control::clear_theme_override|void ()": {
+      "reviewed": false,
+      "summary": "Removes the explicit theme and resumes inheritance."
+    },
+    "gui_forms::Control::authored_surface_material|const std::optional<SurfaceMaterial> &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the explicitly authored surface material, if any."
+    },
+    "gui_forms::Control::set_authored_surface_material|void (SurfaceMaterial)": {
+      "reviewed": false,
+      "summary": "Installs an explicit surface material and invalidates paint."
+    },
+    "gui_forms::Control::clear_authored_surface_material|void ()": {
+      "reviewed": false,
+      "summary": "Removes the explicit surface material and resumes theme resolution."
+    },
+    "gui_forms::Control::owned_decorations|std::span<const OwnerDecorationRecipe> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained owner-decoration recipe."
+    },
+    "gui_forms::Control::set_owned_decorations|void (const OwnerDecorationRecipe *, std::size_t)": {
+      "reviewed": false,
+      "summary": "Installs the owner-decoration recipe and invalidates paint."
+    },
+    "gui_forms::Control::clear_owned_decorations|void ()": {
+      "reviewed": false,
+      "summary": "Removes the owner-decoration recipe."
+    },
+    "gui_forms::Control::visual_status|ControlVisualStatus () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained visual status used by theme recipes."
+    },
+    "gui_forms::Control::set_visual_status|void (ControlVisualStatus)": {
+      "reviewed": false,
+      "summary": "Sets the retained visual status and invalidates style, paint, and semantics."
+    },
+    "gui_forms::Control::visual_context|ControlVisualContext (bool, bool, bool, bool, bool) const noexcept": {
+      "reviewed": false,
+      "summary": "Builds the `ControlVisualContext` (theme, status, scale, and the given interaction flags) consumed by theme recipes when painting."
+    },
+    "gui_forms::Control::invoke_required|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the caller is off the owning UI thread."
+    },
+    "gui_forms::Control::begin_invoke|DispatchOperation (std::function<void ()>)": {
+      "reviewed": false,
+      "summary": "Queues work onto the owning Window's UI thread and returns a `DispatchOperation` handle without waiting."
+    },
+    "gui_forms::Control::invoke|void (std::function<void ()>)": {
+      "reviewed": false,
+      "summary": "Runs work on the owning Window's UI thread, synchronously when already there."
+    },
+    "gui_forms::Control::margin|Insets () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the finite nonnegative outer margin in logical pixels."
+    },
+    "gui_forms::Control::set_margin|void (Insets)": {
+      "reviewed": false,
+      "summary": "Sets the outer margin consumed by parent layout containers."
+    },
+    "gui_forms::Control::padding|Insets () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the finite nonnegative inner padding in logical pixels."
+    },
+    "gui_forms::Control::set_padding|void (Insets)": {
+      "reviewed": false,
+      "summary": "Sets the inner padding that shrinks the display rectangle."
+    },
+    "gui_forms::Control::auto_scroll_offset|Point () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the offset honored by `scroll_control_into_view`."
+    },
+    "gui_forms::Control::set_auto_scroll_offset|void (Point)": {
+      "reviewed": false,
+      "summary": "Sets the offset honored by `scroll_control_into_view`."
+    },
+    "gui_forms::Control::dock|DockStyle () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained dock style."
+    },
+    "gui_forms::Control::set_dock|void (DockStyle)": {
+      "reviewed": false,
+      "summary": "Sets the dock style; default Dock consumes children backmost to topmost."
+    },
+    "gui_forms::Control::anchor|AnchorStyles () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained anchor styles."
+    },
+    "gui_forms::Control::set_anchor|void (AnchorStyles)": {
+      "reviewed": false,
+      "summary": "Sets the anchor styles applied on parent resize."
+    },
+    "gui_forms::Control::auto_size|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the control sizes itself to content."
+    },
+    "gui_forms::Control::set_auto_size|void (bool)": {
+      "reviewed": false,
+      "summary": "Enables or disables content-driven sizing."
+    },
+    "gui_forms::Control::auto_size_mode|AutoSizeMode () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the GrowOnly or GrowAndShrink policy."
+    },
+    "gui_forms::Control::set_auto_size_mode|void (AutoSizeMode)": {
+      "reviewed": false,
+      "summary": "Sets the GrowOnly or GrowAndShrink policy."
+    },
+    "gui_forms::Control::auto_size_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the auto-size flag changes."
+    },
+    "gui_forms::Control::get_preferred_size|Size (Size)": {
+      "reviewed": false,
+      "summary": "Returns the preferred size over visible child bounds, trailing margins, padding, and min/max constraints."
+    },
+    "gui_forms::Control::suspend_layout|void ()": {
+      "reviewed": false,
+      "summary": "Begins a nested layout suspension."
+    },
+    "gui_forms::Control::resume_layout|void (bool)": {
+      "reviewed": false,
+      "summary": "Ends a layout suspension, optionally performing the deferred layout."
+    },
+    "gui_forms::Control::perform_layout|void ()": {
+      "reviewed": false,
+      "summary": "Runs layout for this control immediately."
+    },
+    "gui_forms::Control::layout_transaction_state|LayoutTransactionState () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the current layout transaction depth and pending flags."
+    },
+    "gui_forms::Control::visible|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained visible flag (not effective visibility)."
+    },
+    "gui_forms::Control::set_visible|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets the retained visible flag and publishes `visible_changed`."
+    },
+    "gui_forms::Control::layout_collapsed|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether a layout container has collapsed this control out of effective layout."
+    },
+    "gui_forms::Control::enabled|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained enabled flag."
+    },
+    "gui_forms::Control::set_enabled|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets the retained enabled flag and publishes `enabled_changed`."
+    },
+    "gui_forms::Control::focusable|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the control may receive focus."
+    },
+    "gui_forms::Control::set_focusable|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets whether the control may receive focus."
+    },
+    "gui_forms::Control::causes_validation|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether leaving this control validates the previously focused control (default true)."
+    },
+    "gui_forms::Control::set_causes_validation|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets the causes-validation flag and publishes its change event."
+    },
+    "gui_forms::Control::causes_validation_changed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the causes-validation flag changes."
+    },
+    "gui_forms::Control::validating|Event<ControlValidationEvent &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Cancellable event received before focus loss; setting `cancel` rejects the focus move under prevent mode."
+    },
+    "gui_forms::Control::validated|Event<> &() noexcept": {
+      "reviewed": false,
+      "summary": "Event published only after an accepted validation."
+    },
+    "gui_forms::Control::tab_index|std::uint32_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the stable sibling traversal order."
+    },
+    "gui_forms::Control::set_tab_index|void (std::uint32_t)": {
+      "reviewed": false,
+      "summary": "Sets the stable sibling traversal order."
+    },
+    "gui_forms::Control::tab_stop|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether Tab traversal stops at this control."
+    },
+    "gui_forms::Control::set_tab_stop|void (bool)": {
+      "reviewed": false,
+      "summary": "Removes or restores the control in Tab traversal without preventing explicit focus."
+    },
+    "gui_forms::Control::allow_drop|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether the control accepts drag targets."
+    },
+    "gui_forms::Control::set_allow_drop|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets whether the control accepts drag targets."
+    },
+    "gui_forms::Control::hit_test_transparent|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether ordinary pointer routing passes through this control."
+    },
+    "gui_forms::Control::set_hit_test_transparent|void (bool)": {
+      "reviewed": false,
+      "summary": "Makes ordinary pointer routing pass through this control."
+    },
+    "gui_forms::Control::styles|ControlStyles () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the admitted Forms-compatible `ControlStyles` bits."
+    },
+    "gui_forms::Control::has_style|bool (ControlStyles) const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether a `ControlStyles` bit is set."
+    },
+    "gui_forms::Control::set_style|void (ControlStyles, bool)": {
+      "reviewed": false,
+      "summary": "Sets or clears `ControlStyles` bits; clearing buffering never disables baseline coherent paint."
+    },
+    "gui_forms::Control::double_buffered|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports the retained double-buffering request."
+    },
+    "gui_forms::Control::set_double_buffered|void (bool)": {
+      "reviewed": false,
+      "summary": "Sets the retained double-buffering request."
+    },
+    "gui_forms::Control::cursor|std::optional<CursorKind> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained cursor override, or empty when the cursor is inherited."
+    },
+    "gui_forms::Control::set_cursor|void (std::optional<CursorKind>)": {
+      "reviewed": false,
+      "summary": "Sets or clears the retained cursor override."
+    },
+    "gui_forms::Control::set_custom_cursor|void (CursorImagesPtr, CursorKind)": {
+      "reviewed": false,
+      "summary": "Installs a custom cursor image set with a `CursorKind` fallback for hosts that cannot show it."
+    },
+    "gui_forms::Control::effective_cursor_images|CursorImagesPtr () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the custom cursor images in effect."
+    },
+    "gui_forms::Control::accessible_name|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored accessible name override."
+    },
+    "gui_forms::Control::set_accessible_name|void (std::string)": {
+      "reviewed": false,
+      "summary": "Sets the accessible name and invalidates semantics."
+    },
+    "gui_forms::Control::accessible_description|const std::string &() const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the authored accessible description."
+    },
+    "gui_forms::Control::set_accessible_description|void (std::string)": {
+      "reviewed": false,
+      "summary": "Sets the accessible description and invalidates semantics."
+    },
+    "gui_forms::Control::effective_cursor|CursorKind () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the cursor resolved through ancestry."
+    },
+    "gui_forms::Control::effectively_visible|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether this control and every ancestor are visible and attached."
+    },
+    "gui_forms::Control::effectively_enabled|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether this control and every ancestor are enabled."
+    },
+    "gui_forms::Control::eligible_for_input|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether routed input, commands, and mnemonics may reach this control."
+    },
+    "gui_forms::Control::set_pointer_capture|void (bool)": {
+      "reviewed": false,
+      "summary": "Acquires or releases pointer capture through the owning Window."
+    },
+    "gui_forms::Control::has_pointer_capture|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether this control holds pointer capture."
+    },
+    "gui_forms::Control::dirty|Dirty () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the control's own pending dirty flags."
+    },
+    "gui_forms::Control::subtree_dirty|Dirty () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns dirty flags aggregated over the subtree."
+    },
+    "gui_forms::Control::paint_plane|PaintPlane () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the `PaintPlane` the control paints into."
+    },
+    "gui_forms::Control::set_paint_plane|void (PaintPlane)": {
+      "reviewed": false,
+      "summary": "Selects the paint plane and republishes damage."
+    },
+    "gui_forms::Control::display_chunk_info|std::optional<DisplayChunkInfo> () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the retained display chunk information for this control."
+    },
+    "gui_forms::Control::invalidate|void (Dirty)": {
+      "reviewed": false,
+      "summary": "Marks the given `Dirty` effects on this control and its path."
+    },
+    "gui_forms::Control::invalidate|void (Rect)": {
+      "reviewed": false,
+      "summary": "Marks a local rectangle as paint damage on this control."
+    },
+    "gui_forms::Control::invalidate_subtree|void (Dirty)": {
+      "reviewed": false,
+      "summary": "Explicitly marks the given `Dirty` effects on every descendant."
+    },
+    "gui_forms::Control::invalidate_declared|void (Dirty)": {
+      "reviewed": false,
+      "summary": "Marks declared effects; undeclared effects are rejected in development and conservatively invalidated in production."
+    },
+    "gui_forms::Control::begin_init|void ()": {
+      "reviewed": false,
+      "summary": "Enters a nested initialization transaction that coalesces events and dirty effects."
+    },
+    "gui_forms::Control::end_init|void ()": {
+      "reviewed": false,
+      "summary": "Leaves the initialization transaction; the outer commit publishes coalesced events in first-event order."
+    },
+    "gui_forms::Control::initializing|bool () const noexcept": {
+      "reviewed": false,
+      "summary": "Reports whether an initialization transaction is open."
+    },
+    "gui_forms::Control::initialization_depth|std::uint64_t () const noexcept": {
+      "reviewed": false,
+      "summary": "Returns the current initialization nesting depth."
+    },
+    "gui_forms::Control::initialization_completed|Event<Dirty, bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Event emitting the combined dirty flags and whether a subtree mark was required."
+    },
+    "gui_forms::Control::pointer_observed|Event<const PointerEvent &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized pointer observation for nonvisual providers without subclassing."
+    },
+    "gui_forms::Control::pointer_preview_observed|Event<const PointerEvent &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized pointer-preview observation for nonvisual providers."
+    },
+    "gui_forms::Control::focus_observed|Event<bool> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized focus observation for nonvisual providers."
+    },
+    "gui_forms::Control::arranged_bounds_changed|Event<Rect> &() noexcept": {
+      "reviewed": false,
+      "summary": "Tokenized event published after the arranged bounds change."
+    },
+    "gui_forms::Control::help_requested|Event<HelpRequestEvent &> &() noexcept": {
+      "reviewed": false,
+      "summary": "Event published when help is requested for this control."
+    },
+    "gui_forms::Control::data_bindings|ControlBindingsCollection &()": {
+      "reviewed": false,
+      "summary": "Returns the control's binding collection."
+    },
+    "gui_forms::Control::data_bindings|const ControlBindingsCollection &() const": {
+      "reviewed": false,
+      "summary": "Returns the control's binding collection."
+    },
+    "gui_forms::Control::has_bindable_property|bool (std::string_view) const": {
+      "reviewed": false,
+      "summary": "Reports whether a named bindable property exists."
+    },
+    "gui_forms::Control::bindable_property_names|std::vector<std::string> () const": {
+      "reviewed": false,
+      "summary": "Returns the names of the bindable properties."
+    },
+    "gui_forms::Control::property_descriptor|std::optional<PropertyDescriptor> (std::string_view) const": {
+      "reviewed": false,
+      "summary": "Returns the descriptor for a named bindable property."
+    },
+    "gui_forms::Control::property_descriptors|std::vector<PropertyDescriptor> () const": {
+      "reviewed": false,
+      "summary": "Returns descriptors for every bindable property."
+    },
+    "gui_forms::Control::property_value|std::optional<BindingValue> (std::string_view) const": {
+      "reviewed": false,
+      "summary": "Reads a bindable property by name."
+    },
+    "gui_forms::Control::set_property_value|void (std::string_view, BindingValue)": {
+      "reviewed": false,
+      "summary": "Writes a bindable property by name."
+    },
+    "gui_forms::Control::subscribe_property_changed|SubscriptionToken (std::string_view, Component &, std::function<void ()>)": {
+      "reviewed": false,
+      "summary": "Subscribes to changes of a named bindable property."
+    },
+    "gui_forms::Control::reset_property|bool (std::string_view)": {
+      "reviewed": false,
+      "summary": "Returns a bindable property to its default and reports whether the reset applied."
+    },
+    "gui_forms::Control::should_serialize_property|bool (std::string_view) const": {
+      "reviewed": false,
+      "summary": "Reports whether a bindable property differs from its default."
+    },
+    "gui_forms::Control::property_value_origin|PropertyValueOrigin (std::string_view) const": {
+      "reviewed": false,
+      "summary": "Reports the `PropertyValueOrigin` of a named bindable property."
+    },
+    "gui_forms::Control::measure|Size (Size)": {
+      "reviewed": false,
+      "summary": "Override: computes the desired size for the available constraint without arranging children."
+    },
+    "gui_forms::Control::arrange|void (Rect)": {
+      "reviewed": false,
+      "summary": "Override: commits final geometry and arranges children within it."
+    },
+    "gui_forms::Control::on_paint|void (Painter &, Rect)": {
+      "reviewed": false,
+      "summary": "Override: records renderer-neutral paint operations for the damaged local region."
+    },
+    "gui_forms::Control::visual_outsets|Insets () const noexcept": {
+      "reviewed": false,
+      "summary": "Override: reports bounded decoration that may extend beyond arranged bounds without affecting layout or hit testing."
+    },
+    "gui_forms::Control::hit_test_local|bool (Point) const": {
+      "reviewed": false,
+      "summary": "Override: reports whether a local point hits this control."
+    },
+    "gui_forms::Control::on_pointer_preview|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Override: tunneling pointer hook, parent first."
+    },
+    "gui_forms::Control::on_pointer|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Override: consumes normalized routed pointer input."
+    },
+    "gui_forms::Control::on_pointer_bubble|void (PointerEvent &)": {
+      "reviewed": false,
+      "summary": "Override: bubbling pointer hook, child first."
+    },
+    "gui_forms::Control::on_key_preview|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Override: tunneling keyboard hook, parent first."
+    },
+    "gui_forms::Control::on_key|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Override: consumes normalized keyboard input."
+    },
+    "gui_forms::Control::on_key_bubble|void (KeyEvent &)": {
+      "reviewed": false,
+      "summary": "Override: bubbling keyboard hook, child first."
+    },
+    "gui_forms::Control::on_text_input|void (TextInputEvent &)": {
+      "reviewed": false,
+      "summary": "Override: consumes committed text input."
+    },
+    "gui_forms::Control::process_mnemonic|bool (char32_t)": {
+      "reviewed": false,
+      "summary": "Override: handles a mnemonic character under the portable ampersand contract."
+    },
+    "gui_forms::Control::on_frame|void (FrameTime)": {
+      "reviewed": false,
+      "summary": "Override: advances retained animation state for a scheduled frame."
+    },
+    "gui_forms::Control::semantic_descriptor|SemanticDescriptor () const": {
+      "reviewed": false,
+      "summary": "Override: projects retained state into the semantic/accessibility graph."
+    },
+    "gui_forms::Control::apply_provider_semantics|void (SemanticDescriptor &) const": {
+      "reviewed": false,
+      "summary": "Merges retained extender-provider semantics into a descriptor."
+    },
+    "gui_forms::Control::semantic_virtual_children|std::vector<SemanticNode> () const": {
+      "reviewed": false,
+      "summary": "Override: publishes virtual semantic children without retained controls."
+    },
+    "gui_forms::Control::on_semantic_action|bool (SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Override: performs a semantic action routed by stable ID."
+    },
+    "gui_forms::Control::on_semantic_child_action|bool (std::string_view, SemanticAction, std::string_view)": {
+      "reviewed": false,
+      "summary": "Override: performs a semantic action on a virtual child."
+    },
+    "gui_forms::Control::on_drag_preview|void (DragEvent &)": {
+      "reviewed": false,
+      "summary": "Override: tunneling drag hook, parent first."
+    },
+    "gui_forms::Control::on_drag|void (DragEvent &)": {
+      "reviewed": false,
+      "summary": "Override: consumes normalized drag input."
+    },
+    "gui_forms::Control::on_drag_bubble|void (DragEvent &)": {
+      "reviewed": false,
+      "summary": "Override: bubbling drag hook, child first."
+    },
+    "gui_forms::Control::on_focus_changed|void (bool)": {
+      "reviewed": false,
+      "summary": "Override: updates focus-dependent state and invalidates affected presentation and semantics."
+    },
+    "gui_forms::Control::on_focus_cue_changed|void (bool)": {
+      "reviewed": false,
+      "summary": "Override: reacts to the Window focus-cue visibility change."
+    },
+    "gui_forms::Control::on_activate|void ()": {
+      "reviewed": false,
+      "summary": "Override: runs the control's single authoritative activation path."
+    }
+  }
+}
