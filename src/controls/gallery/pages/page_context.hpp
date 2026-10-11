@@ -67,6 +67,26 @@ using EasingBoard = EasingPreview;
 using DiagnosticsCard = MetricsView;
 using DrawingEffectsBoard = DrawingSurface;
 
+// Scrolls a sidebar row into its ScrollableControl's viewport only when it
+// is outside it, in content coordinates the shell authored.
+inline void reveal_in_scrollable(const Control::Ptr& row) {
+    const std::shared_ptr<ScrollableControl> scrollable =
+        std::dynamic_pointer_cast<ScrollableControl>((*row).parent());
+    if (!scrollable) return;
+    const Rect bounds = (*row).requested_bounds();
+    const Rect viewport = (*scrollable).viewport_rectangle();
+    const Point position = (*scrollable).scroll_position();
+    if (viewport.height <= 0.0) return;
+    double target = position.y;
+    if (bounds.y < position.y + 8.0) {
+        target = bounds.y - 8.0;
+    } else if (bounds.y + bounds.height > position.y + viewport.height - 8.0) {
+        target = bounds.y + bounds.height + 8.0 - viewport.height;
+    }
+    target = std::max(0.0, target);
+    if (target != position.y) static_cast<void>((*scrollable).scroll_to({position.x, target}));
+}
+
 struct PageContext final {
     std::vector<Control::Ptr> pages;
     std::vector<std::shared_ptr<Button>> navigation;
@@ -176,6 +196,7 @@ struct PageContext final {
             }
             (*navigation[page]).set_style(style);
         }
+        reveal_in_scrollable(navigation[index]);
         if (ui_timer) {
             if (selected_page == timing_page) (*ui_timer).start();
             else if ((*ui_timer).enabled()) (*ui_timer).stop();

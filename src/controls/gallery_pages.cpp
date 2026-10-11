@@ -111,45 +111,33 @@ std::shared_ptr<PageContext> retained_page_context(const Window& window) {
     return *retained;
 }
 
+// The shell's own handlers: navigation rows and the live-motion toggle. It
+// borrows the page context weakly; the context's ComponentContainer owns it.
+class ShellActions final : public Component {
+public:
+    explicit ShellActions(std::weak_ptr<PageContext> context) noexcept
+        : context_(std::move(context)) {}
+
+    void navigate(const int index) {
+        if (const std::shared_ptr<PageContext> context = context_.lock()) {
+            (*context).select_page(static_cast<std::size_t>(index));
+        }
+    }
+
+    void live_motion(const bool enabled) {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context) return;
+        (*context).live_motion = enabled;
+        (*context).apply_motion_policy();
+    }
+
+private:
+    std::weak_ptr<PageContext> context_;
+};
+
 } // namespace
 
 GalleryShell build_gallery_shell(const GalleryTree& compiled) {
-    class NavigationClick final {
-    public:
-        NavigationClick(std::weak_ptr<PageContext> context,
-                        std::size_t index) noexcept
-            : context_(std::move(context)), index_(index) {}
-
-        void operator()(ButtonBase&) const
-        {
-            if (const std::shared_ptr<PageContext> context = context_.lock()) {
-                (*context).select_page(index_);
-            }
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-        std::size_t index_{};
-    };
-
-    class LiveMotionChanged final {
-    public:
-        explicit LiveMotionChanged(
-            std::weak_ptr<PageContext> context) noexcept
-            : context_(std::move(context)) {}
-
-        void operator()(bool enabled) const
-        {
-            const std::shared_ptr<PageContext> context = context_.lock();
-            if (!context) return;
-            (*context).live_motion = enabled;
-            (*context).apply_motion_policy();
-        }
-
-    private:
-        std::weak_ptr<PageContext> context_;
-    };
-
     std::shared_ptr<PageContext> context = std::make_shared<PageContext>();
     (*context).compiled = compiled.context;
     std::shared_ptr<gui_forms::ScaledPanel> root = make_control<ScaledPanel>(
@@ -164,14 +152,17 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
 
     const std::vector<NavigationEntry> order = navigation_order();
 
-    std::shared_ptr<gui_forms::ScaledPanel> sidebar = make_control<Surface>(
-        StableId("gallery.sidebar"), Size{238.0, 742.0});
-    (*sidebar).set_background(Color::rgba(220, 229, 237));
+    // The navigation lists every registry page, more than fit in one column,
+    // so the sidebar scrolls; select_page keeps the chosen row in view.
+    std::shared_ptr<gui_forms::ScrollableControl> sidebar = make_control<ScrollableControl>(
+        StableId("gallery.sidebar"));
+    (*sidebar).set_auto_scroll(true);
     (*root).add_at(sidebar, {0.0, 34.0, 238.0, 742.0});
-    std::shared_ptr<gui_forms::Panel> sidebar_rule =
-        make_control<Panel>(StableId("gallery.sidebar.rule"));
-    (*sidebar_rule).set_background(rule);
-    (*sidebar).add_at(sidebar_rule, {237.0, 0.0, 1.0, 742.0});
+    // First child, so it paints beneath the rows; sized to the content below.
+    std::shared_ptr<gui_forms::Panel> sidebar_paper =
+        make_control<Panel>(StableId("gallery.sidebar.paper"));
+    (*sidebar_paper).set_background(Color::rgba(220, 229, 237));
+    (*sidebar).add_child(sidebar_paper);
     double navigation_y = 8.0;
     std::string_view current_group;
     std::size_t group_index = 0;
@@ -182,7 +173,8 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
                 "gallery.sidebar.group." + std::to_string(group_index),
                 std::string(entry.group), 10.0, 700, shell_blue_dark);
             (*heading).set_font({FontRole::control, 10.0, 700, false, 0.24});
-            (*sidebar).add_at(heading, {18.0, navigation_y, 200.0, 16.0});
+            (*heading).set_bounds({18.0, navigation_y, 200.0, 16.0});
+            (*sidebar).add_child(heading);
             navigation_y += 18.0;
             ++group_index;
         }
@@ -192,7 +184,8 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
         (*navigation).set_font({FontRole::control, 12.0, 400, false, 0.24});
         (*navigation).set_visual_style(ButtonVisualStyle::command);
         (*navigation).set_style(page_style());
-        (*sidebar).add_at(navigation, {16.0, navigation_y, 205.0, 24.0});
+        (*navigation).set_bounds({16.0, navigation_y, 205.0, 24.0});
+        (*sidebar).add_child(navigation);
         navigation_y += 24.0;
         (*context).navigation.push_back(navigation);
         (*context).page_ids.push_back((*entry.page).id);
@@ -201,6 +194,8 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
             (*context).timing_page = (*context).page_ids.size() - 1U;
         }
     }
+    (*sidebar_paper).set_bounds({0.0, 0.0, 238.0, std::max(742.0, navigation_y + 8.0)});
+    (*sidebar).set_auto_scroll_min_size({238.0, navigation_y + 8.0});
 
     std::shared_ptr<gui_forms::ScaledPanel> content = make_control<Surface>(
         StableId("gallery.content"), Size{1042.0, 742.0});
@@ -269,14 +264,13 @@ GalleryShell build_gallery_shell(const GalleryTree& compiled) {
         (*root).add_at(diagnostics, {1000.0, 34.0, 280.0, 742.0});
     }
 
+    const std::shared_ptr<ShellActions> actions = std::make_shared<ShellActions>(context);
     for (std::size_t index = 0; index < (*context).navigation.size(); ++index) {
-        const std::weak_ptr<PageContext> weak_context = context;
-        (*context).subscriptions.push_back((*(*context).navigation[index]).clicked().subscribe(
-            *root, NavigationClick(weak_context, index)));
+        on((*(*context).navigation[index]).clicked(), *actions, &ShellActions::navigate,
+           static_cast<int>(index));
     }
-    const std::weak_ptr<PageContext> weak_context = context;
-    (*context).subscriptions.push_back((*live).checked_changed().subscribe(
-        *root, LiveMotionChanged(weak_context)));
+    on((*live).checked_changed(), *actions, &ShellActions::live_motion);
+    (*context).components.add(actions);
     (*context).apply_motion_policy();
     (*context).select_page(0U);
     return {root};

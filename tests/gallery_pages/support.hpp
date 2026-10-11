@@ -199,6 +199,21 @@ inline void select_page(Window& window, std::string_view page_id) {
     const Control::Ptr navigation = window.find(
         std::string(gallery::navigation_id_prefix) + std::string(page_id));
     require(navigation != nullptr, "gallery navigation stable ID must resolve");
+    // The sidebar scrolls; bring the row into the viewport as a user would.
+    if (const std::shared_ptr<ScrollableControl> sidebar =
+            std::dynamic_pointer_cast<ScrollableControl>((*navigation).parent())) {
+        const Rect row = (*navigation).requested_bounds();
+        const Rect viewport = (*sidebar).viewport_rectangle();
+        const Point position = (*sidebar).scroll_position();
+        double target = position.y;
+        if (row.y < position.y + 8.0) target = row.y - 8.0;
+        else if (row.y + row.height > position.y + viewport.height - 8.0) {
+            target = row.y + row.height + 8.0 - viewport.height;
+        }
+        target = std::max(0.0, target);
+        if (target != position.y) static_cast<void>((*sidebar).scroll_to({position.x, target}));
+        window.perform_layout();
+    }
     click(window, navigation);
     for (const gallery::GalleryPageSpec& page : gallery::gallery_pages) {
         const Control::Ptr surface = window.find(
