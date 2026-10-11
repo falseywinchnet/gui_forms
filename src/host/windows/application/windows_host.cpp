@@ -2853,7 +2853,12 @@ private:
         frame_capture_saved_ = detail::complete_frame_capture(options_.capture_path, encoded);
         PostMessageW(hwnd_, WM_CLOSE, 0, 0);
     }
+public:
+    // Read by run_windows after the message loop: the portable contract fails
+    // the process when a requested capture was never saved.
     [[nodiscard]] bool frame_capture_saved() const noexcept { return frame_capture_saved_; }
+
+private:
 
     void collect_damage() {
         static_cast<void>((*model_).poll_frame_schedule(FrameClock::now()));

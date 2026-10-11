@@ -63,8 +63,10 @@ private:
     bool needs_full_frame_{true};
 };
 
-LiveSurfacesPage::LiveSurfacesPage(const std::shared_ptr<Surface>& body)
-    : surface_(LiveSurface::create(description())) {
+LiveSurfacesPage::LiveSurfacesPage(const std::shared_ptr<Surface>& body) {
+    // description() reads large_, so the surface is created after every member
+    // has its initializer, not in the initializer list ahead of them.
+    surface_ = LiveSurface::create(description());
     (*body).add_at(label("gallery.live-surfaces.heading", "LIVE SURFACES", 22.0, 700,
                          shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
     (*body).add_at(label("gallery.live-surfaces.lead",
