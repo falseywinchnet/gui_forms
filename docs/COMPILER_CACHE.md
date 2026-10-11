@@ -286,11 +286,10 @@ SDK after changing it. Consumers continue linking `GUIForms::Audio`: an stx SDK
 installs its decoder/compatibility archives and resolves those dependencies in
 `find_package(GUIForms)`. No consumer API or extra manual library list is needed.
 Only the selected decoder is linked; miniaudio remains the audio-device backend.
-The existing cancellation, bounded arena, clip quota and publication tests run
-against both choices, together with the installed Worker/Ogg examples in CI.
-The internal stb seek-boundary test applies only to stb; stx's own seek tests live
-in its standalone suite. CI builds and installs the default stx SDK, exercises
-stb as the alternate, then restores stx for subsequent checks and publication.
+CI builds, tests, installs and publishes only the stx SDK, the configuration
+the programs ship with; the stb switch is not built or installed by CI. The
+internal stb seek-boundary test applies only to an stb build; stx's own seek
+tests live in its standalone suite.
 The shipping stx decoder now uses the prepared BFFT/BODFT transform for its
 automatic synthesis mode. Its pinned source subset is compiled privately into
 the codec archive, with no separate consumer BFFT dependency. The SDK installs

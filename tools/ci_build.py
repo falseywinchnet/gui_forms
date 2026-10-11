@@ -84,28 +84,6 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     run('ctest', '--test-dir', examples, '--output-on-failure')
 
 
-
-def check_alternate_audio(build: Path, jobs: int) -> None:
-    """Exercise the stb fallback through Audio, then restore the default stx SDK."""
-    toolkit: Path = build / 'gui-forms'
-    examples: Path = build / 'installed-reference-examples'
-    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit,
-        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stb')
-    run('cmake', '--build', toolkit, '--target', 'gui_forms_audio_tests', '--parallel', jobs)
-    run('ctest', '--test-dir', toolkit, '-R', '^gui_forms_audio_tests$', '--output-on-failure')
-    run('cmake', '--install', toolkit)
-    run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples)
-    run('cmake', '--build', examples, '--target', 'ogg_worker', 'application_audio_worker', '--parallel', jobs)
-    run('ctest', '--test-dir', examples, '-R', '^(ogg_worker|application_audio_worker)$', '--output-on-failure')
-    # Retain the default backend in the SDK and baseline build for later checks.
-    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit,
-        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx')
-    run('cmake', '--build', toolkit, '--target', 'gui_forms_audio_tests', '--parallel', jobs)
-    run('cmake', '--install', toolkit)
-    run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples)
-    run('cmake', '--build', examples, '--target', 'ogg_worker', 'application_audio_worker', '--parallel', jobs)
-
-
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
@@ -125,7 +103,6 @@ def main() -> None:
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
                   gallery_enabled(args.gallery, dict(os.environ)))
-    check_alternate_audio(build, args.jobs)
 
 
 if __name__ == '__main__':
