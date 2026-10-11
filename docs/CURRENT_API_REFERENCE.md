@@ -147,9 +147,12 @@ macOS draws the rectangles AppKit supplies (`getRectsBeingDrawn:`) rather than
 their bounding box. Opaque live clips cover what they can; only the remainder,
 such as an overlay floating over a live surface, enters retained painting, which
 draws the live frame beneath the overlay through `Painter::draw_live_surface`.
-Live pixels that retained painting reaches are copied again. The AppKit flush
-still covers each presented clip, and prepared-text builds still copy the
-presented raster into each candidate. Windows copies complete clips; the Linux
+Live pixels that retained painting reaches are copied again. When the raster
+still holds the previous presentation and the frame is opaque, the AppKit
+flush covers only the surface's pending damage inside its clip (the draw path
+re-requests any later damage the flush missed); otherwise it covers the whole
+clip. Prepared-text builds still copy the presented raster into each
+candidate. Windows copies complete clips; the Linux
 host does not present live surfaces.
 
 macOS retained painting is clipped to the pending damage's rectangles
@@ -327,6 +330,10 @@ Windows qualification and Linux host packaging remain open.
 
 ### `Event<Arguments...>` and `SubscriptionToken`
 
+Deprecated authoring seam. New code observes events with
+`on(event, owner, &Owner::method)` (next section); `subscribe(...)` and
+caller-held tokens remain compiled for existing code only.
+
 - subscription callbacks run from a registration-order snapshot;
 - handlers added during emission wait for the next emission;
 - a token disconnected before its turn is skipped;
@@ -378,9 +385,9 @@ when a caller already has a token. Pass `std::move(token)`; the former token
 becomes empty. A dead component, or a failed transfer, disconnects that token.
 Disconnected owner-held tokens are unlinked immediately, including on publisher
 destruction. `owned_subscription_count()` reports the current live entries; no
-separate token-store capacity remains after the last entry is removed. Ordinary `subscribe(...)` remains caller-owned: dropping its returned
-token still disconnects immediately. Use it for an independently cancellable
-connection; `on` deliberately returns no second cancellation owner.
+separate token-store capacity remains after the last entry is removed. Ordinary `subscribe(...)` is deprecated; it remains caller-owned, and
+dropping its returned token still disconnects immediately. `on` deliberately
+returns no second cancellation owner.
 
 One or two small typed values may follow the member pointer:
 
