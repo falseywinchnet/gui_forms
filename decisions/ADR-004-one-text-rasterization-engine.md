@@ -104,7 +104,9 @@ Candidate 3, with this profile:
 2. Shared glyph rasterizer and shared blending rule.
 3. Skia ordinary text (macOS, Linux) on the shared rasterizer.
 4. Prepared text and text masks on the shared profile.
-5. `SkiaExecutor` text on the shared rasterizer.
+5. `SkiaExecutor` text on the shared rasterizer, with host font bytes (macOS
+   CoreText lookup, Windows `GetFontData`) and bold/oblique synthesis in the
+   shared rasterizer.
 6. Windows ordinary text on the shared rasterizer; GDI text removed.
 7. Skia built without a host font backend.
 

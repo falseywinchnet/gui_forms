@@ -37,6 +37,22 @@ struct GlyphRunCoverage final {
     std::uint32_t missing_glyphs{};
 };
 
+// Synthesized styles for faces a family lacks (the C drawing API). Bold
+// thickens outlines by a size-dependent amount; oblique shears by 0.25.
+struct GlyphRunSynthesis final {
+    bool embolden{};
+    bool oblique{};
+};
+
+// Linear map from logical (y down) to device pixels (y down):
+// device = [xx xy; yx yy] * logical. Used for rotated or skewed text.
+struct GlyphRunTransform final {
+    double xx{1.0};
+    double xy{0.0};
+    double yx{0.0};
+    double yy{1.0};
+};
+
 // Rasterizes HarfBuzz-shaped runs. It opens its own FreeType faces, at the
 // device size, from the engine's registered font bytes; the engine's shaping
 // faces are never resized. Not thread-safe: one rasterizer per executor.
@@ -52,10 +68,20 @@ public:
     // subpixel phase. Overlapping glyphs combine as c + p * (255 - c) / 255.
     // FreeType failures throw; the coverage is then not produced.
     [[nodiscard]] GlyphRunCoverage rasterize(const ShapedText& shaped, FontSpec font, double scale,
-                                             std::int32_t phase_x);
+                                             std::int32_t phase_x, GlyphRunSynthesis synthesis = {});
+
+    // General affine placement: the run origin maps to (device_x, device_y)
+    // and glyph positions through transform. Hinting is off (it assumes
+    // axis alignment). Coverage is relative to (floor(device_x),
+    // floor(device_y)), returned in origin.
+    [[nodiscard]] GlyphRunCoverage rasterize_transformed(const ShapedText& shaped, FontSpec font,
+                                                         GlyphRunTransform transform, double device_x,
+                                                         double device_y, GlyphRunSynthesis synthesis,
+                                                         GlyphRunOrigin& origin);
+
+    class Impl;
 
 private:
-    class Impl;
     std::unique_ptr<Impl> impl_;
 };
 

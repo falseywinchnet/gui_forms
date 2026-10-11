@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -154,6 +155,66 @@ void report_identity_hashes(const char* name, const char* font_path) {
     }
 }
 
+// Bold and oblique synthesis, and the unhinted general-transform path used
+// by the C drawing API.
+void synthesis_and_transforms(const char* font_path, const std::uint64_t (&expected)[5]) {
+    HarfBuzzFontEngine engine;
+    require(engine.register_typeface(FontRole::control, 400, false, read_file(font_path)).has_value(), "font registers");
+    const FontSpec font{FontRole::control, 16.0, 400, false};
+    const ShapedText shaped = engine.shape(corpus, font);
+    GlyphRunRasterizer rasterizer(engine);
+    const GlyphRunCoverage plain = rasterizer.rasterize(shaped, font, 1.0, 0);
+    const GlyphRunCoverage bold = rasterizer.rasterize(shaped, font, 1.0, 0, {true, false});
+    const double bold_ratio = ink(bold) / ink(plain);
+    require(bold_ratio > 1.15 && bold_ratio < 1.8, "embolden thickens strokes");
+    const GlyphRunCoverage oblique = rasterizer.rasterize(shaped, font, 1.0, 0, {false, true});
+    require(oblique.pixels != plain.pixels, "oblique changes coverage");
+    require(std::abs(ink(oblique) - ink(plain)) / ink(plain) < 0.06, "oblique preserves ink");
+    // Shear leans tops right: ascenders reach past the plain mask's right edge.
+    require(oblique.left + static_cast<std::int32_t>(oblique.width) > plain.left + static_cast<std::int32_t>(plain.width),
+            "oblique leans right");
+
+    GlyphRunOrigin origin{};
+    const GlyphRunCoverage identity = rasterizer.rasterize_transformed(shaped, font, {}, 10.25, 20.5, {}, origin);
+    require(origin.pixel_x == 10 && origin.pixel_y == 20 && origin.phase_x == 0, "transformed origin floors both axes");
+    require(std::abs(ink(identity) - ink(plain)) / ink(plain) < 0.08, "unhinted identity transform keeps ink");
+    require(std::abs(static_cast<double>(identity.width) - static_cast<double>(plain.width)) <= 2.0,
+            "unhinted identity transform keeps width");
+    const GlyphRunCoverage again = rasterizer.rasterize_transformed(shaped, font, {}, 10.25, 20.5, {}, origin);
+    require(again.pixels == identity.pixels && again.left == identity.left && again.top == identity.top,
+            "transformed rasterization is deterministic");
+
+    // A quarter turn clockwise (y down): the run reads downward and the
+    // glyphs' tops face right.
+    const GlyphRunCoverage turned = rasterizer.rasterize_transformed(shaped, font, {0.0, -1.0, 1.0, 0.0}, 0.0, 0.0, {}, origin);
+    require(std::abs(ink(turned) - ink(identity)) / ink(identity) < 0.08, "rotation keeps ink");
+    require(std::abs(static_cast<double>(turned.height) - shaped.width) < 3.0, "rotated run spans its advance vertically");
+    require(turned.top >= -2 && turned.left >= -3, "rotated run lies below and right of its origin");
+
+    const GlyphRunCoverage doubled = rasterizer.rasterize_transformed(shaped, font, {2.0, 0.0, 0.0, 2.0}, 0.0, 0.0, {}, origin);
+    const double area_ratio = ink(doubled) / ink(identity);
+    require(area_ratio > 3.6 && area_ratio < 4.4, "transformed ink scales with device area");
+    const GlyphRunCoverage turned_bold = rasterizer.rasterize_transformed(shaped, font, {0.0, -1.0, 1.0, 0.0}, 0.0, 0.0,
+                                                                          {true, true}, origin);
+    require(ink(turned_bold) > ink(turned) * 1.15, "synthesis composes with rotation");
+
+    bool refused = false;
+    try {
+        static_cast<void>(rasterizer.rasterize_transformed(shaped, font, {1.0, 2.0, 0.5, 1.0}, 0.0, 0.0, {}, origin));
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused, "singular transform is refused");
+    // Bold, oblique, identity, quarter turn, quarter turn bold-oblique;
+    // identical on macOS arm64 and Alpine aarch64 musl, 2026-10-11.
+    const std::uint64_t observed[5]{coverage_hash(bold), coverage_hash(oblique), coverage_hash(identity),
+                                    coverage_hash(turned), coverage_hash(turned_bold)};
+    for (std::size_t index = 0; index < 5U; ++index) {
+        std::cout << "synthesis " << index << ' ' << std::hex << observed[index] << std::dec << '\n';
+        require(observed[index] == expected[index], "synthesized coverage differs from the cross-platform expectation");
+    }
+}
+
 void unknown_faces_are_reported() {
     HarfBuzzFontEngine engine;
     GlyphRunRasterizer rasterizer(engine);
@@ -173,6 +234,10 @@ int main() {
     rasterization_is_deterministic_and_scales(GUI_FORMS_TEST_RAPIDS_REGULAR);
     rasterization_is_deterministic_and_scales(GUI_FORMS_TEST_CARLITO_REGULAR);
     unknown_faces_are_reported();
+    synthesis_and_transforms(GUI_FORMS_TEST_RAPIDS_REGULAR, {0xa2199bda6d0e05e7ULL, 0xf3fdfff6b1ef2453ULL, 0x3509b246406a7aadULL,
+                                                             0xeece270b10c7e4b9ULL, 0xb26a36159298eee6ULL});
+    synthesis_and_transforms(GUI_FORMS_TEST_CARLITO_REGULAR, {0x740132e6ee72d463ULL, 0x21207356b2411a38ULL, 0x535dbda7fa2302b1ULL,
+                                                              0xda491c0d10f163a9ULL, 0x2f4536e59ea96f93ULL});
     report_identity_hashes("rapids", GUI_FORMS_TEST_RAPIDS_REGULAR);
     report_identity_hashes("carlito", GUI_FORMS_TEST_CARLITO_REGULAR);
     return 0;

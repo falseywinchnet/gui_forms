@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -303,6 +304,97 @@ void quadratic_bezier_polygon_and_pie_paths_rasterize() {
     CHECK(target.get_pixel(0, 0).alpha() == 0U);
 }
 
+// Sum of darkness on a white target: 255 - red per pixel.
+std::uint64_t ink(const Bitmap& bitmap) {
+    std::uint64_t total = 0;
+    for (std::uint32_t y = 0; y < bitmap.height(); ++y) {
+        for (std::uint32_t x = 0; x < bitmap.width(); ++x) total += 255U - bitmap.get_pixel(x, y).red();
+    }
+    return total;
+}
+
+std::uint64_t draw_ink(SkiaExecutor& executor, const Font& font, const Matrix& transform) {
+    Bitmap target(200, 200);
+    GraphicsRecorder recorder;
+    recorder.clear(Color::from_name("white"));
+    recorder.set_transform(transform);
+    recorder.draw_string("Hamburgefonstiv", font, SolidBrush(Color::from_name("black")), {0, 0}, StringFormat());
+    CHECK(executor.execute(recorder, target));
+    return ink(target);
+}
+
+// ADR-004 phase 5: draw_string and measure_string use the shared HarfBuzz/
+// FreeType engine and compositor, so their pixels are the same on every host.
+void text_uses_the_shared_engine() {
+    SkiaExecutor executor;
+    const std::vector<std::byte> regular = read_file(GUI_DRAWING_TEST_FONT);
+    CHECK(executor.register_typeface("Portsmouth Rapids", regular));
+    const Font font("Portsmouth Rapids", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Font bold("Portsmouth Rapids", 16.0, FontStyle::bold, GraphicsUnit::pixel);
+    const Font italic("Portsmouth Rapids", 16.0, FontStyle::italic, GraphicsUnit::pixel);
+    const Matrix identity;
+    const Matrix shifted(1.0, 0.0, 0.0, 1.0, 20.0, 40.0);
+
+    // Unhinted advances: the measured advance is linear in size.
+    const Font large("Portsmouth Rapids", 32.0, FontStyle::regular, GraphicsUnit::pixel);
+    const SizeF small_size = executor.measure_string("Hamburgefonstiv", font.snapshot(), StringFormat().snapshot());
+    const SizeF large_size = executor.measure_string("Hamburgefonstiv", large.snapshot(), StringFormat().snapshot());
+    const double small_advance = small_size.width - 2.0 * 16.0 / 6.0;
+    const double large_advance = large_size.width - 2.0 * 32.0 / 6.0;
+    CHECK(small_advance > 50.0 && std::abs(large_advance - 2.0 * small_advance) < 1e-3);
+    CHECK(large_size.height > small_size.height * 1.9 && large_size.height < small_size.height * 2.1);
+
+    // Synthesized bold thickens, italic shears; neither changes advances.
+    const std::uint64_t plain_ink = draw_ink(executor, font, shifted);
+    const std::uint64_t bold_ink = draw_ink(executor, bold, shifted);
+    CHECK(bold_ink > plain_ink + plain_ink / 8U);
+    const std::uint64_t italic_ink = draw_ink(executor, italic, shifted);
+    CHECK(italic_ink * 100U > plain_ink * 94U && italic_ink * 100U < plain_ink * 106U);
+    CHECK(executor.measure_string("Hamburgefonstiv", bold.snapshot(), StringFormat().snapshot()).width == small_size.width);
+
+    // A quarter turn keeps the ink; rotated text is unhinted.
+    const std::uint64_t turned_ink = draw_ink(executor, font, Matrix(0.0, 1.0, -1.0, 0.0, 120.0, 10.0));
+    CHECK(turned_ink * 100U > plain_ink * 92U && turned_ink * 100U < plain_ink * 108U);
+
+    // A registered bold face replaces synthesis.
+    SkiaExecutor faced;
+    CHECK(faced.register_typeface("Portsmouth Rapids", regular));
+    CHECK(faced.register_typeface("Portsmouth Rapids", read_file(GUI_DRAWING_TEST_BOLD_FONT), 1U));
+    CHECK(draw_ink(faced, bold, shifted) != bold_ink);
+    CHECK(draw_ink(faced, font, shifted) == plain_ink);
+
+    // One scene with every text path, hashed. The hash is the same on every
+    // platform (ADR-004); it was produced on macOS arm64 and Alpine aarch64.
+    Bitmap target(160, 96);
+    GraphicsRecorder recorder;
+    recorder.clear(Color::from_name("white"));
+    recorder.draw_string("Plain 0123", font, SolidBrush(Color::from_name("black")), {2.25, 1.5}, StringFormat());
+    recorder.draw_string("Bold", bold, SolidBrush(Color::from_argb(160, 0, 0, 255)), {2, 22}, StringFormat());
+    recorder.draw_string("Italic", italic, SolidBrush(Color::from_name("red")), {60, 22}, StringFormat());
+    StringFormat centred;
+    centred.set_alignment(StringAlignment::center);
+    recorder.draw_string("Two\nlines", font, SolidBrush(Color::from_name("black")), {80, 40}, centred);
+    recorder.set_clip({120, 30, 20, 30});
+    recorder.draw_string("Clip", large, SolidBrush(Color::from_name("green")), {110, 30}, StringFormat());
+    recorder.reset_clip();
+    recorder.set_quality(SmoothingMode::default_mode, InterpolationMode::default_mode, PixelOffsetMode::default_mode,
+                         CompositingMode::source_copy, CompositingQuality::default_mode);
+    recorder.draw_string("Copy", font, SolidBrush(Color::from_argb(128, 255, 0, 0)), {2, 76}, StringFormat());
+    recorder.set_quality(SmoothingMode::default_mode, InterpolationMode::default_mode, PixelOffsetMode::default_mode,
+                         CompositingMode::source_over, CompositingQuality::default_mode);
+    recorder.set_transform(Matrix(0.8660254, 0.5, -0.5, 0.8660254, 100.0, 60.0));
+    recorder.draw_string("Turn", font, SolidBrush(Color::from_name("black")), {0, 0}, StringFormat());
+    CHECK(executor.execute(recorder, target));
+    const std::uint64_t scene = checksum(target.snapshot());
+    std::cout << "text scene " << std::hex << scene << std::dec << '\n';
+    if (const char* path = std::getenv("GUI_DRAWING_TEXT_PNG"); path != nullptr) {
+        const std::vector<std::byte> png = executor.encode_png(target);
+        std::ofstream output(path, std::ios::binary);
+        output.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
+    }
+    if (std::getenv("GUI_DRAWING_TEXT_PRINT") == nullptr) CHECK(scene == UINT64_C(0xc63b693ed7325115));
+}
+
 } // namespace
 
 int main() {
@@ -313,5 +405,6 @@ int main() {
     gradients_and_hatches_are_native_raster_commands();
     connected_line_figures_fill_as_one_contour();
     quadratic_bezier_polygon_and_pie_paths_rasterize();
+    text_uses_the_shared_engine();
     return 0;
 }

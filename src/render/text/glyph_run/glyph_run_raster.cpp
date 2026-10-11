@@ -2,6 +2,8 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_GLYPH_H
+#include FT_OUTLINE_H
 
 #include <algorithm>
 #include <cmath>
@@ -43,6 +45,7 @@ GlyphRunOrigin glyph_run_origin(const double device_x, const double device_y) no
 
 class GlyphRunRasterizer::Impl final {
 public:
+    class Runner;
     explicit Impl(const HarfBuzzFontEngine& engine) : engine_(engine) {
         if (FT_Init_FreeType(&library_) != 0) throw std::runtime_error("Glyph run FreeType initialization failed");
     }
@@ -86,82 +89,194 @@ GlyphRunRasterizer::GlyphRunRasterizer(const HarfBuzzFontEngine& engine) : impl_
 
 GlyphRunRasterizer::~GlyphRunRasterizer() = default;
 
+namespace {
+
+// How a run's glyphs reach device pixels. Device position of glyph (x, y),
+// in 26.6 relative to the origin pixel, is
+// offset + llround((linear * (x, y)) * 64).
+struct RunPlacement final {
+    std::int64_t offset_x{};
+    std::int64_t offset_y{};
+    GlyphRunTransform linear{};
+    FT_F26Dot6 size{};
+    FT_Int32 flags{light_flags};
+    bool has_matrix{};
+    FT_Matrix matrix{};
+    // Total outline thickening in 26.6 device units; 0 for none.
+    FT_Pos embolden{};
+};
+
+FT_Fixed fixed_16_16(const double value) noexcept {
+    return static_cast<FT_Fixed>(std::llround(value * 65536.0));
+}
+
+// Fake-bold thickening for a device pixel size: 1/24 of the size at 9 px
+// falling linearly to 1/32 at 36 px and beyond.
+FT_Pos embolden_strength(const double device_size) noexcept {
+    const double clamped = std::clamp(device_size, 9.0, 36.0);
+    const double ratio = 1.0 / 24.0 + (clamped - 9.0) / 27.0 * (1.0 / 32.0 - 1.0 / 24.0);
+    return static_cast<FT_Pos>(std::llround(device_size * ratio * 64.0));
+}
+
+// Oblique shear, in FreeType's y-up outline space: x' = x + 0.25 y.
+FT_Matrix oblique_matrix() noexcept {
+    FT_Matrix shear{};
+    shear.xx = 0x10000;
+    shear.xy = 0x4000;
+    shear.yx = 0;
+    shear.yy = 0x10000;
+    return shear;
+}
+
+} // namespace
+
+class GlyphRunRasterizer::Impl::Runner final {
+public:
+    static GlyphRunCoverage run(Impl& impl, const ShapedText& shaped, const RunPlacement& placement) {
+        GlyphRunCoverage result{};
+        std::vector<RenderedGlyph> glyphs;
+        std::vector<std::uint8_t> bitmaps;
+        std::int64_t left = std::numeric_limits<std::int64_t>::max();
+        std::int64_t top = std::numeric_limits<std::int64_t>::max();
+        std::int64_t right = std::numeric_limits<std::int64_t>::min();
+        std::int64_t bottom = std::numeric_limits<std::int64_t>::min();
+        for (const ShapedFontRun& run : shaped.runs) {
+            const FT_Face face = impl.face(run.face);
+            if (face == nullptr) {
+                result.missing_glyphs += static_cast<std::uint32_t>(run.glyphs.size());
+                continue;
+            }
+            if (FT_Set_Char_Size(face, 0, placement.size, 72U, 72U) != 0) throw std::runtime_error("Glyph run size failed");
+            for (const ShapedGlyph& glyph : run.glyphs) {
+                const double x = static_cast<double>(glyph.x);
+                const double y = static_cast<double>(glyph.y);
+                const double mapped_x = placement.linear.xx * x + placement.linear.xy * y;
+                const double mapped_y = placement.linear.yx * x + placement.linear.yy * y;
+                // Integer 26.6 placement relative to the origin pixel.
+                const std::int64_t device_x = placement.offset_x + std::llround(mapped_x * 64.0);
+                const std::int64_t device_y = placement.offset_y + std::llround(mapped_y * 64.0);
+                const std::int64_t pixel_x = floor_div_64(device_x);
+                const std::int64_t pixel_y = floor_div_64(device_y);
+                FT_Vector delta{static_cast<FT_Pos>(device_x - pixel_x * 64), -static_cast<FT_Pos>(device_y - pixel_y * 64)};
+                if (placement.has_matrix) {
+                    FT_Matrix matrix = placement.matrix;
+                    FT_Set_Transform(face, &matrix, &delta);
+                } else {
+                    FT_Set_Transform(face, nullptr, &delta);
+                }
+                if (FT_Load_Glyph(face, glyph.glyph.value, placement.flags) != 0) throw std::runtime_error("Glyph load failed");
+                const FT_GlyphSlot slot = (*face).glyph;
+                if ((*slot).format != FT_GLYPH_FORMAT_OUTLINE) throw std::runtime_error("Glyph is not an outline");
+                if (placement.embolden != 0 && FT_Outline_EmboldenXY(&(*slot).outline, placement.embolden, placement.embolden) != 0) {
+                    throw std::runtime_error("Glyph embolden failed");
+                }
+                if (FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL) != 0) throw std::runtime_error("Glyph render failed");
+                const FT_Bitmap& bitmap = (*slot).bitmap;
+                if (bitmap.width == 0 || bitmap.rows == 0) continue;
+                if (bitmap.pixel_mode != FT_PIXEL_MODE_GRAY || bitmap.num_grays != 256 || bitmap.pitch <= 0 ||
+                    static_cast<unsigned>(bitmap.pitch) < bitmap.width) {
+                    throw std::runtime_error("Unexpected glyph bitmap");
+                }
+                RenderedGlyph rendered{};
+                rendered.left = pixel_x + (*slot).bitmap_left;
+                rendered.top = pixel_y - (*slot).bitmap_top;
+                rendered.width = bitmap.width;
+                rendered.height = bitmap.rows;
+                rendered.offset = bitmaps.size();
+                for (unsigned row = 0; row < bitmap.rows; ++row) {
+                    const std::uint8_t* const line = bitmap.buffer + static_cast<std::size_t>(row) * static_cast<std::size_t>(bitmap.pitch);
+                    bitmaps.insert(bitmaps.end(), line, line + bitmap.width);
+                }
+                left = std::min(left, rendered.left);
+                top = std::min(top, rendered.top);
+                right = std::max(right, rendered.left + static_cast<std::int64_t>(rendered.width));
+                bottom = std::max(bottom, rendered.top + static_cast<std::int64_t>(rendered.height));
+                glyphs.push_back(rendered);
+            }
+        }
+        if (glyphs.empty()) return result;
+        if (right - left > maximum_extent || bottom - top > maximum_extent) throw std::length_error("Glyph run too large");
+        result.left = static_cast<std::int32_t>(left);
+        result.top = static_cast<std::int32_t>(top);
+        result.width = static_cast<std::uint32_t>(right - left);
+        result.height = static_cast<std::uint32_t>(bottom - top);
+        result.pixels.assign(static_cast<std::size_t>(result.width) * result.height, 0U);
+        for (const RenderedGlyph& glyph : glyphs) {
+            for (std::uint32_t row = 0; row < glyph.height; ++row) {
+                const std::size_t source = glyph.offset + static_cast<std::size_t>(row) * glyph.width;
+                const std::size_t target_row = static_cast<std::size_t>(glyph.top - top) + row;
+                const std::size_t target = target_row * result.width + static_cast<std::size_t>(glyph.left - left);
+                for (std::uint32_t column = 0; column < glyph.width; ++column) {
+                    const unsigned coverage = bitmaps[source + column];
+                    const unsigned previous = result.pixels[target + column];
+                    const unsigned combined = coverage + previous * (255U - coverage) / 255U;
+                    result.pixels[target + column] = static_cast<std::uint8_t>(combined);
+                }
+            }
+        }
+        return result;
+    }
+};
+
 GlyphRunCoverage GlyphRunRasterizer::rasterize(const ShapedText& shaped, const FontSpec font, const double scale,
-                                               const std::int32_t phase_x) {
+                                               const std::int32_t phase_x, const GlyphRunSynthesis synthesis) {
     if (!std::isfinite(scale) || scale <= 0.0 || !std::isfinite(font.size) || phase_x < 0 || phase_x > 63) {
         throw std::invalid_argument("Invalid glyph run placement");
     }
     const double device_size = std::clamp(font.size, 1.0, 4096.0) * scale;
-    const FT_F26Dot6 size = static_cast<FT_F26Dot6>(std::llround(device_size * 64.0));
-    GlyphRunCoverage result{};
-    std::vector<RenderedGlyph> glyphs;
-    std::vector<std::uint8_t> bitmaps;
-    std::int64_t left = std::numeric_limits<std::int64_t>::max();
-    std::int64_t top = std::numeric_limits<std::int64_t>::max();
-    std::int64_t right = std::numeric_limits<std::int64_t>::min();
-    std::int64_t bottom = std::numeric_limits<std::int64_t>::min();
-    for (const ShapedFontRun& run : shaped.runs) {
-        const FT_Face face = (*impl_).face(run.face);
-        if (face == nullptr) {
-            result.missing_glyphs += static_cast<std::uint32_t>(run.glyphs.size());
-            continue;
-        }
-        if (FT_Set_Char_Size(face, 0, size, 72U, 72U) != 0) throw std::runtime_error("Glyph run size failed");
-        for (const ShapedGlyph& glyph : run.glyphs) {
-            // Integer 26.6 placement relative to the origin pixel.
-            const std::int64_t device_x = phase_x + std::llround(static_cast<double>(glyph.x) * scale * 64.0);
-            const std::int64_t device_y = std::llround(static_cast<double>(glyph.y) * scale * 64.0);
-            const std::int64_t pixel_x = floor_div_64(device_x);
-            const std::int64_t pixel_y = floor_div_64(device_y);
-            FT_Vector delta{static_cast<FT_Pos>(device_x - pixel_x * 64), -static_cast<FT_Pos>(device_y - pixel_y * 64)};
-            FT_Set_Transform(face, nullptr, &delta);
-            if (FT_Load_Glyph(face, glyph.glyph.value, light_flags) != 0) throw std::runtime_error("Glyph load failed");
-            const FT_GlyphSlot slot = (*face).glyph;
-            if ((*slot).format != FT_GLYPH_FORMAT_OUTLINE) throw std::runtime_error("Glyph is not an outline");
-            if (FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL) != 0) throw std::runtime_error("Glyph render failed");
-            const FT_Bitmap& bitmap = (*slot).bitmap;
-            if (bitmap.width == 0 || bitmap.rows == 0) continue;
-            if (bitmap.pixel_mode != FT_PIXEL_MODE_GRAY || bitmap.num_grays != 256 || bitmap.pitch <= 0 ||
-                static_cast<unsigned>(bitmap.pitch) < bitmap.width) {
-                throw std::runtime_error("Unexpected glyph bitmap");
-            }
-            RenderedGlyph rendered{};
-            rendered.left = pixel_x + (*slot).bitmap_left;
-            rendered.top = pixel_y - (*slot).bitmap_top;
-            rendered.width = bitmap.width;
-            rendered.height = bitmap.rows;
-            rendered.offset = bitmaps.size();
-            for (unsigned row = 0; row < bitmap.rows; ++row) {
-                const std::uint8_t* const line = bitmap.buffer + static_cast<std::size_t>(row) * static_cast<std::size_t>(bitmap.pitch);
-                bitmaps.insert(bitmaps.end(), line, line + bitmap.width);
-            }
-            left = std::min(left, rendered.left);
-            top = std::min(top, rendered.top);
-            right = std::max(right, rendered.left + static_cast<std::int64_t>(rendered.width));
-            bottom = std::max(bottom, rendered.top + static_cast<std::int64_t>(rendered.height));
-            glyphs.push_back(rendered);
-        }
+    RunPlacement placement{};
+    placement.offset_x = phase_x;
+    placement.linear = {scale, 0.0, 0.0, scale};
+    placement.size = static_cast<FT_F26Dot6>(std::llround(device_size * 64.0));
+    placement.flags = light_flags;
+    if (synthesis.oblique) {
+        placement.has_matrix = true;
+        placement.matrix = oblique_matrix();
     }
-    if (glyphs.empty()) return result;
-    if (right - left > maximum_extent || bottom - top > maximum_extent) throw std::length_error("Glyph run too large");
-    result.left = static_cast<std::int32_t>(left);
-    result.top = static_cast<std::int32_t>(top);
-    result.width = static_cast<std::uint32_t>(right - left);
-    result.height = static_cast<std::uint32_t>(bottom - top);
-    result.pixels.assign(static_cast<std::size_t>(result.width) * result.height, 0U);
-    for (const RenderedGlyph& glyph : glyphs) {
-        for (std::uint32_t row = 0; row < glyph.height; ++row) {
-            const std::size_t source = glyph.offset + static_cast<std::size_t>(row) * glyph.width;
-            const std::size_t target_row = static_cast<std::size_t>(glyph.top - top) + row;
-            const std::size_t target = target_row * result.width + static_cast<std::size_t>(glyph.left - left);
-            for (std::uint32_t column = 0; column < glyph.width; ++column) {
-                const unsigned coverage = bitmaps[source + column];
-                const unsigned previous = result.pixels[target + column];
-                const unsigned combined = coverage + previous * (255U - coverage) / 255U;
-                result.pixels[target + column] = static_cast<std::uint8_t>(combined);
-            }
-        }
+    if (synthesis.embolden) placement.embolden = embolden_strength(device_size);
+    GlyphRunCoverage result = Impl::Runner::run(*impl_, shaped, placement);
+    return result;
+}
+
+GlyphRunCoverage GlyphRunRasterizer::rasterize_transformed(const ShapedText& shaped, const FontSpec font,
+                                                           const GlyphRunTransform transform, const double device_x,
+                                                           const double device_y, const GlyphRunSynthesis synthesis,
+                                                           GlyphRunOrigin& origin) {
+    const double determinant = transform.xx * transform.yy - transform.xy * transform.yx;
+    if (!std::isfinite(font.size) || !std::isfinite(device_x) || !std::isfinite(device_y) ||
+        !std::isfinite(determinant) || determinant == 0.0 || std::abs(device_x) > 16'000'000.0 ||
+        std::abs(device_y) > 16'000'000.0) {
+        throw std::invalid_argument("Invalid glyph run transform");
     }
+    const double logical_size = std::clamp(font.size, 1.0, 4096.0);
+    const double pixel_x = std::floor(device_x);
+    const double pixel_y = std::floor(device_y);
+    origin.pixel_x = static_cast<std::int64_t>(pixel_x);
+    origin.pixel_y = static_cast<std::int64_t>(pixel_y);
+    origin.phase_x = 0;
+    RunPlacement placement{};
+    placement.offset_x = std::llround((device_x - pixel_x) * 64.0);
+    placement.offset_y = std::llround((device_y - pixel_y) * 64.0);
+    placement.linear = transform;
+    placement.size = static_cast<FT_F26Dot6>(std::llround(logical_size * 64.0));
+    // Hinting assumes axis alignment; rotated and skewed text is unhinted.
+    placement.flags = FT_LOAD_NO_BITMAP | FT_LOAD_NO_HINTING;
+    // Logical (y down) to device (y down), expressed in FreeType's y-up
+    // outline space: [xx -xy; -yx yy].
+    FT_Matrix matrix{};
+    matrix.xx = fixed_16_16(transform.xx);
+    matrix.xy = fixed_16_16(-transform.xy);
+    matrix.yx = fixed_16_16(-transform.yx);
+    matrix.yy = fixed_16_16(transform.yy);
+    if (synthesis.oblique) {
+        FT_Matrix shear = oblique_matrix();
+        FT_Matrix_Multiply(&matrix, &shear);
+        matrix = shear;
+    }
+    placement.has_matrix = true;
+    placement.matrix = matrix;
+    if (synthesis.embolden) placement.embolden = embolden_strength(logical_size * std::sqrt(std::abs(determinant)));
+    GlyphRunCoverage result = Impl::Runner::run(*impl_, shaped, placement);
     return result;
 }
 

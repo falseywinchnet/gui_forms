@@ -51,13 +51,20 @@ struct TextCoverage final {
 
 enum class TextCompositeStatus : std::uint8_t { success, invalid_geometry };
 
+// source_over blends colour (alpha included) over the destination. source
+// (GDI+ SourceCopy) replaces the destination with the premultiplied colour,
+// alpha included, in proportion to coverage x clip. The two agree for opaque
+// colours.
+enum class TextCompositeMode : std::uint8_t { source_over, source };
+
 // Blends colour over the target with alpha = coverage * colour.alpha * clip,
 // rounded once, and each channel rounded once:
 //   out = (source * alpha + destination * (255 - alpha) + 127) / 255.
 // Validates everything before writing; no allocation, no partial write on
 // failure. Coverage and target must not overlap.
 [[nodiscard]] TextCompositeStatus composite_text_coverage(TextCoverage coverage, TextCompositeTarget target,
-                                                          TextCompositeClip clip, Color color) noexcept;
+                                                          TextCompositeClip clip, Color color,
+                                                          TextCompositeMode mode = TextCompositeMode::source_over) noexcept;
 
 // Clip coverage of one device pixel, 0..256. Exposed for tests.
 [[nodiscard]] std::uint32_t text_clip_coverage(TextCompositeClip clip, std::int64_t x, std::int64_t y) noexcept;
