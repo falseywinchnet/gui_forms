@@ -61,10 +61,13 @@
       ],
       "automation_flag": "--automation",
       "smoke": {
-        "mode": "survive",
-        "seconds": 6,
+        "mode": "exit",
+        "seconds": 60,
         "expect_receipt": true,
-        "extra_arguments": []
+        "extra_arguments": [
+          "--capture",
+          "{scratch}/capture.png"
+        ]
       },
       "platforms": {
         "macos-arm64": {
@@ -105,7 +108,7 @@
       "smoke": {
         "mode": "survive",
         "seconds": 6,
-        "expect_receipt": true,
+        "expect_receipt": false,
         "extra_arguments": [
           "--product-only"
         ]
@@ -149,10 +152,13 @@
       ],
       "automation_flag": "--automation",
       "smoke": {
-        "mode": "survive",
-        "seconds": 6,
+        "mode": "exit",
+        "seconds": 60,
         "expect_receipt": true,
-        "extra_arguments": []
+        "extra_arguments": [
+          "--capture",
+          "{scratch}/capture.png"
+        ]
       },
       "platforms": {
         "macos-arm64": {

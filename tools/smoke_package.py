@@ -9,7 +9,8 @@ exercised. With --install the installer is also applied on this machine and
 the installed copy is launched the same way (macOS `installer -pkg`, Windows
 `setup.exe /S` then the quiet uninstaller, Linux `apt-get install ./x.deb`).
 
-Smoke modes (packaging/programs.json → smoke.mode):
+Smoke modes (packaging/programs.json → smoke.mode; "{scratch}" in
+smoke.extra_arguments expands to a per-launch temporary directory):
   survive  the program must still be running after smoke.seconds, then it is
            asked to quit: macOS `osascript ... quit`, Windows the automation
            probe's `close` when gui_forms_windows_probe.exe is available (else
@@ -176,7 +177,10 @@ class Smoke:
         arguments: list[str] = []
         if record.get("automation_flag"):
             arguments.append(record["automation_flag"])
-        arguments.extend(smoke.get("extra_arguments", []))
+        # "{scratch}" in an extra argument names a per-launch temporary directory,
+        # so a self-exiting program can be asked for --capture <png> there.
+        scratch_root = tempfile.mkdtemp(prefix="gui-forms-smoke-args-")
+        arguments.extend(argument.replace("{scratch}", scratch_root) for argument in smoke.get("extra_arguments", []))
         command = [str(executable), *arguments]
         if self.platform.startswith("linux") and not os.environ.get("DISPLAY") and shutil.which("xvfb-run"):
             command = ["xvfb-run", "-a", "-s", "-screen 0 1280x1024x24 -noreset", *command]
@@ -264,7 +268,8 @@ class Smoke:
             return Path(root) / record["executable"]
         self.log(f"    sudo apt-get install -y ./{installer.name}")
         if not self.dry_run:
-            subprocess.run(["sudo", "apt-get", "install", "-y", str(installer)], check=True)
+            # apt treats a bare relative path as a package name; give it an absolute path.
+            subprocess.run(["sudo", "apt-get", "install", "-y", str(installer.resolve())], check=True)
         return Path(install["linux_dir"]) / record["executable"]
 
     def uninstall(self, record: dict[str, Any]) -> None:
