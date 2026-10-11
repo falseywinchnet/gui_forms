@@ -37,7 +37,7 @@ binding is stored with the event slot. `Component::own_subscription` transfers
 an existing token explicitly. Existing caller-owned subscriptions, callback
 order, nested emission and disposal authority remain intact. Registration
 failure disconnects the candidate, and member emission adds no allocation.
-The portable contract and tests are in `CURRENT_API_REFERENCE.md` and
+The portable contract and tests are in the API reference (`docs/api/`) and
 `tests/owned_event_tests.cpp`; the API example is compiled by the lower build.
 
 This is a provider development source addition under ORC-GUI-001, pending
@@ -515,7 +515,7 @@ C++ live-surface consumption projection; it does not change a stable C ABI.
 `LiveSurfaceFrame::opaque()` retains the promise with the frame's immutable
 buffer so reconfiguration cannot change an in-flight renderer's interpretation.
 Consumers must rebuild against the matching library and explicitly opt in.
-The field and host guards are documented in `CURRENT_API_REFERENCE.md`.
+The field and host guards are documented in the API reference (`docs/api/`).
 
 Source review against `planning/PROGRAMMING_HOUSE_STYLE.md` covers the new
 description field and frame accessor; Skia's two live draw methods and internal
@@ -574,7 +574,7 @@ implementation's `isClipRect` excludes partial-coverage AA edges and clip
 shaders. Windows converts RGBA into reusable host-owned BGRA scratch before DC
 mutation; BGRA still reads directly from the lease through the existing
 `memcpy` / `StretchDIBits` realization. Retry, coverage, and commit authorities
-are unchanged. See `CURRENT_API_REFERENCE.md` for the producer contract.
+are unchanged. See the API reference (`docs/api/`) for the producer contract.
 
 Source review against `planning/PROGRAMMING_HOUSE_STYLE.md` covers the enum and
 query declaration/definition, format validation condition, Skia geometry helper
@@ -626,7 +626,7 @@ This is local in-process execution, with borrowed context and explicit join;
 it adds no Orchestrator service, wire capability, hostile-worker supervision,
 or registry edge. Retained controls remain owned by their UI execution context.
 Compiler/cache and native pacing validation are recorded separately from
-application and API/ABI negotiation. See `COMPILER_CACHE.md` and `THREADING.md`.
+application and API/ABI negotiation. See `docs/COMPILER_CACHE.md` and `docs/user/threading.md`.
 
 ## 2026-10-07 Audio cancellation and shared worker ownership
 

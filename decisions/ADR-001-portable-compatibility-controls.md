@@ -20,7 +20,7 @@ Windows message model the hidden reference semantics of a toolkit whose other
 hosts have no such model.
 
 This decision was cited as ADR-001 by `planning/MASTER_IMPLEMENTATION_PLAN.md`
-(compatibility constraints) and `docs/LIBRARY_AND_ASSEMBLY_GUIDE.md` (section
+(compatibility constraints) and `docs/notes/LIBRARY_AND_ASSEMBLY_GUIDE.md` (section
 8, compatibility promise) before this file existed.
 
 ## Decision

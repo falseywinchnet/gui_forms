@@ -24,7 +24,16 @@ layout
 painting-and-damage
 text-engine
 input-and-focus
+values-commands-and-binding
+data-binding
 controls
+```
+
+```{toctree}
+:caption: Coming from Windows Forms
+:maxdepth: 1
+
+for-windows-forms-developers
 ```
 
 ```{toctree}
@@ -34,4 +43,5 @@ controls
 threading
 lifecycle
 hosts-and-capabilities
+audio
 ```

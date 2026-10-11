@@ -819,7 +819,7 @@ Sequencing note after M6c:
   cross-build, renderer-free portable libraries, protocol-v4 event translation,
   GDI/DIB CPU presentation, WIC PNG, private Gallery fonts, stable-ID control
   automation, framebuffer capture, clean close, strict GCC build, and portable
-  boundary/import audit. Evidence: `docs/WINDOWS_WINE_HOST.md`.
+  boundary/import audit. Evidence: `experiments/WINDOWS_WINE_HOST_2026-08-04.md`.
 - **OPEN:** this completed elevation does not pull M11 managed-facade work, retired compatibility specimen
   unchanged-binary loading, TSF, OLE, UIA/MSAA, Windows packaging, physical
   Windows dogfood, or the full M12 exit gate forward implicitly.
@@ -1752,7 +1752,7 @@ change audit and architect approval.
 
 Pre-M11 documentation checkpoint:
 
-- **OBSERVED:** `docs/LIBRARY_AND_ASSEMBLY_GUIDE.md` now separates the native
+- **OBSERVED:** `docs/notes/LIBRARY_AND_ASSEMBLY_GUIDE.md` now separates the native
   engine, future managed facade, trusted retained-subtree extension shape,
   File Manager capability plugins, and data-only theme/language assemblies.
 - **OBSERVED:** private-context resolution tolerates the authentic Forms public
@@ -1791,7 +1791,7 @@ Windows preflight after M6c:
   broader `dotnet --info` workload query reaches the runtime and then fails in a
   Wine process/workload-installer stub. No retired compatibility specimen executable was launched.
 - **MEASURED:** the bounded W0-W4 host/toolchain gates now pass under Wine. See
-  `docs/WINDOWS_WINE_HOST.md` and the preserved original preflight in
+  `experiments/WINDOWS_WINE_HOST_2026-08-04.md` and the preserved original preflight in
   `experiments/WINDOWS_ORACLE_PREFLIGHT.md`.
 - **OPEN:** Win32 UI Automation publication, TSF/OLE integration, physical
   Windows dogfood, and the later unchanged-binary dogfood gate. The protocol-v5

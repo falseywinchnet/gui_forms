@@ -19,7 +19,8 @@ window is key; X11 maps asynchronously) and a headless host used as the
 conformance reference. One hidden order per host would make traces
 unstable and tests platform-specific.
 
-This decision was cited as ADR-014 by `docs/LIFECYCLE_CONTRACT.md` (which it
+This decision was cited as ADR-014 by `docs/LIFECYCLE_CONTRACT.md`, now
+`docs/user/lifecycle.md` (which it
 governs) and `docs/README.md` before this file existed.
 
 ## Decision
@@ -73,7 +74,7 @@ parented, shown, focused, hit-tested or composited.
   `makeKeyAndOrderFront:`; X11 maps after the drain.
 - `IsHandleCreated` means the lease and nothing else; retained attachment and
   the top-level host window are queried separately.
-- The detailed contract text lives in `docs/LIFECYCLE_CONTRACT.md`; this
+- The detailed contract text lives in `docs/user/lifecycle.md`; this
   record fixes the decision and its rationale.
 
 ## Rejected options

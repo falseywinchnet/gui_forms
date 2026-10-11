@@ -41,7 +41,7 @@ crosses the portable contract.
 
 Application consumers link `GUIForms::Application`, which already contains Core.
 Audio adapters link `GUIForms::Audio`, which exposes Threading without pulling in
-static Core. See [the consumer linking rule](COMPILER_CACHE.md#consumer-linking-rule)
+static Core. See [the consumer linking rule](../COMPILER_CACHE.md#consumer-linking-rule)
 for packaging and the configure-time mixed-Core rejection.
 
 ## 2. Intended delivery layers
@@ -329,7 +329,7 @@ an executable entry point.
 ## 8. Compatibility promise
 
 The authoritative compatibility ledger is the
-[`CONTROL_COMPLETENESS_MATRIX.md`](../planning/CONTROL_COMPLETENESS_MATRIX.md).
+[`CONTROL_COMPLETENESS_MATRIX.md`](../../planning/CONTROL_COMPLETENESS_MATRIX.md).
 An API is supported only when its construction, behavior, event order,
 rendering, input, accessibility, disposal, ABI, documentation, and platform
 lanes meet the applicable conformance requirements.

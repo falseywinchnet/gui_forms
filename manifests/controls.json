@@ -67,7 +67,7 @@
       "type": "TextBox",
       "header": "gui_forms/controls/panel/text_box/text_box.hpp",
       "category": "Text editing",
-      "purpose": "Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events.",
+      "purpose": "Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events.",
       "winforms": "TextBox",
       "status": "stable",
       "gallery_page": "text-and-input",
