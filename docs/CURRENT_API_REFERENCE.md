@@ -191,6 +191,24 @@ Linux and Windows. The Windows prepared-text compositor now delegates to it:
 its output is unchanged for whole-pixel clips, and its rounded clips and
 fractional clip edges are now anti-aliased.
 
+Since ADR-004 phase 3 the Skia raster (macOS, Linux) draws ordinary text with
+that engine: shaping, glyph-run rasterization at the device scale and phase,
+and the shared compositor writing straight into the raster's pixels. The
+glyph-run coverage is kept in the command's `RetainedDrawCache` beside its
+shaping, per device scale and phase. `SkiaRaster` records its clips in device
+coordinates alongside Skia's (frame damage, `clip_damage`, `clip_rect`,
+`clip_rounded_rect`, per save level), because Skia cannot report fractional
+clip edges; a damage region is composited one disjoint rectangle at a time.
+One rounded clip is exact; an enclosing second rounded clip is applied as its
+bounds. Text clips are anti-aliased by the shared rule, so where text and a
+Skia-drawn shape share a rounded clip their edge pixels can differ by a level.
+If the recorded clips no longer match the canvas or its pixels cannot be
+addressed, text falls back to the previous Skia drawing; `Painter` only
+translates, so ordinary painting does not reach that path.
+`gui_forms_text_identity_raster_tests` checks whole-raster hashes of fifteen
+text cases (plain, translucent, fractional clip, rounded clip, damage region,
+at scales 1, 1.5 and 2) that are identical on macOS arm64 and Alpine aarch64.
+
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.
