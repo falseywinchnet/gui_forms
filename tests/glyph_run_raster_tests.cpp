@@ -86,6 +86,50 @@ std::uint64_t coverage_hash(const GlyphRunCoverage& coverage) {
     return value;
 }
 
+// Expected hashes in report order (rapids then carlito; size; scale; phase),
+// identical on macOS arm64 and Alpine aarch64 musl, 2026-10-11. Every CI
+// platform must reproduce them.
+constexpr std::uint64_t expected_identity[36]{
+    0xc5214daa69de2890ULL,  // rapids 9 1 0
+    0xc90c2fd02163deefULL,  // rapids 9 1 23
+    0x64405a9166c0a3a9ULL,  // rapids 9 1.5 0
+    0xc8375f0cd99fbb67ULL,  // rapids 9 1.5 23
+    0x5e168d691cb0de4dULL,  // rapids 9 2 0
+    0x24e647927da5a5bdULL,  // rapids 9 2 23
+    0x7d7dba25a3eac0fULL,  // rapids 13 1 0
+    0x62f300fa8b54567aULL,  // rapids 13 1 23
+    0x1413749b73e00469ULL,  // rapids 13 1.5 0
+    0x79e7eb9b291a9442ULL,  // rapids 13 1.5 23
+    0x57a38740bff65ca1ULL,  // rapids 13 2 0
+    0xeb1ece057f8e50fdULL,  // rapids 13 2 23
+    0xf8185b254e18bd6bULL,  // rapids 20 1 0
+    0xc0ffb19c5f732c24ULL,  // rapids 20 1 23
+    0x808b1880a380e506ULL,  // rapids 20 1.5 0
+    0xb5ac0ec84e0bc0f7ULL,  // rapids 20 1.5 23
+    0x20453454113ca2d2ULL,  // rapids 20 2 0
+    0xc683469cb990571cULL,  // rapids 20 2 23
+    0x1fe2c22874baa87ULL,  // carlito 9 1 0
+    0xae3f9580e1f2be27ULL,  // carlito 9 1 23
+    0x4e53156bb6f6a168ULL,  // carlito 9 1.5 0
+    0xb1703db90555fb4ULL,  // carlito 9 1.5 23
+    0x8b378aa0547e6fc9ULL,  // carlito 9 2 0
+    0x3b71d356a2251cc6ULL,  // carlito 9 2 23
+    0x402f75218c874ea7ULL,  // carlito 13 1 0
+    0x5acd323bbe73f564ULL,  // carlito 13 1 23
+    0xd3ae1596e22aa3d8ULL,  // carlito 13 1.5 0
+    0xae12c2447d728a4bULL,  // carlito 13 1.5 23
+    0x167ec98c14fbe984ULL,  // carlito 13 2 0
+    0xc9832d66402bfbecULL,  // carlito 13 2 23
+    0x3710d46d4095643fULL,  // carlito 20 1 0
+    0xccfa8f070265b808ULL,  // carlito 20 1 23
+    0xea2b90c0c5764bd8ULL,  // carlito 20 1.5 0
+    0xda97a2a42763cefeULL,  // carlito 20 1.5 23
+    0x1d1f6592b02fdc77ULL,  // carlito 20 2 0
+    0xee09aa358d62088aULL,  // carlito 20 2 23
+};
+
+std::size_t identity_index = 0;
+
 void report_identity_hashes(const char* name, const char* font_path) {
     HarfBuzzFontEngine engine;
     require(engine.register_typeface(FontRole::control, 400, false, read_file(font_path)).has_value(), "font registers");
@@ -99,8 +143,12 @@ void report_identity_hashes(const char* name, const char* font_path) {
         for (const double scale : scales) {
             for (const std::int32_t phase : phases) {
                 const GlyphRunCoverage coverage = rasterizer.rasterize(shaped, font, scale, phase);
+                const std::uint64_t observed = coverage_hash(coverage);
                 std::cout << "identity " << name << ' ' << size << ' ' << scale << ' ' << phase << ' ' << std::hex
-                          << coverage_hash(coverage) << std::dec << '\n';
+                          << observed << std::dec << '\n';
+                require(identity_index < 36U && observed == expected_identity[identity_index],
+                        "glyph-run coverage differs from the cross-platform expectation");
+                ++identity_index;
             }
         }
     }
