@@ -1,12 +1,15 @@
 #include "file_manager_demoboard/demoboard.hpp"
 #include "file_manager_demoboard/fixture_model.hpp"
 #include "gui_forms/gui_forms.hpp"
+#include "../src/smoke_test.hpp"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <string_view>
 
 namespace {
@@ -145,6 +148,59 @@ void secondary_click(gui_forms::Window& window, gui_forms::Point point) {
                 window.dispatch_pointer({gui_forms::PointerAction::up,
                                          gui_forms::PointerButton::secondary, point}),
             "secondary click must be handled by the object collection");
+}
+
+struct CountSmokeClose final {
+    std::shared_ptr<int> count;
+
+    void operator()() const { ++(*count); }
+};
+
+std::shared_ptr<file_manager_demoboard::SmokeTest> arm_smoke(
+    gui_forms::Window& window, gui_forms::FrameTime started, const std::shared_ptr<int>& closes) {
+    std::shared_ptr<file_manager_demoboard::SmokeTest> state =
+        std::make_shared<file_manager_demoboard::SmokeTest>();
+    (*state).window = &window;
+    (*state).started = started;
+    (*state).request_close = CountSmokeClose{closes};
+    return state;
+}
+
+// --smoke-test passes only when a frame had been presented before the
+// scheduled close; the deadline close of a never-presented window fails.
+void require_smoke_verdict() {
+    using namespace std::chrono_literals;
+    const gui_forms::FrameTime started = gui_forms::FrameTime{} + 1s;
+
+    std::unique_ptr<gui_forms::Window> hidden = file_manager_demoboard::make_product_window();
+    (*hidden).set_occluded(true, gui_forms::FrameTime{});
+    const std::shared_ptr<int> hidden_closes = std::make_shared<int>(0);
+    const std::shared_ptr<file_manager_demoboard::SmokeTest> unseen =
+        arm_smoke(*hidden, started, hidden_closes);
+    file_manager_demoboard::SmokeTestTick{unseen}(started + 9900ms);
+    require(!(*unseen).completed, "the smoke closed before its deadline");
+    file_manager_demoboard::SmokeTestTick{unseen}(started + 10s);
+    require((*unseen).completed && *hidden_closes == 1 && !(*unseen).presented &&
+                (*unseen).occluded,
+            "the deadline close must record no presented frame and the occlusion");
+    require(file_manager_demoboard::smoke_test_result(unseen, 0) == 1,
+            "a smoke that presented no frame must fail although the host returned 0");
+
+    std::unique_ptr<gui_forms::Window> shown = file_manager_demoboard::make_product_window();
+    NullPainter painter;
+    const std::optional<gui_forms::PaintReceipt> receipt =
+        (*shown).paint(painter, (*shown).take_damage().bounds());
+    require(receipt.has_value() && (*shown).notify_presented(*receipt),
+            "the product window did not present its first frame");
+    const std::shared_ptr<int> shown_closes = std::make_shared<int>(0);
+    const std::shared_ptr<file_manager_demoboard::SmokeTest> seen =
+        arm_smoke(*shown, started, shown_closes);
+    file_manager_demoboard::SmokeTestTick{seen}(started + 1s);
+    require((*seen).completed && *shown_closes == 1 && (*seen).presented,
+            "a presented smoke must close after one second and record the frame");
+    require(file_manager_demoboard::smoke_test_result(seen, 0) == 0, "a presented smoke failed");
+    require(file_manager_demoboard::smoke_test_result(seen, 3) == 3,
+            "the host's failure code was replaced");
 }
 
 } // namespace
@@ -936,10 +992,10 @@ int main() {
     require((*product).dispatch_key({gui_forms::KeyAction::down,
                                    gui_forms::PhysicalKey::enter}),
             "object context menu must handle Enter");
-    const auto context_popup_after_enter =
+    const gui_forms::Control::Ptr context_popup_after_enter =
         (*product).find("fm.context.object.popup.panel.0");
-    const auto context_focus_after_enter = (*product).focused_control();
-    const auto context_authority_after_enter =
+    const gui_forms::Control::Ptr context_focus_after_enter = (*product).focused_control();
+    const std::shared_ptr<gui_forms::Label> context_authority_after_enter =
         std::dynamic_pointer_cast<gui_forms::Label>(
             (*product).find("fm.status.authority"));
     if (context_popup_after_enter || (*product).focus_scope_depth() != 0U ||
@@ -1232,5 +1288,7 @@ int main() {
             "controller reduced-motion toggle did not reach the product presentation contract");
     (*reduced_motion).set_checked(false);
 
-    std::cout << "demoboard fixture, reference geometry, semantics, and controller pass\n";
+    require_smoke_verdict();
+
+    std::cout << "demoboard fixture, reference geometry, semantics, controller, and smoke verdict pass\n";
 }

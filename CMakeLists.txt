@@ -2432,6 +2432,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_frame_scheduler_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_frame_scheduler_tests COMMAND gui_forms_frame_scheduler_tests)
 
+    add_executable(gui_forms_program_options_tests tests/program_options_tests.cpp)
+    target_link_libraries(gui_forms_program_options_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_program_options_tests COMMAND gui_forms_program_options_tests)
+
     add_executable(gui_forms_timer_tests tests/timer_tests.cpp)
     target_link_libraries(gui_forms_timer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_timer_tests COMMAND gui_forms_timer_tests)

@@ -72,7 +72,10 @@ Linux
 Every program can prove itself from a terminal. `--smoke-test` presents one
 frame, closes itself, prints the close receipt and the line
 `GUI.Forms window smoke passed`, and exits with status 0. This is the check
-the release pipeline runs on every package.
+the release pipeline runs on every package. If no frame is presented within
+ten seconds, for example because the window stayed hidden behind other
+windows or on a Space that is not shown, the program still closes but prints
+`GUI.Forms window smoke failed: no frame was presented` and exits with status 1.
 
 ## Verify a download
 
