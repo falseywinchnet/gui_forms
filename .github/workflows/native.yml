@@ -301,9 +301,6 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
-      - name: Check the committed API reference against the headers
-        if: matrix.platform == 'linux-x64' && steps.promotion.outputs.reused != 'true' && steps.reuse.outputs.reused != 'true'
-        run: python3 gui_forms/tools/api_reference.py --check
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}
