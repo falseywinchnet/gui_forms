@@ -42,6 +42,12 @@ struct LiveSurfaceState final {
     Rect presentation_region{};
     // The one presenter that consumes presentation_region. Identity only.
     const void* presenter{};
+    // The previous epoch's last published frame, presented (scaled to the
+    // destination) until the first publication after reconfigure, so a
+    // producer that is a frame late shows a stretched picture, not black.
+    std::shared_ptr<LiveSurfaceBuffer> carried;
+    std::uint64_t carried_epoch{};
+    std::uint64_t carried_generation{};
     std::vector<std::shared_ptr<LiveSurfaceWake>> wakes;
 };
 

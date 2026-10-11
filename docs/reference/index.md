@@ -6,7 +6,7 @@ Types, methods, functions, events, and values for building native applications w
 
 Declarations are extracted from the public C++20 headers by `tools/api_reference.py` (Clang `-ast-dump=json`) and recorded in `docs/reference/inventory.json`. Behavioral contracts are authored separately in `docs/reference/contracts/*.json` and validated against the declarations; the reference never infers behavior from a signature.
 
-25 of 6700 declarations currently have reviewed contracts. See [coverage](coverage.md) for the remaining work. Protected members are extension points. The C ABI and managed experiments have separate references.
+25 of 6702 declarations currently have reviewed contracts. See [coverage](coverage.md) for the remaining work. Protected members are extension points. The C ABI and managed experiments have separate references.
 
 ## Namespaces
 

@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `AnchorReference`
-- Declaration: `include/gui_forms/control/control/control.hpp:817`
+- Declaration: `include/gui_forms/control/control/control.hpp:824`
 - Definition: `inline/header-only`
 - Type narrative: hand-reviewed
 - Method narratives: no declared methods

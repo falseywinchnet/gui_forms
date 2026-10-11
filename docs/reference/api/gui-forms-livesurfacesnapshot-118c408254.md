@@ -25,6 +25,7 @@ struct LiveSurfaceSnapshot final
 | `last_read_generation` | `std::uint64_t last_read_generation{}` Declaration available; behavioral contract pending. |
 | `write_active` | `bool write_active{}` Declaration available; behavioral contract pending. |
 | `has_frame` | `bool has_frame{}` Declaration available; behavioral contract pending. |
+| `carries_previous_frame` | `bool carries_previous_frame{}` Declaration available; behavioral contract pending. |
 
 ### `description` (public)
 
@@ -94,6 +95,14 @@ Declaration reference; a behavioral contract has not yet been reviewed for this 
 
 ```cpp
 bool has_frame{};
+```
+
+Declaration reference; a behavioral contract has not yet been reviewed for this member.
+
+### `carries_previous_frame` (public)
+
+```cpp
+bool carries_previous_frame{};
 ```
 
 Declaration reference; a behavioral contract has not yet been reviewed for this member.

@@ -93,6 +93,7 @@ Renderer-neutral core (`gui_forms_controls`). Available wherever the GUI.Forms c
 | `set_maximum_size` | `void set_maximum_size(Size size)` Sets the maximum size constraint; zero means unbounded. |
 | `arranged_bounds` | `[[nodiscard]] Rect arranged_bounds() const` Returns the bounds committed by the last arrange pass; may execute the layout read barrier. |
 | `committed_arranged_bounds` | `[[nodiscard]] Rect committed_arranged_bounds() const noexcept` Returns the arranged bounds last committed to the presentation. |
+| `pending_layout_bounds` | `[[nodiscard]] Rect pending_layout_bounds() const noexcept` Declaration available; behavioral contract pending. |
 | `client_rectangle` | `[[nodiscard]] Rect client_rectangle() const noexcept` Returns the local client rectangle inside borders and padding. |
 | `display_rectangle` | `[[nodiscard]] virtual Rect display_rectangle() const noexcept` Returns the logical display rectangle available to children. |
 | `absolute_bounds` | `[[nodiscard]] Rect absolute_bounds() const` Returns bounds in Window client coordinates; may execute the layout read barrier. |
@@ -633,6 +634,14 @@ Returns the bounds committed by the last arrange pass; may execute the layout re
 ```
 
 Returns the arranged bounds last committed to the presentation.
+
+### `pending_layout_bounds` (public)
+
+```cpp
+[[nodiscard]] Rect pending_layout_bounds() const noexcept;
+```
+
+Declaration reference; a behavioral contract has not yet been reviewed for this member.
 
 ### `client_rectangle` (public)
 

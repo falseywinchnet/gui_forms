@@ -7,12 +7,12 @@ Compiler coverage and behavioral documentation are measured independently.
 | Measure | Count |
 | --- | --- |
 | Types | 668 |
-| Declared members | 5735 |
+| Declared members | 5737 |
 | Namespace functions | 240 |
 | Namespace aliases and constants | 57 |
-| Symbols | 6700 |
+| Symbols | 6702 |
 | Reviewed contracts | 25 |
-| Pending contracts | 6675 |
+| Pending contracts | 6677 |
 
 ## Pending contracts
 
@@ -179,7 +179,7 @@ This list is work remaining, not a statement that the APIs are unimplemented.
 - [`gui_forms::ContainerControl`](api/gui-forms-containercontrol-451746795c.md): 12 member contracts pending.
 - [`gui_forms::ContentAlignment`](api/gui-forms-contentalignment-baf64fd3be.md): 9 member contracts pending.
 - [`gui_forms::ContextMenu`](api/gui-forms-contextmenu-c5562db771.md): 13 member contracts pending.
-- [`gui_forms::Control`](api/gui-forms-control-afc74eab91.md): 213 member contracts pending.
+- [`gui_forms::Control`](api/gui-forms-control-afc74eab91.md): 214 member contracts pending.
 - [`gui_forms::ControlAvailabilityChange`](api/gui-forms-controlavailabilitychange-a1f1f513f8.md): 4 member contracts pending.
 - [`gui_forms::ControlBindingsCollection`](api/gui-forms-controlbindingscollection-551242e45a.md): 15 member contracts pending.
 - [`gui_forms::ControlFactory`](api/gui-forms-controlfactory-065c9542f6.md): 3 member contracts pending.
@@ -391,7 +391,7 @@ This list is work remaining, not a statement that the APIs are unimplemented.
 - [`gui_forms::LiveSurfaceFrame`](api/gui-forms-livesurfaceframe-1eaca02eb5.md): 15 member contracts pending.
 - [`gui_forms::LiveSurfacePixelFormat`](api/gui-forms-livesurfacepixelformat-745efd1666.md): 2 member contracts pending.
 - [`gui_forms::LiveSurfacePresentation`](api/gui-forms-livesurfacepresentation-abe11f6ee9.md): 5 member contracts pending.
-- [`gui_forms::LiveSurfaceSnapshot`](api/gui-forms-livesurfacesnapshot-118c408254.md): 9 member contracts pending.
+- [`gui_forms::LiveSurfaceSnapshot`](api/gui-forms-livesurfacesnapshot-118c408254.md): 10 member contracts pending.
 - [`gui_forms::LiveSurfaceWakeConnection`](api/gui-forms-livesurfacewakeconnection-f694f7a93c.md): 8 member contracts pending.
 - [`gui_forms::LiveSurfaceWriteLease`](api/gui-forms-livesurfacewritelease-c41bdce16b.md): 12 member contracts pending.
 - [`gui_forms::MasterDetailDisplayMode`](api/gui-forms-masterdetaildisplaymode-80ba8e08ce.md): 4 member contracts pending.

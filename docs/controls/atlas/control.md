@@ -10,7 +10,7 @@
 - Declaration: `include/gui_forms/control/control/control.hpp:339`
 - Definition: `src/core/control/control/control.cpp, src/core/control/dispatcher/control_dispatcher.cpp`
 - Type narrative: hand-reviewed
-- Method narratives: 0 hand-reviewed, 236 declaration-derived
+- Method narratives: 0 hand-reviewed, 237 declaration-derived
 
 Control is the retained visual root and invariant owner for stable/runtime identity, hierarchy, geometry, layout transactions, initialization batching, style/theme resolution, typed invalidation, input eligibility and routing hooks, validation, binding, semantic projection, dispatch, focus, lifetime, and provider extensions.
 
@@ -309,6 +309,14 @@ Reports the current arranged bounds value without mutation. *(declaration-derive
 ```
 
 Reports the current committed arranged bounds value without mutation. *(declaration-derived)*
+
+### `pending_layout_bounds` (public)
+
+```cpp
+[[nodiscard]] Rect pending_layout_bounds() const noexcept
+```
+
+Reports the current pending layout bounds value without mutation. *(declaration-derived)*
 
 ### `client_rectangle` (public)
 
