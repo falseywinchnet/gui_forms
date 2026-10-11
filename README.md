@@ -49,10 +49,12 @@ Controls are created once with a `StableId`, the tree owns them, mutation is
 imperative, and only the damaged rectangle repaints. The longer walkthrough is
 in [Your first window](docs/start/first-window.md).
 
-<!-- screenshots: enable when docs/images/* exist
 ![GUI.Forms Gallery on macOS](docs/images/gallery-macos.png)
-![GUI.Forms Gallery on Windows](docs/images/gallery-windows.png)
-/screenshots -->
+
+![GUI.Forms Correspondence on macOS](docs/images/correspondence-macos.png)
+
+Both frames were written by the programs themselves with `--capture`, the
+same path the release smoke tests use.
 
 ## Downloads
 
