@@ -295,7 +295,9 @@ void ScrollableControl::arrange(Rect final_bounds) {
     for (const Control::Ptr& child : children()) {
         if (!child || !(*child).is_alive() || !(*child).visible() ||
             (*child).dock() != DockStyle::none) continue;
-        Rect bounds = (*child).committed_arranged_bounds();
+        // The base arrange just assigned the unscrolled slot; offset that, not
+        // the committed bounds, which still carry the previous scroll offset.
+        Rect bounds = (*child).pending_layout_bounds();
         bounds.x -= scroll_position_.x;
         bounds.y -= scroll_position_.y;
         set_child_layout(child, bounds);
