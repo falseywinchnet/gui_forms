@@ -267,6 +267,9 @@ jobs:
           compression-level: 0
           # Linux legs may package nothing until their program mains exist.
           if-no-files-found: ${{ runner.os == 'Linux' && 'warn' || 'error' }}
+      # upload-artifact roots an artifact at the common ancestor of its paths, and
+      # the release job reads packages-*.json from the top of the merged receipts.
+      # Every receipts path stays under dist/; the ctest log is its own artifact.
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -275,7 +278,12 @@ jobs:
             dist/packages-*.json
             dist/smoke-*.json
             dist/ctest-*.xml
-            .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-forms-ctest-log-${{ matrix.platform }}
+          path: .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log
           if-no-files-found: warn
   release:
     if: needs.prepare.outputs.publish == 'true'
