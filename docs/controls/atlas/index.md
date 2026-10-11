@@ -24,7 +24,7 @@ passed the Screen Sharing crop gate.
 | Types with hand-reviewed narratives | 479 |
 | Types with declaration-derived narratives | 334 |
 | Methods with hand-reviewed explanations | 2569 |
-| Methods with declaration-derived explanations | 2165 |
+| Methods with declaration-derived explanations | 2168 |
 | Grouped source migrations pending | 66 |
 | Enumerations | 219 |
 

@@ -10,7 +10,7 @@
 - Declaration: `src/abi/registry/registry.hpp:96`
 - Definition: `inline/header-only`
 - Type narrative: hand-reviewed
-- Method narratives: 108 hand-reviewed, 3 declaration-derived
+- Method narratives: 108 hand-reviewed, 5 declaration-derived
 
 Registry is the single compatibility ABI authority for generational handles, thread affinity, control trees, subscriptions, host sessions, queued callbacks, transient services, property proxies, and deterministic retirement.
 
@@ -19,6 +19,14 @@ Registry is the single compatibility ABI authority for generational handles, thr
 Not applicable: this is a nonvisual contract, value, service, or state owner.
 
 ## Declared methods
+
+### `defined` (private)
+
+```cpp
+#if defined(GUI_FORMS_ABI_REGISTRY_TEST) friend struct RegistryLifetimeFixture
+```
+
+Executes Registry's defined operation against retained state; the signature records its exact inputs, result, constness, and failure surface. *(declaration-derived)*
 
 ### `create` (public)
 
@@ -887,10 +895,18 @@ Reuses or appends a slot, preserving nonzero generation, and returns an encoded 
 ### `invalidate_control_locked` (private)
 
 ```cpp
-void invalidate_control_locked(gf_handle handle, ControlRecord& record)
+void invalidate_control_locked(gf_handle handle, ControlRecord& record, std::vector<gui_forms::SubscriptionToken>& revoked)
 ```
 
 Revokes popup/host/pending work, detaches hierarchy, disposes native state, and advances generation.
+
+### `disconnect_revoked` (private)
+
+```cpp
+static void disconnect_revoked(std::vector<gui_forms::SubscriptionToken>& revoked) noexcept
+```
+
+Executes Registry's disconnect revoked operation against retained state; the signature records its exact inputs, result, constness, and failure surface. *(declaration-derived)*
 
 ### `invalidate_slot_locked` (private)
 

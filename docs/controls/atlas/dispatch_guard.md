@@ -7,7 +7,7 @@
 - Scope: source-private header
 - Source layout: header-only or distributed
 - Hierarchy: `DispatchGuard`
-- Declaration: `src/abi/registry/registry.hpp:2502`
+- Declaration: `src/abi/registry/registry.hpp:2521`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 1 declaration-derived

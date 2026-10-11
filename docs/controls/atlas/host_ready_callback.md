@@ -7,7 +7,7 @@
 - Scope: source-private header
 - Source layout: header-only or distributed
 - Hierarchy: `HostReadyCallback`
-- Declaration: `src/abi/registry/registry.hpp:2531`
+- Declaration: `src/abi/registry/registry.hpp:2550`
 - Definition: `inline/header-only`
 - Type narrative: declaration-derived
 - Method narratives: 0 hand-reviewed, 1 declaration-derived
