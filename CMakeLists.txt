@@ -720,11 +720,12 @@ if(GUI_FORMS_ENABLE_SKIA)
             gui_forms_png_archive
             gui_forms_zlib_archive
     )
-    if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
-        target_link_libraries(gui_forms_skia PRIVATE gui_forms_text_engine)
-        target_compile_definitions(gui_forms_skia PRIVATE
-            GUI_FORMS_HAS_HARFBUZZ_TEXT=1)
+    # ADR-004: the Skia painter draws text only through the shared
+    # HarfBuzz/FreeType engine; Skia itself has no font backend.
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "The Skia renderer requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT (ADR-004)")
     endif()
+    target_link_libraries(gui_forms_skia PRIVATE gui_forms_text_engine)
     if(TARGET gui_forms_prepared_text_impl)
         target_sources(gui_forms_skia PRIVATE
             src/render/skia/raster/prepared_skia_frame.cpp)
@@ -737,7 +738,6 @@ if(GUI_FORMS_ENABLE_SKIA)
         target_link_libraries(gui_forms_skia PRIVATE
             ${GUI_FORMS_COREFOUNDATION}
             ${GUI_FORMS_COREGRAPHICS}
-            ${GUI_FORMS_CORETEXT}
         )
     endif()
     target_compile_definitions(gui_forms_skia PRIVATE
@@ -751,6 +751,11 @@ if(GUI_FORMS_ENABLE_SKIA)
     add_library(gui_drawing_skia STATIC
         src/render/skia/executor/skia_executor.cpp
     )
+    if(APPLE)
+        # Finds installed families nobody registered (ADR-004 phase 7).
+        target_sources(gui_drawing_skia PRIVATE
+            src/render/skia/executor/core_text_font_bytes.cpp)
+    endif()
     add_dependencies(gui_drawing_skia gui_forms_skia_dependency)
     target_include_directories(gui_drawing_skia
         PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/render/skia/executor

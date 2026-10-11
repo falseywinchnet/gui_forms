@@ -36,9 +36,10 @@ skia_use_expat = false
 skia_use_lua = false
 skia_use_xps = false
 
-# GUI.Forms owns text semantics. This adapter needs CoreText-backed typefaces
-# and positioned glyph drawing, not SkParagraph/SkShaper/ICU.
-skia_use_fonthost_mac = true
+# ADR-004: GUI.Forms shapes, rasterizes and composites text with its own
+# HarfBuzz/FreeType engine. Skia draws no text and is built without any font
+# backend: no CoreText, FreeType, fontconfig or font manager.
+skia_use_fonthost_mac = false
 skia_use_freetype = false
 skia_use_fontconfig = false
 skia_use_fontations = false

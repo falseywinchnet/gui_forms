@@ -395,6 +395,30 @@ void text_uses_the_shared_engine() {
     if (std::getenv("GUI_DRAWING_TEXT_PRINT") == nullptr) CHECK(scene == UINT64_C(0xc63b693ed7325115));
 }
 
+#if defined(__APPLE__)
+// ADR-004 phase 7: a family nobody registered is found through CoreText
+// directly, since Skia has no font backend. Helvetica ships with every macOS
+// and has a real bold face, whose advances are wider; synthesized bold keeps
+// advances.
+void installed_families_are_located_through_core_text() {
+    SkiaExecutor executor;
+    CHECK(executor.register_typeface("Portsmouth Rapids", read_file(GUI_DRAWING_TEST_FONT)));
+    const StringFormat format;
+    const Font fallback("Portsmouth Rapids", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Font missing("GUI Forms Absent Family", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Font helvetica("Helvetica", 16.0, FontStyle::regular, GraphicsUnit::pixel);
+    const Font helvetica_bold("Helvetica", 16.0, FontStyle::bold, GraphicsUnit::pixel);
+    const double fallback_width = executor.measure_string("Hamburgefonstiv", fallback.snapshot(), format.snapshot()).width;
+    const double missing_width = executor.measure_string("Hamburgefonstiv", missing.snapshot(), format.snapshot()).width;
+    const double regular_width = executor.measure_string("Hamburgefonstiv", helvetica.snapshot(), format.snapshot()).width;
+    const double bold_width = executor.measure_string("Hamburgefonstiv", helvetica_bold.snapshot(), format.snapshot()).width;
+    CHECK(missing_width == fallback_width);
+    CHECK(regular_width != fallback_width);
+    CHECK(bold_width > regular_width);
+    CHECK(draw_ink(executor, helvetica, Matrix(1.0, 0.0, 0.0, 1.0, 20.0, 40.0)) > 0U);
+}
+#endif
+
 } // namespace
 
 int main() {
@@ -406,5 +430,8 @@ int main() {
     connected_line_figures_fill_as_one_contour();
     quadratic_bezier_polygon_and_pie_paths_rasterize();
     text_uses_the_shared_engine();
+#if defined(__APPLE__)
+    installed_families_are_located_through_core_text();
+#endif
     return 0;
 }

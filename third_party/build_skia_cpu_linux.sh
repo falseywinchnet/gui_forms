@@ -12,16 +12,11 @@ command -v gn >/dev/null
 command -v ninja >/dev/null
 mkdir -p "$output_dir"
 sed -e "s/target_cpu = .*/target_cpu = \"$target_cpu\"/" \
-    -e 's/skia_use_fonthost_mac = true/skia_use_fonthost_mac = false/' \
-    -e 's/skia_use_freetype = false/skia_use_freetype = true/' \
     "$script_dir/skia_cpu_args.gn" > "$output_dir/args.gn"
 cat >> "$output_dir/args.gn" <<'ARGS'
 target_os = "linux"
 cc = "clang"
 cxx = "clang++"
-skia_use_system_freetype2 = false
-skia_enable_fontmgr_custom_embedded = true
-skia_enable_fontmgr_custom_empty = true
 extra_cflags = [ "-fPIC" ]
 ARGS
 if [ "${CMAKE_CXX_COMPILER_LAUNCHER:-}" = ccache ]; then

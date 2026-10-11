@@ -6,11 +6,9 @@
 #include "prepared_skia_frame.hpp"
 #endif
 
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
-#endif
 
 #include "include/codec/SkCodec.h"
 #include "include/codec/SkPngDecoder.h"
@@ -18,10 +16,6 @@
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkColorSpace.h"
 #include "include/core/SkData.h"
-#include "include/core/SkFont.h"
-#include "include/core/SkFontMetrics.h"
-#include "include/core/SkFontMgr.h"
-#include "include/core/SkFontStyle.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkMaskFilter.h"
@@ -34,14 +28,7 @@
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
 #include "include/effects/SkShaderMaskFilter.h"
-#include "include/core/SkTypeface.h"
 #include "include/effects/SkGradient.h"
-#if defined(__APPLE__)
-#include "include/ports/SkFontMgr_mac_ct.h"
-#else
-#include "include/ports/SkFontMgr_empty.h"
-#endif
-#include "src/core/SkUTF.h"
 
 #include <algorithm>
 #include <cmath>
@@ -143,29 +130,12 @@ SkPaint make_paint(Color color) {
 
 class SkiaRaster::Impl {
 public:
-    struct RegisteredTypeface final {
-        FontRole role;
-        std::uint16_t weight;
-        bool italic;
-        bool fallback{};
-        sk_sp<SkTypeface> face;
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-        FontFaceId text_face;
-#endif
-    };
-
     struct DecodedImage final {
         std::uint64_t content_hash{};
         sk_sp<SkImage> image;
     };
 
     using ImageMap = std::unordered_map<std::uint64_t, DecodedImage>;
-
-    struct TextRun final {
-        std::size_t offset{};
-        std::size_t length{};
-        sk_sp<SkTypeface> face;
-    };
 
     struct FontSource {
         std::optional<FontRole> role;
@@ -179,24 +149,16 @@ public:
     PreparedSkiaFrame prepared_frame{};
     bool prepared_mode{false};
 #endif
-    sk_sp<SkFontMgr> fonts{
-#if defined(__APPLE__)
-        SkFontMgr_New_CoreText(nullptr)
-#else
-        SkFontMgr_New_Custom_Empty()
-#endif
-    };
     ImageMap images;
-    std::vector<RegisteredTypeface> registered_typefaces;
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     text::HarfBuzzFontEngine text_engine;
     // Identity of text_engine for shaped-text memos. A memo holding an
     // expired or different identity was shaped by another raster.
     std::shared_ptr<const bool> text_engine_identity{std::make_shared<const bool>(true)};
-    // Draws one shaping result exactly as draw_text_utf8 always has. Used only
-    // when the shared ADR-004 path cannot address the canvas pixels.
+    // Draws the run's shared-rasterizer coverage through Skia as an alpha
+    // mask. Used only when the canvas pixels cannot be composited directly;
+    // Skia then blends, so the bytes may differ from the shared rule.
     void draw_shaped_text(SkCanvas& target, const text::ShapedText& shaped, Point origin,
-                          std::string_view text, FontSpec font_spec, Color color);
+                          FontSpec font_spec, Color color);
 
     // ADR-004 text clipping: the device clip that text compositing honours,
     // one entry per canvas save level from text_clip_base upward. Skia cannot
@@ -257,7 +219,6 @@ public:
         Impl& owner_;
     };
 #endif
-#endif
     Size logical_size{};
     double scale{1.0};
     int save_floor{1};
@@ -269,10 +230,7 @@ public:
                                           std::uint16_t weight, bool italic,
                                           sk_sp<SkData> data) {
         if (!data || (*data).isEmpty() || (*data).size() > 64U * 1024U * 1024U) return false;
-        sk_sp<SkTypeface> face = (*fonts).makeFromData(data);
-        if (!face) return false;
         const sk_sp<SkData> retained_data = data;
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         const std::span<const std::byte> bytes(
             static_cast<const std::byte*>((*data).data()), (*data).size());
         const std::shared_ptr<const sk_sp<SkData>> owner =
@@ -280,12 +238,6 @@ public:
         const std::optional<FontFaceId> text_face = text_engine.register_owned_typeface(
             role, weight, italic, bytes, owner);
         if (!text_face) return false;
-        registered_typefaces.push_back(
-            {role.value_or(FontRole::content), weight, italic, !role, std::move(face), *text_face});
-#else
-        registered_typefaces.push_back(
-            {role.value_or(FontRole::content), weight, italic, !role, std::move(face)});
-#endif
         font_sources.push_back({role, weight, italic, retained_data});
         return true;
     }
@@ -308,108 +260,6 @@ public:
         if (prepared_mode) result = prepared_frame.front();
 #endif
         return result;
-    }
-
-    [[nodiscard]] static SkFontStyle font_style(FontSpec spec) {
-        const SkFontStyle::Slant slant = spec.italic
-            ? SkFontStyle::kItalic_Slant
-            : SkFontStyle::kUpright_Slant;
-        return {static_cast<int>(spec.weight), SkFontStyle::kNormal_Width, slant};
-    }
-
-    [[nodiscard]] sk_sp<SkTypeface> typeface(FontSpec spec) const {
-        const RegisteredTypeface* registered = nullptr;
-        int registered_distance = std::numeric_limits<int>::max();
-        for (const RegisteredTypeface& candidate : registered_typefaces) {
-            if (candidate.fallback || candidate.role != spec.role ||
-                candidate.italic != spec.italic) {
-                continue;
-            }
-            const int distance = std::abs(static_cast<int>(candidate.weight) -
-                                          static_cast<int>(spec.weight));
-            if (distance < registered_distance) {
-                registered = &candidate;
-                registered_distance = distance;
-            }
-        }
-        if (registered != nullptr) {
-            return (*registered).face;
-        }
-
-        const SkFontStyle style = font_style(spec);
-        const char* family = nullptr;
-        if (spec.role == FontRole::control) {
-            family = "Lucida Grande";
-        } else if (spec.role == FontRole::monospace) {
-            family = "Menlo";
-        }
-        sk_sp<SkTypeface> face = (*fonts).matchFamilyStyle(family, style);
-        if (!face) {
-            face = (*fonts).legacyMakeTypeface(nullptr, style);
-        }
-        return face;
-    }
-
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
-    [[nodiscard]] sk_sp<SkTypeface> typeface(FontFaceId id) const {
-        for (const RegisteredTypeface& candidate : registered_typefaces) {
-            if (candidate.text_face == id) return candidate.face;
-        }
-        return nullptr;
-    }
-#endif
-
-    [[nodiscard]] std::vector<TextRun> text_runs(std::string_view text,
-                                                 FontSpec spec) const {
-        std::vector<TextRun> runs;
-        if (text.empty()) {
-            return runs;
-        }
-        const SkFontStyle style = font_style(spec);
-        const sk_sp<SkTypeface> primary = typeface(spec);
-        sk_sp<SkTypeface> current = primary;
-        std::size_t run_start{};
-        const char* cursor = text.data();
-        const char* const end = cursor + text.size();
-        while (cursor < end) {
-            const char* const scalar_start = cursor;
-            const SkUnichar scalar = SkUTF::NextUTF8(&cursor, end);
-            sk_sp<SkTypeface> face = primary;
-            if (scalar >= 0 && (!face || (*face).unicharToGlyph(scalar) == 0U)) {
-                for (const RegisteredTypeface& candidate : registered_typefaces) {
-                    const bool house_body_fallback =
-                        spec.role != FontRole::content && !candidate.fallback &&
-                        candidate.role == FontRole::content;
-                    if ((candidate.fallback || house_body_fallback) && candidate.face &&
-                        (*candidate.face).unicharToGlyph(scalar) != 0U) {
-                        face = candidate.face;
-                        break;
-                    }
-                }
-            }
-            if (scalar >= 0 && (!face || (*face).unicharToGlyph(scalar) == 0U)) {
-                face = (*fonts).matchFamilyStyleCharacter(
-                    nullptr, style, nullptr, 0, scalar);
-                if (!face) {
-                    face = primary;
-                }
-            }
-            const bool same_face = (!current && !face) ||
-                (current && face && (*current).uniqueID() == (*face).uniqueID());
-            if (!same_face) {
-                const std::size_t scalar_offset = static_cast<std::size_t>(
-                    scalar_start - text.data());
-                if (scalar_offset > run_start) {
-                    runs.push_back({run_start, scalar_offset - run_start, current});
-                }
-                run_start = scalar_offset;
-                current = std::move(face);
-            }
-        }
-        if (run_start < text.size()) {
-            runs.push_back({run_start, text.size() - run_start, current});
-        }
-        return runs;
     }
 };
 
@@ -547,13 +397,9 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
         (*canvas).clipRegion(region);
         (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
                       static_cast<SkScalar>((*impl_).scale));
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         (*impl_).reset_text_clips(*canvas, &region);
-#endif
     } else {
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         (*impl_).reset_text_clips(*canvas, nullptr);
-#endif
     }
 }
 
@@ -574,22 +420,18 @@ void SkiaRaster::clip_damage(const DamageRegion& damage) {
     (*canvas).resetMatrix();
     (*canvas).clipRegion(region);
     (*canvas).setMatrix(matrix);
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
         if ((*state).region_limited) (*state).region.op(region, SkRegion::kIntersect_Op);
         else (*state).region = region;
         (*state).region_limited = true;
     }
-#endif
 }
 
 void SkiaRaster::end_frame() {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).restoreToCount(1);
     }
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     (*impl_).text_clips.clear();
-#endif
 }
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -781,12 +623,10 @@ std::size_t SkiaRaster::byte_size() const noexcept {
 
 void SkiaRaster::save() {
     if (SkCanvas* canvas = (*impl_).canvas()) {
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
             const Impl::TextClipState copy = *state;
             (*impl_).text_clips.push_back(copy);
         }
-#endif
         (*canvas).save();
     }
 }
@@ -794,11 +634,9 @@ void SkiaRaster::save() {
 void SkiaRaster::restore() {
     if (SkCanvas* canvas = (*impl_).canvas();
         canvas && (*canvas).getSaveCount() > (*impl_).save_floor) {
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         if ((*impl_).current_text_clip(*canvas) != nullptr && (*impl_).text_clips.size() > 1U) {
             (*impl_).text_clips.pop_back();
         }
-#endif
         (*canvas).restore();
     }
 }
@@ -812,19 +650,16 @@ void SkiaRaster::translate(Point offset) {
 void SkiaRaster::clip_rect(Rect rect) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).clipRect(to_sk_rect(rect), SkClipOp::kIntersect, false);
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
             const SkRect device = (*canvas).getTotalMatrix().mapRect(to_sk_rect(rect));
             if (!(*state).rect.intersect(device)) (*state).rect.setEmpty();
         }
-#endif
     }
 }
 
 void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).clipRRect(to_sk_rrect(rect, radius), SkClipOp::kIntersect, true);
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
             const SkMatrix matrix = (*canvas).getTotalMatrix();
             const SkRect device = matrix.mapRect(to_sk_rect(rect));
@@ -836,7 +671,6 @@ void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
             (*state).radius = std::max(0.0, radius) * static_cast<double>(matrix.getScaleX());
             if (!(*state).rect.intersect(device)) (*state).rect.setEmpty();
         }
-#endif
     }
 }
 
@@ -1097,41 +931,40 @@ void SkiaRaster::draw_line(Point from, Point to, Color color, double width) {
     }
 }
 
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 void SkiaRaster::Impl::draw_shaped_text(SkCanvas& target, const text::ShapedText& shaped,
-                                        const Point origin, const std::string_view text,
-                                        const FontSpec font_spec, const Color color) {
-    SkCanvas* const canvas = &target;
-    const SkPaint paint = make_paint(color);
-    for (const text::ShapedFontRun& run : shaped.runs) {
-        const sk_sp<SkTypeface> face = typeface(run.face);
-        if (!face || run.glyphs.empty()) continue;
-        SkFont font(face, static_cast<SkScalar>(font_spec.size));
-        font.setEdging(SkFont::Edging::kAntiAlias);
-        font.setSubpixel(true);
-        std::vector<SkGlyphID> glyphs;
-        std::vector<SkPoint> positions;
-        std::vector<std::uint32_t> clusters;
-        glyphs.reserve(run.glyphs.size());
-        positions.reserve(run.glyphs.size());
-        clusters.reserve(run.glyphs.size());
-        for (const text::ShapedGlyph& glyph : run.glyphs) {
-            glyphs.push_back(static_cast<SkGlyphID>(glyph.glyph.value));
-            positions.push_back({glyph.x, glyph.y});
-            clusters.push_back(static_cast<std::uint32_t>(glyph.cluster.value()));
-        }
-        (*canvas).drawGlyphs(SkSpan<const SkGlyphID>(glyphs),
-                           SkSpan<const SkPoint>(positions),
-                           SkSpan<const std::uint32_t>(clusters),
-                           SkSpan<const char>(text.data(), text.size()),
-                           {static_cast<SkScalar>(origin.x),
-                            static_cast<SkScalar>(origin.y)},
-                           font, paint);
+                                        const Point origin, const FontSpec font_spec, const Color color) {
+    const SkMatrix matrix = target.getTotalMatrix();
+    if (matrix.hasPerspective()) return;
+    if (!glyph_runs) glyph_runs = std::make_unique<text::GlyphRunRasterizer>(text_engine);
+    const SkPoint device = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y)));
+    text::GlyphRunOrigin placement{};
+    text::GlyphRunCoverage coverage{};
+    if (matrix.isScaleTranslate() && matrix.getScaleX() > 0.0F && matrix.getScaleX() == matrix.getScaleY()) {
+        placement = text::glyph_run_origin(static_cast<double>(device.x()), static_cast<double>(device.y()));
+        coverage = (*glyph_runs).rasterize(shaped, font_spec, static_cast<double>(matrix.getScaleX()),
+                                           placement.phase_x);
+    } else {
+        const text::GlyphRunTransform transform{static_cast<double>(matrix.getScaleX()),
+                                                static_cast<double>(matrix.getSkewX()),
+                                                static_cast<double>(matrix.getSkewY()),
+                                                static_cast<double>(matrix.getScaleY())};
+        coverage = (*glyph_runs).rasterize_transformed(shaped, font_spec, transform, static_cast<double>(device.x()),
+                                                       static_cast<double>(device.y()), {}, placement);
     }
+    if (coverage.pixels.empty()) return;
+    const SkPixmap mask(SkImageInfo::MakeA8(static_cast<int>(coverage.width), static_cast<int>(coverage.height)),
+                        coverage.pixels.data(), static_cast<std::size_t>(coverage.width));
+    const sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(mask);
+    if (!image) return;
+    // An alpha-only image draws in the paint's colour.
+    const SkPaint paint = make_paint(color);
+    target.save();
+    target.resetMatrix();
+    target.drawImage(image, static_cast<SkScalar>(placement.pixel_x + coverage.left),
+                     static_cast<SkScalar>(placement.pixel_y + coverage.top), SkSamplingOptions(), &paint);
+    target.restore();
 }
-#endif
 
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 namespace {
 
 // Shaping of one retained draw_text_utf8 command. Text and font are fixed by
@@ -1182,7 +1015,7 @@ void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_v
         (*memo).has_coverage = true;
         return;
     }
-    (*impl_).draw_shaped_text(*canvas, (*memo).shaped, origin, text, font_spec, color);
+    (*impl_).draw_shaped_text(*canvas, (*memo).shaped, origin, font_spec, color);
 }
 
 bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& shaped, const FontSpec font,
@@ -1270,69 +1103,28 @@ bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCo
     }
     return true;
 }
-#else
-void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_view text,
-                                         const FontSpec font_spec, const Color color,
-                                         const std::shared_ptr<RetainedDrawCache>&) {
-    draw_text_utf8(origin, text, font_spec, color);
-}
-#endif
 
 void SkiaRaster::draw_text_utf8(Point origin,
                                 std::string_view text,
                                 FontSpec font_spec,
                                 Color color) {
     if (SkCanvas* canvas = (*impl_).canvas(); canvas && !text.empty()) {
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
         if ((*impl_).composite_run(*canvas, shaped, font_spec, origin, color, nullptr, nullptr, nullptr)) return;
-        (*impl_).draw_shaped_text(*canvas, shaped, origin, text, font_spec, color);
-#else
-        SkScalar x = static_cast<SkScalar>(origin.x);
-        const SkPaint paint = make_paint(color);
-        for (const Impl::TextRun& run : (*impl_).text_runs(text, font_spec)) {
-            SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
-            font.setEdging(SkFont::Edging::kAntiAlias);
-            const char* bytes = text.data() + run.offset;
-            (*canvas).drawSimpleText(bytes, run.length, SkTextEncoding::kUTF8,
-                                   x, static_cast<SkScalar>(origin.y), font, paint);
-            x += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
-        }
-#endif
+        (*impl_).draw_shaped_text(*canvas, shaped, origin, font_spec, color);
     }
 }
 
 Size SkiaRaster::measure_text_utf8(std::string_view text,
                                    FontSpec font_spec) {
     if (text.empty()) return {0.0, font_spec.size};
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
     return {std::max(0.0, shaped.width), std::max(0.0, shaped.height)};
-#else
-    double width{};
-    double height{};
-    for (const Impl::TextRun& run : (*impl_).text_runs(text, font_spec)) {
-        SkFont font(run.face, static_cast<SkScalar>(font_spec.size));
-        const char* bytes = text.data() + run.offset;
-        width += font.measureText(bytes, run.length, SkTextEncoding::kUTF8);
-        SkFontMetrics metrics{};
-        font.getMetrics(&metrics);
-        height = std::max(height,
-            static_cast<double>(metrics.fDescent - metrics.fAscent));
-    }
-    return {std::max(0.0, width), std::max(0.0, height)};
-#endif
 }
 
 ResolvedTextLayout SkiaRaster::resolve_text_layout_utf8(
     std::string_view text, FontSpec font_spec) {
-#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
     return (*impl_).text_engine.resolve(text, font_spec);
-#else
-    ResolvedTextLayout result = estimate_text_layout_utf8(text, font_spec);
-    result.logical_size = measure_text_utf8(text, font_spec);
-    return result;
-#endif
 }
 
 void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
