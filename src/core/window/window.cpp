@@ -2260,6 +2260,11 @@ void Window::change_paint_plane(Control& control, PaintPlane plane) {
 }
 
 void Window::add_damage(Rect damage, PaintPlane plane) {
+    // Damage outside the client area can never be painted. Recording it
+    // would also keep the plane pending forever, because a paint retires a
+    // plane only when its painted bounds contain the pending bounds.
+    damage = Rect::intersection(damage, {0.0, 0.0, client_size_.width, client_size_.height});
+    if (damage.empty()) return;
     DamageRegion& region = plane_damage_[paint_plane_index(plane)];
     const std::uint64_t compactions = region.compaction_count();
     const std::uint64_t collapses = region.collapse_count();

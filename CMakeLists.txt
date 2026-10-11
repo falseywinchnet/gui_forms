@@ -2079,6 +2079,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
 
+    add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
+    target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_damage_clip_tests COMMAND gui_forms_damage_clip_tests)
+
     add_executable(gui_forms_binary_search_tests tests/binary_search_tests.cpp)
     target_link_libraries(gui_forms_binary_search_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_binary_search_tests COMMAND gui_forms_binary_search_tests)
