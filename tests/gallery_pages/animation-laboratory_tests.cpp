@@ -11,6 +11,14 @@ void test_animation_laboratory(gui_forms::Window& window) {
         window.find("gallery.ranges.progress.2"));
     require(easing != nullptr && pause_button != nullptr && animated_progress != nullptr,
             "animation page must retain its public-frame proving surface");
+    // The pause button binds the page's Command; the reduced-motion check box
+    // binds the page's Value<bool>, so neither carries a caller-held handler.
+    require((*pause_button).command_connected(),
+            "animation pause button must bind the page-owned Command");
+    const std::shared_ptr<gui_forms::CheckBox> reduced_box =
+        std::dynamic_pointer_cast<CheckBox>(window.find("gallery.animation.reduced"));
+    require(reduced_box != nullptr && !(*reduced_box).checked(),
+            "reduced-motion check box must start from the page Value's false state");
     (*animated_progress).on_frame(
         FrameClock::now() + std::chrono::milliseconds(410));
     const double retained_progress_phase = (*animated_progress).animation_phase();

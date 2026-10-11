@@ -12,6 +12,13 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
         window.find("gallery.host.clipboard.editor"));
     require(status && editor,
             "host-services board must expose its public result and clipboard controls");
+    for (const char* id : {"gallery.host.message.0", "gallery.host.dialog.0",
+                           "gallery.host.service.0"}) {
+        const std::shared_ptr<gui_forms::Button> button =
+            std::dynamic_pointer_cast<Button>(window.find(id));
+        require(button != nullptr && (*button).command_connected(),
+                "host-services buttons must bind page-owned Commands");
+    }
 
     click(window, window.find("gallery.host.message.2"));
     require((*status).text().find("accepted · yes") != std::string::npos,

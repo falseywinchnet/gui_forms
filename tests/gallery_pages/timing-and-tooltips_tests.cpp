@@ -21,6 +21,32 @@ void test_timing_and_tooltips(gui_forms::Window& window) {
                 (*status).text().find("zero idle wakeups") != std::string::npos,
             "gallery Timer stop must make the window scheduler quiescent");
 
+    // Start/stop bind page-owned Commands; the interval TrackBar binds a
+    // Value<double>, so a programmatic state change (no scroll input) reaches
+    // the Timer and the next tick reports the new interval.
+    const std::shared_ptr<gui_forms::Button> start_button =
+        std::dynamic_pointer_cast<Button>(window.find("gallery.timing.start"));
+    const std::shared_ptr<gui_forms::Button> stop_button =
+        std::dynamic_pointer_cast<Button>(window.find("gallery.timing.stop"));
+    const std::shared_ptr<gui_forms::TrackBar> interval =
+        std::dynamic_pointer_cast<TrackBar>(window.find("gallery.timing.interval"));
+    require(start_button && stop_button && interval &&
+                (*start_button).command_connected() &&
+                (*stop_button).command_connected(),
+            "timer buttons must bind page-owned Commands");
+    (*interval).set_value(400.0);
+    click(window, start_button);
+    require(window.next_wake().has_value() &&
+                (*status).text().find("deadline armed") != std::string::npos,
+            "the start Command must arm the UI Timer deadline");
+    static_cast<void>(window.poll_frame_schedule(
+        FrameClock::now() + std::chrono::seconds(1)));
+    require((*status).text().find("400 ms") != std::string::npos,
+            "the bound interval Value must reach the Timer before its next tick");
+    click(window, stop_button);
+    require(!window.next_wake().has_value(),
+            "the stop Command must make the window scheduler quiescent again");
+
     const Control::Ptr hover_target = window.find("gallery.timing.tooltip.hover");
     const Rect hover_bounds = (*hover_target).absolute_bounds();
     const Point hover_point{hover_bounds.x + 12.0, hover_bounds.y + 12.0};
