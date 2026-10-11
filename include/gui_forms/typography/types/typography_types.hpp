@@ -30,7 +30,14 @@ struct ResolvedFontRun final {
     bool registered_italic{};
     bool fallback{};
     friend bool operator==(const ResolvedFontRun& left,
-                           const ResolvedFontRun& right) = default;
+                           const ResolvedFontRun& right) noexcept {
+        return left.utf8_start == right.utf8_start &&
+               left.utf8_length == right.utf8_length &&
+               left.family == right.family &&
+               left.registered_weight == right.registered_weight &&
+               left.registered_italic == right.registered_italic &&
+               left.fallback == right.fallback;
+    }
 };
 
 struct ResolvedTextLayout final {
@@ -49,7 +56,17 @@ struct ResolvedTextLayout final {
     }
     [[nodiscard]] double baseline() const noexcept { return ascent; }
     friend bool operator==(const ResolvedTextLayout& left,
-                           const ResolvedTextLayout& right) = default;
+                           const ResolvedTextLayout& right) {
+        return left.effective_font == right.effective_font &&
+               left.logical_size == right.logical_size &&
+               left.ascent == right.ascent &&
+               left.descent == right.descent &&
+               left.line_gap == right.line_gap &&
+               left.primary_family == right.primary_family &&
+               left.runs == right.runs &&
+               left.missing_clusters == right.missing_clusters &&
+               left.status == right.status;
+    }
 };
 
 [[nodiscard]] const char* text_resolution_status_name(

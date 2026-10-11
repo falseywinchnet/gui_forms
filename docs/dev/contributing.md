@@ -46,10 +46,17 @@ In practice:
 - Explicit ownership and explicit session shutdown; declare context before
   the worker that borrows it.
 
-`tools/check_house_style.py` reports spelling violations for the paths it is
-given, and CI runs it over the files the project has brought into scope. It
-is a review aid, not a certification: ownership, lifetimes and initialization
-still need a human reader.
+`tools/check_house_style.py` reports spelling violations: `auto`, `->`,
+trailing returns, structured bindings, lambdas, defaulted comparisons,
+coroutines and ranges pipelines. CI runs it over every first-party directory
+and fails on any finding, so run it before you push:
+
+```sh
+python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+```
+
+It is a review aid, not a certification: ownership, lifetimes and
+initialization still need a human reader.
 
 ## Tests and evidence
 

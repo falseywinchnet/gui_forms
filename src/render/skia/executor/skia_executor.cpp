@@ -667,7 +667,9 @@ public:
     }
 
     [[nodiscard]] TextFamily* registered(std::string_view family) {
-        const auto found = families.find(ascii_lower(family));
+        using FamilyMap =
+            std::unordered_map<std::string, std::unique_ptr<TextFamily>>;
+        const FamilyMap::iterator found = families.find(ascii_lower(family));
         TextFamily* const result = found == families.end() ? nullptr : (*found).second.get();
         return result;
     }

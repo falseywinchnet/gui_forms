@@ -104,6 +104,20 @@ const VisualPaintOperationSnapshot* text_operation(
     return nullptr;
 }
 
+bool is_cjk_fallback_run(const ResolvedFontRun& run) {
+    return run.fallback && run.family == "Noto Sans CJK JP";
+}
+
+bool is_emoji_fallback_run(const ResolvedFontRun& run) {
+    return run.fallback && run.family == "Noto Emoji";
+}
+
+bool is_body_specimen_readout(const VisualPaintOperationSnapshot& operation) {
+    return operation.operation == VisualPaintOperation::draw_text &&
+        operation.text.find("content 12.0/400 · exact · Carlito") !=
+            std::string::npos;
+}
+
 void test_exact_resolution_redaction_and_roles() {
     std::unique_ptr<Window> window =
         gui_forms::typography_scale_lab::make_typography_scale_lab();
@@ -130,26 +144,21 @@ void test_exact_resolution_redaction_and_roles() {
         text_operation(*fallback, FontRole::content, 12.0);
     require(title_text && body_text && mono_text && fallback_text,
             "inspection must retain committed effective FontSpec per specimen");
-    require(title_text->text.empty() && title_text->text_byte_count != 0U &&
-                title_text->resolved_text &&
-                title_text->resolved_text->primary_family == "Portsmouth Rapids",
+    require((*title_text).text.empty() && (*title_text).text_byte_count != 0U &&
+                (*title_text).resolved_text &&
+                (*(*title_text).resolved_text).primary_family == "Portsmouth Rapids",
             "text must remain redacted while exact primary face survives inspection");
-    require(body_text->resolved_text->primary_family == "Carlito" &&
-                mono_text->resolved_text->primary_family == "Cousine",
+    require((*(*body_text).resolved_text).primary_family == "Carlito" &&
+                (*(*mono_text).resolved_text).primary_family == "Cousine",
             "content and terminal roles must resolve independently");
-    require(fallback_text->resolved_text->status == TextResolutionStatus::exact &&
-                fallback_text->resolved_text->runs.size() >= 4U &&
-                std::any_of(fallback_text->resolved_text->runs.begin(),
-                            fallback_text->resolved_text->runs.end(),
-                            [](const ResolvedFontRun& run) {
-                                return run.fallback &&
-                                    run.family == "Noto Sans CJK JP";
-                            }) &&
-                std::any_of(fallback_text->resolved_text->runs.begin(),
-                            fallback_text->resolved_text->runs.end(),
-                            [](const ResolvedFontRun& run) {
-                                return run.fallback && run.family == "Noto Emoji";
-                            }),
+    require((*(*fallback_text).resolved_text).status == TextResolutionStatus::exact &&
+                (*(*fallback_text).resolved_text).runs.size() >= 4U &&
+                std::any_of((*(*fallback_text).resolved_text).runs.begin(),
+                            (*(*fallback_text).resolved_text).runs.end(),
+                            is_cjk_fallback_run) &&
+                std::any_of((*(*fallback_text).resolved_text).runs.begin(),
+                            (*(*fallback_text).resolved_text).runs.end(),
+                            is_emoji_fallback_run),
             "inspection must report actual per-cluster fallback run families");
 
     VisualInspectionOptions readable_options;
@@ -159,15 +168,9 @@ void test_exact_resolution_redaction_and_roles() {
     const VisualControlInspection* inspector =
         readable.find("typography-scale.inspector");
     require(inspector != nullptr &&
-                std::any_of(inspector->display_operations.begin(),
-                            inspector->display_operations.end(),
-                            [](const VisualPaintOperationSnapshot& operation) {
-                                return operation.operation ==
-                                           VisualPaintOperation::draw_text &&
-                                    operation.text.find(
-                                        "content 12.0/400 · exact · Carlito") !=
-                                        std::string::npos;
-                            }),
+                std::any_of((*inspector).display_operations.begin(),
+                            (*inspector).display_operations.end(),
+                            is_body_specimen_readout),
             "inspector must prefer the representative specimen text over its caption");
 }
 
@@ -188,19 +191,20 @@ void test_text_scale_reflows_without_role_drift() {
         const VisualControlInspection* long_label = snapshot.find("typography-scale.long");
         require(title && control && long_label,
                 "text-scale geometry must retain all essential specimens");
-        require(title->layout.absolute_bounds.height > previous_title_height &&
-                    (control->layout.absolute_bounds.x !=
-                         title->layout.absolute_bounds.x ||
-                     control->layout.absolute_bounds.y >=
-                         title->layout.absolute_bounds.y +
-                             title->layout.absolute_bounds.height) &&
-                    long_label->layout.absolute_bounds.y +
-                        long_label->layout.absolute_bounds.height <= 840.0 + 0.001,
+        require((*title).layout.absolute_bounds.height > previous_title_height &&
+                    ((*control).layout.absolute_bounds.x !=
+                         (*title).layout.absolute_bounds.x ||
+                     (*control).layout.absolute_bounds.y >=
+                         (*title).layout.absolute_bounds.y +
+                             (*title).layout.absolute_bounds.height) &&
+                    (*long_label).layout.absolute_bounds.y +
+                        (*long_label).layout.absolute_bounds.height <= 840.0 + 0.001,
                 "100/125/150/200% layout must reflow without specimen overlap or clipping");
-        previous_title_height = title->layout.absolute_bounds.height;
+        previous_title_height = (*title).layout.absolute_bounds.height;
 
         const Control::Ptr node = (*window).find("typography-scale.title");
-        const auto* specimen = dynamic_cast<const TypographySpecimen*>(node.get());
+        const TypographySpecimen* specimen =
+            dynamic_cast<const TypographySpecimen*>(node.get());
         require(specimen != nullptr &&
                     near((*specimen).resolved_layout().effective_font.size,
                          17.0 * scale) &&
@@ -216,7 +220,8 @@ void test_device_scale_changes_snapping_not_logical_metrics() {
     ExactFixtureText provider;
     (*window).set_text_metrics_provider(&provider);
     const Control::Ptr node = (*window).find("typography-scale.body");
-    const auto* specimen = dynamic_cast<const TypographySpecimen*>(node.get());
+    const TypographySpecimen* specimen =
+        dynamic_cast<const TypographySpecimen*>(node.get());
     require(specimen != nullptr, "body specimen must be queryable");
     (*window).set_scale(1.0);
     const ResolvedTextLayout at_one = (*specimen).resolved_layout();
@@ -232,7 +237,8 @@ void test_unavailable_and_invalid_resolution_are_labelled() {
     std::unique_ptr<Window> window =
         gui_forms::typography_scale_lab::make_typography_scale_lab();
     const Control::Ptr node = (*window).find("typography-scale.body");
-    const auto* specimen = dynamic_cast<const TypographySpecimen*>(node.get());
+    const TypographySpecimen* specimen =
+        dynamic_cast<const TypographySpecimen*>(node.get());
     require(specimen != nullptr &&
                 (*specimen).resolved_layout().status ==
                     TextResolutionStatus::estimated &&

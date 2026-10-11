@@ -44,7 +44,7 @@ std::string representative_font_text(const VisualControlInspection& target) {
          target.display_operations) {
         if (operation.operation != VisualPaintOperation::draw_text) continue;
         if (representative == nullptr ||
-            operation.font.size > representative->font.size) {
+            operation.font.size > (*representative).font.size) {
             representative = &operation;
         }
     }
@@ -179,26 +179,26 @@ void VisualInspectorView::on_paint(Painter& painter, Rect) {
 
     struct Row final { std::string label; std::string value; Color color; };
     const std::vector<Row> rows{
-        {"IDENTITY", target->stable_id + "  #" +
-             std::to_string(target->runtime_id.value), inspector_ink},
+        {"IDENTITY", (*target).stable_id + "  #" +
+             std::to_string((*target).runtime_id.value), inspector_ink},
         {"STATE", state_text(*target), inspector_ink},
-        {"REQUESTED", rect_text(target->layout.requested_bounds), inspector_muted},
-        {"ARRANGED", rect_text(target->layout.arranged_bounds), inspector_blue},
-        {"ABSOLUTE", rect_text(target->layout.absolute_bounds), inspector_blue},
-        {"VISUAL", rect_text(target->layout.visual_bounds), inspector_magenta},
-        {"EFFECTIVE CLIP", rect_text(target->layout.effective_clip), inspector_gold},
-        {"VIEWPORT", rect_text(target->layout.child_viewport), inspector_muted},
+        {"REQUESTED", rect_text((*target).layout.requested_bounds), inspector_muted},
+        {"ARRANGED", rect_text((*target).layout.arranged_bounds), inspector_blue},
+        {"ABSOLUTE", rect_text((*target).layout.absolute_bounds), inspector_blue},
+        {"VISUAL", rect_text((*target).layout.visual_bounds), inspector_magenta},
+        {"EFFECTIVE CLIP", rect_text((*target).layout.effective_clip), inspector_gold},
+        {"VIEWPORT", rect_text((*target).layout.child_viewport), inspector_muted},
         {"MATERIAL", material_summary(*target), inspector_ink},
         {"RESOLVED FONT", representative_font_text(*target), inspector_ink},
         {"DISPLAY", operation_summary(*target), inspector_ink},
-        {"CHUNK", target->display_chunk
-             ? (target->display_chunk_current ? "current generation " :
+        {"CHUNK", (*target).display_chunk
+             ? ((*target).display_chunk_current ? "current generation " :
                                                 "STALE generation ") +
-                   std::to_string((*target->display_chunk).generation)
-             : "not painted", target->display_chunk_current ? inspector_blue :
+                   std::to_string((*(*target).display_chunk).generation)
+             : "not painted", (*target).display_chunk_current ? inspector_blue :
                                                                inspector_gold},
-        {"THEME", target->theme_id +
-             (target->theme_override ? " · local override" : " · inherited"),
+        {"THEME", (*target).theme_id +
+             ((*target).theme_override ? " · local override" : " · inherited"),
              inspector_muted},
         {"WINDOW", std::to_string(snapshot.total_controls) + " controls · " +
              std::to_string(snapshot.pending_damage[0].size() +
@@ -228,9 +228,9 @@ std::string VisualInspectorView::accessible_value() const {
         (*owner).visual_inspection_snapshot(view_options());
     const VisualControlInspection* target = snapshot.find(target_stable_id_);
     if (target == nullptr) return "Target not found: " + target_stable_id_;
-    return target->stable_id + "; " + state_text(*target) + "; arranged " +
-           rect_text(target->layout.arranged_bounds) + "; effective clip " +
-           rect_text(target->layout.effective_clip) + "; " +
+    return (*target).stable_id + "; " + state_text(*target) + "; arranged " +
+           rect_text((*target).layout.arranged_bounds) + "; effective clip " +
+           rect_text((*target).layout.effective_clip) + "; " +
            operation_summary(*target);
 }
 
@@ -268,11 +268,11 @@ void VisualInspectorOverlay::on_paint(Painter& painter, Rect) {
     const VisualInspectionSnapshot snapshot =
         (*owner).visual_inspection_snapshot(overlay_options());
     const VisualControlInspection* target = snapshot.find(target_stable_id_);
-    if (target == nullptr || target->runtime_id == runtime_id()) return;
+    if (target == nullptr || (*target).runtime_id == runtime_id()) return;
 
-    Rect arranged = rectangle_from_window(target->layout.absolute_bounds);
-    Rect visual = rectangle_from_window(target->layout.visual_bounds);
-    Rect clip = rectangle_from_window(target->layout.effective_clip);
+    Rect arranged = rectangle_from_window((*target).layout.absolute_bounds);
+    Rect visual = rectangle_from_window((*target).layout.visual_bounds);
+    Rect clip = rectangle_from_window((*target).layout.effective_clip);
     painter.stroke_rect(visual, inspector_magenta, 2.0);
     painter.stroke_rect(arranged, inspector_blue, 2.0);
     if (!clip.empty()) painter.stroke_rect(clip, inspector_gold, 1.0);

@@ -59,22 +59,22 @@ int main() {
         require(isolated && first && middle && disabled && disabled_interior &&
                     split && vertical && overlay,
                 "connected lab must retain every required specimen and inspector overlay");
-        require(first->layout.absolute_bounds.right() ==
-                    middle->layout.absolute_bounds.left() &&
-                    middle->layout.absolute_bounds.right() ==
-                    disabled->layout.absolute_bounds.left(),
+        require((*first).layout.absolute_bounds.right() ==
+                    (*middle).layout.absolute_bounds.left() &&
+                    (*middle).layout.absolute_bounds.right() ==
+                    (*disabled).layout.absolute_bounds.left(),
                 "three-segment specimen must have exact crack-free logical boundaries");
-        require(first->state.focused && middle->state.enabled &&
-                    !disabled->state.effectively_enabled &&
-                    !disabled_interior->state.effectively_enabled,
+        require((*first).state.focused && (*middle).state.enabled &&
+                    !(*disabled).state.effectively_enabled &&
+                    !(*disabled_interior).state.effectively_enabled,
                 "lab must expose focused/default, checked-capable, disabled trailing, and disabled interior states");
-        require(isolated->total_display_operations <
-                    middle->total_display_operations &&
-                    middle->display_chunk_current && split->display_chunk_current &&
-                    vertical->display_chunk_current,
+        require((*isolated).total_display_operations <
+                    (*middle).total_display_operations &&
+                    (*middle).display_chunk_current && (*split).display_chunk_current &&
+                    (*vertical).display_chunk_current,
                 "connected specimens must retain committed clipped/seam paint operations");
-        require(overlay->paint_plane == PaintPlane::overlay &&
-                    overlay->state.hit_test_transparent,
+        require((*overlay).paint_plane == PaintPlane::overlay &&
+                    (*overlay).state.hit_test_transparent,
                 "connected lab inspector overlay must remain pointer-transparent");
         const std::string semantics = (*window).semantic_snapshot().to_json();
         require(semantics.find("connected-controls.three.default") !=

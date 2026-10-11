@@ -7,6 +7,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -141,6 +142,30 @@ void test_topology_and_resolved_geometry() {
             "connected material replay must clip one expanded surface and draw one seam");
 }
 
+struct PaintOperationMatches final {
+    VisualPaintOperation operation;
+
+    bool operator()(const VisualPaintOperationSnapshot& candidate) const {
+        return candidate.operation == operation;
+    }
+};
+
+struct InspectedOperationCounter final {
+    Window& window;
+
+    std::size_t operator()(const std::string_view id,
+                           const VisualPaintOperation operation) const {
+        const VisualInspectionSnapshot snapshot =
+            window.visual_inspection_snapshot();
+        const VisualControlInspection* control = snapshot.find(id);
+        require(control != nullptr, "state trace target must remain inspectable");
+        return static_cast<std::size_t>(std::count_if(
+            (*control).display_operations.begin(),
+            (*control).display_operations.end(),
+            PaintOperationMatches{operation}));
+    }
+};
+
 void test_atomic_grouping_hit_cracks_focus_and_semantics() {
     const std::shared_ptr<Panel> root = make_control<Panel>(
         StableId("connected.test.root"));
@@ -172,7 +197,8 @@ void test_atomic_grouping_hit_cracks_focus_and_semantics() {
                 ConnectedControlTopology{ConnectedControlAxis::horizontal, 2U, 3U},
             "atomic helper must assign the explicit supplied order");
 
-    const auto before = (*first).connection_topology();
+    const std::optional<ConnectedControlTopology> before =
+        (*first).connection_topology();
     bool rejected_axis{};
     try {
         connect_button_group(group, ConnectedControlAxis::vertical);
@@ -180,9 +206,9 @@ void test_atomic_grouping_hit_cracks_focus_and_semantics() {
         rejected_axis = true;
     }
     require(rejected_axis && (*first).connection_topology() == before &&
-                (*middle).connection_topology()->axis ==
+                (*(*middle).connection_topology()).axis ==
                     ConnectedControlAxis::horizontal &&
-                (*last).connection_topology()->axis ==
+                (*(*last).connection_topology()).axis ==
                     ConnectedControlAxis::horizontal,
             "mixed-axis rejection must mutate no group member");
 
@@ -247,19 +273,7 @@ void test_atomic_grouping_hit_cracks_focus_and_semantics() {
 
     GeometryPainter painter;
     static_cast<void>(window.paint(painter, {0.0, 0.0, 300.0, 80.0}));
-    auto operation_count = [&window](const std::string_view id,
-                                     const VisualPaintOperation operation) {
-        const VisualInspectionSnapshot snapshot =
-            window.visual_inspection_snapshot();
-        const VisualControlInspection* control = snapshot.find(id);
-        require(control != nullptr, "state trace target must remain inspectable");
-        return static_cast<std::size_t>(std::count_if(
-            control->display_operations.begin(),
-            control->display_operations.end(),
-            [operation](const VisualPaintOperationSnapshot& candidate) {
-                return candidate.operation == operation;
-            }));
-    };
+    const InspectedOperationCounter operation_count{window};
     require(operation_count("connected.test.first",
                             VisualPaintOperation::draw_line) == 0U &&
                 operation_count("connected.test.middle",

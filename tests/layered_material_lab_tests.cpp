@@ -120,8 +120,8 @@ void test_lab_trace_inspection_and_complexity() {
         snapshot.find("layered-material.live-state");
     require(watercolor && office && graphite && studio && live,
             "material lab must retain every named reference specimen");
-    require(watercolor->authored_material &&
-                (*watercolor->authored_material).keylines.size() == 2U &&
+    require((*watercolor).authored_material &&
+                (*(*watercolor).authored_material).keylines.size() == 2U &&
                 operation_count(*watercolor,
                                 VisualPaintOperation::fill_radial_gradient) == 3U &&
                 operation_count(*watercolor,
@@ -130,17 +130,17 @@ void test_lab_trace_inspection_and_complexity() {
     const std::vector<const VisualPaintOperationSnapshot*> watercolor_lines =
         operations(*watercolor, VisualPaintOperation::draw_line);
     require(watercolor_lines.size() == 2U &&
-                watercolor_lines[0]->color == Color::rgba(23, 45, 105) &&
-                watercolor_lines[0]->first == Point{0.0, 165.5} &&
-                watercolor_lines[0]->second == Point{380.0, 165.5} &&
-                watercolor_lines[1]->color ==
+                (*watercolor_lines[0]).color == Color::rgba(23, 45, 105) &&
+                (*watercolor_lines[0]).first == Point{0.0, 165.5} &&
+                (*watercolor_lines[0]).second == Point{380.0, 165.5} &&
+                (*watercolor_lines[1]).color ==
                     Color::rgba(215, 242, 255, 196) &&
-                watercolor_lines[1]->first == Point{2.0, 163.5} &&
-                watercolor_lines[1]->second == Point{378.0, 163.5} &&
-                watercolor_lines[0]->command_index <
-                    watercolor_lines[1]->command_index,
+                (*watercolor_lines[1]).first == Point{2.0, 163.5} &&
+                (*watercolor_lines[1]).second == Point{378.0, 163.5} &&
+                (*watercolor_lines[0]).command_index <
+                    (*watercolor_lines[1]).command_index,
             "committed command inspection must preserve outer-before-inset authored keyline order and distinct geometry");
-    require(office->authored_material &&
+    require((*office).authored_material &&
                 operation_count(*office,
                     VisualPaintOperation::fill_linear_gradient_spread) == 2U &&
                 operation_count(*office,
@@ -148,14 +148,14 @@ void test_lab_trace_inspection_and_complexity() {
                 operation_count(*office,
                     VisualPaintOperation::draw_inset_box_shadow) == 1U,
             "Office inspection must expose both gradient spreads and both shadow directions");
-    require(graphite->authored_material &&
+    require((*graphite).authored_material &&
                 operation_count(*graphite,
                     VisualPaintOperation::fill_linear_gradient_spread) == 2U &&
                 operation_count(*graphite,
                     VisualPaintOperation::draw_line) == 4U,
             "Graphite inspection must expose its texture and edge-specific chassis keylines");
-    require(studio->authored_material &&
-                (*studio->authored_material).fills.front().image_mode ==
+    require((*studio).authored_material &&
+                (*(*studio).authored_material).fills.front().image_mode ==
                     MaterialImageMode::nine_patch &&
                 operation_count(*studio,
                     VisualPaintOperation::draw_image_region) == 9U,
@@ -163,9 +163,9 @@ void test_lab_trace_inspection_and_complexity() {
 
     for (const VisualControlInspection* specimen :
          {watercolor, office, graphite, studio}) {
-        require(specimen->display_chunk_current &&
-                    !specimen->display_operations_truncated &&
-                    specimen->total_display_operations <= 24U,
+        require((*specimen).display_chunk_current &&
+                    !(*specimen).display_operations_truncated &&
+                    (*specimen).total_display_operations <= 24U,
                 "each material specimen must commit a current bounded display chunk");
     }
 
@@ -194,8 +194,8 @@ void test_lab_trace_inspection_and_complexity() {
         (*window).visual_inspection_snapshot();
     const VisualControlInspection* pressed = pressed_snapshot.find(
         "layered-material.live-state");
-    require(pressed && pressed->state.hovered && pressed->state.pressed &&
-                pressed->state.pointer_captured,
+    require(pressed && (*pressed).state.hovered && (*pressed).state.pressed &&
+                (*pressed).state.pointer_captured,
             "live state must be truthfully inspectable while pressed and captured");
     PointerEvent up = down;
     up.action = PointerAction::up;
@@ -216,9 +216,9 @@ void test_lab_trace_inspection_and_complexity() {
     const VisualControlInspection* resized_inspector =
         resized.find("layered-material.inspector");
     require(resized_inspector &&
-                resized_inspector->layout.arranged_bounds.x == 822.0 &&
-                resized_inspector->layout.arranged_bounds.width == 350.0 &&
-                resized_inspector->layout.arranged_bounds.height == 550.0,
+                (*resized_inspector).layout.arranged_bounds.x == 822.0 &&
+                (*resized_inspector).layout.arranged_bounds.width == 350.0 &&
+                (*resized_inspector).layout.arranged_bounds.height == 550.0,
             "native minimum resize must preserve specimen/inspector separation without overlap");
 }
 
@@ -273,12 +273,12 @@ void test_lab_copy_fits_at_150_percent_text_scale() {
                 "every scale-profile copy control must remain inspectable");
         bool found_text = false;
         for (const VisualPaintOperationSnapshot& operation :
-             control->display_operations) {
+             (*control).display_operations) {
             if (operation.operation != VisualPaintOperation::draw_text) continue;
             require(operation.resolved_text.has_value(),
                     "scale-profile text must carry deterministic resolved metrics");
             const ResolvedTextLayout& resolved = *operation.resolved_text;
-            const Rect client = control->layout.client_rectangle;
+            const Rect client = (*control).layout.client_rectangle;
             if (!(operation.first.x >= -tolerance &&
                   operation.first.x + resolved.logical_size.width <=
                       client.width + tolerance &&

@@ -16,12 +16,23 @@ namespace {
 
 using namespace container_layout_detail;
 
+using GroupSpecMap =
+    std::unordered_map<std::uint64_t, CommandOverflowGroupSpec>;
+
 constexpr std::size_t maximum_command_groups = 32U;
 constexpr double maximum_extent = 1'000'000.0;
 
 [[nodiscard]] double bounded_maximum(
     const CommandOverflowGroupSpec& spec) noexcept {
     return spec.maximum > 0.0 ? spec.maximum : maximum_extent;
+}
+
+[[nodiscard]] double desired_track_extent(
+    const std::vector<ResponsiveTrackSpec>& tracks, double gap) noexcept {
+    double value = 0.0;
+    for (const ResponsiveTrackSpec& track : tracks) value += track.preferred;
+    if (tracks.size() > 1U) value += gap * (tracks.size() - 1U);
+    return value;
 }
 
 } // namespace
@@ -71,9 +82,9 @@ void CommandOverflowPanel::set_group_spec(
         throw std::invalid_argument(
             "CommandOverflowPanel actuator cannot also be a command group");
     }
-    for (const auto& [runtime_id, existing] : group_specs_) {
-        if (runtime_id != group.runtime_id().value &&
-            spec.collapse_priority && existing.collapse_priority == spec.collapse_priority) {
+    for (const GroupSpecMap::value_type& entry : group_specs_) {
+        if (entry.first != group.runtime_id().value &&
+            spec.collapse_priority && entry.second.collapse_priority == spec.collapse_priority) {
             throw std::invalid_argument(
                 "CommandOverflowPanel collapse priorities must be unique");
         }
@@ -83,8 +94,8 @@ void CommandOverflowPanel::set_group_spec(
         throw std::invalid_argument(
             "CommandOverflowPanel group count exceeds 32");
     }
-    auto found = group_specs_.find(group.runtime_id().value);
-    if (found != group_specs_.end() && found->second == spec) return;
+    GroupSpecMap::iterator found = group_specs_.find(group.runtime_id().value);
+    if (found != group_specs_.end() && (*found).second == spec) return;
     group_specs_[group.runtime_id().value] = std::move(spec);
     invalidate(invalidation::bounds);
 }
@@ -92,9 +103,10 @@ void CommandOverflowPanel::set_group_spec(
 std::optional<CommandOverflowGroupSpec> CommandOverflowPanel::group_spec(
     const Control& group) const {
     if (group.parent().get() != this || !group.is_alive()) return std::nullopt;
-    const auto found = group_specs_.find(group.runtime_id().value);
+    const GroupSpecMap::const_iterator found =
+        group_specs_.find(group.runtime_id().value);
     return found == group_specs_.end() ? std::nullopt
-                                      : std::optional(found->second);
+                                      : std::optional((*found).second);
 }
 
 void CommandOverflowPanel::clear_group_spec(const Control& group) {
@@ -130,16 +142,16 @@ void CommandOverflowPanel::clear_overflow_actuator() {
 void CommandOverflowPanel::reconcile_metadata() {
     std::unordered_set<std::uint64_t> live;
     for (const Control::Ptr& child : children()) {
-        if (child && child->is_alive() && child->parent().get() == this) {
-            live.insert(child->runtime_id().value);
+        if (child && (*child).is_alive() && (*child).parent().get() == this) {
+            live.insert((*child).runtime_id().value);
         }
     }
-    for (auto entry = group_specs_.begin(); entry != group_specs_.end();) {
-        if (!live.contains(entry->first)) entry = group_specs_.erase(entry);
+    for (GroupSpecMap::iterator entry = group_specs_.begin(); entry != group_specs_.end();) {
+        if (!live.contains((*entry).first)) entry = group_specs_.erase(entry);
         else ++entry;
     }
     const std::shared_ptr<Control> actuator = overflow_actuator_.lock();
-    if (!actuator || !actuator->is_alive() || actuator->parent().get() != this) {
+    if (!actuator || !(*actuator).is_alive() || (*actuator).parent().get() != this) {
         overflow_actuator_.reset();
     }
 }
@@ -159,23 +171,23 @@ CommandOverflowPanel::LayoutResult CommandOverflowPanel::layout_groups(
     };
     std::vector<Item> items;
     for (const Control::Ptr& child : snapshot_layout_children()) {
-        if (!is_current_layout_child(child) || !child->visible() ||
+        if (!is_current_layout_child(child) || !(*child).visible() ||
             child == overflow_actuator_.lock()) {
             continue;
         }
         const Size desired = preferred_child_size(child, inner);
         if (!is_alive()) return {};
-        if (!is_current_layout_child(child) || !child->visible()) continue;
-        const auto found = group_specs_.find(child->runtime_id().value);
+        if (!is_current_layout_child(child) || !(*child).visible()) continue;
+        const GroupSpecMap::iterator found = group_specs_.find((*child).runtime_id().value);
         CommandOverflowGroupSpec spec;
         if (found == group_specs_.end()) {
-            spec.minimum = desired.width + horizontal_extent(child->margin());
+            spec.minimum = desired.width + horizontal_extent((*child).margin());
             spec.preferred = spec.minimum;
             spec.maximum = spec.minimum;
         } else {
-            spec = found->second;
+            spec = (*found).second;
         }
-        items.push_back({child, spec, desired, child->margin()});
+        items.push_back({child, spec, desired, (*child).margin()});
     }
     if (items.size() > maximum_command_groups) {
         throw std::logic_error("CommandOverflowPanel retained group count exceeds 32");
@@ -193,14 +205,14 @@ CommandOverflowPanel::LayoutResult CommandOverflowPanel::layout_groups(
         measured.push_back(item.desired.width + horizontal_extent(item.margin));
     }
     Window* const owner = attached_window();
-    const double device_scale = owner == nullptr ? 1.0 : owner->scale();
+    const double device_scale = owner == nullptr ? 1.0 : (*owner).scale();
     const Control::Ptr focused = owner == nullptr ? Control::Ptr{}
-                                                   : owner->focused_control();
+                                                   : (*owner).focused_control();
     std::vector<std::size_t> protected_tracks;
     std::optional<std::size_t> focused_track;
     for (std::size_t index = 0U; index < items.size(); ++index) {
         if (focused && (items[index].control == focused ||
-                        items[index].control->contains(*focused))) {
+                        (*items[index].control).contains(*focused))) {
             protected_tracks.push_back(index);
             focused_track = index;
             break;
@@ -214,9 +226,9 @@ CommandOverflowPanel::LayoutResult CommandOverflowPanel::layout_groups(
     Size actuator_desired{};
     Insets actuator_margin{};
     double actuator_extent = 0.0;
-    if (actuator && actuator->visible()) {
+    if (actuator && (*actuator).visible()) {
         actuator_desired = preferred_child_size(actuator, inner);
-        actuator_margin = actuator->margin();
+        actuator_margin = (*actuator).margin();
         actuator_extent = actuator_desired.width + horizontal_extent(actuator_margin);
     }
     if (needs_actuator && actuator) {
@@ -230,7 +242,7 @@ CommandOverflowPanel::LayoutResult CommandOverflowPanel::layout_groups(
                 tracks, measured, std::max(0.0, inner.width - reserved),
                 group_gap_, device_scale);
             if (alternative.tracks[*focused_track].collapsed() &&
-                actuator->focusable() && owner->request_focus(actuator)) {
+                (*actuator).focusable() && (*owner).request_focus(actuator)) {
                 resolution = std::move(alternative);
             }
         }
@@ -244,17 +256,12 @@ CommandOverflowPanel::LayoutResult CommandOverflowPanel::layout_groups(
     snapshot.groups.reserve(items.size());
     for (std::size_t index = 0U; index < items.size(); ++index) {
         snapshot.groups.push_back({
-            std::string(items[index].control->stable_id().value()),
+            std::string((*items[index].control).stable_id().value()),
             measured[index], resolution.tracks[index].allocated,
             resolution.tracks[index].collapsed(),
             items[index].spec.collapse_priority});
     }
-    const double desired_groups = [&] {
-        double value = 0.0;
-        for (const auto& track : tracks) value += track.preferred;
-        if (tracks.size() > 1U) value += group_gap_ * (tracks.size() - 1U);
-        return value;
-    }();
+    const double desired_groups = desired_track_extent(tracks, group_gap_);
 
     if (assign) {
         for (std::size_t index = 0U; index < items.size(); ++index) {

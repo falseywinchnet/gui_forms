@@ -155,7 +155,8 @@ VisualInspectionSnapshot Window::visual_inspection_snapshot(
     if (root_) {
         pending.push_back({root_, std::nullopt, {}, 0U, false, window_clip, 0U});
     }
-    for (auto iterator = popups_.rbegin(); iterator != popups_.rend(); ++iterator) {
+    for (PopupList::reverse_iterator iterator = popups_.rbegin();
+         iterator != popups_.rend(); ++iterator) {
         if (!*iterator || !(*(*iterator)).connected()) continue;
         const Control::Ptr popup = (*(*iterator)).popup();
         if (popup) {
@@ -275,7 +276,8 @@ VisualInspectionSnapshot Window::visual_inspection_snapshot(
         }
 
         const std::vector<Control::Ptr> children = (*control).children_;
-        for (auto iterator = children.rbegin(); iterator != children.rend(); ++iterator) {
+        for (ControlList::const_reverse_iterator iterator = children.rbegin();
+             iterator != children.rend(); ++iterator) {
             const Control::Ptr& child = *iterator;
             if (!child || !(*child).is_alive() || (*child).window_ != this ||
                 (*child).parent_.lock().get() != control.get()) {

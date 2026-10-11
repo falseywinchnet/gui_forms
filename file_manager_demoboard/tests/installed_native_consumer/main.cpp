@@ -5,19 +5,21 @@
 #include <string_view>
 
 int main(int argc, char** argv) {
-    auto root = std::make_shared<gui_forms::Panel>(
-        gui_forms::StableId("installed.native.root"));
-    auto label = std::make_shared<gui_forms::Label>(
-        gui_forms::StableId("installed.native.label"),
-        "GUI.Forms installed native application target");
-    label->set_requested_bounds({24, 24, 360, 28});
-    root->add_child(label);
+    std::shared_ptr<gui_forms::Panel> root =
+        std::make_shared<gui_forms::Panel>(
+            gui_forms::StableId("installed.native.root"));
+    std::shared_ptr<gui_forms::Label> label =
+        std::make_shared<gui_forms::Label>(
+            gui_forms::StableId("installed.native.label"),
+            "GUI.Forms installed native application target");
+    (*label).set_requested_bounds({24, 24, 360, 28});
+    (*root).add_child(label);
 
-    auto window = std::make_unique<gui_forms::Window>(root,
-                                                      gui_forms::Size{520, 240});
+    std::unique_ptr<gui_forms::Window> window =
+        std::make_unique<gui_forms::Window>(root, gui_forms::Size{520, 240});
     if (argc == 2 && std::string_view(argv[1]) == "--model-only") {
-        window->perform_layout();
-        return window->find("installed.native.label") == label ? 0 : 1;
+        (*window).perform_layout();
+        return (*window).find("installed.native.label") == label ? 0 : 1;
     }
 
     gui_forms::host::MacHostOptions options;

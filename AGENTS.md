@@ -6,6 +6,27 @@ subtree may never include, link, inspect, or depend on sources outside
 `gui_forms/`, except pinned third-party dependencies explicitly declared by its
 own build.
 
+## Code style (mandatory)
+
+All first-party C++ and Objective-C++ in this repository follows
+`planning/PROGRAMMING_HOUSE_STYLE.md`. Read it in full before writing or
+changing code; section 10, "C++ spelling", is the short form. Among other
+rules: spell every type (no `auto`, no trailing returns, no structured
+bindings), write `(*pointer).member` instead of `->`, name all executable
+behaviour (no lambdas), and write comparisons by hand (no `= default`
+comparisons). Match the surrounding code's naming and comment density.
+
+Before committing, run the spelling check over everything you touched; the
+`house-style` CI job runs it over every first-party directory and fails on any
+finding:
+
+```text
+python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+```
+
+The check covers spelling only. Ownership, lifetime, initialization and
+naming still need review against the full document.
+
 ## Scope of the first proving slice
 
 Build a native macOS control-gallery demonstration and automated tests proving:

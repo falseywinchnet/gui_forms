@@ -49,15 +49,15 @@ int main() {
             snapshot.find("visual-inspector.clipped-child");
         const VisualControlInspection* overlay =
             snapshot.find("visual-inspector.overlay");
-        require(card && card->authored_material && card->display_chunk_current &&
-                    (*card->authored_material).fills.size() == 3U,
+        require(card && (*card).authored_material && (*card).display_chunk_current &&
+                    (*(*card).authored_material).fills.size() == 3U,
                 "lab must dogfood ordered authored material inspection");
-        require(text && text->display_chunk_current,
+        require(text && (*text).display_chunk_current,
                 "lab must dogfood committed resolved text inspection");
-        require(clipped && clipped->layout.clipped_by_ancestor,
+        require(clipped && (*clipped).layout.clipped_by_ancestor,
                 "lab must dogfood ancestor clip inspection");
-        require(overlay && overlay->paint_plane == PaintPlane::overlay &&
-                    overlay->state.hit_test_transparent,
+        require(overlay && (*overlay).paint_plane == PaintPlane::overlay &&
+                    (*overlay).state.hit_test_transparent,
                 "lab overlay must remain pointer-transparent and ordered last");
         require(snapshot.total_controls >= 20U,
                 "lab must contain a representative retained inspection surface");

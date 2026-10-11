@@ -288,24 +288,24 @@ void test_seam_tab_pointer_keyboard_and_semantic_collapse() {
 }
 
 void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
-    auto split = make_control<SplitContainer>(StableId("split.grip.visual"));
-    split->set_splitter_width(3.0);
-    split->set_splitter_hit_width(9.0);
-    split->set_splitter_distance(120.0);
-    split->set_collapse_panel(SplitFixedPanel::second);
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("split.grip.visual"));
+    (*split).set_splitter_width(3.0);
+    (*split).set_splitter_hit_width(9.0);
+    (*split).set_splitter_distance(120.0);
+    (*split).set_collapse_panel(SplitFixedPanel::second);
     Window window(split, {400.0, 180.0});
     window.perform_layout();
-    split->set_splitter_transition_duration(0ms);
-    const Control::Ptr grip = split->splitter_control();
-    const Rect seam = grip->absolute_bounds();
-    const Insets outsets = grip->visual_outsets();
+    (*split).set_splitter_transition_duration(0ms);
+    const Control::Ptr grip = (*split).splitter_control();
+    const Rect seam = (*grip).absolute_bounds();
+    const Insets outsets = (*grip).visual_outsets();
     require(near(seam.width, 9.0) && near(outsets.left, 10.5) &&
                 near(outsets.right, 10.5) && near(outsets.top, 0.0) &&
                 near(outsets.bottom, 0.0),
             "vertical seam must retain a nine-unit hit strip and declare the complete engaged shadow outsets");
 
     GripRecordingPainter rest;
-    grip->on_paint(rest, {0.0, 0.0, seam.width, seam.height});
+    (*grip).on_paint(rest, {0.0, 0.0, seam.width, seam.height});
     require(rest.fills.size() == 2U && near(rest.fills[0].width, 3.0) &&
                 near(rest.fills[1].width, 7.0) &&
                 near(rest.fills[1].height, 28.0) && rest.shadows.empty() &&
@@ -317,7 +317,7 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::move, PointerButton::none, center}));
     GripRecordingPainter hot;
-    grip->on_paint(hot, {0.0, 0.0, seam.width, seam.height});
+    (*grip).on_paint(hot, {0.0, 0.0, seam.width, seam.height});
     require(hot.fills.size() == 2U && near(hot.fills[1].width, 12.0) &&
                 near(hot.fills[1].height, 42.0) &&
                 near(hot.fills[1].x, -1.5) && hot.shadows.size() == 1U &&
@@ -327,7 +327,7 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::move, PointerButton::none, {20.0, 20.0}}));
     GripRecordingPainter left;
-    grip->on_paint(left, {0.0, 0.0, seam.width, seam.height});
+    (*grip).on_paint(left, {0.0, 0.0, seam.width, seam.height});
     require(left.fills.size() == 2U && near(left.fills[1].width, 7.0) &&
                 near(left.fills[1].height, 28.0) && left.shadows.empty(),
             "leaving the actuator proximity must restore its quiet rest geometry");
@@ -337,7 +337,7 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
     static_cast<void>(window.dispatch_key(
         {KeyAction::down, PhysicalKey::a}));
     GripRecordingPainter focused;
-    grip->on_paint(focused, {0.0, 0.0, seam.width, seam.height});
+    (*grip).on_paint(focused, {0.0, 0.0, seam.width, seam.height});
     require(focused.fills.size() == 2U &&
                 near(focused.fills[1].width, 12.0) &&
                 near(focused.fills[1].height, 42.0) &&
@@ -352,7 +352,7 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
     require(window.dispatch_pointer(down),
             "collapse actuator press must route through the expanded activation box");
     GripRecordingPainter pressed;
-    grip->on_paint(pressed, {0.0, 0.0, seam.width, seam.height});
+    (*grip).on_paint(pressed, {0.0, 0.0, seam.width, seam.height});
     require(pressed.fills.size() == 2U &&
                 near(pressed.fills[1].width, 12.0) &&
                 near(pressed.fills[1].height, 42.0) &&
@@ -360,25 +360,25 @@ void test_seam_grip_rest_proximity_focus_press_and_orientation_paint() {
             "pressed collapse actuator must retain its pre-activation engaged treatment");
     PointerEvent up = down;
     up.action = PointerAction::up;
-    require(window.dispatch_pointer(up) && split->second_collapsed(),
+    require(window.dispatch_pointer(up) && (*split).second_collapsed(),
             "engaged grip release must preserve the existing pane-collapse action");
 
-    auto horizontal = make_control<SplitContainer>(
+    std::shared_ptr<SplitContainer> horizontal = make_control<SplitContainer>(
         StableId("split.grip.horizontal"));
-    horizontal->set_orientation(Orientation::horizontal);
-    horizontal->set_splitter_width(3.0);
-    horizontal->set_splitter_hit_width(9.0);
-    horizontal->set_splitter_distance(50.0);
-    horizontal->set_collapse_panel(SplitFixedPanel::first);
+    (*horizontal).set_orientation(Orientation::horizontal);
+    (*horizontal).set_splitter_width(3.0);
+    (*horizontal).set_splitter_hit_width(9.0);
+    (*horizontal).set_splitter_distance(50.0);
+    (*horizontal).set_collapse_panel(SplitFixedPanel::first);
     Window horizontal_window(horizontal, {180.0, 120.0});
     horizontal_window.perform_layout();
-    const Control::Ptr horizontal_grip = horizontal->splitter_control();
-    const Insets horizontal_outsets = horizontal_grip->visual_outsets();
+    const Control::Ptr horizontal_grip = (*horizontal).splitter_control();
+    const Insets horizontal_outsets = (*horizontal_grip).visual_outsets();
     GripRecordingPainter horizontal_rest;
-    horizontal_grip->on_paint(
+    (*horizontal_grip).on_paint(
         horizontal_rest, {0.0, 0.0,
-                          horizontal_grip->absolute_bounds().width,
-                          horizontal_grip->absolute_bounds().height});
+                          (*horizontal_grip).absolute_bounds().width,
+                          (*horizontal_grip).absolute_bounds().height});
     require(near(horizontal_outsets.top, 8.5) &&
                 near(horizontal_outsets.bottom, 12.5) &&
                 horizontal_rest.fills.size() == 2U &&
@@ -466,7 +466,7 @@ void test_content_aware_maximum_extents() {
 }
 
 void test_physical_hairline_asymmetric_hit_geometry_and_atomic_rejection() {
-    auto split = make_control<SplitContainer>(StableId("split.physical"));
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("split.physical"));
     SplitSeamGeometry geometry;
     geometry.visible_thickness = 1.0;
     geometry.thickness_policy =
@@ -474,12 +474,12 @@ void test_physical_hairline_asymmetric_hit_geometry_and_atomic_rejection() {
     geometry.hit_before = 5.0;
     geometry.hit_after = 7.0;
     geometry.minimum_hit_target = 12.0;
-    split->set_splitter_geometry(geometry);
-    split->set_splitter_distance(100.0);
+    (*split).set_splitter_geometry(geometry);
+    (*split).set_splitter_distance(100.0);
     Window window(split, {300.0, 160.0});
     window.perform_layout();
 
-    SplitSeamSnapshot at_one = split->splitter_seam_snapshot();
+    SplitSeamSnapshot at_one = (*split).splitter_seam_snapshot();
     require(near(at_one.visible_bounds.width, 1.0) &&
                 near(at_one.visible_device_pixels, 1.0) &&
                 near(at_one.hit_bounds.x, 95.0) &&
@@ -489,85 +489,85 @@ void test_physical_hairline_asymmetric_hit_geometry_and_atomic_rejection() {
 
     window.set_scale(2.0);
     window.perform_layout();
-    SplitSeamSnapshot at_two = split->splitter_seam_snapshot();
+    SplitSeamSnapshot at_two = (*split).splitter_seam_snapshot();
     require(near(at_two.visible_bounds.width, 0.5) &&
                 near(at_two.visible_device_pixels, 1.0) &&
                 near(at_two.hit_bounds.x, 95.0) &&
                 near(at_two.hit_bounds.width, 12.5) &&
                 at_two.hit_bounds.width >= geometry.minimum_hit_target &&
-                near((*split->second_panel()).arranged_bounds().x, 100.5),
+                near((*(*split).second_panel()).arranged_bounds().x, 100.5),
             "two-times hairline must remain one physical pixel while pane and hit geometry stay coherent");
-    require(window.hit_test({95.01, 10.0}) == split->splitter_control() &&
-                window.hit_test({107.49, 10.0}) == split->splitter_control(),
+    require(window.hit_test({95.01, 10.0}) == (*split).splitter_control() &&
+                window.hit_test({107.49, 10.0}) == (*split).splitter_control(),
             "both neighboring pane edges must deterministically resolve to the overlaid seam without a dead crack");
 
-    split->set_splitter_distance(100.26);
+    (*split).set_splitter_distance(100.26);
     window.perform_layout();
-    const SplitSeamSnapshot snapped = split->splitter_seam_snapshot();
+    const SplitSeamSnapshot snapped = (*split).splitter_seam_snapshot();
     require(near(snapped.visible_bounds.x, 100.5) &&
                 near(snapped.visible_bounds.x * snapped.device_scale,
                      std::round(snapped.visible_bounds.x *
                                 snapped.device_scale)),
             "physical hairline origin must snap deterministically to the device grid");
-    split->set_splitter_distance(100.0);
+    (*split).set_splitter_distance(100.0);
     window.perform_layout();
 
     GripRecordingPainter painter;
-    split->splitter_control()->on_paint(
+    (*(*split).splitter_control()).on_paint(
         painter, {0.0, 0.0, at_two.hit_bounds.width,
                   at_two.hit_bounds.height});
     require(painter.fills.size() == 1U &&
                 near(painter.fills.front().width, 0.5) && painter.lines == 0U,
             "physical hairline paint must commit one half-logical fill at two-times scale without wider relief strokes");
 
-    const SplitSeamGeometry before = split->splitter_geometry();
+    const SplitSeamGeometry before = (*split).splitter_geometry();
     SplitSeamGeometry invalid = before;
     invalid.hit_before = SplitSeamGeometry::maximum_hit_extension + 1.0;
     bool rejected{};
     try {
-        split->set_splitter_geometry(invalid);
+        (*split).set_splitter_geometry(invalid);
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && split->splitter_geometry() == before,
+    require(rejected && (*split).splitter_geometry() == before,
             "over-budget seam geometry must be rejected atomically without partially publishing its fields");
 
     invalid = before;
     invalid.minimum_hit_target = 40.0;
     rejected = false;
     try {
-        split->set_splitter_geometry(invalid);
+        (*split).set_splitter_geometry(invalid);
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && split->splitter_geometry() == before,
+    require(rejected && (*split).splitter_geometry() == before,
             "a hit geometry below its declared accessibility target must be rejected atomically");
 }
 
 void test_proximity_states_cancel_disable_detach_and_semantics() {
-    auto host = make_control<Panel>(StableId("split.proximity.host"));
-    auto split = make_control<SplitContainer>(StableId("split.proximity"));
-    split->set_requested_bounds({0.0, 0.0, 360.0, 180.0});
-    split->set_splitter_distance(140.0);
-    split->set_collapse_panel(SplitFixedPanel::second);
-    auto field = make_control<Button>(StableId("split.proximity.field"),
-                                      "Selection keeper");
-    field->set_requested_bounds({12.0, 12.0, 110.0, 24.0});
-    split->first_panel()->add_child(field);
-    host->add_child(split);
+    std::shared_ptr<Panel> host = make_control<Panel>(StableId("split.proximity.host"));
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("split.proximity"));
+    (*split).set_requested_bounds({0.0, 0.0, 360.0, 180.0});
+    (*split).set_splitter_distance(140.0);
+    (*split).set_collapse_panel(SplitFixedPanel::second);
+    std::shared_ptr<Button> field = make_control<Button>(StableId("split.proximity.field"),
+                                                         "Selection keeper");
+    (*field).set_requested_bounds({12.0, 12.0, 110.0, 24.0});
+    (*(*split).first_panel()).add_child(field);
+    (*host).add_child(split);
     Window window(host, {360.0, 180.0});
     window.perform_layout();
     require(window.request_focus(field),
             "proximity fixture requires independent content focus");
 
-    const Rect hit = split->splitter_control()->absolute_bounds();
+    const Rect hit = (*(*split).splitter_control()).absolute_bounds();
     PointerEvent near_event;
     near_event.action = PointerAction::move;
     near_event.position = {hit.x + 0.25, hit.y + 10.0};
     near_event.pointer_id = 7U;
     static_cast<void>(window.dispatch_pointer(near_event));
-    require(split->splitter_seam_snapshot().state == SplitSeamState::near &&
-                split->splitter_seam_snapshot().transition_active &&
+    require((*split).splitter_seam_snapshot().state == SplitSeamState::near &&
+                (*split).splitter_seam_snapshot().transition_active &&
                 window.focused_control() == field && window.next_wake(),
             "quiet proximity must reveal near state without stealing focus and schedule only its bounded transition");
 
@@ -575,93 +575,93 @@ void test_proximity_states_cancel_disable_detach_and_semantics() {
     hot_event.position = {hit.x + hit.width * 0.5,
                           hit.y + hit.height * 0.5};
     static_cast<void>(window.dispatch_pointer(hot_event));
-    require(split->splitter_seam_snapshot().state == SplitSeamState::hot &&
+    require((*split).splitter_seam_snapshot().state == SplitSeamState::hot &&
                 window.focused_control() == field,
             "actuator proximity must enter hot state without changing content focus");
 
     PointerEvent down = near_event;
     down.action = PointerAction::down;
     down.button = PointerButton::primary;
-    const double original = split->splitter_distance();
+    const double original = (*split).splitter_distance();
     require(window.dispatch_pointer(down) &&
-                split->splitter_seam_snapshot().state ==
+                (*split).splitter_seam_snapshot().state ==
                     SplitSeamState::dragging &&
-                window.captured_control() == split->splitter_control(),
+                window.captured_control() == (*split).splitter_control(),
             "a press in the wide seam target must enter explicit drag state and capture");
     PointerEvent move = down;
     move.action = PointerAction::move;
     move.button = PointerButton::none;
     move.position.x += 30.0;
     require(window.dispatch_pointer(move) &&
-                split->splitter_distance() > original,
+                (*split).splitter_distance() > original,
             "captured seam drag must update its semantic value live");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
                 !window.captured_control() &&
-                near(split->splitter_distance(), original),
+                near((*split).splitter_distance(), original),
             "Escape must cancel a live seam drag, release capture, and restore its starting value");
 
     static_cast<void>(window.dispatch_pointer(down));
-    require(window.captured_control() == split->splitter_control(),
+    require(window.captured_control() == (*split).splitter_control(),
             "disable fixture must begin with retained seam capture");
-    split->set_enabled(false);
+    (*split).set_enabled(false);
     require(!window.captured_control() &&
-                split->splitter_seam_snapshot().state ==
+                (*split).splitter_seam_snapshot().state ==
                     SplitSeamState::disabled,
             "disabling an ancestor seam control must revoke capture and expose disabled state");
-    split->set_enabled(true);
+    (*split).set_enabled(true);
     static_cast<void>(window.dispatch_pointer(
         {PointerAction::move, PointerButton::none, {20.0, 170.0}}));
-    split->set_second_collapsed(true, SplitCollapseOrigin::user);
+    (*split).set_second_collapsed(true, SplitCollapseOrigin::user);
     window.perform_layout();
-    require(split->splitter_seam_snapshot().state ==
+    require((*split).splitter_seam_snapshot().state ==
                 SplitSeamState::collapsed,
             "a quiet collapsed seam must retain an explicit collapsed state");
-    split->set_second_collapsed(false, SplitCollapseOrigin::user);
+    (*split).set_second_collapsed(false, SplitCollapseOrigin::user);
     window.perform_layout();
 
-    const double before_semantic = split->splitter_distance();
-    const SemanticDescriptor semantics = split->semantic_descriptor();
+    const double before_semantic = (*split).splitter_distance();
+    const SemanticDescriptor semantics = (*split).semantic_descriptor();
     require(semantics.numeric_value == before_semantic &&
                 semantics.minimum_value.has_value() &&
                 semantics.maximum_value.has_value() &&
                 window.perform_semantic_action(
                     "split.proximity", SemanticAction::increment) &&
-                split->splitter_distance() > before_semantic &&
+                (*split).splitter_distance() > before_semantic &&
                 window.perform_semantic_action(
                     "split.proximity", SemanticAction::set_value, "170") &&
-                near(split->splitter_distance(), 170.0),
+                near((*split).splitter_distance(), 170.0),
             "adjustable seam semantics must expose range value plus shared increment and set-value actions");
 
-    const Rect detached_hit = split->splitter_control()->absolute_bounds();
+    const Rect detached_hit = (*(*split).splitter_control()).absolute_bounds();
     PointerEvent detach_down;
     detach_down.action = PointerAction::down;
     detach_down.button = PointerButton::primary;
     detach_down.position = {detached_hit.x + 0.25,
                             detached_hit.y + 10.0};
     require(window.dispatch_pointer(detach_down) &&
-                window.captured_control() == split->splitter_control(),
+                window.captured_control() == (*split).splitter_control(),
             "detach fixture must begin with retained seam capture");
-    static_cast<void>(host->remove_child(split->runtime_id()));
-    require(!window.captured_control() && split->attached_window() == nullptr &&
-                split->splitter_seam_snapshot().state == SplitSeamState::idle,
+    static_cast<void>((*host).remove_child((*split).runtime_id()));
+    require(!window.captured_control() && (*split).attached_window() == nullptr &&
+                (*split).splitter_seam_snapshot().state == SplitSeamState::idle,
             "detaching a captured seam must release capture and clear every proximity interaction flag");
 }
 
 void test_bounded_seam_interpolation_and_reduced_motion() {
-    auto split = make_control<SplitContainer>(StableId("split.transition"));
-    split->set_splitter_distance(140.0);
-    split->set_collapse_panel(SplitFixedPanel::second);
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("split.transition"));
+    (*split).set_splitter_distance(140.0);
+    (*split).set_collapse_panel(SplitFixedPanel::second);
     Window window(split, {360.0, 180.0});
     window.perform_layout();
 
-    const SplitSeamSnapshot resting = split->splitter_seam_snapshot();
+    const SplitSeamSnapshot resting = (*split).splitter_seam_snapshot();
     require(near(resting.transition_duration_milliseconds, 90.0) &&
                 !resting.transition_active &&
                 near(resting.actuator_bounds.width, 7.0) &&
                 near(resting.actuator_bounds.height, 28.0),
             "collapse-tab interpolation must default to a quiescent 90-millisecond retained rest geometry");
 
-    const Rect hit = split->splitter_control()->absolute_bounds();
+    const Rect hit = (*(*split).splitter_control()).absolute_bounds();
     PointerEvent hover;
     hover.action = PointerAction::move;
     hover.position = {hit.x + hit.width * 0.5,
@@ -669,7 +669,7 @@ void test_bounded_seam_interpolation_and_reduced_motion() {
     hover.pointer_id = 41U;
     static_cast<void>(window.dispatch_pointer(hover));
 
-    const SplitSeamSnapshot started = split->splitter_seam_snapshot();
+    const SplitSeamSnapshot started = (*split).splitter_seam_snapshot();
     require(started.state == SplitSeamState::hot &&
                 started.transition_active &&
                 near(started.transition_progress, 0.0) &&
@@ -677,8 +677,8 @@ void test_bounded_seam_interpolation_and_reduced_motion() {
                 window.next_wake().has_value(),
             "hot proximity must start from the committed rest geometry and own one bounded frame lease");
 
-    split->splitter_control()->on_frame(FrameClock::now() + 45ms);
-    const SplitSeamSnapshot middle = split->splitter_seam_snapshot();
+    (*(*split).splitter_control()).on_frame(FrameClock::now() + 45ms);
+    const SplitSeamSnapshot middle = (*split).splitter_seam_snapshot();
     require(middle.transition_active &&
                 middle.transition_progress > 0.0 &&
                 middle.transition_progress < 1.0 &&
@@ -691,8 +691,8 @@ void test_bounded_seam_interpolation_and_reduced_motion() {
                 middle.hit_bounds == resting.hit_bounds,
             "visual interpolation must remain orthogonal to physical seam and proximity geometry");
 
-    split->splitter_control()->on_frame(FrameClock::now() + 180ms);
-    const SplitSeamSnapshot finished = split->splitter_seam_snapshot();
+    (*(*split).splitter_control()).on_frame(FrameClock::now() + 180ms);
+    const SplitSeamSnapshot finished = (*split).splitter_seam_snapshot();
     require(!finished.transition_active &&
                 near(finished.transition_progress, 1.0) &&
                 near(finished.actuator_bounds.width, 12.0) &&
@@ -705,25 +705,25 @@ void test_bounded_seam_interpolation_and_reduced_motion() {
     window.set_presentation_settings(calm);
     PointerEvent leave = hover;
     leave.action = PointerAction::leave;
-    static_cast<void>(split->splitter_control()->on_pointer(leave));
-    const SplitSeamSnapshot reduced = split->splitter_seam_snapshot();
+    static_cast<void>((*(*split).splitter_control()).on_pointer(leave));
+    const SplitSeamSnapshot reduced = (*split).splitter_seam_snapshot();
     require(!reduced.transition_active &&
                 near(reduced.actuator_bounds.width, 7.0) &&
                 near(reduced.actuator_bounds.height, 28.0) &&
                 !window.next_wake().has_value(),
             "reduced motion must replace interpolation with an immediate exact state change");
 
-    split->set_splitter_transition_duration(0ms);
-    require(split->splitter_transition_duration() == 0ms,
+    (*split).set_splitter_transition_duration(0ms);
+    require((*split).splitter_transition_duration() == 0ms,
             "consumers must be able to explicitly select immediate seam presentation");
-    const FrameInterval before = split->splitter_transition_duration();
+    const FrameInterval before = (*split).splitter_transition_duration();
     bool rejected{};
     try {
-        split->set_splitter_transition_duration(1001ms);
+        (*split).set_splitter_transition_duration(1001ms);
     } catch (const std::invalid_argument&) {
         rejected = true;
     }
-    require(rejected && split->splitter_transition_duration() == before,
+    require(rejected && (*split).splitter_transition_duration() == before,
             "over-budget seam duration must be rejected atomically");
 }
 
