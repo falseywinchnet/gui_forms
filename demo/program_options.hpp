@@ -4,10 +4,11 @@
 // (Gallery, Correspondence and the labs) on every host:
 //
 //   --automation        Windows: enable the WM_COPYDATA automation channel.
-//   --smoke-test        --capture to a temporary file: present one frame, print
-//                       the capture line and the close receipt, exit 0.
-//                       Other hosts accept and ignore the flag so one CI
-//                       command line works everywhere.
+//   --smoke-test        The packaged-program proof, shaped like PlaySuite's:
+//                       the program runs normally, a UI timer closes the
+//                       window once a frame has been presented, the host
+//                       prints its close receipt and main prints
+//                       "GUI.Forms window smoke passed" before exiting 0.
 //   --capture <path>    After the first presented frame that covers the whole
 //                       window, write the framebuffer as PNG to <path>, print
 //                       {"automation":"capture","saved":true|false,"path":"..."}
@@ -19,22 +20,27 @@
 // Header-only so every demo executable can include it without a new library.
 // It is demo-facing code: no host, renderer or platform type appears here.
 
+#include "gui_forms/host/types/host_types.hpp"
 #include "gui_forms/types.hpp"
+#include "gui_forms/window.hpp"
 
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <ctime>
-#include <filesystem>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace gui_forms::demo {
 
 struct ProgramOptions final {
     bool automation{};
+    bool smoke_test{};
     std::string capture_path;
     std::optional<Size> capture_size;
     double scale_hint{};
@@ -78,19 +84,6 @@ inline bool parse_size(std::string_view text, Size& size) {
 
 } // namespace detail
 
-// The capture file a --smoke-test run writes: a per-process name under the
-// platform temporary directory, so parallel smokes never collide.
-inline std::string smoke_test_capture_path() {
-    std::error_code error;
-    std::filesystem::path directory = std::filesystem::temp_directory_path(error);
-    if (error) directory = std::filesystem::current_path(error);
-    const std::filesystem::path file =
-        directory / ("gui-forms-smoke-" + std::to_string(static_cast<unsigned long long>(
-                         std::hash<std::string>{}(std::filesystem::current_path(error).string()) ^
-                         static_cast<std::size_t>(std::time(nullptr)))) + ".png");
-    return file.string();
-}
-
 // Returns nullopt after printing usage to stderr when an argument is unknown,
 // a value is missing, or a value is malformed.
 inline std::optional<ProgramOptions> parse_program_options(int argc, char** argv) {
@@ -107,9 +100,7 @@ inline std::optional<ProgramOptions> parse_program_options(int argc, char** argv
             continue;
         }
         if (argument == "--smoke-test") {
-            // A packaged program proves itself the way PlaySuite's does: present
-            // one frame, print the capture line and the close receipt, exit 0.
-            options.capture_path = smoke_test_capture_path();
+            options.smoke_test = true;
             continue;
         }
         const bool wants_value = argument == "--capture" || argument == "--size" ||
@@ -155,6 +146,101 @@ template <class HostOptions>
 inline void apply_program_options(const ProgramOptions& program, HostOptions& host) {
     host.capture_path = program.capture_path;
     host.capture_size = program.capture_size;
+}
+
+// --smoke-test, the way PlaySuite proves its packaged programs: nothing
+// special is rendered or captured. The host attaches and shows the window as
+// it always does; once it reports ready, a UI timer on the window's root
+// control polls the presented-frame count and requests the ordinary close as
+// soon as one frame is on screen (or after the deadline, so a program that
+// never presents still exits and fails on its receipt). main then prints the
+// pass line when the host returned 0.
+struct SmokeTest final {
+    Window* window{};
+    FrameTime started{};
+    bool completed{};
+    std::function<void()> request_close;
+    FrameRequestToken timer;
+};
+
+inline constexpr std::string_view smoke_test_pass_line = "GUI.Forms window smoke passed";
+
+struct SmokeTestTick final {
+    std::weak_ptr<SmokeTest> state;
+
+    void operator()(FrameTime now) const {
+        const std::shared_ptr<SmokeTest> live = state.lock();
+        if (!live || (*live).completed || !(*live).request_close || (*live).window == nullptr) {
+            return;
+        }
+        const double seconds = std::chrono::duration<double>(now - (*live).started).count();
+        const bool presented = (*(*live).window).metrics_snapshot().frames_presented >= 1U;
+        if ((presented && seconds >= 1.0) || seconds >= 10.0) {
+            (*live).completed = true;
+            (*live).request_close();
+        }
+    }
+};
+
+using HostReadyCallback = std::function<void(
+    std::function<void()>, std::function<void()>,
+    std::function<HostDialogResult(const HostDialogRequest&)>,
+    std::function<HostServiceStatus(const HostTooltipRequest&)>, std::function<void()>,
+    std::function<HostClipboardTextResult()>, std::function<HostServiceStatus(std::string_view)>)>;
+
+struct SmokeTestHostReady final {
+    std::shared_ptr<SmokeTest> state;
+    HostReadyCallback previous;
+
+    void operator()(std::function<void()> wake, std::function<void()> request_close,
+                    std::function<HostDialogResult(const HostDialogRequest&)> show_dialog,
+                    std::function<HostServiceStatus(const HostTooltipRequest&)> show_tooltip,
+                    std::function<void()> hide_tooltip,
+                    std::function<HostClipboardTextResult()> read_clipboard_text,
+                    std::function<HostServiceStatus(std::string_view)> write_clipboard_text) const {
+        (*state).request_close = request_close;
+        (*state).started = FrameClock::now();
+        const Control::Ptr root = (*(*state).window).root();
+        const FrameInterval interval = std::chrono::milliseconds(50);
+        (*state).timer = (*(*state).window).schedule_ui_timer(
+            *root, interval, (*state).started + interval, SmokeTestTick{state});
+        if (previous) {
+            previous(std::move(wake), std::move(request_close), std::move(show_dialog),
+                     std::move(show_tooltip), std::move(hide_tooltip),
+                     std::move(read_clipboard_text), std::move(write_clipboard_text));
+        }
+    }
+};
+
+// Arms the smoke on a host option struct (MacHostOptions, WindowsHostOptions,
+// LinuxHostOptions) for the window the host is about to run. Returns null when
+// --smoke-test was not given; pass the result to smoke_test_result.
+template <class HostOptions>
+[[nodiscard]] inline std::shared_ptr<SmokeTest> arm_smoke_test(const ProgramOptions& program,
+                                                               HostOptions& host, Window& window) {
+    if (!program.smoke_test) return nullptr;
+    std::shared_ptr<SmokeTest> state = std::make_shared<SmokeTest>();
+    (*state).window = &window;
+    host.print_metrics_on_close = true;
+    host.host_ready = SmokeTestHostReady{state, std::move(host.host_ready)};
+    return state;
+}
+
+// The process exit code after the host returned: unchanged without a smoke;
+// 1 when the smoke never reached its scheduled close; the host's code
+// otherwise, with the pass line printed on 0.
+inline int smoke_test_result(const std::shared_ptr<SmokeTest>& state, int exit_code) {
+    if (!state) return exit_code;
+    if (!(*state).completed) {
+        std::fprintf(stderr, "GUI.Forms window smoke did not reach its scheduled close\n");
+        return exit_code == 0 ? 1 : exit_code;
+    }
+    if (exit_code == 0) {
+        std::fprintf(stdout, "%.*s\n", static_cast<int>(smoke_test_pass_line.size()),
+                     smoke_test_pass_line.data());
+        std::fflush(stdout);
+    }
+    return exit_code;
 }
 
 } // namespace gui_forms::demo

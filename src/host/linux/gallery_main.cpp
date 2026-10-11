@@ -2,6 +2,7 @@
 #include "gui_forms/platform/linux_host.hpp"
 #include "program_options.hpp"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <utility>
@@ -17,6 +18,9 @@ int main(int argc, char** argv) {
     gui_forms::demo::apply_program_options(*program, options);
     // --automation is accepted for a uniform CI command line; the X11 host has
     // no WM_COPYDATA-style automation channel, so the flag has no effect here.
-    return gui_forms::host::run_linux(gui_forms::gallery::make_gallery(),
-                                      std::move(options));
+    std::unique_ptr<gui_forms::Window> window = gui_forms::gallery::make_gallery();
+    const std::shared_ptr<gui_forms::demo::SmokeTest> smoke =
+        gui_forms::demo::arm_smoke_test(*program, options, *window);
+    return gui_forms::demo::smoke_test_result(
+        smoke, gui_forms::host::run_linux(std::move(window), std::move(options)));
 }
