@@ -79,8 +79,11 @@ constexpr double search_width = 220.0;
     return MenuItemSpec(std::string(id), MenuItemKind::separator);
 }
 
+// English plural for the fixture nouns: "message"/"messages", "match"/"matches".
 [[nodiscard]] std::string plural(const std::size_t count, const std::string_view noun) {
-    return std::to_string(count) + " " + std::string(noun) + (count == 1U ? "" : "s");
+    std::string result = std::to_string(count) + " " + std::string(noun);
+    if (count != 1U) result += noun.ends_with("ch") ? "es" : "s";
+    return result;
 }
 
 }  // namespace
@@ -313,8 +316,10 @@ void CorrespondenceShell::build_panes() {
     content_split_ = make_control<SplitContainer>(StableId(std::string(ids::content_split)));
     (*content_split_).set_orientation(Orientation::horizontal);
     (*content_split_).set_splitter_distance(290.0);
-    (*content_split_).set_first_minimum(120.0);
-    (*content_split_).set_second_minimum(140.0);
+    // At the 600x420 minimum the list yields to the reading pane: its header
+    // block takes about 90 logical pixels, so 180 keeps the body readable.
+    (*content_split_).set_first_minimum(100.0);
+    (*content_split_).set_second_minimum(180.0);
     (*content_split_).set_dock(DockStyle::fill);
     (*(*split_).second_panel()).add_child(content_split_);
     (*(*content_split_).first_panel()).set_background(paper);

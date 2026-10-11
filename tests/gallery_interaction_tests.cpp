@@ -186,9 +186,11 @@ int main()
                (*window).next_wake().has_value(),
            "custom instrument declares a scheduled active surface while shown");
     const gui_forms::ImageRegistrySnapshot images = (*window).image_resource_snapshot();
-    // One validated PNG (the status badge) plus the six in-memory BGRA fixtures
-    // the image pages consume (test card, three folder icons, nine-patch, tile).
-    expect(images.resource_count == 7 && images.encoded_bytes == 146 &&
+    // One validated PNG (the status badge, 146 encoded bytes), the six
+    // in-memory BGRA fixtures the image pages consume (128x80 test card, three
+    // 16x16 folder icons, 18x18 nine-patch, 8x8 tile: 45,584 source bytes) and
+    // the images page's 12x12 RasterCanvas bitmap (576 bytes).
+    expect(images.resource_count == 8 && images.encoded_bytes == 46306 &&
                images.decoded_bytes > 16U * 16U * 4U,
            "Gallery status badge is owned and bounded by the core PNG registry");
     expect(!(*(*window).find("gallery.diagnostics")).visible(),
@@ -241,6 +243,10 @@ int main()
            "collection field text must use the content typography role");
     expect(gui_forms::gallery::select_gallery_page(*window, "basics"),
            "basics page selects again by stable id");
+    // Selecting a page damages the whole page surface; present that frame so
+    // the checkbox toggle below is the only pending damage.
+    CountingPainter page_switch_painter;
+    (*window).paint(page_switch_painter);
     (*window).reset_activity_metrics();
 
     const std::shared_ptr<gui_forms::CheckBox> checkbox = std::dynamic_pointer_cast<gui_forms::CheckBox>(
@@ -278,7 +284,14 @@ int main()
                                     gui_forms::PointerButton::primary,
                                     disabled_point});
     expect((*window).focused_control() != disabled, "disabled control cannot receive focus");
-    expect((*window).metrics_snapshot().activations == activations_before_disabled,
+    // A disabled control is transparent to hit testing, so the press lands on
+    // the page body beneath it; the body records the one pass-through
+    // activation and the disabled button records none.
+    const gui_forms::Control::Ptr beneath = (*window).hit_test(disabled_point);
+    expect(beneath != nullptr && beneath != disabled &&
+               (*beneath).stable_id().value() == "gallery.body.basics",
+           "disabled control passes the press through to the page body");
+    expect((*window).metrics_snapshot().activations == activations_before_disabled + 1U,
            "disabled control cannot activate");
 
     click(*window, "gallery.text-input");
