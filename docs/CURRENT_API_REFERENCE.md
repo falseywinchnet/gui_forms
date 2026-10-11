@@ -168,6 +168,14 @@ is applied through a shader mask filter, so the color passes through the same
 mask blitter as a direct blur; tests require byte-identical output for both.
 The Windows GDI host and other painters use the defaults.
 
+HarfBuzz shaping uses unhinted FreeType advances at the logical size
+(ADR-004): a line's width is linear in its font size and agrees with the
+glyph outlines at every device scale. Hinted logical-size advances previously
+drifted 47-character lines by up to 12 logical pixels. Vertical metrics are
+unchanged. This changes measured text widths by a few logical pixels per line;
+layouts that depend on exact widths reflow accordingly. The Windows GDI host
+still shapes through GDI until ADR-004 phase 6.
+
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.

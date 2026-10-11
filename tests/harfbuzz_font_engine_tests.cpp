@@ -500,8 +500,33 @@ void test_canonical_pair_coverage_preserves_source() {
 }
 } // namespace
 
+// ADR-004: advances are unhinted outline advances at the logical size, so a
+// line's width is linear in the font size. Each glyph's advance is rounded to
+// 1/64 px at each size; hinted advances missed linearity by several pixels.
+void test_advances_are_unhinted_and_scale_linearly() {
+    const std::string corpus = "Hamburgefonstiv quick brown fox 0123456789 Help";
+    const std::array<const char*, 2> fonts{GUI_FORMS_TEST_RAPIDS_REGULAR, GUI_FORMS_TEST_CARLITO_REGULAR};
+    for (const char* font : fonts) {
+        HarfBuzzFontEngine engine;
+        require(engine.register_typeface(FontRole::control, 400, false, read_file(font)).has_value(),
+                "linearity font registers");
+        const std::array<double, 3> sizes{9.0, 11.0, 13.0};
+        for (const double size : sizes) {
+            const ShapedText single = engine.shape(corpus, {FontRole::control, size, 400, false});
+            const ShapedText doubled = engine.shape(corpus, {FontRole::control, size * 2.0, 400, false});
+            std::size_t glyphs = 0;
+            for (const ShapedFontRun& run : single.runs) glyphs += run.glyphs.size();
+            require(glyphs > 40U, "linearity corpus shapes every glyph");
+            const double tolerance = static_cast<double>(glyphs) * 1.5 / 64.0;
+            require(near(doubled.width, single.width * 2.0, tolerance),
+                    "line width doubles with the font size (unhinted advances)");
+        }
+    }
+}
+
 int main() {
     try {
+        test_advances_are_unhinted_and_scale_linearly();
         test_canonical_pair_coverage_preserves_source();
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
         test_call_failure_preserves_caller_and_recovers();

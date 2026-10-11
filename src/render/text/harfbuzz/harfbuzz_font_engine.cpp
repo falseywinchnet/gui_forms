@@ -395,7 +395,11 @@ public:
             hb_font = font_owner.get();
             if (hb_font == nullptr || hb_font == hb_font_get_empty() ||
                 hb_ft_font_get_ft_face(hb_font) != face.face) { throw std::bad_alloc(); }
-            hb_ft_font_set_load_flags(hb_font, FT_LOAD_DEFAULT | FT_LOAD_NO_BITMAP);
+            // ADR-004: advances are the outlines' own, unhinted at the logical
+            // size, so glyph positions agree with the light-hinted glyphs drawn
+            // at any device scale. Hinted logical-size advances drifted lines by
+            // up to 12 logical px. Vertical metrics are unchanged.
+            hb_ft_font_set_load_flags(hb_font, FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP);
             CallFont& entry = call.fonts[font_count];
             entry.face = &face;
             entry.owner = std::move(font_owner);
