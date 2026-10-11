@@ -231,7 +231,7 @@ int main()
                painter.observed_role("COMPOSED", gui_forms::FontRole::control) &&
                painter.observed_role("Load 1 · attach 1 · init 1",
                                      gui_forms::FontRole::content) &&
-               painter.observed_role("Commands", gui_forms::FontRole::control),
+               painter.observed_role("Information display", gui_forms::FontRole::control),
            "titles and control chrome must use the control typography role");
     expect(painter.observed_role("Edit this text", gui_forms::FontRole::content),
            "editable field text must use the content typography role");
