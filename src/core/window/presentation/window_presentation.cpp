@@ -260,7 +260,8 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
                 plane_bounds = Rect::intersection(plane_damage_[index].bounds(),
                                                   window_bounds);
             }
-            const Rect pending_bounds = plane_damage_[index].bounds();
+            const Rect pending_bounds =
+                Rect::intersection(plane_damage_[index].bounds(), window_bounds);
             if (pending_bounds.empty() ||
                 Rect::intersection(plane_bounds, pending_bounds) == pending_bounds) {
                 plane_damage_[index].clear();
