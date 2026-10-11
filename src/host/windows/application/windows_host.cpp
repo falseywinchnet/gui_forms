@@ -2687,6 +2687,24 @@ private:
         tooltip_.pixels.clear();
     }
 
+    // The logical extent that the framebuffer rounds up to exactly pixels.
+    // pixels / scale can land a hair above the quotient (at 1.1, 71 / 1.1
+    // * 1.1 > 71), which would allocate an extra unpainted row or column.
+    static double logical_extent(const double pixels, const double scale) {
+        double logical = pixels / scale;
+        while (std::ceil(logical * scale) > pixels) logical = std::nextafter(logical, 0.0);
+        return logical;
+    }
+
+    // A logical rect that fill_rect maps to exactly the given device pixels.
+    // fill_rect covers every touched pixel, so edges at whole-pixel logical
+    // positions can spill a pixel either way; edges a quarter pixel inside
+    // the span cannot.
+    static Rect device_pixels(const double column, const double row, const double columns, const double rows,
+                              const double scale) {
+        return {(column + 0.25) / scale, (row + 0.25) / scale, (columns - 0.5) / scale, (rows - 0.5) / scale};
+    }
+
     // Wraps the tooltip text at word boundaries to 360 logical pixels and
     // paints it, with its face and border, through the window's painter.
     bool paint_tooltip(const std::string_view utf8) {
@@ -2732,18 +2750,18 @@ private:
         // The popup presents every allocated device pixel. Align its logical
         // extent before painting so fractional sizes cannot leave a clear
         // final row/column or make the one-device-pixel border two pixels wide.
-        const Size logical{std::ceil(requested.width * scale_) / scale_,
-                           std::ceil(requested.height * scale_) / scale_};
+        const double columns = std::ceil(requested.width * scale_);
+        const double rows = std::ceil(requested.height * scale_);
+        const Size logical{logical_extent(columns, scale_), logical_extent(rows, scale_)};
         const std::unique_ptr<PaintFramebuffer> framebuffer = raster_.create_framebuffer(logical, scale_);
         if (!framebuffer) return false;
         Painter& painter = (*framebuffer).painter();
-        const double hairline = 1.0 / scale_;
         const Color border = Color::rgba(105, 116, 128);
         painter.fill_rect({0.0, 0.0, logical.width, logical.height}, Color::rgba(255, 255, 240));
-        painter.fill_rect({0.0, 0.0, logical.width, hairline}, border);
-        painter.fill_rect({0.0, logical.height - hairline, logical.width, hairline}, border);
-        painter.fill_rect({0.0, 0.0, hairline, logical.height}, border);
-        painter.fill_rect({logical.width - hairline, 0.0, hairline, logical.height}, border);
+        painter.fill_rect(device_pixels(0.0, 0.0, columns, 1.0, scale_), border);
+        painter.fill_rect(device_pixels(0.0, rows - 1.0, columns, 1.0, scale_), border);
+        painter.fill_rect(device_pixels(0.0, 0.0, 1.0, rows, scale_), border);
+        painter.fill_rect(device_pixels(columns - 1.0, 0.0, 1.0, rows, scale_), border);
         for (std::size_t index = 0; index < lines.size(); ++index) {
             const Point baseline{8.0, 5.0 + metrics.ascent + line_height * static_cast<double>(index)};
             painter.draw_text_utf8(baseline, lines[index], font, Color::rgba(31, 37, 44));
