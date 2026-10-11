@@ -173,8 +173,8 @@ HarfBuzz shaping uses unhinted FreeType advances at the logical size
 glyph outlines at every device scale. Hinted logical-size advances previously
 drifted 47-character lines by up to 12 logical pixels. Vertical metrics are
 unchanged. This changes measured text widths by a few logical pixels per line;
-layouts that depend on exact widths reflow accordingly. The Windows GDI host
-still shapes through GDI until ADR-004 phase 6.
+layouts that depend on exact widths reflow accordingly. Since ADR-004 phase 6
+the Windows host shapes the same way.
 
 ADR-004 phase 2 adds the shared text engine pieces. `GlyphRunRasterizer`
 (private, text engine) rasterizes HarfBuzz-shaped runs with FreeType light
@@ -242,6 +242,19 @@ metrics are the face's unrounded ascender, descender and line gap. Invalid
 UTF-8 draws and measures nothing. `gui_drawing_skia` now requires
 `GUI_FORMS_ENABLE_HARFBUZZ_TEXT`. `gui_drawing_skia_tests` enforces one scene
 hash covering every text path, identical on macOS arm64 and Alpine aarch64.
+
+ADR-004 phase 6 moves the Win32 host's ordinary text onto the shared engine.
+`DibPainter` shapes with HarfBuzz, rasterizes with `GlyphRunRasterizer` and
+blends into the DIB with the shared compositor; retained text keeps its shaping
+and coverage in the command's `RetainedDrawCache`. GDI and Uniscribe text,
+the HFONT/script caches, per-grapheme GDI font fallback and `AddFontResourceEx`
+are gone: the host reads the bundled faces once (beside the executable, or
+`GUI_FORMS_FONT_DIR`) and registers them with the same roles and fallbacks as
+Linux. Tooltips are painted by the same engine. Windows text is therefore
+byte-identical to macOS and Linux: `gui_forms_windows_text_tests` checks the
+shared identity scene (`tests/text_identity_scene.hpp`, Carlito) against the
+same hashes. The Win32 host now requires `GUI_FORMS_ENABLE_HARFBUZZ_TEXT`, which
+defaults on with it, and no longer links `usp10`.
 
 ## GUI.Drawing renderer-free core
 

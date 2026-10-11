@@ -107,7 +107,8 @@ Candidate 3, with this profile:
 5. `SkiaExecutor` text on the shared rasterizer, with host font bytes (macOS
    CoreText lookup, Windows `GetFontData`) and bold/oblique synthesis in the
    shared rasterizer.
-6. Windows ordinary text on the shared rasterizer; GDI text removed.
+6. Windows ordinary text on the shared rasterizer; GDI text (including tooltips)
+   and Uniscribe removed.
 7. Skia built without a host font backend.
 
 A cross-platform identity test, comparing rendered text against checked-in

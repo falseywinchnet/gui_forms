@@ -18,6 +18,9 @@
 
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
+#include "../../../core/text/composite/text_composite.hpp"
+#include "../../../render/text/glyph_run/glyph_run_raster.hpp"
+#include "../../../render/text/harfbuzz/harfbuzz_font_engine.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
@@ -28,7 +31,6 @@
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
-#include <usp10.h>
 
 #include <algorithm>
 #include <array>
@@ -40,6 +42,8 @@
 #include <cstdio>
 #include <cstring>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -75,12 +79,6 @@ bool environment_flag(const char* name) noexcept {
 bool trace_win32_input() noexcept {
     static const bool enabled =
         environment_flag("GUI_FORMS_TRACE_WIN32_INPUT");
-    return enabled;
-}
-
-bool trace_win32_text() noexcept {
-    static const bool enabled =
-        environment_flag("GUI_FORMS_TRACE_WIN32_TEXT");
     return enabled;
 }
 
@@ -436,10 +434,14 @@ double native_monitor_scale(HMONITOR monitor) noexcept {
 
 #include "../services/windows_host_services.hpp"
 
+// A tooltip's content is painted by the window's text engine (ADR-004) into
+// top-down BGRA pixels; the popup only presents them.
 struct TooltipPopup final {
     HWND window{};
     std::wstring text;
-    HFONT font{};
+    std::vector<std::uint32_t> pixels;
+    int width{};
+    int height{};
 };
 
 LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
@@ -459,26 +461,18 @@ LRESULT CALLBACK tooltip_window_procedure(HWND window, UINT message,
     case WM_PAINT: {
         PAINTSTRUCT paint{};
         HDC dc = BeginPaint(window, &paint);
-        RECT bounds{};
-        GetClientRect(window, &bounds);
-        HBRUSH face = CreateSolidBrush(RGB(255, 255, 240));
-        FillRect(dc, &bounds, face);
-        DeleteObject(face);
-        HPEN border = CreatePen(PS_SOLID, 1, RGB(105, 116, 128));
-        HGDIOBJ old_pen = SelectObject(dc, border);
-        HGDIOBJ old_brush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
-        Rectangle(dc, bounds.left, bounds.top, bounds.right, bounds.bottom);
-        SelectObject(dc, old_brush);
-        SelectObject(dc, old_pen);
-        DeleteObject(border);
-        SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(31, 37, 44));
-        HGDIOBJ old_font = state && (*state).font ? SelectObject(dc, (*state).font) : nullptr;
-        RECT text_bounds{8, 5, std::max(8L, bounds.right - 8),
-                         std::max(5L, bounds.bottom - 5)};
-        if (state) DrawTextW(dc, (*state).text.c_str(), -1, &text_bounds,
-                             DT_WORDBREAK | DT_NOPREFIX | DT_LEFT);
-        if (old_font) SelectObject(dc, old_font);
+        if (state && !(*state).pixels.empty()) {
+            BITMAPINFO info{};
+            info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+            info.bmiHeader.biWidth = (*state).width;
+            info.bmiHeader.biHeight = -(*state).height;
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BI_RGB;
+            SetDIBitsToDevice(dc, 0, 0, static_cast<DWORD>((*state).width), static_cast<DWORD>((*state).height),
+                              0, 0, 0, static_cast<UINT>((*state).height), (*state).pixels.data(), &info,
+                              DIB_RGB_COLORS);
+        }
         EndPaint(window, &paint);
         return 0;
     }
@@ -572,6 +566,83 @@ void enable_best_dpi_awareness() noexcept {
 }
 
 class DibFramebuffer;
+namespace text = gui_forms::render::text;
+
+// One bundled face. The encoded bytes are read once per host and shared by
+// every painter's engine.
+struct BundledFace final {
+    std::shared_ptr<const std::vector<std::byte>> bytes;
+    FontRole role{FontRole::control};
+    std::uint16_t weight{400};
+    bool italic{};
+    bool fallback{};
+};
+using BundledFonts = std::vector<BundledFace>;
+
+// The bundled faces, as every host registers them (ADR-004). The first seven
+// are required; the remaining Unicode faces may be omitted by a consumer.
+// Nullptr when a required face is missing or unreadable.
+std::shared_ptr<const BundledFonts> load_bundled_fonts(const std::filesystem::path& directory) {
+    struct Entry final {
+        const wchar_t* name;
+        FontRole role;
+        std::uint16_t weight;
+        bool italic;
+        bool fallback;
+    };
+    constexpr std::array<Entry, 17> entries{{
+        {L"PortsmouthRapids.ttf", FontRole::control, 400, false, false},
+        {L"PortsmouthRapids-Bold.ttf", FontRole::control, 700, false, false},
+        {L"Carlito-Regular.ttf", FontRole::content, 400, false, false},
+        {L"Carlito-Bold.ttf", FontRole::content, 700, false, false},
+        {L"Carlito-Italic.ttf", FontRole::content, 400, true, false},
+        {L"Carlito-BoldItalic.ttf", FontRole::content, 700, true, false},
+        {L"Cousine-Regular.ttf", FontRole::monospace, 400, false, false},
+        {L"Cousine-Bold.ttf", FontRole::monospace, 700, false, false},
+        {L"Cousine-Italic.ttf", FontRole::monospace, 400, true, false},
+        {L"Cousine-BoldItalic.ttf", FontRole::monospace, 700, true, false},
+        {L"NotoSansCJKjp-Regular.otf", FontRole::content, 400, false, true},
+        {L"NotoSansArabic-Regular.ttf", FontRole::content, 400, false, true},
+        {L"NotoSansHebrew-Regular.ttf", FontRole::content, 400, false, true},
+        {L"NotoSansDevanagari-Regular.ttf", FontRole::content, 400, false, true},
+        {L"NotoSansBengali-Regular.ttf", FontRole::content, 400, false, true},
+        {L"NotoSansGurmukhi-Regular.ttf", FontRole::content, 400, false, true},
+        {L"NotoEmoji-Regular.ttf", FontRole::content, 400, false, true}}};
+    std::shared_ptr<BundledFonts> result = std::make_shared<BundledFonts>();
+    (*result).reserve(entries.size());
+    for (std::size_t index = 0; index < entries.size(); ++index) {
+        const Entry& entry = entries[index];
+        std::ifstream input(directory / entry.name, std::ios::binary | std::ios::ate);
+        const std::streamoff size = input ? static_cast<std::streamoff>(input.tellg()) : std::streamoff{-1};
+        if (size <= 0 || size > 64 * 1024 * 1024) {
+            if (index < 7U) return {};
+            continue;
+        }
+        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        input.seekg(0);
+        input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(size));
+        if (!input) {
+            if (index < 7U) return {};
+            continue;
+        }
+        (*result).push_back({std::make_shared<const std::vector<std::byte>>(std::move(bytes)), entry.role,
+                             entry.weight, entry.italic, entry.fallback});
+    }
+    return result;
+}
+
+// Shaping and coverage of one retained draw_text_utf8 command.
+class ShapedTextMemo final : public RetainedDrawMemo {
+public:
+    std::weak_ptr<const bool> engine;
+    FontSpec font{};
+    std::size_t text_bytes{};
+    text::ShapedText shaped;
+    double coverage_scale{};
+    std::int32_t coverage_phase{};
+    text::GlyphRunCoverage coverage;
+};
+
 class DibPainter final : public Painter {
     friend class DibFramebuffer;
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
@@ -643,7 +714,6 @@ public:
             if (metrics_dc_ == nullptr) return false;
         }
         memory_dc_ = metrics_dc_;
-        if (scale_ != scale) text_run_cache_.clear();
         logical_size_ = logical_size;
         scale_ = scale;
         width_ = static_cast<int>(columns);
@@ -651,7 +721,6 @@ public:
         surface_size_valid_ = true;
         return true;
 #else
-        if (scale_ != scale) text_run_cache_.clear();
         const int width = std::max(1, static_cast<int>(std::ceil(logical_size.width * scale)));
         const int height = std::max(1, static_cast<int>(std::ceil(logical_size.height * scale)));
         logical_size_ = logical_size;
@@ -1192,193 +1261,79 @@ public:
     }
 #endif
 
+    // ADR-004: ordinary text is shaped by HarfBuzz and rasterized by the
+    // shared engine, then blended into the DIB by the shared compositor, so
+    // its pixels match macOS and Linux byte for byte.
     void draw_text_utf8(Point origin, std::string_view text,
                         FontSpec font, Color color) override {
         const PaintTimer timer(timings_[5]);
-        const std::vector<GdiTextRun> runs = text_runs(text, font);
-        if (runs.empty() || memory_dc_ == nullptr) return;
-        const int saved = SaveDC(memory_dc_);
-        apply_gdi_clip();
-        SetTextColor(memory_dc_, RGB(color.red, color.green, color.blue));
-        SetBkMode(memory_dc_, TRANSPARENT);
-        const int baseline = logical_y(origin.y);
-        int x = logical_x(origin.x);
-        for (const GdiTextRun& run : runs) {
-            HFONT native_font = create_font(font, run.family.c_str());
-            if (native_font == nullptr) continue;
-            HGDIOBJ old = SelectObject(memory_dc_, native_font);
-            SetTextCharacterExtra(memory_dc_,
-                static_cast<int>(std::lround(font.letter_spacing * scale_)));
-            TEXTMETRICW metrics{};
-            SIZE measured{};
-            GetTextMetricsW(memory_dc_, &metrics);
-            const bool rendered = shape_text_run(run.text, x, baseline,
-                                                 true, measured);
-            if (trace_win32_text()) {
-                std::fprintf(stderr,
-                             "win32-text draw family=%s units=%zu rendered=%d\n",
-                             utf8_from_wide(run.family).c_str(), run.text.size(),
-                             rendered ? 1 : 0);
-            }
-            if (rendered) {
-                x += measured.cx;
-            }
-            SelectObject(memory_dc_, old);
-            release_font(native_font);
+        if (text.empty() || !text_engine_ || pixels_ == nullptr || states_.empty()) return;
+        const text::ShapedText shaped = (*text_engine_).shape(text, font);
+        composite_run(shaped, font, origin, color, nullptr);
+    }
+
+    void draw_retained_text_utf8(const Point origin, const std::string_view text, const FontSpec font,
+                                 const Color color, const std::shared_ptr<RetainedDrawCache>& cache) override {
+        const PaintTimer timer(timings_[5]);
+        if (text.empty() || !text_engine_ || pixels_ == nullptr || states_.empty()) return;
+        if (!cache) {
+            const text::ShapedText shaped = (*text_engine_).shape(text, font);
+            composite_run(shaped, font, origin, color, nullptr);
+            return;
         }
-        RestoreDC(memory_dc_, saved);
+        ShapedTextMemo* memo = dynamic_cast<ShapedTextMemo*>((*cache).memo.get());
+        const bool current = memo != nullptr && (*memo).engine.lock() == text_engine_identity_ &&
+            (*memo).font == font && (*memo).text_bytes == text.size();
+        if (!current) {
+            std::unique_ptr<ShapedTextMemo> replacement = std::make_unique<ShapedTextMemo>();
+            (*replacement).engine = text_engine_identity_;
+            (*replacement).font = font;
+            (*replacement).text_bytes = text.size();
+            (*replacement).shaped = (*text_engine_).shape(text, font);
+            memo = replacement.get();
+            (*cache).memo = std::move(replacement);
+        }
+        composite_run((*memo).shaped, font, origin, color, memo);
     }
 
     Size measure_text_utf8(std::string_view text, FontSpec font) override {
-        const std::vector<GdiTextRun> runs = text_runs(text, font);
-        if (runs.empty() || memory_dc_ == nullptr) return {0.0, font.size};
-        const int saved = SaveDC(memory_dc_);
-        int width{};
-        int height{};
-        for (const GdiTextRun& run : runs) {
-            HFONT native_font = create_font(font, run.family.c_str());
-            if (native_font == nullptr) continue;
-            HGDIOBJ old = SelectObject(memory_dc_, native_font);
-            SetTextCharacterExtra(memory_dc_,
-                static_cast<int>(std::lround(font.letter_spacing * scale_)));
-            SIZE measured{};
-            if (shape_text_run(run.text, 0, 0, false, measured)) {
-                width += measured.cx;
-                height = std::max(height, static_cast<int>(measured.cy));
-            }
-            SelectObject(memory_dc_, old);
-            release_font(native_font);
-        }
-        RestoreDC(memory_dc_, saved);
-        return {width / scale_, height / scale_};
+        if (text.empty() || !text_engine_) return {0.0, font.size};
+        const text::ShapedText shaped = (*text_engine_).shape(text, font);
+        return {std::max(0.0, shaped.width), std::max(0.0, shaped.height)};
     }
 
     ResolvedTextLayout resolve_text_layout_utf8(
         std::string_view text, FontSpec font) override {
         const PaintTimer timer(timings_[6]);
-        ResolvedTextLayout result;
-        result.effective_font = font;
-        if (!valid_font_spec(font) || !validate_utf8(text).valid()) {
-            result.status = TextResolutionStatus::invalid_request;
-            return result;
-        }
-        if (!bundled_fonts_ready_ || memory_dc_ == nullptr) {
-            result.status = TextResolutionStatus::missing_primary_face;
-            return result;
-        }
-        if (text.empty()) {
-            const wchar_t* requested = primary_font_family(font.role);
-            HFONT native_font = create_font(font, requested);
-            if (native_font == nullptr) {
-                result.status = TextResolutionStatus::missing_primary_face;
-                return result;
-            }
-            const int saved = SaveDC(memory_dc_);
-            HGDIOBJ old = SelectObject(memory_dc_, native_font);
-            std::array<wchar_t, LF_FACESIZE> actual_family{};
-            const int family_length = GetTextFaceW(
-                memory_dc_, static_cast<int>(actual_family.size()),
-                actual_family.data());
-            TEXTMETRICW metrics{};
-            const bool exact_face = family_length > 0 &&
-                _wcsicmp(actual_family.data(), requested) == 0 &&
-                GetTextMetricsW(memory_dc_, &metrics) != 0;
-            if (exact_face) {
-                result.primary_family = utf8_from_wide(actual_family.data());
-                result.ascent = metrics.tmAscent / scale_;
-                result.descent = metrics.tmDescent / scale_;
-                result.line_gap = metrics.tmExternalLeading / scale_;
-                result.logical_size = {
-                    0.0, std::max(font.size, result.ascent + result.descent +
-                                                result.line_gap)};
-                result.status = TextResolutionStatus::exact;
-            } else {
-                result.status = TextResolutionStatus::missing_primary_face;
-            }
-            SelectObject(memory_dc_, old);
-            RestoreDC(memory_dc_, saved);
-            release_font(native_font);
-            return result;
-        }
-        const std::vector<GdiTextRun> runs = text_runs(text, font);
-        if (!text.empty() && runs.empty()) {
-            result.status = TextResolutionStatus::missing_primary_face;
-            return result;
-        }
-        const int saved = SaveDC(memory_dc_);
-        double width{};
-        bool missing_face{};
-        for (const GdiTextRun& run : runs) {
-            HFONT native_font = create_font(font, run.family.c_str());
-            if (native_font == nullptr) {
-                missing_face = true;
-                break;
-            }
-            HGDIOBJ old = SelectObject(memory_dc_, native_font);
-            std::array<wchar_t, LF_FACESIZE> actual_family{};
-            const int family_length = GetTextFaceW(
-                memory_dc_, static_cast<int>(actual_family.size()),
-                actual_family.data());
-            const std::wstring_view actual_name(actual_family.data());
-            const bool expected_face = family_length > 0 &&
-                _wcsicmp(actual_family.data(), run.family.c_str()) == 0;
-            TEXTMETRICW metrics{};
-            SIZE measured{};
-            SetTextCharacterExtra(memory_dc_, static_cast<int>(
-                std::lround(font.letter_spacing * scale_)));
-            const bool measured_ok = expected_face &&
-                GetTextMetricsW(memory_dc_, &metrics) != 0 &&
-                shape_text_run(run.text, 0, 0, false, measured);
-            if (measured_ok) {
-                if (!run.fallback && result.primary_family.empty()) {
-                    result.primary_family = utf8_from_wide(
-                        actual_name);
-                }
-                result.runs.push_back({
-                    run.utf8_start, run.utf8_length,
-                    utf8_from_wide(actual_name),
-                    run.registered_weight, run.registered_italic, run.fallback});
-                width += measured.cx / scale_;
-                result.ascent = std::max(
-                    result.ascent, metrics.tmAscent / scale_);
-                result.descent = std::max(
-                    result.descent, metrics.tmDescent / scale_);
-                result.line_gap = std::max(
-                    result.line_gap, metrics.tmExternalLeading / scale_);
-                result.missing_clusters += run.missing_clusters;
-            } else {
-                missing_face = true;
-            }
-            SelectObject(memory_dc_, old);
-            release_font(native_font);
-            if (missing_face) break;
-        }
-        RestoreDC(memory_dc_, saved);
-        // A fallback-only string still has a valid requested primary face.
-        // Resolve that identity separately instead of discarding its layout.
-        if (!missing_face && result.primary_family.empty()) {
-            const ResolvedTextLayout primary = resolve_text_layout_utf8({}, font);
-            if (primary.status != TextResolutionStatus::exact) return primary;
-            result.primary_family = primary.primary_family;
-        }
-        if (missing_face) {
-            result = {};
+        if (!bundled_fonts_ready_ || !text_engine_) {
+            ResolvedTextLayout result;
             result.effective_font = font;
-            result.status = TextResolutionStatus::missing_primary_face;
+            result.status = valid_font_spec(font) && validate_utf8(text).valid()
+                ? TextResolutionStatus::missing_primary_face : TextResolutionStatus::invalid_request;
             return result;
         }
-        result.logical_size = {
-            width, std::max(font.size,
-                            result.ascent + result.descent + result.line_gap)};
-        result.status = result.missing_clusters == 0U
-            ? TextResolutionStatus::exact
-            : TextResolutionStatus::missing_cluster_coverage;
-        return result;
+        return (*text_engine_).resolve(text, font);
     }
 
-    void set_bundled_fonts_ready(bool ready) noexcept {
-        if (bundled_fonts_ready_ != ready) text_run_cache_.clear();
-        bundled_fonts_ready_ = ready;
+    // Registers the bundled faces in a private engine. Faces share their
+    // bytes with every other painter given the same set.
+    [[nodiscard]] bool bundled_fonts_ready() const noexcept { return bundled_fonts_ready_; }
+
+    void set_bundled_fonts(std::shared_ptr<const BundledFonts> fonts) {
+        glyph_runs_.reset();
+        text_engine_.reset();
+        text_engine_identity_ = std::make_shared<const bool>(true);
+        bundled_fonts_ = std::move(fonts);
+        bundled_fonts_ready_ = false;
+        if (!bundled_fonts_) return;
+        std::unique_ptr<text::HarfBuzzFontEngine> engine = std::make_unique<text::HarfBuzzFontEngine>();
+        for (const BundledFace& face : *bundled_fonts_) {
+            std::optional<FontRole> role;
+            if (!face.fallback) role = face.role;
+            if (!(*engine).register_shared_typeface(role, face.weight, face.italic, face.bytes)) return;
+        }
+        text_engine_ = std::move(engine);
+        bundled_fonts_ready_ = true;
     }
 
     void draw_image(ImageId image, Rect destination, double opacity) override {
@@ -1661,29 +1616,6 @@ private:
         double ty{};
         Rect clip{};
         std::optional<RoundedClip> rounded_clip;
-    };
-    struct GdiTextRun {
-        std::wstring family;
-        std::wstring text;
-        std::size_t utf8_start{};
-        std::size_t utf8_length{};
-        std::size_t missing_clusters{};
-        std::uint16_t registered_weight{400};
-        bool registered_italic{};
-        bool fallback{};
-    };
-    struct CachedTextRuns final {
-        std::string text;
-        FontSpec font;
-        std::vector<GdiTextRun> runs;
-    };
-    struct CachedFont final {
-        int height{};
-        std::uint16_t weight{};
-        bool italic{};
-        std::wstring family;
-        HFONT handle{};
-        SCRIPT_CACHE script_cache{};
     };
     struct PixelRect {
         int left{}; int top{}; int right{}; int bottom{};
@@ -2026,6 +1958,56 @@ private:
                 std::clamp(static_cast<int>(std::ceil((rect.x + rect.width) * scale_)), 0, width_),
                 std::clamp(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), 0, height_)};
     }
+    // Rasterizes a shaped run at the device scale and blends it into the
+    // DIB under the current clip. A memo keeps the coverage for its scale
+    // and subpixel phase.
+    void composite_run(const text::ShapedText& shaped, const FontSpec font, const Point origin, const Color color,
+                       ShapedTextMemo* const memo) {
+        if (pixels_ == nullptr || width_ <= 0 || height_ <= 0 || states_.empty()) return;
+        const State& current = state();
+        const text::GlyphRunOrigin placement =
+            text::glyph_run_origin((origin.x + current.tx) * scale_, (origin.y + current.ty) * scale_);
+        if (!glyph_runs_) glyph_runs_ = std::make_unique<text::GlyphRunRasterizer>(*text_engine_);
+        text::GlyphRunCoverage fresh{};
+        const text::GlyphRunCoverage* coverage = &fresh;
+        if (memo != nullptr && (*memo).coverage_scale == scale_ && (*memo).coverage_phase == placement.phase_x &&
+            !(*memo).coverage.pixels.empty()) {
+            coverage = &(*memo).coverage;
+        } else {
+            fresh = (*glyph_runs_).rasterize(shaped, font, scale_, placement.phase_x);
+            if (memo != nullptr) {
+                (*memo).coverage = std::move(fresh);
+                (*memo).coverage_scale = scale_;
+                (*memo).coverage_phase = placement.phase_x;
+                coverage = &(*memo).coverage;
+            }
+        }
+        if ((*coverage).pixels.empty()) return;
+        // Finish batched GDI writes before blending through the CPU pointer.
+        GdiFlush();
+        const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
+        gui_forms::detail::TextCompositeTarget target{};
+        target.pixels = std::span<std::uint32_t>(pixels_, pixel_count);
+        target.width = static_cast<std::uint32_t>(width_);
+        target.height = static_cast<std::uint32_t>(height_);
+        target.stride = static_cast<std::size_t>(width_);
+        target.order = gui_forms::detail::TextPixelOrder::bgra;
+        target.opaque = true;
+        gui_forms::detail::TextCompositeClip clip{};
+        clip.rect = {current.clip.x * scale_, current.clip.y * scale_, current.clip.width * scale_,
+                     current.clip.height * scale_};
+        if (current.rounded_clip) {
+            const Rect rounded = (*current.rounded_clip).rect;
+            clip.rounded = true;
+            clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
+            clip.radius = (*current.rounded_clip).radius * scale_;
+        }
+        const gui_forms::detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
+                                          .height = (*coverage).height,
+                                          .left = placement.pixel_x + (*coverage).left,
+                                          .top = placement.pixel_y + (*coverage).top};
+        static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
+    }
     void apply_gdi_clip() const {
         const Rect clip = state().clip;
         IntersectClipRect(memory_dc_,
@@ -2033,338 +2015,6 @@ private:
             static_cast<int>(std::floor(clip.y * scale_)),
             static_cast<int>(std::ceil((clip.x + clip.width) * scale_)),
             static_cast<int>(std::ceil((clip.y + clip.height) * scale_)));
-    }
-    [[nodiscard]] static const wchar_t* primary_font_family(FontRole role) {
-        return role == FontRole::control ? L"Portsmouth Rapids"
-            : role == FontRole::monospace ? L"Cousine" : L"Carlito";
-    }
-    [[nodiscard]] HFONT create_font(FontSpec font, const wchar_t* family) const {
-        // Font and Uniscribe state belong to this painter/DC. Recreating them
-        // per grapheme made unchanged File Manager labels cost seconds/frame.
-        // The bounded overflow path remains owned by the immediate caller.
-        const int height = -std::max(1, static_cast<int>(std::lround(font.size * scale_)));
-        for (const CachedFont& cached : font_cache_) {
-            if (cached.height == height && cached.weight == font.weight &&
-                cached.italic == font.italic && cached.family == family) return cached.handle;
-        }
-        const HFONT handle = CreateFontW(
-            height,
-            0, 0, 0, font.weight, font.italic ? TRUE : FALSE, FALSE, FALSE,
-            DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS,
-            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, family);
-        if (handle != nullptr && font_cache_.size() < 64U) {
-            font_cache_.push_back({height, font.weight, font.italic, family, handle});
-        }
-        return handle;
-    }
-    void release_font(HFONT handle) const noexcept {
-        for (const CachedFont& cached : font_cache_) {
-            if (cached.handle == handle) return;
-        }
-        if (handle != nullptr) DeleteObject(handle);
-    }
-    [[nodiscard]] SCRIPT_CACHE* selected_script_cache(SCRIPT_CACHE& temporary) const noexcept {
-        const HGDIOBJ selected = GetCurrentObject(memory_dc_, OBJ_FONT);
-        for (CachedFont& cached : font_cache_) {
-            if (cached.handle == selected) return &cached.script_cache;
-        }
-        return &temporary;
-    }
-    [[nodiscard]] bool shape_text_run(std::wstring_view text, int x, int y,
-                                      bool draw, SIZE& measured) const {
-        if (text.empty() ||
-            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-            return false;
-        }
-        const int length = static_cast<int>(text.size());
-        std::vector<SCRIPT_ITEM> source_items(text.size() + 2U);
-        int item_count{};
-        if (FAILED(ScriptItemize(text.data(), length,
-                                 static_cast<int>(source_items.size()), nullptr,
-                                 nullptr, source_items.data(), &item_count)) ||
-            item_count <= 0) {
-            return false;
-        }
-        struct PlacedItem final {
-            SCRIPT_ANALYSIS analysis{};
-            std::vector<WORD> glyphs;
-            std::vector<int> advances;
-            std::vector<GOFFSET> offsets;
-            int width{};
-        };
-        SCRIPT_CACHE temporary_cache{};
-        SCRIPT_CACHE* const cache = selected_script_cache(temporary_cache);
-        std::vector<PlacedItem> placed;
-        placed.reserve(static_cast<std::size_t>(item_count));
-        bool valid = true;
-        for (int item = 0; item < item_count && valid; ++item) {
-            const int start = source_items[static_cast<std::size_t>(item)].iCharPos;
-            const int end = source_items[static_cast<std::size_t>(item + 1)].iCharPos;
-            const int item_length = end - start;
-            if (item_length <= 0) continue;
-            const int capacity = item_length * 3 / 2 + 16;
-            PlacedItem output;
-            output.analysis = source_items[static_cast<std::size_t>(item)].a;
-            output.glyphs.resize(static_cast<std::size_t>(capacity));
-            std::vector<WORD> clusters(static_cast<std::size_t>(item_length));
-            std::vector<SCRIPT_VISATTR> attributes(
-                static_cast<std::size_t>(capacity));
-            int glyph_count{};
-            if (FAILED(ScriptShape(
-                    memory_dc_, cache, text.data() + start, item_length,
-                    capacity, &output.analysis, output.glyphs.data(),
-                    clusters.data(), attributes.data(), &glyph_count)) ||
-                glyph_count <= 0) {
-                valid = false;
-                break;
-            }
-            output.glyphs.resize(static_cast<std::size_t>(glyph_count));
-            attributes.resize(static_cast<std::size_t>(glyph_count));
-            output.advances.resize(static_cast<std::size_t>(glyph_count));
-            output.offsets.resize(static_cast<std::size_t>(glyph_count));
-            ABC extent{};
-            if (FAILED(ScriptPlace(memory_dc_, cache, output.glyphs.data(),
-                                   glyph_count, attributes.data(),
-                                   &output.analysis, output.advances.data(),
-                                   output.offsets.data(), &extent))) {
-                valid = false;
-                break;
-            }
-            const int character_extra = GetTextCharacterExtra(memory_dc_);
-            for (int glyph = 0; glyph < glyph_count; ++glyph) {
-                if (character_extra != 0 &&
-                    !(item + 1 == item_count && glyph + 1 == glyph_count)) {
-                    output.advances[static_cast<std::size_t>(glyph)] +=
-                        character_extra;
-                }
-                output.width += output.advances[static_cast<std::size_t>(glyph)];
-            }
-            placed.push_back(std::move(output));
-        }
-        TEXTMETRICW metrics{};
-        GetTextMetricsW(memory_dc_, &metrics);
-        if (valid) {
-            measured = {0, metrics.tmHeight};
-            if (draw) SetTextAlign(memory_dc_, TA_LEFT | TA_BASELINE);
-            std::vector<BYTE> levels(placed.size());
-            for (std::size_t item = 0; item < placed.size(); ++item) {
-                levels[item] = placed[item].analysis.s.uBidiLevel;
-            }
-            std::vector<int> visual_to_logical(placed.size());
-            std::vector<int> logical_to_visual(placed.size());
-            if (!placed.empty()) {
-                ScriptLayout(static_cast<int>(placed.size()), levels.data(),
-                             visual_to_logical.data(), logical_to_visual.data());
-            }
-            for (std::size_t visual = 0; visual < placed.size(); ++visual) {
-                const std::size_t logical = static_cast<std::size_t>(
-                    visual_to_logical[visual]);
-                PlacedItem& item = placed[logical];
-                if (draw && FAILED(ScriptTextOut(
-                        memory_dc_, cache, x + measured.cx, y, 0, nullptr,
-                        &item.analysis, nullptr, 0, item.glyphs.data(),
-                        static_cast<int>(item.glyphs.size()), item.advances.data(),
-                        nullptr, item.offsets.data()))) {
-                    valid = false;
-                    break;
-                }
-                measured.cx += item.width;
-            }
-        }
-        if (cache == &temporary_cache) ScriptFreeCache(cache);
-        if (valid) return true;
-        if (!GetTextExtentPoint32W(memory_dc_, text.data(), length, &measured)) {
-            return false;
-        }
-        if (draw) SetTextAlign(memory_dc_, TA_LEFT | TA_TOP);
-        return !draw || TextOutW(memory_dc_, x, y - metrics.tmAscent,
-                                 text.data(), length);
-    }
-    [[nodiscard]] bool selected_font_shapes(std::wstring_view text) const {
-        if (text.empty() ||
-            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-            return false;
-        }
-        const int length = static_cast<int>(text.size());
-        std::vector<SCRIPT_ITEM> items(text.size() + 2U);
-        int item_count{};
-        if (FAILED(ScriptItemize(text.data(), length,
-                                 static_cast<int>(items.size()), nullptr, nullptr,
-                                 items.data(), &item_count)) || item_count <= 0) {
-            return false;
-        }
-        SCRIPT_CACHE temporary_cache{};
-        SCRIPT_CACHE* const cache = selected_script_cache(temporary_cache);
-        bool covered = true;
-        for (int item = 0; item < item_count && covered; ++item) {
-            const int start = items[static_cast<std::size_t>(item)].iCharPos;
-            const int end = items[static_cast<std::size_t>(item + 1)].iCharPos;
-            const int item_length = end - start;
-            if (item_length <= 0) continue;
-            const int capacity = item_length * 3 / 2 + 16;
-            std::vector<WORD> glyphs(static_cast<std::size_t>(capacity));
-            std::vector<WORD> clusters(static_cast<std::size_t>(item_length));
-            std::vector<SCRIPT_VISATTR> attributes(
-                static_cast<std::size_t>(capacity));
-            int glyph_count{};
-            const HRESULT shaped = ScriptShape(
-                memory_dc_, cache, text.data() + start, item_length, capacity,
-                &items[static_cast<std::size_t>(item)].a, glyphs.data(),
-                clusters.data(), attributes.data(), &glyph_count);
-            if (FAILED(shaped) || glyph_count <= 0) {
-                covered = false;
-                continue;
-            }
-            SCRIPT_FONTPROPERTIES properties{};
-            properties.cBytes = sizeof(properties);
-            if (FAILED(ScriptGetFontProperties(memory_dc_, cache, &properties))) {
-                covered = false;
-                continue;
-            }
-            for (int glyph = 0; glyph < glyph_count; ++glyph) {
-                if (glyphs[static_cast<std::size_t>(glyph)] ==
-                    properties.wgDefault) {
-                    covered = false;
-                    break;
-                }
-            }
-            if (trace_win32_text()) {
-                std::fprintf(stderr,
-                             "win32-text shaped=%d glyph-count=%d default=%04x glyphs=",
-                             covered ? 1 : 0, glyph_count,
-                             static_cast<unsigned>(properties.wgDefault));
-                for (int glyph = 0; glyph < glyph_count; ++glyph) {
-                    std::fprintf(stderr, "%04x,", static_cast<unsigned>(
-                        glyphs[static_cast<std::size_t>(glyph)]));
-                }
-                std::fputc('\n', stderr);
-            }
-        }
-        if (cache == &temporary_cache) ScriptFreeCache(cache);
-        return covered;
-    }
-    [[nodiscard]] bool font_covers(HFONT font, const wchar_t* requested_family,
-                                   std::wstring_view text) const {
-        if (font == nullptr || text.empty() ||
-            text.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
-            return false;
-        }
-        const int saved = SaveDC(memory_dc_);
-        HGDIOBJ old = SelectObject(memory_dc_, font);
-        std::array<wchar_t, LF_FACESIZE> selected_family{};
-        const bool requested_face = GetTextFaceW(memory_dc_,
-            static_cast<int>(selected_family.size()), selected_family.data()) > 0 &&
-            _wcsicmp(selected_family.data(), requested_family) == 0;
-        const bool shaped_coverage = requested_face && selected_font_shapes(text);
-        std::vector<WORD> glyphs(text.size(), 0xffffU);
-        const DWORD count = GetGlyphIndicesW(
-            memory_dc_, text.data(), static_cast<int>(text.size()),
-            glyphs.data(), GGI_MARK_NONEXISTING_GLYPHS);
-        if (trace_win32_text()) {
-            std::array<wchar_t, LF_FACESIZE> actual_family{};
-            GetTextFaceW(memory_dc_, static_cast<int>(actual_family.size()),
-                         actual_family.data());
-            std::fprintf(stderr,
-                         "win32-text requested=%s actual=%s units=%zu glyphs=",
-                         utf8_from_wide(requested_family).c_str(),
-                         utf8_from_wide(actual_family.data()).c_str(), text.size());
-            for (const WORD glyph : glyphs) {
-                std::fprintf(stderr, "%04x,", static_cast<unsigned>(glyph));
-            }
-            std::fputc('\n', stderr);
-        }
-        SelectObject(memory_dc_, old);
-        RestoreDC(memory_dc_, saved);
-        if (!requested_face) return false;
-        if (shaped_coverage) return true;
-        if (count == GDI_ERROR) return false;
-        for (std::size_t index = 0; index < text.size(); ++index) {
-            const wchar_t unit = text[index];
-            if (unit == 0x200d || (unit >= 0xfe00 && unit <= 0xfe0f)) continue;
-            if (unit >= 0xd800 && unit <= 0xdbff && index + 1U < text.size() &&
-                text[index + 1U] >= 0xdc00 && text[index + 1U] <= 0xdfff) {
-                if (glyphs[index] == 0xffffU && glyphs[index + 1U] == 0xffffU) {
-                    return false;
-                }
-                ++index;
-                continue;
-            }
-            if (glyphs[index] == 0xffffU) return false;
-        }
-        return true;
-    }
-    [[nodiscard]] std::vector<GdiTextRun> text_runs(
-        std::string_view utf8, FontSpec font) const {
-        for (const CachedTextRuns& cached : text_run_cache_) {
-            if (cached.font == font && cached.text == utf8) return cached.runs;
-        }
-        std::vector<GdiTextRun> runs;
-        if (utf8.empty() || memory_dc_ == nullptr || !validate_utf8(utf8).valid()) {
-            return runs;
-        }
-        // Prefer the bundled UI companion for Cyrillic/Greek before CJK,
-        // and use the shipped script faces rather than implicit GDI substitutes.
-        const std::array<const wchar_t*, 9> families{
-            primary_font_family(font.role), L"Carlito", L"Noto Sans CJK JP",
-            L"Noto Sans Arabic", L"Noto Sans Hebrew", L"Noto Sans Devanagari",
-            L"Noto Sans Bengali", L"Noto Sans Gurmukhi", L"Noto Emoji"};
-        std::array<HFONT, 9> candidates{};
-        TextStore store(utf8);
-        for (std::size_t index = 0; index < store.grapheme_count().value();
-             ++index) {
-            const Utf8Range range = store.grapheme_range(GraphemeIndex(index));
-            const std::wstring cluster = wide_from_utf8(
-                utf8.substr(range.start.value(),
-                            range.end.value() - range.start.value()));
-            if (cluster.empty()) continue;
-            std::size_t selected{};
-            bool covered{};
-            for (; selected < candidates.size(); ++selected) {
-                if (candidates[selected] == nullptr) {
-                    candidates[selected] = create_font(font, families[selected]);
-                }
-                covered = font_covers(candidates[selected], families[selected],
-                                      cluster);
-                if (covered) break;
-            }
-            if (!covered) {
-                selected = 0U;
-            }
-            if (trace_win32_text()) {
-                std::fprintf(stderr, "win32-text selected=%s\n",
-                             utf8_from_wide(families[selected]).c_str());
-            }
-            const bool fallback = selected != 0U;
-            const std::uint16_t registered_weight = fallback
-                ? 400U : (font.weight >= 550U ? 700U : 400U);
-            const bool registered_italic = !fallback &&
-                font.role != FontRole::control && font.italic;
-            if (!runs.empty() && runs.back().family == families[selected] &&
-                runs.back().registered_weight == registered_weight &&
-                runs.back().registered_italic == registered_italic &&
-                runs.back().fallback == fallback) {
-                runs.back().text.append(cluster);
-                runs.back().utf8_length =
-                    range.end.value() - runs.back().utf8_start;
-                if (!covered) ++runs.back().missing_clusters;
-            } else {
-                runs.push_back({
-                    families[selected], cluster, range.start.value(),
-                    range.end.value() - range.start.value(),
-                    covered ? 0U : 1U, registered_weight,
-                    registered_italic, fallback});
-            }
-        }
-        for (HFONT candidate : candidates) {
-            if (candidate != nullptr) release_font(candidate);
-        }
-        if (utf8.size() <= 2048U) {
-            // Keep retained labels cheap without retaining unbounded filenames
-            // or preview content. Font changes key separately; DPI clears runs.
-            if (text_run_cache_.size() >= 512U) text_run_cache_.clear();
-            text_run_cache_.push_back({std::string(utf8), font, runs});
-        }
-        return runs;
     }
     void reset_bitmap() noexcept {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
@@ -2382,12 +2032,7 @@ private:
     }
     void reset() noexcept {
         reset_bitmap();
-        for (CachedFont& cached : font_cache_) {
-            ScriptFreeCache(&cached.script_cache);
-            DeleteObject(cached.handle);
-        }
-        font_cache_.clear();
-        text_run_cache_.clear();
+        glyph_runs_.reset();
     }
 
     static bool decode_png(IWICImagingFactory& factory,
@@ -2465,8 +2110,12 @@ private:
     std::uint64_t image_revision_{std::numeric_limits<std::uint64_t>::max()};
     bool images_synchronized_{true};
     bool bundled_fonts_ready_{};
-    mutable std::vector<CachedFont> font_cache_;
-    mutable std::vector<CachedTextRuns> text_run_cache_;
+    std::shared_ptr<const BundledFonts> bundled_fonts_;
+    // Declared before the rasterizer that borrows it.
+    std::unique_ptr<text::HarfBuzzFontEngine> text_engine_;
+    std::unique_ptr<text::GlyphRunRasterizer> glyph_runs_;
+    // Identity of text_engine_ for retained shaping memos.
+    std::shared_ptr<const bool> text_engine_identity_{std::make_shared<const bool>(true)};
     std::array<PaintTiming, 8> timings_{};
     std::vector<GradientRaster> gradient_cache_;
     std::size_t gradient_cache_pixels_{};
@@ -2528,7 +2177,7 @@ std::unique_ptr<PaintFramebuffer> DibPainter::create_framebuffer(Size logical_si
         return {};
     std::unique_ptr<DibFramebuffer> result = std::make_unique<DibFramebuffer>();
     (*result).raster.offscreen_ = true;
-    (*result).raster.set_bundled_fonts_ready(bundled_fonts_ready_);
+    (*result).raster.set_bundled_fonts(bundled_fonts_);
     if (!(*result).raster.resize(logical_size, scale) || !(*result).raster.begin_frame()) return {};
     return result;
 }
@@ -2568,7 +2217,6 @@ public:
             live_frame_clock_ = nullptr;
         }
         hide_tooltip();
-        if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
         if (model_) {
             (*model_).set_paint_wake_handler({});
             (*model_).set_text_metrics_provider(nullptr);
@@ -2576,9 +2224,6 @@ public:
         }
         session_.shutdown();
         services_.shutdown();
-        for (const std::wstring& path : private_font_paths_) {
-            RemoveFontResourceExW(path.c_str(), FR_PRIVATE, nullptr);
-        }
     }
 
     void bind_window(HWND window) noexcept {
@@ -2595,18 +2240,25 @@ public:
         }
         hwnd_ = window;
         scale_ = query_scale(window);
-        const bool fonts_ready = load_private_fonts();
+        // GUI_FORMS_FONT_DIR overrides the fonts beside the executable, as on Linux.
+        std::shared_ptr<const BundledFonts> fonts;
+        if (const wchar_t* override_directory = _wgetenv(L"GUI_FORMS_FONT_DIR"); override_directory != nullptr) {
+            fonts = load_bundled_fonts(std::filesystem::path(override_directory));
+        } else if (const std::wstring directory = executable_directory(); !directory.empty()) {
+            fonts = load_bundled_fonts(std::filesystem::path(directory) / L"fonts");
+        }
         RECT client{};
         GetClientRect(window, &client);
         const Size logical{(client.right - client.left) / scale_,
                            (client.bottom - client.top) / scale_};
         raster_.resize(logical, scale_);
-        raster_.set_bundled_fonts_ready(fonts_ready);
+        raster_.set_bundled_fonts(std::move(fonts));
+        const bool fonts_ready = raster_.bundled_fonts_ready();
         (*model_).set_text_metrics_provider(fonts_ready ? &raster_ : nullptr);
         (*model_).set_framebuffer_painter(fonts_ready ? &raster_ : nullptr);
         (*model_).metrics().set_renderer(
             fonts_ready
-                ? "Win32 DIB CPU · Uniscribe/GDI text · WIC PNG · bundled fonts"
+                ? "Win32 DIB CPU · HarfBuzz/FreeType text · WIC PNG · bundled fonts"
                 : "Win32 DIB CPU · incomplete bundled font pack",
             true);
         const HostDispatchResult attached = dispatch(HostAttachEvent{logical, scale_});
@@ -2989,22 +2641,9 @@ private:
             return {HostServiceError::backend_failure};
         }
 
-        if (tooltip_.font != nullptr) DeleteObject(tooltip_.font);
-        const int font_height = -std::max(12, static_cast<int>(std::lround(13.0 * scale_)));
-        tooltip_.font = CreateFontW(font_height, 0, 0, 0, FW_NORMAL, FALSE, FALSE,
-                                    FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
-                                    CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                                    DEFAULT_PITCH | FF_SWISS, L"Lucida Grande");
-        HDC dc = GetDC(hwnd_);
-        HGDIOBJ old_font = tooltip_.font ? SelectObject(dc, tooltip_.font) : nullptr;
-        RECT measured{0, 0, static_cast<LONG>(std::lround(360.0 * scale_)), 0};
-        DrawTextW(dc, tooltip_.text.c_str(), -1, &measured,
-                  DT_CALCRECT | DT_WORDBREAK | DT_NOPREFIX | DT_LEFT);
-        if (old_font) SelectObject(dc, old_font);
-        ReleaseDC(hwnd_, dc);
-        const int width = std::clamp<int>(measured.right - measured.left + 16,
-                                          40, static_cast<int>(std::lround(376.0 * scale_)));
-        const int height = std::max(24L, measured.bottom - measured.top + 10);
+        if (!paint_tooltip(request.text)) return {HostServiceError::backend_failure};
+        const int width = tooltip_.width;
+        const int height = tooltip_.height;
 
         POINT anchor{static_cast<LONG>(std::lround(request.anchor.x * scale_)),
                      static_cast<LONG>(std::lround(request.anchor.y * scale_))};
@@ -3042,6 +2681,76 @@ private:
         }
         tooltip_.window = nullptr;
         tooltip_.text.clear();
+        tooltip_.pixels.clear();
+    }
+
+    // Wraps the tooltip text at word boundaries to 360 logical pixels and
+    // paints it, with its face and border, through the window's painter.
+    bool paint_tooltip(const std::string_view utf8) {
+        if (!raster_.bundled_fonts_ready()) return false;
+        const FontSpec font{.role = FontRole::control, .size = 13.0};
+        constexpr double wrap_width = 360.0;
+        std::vector<std::string> lines;
+        std::size_t offset = 0;
+        for (;;) {
+            const std::size_t newline = utf8.find('\n', offset);
+            std::string_view paragraph = utf8.substr(offset, newline == std::string_view::npos ? std::string_view::npos
+                                                                                               : newline - offset);
+            if (!paragraph.empty() && paragraph.back() == '\r') paragraph.remove_suffix(1U);
+            std::string line;
+            std::size_t word_start = 0;
+            while (word_start <= paragraph.size()) {
+                std::size_t word_end = paragraph.find(' ', word_start);
+                if (word_end == std::string_view::npos) word_end = paragraph.size();
+                const std::string_view word = paragraph.substr(word_start, word_end - word_start);
+                std::string candidate = line;
+                if (!candidate.empty()) candidate += ' ';
+                candidate += word;
+                if (line.empty() || raster_.measure_text_utf8(candidate, font).width <= wrap_width) {
+                    line = std::move(candidate);
+                } else {
+                    lines.push_back(std::move(line));
+                    line = std::string(word);
+                }
+                word_start = word_end + 1U;
+            }
+            lines.push_back(std::move(line));
+            if (newline == std::string_view::npos) break;
+            offset = newline + 1U;
+        }
+        double text_width = 0.0;
+        for (const std::string& line : lines) {
+            text_width = std::max(text_width, raster_.measure_text_utf8(line, font).width);
+        }
+        const ResolvedTextLayout metrics = raster_.resolve_text_layout_utf8("Ag", font);
+        const double line_height = metrics.ascent + metrics.descent + metrics.line_gap;
+        const Size logical{std::clamp(text_width + 16.0, 40.0, 376.0),
+                           std::max(24.0, line_height * static_cast<double>(lines.size()) + 10.0)};
+        const std::unique_ptr<PaintFramebuffer> framebuffer = raster_.create_framebuffer(logical, scale_);
+        if (!framebuffer) return false;
+        Painter& painter = (*framebuffer).painter();
+        const double hairline = 1.0 / scale_;
+        const Color border = Color::rgba(105, 116, 128);
+        painter.fill_rect({0.0, 0.0, logical.width, logical.height}, Color::rgba(255, 255, 240));
+        painter.fill_rect({0.0, 0.0, logical.width, hairline}, border);
+        painter.fill_rect({0.0, logical.height - hairline, logical.width, hairline}, border);
+        painter.fill_rect({0.0, 0.0, hairline, logical.height}, border);
+        painter.fill_rect({logical.width - hairline, 0.0, hairline, logical.height}, border);
+        for (std::size_t index = 0; index < lines.size(); ++index) {
+            const Point baseline{8.0, 5.0 + metrics.ascent + line_height * static_cast<double>(index)};
+            painter.draw_text_utf8(baseline, lines[index], font, Color::rgba(31, 37, 44));
+        }
+        (*framebuffer).end();
+        tooltip_.width = static_cast<int>((*framebuffer).width());
+        tooltip_.height = static_cast<int>((*framebuffer).height());
+        const std::span<std::byte> bytes = (*framebuffer).pixels();
+        tooltip_.pixels.resize(static_cast<std::size_t>(tooltip_.width) * static_cast<std::size_t>(tooltip_.height));
+        for (int row = 0; row < tooltip_.height; ++row) {
+            std::memcpy(tooltip_.pixels.data() + static_cast<std::size_t>(row) * static_cast<std::size_t>(tooltip_.width),
+                        bytes.data() + static_cast<std::size_t>(row) * (*framebuffer).row_bytes(),
+                        static_cast<std::size_t>(tooltip_.width) * 4U);
+        }
+        return true;
     }
 
     void resize() {
@@ -3665,29 +3374,6 @@ private:
         return FALSE;
     }
 
-    bool load_private_fonts() {
-        const std::wstring directory = executable_directory();
-        if (directory.empty()) return false;
-        constexpr std::array<const wchar_t*, 17> names{
-            L"PortsmouthRapids.ttf", L"PortsmouthRapids-Bold.ttf",
-            L"Carlito-Regular.ttf", L"Carlito-Bold.ttf",
-            L"Carlito-Italic.ttf", L"Carlito-BoldItalic.ttf",
-            L"Cousine-Regular.ttf", L"Cousine-Bold.ttf",
-            L"Cousine-Italic.ttf", L"Cousine-BoldItalic.ttf",
-            L"NotoSansCJKjp-Regular.otf", L"NotoSansArabic-Regular.ttf", L"NotoSansHebrew-Regular.ttf", L"NotoSansDevanagari-Regular.ttf", L"NotoSansBengali-Regular.ttf", L"NotoSansGurmukhi-Regular.ttf", L"NotoEmoji-Regular.ttf"};
-        private_font_paths_.reserve(names.size());
-        bool required_ready = true;
-        for (std::size_t index = 0; index < names.size(); ++index) {
-            std::wstring path = directory + L"fonts\\" + names[index];
-            if (AddFontResourceExW(path.c_str(), FR_PRIVATE, nullptr) > 0) {
-                private_font_paths_.push_back(std::move(path));
-            } else if (index < 7) {
-                required_ready = false;
-            }
-        }
-        return required_ready;
-    }
-
     static std::wstring executable_directory() {
         wchar_t executable[MAX_PATH]{};
         const DWORD count = GetModuleFileNameW(nullptr, executable, MAX_PATH);
@@ -3743,7 +3429,6 @@ private:
     std::shared_ptr<TitleCallbackState> title_state_{std::make_shared<TitleCallbackState>()};
     bool closed_{};
     NativePhase native_phase_{NativePhase::creating};
-    std::vector<std::wstring> private_font_paths_;
     TooltipPopup tooltip_;
 };
 
