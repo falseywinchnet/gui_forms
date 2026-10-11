@@ -12,7 +12,9 @@ void test_containers_and_focus(gui_forms::Window& window) {
         window.find("gallery.containers.user"));
     std::shared_ptr<gui_forms::Label> user_status = std::dynamic_pointer_cast<Label>(
         window.find("gallery.containers.user.status"));
-    require(base_container && user_control && user_status &&
+    std::shared_ptr<gui_forms::Button> collapse = std::dynamic_pointer_cast<Button>(
+        window.find("gallery.containers.collapse"));
+    require(base_container && user_control && user_status && collapse &&
                 (*user_control).is_loaded() && (*user_control).is_attached() &&
                 (*user_control).attachment_count() == 1U &&
                 (*user_status).text().find("Loaded fired once") != std::string::npos,
@@ -23,11 +25,22 @@ void test_containers_and_focus(gui_forms::Window& window) {
                 window.semantic_snapshot().to_json().find(
                     "UserControl lifecycle specimen") != std::string::npos,
             "public container focus and named group semantics must work in the gallery");
-    click(window, window.find("gallery.containers.collapse"));
-    require(split && (*split).first_collapsed(),
+    // The page owner's named handler transfers focus to the splitter through
+    // the public container seam; arrow keys then move the seam.
+    click(window, window.find("gallery.containers.focus"));
+    require(split && window.focused_control() == (*split).splitter_control(),
+            "gallery focus command must route focus to the public splitter control");
+    const double distance_before = (*split).splitter_distance();
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::right}) &&
+                (*split).splitter_distance() > distance_before,
+            "a focused splitter must move its seam from keyboard input");
+    click(window, collapse);
+    require((*split).first_collapsed() &&
+                (*collapse).text() == "Restore navigation",
             "gallery collapse command must mutate the public SplitContainer");
-    click(window, window.find("gallery.containers.collapse"));
-    require(!(*split).first_collapsed(),
+    click(window, collapse);
+    require(!(*split).first_collapsed() &&
+                (*collapse).text() == "Collapse navigation",
             "gallery SplitContainer must restore its retained allocation");
 }
 
