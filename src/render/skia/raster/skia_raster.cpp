@@ -8,6 +8,8 @@
 
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
+#include "../../text/glyph_run/glyph_run_raster.hpp"
+#include "../../../core/text/composite/text_composite.hpp"
 #endif
 
 #include "include/codec/SkCodec.h"
@@ -191,9 +193,52 @@ public:
     // Identity of text_engine for shaped-text memos. A memo holding an
     // expired or different identity was shaped by another raster.
     std::shared_ptr<const bool> text_engine_identity{std::make_shared<const bool>(true)};
-    // Draws one shaping result exactly as draw_text_utf8 always has.
+    // Draws one shaping result exactly as draw_text_utf8 always has. Used only
+    // when the shared ADR-004 path cannot address the canvas pixels.
     void draw_shaped_text(SkCanvas& target, const text::ShapedText& shaped, Point origin,
                           std::string_view text, FontSpec font_spec, Color color);
+
+    // ADR-004 text clipping: the device clip that text compositing honours,
+    // one entry per canvas save level from text_clip_base upward. Skia cannot
+    // report a clip's fractional edges, so SkiaRaster records them itself.
+    struct TextClipState final {
+        SkRect rect{};
+        bool rounded{};
+        SkRect rounded_rect{};
+        double radius{};
+        // Disjoint device rectangles of the frame damage and clip_damage.
+        bool region_limited{};
+        SkRegion region;
+    };
+    std::vector<TextClipState> text_clips;
+    int text_clip_base{};
+    std::unique_ptr<text::GlyphRunRasterizer> glyph_runs;
+
+    void reset_text_clips(SkCanvas& target, const SkRegion* region) {
+        text_clips.clear();
+        TextClipState base{};
+        base.rect = SkRect::MakeIWH(target.imageInfo().width(), target.imageInfo().height());
+        if (region != nullptr) {
+            base.region_limited = true;
+            base.region = *region;
+        }
+        text_clips.push_back(std::move(base));
+        text_clip_base = target.getSaveCount();
+    }
+
+    // Null when the recorded clips no longer describe the canvas.
+    [[nodiscard]] TextClipState* current_text_clip(const SkCanvas& target) noexcept {
+        if (text_clips.empty()) return nullptr;
+        const int expected = text_clip_base + static_cast<int>(text_clips.size()) - 1;
+        if (target.getSaveCount() != expected) return nullptr;
+        return &text_clips.back();
+    }
+
+    // Rasterizes (or reuses) the run's coverage and composites it with the
+    // shared rule into the canvas pixels. False when the canvas cannot be
+    // addressed this way; the caller then draws through Skia.
+    bool composite_run(SkCanvas& target, const text::ShapedText& shaped, FontSpec font, Point origin, Color color,
+                       text::GlyphRunCoverage* kept, double* kept_scale, std::int32_t* kept_phase);
 #endif
     Size logical_size{};
     double scale{1.0};
@@ -484,6 +529,13 @@ void SkiaRaster::begin_frame(const DamageRegion& damage) {
         (*canvas).clipRegion(region);
         (*canvas).scale(static_cast<SkScalar>((*impl_).scale),
                       static_cast<SkScalar>((*impl_).scale));
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        (*impl_).reset_text_clips(*canvas, &region);
+#endif
+    } else {
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        (*impl_).reset_text_clips(*canvas, nullptr);
+#endif
     }
 }
 
@@ -504,12 +556,22 @@ void SkiaRaster::clip_damage(const DamageRegion& damage) {
     (*canvas).resetMatrix();
     (*canvas).clipRegion(region);
     (*canvas).setMatrix(matrix);
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
+        if ((*state).region_limited) (*state).region.op(region, SkRegion::kIntersect_Op);
+        else (*state).region = region;
+        (*state).region_limited = true;
+    }
+#endif
 }
 
 void SkiaRaster::end_frame() {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).restoreToCount(1);
     }
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+    (*impl_).text_clips.clear();
+#endif
 }
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -700,6 +762,12 @@ std::size_t SkiaRaster::byte_size() const noexcept {
 
 void SkiaRaster::save() {
     if (SkCanvas* canvas = (*impl_).canvas()) {
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
+            const Impl::TextClipState copy = *state;
+            (*impl_).text_clips.push_back(copy);
+        }
+#endif
         (*canvas).save();
     }
 }
@@ -707,6 +775,11 @@ void SkiaRaster::save() {
 void SkiaRaster::restore() {
     if (SkCanvas* canvas = (*impl_).canvas();
         canvas && (*canvas).getSaveCount() > (*impl_).save_floor) {
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        if ((*impl_).current_text_clip(*canvas) != nullptr && (*impl_).text_clips.size() > 1U) {
+            (*impl_).text_clips.pop_back();
+        }
+#endif
         (*canvas).restore();
     }
 }
@@ -720,12 +793,31 @@ void SkiaRaster::translate(Point offset) {
 void SkiaRaster::clip_rect(Rect rect) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).clipRect(to_sk_rect(rect), SkClipOp::kIntersect, false);
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
+            const SkRect device = (*canvas).getTotalMatrix().mapRect(to_sk_rect(rect));
+            if (!(*state).rect.intersect(device)) (*state).rect.setEmpty();
+        }
+#endif
     }
 }
 
 void SkiaRaster::clip_rounded_rect(Rect rect, double radius) {
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).clipRRect(to_sk_rrect(rect, radius), SkClipOp::kIntersect, true);
+#if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
+        if (Impl::TextClipState* const state = (*impl_).current_text_clip(*canvas)) {
+            const SkMatrix matrix = (*canvas).getTotalMatrix();
+            const SkRect device = matrix.mapRect(to_sk_rect(rect));
+            // One rounded clip is exact. An enclosing rounded clip is kept as
+            // its bounds only: nested rounded clips are approximated.
+            if ((*state).rounded && !(*state).rect.intersect((*state).rounded_rect)) (*state).rect.setEmpty();
+            (*state).rounded = true;
+            (*state).rounded_rect = device;
+            (*state).radius = std::max(0.0, radius) * static_cast<double>(matrix.getScaleX());
+            if (!(*state).rect.intersect(device)) (*state).rect.setEmpty();
+        }
+#endif
     }
 }
 
@@ -1032,6 +1124,11 @@ public:
     FontSpec font{};
     std::size_t text_bytes{};
     text::ShapedText shaped;
+    // ADR-004 coverage of the shaped run at one device scale and phase.
+    bool has_coverage{};
+    double coverage_scale{};
+    std::int32_t coverage_phase{};
+    text::GlyphRunCoverage coverage;
 };
 
 } // namespace
@@ -1061,7 +1158,84 @@ void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_v
         memo = replacement.get();
         (*cache).memo = std::move(replacement);
     }
+    if ((*impl_).composite_run(*canvas, (*memo).shaped, font_spec, origin, color, &(*memo).coverage,
+                               &(*memo).coverage_scale, &(*memo).coverage_phase)) {
+        (*memo).has_coverage = true;
+        return;
+    }
     (*impl_).draw_shaped_text(*canvas, (*memo).shaped, origin, text, font_spec, color);
+}
+
+bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& shaped, const FontSpec font,
+                                     const Point origin, const Color color, text::GlyphRunCoverage* const kept,
+                                     double* const kept_scale, std::int32_t* const kept_phase) {
+    TextClipState* const state = current_text_clip(target);
+    if (state == nullptr) return false;
+    SkPixmap pixmap{};
+    if (!target.peekPixels(&pixmap) || pixmap.alphaType() != kPremul_SkAlphaType ||
+        (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
+        pixmap.rowBytes() % 4U != 0U) {
+        return false;
+    }
+    const SkMatrix matrix = target.getTotalMatrix();
+    if (!matrix.isScaleTranslate() || matrix.getScaleX() <= 0.0F || matrix.getScaleX() != matrix.getScaleY()) return false;
+    const double device_scale = static_cast<double>(matrix.getScaleX());
+    const SkPoint device = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y)));
+    const text::GlyphRunOrigin placement = text::glyph_run_origin(static_cast<double>(device.x()), static_cast<double>(device.y()));
+    if (!glyph_runs) glyph_runs = std::make_unique<text::GlyphRunRasterizer>(text_engine);
+    text::GlyphRunCoverage fresh{};
+    const text::GlyphRunCoverage* coverage = &fresh;
+    if (kept != nullptr && kept_scale != nullptr && kept_phase != nullptr && *kept_scale == device_scale &&
+        *kept_phase == placement.phase_x && !(*kept).pixels.empty()) {
+        coverage = kept;
+    } else {
+        fresh = (*glyph_runs).rasterize(shaped, font, device_scale, placement.phase_x);
+        if (kept != nullptr && kept_scale != nullptr && kept_phase != nullptr) {
+            *kept = std::move(fresh);
+            *kept_scale = device_scale;
+            *kept_phase = placement.phase_x;
+            coverage = kept;
+        }
+    }
+    if ((*coverage).pixels.empty() || (*state).rect.isEmpty()) return true;
+    const std::size_t stride = pixmap.rowBytes() / 4U;
+    const std::size_t pixel_count = stride * static_cast<std::size_t>(pixmap.height());
+    detail::TextCompositeTarget composite_target{};
+    composite_target.pixels = std::span<std::uint32_t>(pixmap.writable_addr32(0, 0), pixel_count);
+    composite_target.width = static_cast<std::uint32_t>(pixmap.width());
+    composite_target.height = static_cast<std::uint32_t>(pixmap.height());
+    composite_target.stride = stride;
+    composite_target.order = pixmap.colorType() == kRGBA_8888_SkColorType ? detail::TextPixelOrder::rgba
+                                                                          : detail::TextPixelOrder::bgra;
+    composite_target.opaque = false;
+    const detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
+                                      .height = (*coverage).height,
+                                      .left = placement.pixel_x + (*coverage).left,
+                                      .top = placement.pixel_y + (*coverage).top};
+    detail::TextCompositeClip clip{};
+    clip.rect = {static_cast<double>((*state).rect.left()), static_cast<double>((*state).rect.top()),
+                 static_cast<double>((*state).rect.width()), static_cast<double>((*state).rect.height())};
+    if ((*state).rounded) {
+        clip.rounded = true;
+        clip.rounded_rect = {static_cast<double>((*state).rounded_rect.left()), static_cast<double>((*state).rounded_rect.top()),
+                             static_cast<double>((*state).rounded_rect.width()), static_cast<double>((*state).rounded_rect.height())};
+        clip.radius = (*state).radius;
+    }
+    if (!(*state).region_limited) {
+        static_cast<void>(detail::composite_text_coverage(source, composite_target, clip, color));
+        return true;
+    }
+    // Disjoint region rectangles: no pixel is blended twice.
+    for (SkRegion::Iterator piece((*state).region); !piece.done(); piece.next()) {
+        const SkIRect bounds = piece.rect();
+        detail::TextCompositeClip piece_clip = clip;
+        const Rect piece_rect{static_cast<double>(bounds.left()), static_cast<double>(bounds.top()),
+                              static_cast<double>(bounds.width()), static_cast<double>(bounds.height())};
+        piece_clip.rect = Rect::intersection(clip.rect, piece_rect);
+        if (piece_clip.rect.empty()) continue;
+        static_cast<void>(detail::composite_text_coverage(source, composite_target, piece_clip, color));
+    }
+    return true;
 }
 #else
 void SkiaRaster::draw_retained_text_utf8(const Point origin, const std::string_view text,
@@ -1078,6 +1252,7 @@ void SkiaRaster::draw_text_utf8(Point origin,
     if (SkCanvas* canvas = (*impl_).canvas(); canvas && !text.empty()) {
 #if defined(GUI_FORMS_HAS_HARFBUZZ_TEXT)
         const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
+        if ((*impl_).composite_run(*canvas, shaped, font_spec, origin, color, nullptr, nullptr, nullptr)) return;
         (*impl_).draw_shaped_text(*canvas, shaped, origin, text, font_spec, color);
 #else
         SkScalar x = static_cast<SkScalar>(origin.x);
