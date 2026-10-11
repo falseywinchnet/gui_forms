@@ -63,13 +63,15 @@ mandatory for work in that directory.
   not required to instantiate a control. Supported stock controls still supply
   default semantic adapters; File Manager requires native accessibility
   publication and does not treat it as a user-disabled product mode.
-- Portsmouth Rapids 1.0 evaluation faces are supplied for the current Gallery.
+- Portsmouth Rapids 1.0 faces are supplied for the current Gallery.
   That bounded historical proving slice retains Lucida Grande for editable,
   collection, metric, and field content until its fixture is deliberately
   migrated. **GIVEN forward direction:** M4/M9 use HarfBuzz, FreeType, bundled
   Portsmouth control faces, a selected bundled Tahoma/Calibri-like body face,
-  and bounded bundled fallback packs. Production Portsmouth rights and exact
-  body/coverage assets remain gates; do not silently use arbitrary host fonts.
+  and bounded bundled fallback packs. Portsmouth is the repository owner's own
+  typeface, bundled under MIT (`assets/fonts/LICENSE-PortsmouthRapids.txt`);
+  body-face coverage assets remain a gate; do not silently use arbitrary host
+  fonts.
 - Preserve user files and unrelated working-tree changes.
 
 ## Public seam
@@ -93,7 +95,7 @@ The public ABI may begin as disciplined portable C++ for the spike, but no
 compiler-specific type may be assumed to be the eventual stable C ABI.
 
 Cross-project consumption is negotiated through
-`docs/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. GUI.Forms records its reply and
+`docs/notes/ORCHESTRATOR_INTERFACE_NEGOTIATION.md`. GUI.Forms records its reply and
 evidence there; Orchestrator reconciles the canonical program contract. Do not
 freeze an ABI merely because the current frontend experiment calls it.
 

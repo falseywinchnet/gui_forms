@@ -4,5 +4,9 @@ set -eu
 # Screen Sharing/Aqua launcher for the deterministic m4build mirror. Running
 # the binary through a symlink changes NSBundle discovery and hides bundled
 # fonts, so the executable path itself must remain inside the real .app.
-demoboard_executable='/Users/joshuahkuttenkuler/Developer/CodexBuilds/file_manager-2d80cdb86b7d/gui_forms/build/File Manager Demoboard.app/Contents/MacOS/File Manager Demoboard'
+if [ "$#" -lt 1 ]; then
+    echo "usage: $0 <path-to>/File Manager Demoboard.app/Contents/MacOS/File Manager Demoboard" >&2
+    exit 2
+fi
+demoboard_executable=$1
 exec "$demoboard_executable"

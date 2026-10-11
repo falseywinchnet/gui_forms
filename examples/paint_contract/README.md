@@ -33,4 +33,4 @@ ctest --test-dir build/paint-contract-native --output-on-failure
 Native execution needs an active graphical session (or a configured Windows
 runner for cross-build tests). It is intentionally
 automatic and short-lived. Visual review is performed separately with the
-Complete Showcase, not inferred from this probe.
+GUI.Forms Gallery, not inferred from this probe.
