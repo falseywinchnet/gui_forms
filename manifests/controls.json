@@ -37,7 +37,7 @@
       "purpose": "Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region.",
       "winforms": "ToolStripSplitButton",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "commands-and-menus",
       "doc": "controls/drop-down-button.md"
     },
     {
@@ -59,7 +59,7 @@
       "purpose": "Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement.",
       "winforms": "ToolStrip",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "commands-and-menus",
       "doc": "controls/command-bar.md"
     },
     {
@@ -114,7 +114,7 @@
       "purpose": "Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "choices-and-sections",
       "doc": "controls/review-card.md"
     },
     {
@@ -158,7 +158,7 @@
       "purpose": "Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants.",
       "winforms": "TreeView",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "tree-and-object-views",
       "doc": "controls/tree-view.md"
     },
     {
@@ -169,7 +169,7 @@
       "purpose": "Stable-ID virtual object collection with icon and details projections that owns no per-item controls.",
       "winforms": "ListView",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "tree-and-object-views",
       "doc": "controls/object-view.md"
     },
     {
@@ -180,7 +180,7 @@
       "purpose": "Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "tree-and-object-views",
       "doc": "controls/correspondence-view.md"
     },
     {
@@ -191,7 +191,7 @@
       "purpose": "Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "choices-and-sections",
       "doc": "controls/choice-group.md"
     },
     {
@@ -202,7 +202,7 @@
       "purpose": "Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "tree-and-object-views",
       "doc": "controls/breadcrumb-trail.md"
     },
     {
@@ -268,7 +268,7 @@
       "purpose": "Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "value-editors",
       "doc": "controls/color-value-editor.md"
     },
     {
@@ -279,7 +279,7 @@
       "purpose": "Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "value-editors",
       "doc": "controls/flags-value-editor.md"
     },
     {
@@ -301,7 +301,7 @@
       "purpose": "Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "value-editors",
       "doc": "controls/property-list.md"
     },
     {
@@ -312,7 +312,7 @@
       "purpose": "Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "value-editors",
       "doc": "controls/instrument-rack.md"
     },
     {
@@ -345,7 +345,7 @@
       "purpose": "Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics.",
       "winforms": "GroupBox",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "choices-and-sections",
       "doc": "controls/group-box.md"
     },
     {
@@ -378,7 +378,7 @@
       "purpose": "Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "choices-and-sections",
       "doc": "controls/card.md"
     },
     {
@@ -389,7 +389,7 @@
       "purpose": "Stack of captioned sections whose content controls expand and collapse individually or in single-open mode.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "choices-and-sections",
       "doc": "controls/expandable-sections.md"
     },
     {
@@ -466,7 +466,7 @@
       "purpose": "Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "responsive-layouts",
       "doc": "controls/responsive-track-panel.md"
     },
     {
@@ -510,7 +510,7 @@
       "purpose": "Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
-      "gallery_page": null,
+      "gallery_page": "responsive-layouts",
       "doc": "controls/command-overflow-panel.md"
     },
     {
@@ -521,7 +521,7 @@
       "purpose": "Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "responsive-layouts",
       "doc": "controls/master-detail-view.md"
     },
     {
@@ -532,7 +532,7 @@
       "purpose": "Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics.",
       "winforms": "ScrollableControl",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "responsive-layouts",
       "doc": "controls/scrollable-control.md"
     },
     {
@@ -576,7 +576,7 @@
       "purpose": "Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances.",
       "winforms": "MenuStrip",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "commands-and-menus",
       "doc": "controls/menu-strip.md"
     },
     {
@@ -587,7 +587,7 @@
       "purpose": "Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands.",
       "winforms": "ContextMenuStrip",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "commands-and-menus",
       "doc": "controls/context-menu.md"
     },
     {
@@ -598,7 +598,7 @@
       "purpose": "Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "commands-and-menus",
       "doc": "controls/command.md"
     },
     {
@@ -609,7 +609,7 @@
       "purpose": "Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "anchored-popups",
       "doc": "controls/anchored-popup-layer.md"
     },
     {
@@ -653,7 +653,7 @@
       "purpose": "Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "live-surfaces",
       "doc": "controls/live-surface.md"
     },
     {
@@ -686,7 +686,7 @@
       "purpose": "Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status.",
       "winforms": "GUI.Forms-only",
       "status": "lab",
-      "gallery_page": null,
+      "gallery_page": "typography-and-inspection",
       "doc": "controls/typography-specimen.md"
     },
     {
@@ -697,7 +697,7 @@
       "purpose": "Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics.",
       "winforms": "GUI.Forms-only",
       "status": "lab",
-      "gallery_page": null,
+      "gallery_page": "typography-and-inspection",
       "doc": "controls/visual-inspector-view.md"
     },
     {
@@ -708,7 +708,7 @@
       "purpose": "Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing.",
       "winforms": "GUI.Forms-only",
       "status": "lab",
-      "gallery_page": null,
+      "gallery_page": "typography-and-inspection",
       "doc": "controls/visual-inspector-overlay.md"
     },
     {
@@ -763,7 +763,7 @@
       "purpose": "Turns one-shot application transitions into bounded, traceable host cues.",
       "winforms": "GUI.Forms-only",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "semantic-feedback",
       "doc": "controls/semantic-feedback.md"
     },
     {
@@ -796,7 +796,7 @@
       "purpose": "Window-scoped weak membership and disposal subscriptions for BindingSources.",
       "winforms": "BindingContext",
       "status": "stable",
-      "gallery_page": null,
+      "gallery_page": "value-editors",
       "doc": "controls/binding-context.md"
     }
   ]

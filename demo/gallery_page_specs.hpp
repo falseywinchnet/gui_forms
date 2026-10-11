@@ -36,7 +36,7 @@ inline constexpr std::string_view body_id_prefix = "gallery.body.";
 
 // Compiled-DML pages first (their content is declared in gallery.dml), then the
 // pages migrated from the retired Complete Showcase in their former order.
-inline constexpr std::array<GalleryPageSpec, 20> gallery_pages {{
+inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
     {"basics", "Basic controls",
      "Compiled-DML form grid over public Button, CheckBox, RadioButton, LinkLabel and Label instances plus a composed UserControl lifecycle card.",
      false, "Information display"},
@@ -97,6 +97,34 @@ inline constexpr std::array<GalleryPageSpec, 20> gallery_pages {{
     {"dock-and-anchor", "Dock and anchor",
      "Dock and Anchor layout policy on public Panel and Button instances.",
      false, "Layout"},
+    // Pages added for the registry records the migrated Showcase did not demonstrate.
+    {"commands-and-menus", "Commands and menus",
+     "CommandBar, DropDownButton, MenuStrip and ContextMenu driven by shared Commands.",
+     false, "Menus and commands"},
+    {"tree-and-object-views", "Trees and object views",
+     "TreeView, ObjectView, CorrespondenceView and BreadcrumbTrail over one fixture.",
+     false, "Selection from a list"},
+    {"choices-and-sections", "Choices and sections",
+     "ChoiceGroup, ExpandableSections, GroupBox, Card and ReviewCard bound to shared values.",
+     false, "Grouping"},
+    {"value-editors", "Value editors",
+     "ColorValueEditor, FlagsValueEditor, PropertyList and InstrumentRack editing one bound record.",
+     false, "Value setting"},
+    {"responsive-layouts", "Responsive layouts",
+     "ResponsiveTrackPanel, CommandOverflowPanel, MasterDetailView and ScrollableControl under resize.",
+     false, "Layout"},
+    {"anchored-popups", "Anchored popups",
+     "AnchoredPopupLayer placement, flipping and dismissal.",
+     false, "Dialogs and popups"},
+    {"live-surfaces", "Live surfaces",
+     "LiveSurface publication, damage-limited presentation and reconfigure.",
+     false, "Drawing"},
+    {"typography-and-inspection", "Typography and inspection",
+     "TypographySpecimen and the VisualInspectorView overlay.",
+     true, "Diagnostics"},
+    {"semantic-feedback", "Semantic feedback",
+     "SemanticFeedback announcements and sound cues through the host.",
+     false, "Components"},
 }};
 
 [[nodiscard]] constexpr const GalleryPageSpec* find_gallery_page(std::string_view id) noexcept
