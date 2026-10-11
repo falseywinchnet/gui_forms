@@ -24,7 +24,8 @@ def ensure_release(repository: str, revision: str) -> str:
                       'These are build inputs, not an application release.')
         created: subprocess.CompletedProcess[str] = subprocess.run(
             ['gh', 'release', 'create', tag, '--repo', repository, '--target', revision,
-             '--prerelease', '--title', tag, '--notes', notes], capture_output=True, text=True)
+             '--prerelease', '--title', 'Compiler cache ' + revision[:7], '--notes', notes],
+            capture_output=True, text=True)
         if created.returncode != 0:
             # Another platform may have won the creation race. Only an existing
             # release with the exact source tag permits continuing.

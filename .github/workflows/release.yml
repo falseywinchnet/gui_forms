@@ -1,0 +1,320 @@
+name: GUI.Forms programs and release
+# Builds the demonstration programs (packaging/programs.json) with the Gallery and
+# the File Manager demoboard enabled, runs ctest, packages each program, installs
+# and smoke-launches the packages on the runner, and publishes a tested `v*`
+# release from main. Pull requests stop after the smoke. Toolchain and cache
+# restoration mirror native.yml so the published compiler cache can match.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    paths-ignore: ['docs/**', '*.md', 'planning/**', 'decisions/**', 'results/**']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the tested packages from main
+        type: boolean
+        default: false
+  schedule:
+    # Weekly dry report of prunable compiler-cache pre-releases (tools/prune_cache_releases.py).
+    - cron: '17 6 * * 1'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: gui-forms-release-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+jobs:
+  prepare:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test the packaging tools
+        run: |
+          python3 -B -m unittest discover -s tools -p test_publication_version.py
+          python3 -B -m unittest discover -s tools -p test_package_programs.py
+          python3 -B -m unittest discover -s tools -p test_prune_cache_releases.py
+      - name: Select one tested publication version
+        id: version
+        env:
+          PUBLISH_REQUESTED: ${{ inputs.publish }}
+        run: python3 tools/publication_version.py
+  programs:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: macos-arm64
+            host: MACOS
+            shell: bash
+          - runner: windows-2022
+            platform: windows-x64
+            host: WINDOWS
+            shell: 'msys2 {0}'
+          - runner: ubuntu-24.04
+            platform: linux-x64
+            host: LINUX
+            shell: bash
+          - runner: ubuntu-24.04-arm
+            platform: linux-arm64
+            host: LINUX
+            shell: bash
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      GUI_FORMS_RUNNER: ${{ matrix.runner }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_DIR: .build/native-${{ matrix.platform }}/gui-forms
+      OBJCXX: clang++
+      CC: clang
+      CXX: clang++
+      CMAKE_C_COMPILER_LAUNCHER: ccache
+      CMAKE_CXX_COMPILER_LAUNCHER: ccache
+      CMAKE_OBJCXX_COMPILER_LAUNCHER: ccache
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    steps:
+      # The same layout as native.yml (sources at gui_forms/, build three levels
+      # down) so the compiler cache native.yml publishes matches these objects.
+      - uses: actions/checkout@v4
+        with:
+          path: gui_forms
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # --- toolchain restoration, copied from native.yml ---------------------------
+      - uses: actions/setup-python@v5
+        id: toolchain-python
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.14'
+          update-environment: false
+      - name: Restore the published Windows toolchain without MSYS2 mirrors
+        id: toolchain
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+        run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          brew install cmake ninja ccache llvm@22
+          echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
+          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
+          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev \
+            xvfb xauth xdg-utils xdotool patchelf dpkg-dev
+          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        if: runner.os == 'Windows' && steps.toolchain.outputs.restored != 'true'
+        with:
+          msystem: CLANG64
+          update: true
+          path-type: inherit
+          install: ${{ steps.toolchain.outputs.packages }}
+      - name: Select macOS 14 runtime prefix
+        if: runner.os == 'macOS'
+        run: echo "GUI_FORMS_LLVM_RUNTIME=$PWD/.build/toolchain/llvm-22.1.8-macos14" >> "$GITHUB_ENV"
+      - name: Identify and verify LLVM release compiler
+        id: compiler
+        run: python gui_forms/tools/compiler_identity.py
+      - uses: actions/cache@v4
+        if: runner.os == 'macOS'
+        with:
+          path: .build/toolchain/llvm-22.1.8-macos14
+          key: gui-runtimes-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/tools/build_macos_runtimes.py', 'gui_forms/tools/macos_runtime_manifest.py') }}
+      - name: Build minimum-compatible macOS runtimes
+        if: runner.os == 'macOS'
+        run: |
+          if [ ! -f "$GUI_FORMS_LLVM_RUNTIME/runtime-manifest.json" ]; then
+            python gui_forms/tools/build_macos_runtimes.py --work "$RUNNER_TEMP/llvm-runtimes" --prefix "$GUI_FORMS_LLVM_RUNTIME" --jobs 4
+          fi
+          python gui_forms/tools/macos_runtime_manifest.py "$GUI_FORMS_LLVM_RUNTIME"
+          python gui_forms/tools/audit_macos_minimum.py "$GUI_FORMS_LLVM_RUNTIME/lib"
+      - name: Configure compiler cache
+        run: |
+          cache_dir="$PWD/.ccache"
+          cache_base="$PWD"
+          if command -v cygpath >/dev/null; then
+            cache_dir="$(cygpath -m "$cache_dir")"
+            cache_base="$(cygpath -m "$cache_base")"
+          fi
+          echo "CCACHE_DIR=$cache_dir" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$cache_base" >> "$GITHUB_ENV"
+          echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=500M" >> "$GITHUB_ENV"
+      # Objects: this workflow's own key first, then whatever native.yml saved for
+      # the same compiler. Dependencies: native.yml's exact key (same fetch scripts).
+      - uses: actions/cache/restore@v4
+        id: objects
+        with:
+          path: .ccache
+          key: gui-programs-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/CMakeLists.txt', 'gui_forms/cmake/**', 'gui_forms/include/**', 'gui_forms/src/**', 'gui_forms/demo/**', 'gui_forms/file_manager_demoboard/**', 'gui_forms/tests/**') }}
+          restore-keys: |
+            gui-programs-objects-v1-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
+            gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-
+            gui-objects-v2-${{ matrix.platform }}-
+      - uses: actions/cache@v4
+        id: dependencies
+        with:
+          path: |
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            gui_forms/third_party/libunibreak
+            .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
+            .build/native-${{ matrix.platform }}/skia
+          key: gui-deps-v3-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
+      # --- build, as tools/ci_build.py configures it, plus the programs ------------
+      - name: Fetch pinned text sources and build the CPU renderer
+        run: |
+          sh gui_forms/third_party/fetch_text_stack.sh
+          if [ "$RUNNER_OS" != Windows ]; then
+            if [ "$RUNNER_OS" = Linux ]; then export GUI_FORMS_SYSTEM_BUILD_TOOLS=1; fi
+            sh gui_forms/third_party/fetch_skia_cpu.sh
+            if [ "$RUNNER_OS" = Linux ]; then
+              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu_linux.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
+            else
+              BUILD_JOBS=4 sh gui_forms/third_party/build_skia_cpu.sh "$PWD/.build/native-${{ matrix.platform }}/skia"
+            fi
+          fi
+      - name: Configure the programs
+        run: |
+          renderer="-DGUI_FORMS_ENABLE_SKIA=ON -DGUI_FORMS_SKIA_PREBUILT=ON -DGUI_FORMS_SKIA_OUT=$PWD/.build/native-${{ matrix.platform }}/skia"
+          if [ "$RUNNER_OS" = Windows ]; then renderer="-DGUI_FORMS_ENABLE_SKIA=OFF"; fi
+          miniaudio="$BUILD_DIR/_deps/gui_forms_miniaudio-src"
+          if [ -f "$miniaudio/miniaudio.h" ]; then renderer="$renderer -DFETCHCONTENT_SOURCE_DIR_GUI_FORMS_MINIAUDIO=$PWD/$miniaudio"; fi
+          cmake -S gui_forms -B "$BUILD_DIR" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_LIBDIR=lib \
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/gui_forms/cmake/llvm22.cmake" -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+            -DGUI_FORMS_ENABLE_MACOS_HOST=$([ "${{ matrix.host }}" = MACOS ] && echo ON || echo OFF) \
+            -DGUI_FORMS_ENABLE_WINDOWS_HOST=$([ "${{ matrix.host }}" = WINDOWS ] && echo ON || echo OFF) \
+            -DGUI_FORMS_ENABLE_LINUX_HOST=$([ "${{ matrix.host }}" = LINUX ] && echo ON || echo OFF) \
+            -DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON $renderer \
+            -DGUI_FORMS_BUILD_TESTS=ON -DGUI_FORMS_BUILD_AUDIO=ON -DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx \
+            -DGUI_FORMS_BUILD_GALLERY=ON -DGUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD=ON
+      - name: Build the programs and tests
+        id: compile
+        run: |
+          ccache --zero-stats
+          cmake --build "$BUILD_DIR" --parallel 4
+      - name: Report cache statistics
+        if: always()
+        run: ccache --show-stats --verbose
+      - uses: actions/cache/save@v4
+        if: always() && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
+        with:
+          path: .ccache
+          key: ${{ steps.objects.outputs.cache-primary-key }}
+      - name: Test
+        env:
+          GUI_FORMS_FONT_DIR: ${{ github.workspace }}/gui_forms/assets/fonts
+        run: |
+          mkdir -p dist
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" ctest --test-dir "$BUILD_DIR" --output-on-failure --timeout 120 --output-junit "$PWD/dist/ctest-${{ matrix.platform }}.xml"
+          else
+            ctest --test-dir "$BUILD_DIR" --output-on-failure --timeout 120 --output-junit "$PWD/dist/ctest-${{ matrix.platform }}.xml"
+          fi
+      # --- package, then install and launch what was packaged -----------------------
+      - name: Package the programs
+        run: |
+          extra=""
+          if [ "$RUNNER_OS" = macOS ]; then extra="--runtime $GUI_FORMS_LLVM_RUNTIME"; fi
+          if [ "$RUNNER_OS" = Windows ]; then extra="--runtime-dir /clang64/bin"; fi
+          python gui_forms/tools/package_programs.py --platform "${{ matrix.platform }}" --build-dir "$BUILD_DIR" \
+            --version "$RELEASE_VERSION" --out dist --revision "${{ github.event.pull_request.head.sha || github.sha }}" $extra
+      - name: Install and launch the packaged programs
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/smoke_package.py --platform "${{ matrix.platform }}" --dist dist --build-dir "$BUILD_DIR" --install
+          else
+            python gui_forms/tools/smoke_package.py --platform "${{ matrix.platform }}" --dist dist --build-dir "$BUILD_DIR" --install
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-forms-programs-${{ matrix.platform }}
+          path: |
+            dist/*.zip
+            dist/*.pkg
+            dist/*.exe
+            dist/*.tar.gz
+            dist/*.deb
+          compression-level: 0
+          # Linux legs may package nothing until their program mains exist.
+          if-no-files-found: ${{ runner.os == 'Linux' && 'warn' || 'error' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-forms-receipts-${{ matrix.platform }}
+          path: |
+            dist/packages-*.json
+            dist/smoke-*.json
+            dist/ctest-*.xml
+            .build/native-${{ matrix.platform }}/gui-forms/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+  release:
+    if: needs.prepare.outputs.publish == 'true'
+    needs: [prepare, programs]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    concurrency:
+      group: gui-forms-publication
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-programs-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gui-forms-receipts-*
+          merge-multiple: true
+          path: receipts
+      - name: Publish exactly the tested revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+        run: python3 tools/publish_tested_release.py --artifacts dist --receipts receipts
+  prune:
+    # Dry report only: deleting cache pre-releases stays a manual
+    # `python3 tools/prune_cache_releases.py --apply` by a maintainer.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report prunable compiler-cache pre-releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/prune_cache_releases.py --repo "${{ github.repository }}"

@@ -1,177 +1,273 @@
-# GUI.Forms proving project
+This software is dedicated to the service of those in need, in the name of our savior Christ Jesus and our great and all powerful God
 
-Status: active proving project with a named File Manager FM0 consumption
-manifest. This subtree builds a native, retained, custom-rendered control
-framework backed by CPU-only Skia and now exports an installed
-`GUIForms::Application` host boundary. It is not the File Manager application
-and does not yet constitute a stable 1.0 ABI.
+# GUI.Forms
 
-The first deliverable is a Modern.Forms-style control gallery with structured
-instrumentation, automated tests, and private AppKit and Win32 hosts. The same
-retained Gallery now runs natively on macOS and as a PE64 program under Wine.
-See `AGENTS.md` for the non-negotiable dependency and source boundaries.
+A retained, WinForms-shaped native C++20 toolkit that paints on the CPU and
+runs the same control tree on macOS, Windows and Linux.
 
-## Build and run on macOS
+[![CI](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml/badge.svg)](https://github.com/falseywinchnet/gui_forms/actions/workflows/native.yml) [![Docs](https://readthedocs.org/projects/gui-forms/badge/?version=latest)](https://gui-forms.readthedocs.io/) [![Release](https://img.shields.io/github/v/release/falseywinchnet/gui_forms?display_name=tag)](https://github.com/falseywinchnet/gui_forms/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg) ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)
 
-The dependency scripts fetch the pinned Skia/libpng/zlib revisions and apply
-the recorded PNG-only policy patch. CMake invokes them automatically when the
-private archives are absent.
+**Status: early public preview. The API is not yet stable. The macOS and
+Windows hosts are native; the Linux X11 host is opt-in. GUI.Forms is CPU-only
+by design and has no GPU backend. Text is drawn by one HarfBuzz/FreeType
+engine from bundled fonts, so the same string renders identically on every
+platform ([ADR-004](decisions/ADR-004-one-text-rasterization-engine.md)).**
 
-```sh
-cmake -S gui_forms -B gui_forms/build -DCMAKE_BUILD_TYPE=Release
-cmake --build gui_forms/build --parallel
-ctest --test-dir gui_forms/build --output-on-failure
-open "gui_forms/build/GUI.Forms Gallery.app"
-open "gui_forms/build/GUI.Forms Complete Showcase.app"
+## First window
+
+```cpp
+#include <gui_forms/application.hpp>
+#include <gui_forms/basic_controls.hpp>
+#include <gui_forms/component.hpp>
+
+#include <memory>
+
+namespace gf = gui_forms;
+
+struct Greeter final : gf::Component {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("root"));
+    std::shared_ptr<gf::Label> status = gf::make_control<gf::Label>(gf::StableId("status"), "Ready.");
+    std::shared_ptr<gf::Button> run = gf::make_control<gf::Button>(gf::StableId("run"), "Run");
+    Greeter() {
+        (*status).set_bounds({24.0, 24.0, 432.0, 32.0});
+        (*run).set_bounds({24.0, 72.0, 120.0, 36.0});
+        (*root).add_child(status);
+        (*root).add_child(run);
+        gf::on((*run).clicked(), *this, &Greeter::on_run); // owned: revoked with Greeter
+    }
+    void on_run() { (*status).set_text("Clicked."); }
+};
+
+int main() {
+    Greeter greeter{};
+    std::unique_ptr<gf::Window> window = std::make_unique<gf::Window>(greeter.root, gf::Size{480.0, 140.0});
+    return gf::Application::run(std::move(window), {.title = "First window"}).accepted() ? 0 : 1;
+}
 ```
 
-The lower project does not consume sources from the File Manager parent. The
-public retained core is renderer-neutral; Skia and AppKit remain private
-adapters. See `third_party/SKIA_BUILD_EVIDENCE.md` for the exact measured pin,
-archive sizes, link audit, and the non-PNG decoder negative result.
+Controls are created once with a `StableId`, the tree owns them, mutation is
+imperative, and only the damaged rectangle repaints. The longer walkthrough is
+in [Your first window](docs/start/first-window.md).
 
-The independent Complete Showcase is the broad dogfood board rather than the
-File Manager mockup. Its current twelve pages include stock controls, ranges,
-containers, animation/state matrices, text and collections, values, images and
-drawing, tabs, checked lists, and live Timer/ToolTip provider behavior.
+<!-- screenshots: enable when docs/images/* exist
+![GUI.Forms Gallery on macOS](docs/images/gallery-macos.png)
+![GUI.Forms Gallery on Windows](docs/images/gallery-windows.png)
+/screenshots -->
 
-## First-party consumer specification
+## Downloads
 
-[`file_manager_demoboard/README.md`](file_manager_demoboard/README.md) defines
-the standalone Native File Manager Demoboard: a fully interactive,
-fixture-backed reproduction of the accepted File Manager prototype built only
-through public GUI.Forms. It is currently a detailed worker specification, not
-an implemented frontend or authorization to add missing GUI.Forms capabilities
-inside the consumer directory.
+Three demonstration programs are built from `demo/` and
+`file_manager_demoboard/` using only the public headers.
 
-## Build and run the Windows Gallery under Wine
+| Program | What it is | Today |
+|---|---|---|
+| GUI.Forms Gallery | Control catalogue: one page per control, with diagnostics | Builds from source on macOS and Windows |
+| GUI.Forms Explore (preview) | Fixture-backed file-explorer mockup from `file_manager_demoboard/`; never touches the real filesystem | Builds from source with `-DGUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD=ON`; not packaged yet |
+| GUI.Forms Correspondence | Mail-client mockup over in-memory fixtures (`demo/correspondence/`); no real mail, filesystem or network | Builds from source on macOS and Windows; not packaged yet |
+
+The first downloadable builds arrive with the first `v0.1` release at
+[releases/latest](https://github.com/falseywinchnet/gui_forms/releases/latest).
+No application release exists yet; the `build-<sha>` entries on the Releases
+page are compiler-cache publications for CI, not downloads. When builds ship:
+
+- **Linux** builds need an X11 display (XWayland works).
+- **macOS** builds are ad hoc signed, not notarized. Right-click the app and
+  choose Open on first launch.
+- **Windows** builds are unsigned. SmartScreen shows "More info", then
+  "Run anyway".
+
+See [Download](docs/start/download.md) for the full platform notes.
+
+## Features
+
+- Retained controls with explicit ownership: the tree owns its children,
+  handlers are owned by a `Component` and revoked with it.
+- Typed layout, paint and hit-test dirtiness, with nested update scopes and
+  bounded flushes.
+- Damage-limited CPU painting. No redraw loop; nothing repaints until
+  something changes.
+- Forms-like focus, pointer, keyboard and activation behaviour on every host.
+- One text engine (HarfBuzz shaping, FreeType rasterization, bundled fonts):
+  identical glyphs on every OS.
+- Structured instrumentation counters and snapshots, plus an on-screen
+  diagnostics panel in the Gallery.
+- Stable IDs on every control, used by logs, semantics, tests and automation.
+- A C ABI seam (`include/gui_forms/c_api.h`) and an installed CMake SDK
+  (`GUIForms::Application`).
+- PNG is the only image decoder in the core.
+- No GPU, no .NET, no browser engine.
+
+## Controls
+
+Every stock control, grouped by function; the table is generated from
+[`manifests/controls.json`](manifests/controls.json).
+
+<!-- controls:start -->
+| Control | Function | Description |
+|---|---|---|
+| `Button` | Commands | Push button with accept/cancel dialog results, default-button state, and four visual policies. |
+| `ButtonBase` |  | Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize. |
+| `CommandBar` |  | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
+| `DropDownButton` |  | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
+| `LinkLabel` |  | Command presented as underlined link text with retained visited state and link semantics. |
+| `TextBox` | Text editing | Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
+| `Label` | Information display | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
+| `PictureBox` |  | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
+| `ProgressBar` |  | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |
+| `ReviewCard` |  | Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws. |
+| `BreadcrumbTrail` | Selection from a list | Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing. |
+| `CheckedListBox` |  | ListBox with an independently retained three-state check model, cancellable pre-change events, and optional check-on-click. |
+| `ChoiceGroup` |  | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
+| `ComboBox` |  | Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup. |
+| `CorrespondenceView` |  | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
+| `ListBox` |  | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
+| `ObjectView` |  | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
+| `TreeView` |  | Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants. |
+| `CheckBox` | Value setting | Two- or three-state selection control with optional automatic cycling, three indicator families, and ordered state events. |
+| `ColorValueEditor` |  | Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion. |
+| `FlagsValueEditor` |  | Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases. |
+| `InstrumentRack` |  | Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement. |
+| `NumericUpDown` |  | Composite numeric editor over an owned TextBox and source-private spin buttons with ordered ranges, bounded step and precision, and decimal or hexadecimal formatting. |
+| `PropertyGrid` |  | Metadata-driven inspector and editor over one or more selected Controls that projects descriptors into a PropertyList. |
+| `PropertyList` |  | Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane. |
+| `RadioButton` |  | Retained checked state with container-scoped named exclusion groups, optional automatic checking, and radio semantics. |
+| `RangeControl` |  | Nonvisual retained authority for ordered bounds, a constrained value, small/large changes, and orientation that TrackBar, ProgressBar, and ScrollBar specialize. |
+| `TrackBar` |  | Slider over RangeControl with bounded tick frequency, absolute pointer positioning, keyboard movement, and slider semantics. |
+| `DateTimePicker` | Date setting | Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation. |
+| `Card` | Grouping | Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement. |
+| `ContainerControl` |  | ScrollableControl with descendant-scoped active-control authority and inherited validation policy. |
+| `ExpandableSections` |  | Stack of captioned sections whose content controls expand and collapse individually or in single-open mode. |
+| `GroupBox` |  | Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics. |
+| `MaterialPanel` |  | Content-agnostic container painted with a SurfaceMaterial. |
+| `Panel` |  | Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics. |
+| `ScaledGroupBox` |  | GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds. |
+| `TabControl` |  | Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics. |
+| `TabPage` |  | Panel surface owned by a TabControl with bounded caption text and page semantics. |
+| `UserControl` |  | Authored-container base that distinguishes current attachment from first committed load and counts attachment epochs. |
+| `CommandOverflowPanel` | Layout | Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer. |
+| `FlowLayoutPanel` |  | Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks. |
+| `MasterDetailView` |  | Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse. |
+| `ResponsiveTrackPanel` |  | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
+| `ScaledPanel` |  | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
+| `SplitContainer` |  | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
+| `SplitterPanel` |  | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
+| `TableLayoutPanel` |  | Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans. |
+| `HScrollBar` | Scrolling | Explicit horizontal ScrollBar leaf type. |
+| `ScrollableControl` |  | Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics. |
+| `ScrollBar` |  | RangeControl with bounded button and thumb geometry, proportional thumb allocation, drag and track interaction, and retained auto-repeat. |
+| `VScrollBar` |  | Explicit vertical ScrollBar leaf type. |
+| `Command` | Menus and commands | Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation. |
+| `ContextMenu` |  | Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands. |
+| `MenuStrip` |  | Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances. |
+| `AnchoredPopupLayer` | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
+| `ToolTip` |  | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
+| `DrawingSurface` | Drawing | Owner-render surface configured through the renderer-neutral Painter vocabulary without a Control subclass. |
+| `LiveSurface` |  | Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one. |
+| `RasterCanvas` |  | Viewport over an owned GUI.Drawing bitmap that handles presentation, coordinate transforms, resource synchronization, and local invalidation. |
+| `EasingPreview` | Diagnostics | Animation and easing conformance surface over an owned AnimationTimeline with configurable tracks and motion policy. |
+| `MetricsView` |  | View over the structured Window metrics snapshot. |
+| `TypographySpecimen` |  | Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status. |
+| `VisualInspectorOverlay` |  | Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing. |
+| `VisualInspectorView` |  | Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics. |
+| `Binding` | Components | Connects one Control property to one BindingSource field with validated conversion, update timing, and error routing. |
+| `BindingContext` |  | Window-scoped weak membership and disposal subscriptions for BindingSources. |
+| `BindingSource` |  | Owns stable rows, currency, edit snapshots, list and error events, and the active Bindings for one Window. |
+| `ErrorProvider` |  | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
+| `HelpProvider` |  | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
+| `ImageList` |  | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
+| `SemanticFeedback` |  | Turns one-shot application transitions into bounded, traceable host cues. |
+| `Timer` |  | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
+<!-- controls:end -->
+
+## Supported platforms
+
+| Platform | Host | Status | Notes |
+|---|---|---|---|
+| macOS 14.0+ | AppKit | Native | Apple silicon (arm64) only; builds `GUI.Forms Gallery.app` |
+| Windows 10+ | Win32 DIB | Native | x64; native build in MSYS2 CLANG64, or MinGW-w64 cross-build run under Wine |
+| Linux | X11 | Opt-in | `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`; Ubuntu 24.04 tested in CI; no packaged programs yet |
+
+The portable core (`Core`, `Controls`, `Drawing`, `Threading`) builds and
+tests wherever a C++20 compiler runs; only the `Application` host is platform
+specific.
+
+## Build from source
+
+Prerequisites: CMake 3.25+, Ninja, LLVM 22.1 (selected by
+[`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. The first
+configure fetches and builds the pinned CPU-only Skia, HarfBuzz, FreeType,
+SheenBidi and libunibreak automatically. CI publishes a compiler cache;
+see [docs/COMPILER_CACHE.md](docs/COMPILER_CACHE.md).
 
 ```sh
-cmake -S gui_forms -B gui_forms/build-windows-x64 \
-  -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/x86_64-w64-mingw32.cmake \
-  -DGUI_FORMS_ENABLE_SKIA=OFF \
-  -DGUI_FORMS_ENABLE_MACOS_HOST=OFF \
-  -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON \
-  -DGUI_FORMS_BUILD_TESTS=OFF \
-  -DCMAKE_BUILD_TYPE=Release
-cmake --build gui_forms/build-windows-x64 --parallel
-wine "gui_forms/build-windows-x64/GUI.Forms Gallery.exe"
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_TOOLCHAIN_FILE=cmake/llvm22.cmake
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
 ```
 
-The deterministic Wine interaction, capture, and close gate is:
+Run the Gallery:
 
-```sh
-gui_forms/tools/run_windows_wine_smoke.sh \
-  /Users/quentinkuttenkuler/file_manager/gui_forms/build-windows-x64
+- macOS: `open "build/GUI.Forms Gallery.app"`
+- Windows: `build/GUI.Forms Gallery.exe` (keep `fonts/` beside it)
+- Linux: `build/gui-forms-gallery`; configure with
+  `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`
+
+Per-platform toolchain setup and every build option are in
+[Build from source](docs/start/build-from-source.md).
+
+## Consume the SDK
+
+```cmake
+cmake_minimum_required(VERSION 3.25)
+project(MyForms LANGUAGES CXX)
+find_package(GUIForms 0.1 CONFIG REQUIRED COMPONENTS Application)
+add_executable(app main.cpp)
+target_compile_features(app PRIVATE cxx_std_20)
+target_link_libraries(app PRIVATE GUIForms::Application)
 ```
 
-See [`docs/WINDOWS_WINE_HOST.md`](docs/WINDOWS_WINE_HOST.md) for implemented
-host calls, measured evidence, the stable-ID automation channel, and the honest
-MSAA/UIA boundary.
+Install with `cmake --install build`, then configure your project with
+`-DCMAKE_PREFIX_PATH=<prefix>` and the same toolchain file. Never link
+`GUIForms::Core` or `GUIForms::Controls` into a program that links
+`GUIForms::Application`; CMake rejects the combination. Details and runtime
+files to ship: [Consume the SDK](docs/start/consume-the-sdk.md).
+`examples/reference/` is a complete consumer built against the installed SDK
+in CI.
 
-## Library and extension documentation
+## Documentation
 
-- [`docs/LIBRARY_AND_ASSEMBLY_GUIDE.md`](docs/LIBRARY_AND_ASSEMBLY_GUIDE.md)
-  describes current native targets, the experimental managed facade, trusted
-  retained-subtree extensions, lifecycle/ownership rules, and host-owned house
-  aesthetics.
-- [`docs/CURRENT_API_REFERENCE.md`](docs/CURRENT_API_REFERENCE.md) maps the
-  implemented C++ and experimental C ABI 0.x surface without implying 1.0
-  stability.
-- [`experiments/WINDOWS_ORACLE_PREFLIGHT.md`](experiments/WINDOWS_ORACLE_PREFLIGHT.md)
-  records the installed Wine/.NET/MinGW environment and the original bounded
-  backend gates; [`docs/WINDOWS_WINE_HOST.md`](docs/WINDOWS_WINE_HOST.md)
-  records their implementation and result.
-- [`experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md`](experiments/M11A_GENERATED_SURFACE_AND_ABI_0_2.md)
-  records the generated 796-row replacement surface and its first ABI-backed
-  managed control tree on host .NET and Wine.
-- [`experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md`](experiments/M11B_MANAGED_HOST_SURFACE_AND_ABI_0_3.md)
-  records `Application.Run(Form)` crossing ABI 0.3 into the deterministic
-  headless host and the real Win32 DIB host under Wine, including the captured
-  managed demonstration surface.
-- [`experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md`](experiments/M11C_MANAGED_CALLBACKS_AND_LOOP_ABI_0_4.md)
-- [`experiments/M11D_BEHAVIORAL_FACADE_AND_PRIVATE_LOAD.md`](experiments/M11D_BEHAVIORAL_FACADE_AND_PRIVATE_LOAD.md)
-  records the unchanged-specimen Wine load, visible retained surface, behavior
-  widening, and the remaining managed drawing passthrough.
-- [`experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md`](experiments/M11E_GUI_DRAWING_CORE_AND_ABI.md)
-  records the renderer-free GUI.Drawing semantic core, independent drawing ABI,
-  deterministic C++/C traces, and exact raster/facade work still left to M11f.
-- [`experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md`](experiments/M11F_RENDERING_RASTER_STORAGE_AND_DRAWING_FACADE.md)
-  records owned raster storage, the private Skia service, the generated 307-row
-  Drawing facade, and measured Win32 handle leases under Wine.
-- [`planning/GUI_DRAWING_REVISION_PLAN.md`](planning/GUI_DRAWING_REVISION_PLAN.md)
-  owns the 307 required captured drawing rows, separates native/facade/
-  passthrough/missing status, and keeps broader File Manager drawing needs in a
-  distinct consumer-promotion ledger.
-- [`planning/CONTROL_COMPLETENESS_MATRIX.md`](planning/CONTROL_COMPLETENESS_MATRIX.md)
-  remains authoritative for supported, deferred, packaged, and excluded
-  control families.
+- [gui-forms.readthedocs.io](https://gui-forms.readthedocs.io/): the rendered
+  site, built from [`docs/index.md`](docs/index.md).
+- [Controls by function](docs/controls/generated/by-function.md): every stock
+  control, its WinForms counterpart and a one-line description.
+- [`decisions/`](decisions/): architecture decision records.
+- [`planning/`](planning/): internal plans and working notes, kept as records
+  rather than user documentation.
 
-## Current proving-slice limits
+## Project boundaries
 
-- M11f supplies owned GUI.Drawing pixels, a private macOS CPU-only Skia raster
-  module, a generated 307/307 Drawing facade, and measured D8 handle leases
-  under Wine. The Windows x64 Skia raster DLL is not packaged yet, so the
-  unchanged Wine specimen still uses the earlier managed paint path. M11g owns
-  the visible zero-passthrough cutover; the prior retired compatibility specimen result is not native
-  drawing closure.
-- The checked-in C++ header remains the compiled form of the provisional
-  Gallery DML schema. The sibling `../web_forms/` now implements the bounded
-  HTML/CSS compiler and generates the File Manager's public retained C++ tree.
-  A visual designer and general browser/CSS runtime remain excluded.
-- Text input proves committed UTF-8 and the AppKit IME bridge, not a finished
-  shaping, selection, or editing engine.
-- The M3e host seam supplies monitor/work-area records and change events,
-  inherited portable cursors, bounded UTF-8 clipboard text, synchronous pointer
-  capture, occlusion-aware frame scheduling, five typed common-dialog families,
-  bounded nested-modal state, and typed inbound drag destinations in headless
-  and AppKit adapters. Drag payloads are portable text, file-list, and
-  media-typed byte variants; outbound drag initiation remains open. The
-  contract is platform-neutral; the Windows proving adapter now implements the
-  W0-W3 window/input/presentation subset, while Linux and the remaining Windows
-  services are open. AppKit capture is scoped to its native implicit drag
-  sequence, not a global event tap. Clipboard commands are not wired into the
-  provisional text probe; M4 owns the editor, selection, copy/paste, and undo
-  contract.
-- The Gallery bundles Portsmouth Rapids 1.0 evaluation faces for titles and
-  control chrome while retaining Lucida Grande for field content. This is a
-  demo-only role split, not the final shaping or redistribution contract.
-- The first M6 extraction provides reusable panel/group/label/link and
-  button/check/radio controls with deterministic events and normalized-key
-  activation. The Gallery now consumes those public types and visibly exercises
-  indeterminate and visited-link state. Text, range, list, container, provider,
-  and command families remain incomplete; see
-  `experiments/M6A_REUSABLE_BASIC_CONTROLS.md`.
-- M6b adds focus-aware `ContainerControl`/`UserControl` identities and a reusable
-  custom `RangeControl` substrate with concrete `TrackBar` and determinate
-  `ProgressBar`. The Gallery consumes the latter two. Real scrolling/extents,
-  container load/validation/dialog routing, and complete stock range facades
-  remain open; see `experiments/M6B_CONTAINER_RANGE_CONTROLS.md`.
-- M6c adds nested `begin_init`/`end_init` invalidation batching, deterministic
-  attach/detach hooks with failed-attach rollback, and one-shot lifetime
-  `UserControl::loaded` with committed attachment counts. The DML Gallery now
-  dogfoods a composed `UserControl` with reusable label children and visible
-  lifecycle counts. Typed property metadata, validation, scrolling, and
-  designer serialization remain open; see
-  `experiments/M6C_INITIALIZATION_LIFECYCLE.md`.
-- M4a adds the renderer-neutral Unicode text-store foundation: strict UTF-8,
-  typed UTF-8/UTF-16/scalar/line positions, bounded atomic replacement, Unicode
-  separator line indexing, deterministic style-span transformation, and
-  structured rebuild/rejection counters. Contiguous UTF-8 remains a candidate;
-  grapheme segmentation, shaping, editing, and IME remain open. See
-  `experiments/M4A_UNICODE_TEXT_STORE.md`.
-- M11a generates and verifies the complete captured 796-row managed facade
-  surface, but most rows remain behavioral stubs. ABI 0.2 implements only the
-  high-frequency construction/property/tree/disposal spine. M11b appends the
-  ABI 0.3 top-level host projection: the managed 17-control demonstration now
-  completes real Win32 create/show/paint/close under Wine and the equivalent
-  deterministic headless lifecycle. M11c appends ABI 0.4 typed click/form
-  callbacks and managed-loop dispatch. M11d widens the generated behavioral
-  facade and privately loads the pinned unchanged retired compatibility specimen specimen to a live
-  46-control Win32/Wine surface; this is measured compatibility evidence, not
-  parity or redistribution.
-  callbacks, UI dispatch, live mutation, contained callback faults, requested
-  close, and a bounded `ApplicationContext`. Broader input/member behavior,
-  cross-thread dispatcher stress, accessibility, and packaging remain open.
-  This is not the final cross-language ABI or evidence that the 51-family
-  matrix is filled out.
+GUI.Forms is a control toolkit, not an application: it is not File Manager and
+not a file browser. `file_manager_demoboard/` is an admitted first-party
+consumer that reproduces a file-explorer interface over deterministic
+in-memory fixtures through public seams only; it never reads the real
+filesystem. Deliberately excluded: GPU rendering (no Ganesh, Graphite, GL,
+Vulkan, Metal, Direct3D or WebGPU), .NET, Java, browser engines, Godot,
+immediate-mode control APIs, host font catalogues and image codecs other than
+PNG. AppKit stays in `src/host/macos/`, Win32 in `src/host/windows/`, X11 in
+`src/host/linux/` and Skia in `src/render/skia/`; tests enforce these
+boundaries.
+
+## Contributing
+
+CI ([`native.yml`](.github/workflows/native.yml)) must pass on every platform.
+Run `python3 tools/check_house_style.py <paths>` on first-party files you
+touch, and build the docs with `sphinx-build -W docs <out>` so warnings fail.
+Boundary violations fail `ctest` before review.
+
+## License
+
+[MIT](LICENSE). Bundled fonts carry their own notices in
+[`assets/fonts/ATTRIBUTION.md`](assets/fonts/ATTRIBUTION.md): Portsmouth
+Rapids (MIT, the owner's typeface), Carlito, Cousine and the Noto fallback
+faces (SIL OFL 1.1).

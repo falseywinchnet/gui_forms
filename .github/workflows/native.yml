@@ -31,7 +31,27 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
-          python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp examples/reference/bound_values.cpp examples/reference/shared_state.cpp examples/reference/collection_state.cpp examples/reference/collection_gallery.cpp tools/owned_event_lab.cpp tools/concise_authoring_lab.cpp include/gui_forms/threading.hpp src/core/threading/worker.cpp tests/threading_tests.cpp tests/live_surface_idle_wake_tests.cpp tests/macos_display_link_tests.mm examples/reference/cooperative_worker.cpp examples/reference/audio_worker.cpp examples/reference/audio_worker.hpp examples/reference/ogg_worker.cpp examples/linkage_rejection/main.cpp include/gui_forms/value include/gui_forms/detail/scalar_binding.hpp include/gui_forms/controls/collections src/controls/collections
+          python3 -B -m unittest discover -s tools -p test_control_registry.py
+          python3 tools/control_registry.py check
+          python3 tools/control_registry.py emit-cpp --check
+          python3 tools/generate_library_docs.py --check
+          python3 -B tools/check_house_style.py include/gui_forms/component/component/component.hpp src/core/component/component/component.cpp include/gui_forms/event/event/event.hpp include/gui_forms/event/subscription_token/subscription_token.hpp tests/owned_event_tests.cpp examples/reference/owned_events.cpp examples/reference/bound_values.cpp examples/reference/shared_state.cpp examples/reference/collection_state.cpp examples/reference/collection_gallery.cpp tools/owned_event_lab.cpp tools/concise_authoring_lab.cpp include/gui_forms/threading.hpp src/core/threading/worker.cpp tests/threading_tests.cpp tests/live_surface_idle_wake_tests.cpp tests/macos_display_link_tests.mm examples/reference/cooperative_worker.cpp examples/reference/audio_worker.cpp examples/reference/audio_worker.hpp examples/reference/ogg_worker.cpp examples/linkage_rejection/main.cpp include/gui_forms/value include/gui_forms/detail/scalar_binding.hpp include/gui_forms/controls/collections src/controls/collections demo/correspondence demo/program_options.hpp demo/gallery_catalog.hpp demo/gallery_page_specs.hpp src/core/image src/core/host/frame_capture tests/correspondence_tests.cpp tests/correspondence_interaction_tests.cpp tests/png_writer_tests.cpp
+  docs:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the documentation toolchain
+        run: python3 -m pip install -r docs/requirements.txt
+      - name: Build the documentation site with warnings as errors
+        run: sphinx-build -W --keep-going -b html docs docs/_build/html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-forms-docs-html
+          path: docs/_build/html
+          retention-days: 30
   native:
     needs: house-style
     strategy:
@@ -281,6 +301,9 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
+      - name: Check the committed API reference against the headers
+        if: matrix.platform == 'linux-x64' && steps.promotion.outputs.reused != 'true' && steps.reuse.outputs.reused != 'true'
+        run: python3 gui_forms/tools/api_reference.py --check
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}
