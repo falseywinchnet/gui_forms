@@ -1,0 +1,68 @@
+/* GUI.Forms documentation theme adjustments.
+ *
+ * Adapted from the NumPy documentation's numpy.css (BSD-3-Clause,
+ * https://github.com/numpy/numpy/blob/main/doc/source/_static/numpy.css):
+ * the same fonts, navbar sizing, overview cards and dark-mode icon handling
+ * on top of the PyData Sphinx Theme.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Open+Sans:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+
+.navbar-brand img {
+  height: 40px;
+}
+
+.navbar-brand {
+  height: 75px;
+}
+
+.navbar-brand .title {
+  font-family: 'Lato', sans-serif;
+  font-weight: 900;
+  font-size: 1.6rem;
+}
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  font-size: medium;
+}
+
+/* Keep the navbar on one line. NumPy narrows the logo column to 15% for its
+   image logo; the text logo here needs its natural width. */
+.bd-header .navbar-header-items__start {
+  flex: 0 0 auto;
+  margin-right: 1.5rem;
+}
+
+/* Main index page overview cards */
+.sd-card {
+  background-color: var(--pst-color-on-background);
+}
+
+.sd-card .sd-card-img-top {
+  height: 60px;
+  width: 60px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 10px;
+}
+
+/* Main index page overview images */
+html[data-theme=dark] .sd-card img[src*='.svg'] {
+  filter: invert(1.0) saturate(0.0);
+  background: none;
+}
+
+code.literal,
+code.literal .pre {
+  font-variant-ligatures: none;
+}
+
+/* Reference summary tables: the member name column stays on one line where
+   it fits, as in NumPy's autosummary tables. */
+table.autosummary td:first-child {
+  white-space: nowrap;
+}
+
+table.autosummary td:first-child code {
+  white-space: normal;
+}

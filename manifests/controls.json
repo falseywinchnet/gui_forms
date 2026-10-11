@@ -16,7 +16,7 @@
       "winforms": "ButtonBase",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/button-base.md"
+      "doc": "api/generated/gui_forms.ButtonBase.rst"
     },
     {
       "id": "button",
@@ -27,7 +27,7 @@
       "winforms": "Button",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/button.md"
+      "doc": "api/generated/gui_forms.Button.rst"
     },
     {
       "id": "drop-down-button",
@@ -38,7 +38,7 @@
       "winforms": "ToolStripSplitButton",
       "status": "provisional",
       "gallery_page": "commands-and-menus",
-      "doc": "controls/drop-down-button.md"
+      "doc": "api/generated/gui_forms.DropDownButton.rst"
     },
     {
       "id": "link-label",
@@ -49,7 +49,7 @@
       "winforms": "LinkLabel",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/link-label.md"
+      "doc": "api/generated/gui_forms.LinkLabel.rst"
     },
     {
       "id": "command-bar",
@@ -60,7 +60,7 @@
       "winforms": "ToolStrip",
       "status": "provisional",
       "gallery_page": "commands-and-menus",
-      "doc": "controls/command-bar.md"
+      "doc": "api/generated/gui_forms.CommandBar.rst"
     },
     {
       "id": "text-box",
@@ -71,7 +71,7 @@
       "winforms": "TextBox",
       "status": "stable",
       "gallery_page": "text-and-input",
-      "doc": "controls/text-box.md"
+      "doc": "api/generated/gui_forms.TextBox.rst"
     },
     {
       "id": "label",
@@ -82,7 +82,7 @@
       "winforms": "Label",
       "status": "stable",
       "gallery_page": "basics",
-      "doc": "controls/label.md"
+      "doc": "api/generated/gui_forms.Label.rst"
     },
     {
       "id": "picture-box",
@@ -93,7 +93,7 @@
       "winforms": "PictureBox",
       "status": "stable",
       "gallery_page": "images-and-drawing",
-      "doc": "controls/picture-box.md"
+      "doc": "api/generated/gui_forms.PictureBox.rst"
     },
     {
       "id": "progress-bar",
@@ -104,7 +104,7 @@
       "winforms": "ProgressBar",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/progress-bar.md"
+      "doc": "api/generated/gui_forms.ProgressBar.rst"
     },
     {
       "id": "review-card",
@@ -115,7 +115,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "choices-and-sections",
-      "doc": "controls/review-card.md"
+      "doc": "api/generated/gui_forms.ReviewCard.rst"
     },
     {
       "id": "list-box",
@@ -126,7 +126,7 @@
       "winforms": "ListBox",
       "status": "stable",
       "gallery_page": "collections-and-popups",
-      "doc": "controls/list-box.md"
+      "doc": "api/generated/gui_forms.ListBox.rst"
     },
     {
       "id": "checked-list-box",
@@ -137,7 +137,7 @@
       "winforms": "CheckedListBox",
       "status": "stable",
       "gallery_page": "checked-collections",
-      "doc": "controls/checked-list-box.md"
+      "doc": "api/generated/gui_forms.CheckedListBox.rst"
     },
     {
       "id": "combo-box",
@@ -148,7 +148,7 @@
       "winforms": "ComboBox",
       "status": "stable",
       "gallery_page": "collections-and-popups",
-      "doc": "controls/combo-box.md"
+      "doc": "api/generated/gui_forms.ComboBox.rst"
     },
     {
       "id": "tree-view",
@@ -159,7 +159,7 @@
       "winforms": "TreeView",
       "status": "stable",
       "gallery_page": "tree-and-object-views",
-      "doc": "controls/tree-view.md"
+      "doc": "api/generated/gui_forms.TreeView.rst"
     },
     {
       "id": "object-view",
@@ -170,7 +170,7 @@
       "winforms": "ListView",
       "status": "stable",
       "gallery_page": "tree-and-object-views",
-      "doc": "controls/object-view.md"
+      "doc": "api/generated/gui_forms.ObjectView.rst"
     },
     {
       "id": "correspondence-view",
@@ -181,7 +181,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "tree-and-object-views",
-      "doc": "controls/correspondence-view.md"
+      "doc": "api/generated/gui_forms.CorrespondenceView.rst"
     },
     {
       "id": "choice-group",
@@ -192,7 +192,7 @@
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "choices-and-sections",
-      "doc": "controls/choice-group.md"
+      "doc": "api/generated/gui_forms.ChoiceGroup.rst"
     },
     {
       "id": "breadcrumb-trail",
@@ -203,7 +203,7 @@
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "tree-and-object-views",
-      "doc": "controls/breadcrumb-trail.md"
+      "doc": "api/generated/gui_forms.BreadcrumbTrail.rst"
     },
     {
       "id": "check-box",
@@ -214,7 +214,7 @@
       "winforms": "CheckBox",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/check-box.md"
+      "doc": "api/generated/gui_forms.CheckBox.rst"
     },
     {
       "id": "radio-button",
@@ -225,7 +225,7 @@
       "winforms": "RadioButton",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/radio-button.md"
+      "doc": "api/generated/gui_forms.RadioButton.rst"
     },
     {
       "id": "range-control",
@@ -236,7 +236,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/range-control.md"
+      "doc": "api/generated/gui_forms.RangeControl.rst"
     },
     {
       "id": "track-bar",
@@ -247,7 +247,7 @@
       "winforms": "TrackBar",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/track-bar.md"
+      "doc": "api/generated/gui_forms.TrackBar.rst"
     },
     {
       "id": "numeric-up-down",
@@ -258,7 +258,7 @@
       "winforms": "NumericUpDown",
       "status": "stable",
       "gallery_page": "values-and-spinners",
-      "doc": "controls/numeric-up-down.md"
+      "doc": "api/generated/gui_forms.NumericUpDown.rst"
     },
     {
       "id": "color-value-editor",
@@ -269,7 +269,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "value-editors",
-      "doc": "controls/color-value-editor.md"
+      "doc": "api/generated/gui_forms.ColorValueEditor.rst"
     },
     {
       "id": "flags-value-editor",
@@ -280,7 +280,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "value-editors",
-      "doc": "controls/flags-value-editor.md"
+      "doc": "api/generated/gui_forms.FlagsValueEditor.rst"
     },
     {
       "id": "property-grid",
@@ -291,7 +291,7 @@
       "winforms": "PropertyGrid",
       "status": "stable",
       "gallery_page": "values-and-spinners",
-      "doc": "controls/property-grid.md"
+      "doc": "api/generated/gui_forms.PropertyGrid.rst"
     },
     {
       "id": "property-list",
@@ -302,7 +302,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "value-editors",
-      "doc": "controls/property-list.md"
+      "doc": "api/generated/gui_forms.PropertyList.rst"
     },
     {
       "id": "instrument-rack",
@@ -313,7 +313,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "value-editors",
-      "doc": "controls/instrument-rack.md"
+      "doc": "api/generated/gui_forms.InstrumentRack.rst"
     },
     {
       "id": "date-time-picker",
@@ -324,7 +324,7 @@
       "winforms": "DateTimePicker",
       "status": "stable",
       "gallery_page": "dates-and-calendar",
-      "doc": "controls/date-time-picker.md"
+      "doc": "api/generated/gui_forms.DateTimePicker.rst"
     },
     {
       "id": "panel",
@@ -335,7 +335,7 @@
       "winforms": "Panel",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/panel.md"
+      "doc": "api/generated/gui_forms.Panel.rst"
     },
     {
       "id": "group-box",
@@ -346,7 +346,7 @@
       "winforms": "GroupBox",
       "status": "stable",
       "gallery_page": "choices-and-sections",
-      "doc": "controls/group-box.md"
+      "doc": "api/generated/gui_forms.GroupBox.rst"
     },
     {
       "id": "scaled-group-box",
@@ -357,7 +357,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/scaled-group-box.md"
+      "doc": "api/generated/gui_forms.ScaledGroupBox.rst"
     },
     {
       "id": "material-panel",
@@ -368,7 +368,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "images-and-drawing",
-      "doc": "controls/material-panel.md"
+      "doc": "api/generated/gui_forms.MaterialPanel.rst"
     },
     {
       "id": "card",
@@ -379,7 +379,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "choices-and-sections",
-      "doc": "controls/card.md"
+      "doc": "api/generated/gui_forms.Card.rst"
     },
     {
       "id": "expandable-sections",
@@ -390,7 +390,7 @@
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "choices-and-sections",
-      "doc": "controls/expandable-sections.md"
+      "doc": "api/generated/gui_forms.ExpandableSections.rst"
     },
     {
       "id": "container-control",
@@ -401,7 +401,7 @@
       "winforms": "ContainerControl",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/container-control.md"
+      "doc": "api/generated/gui_forms.ContainerControl.rst"
     },
     {
       "id": "user-control",
@@ -412,7 +412,7 @@
       "winforms": "UserControl",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/user-control.md"
+      "doc": "api/generated/gui_forms.UserControl.rst"
     },
     {
       "id": "tab-control",
@@ -423,7 +423,7 @@
       "winforms": "TabControl",
       "status": "stable",
       "gallery_page": "tabs-and-pages",
-      "doc": "controls/tab-control.md"
+      "doc": "api/generated/gui_forms.TabControl.rst"
     },
     {
       "id": "tab-page",
@@ -434,7 +434,7 @@
       "winforms": "TabPage",
       "status": "stable",
       "gallery_page": "tabs-and-pages",
-      "doc": "controls/tab-page.md"
+      "doc": "api/generated/gui_forms.TabPage.rst"
     },
     {
       "id": "flow-layout-panel",
@@ -445,7 +445,7 @@
       "winforms": "FlowLayoutPanel",
       "status": "stable",
       "gallery_page": "retained-layout-panels",
-      "doc": "controls/flow-layout-panel.md"
+      "doc": "api/generated/gui_forms.FlowLayoutPanel.rst"
     },
     {
       "id": "table-layout-panel",
@@ -456,7 +456,7 @@
       "winforms": "TableLayoutPanel",
       "status": "stable",
       "gallery_page": "retained-layout-panels",
-      "doc": "controls/table-layout-panel.md"
+      "doc": "api/generated/gui_forms.TableLayoutPanel.rst"
     },
     {
       "id": "responsive-track-panel",
@@ -467,7 +467,7 @@
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "responsive-layouts",
-      "doc": "controls/responsive-track-panel.md"
+      "doc": "api/generated/gui_forms.ResponsiveTrackPanel.rst"
     },
     {
       "id": "scaled-panel",
@@ -478,7 +478,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
-      "doc": "controls/scaled-panel.md"
+      "doc": "api/generated/gui_forms.ScaledPanel.rst"
     },
     {
       "id": "split-container",
@@ -489,7 +489,7 @@
       "winforms": "SplitContainer",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/split-container.md"
+      "doc": "api/generated/gui_forms.SplitContainer.rst"
     },
     {
       "id": "splitter-panel",
@@ -500,7 +500,7 @@
       "winforms": "SplitterPanel",
       "status": "stable",
       "gallery_page": "containers-and-focus",
-      "doc": "controls/splitter-panel.md"
+      "doc": "api/generated/gui_forms.SplitterPanel.rst"
     },
     {
       "id": "command-overflow-panel",
@@ -511,7 +511,7 @@
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "responsive-layouts",
-      "doc": "controls/command-overflow-panel.md"
+      "doc": "api/generated/gui_forms.CommandOverflowPanel.rst"
     },
     {
       "id": "master-detail-view",
@@ -522,7 +522,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "responsive-layouts",
-      "doc": "controls/master-detail-view.md"
+      "doc": "api/generated/gui_forms.MasterDetailView.rst"
     },
     {
       "id": "scrollable-control",
@@ -533,7 +533,7 @@
       "winforms": "ScrollableControl",
       "status": "stable",
       "gallery_page": "responsive-layouts",
-      "doc": "controls/scrollable-control.md"
+      "doc": "api/generated/gui_forms.ScrollableControl.rst"
     },
     {
       "id": "scroll-bar",
@@ -544,7 +544,7 @@
       "winforms": "ScrollBar",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/scroll-bar.md"
+      "doc": "api/generated/gui_forms.ScrollBar.rst"
     },
     {
       "id": "h-scroll-bar",
@@ -555,7 +555,7 @@
       "winforms": "HScrollBar",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/h-scroll-bar.md"
+      "doc": "api/generated/gui_forms.HScrollBar.rst"
     },
     {
       "id": "v-scroll-bar",
@@ -566,7 +566,7 @@
       "winforms": "VScrollBar",
       "status": "stable",
       "gallery_page": "ranges-and-progress",
-      "doc": "controls/v-scroll-bar.md"
+      "doc": "api/generated/gui_forms.VScrollBar.rst"
     },
     {
       "id": "menu-strip",
@@ -577,7 +577,7 @@
       "winforms": "MenuStrip",
       "status": "stable",
       "gallery_page": "commands-and-menus",
-      "doc": "controls/menu-strip.md"
+      "doc": "api/generated/gui_forms.MenuStrip.rst"
     },
     {
       "id": "context-menu",
@@ -588,7 +588,7 @@
       "winforms": "ContextMenuStrip",
       "status": "stable",
       "gallery_page": "commands-and-menus",
-      "doc": "controls/context-menu.md"
+      "doc": "api/generated/gui_forms.ContextMenu.rst"
     },
     {
       "id": "command",
@@ -599,7 +599,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "commands-and-menus",
-      "doc": "controls/command.md"
+      "doc": "api/generated/gui_forms.Command.rst"
     },
     {
       "id": "anchored-popup-layer",
@@ -610,7 +610,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "anchored-popups",
-      "doc": "controls/anchored-popup-layer.md"
+      "doc": "api/generated/gui_forms.AnchoredPopupLayer.rst"
     },
     {
       "id": "tool-tip",
@@ -621,7 +621,7 @@
       "winforms": "ToolTip",
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
-      "doc": "controls/tool-tip.md"
+      "doc": "api/generated/gui_forms.ToolTip.rst"
     },
     {
       "id": "drawing-surface",
@@ -632,7 +632,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "images-and-drawing",
-      "doc": "controls/drawing-surface.md"
+      "doc": "api/generated/gui_forms.DrawingSurface.rst"
     },
     {
       "id": "raster-canvas",
@@ -643,7 +643,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "images-and-drawing",
-      "doc": "controls/raster-canvas.md"
+      "doc": "api/generated/gui_forms.RasterCanvas.rst"
     },
     {
       "id": "live-surface",
@@ -654,7 +654,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "live-surfaces",
-      "doc": "controls/live-surface.md"
+      "doc": "api/generated/gui_forms.LiveSurface.rst"
     },
     {
       "id": "easing-preview",
@@ -665,7 +665,7 @@
       "winforms": "GUI.Forms-only",
       "status": "lab",
       "gallery_page": "animation-laboratory",
-      "doc": "controls/easing-preview.md"
+      "doc": "api/generated/gui_forms.EasingPreview.rst"
     },
     {
       "id": "metrics-view",
@@ -676,7 +676,7 @@
       "winforms": "GUI.Forms-only",
       "status": "lab",
       "gallery_page": "states-and-diagnostics",
-      "doc": "controls/metrics-view.md"
+      "doc": "api/generated/gui_forms.MetricsView.rst"
     },
     {
       "id": "typography-specimen",
@@ -687,7 +687,7 @@
       "winforms": "GUI.Forms-only",
       "status": "lab",
       "gallery_page": "typography-and-inspection",
-      "doc": "controls/typography-specimen.md"
+      "doc": "api/generated/gui_forms.TypographySpecimen.rst"
     },
     {
       "id": "visual-inspector-view",
@@ -698,7 +698,7 @@
       "winforms": "GUI.Forms-only",
       "status": "lab",
       "gallery_page": "typography-and-inspection",
-      "doc": "controls/visual-inspector-view.md"
+      "doc": "api/generated/gui_forms.VisualInspectorView.rst"
     },
     {
       "id": "visual-inspector-overlay",
@@ -709,7 +709,7 @@
       "winforms": "GUI.Forms-only",
       "status": "lab",
       "gallery_page": "typography-and-inspection",
-      "doc": "controls/visual-inspector-overlay.md"
+      "doc": "api/generated/gui_forms.VisualInspectorOverlay.rst"
     },
     {
       "id": "timer",
@@ -720,7 +720,7 @@
       "winforms": "Timer",
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
-      "doc": "controls/timer.md"
+      "doc": "api/generated/gui_forms.Timer.rst"
     },
     {
       "id": "image-list",
@@ -731,7 +731,7 @@
       "winforms": "ImageList",
       "status": "stable",
       "gallery_page": "control-spectrum",
-      "doc": "controls/image-list.md"
+      "doc": "api/generated/gui_forms.ImageList.rst"
     },
     {
       "id": "error-provider",
@@ -742,7 +742,7 @@
       "winforms": "ErrorProvider",
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
-      "doc": "controls/error-provider.md"
+      "doc": "api/generated/gui_forms.ErrorProvider.rst"
     },
     {
       "id": "help-provider",
@@ -753,7 +753,7 @@
       "winforms": "HelpProvider",
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
-      "doc": "controls/help-provider.md"
+      "doc": "api/generated/gui_forms.HelpProvider.rst"
     },
     {
       "id": "semantic-feedback",
@@ -764,7 +764,7 @@
       "winforms": "GUI.Forms-only",
       "status": "stable",
       "gallery_page": "semantic-feedback",
-      "doc": "controls/semantic-feedback.md"
+      "doc": "api/generated/gui_forms.SemanticFeedback.rst"
     },
     {
       "id": "binding",
@@ -775,7 +775,7 @@
       "winforms": "Binding",
       "status": "stable",
       "gallery_page": "values-and-spinners",
-      "doc": "controls/binding.md"
+      "doc": "api/generated/gui_forms.Binding.rst"
     },
     {
       "id": "binding-source",
@@ -786,7 +786,7 @@
       "winforms": "BindingSource",
       "status": "stable",
       "gallery_page": "values-and-spinners",
-      "doc": "controls/binding-source.md"
+      "doc": "api/generated/gui_forms.BindingSource.rst"
     },
     {
       "id": "binding-context",
@@ -797,7 +797,7 @@
       "winforms": "BindingContext",
       "status": "stable",
       "gallery_page": "value-editors",
-      "doc": "controls/binding-context.md"
+      "doc": "api/generated/gui_forms.BindingContext.rst"
     }
   ]
 }
