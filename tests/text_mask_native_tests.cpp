@@ -84,6 +84,50 @@ void test_shape_and_scale(const std::span<const std::byte> bytes) {
     require(first_work.shape_calls > 0 && first_work.context_bytes > 0, "native calls and context bytes accounted");
 }
 
+// ADR-004: outline_gray keeps each glyph's 1/64 horizontal phase. Shifting a
+// run by a quarter device pixel changes coverage but conserves its ink.
+std::vector<std::uint8_t> gray_mask(NativeFixture& fixture, const std::string& text, const double shift) {
+    TextMaskRequest request{.utf8 = text, .size = 19.0, .device_scale = 1.0};
+    const std::shared_ptr<const MaskKey> key = fixture.key(request);
+    NativeFonts fonts(*key);
+    NativeWork work{};
+    NativeParagraph paragraph(fixture.ledger, fonts, work, text);
+    NativeGlyphBuffer glyphs{MaskAllocator<NativeGlyph>(fixture.ledger, MaskResource::shaping)};
+    const NativeShape shape = paragraph.shape(0, text.size(), glyphs);
+    for (std::size_t index = 0; index < shape.glyph_count; ++index) {
+        glyphs[index].y += shape.ascent;
+        // Whole-pixel starting positions: only a kept phase can see the shift.
+        glyphs[index].x = std::round(glyphs[index].x) + 2.0 + shift;
+    }
+    const std::span<const NativeGlyph> live(glyphs.data(), shape.glyph_count);
+    TextMaskMetrics metrics{};
+    metrics.device_scale = 1.0;
+    metrics.ink_left_px = 0;
+    metrics.ink_top_px = 0;
+    metrics.width_px = static_cast<std::uint32_t>(std::ceil(shape.advance)) + 8U;
+    metrics.height_px = static_cast<std::uint32_t>(std::ceil(shape.ascent + shape.descent)) + 4U;
+    metrics.stride_bytes = metrics.width_px;
+    std::shared_ptr<TextMaskStorage> mask = allocate_mask_storage(fixture.ledger, key, metrics, 1);
+    fill_native_mask(fonts, (*key).options, live, *mask);
+    return std::vector<std::uint8_t>((*mask).pixels.begin(), (*mask).pixels.end());
+}
+
+void test_gray_subpixel_phase(const std::span<const std::byte> bytes) {
+    NativeFixture fixture(bytes);
+    const std::string text = "Hamburgefonstiv";
+    const std::vector<std::uint8_t> whole = gray_mask(fixture, text, 0.0);
+    const std::vector<std::uint8_t> quarter = gray_mask(fixture, text, 0.25);
+    require(whole.size() == quarter.size(), "same mask extent");
+    require(whole != quarter, "a quarter-pixel shift changes gray coverage (phase kept)");
+    double whole_ink = 0.0;
+    double quarter_ink = 0.0;
+    for (std::size_t index = 0; index < whole.size(); ++index) {
+        whole_ink += static_cast<double>(whole[index]);
+        quarter_ink += static_cast<double>(quarter[index]);
+    }
+    require(whole_ink > 0.0 && std::abs(quarter_ink - whole_ink) / whole_ink < 0.03, "phase conserves ink");
+}
+
 void test_raster_profiles(const std::span<const std::byte> bytes) {
     NativeFixture fixture(bytes);
     const std::string text = "Agj cafe\xCC\x81";
@@ -255,6 +299,7 @@ int main(const int argc, char** const argv) {
         test_shape_and_scale(bytes);
         std::cout << "native group: raster profiles\n";
         test_raster_profiles(bytes);
+        test_gray_subpixel_phase(bytes);
         std::cout << "native group: failures and work bounds\n";
         test_native_failure_and_work(bytes);
         test_paragraph_bidi(bytes);

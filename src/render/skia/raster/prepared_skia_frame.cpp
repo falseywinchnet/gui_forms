@@ -190,7 +190,7 @@ PreparedTextStatus PreparedSkiaFrame::commit(const PaintReceipt receipt) {
 }
 
 PreparedTextPaintResult PreparedSkiaFrame::draw(const PreparedTextLayout& layout,
-    const LayoutAuthority expected, const Point baseline, const Color color) {
+    const LayoutAuthority expected, const Point baseline, const Color color, PreparedCoverageSink* const sink) {
     PreparedTextPaintResult result{};
     if (std::this_thread::get_id() != executor_) {
         result.status = PreparedTextStatus::wrong_executor;
@@ -216,19 +216,27 @@ PreparedTextPaintResult PreparedSkiaFrame::draw(const PreparedTextLayout& layout
                 if (result.status == PreparedTextStatus::success) {
                     const std::int64_t left = std::llround(x) + mask.left();
                     const std::int64_t top = std::llround(y) + mask.top();
-                    sk_sp<SkImage> image{};
-                    if (mask.width() != 0 && mask.height() != 0) {
-                        // Transfer the existing charged mask to the named release
-                        // context. Any native image retention extends its owner.
-                        image = make_mask_image(mask);
-                        if (!image) result.status = PreparedTextStatus::resource_failure;
-                    }
+                    const bool has_ink = mask.width() != 0 && mask.height() != 0;
                     if (result.status == PreparedTextStatus::success) {
                         detail::PreparedAuthorityState& authority = *(*storage).authority_state;
                         std::lock_guard<std::mutex> lock(authority.mutex);
                         if (!detail::prepared_authority_current_locked(*storage, expected)) result.status = PreparedTextStatus::stale;
                         else result.status = candidate_authorities_.retain(storage);
-                        if (result.status == PreparedTextStatus::success && image) {
+                        bool composited = false;
+                        if (result.status == PreparedTextStatus::success && sink != nullptr && has_ink) {
+                            // ADR-004: the same compositor and clips as ordinary text.
+                            const detail::TextCoverage coverage{.pixels = mask.pixels(), .width = mask.width(),
+                                                                .height = mask.height(), .left = left, .top = top};
+                            composited = (*sink).composite(*target, coverage, color);
+                        }
+                        sk_sp<SkImage> image{};
+                        if (result.status == PreparedTextStatus::success && has_ink && !composited) {
+                            // Transfer the existing charged mask to the named release
+                            // context. Any native image retention extends its owner.
+                            image = make_mask_image(mask);
+                            if (!image) result.status = PreparedTextStatus::resource_failure;
+                        }
+                        if (result.status == PreparedTextStatus::success && image && !composited) {
                             SkPaint paint{};
                             paint.setColor(SkColorSetARGB(color.alpha, color.red, color.green, color.blue));
                             paint.setAntiAlias(false);

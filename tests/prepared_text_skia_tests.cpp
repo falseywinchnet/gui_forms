@@ -154,7 +154,8 @@ void raster_parity(const std::span<const std::byte> bytes) {
                 const std::size_t mask_offset = static_cast<std::size_t>(row) * oracle.width() + column;
                 const int expected = 255 - oracle.pixels()[mask_offset];
                 for (std::size_t channel = 0; channel < 3; ++channel) {
-                    require(std::abs(static_cast<int>(pixels[offset + channel]) - expected) <= 1, "Skia uses unchanged A2 mask at device positions");
+                    // ADR-004 shared compositor: black over white is exactly 255 - coverage.
+                    require(static_cast<int>(pixels[offset + channel]) == expected, "Skia composites the unchanged mask exactly at device positions");
                 }
                 require(pixels[offset + 3U] == 255, "opaque destination remains opaque");
             }

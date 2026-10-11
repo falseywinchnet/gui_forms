@@ -209,6 +209,16 @@ translates, so ordinary painting does not reach that path.
 text cases (plain, translucent, fractional clip, rounded clip, damage region,
 at scales 1, 1.5 and 2) that are identical on macOS arm64 and Alpine aarch64.
 
+ADR-004 phase 4 moves prepared text and text masks onto the same profile.
+`PreparedRasterProfile::light_gray_v2` (now the `PreparedTextKey` default) is
+FreeType light auto-hinting; `outline_gray_72dpi_v1` (bytecode hinting) is
+retired and refused as `unsupported_profile`. On Skia, prepared text composites
+through the same shared compositor and recorded clips as ordinary text, so
+black over white is exactly `255 − coverage`; the Windows host already did.
+`TextMaskRaster::outline_gray` masks use light auto-hinting and keep each
+glyph's 1/64 horizontal phase (vertical placement stays on whole pixels).
+`TextMaskRaster::true_mono` is unchanged: whole-pixel FreeType monochrome.
+
 This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.
