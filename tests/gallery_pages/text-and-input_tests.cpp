@@ -8,28 +8,38 @@ void test_text_and_input(gui_forms::Window& window,
     std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(window.find("gallery.text.primary"));
     std::shared_ptr<gui_forms::TextBox> password = std::dynamic_pointer_cast<TextBox>(
         window.find("gallery.text.password"));
+    // The editing surface is one CommandBar; Undo and Redo are Commands whose
+    // availability follows the field's history before any input arrives.
+    const Control::Ptr undo = window.find("gallery.text.command.item.2");
+    const Control::Ptr redo = window.find("gallery.text.command.item.3");
+    require(undo && redo && !(*undo).effectively_enabled() && !(*redo).effectively_enabled(),
+            "gallery Undo/Redo Commands must project a clean history as disabled buttons");
+    require(window.semantic_snapshot().to_json().find("\"role\":\"toolbar\"") != std::string::npos,
+            "gallery editing CommandBar must publish toolbar semantics");
     require(text && window.request_focus(text) && window.dispatch_text({"dogfood Ω"}) &&
                 (*text).text() == "dogfood Ω" && (*text).can_undo(),
             "gallery public TextBox must accept normalized Unicode input");
-    click(window, window.find("gallery.text.command.0"));
-    click(window, window.find("gallery.text.command.1"));
+    require((*undo).effectively_enabled(),
+            "typing must enable the Undo Command through the bound bar button");
+    click(window, window.find("gallery.text.command.item.0"));
+    click(window, window.find("gallery.text.command.item.1"));
     require((*text).text() == "GUI.Forms",
             "gallery TextBox commands must operate on the public selection surface");
-    click(window, window.find("gallery.text.command.2"));
-    require((*text).text() == "dogfood Ω",
-            "gallery TextBox Undo command must restore its prior snapshot");
+    click(window, undo);
+    require((*text).text() == "dogfood Ω" && (*redo).effectively_enabled(),
+            "gallery TextBox Undo command must restore its prior snapshot and enable Redo");
     (*text).select_all();
-    click(window, window.find("gallery.text.command.4"));
+    click(window, window.find("gallery.text.command.item.4"));
     (*text).set_text("replace me");
     (*text).select_all();
-    click(window, window.find("gallery.text.command.6"));
+    click(window, window.find("gallery.text.command.item.6"));
     require((*text).text() == "dogfood Ω",
             "gallery clipboard buttons must round-trip through HostServices");
     (*text).select_all();
-    click(window, window.find("gallery.text.command.5"));
+    click(window, window.find("gallery.text.command.item.5"));
     require((*text).text().empty(),
             "gallery Cut must mutate through the public TextBox command");
-    click(window, window.find("gallery.text.command.6"));
+    click(window, window.find("gallery.text.command.item.6"));
     require((*text).text() == "dogfood Ω",
             "gallery Paste must restore the cut Unicode text");
     require(password && (*password).password_protected() &&

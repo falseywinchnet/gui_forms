@@ -1,16 +1,447 @@
 #include "pages.hpp"
 
 namespace gui_forms::gallery::pages {
+namespace {
 
-// Page under construction: TreeView, ObjectView, CorrespondenceView, BreadcrumbTrail.
-void add_tree_and_object_views(const std::shared_ptr<Surface>& page,
-                               const std::shared_ptr<PageContext>& context) {
-    static_cast<void>(context);
-    (*page).add_at(label("gallery.tree-and-object-views.heading", "TREES AND OBJECT VIEWS", 22.0, 700, shell_blue_dark),
-                   {24.0, 18.0, 620.0, 34.0});
-    (*page).add_at(label("gallery.tree-and-object-views.pending", "TreeView, ObjectView, CorrespondenceView and BreadcrumbTrail over one fixture. This page is being written.",
-                         12.0, 400, muted),
-                   {26.0, 52.0, 920.0, 24.0});
+constexpr std::size_t no_parent = static_cast<std::size_t>(-1);
+
+// One fixture: a small project tree in preorder. Folders feed the TreeView and
+// the BreadcrumbTrail; a folder's children feed the ObjectView; the files
+// under a folder feed the CorrespondenceView ledger.
+struct ProjectNode final {
+    std::string_view id;
+    std::string_view name;
+    std::size_t parent;
+    bool folder;
+    ObjectGlyph glyph;
+    std::string_view kind;
+    std::string_view size;
+    std::string_view modified;
+    std::string_view note;
+};
+
+constexpr std::array<ProjectNode, 15> project{{
+    {"root", "Portsmouth Gallery", no_parent, true, ObjectGlyph::folder, "Project", "", "2026-10-11", "Project root"},
+    {"src", "src", 0, true, ObjectGlyph::folder, "Folder", "", "2026-10-11", "Sources"},
+    {"controls", "controls", 1, true, ObjectGlyph::folder, "Folder", "", "2026-10-10", "Retained controls"},
+    {"button.cpp", "button.cpp", 2, false, ObjectGlyph::code, "C++ source", "18 KB", "2026-10-09", "Dialog results and the four visual styles"},
+    {"tree_view.cpp", "tree_view.cpp", 2, false, ObjectGlyph::code, "C++ source", "42 KB", "2026-10-10", "Visible-row virtualization and type-select"},
+    {"core", "core", 1, true, ObjectGlyph::folder, "Folder", "", "2026-10-08", "Window and scheduler"},
+    {"window.cpp", "window.cpp", 5, false, ObjectGlyph::code, "C++ source", "96 KB", "2026-10-08", "Popup leases and focus scopes"},
+    {"docs", "docs", 0, true, ObjectGlyph::folder, "Folder", "", "2026-10-07", "Atlas and manual"},
+    {"atlas.md", "atlas.md", 7, false, ObjectGlyph::document, "Markdown", "7 KB", "2026-10-07", "Generated control atlas"},
+    {"manual.json", "manual.json", 7, false, ObjectGlyph::code, "JSON", "121 KB", "2026-10-06", "Hand-reviewed narratives"},
+    {"assets", "assets", 0, true, ObjectGlyph::folder, "Folder", "", "2026-10-05", "Images and fonts"},
+    {"logo.png", "logo.png", 10, false, ObjectGlyph::image, "PNG image", "12 KB", "2026-10-05", "The only admitted codec"},
+    {"fonts", "fonts", 10, true, ObjectGlyph::folder, "Folder", "", "2026-10-04", "Bundled faces"},
+    {"carlito.ttf", "carlito.ttf", 12, false, ObjectGlyph::archive, "Font", "612 KB", "2026-10-04", "Body face"},
+    {"README.md", "README.md", 0, false, ObjectGlyph::document, "Markdown", "3 KB", "2026-10-11", "Start here"},
+}};
+
+constexpr std::string_view column_name = "name";
+constexpr std::string_view column_kind = "kind";
+constexpr std::string_view column_size = "size";
+constexpr std::string_view column_modified = "modified";
+
+[[nodiscard]] std::size_t node_index(const std::string_view id) {
+    for (std::size_t index = 0; index < project.size(); ++index) {
+        if (project[index].id == id) return index;
+    }
+    return no_parent;
 }
 
-}  // namespace gui_forms::gallery::pages
+[[nodiscard]] std::string node_path(std::size_t index) {
+    std::string path(project[index].name);
+    while (project[index].parent != no_parent) {
+        index = project[index].parent;
+        path = std::string(project[index].name) + " / " + path;
+    }
+    return path;
+}
+
+[[nodiscard]] bool descends_from(std::size_t index, const std::size_t ancestor) {
+    while (index != no_parent) {
+        if (index == ancestor) return true;
+        index = project[index].parent;
+    }
+    return false;
+}
+
+[[nodiscard]] std::string_view cell_text(const ProjectNode& node, const std::string_view column) {
+    if (column == column_name) return node.name;
+    if (column == column_kind) return node.kind;
+    if (column == column_size) return node.size;
+    return node.modified;
+}
+
+class TreeAndObjectViewsPage final : public Component {
+public:
+    TreeAndObjectViewsPage(const std::shared_ptr<Surface>& body,
+                           const std::shared_ptr<PageContext>& context) {
+        static_cast<void>(context);
+        (*body).add_at(label("gallery.tree-and-object-views.heading", "TREES AND OBJECT VIEWS",
+                             22.0, 700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
+        (*body).add_at(label("gallery.tree-and-object-views.lead",
+                             "One project fixture: the TreeView selects a folder, the BreadcrumbTrail follows it, the ObjectView lists its children and the CorrespondenceView ledgers its files.",
+                             12.0, 400, muted), {26.0, 52.0, 920.0, 24.0});
+        build_location(body);
+        build_tree(body);
+        build_objects(body);
+        build_ledger(body);
+        status_ = label("gallery.tree.status", "Ready", 11.0, 600, green);
+        (*body).add_at(status_, {24.0, 634.0, 930.0, 22.0});
+        on(view_mode_.changed(), *this, &TreeAndObjectViewsPage::on_view_mode_changed);
+        select_folder(node_index("controls"));
+    }
+
+private:
+    void build_location(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> location = group(
+            "gallery.tree.location", "BreadcrumbTrail · follows the tree selection; F2 edits the exact path",
+            {930.0, 72.0});
+        (*body).add_at(location, {24.0, 88.0, 930.0, 72.0});
+        trail_ = make_control<BreadcrumbTrail>(StableId("gallery.tree.trail"),
+                                               "gallery.tree.trail.editor");
+        (*trail_).set_appearance(BreadcrumbAppearance::raised);
+        (*trail_).set_accessible_name("Current folder");
+        (*location).add_at(trail_, {22.0, 32.0, 690.0, 28.0});
+        on((*trail_).segment_activated(), *this, &TreeAndObjectViewsPage::on_segment_activated);
+        on((*trail_).edit_started(), *this, &TreeAndObjectViewsPage::on_edit_started);
+        on((*trail_).edit_committed(), *this, &TreeAndObjectViewsPage::on_edit_committed);
+        on((*trail_).edit_cancelled(), *this, &TreeAndObjectViewsPage::on_edit_cancelled);
+        // The view-mode row is a ChoiceGroup bound to a page-owned Value.
+        std::shared_ptr<ChoiceGroup> view_mode = make_control<ChoiceGroup>(
+            StableId("gallery.tree.view-mode"));
+        (*view_mode).set_style(page_style());
+        (*view_mode).set_accessible_name("Object view mode");
+        (*view_mode).set_items({{.id = 0, .label = "Icons"}, {.id = 1, .label = "Details"}});
+        (*view_mode).bind(view_mode_);
+        (*location).add_at(view_mode, {732.0, 30.0, 176.0, 32.0});
+    }
+
+    void build_tree(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> tree_group = group(
+            "gallery.tree.folders-group", "TreeView · folders", {300.0, 456.0});
+        (*body).add_at(tree_group, {24.0, 172.0, 300.0, 456.0});
+        tree_ = make_control<TreeView>(StableId("gallery.tree.folders"));
+        (*tree_).set_accessible_name("Project folders");
+        (*tree_).set_style(page_style());
+        std::vector<TreeViewItem> items;
+        for (std::size_t index = 0; index < project.size(); ++index) {
+            const ProjectNode& node = project[index];
+            if (!node.folder) continue;
+            TreeViewItem item;
+            item.stable_id = std::string(node.id);
+            item.text = std::string(node.name);
+            item.depth = depth_of(index);
+            item.expandable = has_child_folder(index);
+            item.expanded = node.id == "root" || node.id == "src";
+            items.push_back(std::move(item));
+        }
+        (*tree_).set_items(std::move(items));
+        (*tree_group).add_at(tree_, {18.0, 36.0, 264.0, 404.0});
+        on((*tree_).selection_changed(), *this, &TreeAndObjectViewsPage::on_folder_selected);
+        on((*tree_).expansion_changed(), *this, &TreeAndObjectViewsPage::on_expansion_changed);
+        on((*tree_).item_activated(), *this, &TreeAndObjectViewsPage::on_folder_activated);
+    }
+
+    void build_objects(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> objects_group = group(
+            "gallery.tree.objects-group", "ObjectView · children of the selected folder",
+            {330.0, 456.0});
+        (*body).add_at(objects_group, {338.0, 172.0, 330.0, 456.0});
+        objects_ = make_control<ObjectView>(StableId("gallery.tree.objects"));
+        (*objects_).set_accessible_name("Folder contents");
+        (*objects_).set_style(page_style());
+        (*objects_).set_icon_cell_size({94.0, 84.0});
+        (*objects_).set_view_mode(ObjectViewMode::details);
+        (*objects_group).add_at(objects_, {18.0, 36.0, 294.0, 404.0});
+        on((*objects_).selection_changed(), *this, &TreeAndObjectViewsPage::on_object_selected);
+        on((*objects_).item_activated(), *this, &TreeAndObjectViewsPage::on_object_activated);
+        on((*objects_).sort_requested(), *this, &TreeAndObjectViewsPage::on_sort_requested);
+    }
+
+    void build_ledger(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> ledger_group = group(
+            "gallery.tree.ledger-group", "CorrespondenceView · files under the folder",
+            {272.0, 456.0});
+        (*body).add_at(ledger_group, {682.0, 172.0, 272.0, 456.0});
+        ledger_ = make_control<CorrespondenceView>(StableId("gallery.tree.ledger"));
+        (*ledger_).set_accessible_name("Recent files");
+        (*ledger_).set_style(page_style());
+        (*ledger_).set_compact_height(44.0);
+        (*ledger_).set_expanded_height(118.0);
+        (*ledger_group).add_at(ledger_, {18.0, 36.0, 236.0, 404.0});
+        on((*ledger_).selection_changed(), *this, &TreeAndObjectViewsPage::on_file_selected);
+        on((*ledger_).pin_changed(), *this, &TreeAndObjectViewsPage::on_pin_changed);
+        on((*ledger_).expansion_changed(), *this, &TreeAndObjectViewsPage::on_file_expansion);
+        on((*ledger_).item_activated(), *this, &TreeAndObjectViewsPage::on_file_activated);
+    }
+
+    [[nodiscard]] static std::size_t depth_of(std::size_t index) {
+        std::size_t depth = 0;
+        while (project[index].parent != no_parent) {
+            index = project[index].parent;
+            ++depth;
+        }
+        return depth;
+    }
+
+    [[nodiscard]] static bool has_child_folder(const std::size_t index) {
+        for (const ProjectNode& node : project) {
+            if (node.parent == index && node.folder) return true;
+        }
+        return false;
+    }
+
+    // Projects the fixture around one folder into every view.
+    void project_folder(const std::size_t folder) {
+        folder_ = folder;
+        std::vector<BreadcrumbSegment> segments;
+        for (std::size_t index = folder; index != no_parent; index = project[index].parent) {
+            segments.insert(segments.begin(),
+                            {std::string(project[index].id), std::string(project[index].name),
+                             "Open " + std::string(project[index].name)});
+        }
+        (*trail_).set_segments(std::move(segments));
+        (*trail_).set_active_id(project[folder].id);
+        project_objects();
+        project_ledger();
+    }
+
+    // Every surface routes a folder change through the TreeView's selection,
+    // whose state event projects the views exactly once.
+    void select_folder(const std::size_t folder) {
+        for (std::size_t index = project[folder].parent; index != no_parent;
+             index = project[index].parent) {
+            (*tree_).set_expanded(project[index].id, true);
+        }
+        if ((*tree_).selected_id() == project[folder].id) {
+            project_folder(folder);
+            return;
+        }
+        (*tree_).set_selected_id(project[folder].id);
+    }
+
+    void project_objects() {
+        std::vector<std::size_t> children;
+        for (std::size_t index = 0; index < project.size(); ++index) {
+            if (project[index].parent == folder_) children.push_back(index);
+        }
+        if (!sort_.column.value.empty()) {
+            std::stable_sort(children.begin(), children.end(),
+                             SortByColumn{sort_.column.value, sort_.direction});
+        }
+        std::vector<ObjectViewItem> items;
+        for (const std::size_t index : children) {
+            const ProjectNode& node = project[index];
+            ObjectViewItem item;
+            item.stable_id = std::string(node.id);
+            item.name = std::string(node.name);
+            item.secondary_text = std::string(node.kind);
+            item.description = std::string(node.note);
+            item.glyph = node.glyph;
+            item.cells = {{{std::string(column_name)}, std::string(node.name)},
+                          {{std::string(column_kind)}, std::string(node.kind)},
+                          // A non-available cell must still carry text.
+                          {{std::string(column_size)},
+                           node.folder ? std::string("—") : std::string(node.size),
+                           node.folder ? ObjectCellAvailability::not_applicable
+                                       : ObjectCellAvailability::available},
+                          {{std::string(column_modified)}, std::string(node.modified)}};
+            items.push_back(std::move(item));
+        }
+        (*objects_).set_details_model(
+            {{{std::string(column_name)}, "Name", 118.0},
+             {{std::string(column_kind)}, "Kind", 86.0},
+             {{std::string(column_size)}, "Size", 58.0, 40.0, 4096.0, ObjectColumnAlignment::right},
+             {{std::string(column_modified)}, "Modified", 84.0}},
+            std::move(items), sort_);
+    }
+
+    void project_ledger() {
+        std::vector<CorrespondenceItem> items;
+        for (std::size_t index = 0; index < project.size(); ++index) {
+            const ProjectNode& node = project[index];
+            if (node.folder || !descends_from(index, folder_)) continue;
+            CorrespondenceItem item;
+            item.stable_id = std::string(node.id);
+            item.title = std::string(node.name);
+            item.secondary_text = node_path(node.parent);
+            item.metadata = std::string(node.modified);
+            item.excerpt = std::string(node.note);
+            item.metric = std::string(node.size);
+            item.glyph = node.glyph;
+            item.information_heading = "Details";
+            item.information_tags = {std::string(node.kind)};
+            item.information_detail = node_path(index);
+            items.push_back(std::move(item));
+        }
+        (*ledger_).set_items(std::move(items));
+        if (!(*ledger_).items().empty()) {
+            (*ledger_).set_pinned_id((*ledger_).items().front().stable_id);
+        }
+    }
+
+    struct SortByColumn final {
+        std::string_view column;
+        ObjectSortDirection direction;
+        [[nodiscard]] bool operator()(const std::size_t left, const std::size_t right) const {
+            const std::string_view first = cell_text(project[left], column);
+            const std::string_view second = cell_text(project[right], column);
+            return direction == ObjectSortDirection::ascending ? first < second : second < first;
+        }
+    };
+
+    // TreeView
+    void on_folder_selected(const TreeSelectionChange& change) {
+        const std::size_t folder = node_index(change.current_id);
+        if (folder == no_parent) return;
+        project_folder(folder);
+        (*status_).set_text("Folder " + node_path(folder) + " selected · " +
+                            std::to_string((*objects_).items().size()) + " children · " +
+                            std::to_string((*ledger_).items().size()) + " files in the ledger");
+    }
+
+    void on_expansion_changed(const TreeExpansionChange& change) {
+        (*status_).set_text("Folder " + change.stable_id + (change.expanded ? " expanded" : " collapsed") +
+                            " · unrealized descendants keep their identity");
+    }
+
+    void on_folder_activated(const std::string& stable_id) {
+        (*status_).set_text("Folder " + stable_id + " activated · Enter or double-click");
+    }
+
+    // ObjectView
+    void on_object_selected(const ObjectSelectionChange& change) {
+        (*status_).set_text(std::to_string(change.current_ids.size()) + " object(s) selected" +
+                            (change.current_id.empty() ? std::string() : " · primary " + change.current_id));
+    }
+
+    void on_object_activated(const std::string& stable_id) {
+        const std::size_t index = node_index(stable_id);
+        if (index == no_parent) return;
+        if (project[index].folder) {
+            select_folder(index);
+            (*status_).set_text("Opened " + node_path(index) + " from the ObjectView");
+            return;
+        }
+        (*status_).set_text("File " + stable_id + " activated · " + std::string(project[index].note));
+    }
+
+    void on_sort_requested(const ObjectDetailsSort& requested) {
+        sort_ = requested;
+        project_objects();
+        (*status_).set_text("Sorted by " + requested.column.value +
+                            (requested.direction == ObjectSortDirection::ascending ? " ascending"
+                                                                                   : " descending"));
+    }
+
+    // CorrespondenceView
+    void on_file_selected(const CorrespondenceSelectionChange& change) {
+        if (change.current_id.empty()) return;
+        (*status_).set_text("Ledger entry " + change.current_id + " selected · " +
+                            node_path(node_index(change.current_id)));
+    }
+
+    // A single click on a row both selects it and toggles the one pinned
+    // (persistently expanded) entry, so this report lands after the
+    // selection report above.
+    void on_pin_changed(const CorrespondencePinChange& change) {
+        if (change.current_id.empty()) {
+            (*status_).set_text("Pinned entry cleared · " + change.previous_id +
+                                " collapses back to its compact row");
+            return;
+        }
+        (*status_).set_text("Pinned entry: " + change.current_id + " · " +
+                            node_path(node_index(change.current_id)) +
+                            " · stays expanded while the pointer moves on");
+    }
+
+    void on_file_expansion(const CorrespondenceExpansionChange& change) {
+        if (change.reason != CorrespondenceExpansionReason::hover_intent) return;
+        (*status_).set_text("Hover intent " + std::string(change.expanded ? "expanded " : "collapsed ") +
+                            change.stable_id);
+    }
+
+    void on_file_activated(const std::string& stable_id) {
+        const std::size_t index = node_index(stable_id);
+        if (index == no_parent) return;
+        select_folder(project[index].parent);
+        (*objects_).set_selected_id(stable_id);
+        (*status_).set_text("Ledger entry " + stable_id + " activated · its folder is now selected");
+    }
+
+    // BreadcrumbTrail
+    void on_segment_activated(const std::string& stable_id) {
+        const std::size_t index = node_index(stable_id);
+        if (index == no_parent) return;
+        select_folder(index);
+        (*status_).set_text("Breadcrumb " + stable_id + " activated · tree selection follows");
+    }
+
+    void on_edit_started() {
+        (*status_).set_text("Editing the exact path · Enter commits, Escape cancels");
+    }
+
+    void on_edit_committed(const std::string& text) {
+        std::size_t current = no_parent;
+        std::size_t start = 0;
+        while (start <= text.size()) {
+            std::size_t end = text.find('/', start);
+            if (end == std::string::npos) end = text.size();
+            const std::string_view segment = trim(std::string_view(text).substr(start, end - start));
+            if (!segment.empty()) {
+                std::size_t found = no_parent;
+                for (std::size_t index = 0; index < project.size(); ++index) {
+                    if (project[index].folder && project[index].parent == current &&
+                        project[index].name == segment) {
+                        found = index;
+                    }
+                }
+                if (found == no_parent) {
+                    (*status_).set_text("No folder at \"" + text + "\" · path left unchanged");
+                    return;
+                }
+                current = found;
+            }
+            start = end + 1;
+        }
+        if (current == no_parent) return;
+        select_folder(current);
+        (*status_).set_text("Path committed · " + node_path(current));
+    }
+
+    void on_edit_cancelled() { (*status_).set_text("Path edit cancelled · segments restored"); }
+
+    [[nodiscard]] static std::string_view trim(std::string_view text) {
+        while (!text.empty() && text.front() == ' ') text.remove_prefix(1);
+        while (!text.empty() && text.back() == ' ') text.remove_suffix(1);
+        return text;
+    }
+
+    // Value
+    void on_view_mode_changed(const int mode) {
+        (*objects_).set_view_mode(mode == 0 ? ObjectViewMode::icons : ObjectViewMode::details);
+        (*status_).set_text(std::string("ObjectView ") + (mode == 0 ? "icons" : "details") +
+                            " · one ChoiceGroup bound to a Value<int>");
+    }
+
+    std::shared_ptr<BreadcrumbTrail> trail_;
+    std::shared_ptr<TreeView> tree_;
+    std::shared_ptr<ObjectView> objects_;
+    std::shared_ptr<CorrespondenceView> ledger_;
+    std::shared_ptr<Label> status_;
+    Value<int> view_mode_{1};
+    ObjectDetailsSort sort_{};
+    std::size_t folder_{no_parent};
+};
+
+} // namespace
+
+void add_tree_and_object_views(const std::shared_ptr<Surface>& page,
+                               const std::shared_ptr<PageContext>& context) {
+    (*context).components.add(std::make_shared<TreeAndObjectViewsPage>(page, context));
+}
+
+} // namespace gui_forms::gallery::pages
