@@ -179,7 +179,8 @@ std::uint32_t text_clip_coverage(const TextCompositeClip clip, const std::int64_
 }
 
 TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const TextCompositeTarget target,
-                                            const TextCompositeClip clip, const Color color) noexcept {
+                                            const TextCompositeClip clip, const Color color,
+                                            const TextCompositeMode mode) noexcept {
     if (target.width == 0 || target.height == 0 || target.stride < target.width ||
         target.height > target.pixels.size() / target.stride || !valid_rect(clip.rect) ||
         (clip.rounded && (!valid_rect(clip.rounded_rect) || !valid_coordinate(clip.radius) || clip.radius < 0.0)) ||
@@ -187,7 +188,8 @@ TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const T
         std::abs(coverage.top) > static_cast<std::int64_t>(coordinate_limit)) {
         return TextCompositeStatus::invalid_geometry;
     }
-    if (coverage.width == 0 || coverage.height == 0 || color.alpha == 0) return TextCompositeStatus::success;
+    const bool source = mode == TextCompositeMode::source;
+    if (coverage.width == 0 || coverage.height == 0 || (color.alpha == 0 && !source)) return TextCompositeStatus::success;
     if (coverage.height > coverage.pixels.size() / coverage.width) return TextCompositeStatus::invalid_geometry;
     const PreparedClip prepared = prepare_clip(clip);
     FixedRect limit = prepared.rect;
@@ -204,7 +206,19 @@ TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const T
     const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
                                                         coverage.top + static_cast<std::int64_t>(coverage.height)});
     const ChannelShifts shifts = channel_shifts(target.order);
-    const std::uint64_t colour_alpha = color.alpha;
+    // source_over weights coverage by the colour's alpha; source carries the
+    // alpha in the premultiplied colour instead.
+    const std::uint64_t colour_alpha = source ? 255U : color.alpha;
+    unsigned source_red = color.red;
+    unsigned source_green = color.green;
+    unsigned source_blue = color.blue;
+    unsigned source_alpha = 255U;
+    if (source) {
+        source_red = (color.red * static_cast<unsigned>(color.alpha) + 127U) / 255U;
+        source_green = (color.green * static_cast<unsigned>(color.alpha) + 127U) / 255U;
+        source_blue = (color.blue * static_cast<unsigned>(color.alpha) + 127U) / 255U;
+        source_alpha = color.alpha;
+    }
     for (std::int64_t y = top; y < bottom; ++y) {
         const std::size_t source_row = static_cast<std::size_t>(y - coverage.top) * coverage.width;
         const std::size_t target_row = static_cast<std::size_t>(y) * target.stride;
@@ -218,11 +232,11 @@ TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const T
             if (alpha == 0) continue;
             std::uint32_t& pixel = target.pixels[target_row + static_cast<std::size_t>(x)];
             const std::uint32_t previous = pixel;
-            const unsigned red = blend_channel(color.red, (previous >> shifts.red) & 255U, alpha);
-            const unsigned green = blend_channel(color.green, (previous >> shifts.green) & 255U, alpha);
-            const unsigned blue = blend_channel(color.blue, (previous >> shifts.blue) & 255U, alpha);
+            const unsigned red = blend_channel(source_red, (previous >> shifts.red) & 255U, alpha);
+            const unsigned green = blend_channel(source_green, (previous >> shifts.green) & 255U, alpha);
+            const unsigned blue = blend_channel(source_blue, (previous >> shifts.blue) & 255U, alpha);
             unsigned result_alpha = 255U;
-            if (!target.opaque) result_alpha = blend_channel(255U, (previous >> shifts.alpha) & 255U, alpha);
+            if (!target.opaque) result_alpha = blend_channel(source_alpha, (previous >> shifts.alpha) & 255U, alpha);
             pixel = (red << shifts.red) | (green << shifts.green) | (blue << shifts.blue) | (result_alpha << shifts.alpha);
         }
     }

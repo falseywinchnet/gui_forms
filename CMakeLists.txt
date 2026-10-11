@@ -751,9 +751,17 @@ if(GUI_FORMS_ENABLE_SKIA)
     target_include_directories(gui_drawing_skia SYSTEM PRIVATE
         ${GUI_FORMS_SKIA_ROOT}
     )
+    # ADR-004: the C drawing API draws text with the shared HarfBuzz/FreeType
+    # engine and compositor.
+    if(NOT TARGET gui_forms_text_engine)
+        message(FATAL_ERROR "GUI.Drawing's Skia executor requires GUI_FORMS_ENABLE_HARFBUZZ_TEXT")
+    endif()
     target_link_libraries(gui_drawing_skia
         PUBLIC gui_drawing_core
         PRIVATE
+            gui_forms_text_engine
+            gui_forms_core
+            freetype
             gui_forms_skia_archive
             gui_forms_skcms_archive
             gui_forms_png_archive
@@ -2714,6 +2722,7 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_drawing_skia_tests tests/drawing_skia_tests.cpp)
         target_compile_definitions(gui_drawing_skia_tests PRIVATE
             GUI_DRAWING_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
+            GUI_DRAWING_TEST_BOLD_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf"
         )
         target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia)
         add_test(NAME gui_drawing_skia_tests COMMAND gui_drawing_skia_tests)

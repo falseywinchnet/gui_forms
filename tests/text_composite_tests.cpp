@@ -139,6 +139,37 @@ void clipped_composite_blends_partially() {
 
 } // namespace
 
+// SourceCopy replaces the destination with the premultiplied colour in
+// proportion to coverage; it agrees with source-over for opaque colours.
+void source_mode_replaces() {
+    std::array<std::uint32_t, 1> pixels{0xff00ff00U};
+    const std::array<std::uint8_t, 1> full{255U};
+    const TextCompositeTarget target{.pixels = pixels, .width = 1, .height = 1, .stride = 1, .order = TextPixelOrder::bgra};
+    const TextCompositeClip clip{.rect = {0.0, 0.0, 1.0, 1.0}};
+    TextCompositeStatus status = detail::composite_text_coverage({.pixels = full, .width = 1, .height = 1}, target, clip,
+                                                                 Color::rgba(255, 0, 0, 128), detail::TextCompositeMode::source);
+    // Premultiplied red at alpha 128 replaces opaque green entirely.
+    require(status == TextCompositeStatus::success && pixels[0] == 0x80800000U, "full coverage copies the premultiplied colour");
+    pixels[0] = 0xff00ff00U;
+    const std::array<std::uint8_t, 1> half{128U};
+    status = detail::composite_text_coverage({.pixels = half, .width = 1, .height = 1}, target, clip, Color::rgba(0, 0, 0, 0),
+                                             detail::TextCompositeMode::source);
+    // Transparent colour erases in proportion to coverage: (255 * 127 + 127) / 255.
+    require(status == TextCompositeStatus::success && pixels[0] == 0x7f007f00U, "transparent source erases by coverage");
+    for (unsigned coverage = 0; coverage < 256U; coverage += 17U) {
+        const std::array<std::uint8_t, 1> value{static_cast<std::uint8_t>(coverage)};
+        std::array<std::uint32_t, 1> over{0xff336699U};
+        std::array<std::uint32_t, 1> copy{0xff336699U};
+        const Color colour = Color::rgba(200, 40, 90, 255);
+        static_cast<void>(detail::composite_text_coverage({.pixels = value, .width = 1, .height = 1},
+                                                          {.pixels = over, .width = 1, .height = 1, .stride = 1}, clip, colour));
+        static_cast<void>(detail::composite_text_coverage({.pixels = value, .width = 1, .height = 1},
+                                                          {.pixels = copy, .width = 1, .height = 1, .stride = 1}, clip, colour,
+                                                          detail::TextCompositeMode::source));
+        require(over[0] == copy[0], "opaque source equals source-over");
+    }
+}
+
 int main() {
     unclipped_alpha_matches_previous_rule();
     pixel_orders_agree();
@@ -147,5 +178,6 @@ int main() {
     rounded_corners_are_antialiased();
     invalid_geometry_writes_nothing();
     clipped_composite_blends_partially();
+    source_mode_replaces();
     return 0;
 }

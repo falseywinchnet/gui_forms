@@ -223,6 +223,26 @@ This additive development C++ source API changes description layout: rebuild
 consumers and their matching GUI.Forms libraries together. No stable C ABI change
 or consumer opt-in is implied; existing producers keep `opaque == false`.
 
+ADR-004 phase 5 moves GUI.Drawing's `SkiaExecutor` (and so the
+`gd_raster_service_v0` C API) onto the shared engine. `draw_string` and
+`measure_string` shape with HarfBuzz at unhinted advances and draw with
+`GlyphRunRasterizer` and the shared compositor; Skia no longer draws or
+measures text there. Each registered family gets its own HarfBuzz engine over
+the registered bytes (regular and bold slots; a TTC face is chosen by FreeType
+family name and OS/2 weight). Families nobody registered are located through
+the host catalog on macOS (CoreText, bytes only) and fall back to Portsmouth
+Rapids elsewhere; Windows still registers GDI's `GetFontData` bytes first.
+Bold without a bold face is synthesized by outline emboldening (1/24 of the
+size at 9 px to 1/32 at 36 px); italic is always a 0.25 shear. Translation and
+uniform positive scale keep light auto-hinting and the snapped baseline; any
+other transform rasterizes unhinted through `rasterize_transformed`. Clips are
+snapped to whole pixels like the executor's other commands, and
+`CompositingMode::source_copy` uses the compositor's new `source` mode. Line
+metrics are the face's unrounded ascender, descender and line gap. Invalid
+UTF-8 draws and measures nothing. `gui_drawing_skia` now requires
+`GUI_FORMS_ENABLE_HARFBUZZ_TEXT`. `gui_drawing_skia_tests` enforces one scene
+hash covering every text path, identical on macOS arm64 and Alpine aarch64.
+
 ## GUI.Drawing renderer-free core
 
 `drawing.hpp` defines the drawing substrate independently of the Forms tree. It
