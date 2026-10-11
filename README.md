@@ -1,4 +1,4 @@
-This software is dedicated to the service of those in need, in the name of our savior Christ Jesus and our great and all powerful God
+To the Holy One, blessed be He, from whom all good things come. We dedicate this work in gratitude for the nourishment that sustains human life, the energy that powers our tools, and the opportunity to weave information into works of use and beauty.
 
 # GUI.Forms
 
