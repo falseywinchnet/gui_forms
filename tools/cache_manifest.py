@@ -44,7 +44,8 @@ def main() -> None:
         'native_options': {'build_type': 'Release', 'cxx_standard': 20, 'pic': True,
                            'audio': True, 'tests': True, 'gallery': False,
                            'skia': sys.argv[1] != 'windows-x64',
-                           'harfbuzz': sys.argv[1] != 'windows-x64'},
+                           # ADR-004: every host draws text with the shared HarfBuzz/FreeType engine.
+                           'harfbuzz': True},
         'validation': 'provider CTest passed; consumer compilation and tests remain required'}
     if sys.argv[1] == 'macos-arm64':
         manifest['sdk_version'] = subprocess.check_output(['xcrun', '--show-sdk-version'], text=True).strip()
