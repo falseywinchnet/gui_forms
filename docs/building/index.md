@@ -130,9 +130,10 @@ CI compiles through `ccache` with `CCACHE_COMPILERCHECK=content` and, after
 tests pass, publishes a cache archive per platform to a `build-<sha>`
 pre-release. Those releases are build inputs, not application releases.
 A consumer that restores one still compiles and tests its own code; a cache
-miss is an ordinary compilation. The archive layout, manifest schema and the
-macOS runtime payload are described in `docs/COMPILER_CACHE.md` in the
-repository.
+miss is an ordinary compilation. [Fast, reproducible builds](fast-builds) explains
+the whole method (the pinned configuration, exact reuse of tested trees and
+the published caches), and [Reusing CI caches](reusing-ci-caches) covers the
+archive layout, the manifest, restoring a cache and copying the method.
 
 ## Dependency boundaries
 
@@ -141,3 +142,10 @@ conventions: C++20 everywhere, Objective-C++ only in `src/host/macos/`, Win32
 only in `src/host/windows/`, X11 only in `src/host/linux/`, Skia only in
 `src/render/skia/`, PNG as the only image decoder, and no GPU API anywhere.
 A change that violates one of these fails `ctest` before it reaches review.
+
+```{toctree}
+:hidden:
+
+fast-builds
+reusing-ci-caches
+```

@@ -45,7 +45,6 @@ The top bar has NumPy's five sections. Each is a directory with an index page.
 | `library/` | API reference inputs: docstrings, `manual.json`, archived captures; see `library/README.md` | hand; excluded |
 | `reference/` | Inputs of `tools/api_reference.py` (clang inventory, reviewed contracts) | generated or reviewed JSON; excluded |
 | `notes/` | Dated internal working notes | kept for provenance; excluded |
-| `COMPILER_CACHE.md` | The last legacy long-form document, pending its rewrite under `building/` | excluded |
 
 ## The exclude list
 

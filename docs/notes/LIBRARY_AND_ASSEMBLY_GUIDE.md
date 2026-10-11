@@ -41,7 +41,7 @@ crosses the portable contract.
 
 Application consumers link `GUIForms::Application`, which already contains Core.
 Audio adapters link `GUIForms::Audio`, which exposes Threading without pulling in
-static Core. See [the consumer linking rule](../COMPILER_CACHE.md#consumer-linking-rule)
+static Core. See [the consumer linking rule](COMPILER_CACHE.md#consumer-linking-rule)
 for packaging and the configure-time mixed-Core rejection.
 
 ## 2. Intended delivery layers
