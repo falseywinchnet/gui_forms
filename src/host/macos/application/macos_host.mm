@@ -1766,11 +1766,29 @@ private:
             return;
         }
         const double scale = self.window.backingScaleFactor;
+        // When the raster still holds the previous presentation, ask AppKit to
+        // redraw only where the surface actually changed. Redrawing the whole
+        // clip left every overlay inside it as uncovered damage, so a floating
+        // control was retained-painted on each publication however far away
+        // the change was. drawRetainedRect: re-requests any part of the copied
+        // region the flush did not cover, so a narrower request never leaves
+        // stale pixels presented.
+        const bool rasterReusable = _rasterHasContent == YES && _liveRegionLost == NO &&
+            (*_model).paint_lease_snapshot().state == gui_forms::PaintLeaseState::clean;
         for (const LiveSurfacePresentation& update : _pendingLivePresentations) {
-            const GFRect clip = gui_forms::detail::align_damage_outward(
-                update.clip, scale);
+            GFRect request = update.clip;
+            if (rasterReusable && update.damage_limited && update.surface) {
+                const gui_forms::LiveSurfaceFrame latest = (*update.surface).acquire_latest();
+                if (latest && latest.opaque() && !latest.damage().empty()) {
+                    const GFRect changed = gui_forms::detail::live_damage_in_window(
+                        latest.damage(), update.destination, latest.width(), latest.height(), scale);
+                    const GFRect narrowed = GFRect::intersection(update.clip, changed);
+                    if (!narrowed.empty()) request = narrowed;
+                }
+            }
+            const GFRect aligned = gui_forms::detail::align_damage_outward(request, scale);
             [self setNeedsDisplayInRect:
-                NSMakeRect(clip.x, clip.y, clip.width, clip.height)];
+                NSMakeRect(aligned.x, aligned.y, aligned.width, aligned.height)];
         }
         // AppKit calls on the main run loop, following this view's screen. Keep
         // its default variable refresh policy; sample only the newest frame.
@@ -2030,6 +2048,14 @@ private:
                 drawn.damage(), update.destination, drawn.width(), drawn.height(), scale);
             region = GFRect::intersection(update.clip, changed);
             narrowedAny = true;
+            // The display link requested the damage it saw; a publication that
+            // landed since can reach outside this flush. The raster receives
+            // the copy now, so request the remainder for the next flush.
+            if (!region.empty() && GFRect::intersection(nativeDamage, region) != region) {
+                const GFRect remainder = gui_forms::detail::align_damage_outward(region, scale);
+                [self setNeedsDisplayInRect:
+                    NSMakeRect(remainder.x, remainder.y, remainder.width, remainder.height)];
+            }
         }
         if (drawn && drawn.opaque()) {
             const GFRect covered = gui_forms::detail::opaque_live_clip(
