@@ -23,7 +23,7 @@ Not applicable: this is a nonvisual contract, value, service, or state owner.
 ### `Slot` (public)
 
 ```cpp
-Slot(std::weak_ptr<State> event_state, Callback event_callback) : state(std::move(event_state)), callback(std::move(event_callback)), kind(CallbackKind::owning)
+Slot(std::weak_ptr<State> event_state, Callback event_callback) : state(std::move(event_state)), callback(std::make_shared<Callback>(std::move(event_callback))), kind(CallbackKind::owning)
 ```
 
 Constructs or tears down the retained Slot object according to its ownership contract. *(declaration-derived)*

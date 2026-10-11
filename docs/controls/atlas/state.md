@@ -7,7 +7,7 @@
 - Scope: public header
 - Source layout: header-only or distributed
 - Hierarchy: `State`
-- Declaration: `include/gui_forms/event/event/event.hpp:237`
+- Declaration: `include/gui_forms/event/event/event.hpp:242`
 - Definition: `inline/header-only`
 - Type narrative: hand-reviewed
 - Method narratives: no declared methods

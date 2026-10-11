@@ -10,7 +10,7 @@
 - Declaration: `include/gui_forms/resources/image_registry/image_registry.hpp:13`
 - Definition: `src/core/resources/image_registry/image_registry.cpp`
 - Type narrative: hand-reviewed
-- Method narratives: 20 hand-reviewed, 0 declaration-derived
+- Method narratives: 20 hand-reviewed, 1 declaration-derived
 
 ImageRegistry is the renderer-neutral generational identity store for validated PNG and premultiplied BGRA resources, with bounded per-image/global quotas, in-place live updates, rectangular patches, stale-ID rejection, and structured telemetry.
 
@@ -179,3 +179,11 @@ Finds or creates a slot, commits candidate ownership, updates totals/revision, a
 ```
 
 Checks replacement-adjusted encoded and decoded totals without overflow and names the first exceeded quota.
+
+### `release_moved_contents` (private)
+
+```cpp
+void release_moved_contents() noexcept
+```
+
+Executes ImageRegistry's release moved contents operation against retained state; the signature records its exact inputs, result, constness, and failure surface. *(declaration-derived)*

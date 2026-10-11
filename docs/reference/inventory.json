@@ -52933,7 +52933,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 17,
+          "line": 20,
           "page": "gui-forms-imageregistry-imageregistry-void-imageregistry-noexcept-e895ae24b7.html"
         },
         {
@@ -52954,7 +52954,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 18,
+          "line": 21,
           "page": "gui-forms-imageregistry-operator-imageregistry-imageregistry-noexcept-b409c299c5.html"
         },
         {
@@ -52975,7 +52975,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 19,
+          "line": 22,
           "page": "gui-forms-imageregistry-imageregistry-void-const-imageregistry-491d022c79.html"
         },
         {
@@ -52996,7 +52996,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 20,
+          "line": 23,
           "page": "gui-forms-imageregistry-operator-imageregistry-const-imageregistry-b6bd6a9855.html"
         },
         {
@@ -53017,7 +53017,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 22,
+          "line": 25,
           "page": "gui-forms-imageregistry-load-png-imageloadresult-std-span-const-std-byte-5995d24283.html"
         },
         {
@@ -53053,7 +53053,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 23,
+          "line": 26,
           "page": "gui-forms-imageregistry-load-bgra32-premultiplied-imageloadresult-std-uint32-t-std-uint32-t-std-uint64-t-std-s-40bd644342.html"
         },
         {
@@ -53079,7 +53079,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 26,
+          "line": 29,
           "page": "gui-forms-imageregistry-replace-png-imageloadresult-imageid-std-span-const-std-byte-37533716d4.html"
         },
         {
@@ -53120,7 +53120,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 28,
+          "line": 31,
           "page": "gui-forms-imageregistry-replace-bgra32-premultiplied-imageloadresult-imageid-std-uint32-t-std-uint32-t-std-uin-9d65633632.html"
         },
         {
@@ -53161,7 +53161,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 31,
+          "line": 34,
           "page": "gui-forms-imageregistry-update-bgra32-premultiplied-imageloadresult-imageid-std-uint32-t-std-uint32-t-std-uint-c366c1ef32.html"
         },
         {
@@ -53212,7 +53212,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 34,
+          "line": 37,
           "page": "gui-forms-imageregistry-patch-bgra32-premultiplied-imageloadresult-imageid-std-uint32-t-std-uint32-t-std-uint3-b4f648c4d9.html"
         },
         {
@@ -53233,7 +53233,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 38,
+          "line": 41,
           "page": "gui-forms-imageregistry-remove-bool-imageid-noexcept-e15b425377.html"
         },
         {
@@ -53248,7 +53248,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 39,
+          "line": 42,
           "page": "gui-forms-imageregistry-clear-void-noexcept-1f3a79b7ab.html"
         },
         {
@@ -53269,7 +53269,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 41,
+          "line": 44,
           "page": "gui-forms-imageregistry-find-std-optional-imageresourceview-imageid-const-noexcept-fa84e1804d.html"
         },
         {
@@ -53284,7 +53284,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 43,
+          "line": 46,
           "page": "gui-forms-imageregistry-image-ids-std-vector-imageid-const-17aa15c6e8.html"
         },
         {
@@ -53299,7 +53299,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 44,
+          "line": 47,
           "page": "gui-forms-imageregistry-snapshot-imageregistrysnapshot-const-noexcept-c692de5078.html"
         },
         {
@@ -53314,7 +53314,7 @@
           "comment": "",
           "header": "gui_forms/resources/image_registry/image_registry.hpp",
           "source": "include/gui_forms/resources/image_registry/image_registry.hpp",
-          "line": 45,
+          "line": 48,
           "page": "gui-forms-imageregistry-limits-const-imageregistrylimits-const-noexcept-97107cd999.html"
         }
       ],
@@ -111893,7 +111893,7 @@
       "comment": "",
       "header": "gui_forms/event/event/event.hpp",
       "source": "include/gui_forms/event/event/event.hpp",
-      "line": 330,
+      "line": 335,
       "page": "gui-forms-on-void-event-arguments-owner-method-bound-7821ac3d76.html"
     },
     {

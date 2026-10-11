@@ -4,7 +4,7 @@
 
 - Status: **OBSERVED source inventory; declaration-derived narrative**
 - Kind: **enum class / state or value vocabulary**
-- Declaration: `include/gui_forms/event/event/event.hpp:180`
+- Declaration: `include/gui_forms/event/event/event.hpp:183`
 
 This closed vocabulary makes the named state explicit at API boundaries; the
 declaration is authoritative for admitted values.
