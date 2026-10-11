@@ -183,6 +183,11 @@ public:
         std::string family;
         std::shared_ptr<const void> encoded;
         FT_Face face{};
+        // The HarfBuzz font shaping this face, kept across calls so HarfBuzz
+        // keeps the face's parsed tables and shape plans. It references face;
+        // its scale is the one set at shaping_size.
+        HarfBuzzFontOwner shaping_font{nullptr, hb_font_destroy};
+        FT_F26Dot6 shaping_size{};
 
         Face(FontFaceId id_value, std::optional<FontRole> role_value,
              std::uint16_t weight_value, bool italic_value,
@@ -193,6 +198,7 @@ public:
               family(std::move(family_value)), encoded(std::move(bytes)),
               face(face_value) {}
         ~Face() {
+            shaping_font.reset();
             if (face != nullptr) FT_Done_Face(face);
         }
         Face(const Face&) = delete;
@@ -201,7 +207,8 @@ public:
             : id(other.id), role(other.role), weight(other.weight),
               italic(other.italic), fallback(other.fallback),
               family(std::move(other.family)), encoded(std::move(other.encoded)),
-              face(std::exchange(other.face, nullptr)) {}
+              face(std::exchange(other.face, nullptr)), shaping_font(std::move(other.shaping_font)),
+              shaping_size(other.shaping_size) {}
         Face& operator=(Face&&) = delete;
     };
 
@@ -329,9 +336,9 @@ public:
 
     struct CallFont final {
         Face* face{};
-        HarfBuzzFontOwner owner{nullptr, hb_font_destroy};
+        hb_font_t* font{};
     };
-    // Native owners and face borrows live for one synchronous shape call.
+    // Face and font borrows live for one synchronous shape call.
     // Registration cannot run concurrently; the face vector stays unchanged.
     struct ShapeCall final {
         std::array<CallFont, maximum_faces> fonts{};
@@ -357,7 +364,7 @@ public:
         for (std::size_t index = 0; index < font_count; ++index) {
             const CallFont& entry = call.fonts[index];
             if (entry.face == &face) {
-                hb_font = entry.owner.get();
+                hb_font = entry.font;
                 break;
             }
         }
@@ -377,32 +384,44 @@ public:
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
             TextLayoutPhaseTimer font_timer(diagnostics, TextLayoutPhase::hb_font);
 #endif
-            hb_font_t* acquired_font = nullptr;
+            // A diagnostic acquisition failure replaces the font this call
+            // binds, kept or not, and is never kept.
+            HarfBuzzFontOwner font_owner{nullptr, hb_font_destroy};
+            bool injected = false;
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
             if (take_failure(TextLayoutFailure::empty_font)) {
-                acquired_font = hb_font_get_empty();
+                font_owner.reset(hb_font_get_empty());
+                injected = true;
             } else if (take_failure(TextLayoutFailure::unbound_font)) {
-                acquired_font = hb_font_create(hb_face_get_empty());
-            } else
-#endif
-            {
-                acquired_font = hb_ft_font_create_referenced(face.face);
+                font_owner.reset(hb_font_create(hb_face_get_empty()));
+                injected = true;
             }
-            HarfBuzzFontOwner font_owner{acquired_font, hb_font_destroy};
+#endif
+            if (injected || !face.shaping_font) {
+                if (!injected) font_owner.reset(hb_ft_font_create_referenced(face.face));
+                hb_font_t* const created = font_owner.get();
+                if (created == nullptr || created == hb_font_get_empty() ||
+                    hb_ft_font_get_ft_face(created) != face.face) { throw std::bad_alloc(); }
+                // ADR-004: advances are the outlines' own, unhinted at the logical
+                // size, so glyph positions agree with the light-hinted glyphs drawn
+                // at any device scale. Hinted logical-size advances drifted lines by
+                // up to 12 logical px. Vertical metrics are unchanged.
+                hb_ft_font_set_load_flags(created, FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP);
+                face.shaping_font = std::move(font_owner);
+                face.shaping_size = size;
+            } else if (face.shaping_size != size) {
+                // The kept font takes its scale and advance cache from the
+                // FreeType size, which was just set.
+                hb_ft_font_changed(face.shaping_font.get());
+                face.shaping_size = size;
+            }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
             font_timer.stop();
 #endif
-            hb_font = font_owner.get();
-            if (hb_font == nullptr || hb_font == hb_font_get_empty() ||
-                hb_ft_font_get_ft_face(hb_font) != face.face) { throw std::bad_alloc(); }
-            // ADR-004: advances are the outlines' own, unhinted at the logical
-            // size, so glyph positions agree with the light-hinted glyphs drawn
-            // at any device scale. Hinted logical-size advances drifted lines by
-            // up to 12 logical px. Vertical metrics are unchanged.
-            hb_ft_font_set_load_flags(hb_font, FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP);
+            hb_font = face.shaping_font.get();
             CallFont& entry = call.fonts[font_count];
             entry.face = &face;
-            entry.owner = std::move(font_owner);
+            entry.font = hb_font;
             ++call.font_count;
         }
 #if defined(GUI_FORMS_TEXT_LAYOUT_DIAGNOSTICS)
