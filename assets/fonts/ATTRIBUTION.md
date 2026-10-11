@@ -1,26 +1,23 @@
 # Bundled UI font assets
 
-The GUI.Forms Gallery bundles two Portsmouth Rapids 1.0 evaluation faces:
+Portsmouth Rapids is the repository owner's own typeface. GUI.Forms bundles
+two Portsmouth Rapids 1.0 faces and uses them for all control and title roles:
 
 - `PortsmouthRapids.ttf` — regular, SHA-256
   `88988bea222852c30e08a3629d9f929baacfec4844c85bb978dcc68e6f4d4add`
 - `PortsmouthRapids-Bold.ttf` — bold, SHA-256
   `f97d702778f5933b4ae138064a348499a6dba90d9e2e6bf75a6ab81a6730c03a`
 
-Source: `/Users/quentinkuttenkuler/future/portsmouth/build/rapids`, supplied by
-the grand architect, with the interface-symbol rebuild supplied 2026-08-06.
-Embedded metadata identifies the family as
-`Portsmouth Rapids`, version 1.0, and describes it as an experimental personal
-and artistic evaluation build. Full source provenance is retained in the
-FutureScope project's `portsmouth/PROJECT.md`.
+Licence: MIT, copyright the repository owner; the exact text is retained as
+`LICENSE-PortsmouthRapids.txt`. Embedded metadata identifies the family as
+`Portsmouth Rapids`, version 1.0. The current faces were supplied 2026-08-06
+with the interface-symbol rebuild. Full source provenance is retained in the
+owner's Portsmouth source project (`portsmouth/PROJECT.md`).
 
 The 2026-08-06 faces add the protected `← ↑ → ▼` navigation/disclosure set
 requested by GUI.Forms while retaining the previous 330 cmap entries, glyph
 IDs, advances, and outlines exactly. The editable construction and acceptance
 reports live in the cited Portsmouth source project.
-
-**CANDIDATE:** Portsmouth remains admitted for titles and control chrome,
-subject to the production redistribution-rights gate.
 
 The font-pack specimen also contains Carlito and Cousine at upstream commit
 and byte identity:
@@ -43,7 +40,7 @@ monospace specimen. Their use here measures the bundled-font pipeline; it does
 not silently elevate either candidate into the final M9 typography decision.
 
 Two bounded, role-independent fallback faces complete the mixed-script
-showcase specimen:
+Gallery specimen:
 
 - Noto Sans CJK JP Regular from `notofonts/noto-cjk` commit
   `f8d157532fbfaeda587e826d4cd5b21a49186f7c`, file
@@ -59,7 +56,7 @@ as `OFL-NotoSansCJKjp.txt` and `OFL-NotoEmoji.txt`, each SHA-256
 `6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2`.
 The files are reproducibly acquired and verified by
 `third_party/fetch_showcase_fallback_fonts.sh`. They are **DECIDED** only for
-the complete-showcase font pack and deterministic cross-script fallback proof;
+the Gallery font pack and deterministic cross-script fallback proof;
 File Manager's final locale/font-pack policy remains an M9 decision.
 
 **REJECTED for this CPU renderer:** current COLRv1 Noto Emoji shaped correctly
