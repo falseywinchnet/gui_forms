@@ -2189,6 +2189,9 @@ class WindowsHostState final {
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
     friend struct PreparedHostFixture;
 #endif
+#if defined(GUI_FORMS_WINDOWS_TOOLTIP_TEST)
+    friend struct TooltipHostFixture;
+#endif
 public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
@@ -2724,8 +2727,13 @@ private:
         }
         const ResolvedTextLayout metrics = raster_.resolve_text_layout_utf8("Ag", font);
         const double line_height = metrics.ascent + metrics.descent + metrics.line_gap;
-        const Size logical{std::clamp(text_width + 16.0, 40.0, 376.0),
-                           std::max(24.0, line_height * static_cast<double>(lines.size()) + 10.0)};
+        const Size requested{std::clamp(text_width + 16.0, 40.0, 376.0),
+                             std::max(24.0, line_height * static_cast<double>(lines.size()) + 10.0)};
+        // The popup presents every allocated device pixel. Align its logical
+        // extent before painting so fractional sizes cannot leave a clear
+        // final row/column or make the one-device-pixel border two pixels wide.
+        const Size logical{std::ceil(requested.width * scale_) / scale_,
+                           std::ceil(requested.height * scale_) / scale_};
         const std::unique_ptr<PaintFramebuffer> framebuffer = raster_.create_framebuffer(logical, scale_);
         if (!framebuffer) return false;
         Painter& painter = (*framebuffer).painter();
@@ -3453,6 +3461,9 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
 #include "windows_prepared_text_fixture.inc"
 #endif
+#if defined(GUI_FORMS_WINDOWS_TOOLTIP_TEST)
+#include "windows_tooltip_fixture.inc"
+#endif
 
 } // namespace
 
@@ -3464,6 +3475,11 @@ void run_windows_dib_lifecycle_fixture() {
 #endif
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST)
 void run_windows_prepared_text_fixture(const std::span<const std::byte> fonts) { PreparedHostFixture::run(fonts); }
+#endif
+#if defined(GUI_FORMS_WINDOWS_TOOLTIP_TEST)
+void run_windows_tooltip_fixture(const std::filesystem::path& fonts) {
+    TooltipHostFixture::run(fonts);
+}
 #endif
 
 HostCapabilities windows_capabilities() {

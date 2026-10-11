@@ -1842,6 +1842,24 @@ if(GUI_FORMS_BUILD_TESTS)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
+            add_executable(gui_forms_windows_tooltip_tests
+                tests/windows_tooltip_tests.cpp
+                src/host/windows/application/windows_host.cpp
+                src/host/windows/accessibility/windows_accessibility.cpp
+                src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
+                src/host/windows/raster/dib_frame_store.cpp)
+            target_include_directories(gui_forms_windows_tooltip_tests PRIVATE
+                include src/host/windows)
+            target_compile_definitions(gui_forms_windows_tooltip_tests PRIVATE
+                WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
+                GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_WINDOWS_TOOLTIP_TEST=1)
+            target_link_libraries(gui_forms_windows_tooltip_tests PRIVATE
+                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                windowscodecs comdlg32 shell32)
+            add_test(NAME gui_forms_windows_tooltip_tests
+                     COMMAND gui_forms_windows_tooltip_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+            set_tests_properties(gui_forms_windows_tooltip_tests PROPERTIES TIMEOUT 30)
             if(TARGET gui_forms_prepared_text_impl)
                 add_executable(gui_forms_windows_prepared_text_tests
                     tests/windows_prepared_text_tests.cpp
