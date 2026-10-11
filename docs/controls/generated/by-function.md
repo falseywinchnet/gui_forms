@@ -4,75 +4,75 @@ Generated from `manifests/controls.json` by `python3 tools/control_registry.py r
 
 | Function | Control | WinForms counterpart | Description |
 |---|---|---|---|
-| Commands | `Button` | Button | Push button with accept/cancel dialog results, default-button state, and four visual policies. |
-|  | `ButtonBase` | ButtonBase | Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize. |
-|  | `CommandBar` | ToolStrip | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
-|  | `DropDownButton` | ToolStripSplitButton | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
-|  | `LinkLabel` | LinkLabel | Command presented as underlined link text with retained visited state and link semantics. |
-| Text editing | `TextBox` | TextBox | Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
-| Information display | `Label` | Label | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
-|  | `PictureBox` | PictureBox | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
-|  | `ProgressBar` | ProgressBar | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |
-|  | `ReviewCard` | GUI.Forms-only | Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws. |
-| Selection from a list | `BreadcrumbTrail` | GUI.Forms-only | Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing. |
-|  | `CheckedListBox` | CheckedListBox | ListBox with an independently retained three-state check model, cancellable pre-change events, and optional check-on-click. |
-|  | `ChoiceGroup` | GUI.Forms-only | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
-|  | `ComboBox` | ComboBox | Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup. |
-|  | `CorrespondenceView` | GUI.Forms-only | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
-|  | `ListBox` | ListBox | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
-|  | `ObjectView` | ListView | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
-|  | `TreeView` | TreeView | Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants. |
-| Value setting | `CheckBox` | CheckBox | Two- or three-state selection control with optional automatic cycling, three indicator families, and ordered state events. |
-|  | `ColorValueEditor` | GUI.Forms-only | Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion. |
-|  | `FlagsValueEditor` | GUI.Forms-only | Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases. |
-|  | `InstrumentRack` | GUI.Forms-only | Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement. |
-|  | `NumericUpDown` | NumericUpDown | Composite numeric editor over an owned TextBox and source-private spin buttons with ordered ranges, bounded step and precision, and decimal or hexadecimal formatting. |
-|  | `PropertyGrid` | PropertyGrid | Metadata-driven inspector and editor over one or more selected Controls that projects descriptors into a PropertyList. |
-|  | `PropertyList` | GUI.Forms-only | Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane. |
-|  | `RadioButton` | RadioButton | Retained checked state with container-scoped named exclusion groups, optional automatic checking, and radio semantics. |
-|  | `RangeControl` | GUI.Forms-only | Nonvisual retained authority for ordered bounds, a constrained value, small/large changes, and orientation that TrackBar, ProgressBar, and ScrollBar specialize. |
-|  | `TrackBar` | TrackBar | Slider over RangeControl with bounded tick frequency, absolute pointer positioning, keyboard movement, and slider semantics. |
-| Date setting | `DateTimePicker` | DateTimePicker | Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation. |
-| Grouping | `Card` | GUI.Forms-only | Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement. |
-|  | `ContainerControl` | ContainerControl | ScrollableControl with descendant-scoped active-control authority and inherited validation policy. |
-|  | `ExpandableSections` | GUI.Forms-only | Stack of captioned sections whose content controls expand and collapse individually or in single-open mode. |
-|  | `GroupBox` | GroupBox | Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics. |
-|  | `MaterialPanel` | GUI.Forms-only | Content-agnostic container painted with a SurfaceMaterial. |
-|  | `Panel` | Panel | Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics. |
-|  | `ScaledGroupBox` | GUI.Forms-only | GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds. |
-|  | `TabControl` | TabControl | Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics. |
-|  | `TabPage` | TabPage | Panel surface owned by a TabControl with bounded caption text and page semantics. |
-|  | `UserControl` | UserControl | Authored-container base that distinguishes current attachment from first committed load and counts attachment epochs. |
-| Layout | `CommandOverflowPanel` | GUI.Forms-only | Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer. |
-|  | `FlowLayoutPanel` | FlowLayoutPanel | Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks. |
-|  | `MasterDetailView` | GUI.Forms-only | Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse. |
-|  | `ResponsiveTrackPanel` | GUI.Forms-only | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
-|  | `ScaledPanel` | GUI.Forms-only | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
-|  | `SplitContainer` | SplitContainer | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
-|  | `SplitterPanel` | SplitterPanel | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
-|  | `TableLayoutPanel` | TableLayoutPanel | Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans. |
-| Scrolling | `HScrollBar` | HScrollBar | Explicit horizontal ScrollBar leaf type. |
-|  | `ScrollableControl` | ScrollableControl | Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics. |
-|  | `ScrollBar` | ScrollBar | RangeControl with bounded button and thumb geometry, proportional thumb allocation, drag and track interaction, and retained auto-repeat. |
-|  | `VScrollBar` | VScrollBar | Explicit vertical ScrollBar leaf type. |
-| Menus and commands | `Command` | GUI.Forms-only | Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation. |
-|  | `ContextMenu` | ContextMenuStrip | Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands. |
-|  | `MenuStrip` | MenuStrip | Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances. |
-| Dialogs and popups | `AnchoredPopupLayer` | GUI.Forms-only | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
-|  | `ToolTip` | ToolTip | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
-| Drawing | `DrawingSurface` | GUI.Forms-only | Owner-render surface configured through the renderer-neutral Painter vocabulary without a Control subclass. |
-|  | `LiveSurface` | GUI.Forms-only | Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one. |
-|  | `RasterCanvas` | GUI.Forms-only | Viewport over an owned GUI.Drawing bitmap that handles presentation, coordinate transforms, resource synchronization, and local invalidation. |
-| Diagnostics | `EasingPreview` | GUI.Forms-only | Animation and easing conformance surface over an owned AnimationTimeline with configurable tracks and motion policy. |
-|  | `MetricsView` | GUI.Forms-only | View over the structured Window metrics snapshot. |
-|  | `TypographySpecimen` | GUI.Forms-only | Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status. |
-|  | `VisualInspectorOverlay` | GUI.Forms-only | Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing. |
-|  | `VisualInspectorView` | GUI.Forms-only | Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics. |
-| Components | `Binding` | Binding | Connects one Control property to one BindingSource field with validated conversion, update timing, and error routing. |
-|  | `BindingContext` | BindingContext | Window-scoped weak membership and disposal subscriptions for BindingSources. |
-|  | `BindingSource` | BindingSource | Owns stable rows, currency, edit snapshots, list and error events, and the active Bindings for one Window. |
-|  | `ErrorProvider` | ErrorProvider | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
-|  | `HelpProvider` | HelpProvider | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
-|  | `ImageList` | ImageList | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
-|  | `SemanticFeedback` | GUI.Forms-only | Turns one-shot application transitions into bounded, traceable host cues. |
-|  | `Timer` | Timer | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
+| Commands | [`Button`](../../api/generated/gui_forms.Button.rst) | Button | Push button with accept/cancel dialog results, default-button state, and four visual policies. |
+|  | [`ButtonBase`](../../api/generated/gui_forms.ButtonBase.rst) | ButtonBase | Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize. |
+|  | [`CommandBar`](../../api/generated/gui_forms.CommandBar.rst) | ToolStrip | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
+|  | [`DropDownButton`](../../api/generated/gui_forms.DropDownButton.rst) | ToolStripSplitButton | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
+|  | [`LinkLabel`](../../api/generated/gui_forms.LinkLabel.rst) | LinkLabel | Command presented as underlined link text with retained visited state and link semantics. |
+| Text editing | [`TextBox`](../../api/generated/gui_forms.TextBox.rst) | TextBox | Single-line Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
+| Information display | [`Label`](../../api/generated/gui_forms.Label.rst) | Label | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
+|  | [`PictureBox`](../../api/generated/gui_forms.PictureBox.rst) | PictureBox | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
+|  | [`ProgressBar`](../../api/generated/gui_forms.ProgressBar.rst) | ProgressBar | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |
+|  | [`ReviewCard`](../../api/generated/gui_forms.ReviewCard.rst) | GUI.Forms-only | Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws. |
+| Selection from a list | [`BreadcrumbTrail`](../../api/generated/gui_forms.BreadcrumbTrail.rst) | GUI.Forms-only | Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing. |
+|  | [`CheckedListBox`](../../api/generated/gui_forms.CheckedListBox.rst) | CheckedListBox | ListBox with an independently retained three-state check model, cancellable pre-change events, and optional check-on-click. |
+|  | [`ChoiceGroup`](../../api/generated/gui_forms.ChoiceGroup.rst) | GUI.Forms-only | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
+|  | [`ComboBox`](../../api/generated/gui_forms.ComboBox.rst) | ComboBox | Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup. |
+|  | [`CorrespondenceView`](../../api/generated/gui_forms.CorrespondenceView.rst) | GUI.Forms-only | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
+|  | [`ListBox`](../../api/generated/gui_forms.ListBox.rst) | ListBox | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
+|  | [`ObjectView`](../../api/generated/gui_forms.ObjectView.rst) | ListView | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
+|  | [`TreeView`](../../api/generated/gui_forms.TreeView.rst) | TreeView | Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants. |
+| Value setting | [`CheckBox`](../../api/generated/gui_forms.CheckBox.rst) | CheckBox | Two- or three-state selection control with optional automatic cycling, three indicator families, and ordered state events. |
+|  | [`ColorValueEditor`](../../api/generated/gui_forms.ColorValueEditor.rst) | GUI.Forms-only | Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion. |
+|  | [`FlagsValueEditor`](../../api/generated/gui_forms.FlagsValueEditor.rst) | GUI.Forms-only | Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases. |
+|  | [`InstrumentRack`](../../api/generated/gui_forms.InstrumentRack.rst) | GUI.Forms-only | Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement. |
+|  | [`NumericUpDown`](../../api/generated/gui_forms.NumericUpDown.rst) | NumericUpDown | Composite numeric editor over an owned TextBox and source-private spin buttons with ordered ranges, bounded step and precision, and decimal or hexadecimal formatting. |
+|  | [`PropertyGrid`](../../api/generated/gui_forms.PropertyGrid.rst) | PropertyGrid | Metadata-driven inspector and editor over one or more selected Controls that projects descriptors into a PropertyList. |
+|  | [`PropertyList`](../../api/generated/gui_forms.PropertyList.rst) | GUI.Forms-only | Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane. |
+|  | [`RadioButton`](../../api/generated/gui_forms.RadioButton.rst) | RadioButton | Retained checked state with container-scoped named exclusion groups, optional automatic checking, and radio semantics. |
+|  | [`RangeControl`](../../api/generated/gui_forms.RangeControl.rst) | GUI.Forms-only | Nonvisual retained authority for ordered bounds, a constrained value, small/large changes, and orientation that TrackBar, ProgressBar, and ScrollBar specialize. |
+|  | [`TrackBar`](../../api/generated/gui_forms.TrackBar.rst) | TrackBar | Slider over RangeControl with bounded tick frequency, absolute pointer positioning, keyboard movement, and slider semantics. |
+| Date setting | [`DateTimePicker`](../../api/generated/gui_forms.DateTimePicker.rst) | DateTimePicker | Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation. |
+| Grouping | [`Card`](../../api/generated/gui_forms.Card.rst) | GUI.Forms-only | Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement. |
+|  | [`ContainerControl`](../../api/generated/gui_forms.ContainerControl.rst) | ContainerControl | ScrollableControl with descendant-scoped active-control authority and inherited validation policy. |
+|  | [`ExpandableSections`](../../api/generated/gui_forms.ExpandableSections.rst) | GUI.Forms-only | Stack of captioned sections whose content controls expand and collapse individually or in single-open mode. |
+|  | [`GroupBox`](../../api/generated/gui_forms.GroupBox.rst) | GroupBox | Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics. |
+|  | [`MaterialPanel`](../../api/generated/gui_forms.MaterialPanel.rst) | GUI.Forms-only | Content-agnostic container painted with a SurfaceMaterial. |
+|  | [`Panel`](../../api/generated/gui_forms.Panel.rst) | Panel | Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics. |
+|  | [`ScaledGroupBox`](../../api/generated/gui_forms.ScaledGroupBox.rst) | GUI.Forms-only | GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds. |
+|  | [`TabControl`](../../api/generated/gui_forms.TabControl.rst) | TabControl | Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics. |
+|  | [`TabPage`](../../api/generated/gui_forms.TabPage.rst) | TabPage | Panel surface owned by a TabControl with bounded caption text and page semantics. |
+|  | [`UserControl`](../../api/generated/gui_forms.UserControl.rst) | UserControl | Authored-container base that distinguishes current attachment from first committed load and counts attachment epochs. |
+| Layout | [`CommandOverflowPanel`](../../api/generated/gui_forms.CommandOverflowPanel.rst) | GUI.Forms-only | Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer. |
+|  | [`FlowLayoutPanel`](../../api/generated/gui_forms.FlowLayoutPanel.rst) | FlowLayoutPanel | Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks. |
+|  | [`MasterDetailView`](../../api/generated/gui_forms.MasterDetailView.rst) | GUI.Forms-only | Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse. |
+|  | [`ResponsiveTrackPanel`](../../api/generated/gui_forms.ResponsiveTrackPanel.rst) | GUI.Forms-only | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
+|  | [`ScaledPanel`](../../api/generated/gui_forms.ScaledPanel.rst) | GUI.Forms-only | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
+|  | [`SplitContainer`](../../api/generated/gui_forms.SplitContainer.rst) | SplitContainer | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
+|  | [`SplitterPanel`](../../api/generated/gui_forms.SplitterPanel.rst) | SplitterPanel | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
+|  | [`TableLayoutPanel`](../../api/generated/gui_forms.TableLayoutPanel.rst) | TableLayoutPanel | Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans. |
+| Scrolling | [`HScrollBar`](../../api/generated/gui_forms.HScrollBar.rst) | HScrollBar | Explicit horizontal ScrollBar leaf type. |
+|  | [`ScrollableControl`](../../api/generated/gui_forms.ScrollableControl.rst) | ScrollableControl | Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics. |
+|  | [`ScrollBar`](../../api/generated/gui_forms.ScrollBar.rst) | ScrollBar | RangeControl with bounded button and thumb geometry, proportional thumb allocation, drag and track interaction, and retained auto-repeat. |
+|  | [`VScrollBar`](../../api/generated/gui_forms.VScrollBar.rst) | VScrollBar | Explicit vertical ScrollBar leaf type. |
+| Menus and commands | [`Command`](../../api/generated/gui_forms.Command.rst) | GUI.Forms-only | Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation. |
+|  | [`ContextMenu`](../../api/generated/gui_forms.ContextMenu.rst) | ContextMenuStrip | Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands. |
+|  | [`MenuStrip`](../../api/generated/gui_forms.MenuStrip.rst) | MenuStrip | Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances. |
+| Dialogs and popups | [`AnchoredPopupLayer`](../../api/generated/gui_forms.AnchoredPopupLayer.rst) | GUI.Forms-only | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
+|  | [`ToolTip`](../../api/generated/gui_forms.ToolTip.rst) | ToolTip | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
+| Drawing | [`DrawingSurface`](../../api/generated/gui_forms.DrawingSurface.rst) | GUI.Forms-only | Owner-render surface configured through the renderer-neutral Painter vocabulary without a Control subclass. |
+|  | [`LiveSurface`](../../api/generated/gui_forms.LiveSurface.rst) | GUI.Forms-only | Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one. |
+|  | [`RasterCanvas`](../../api/generated/gui_forms.RasterCanvas.rst) | GUI.Forms-only | Viewport over an owned GUI.Drawing bitmap that handles presentation, coordinate transforms, resource synchronization, and local invalidation. |
+| Diagnostics | [`EasingPreview`](../../api/generated/gui_forms.EasingPreview.rst) | GUI.Forms-only | Animation and easing conformance surface over an owned AnimationTimeline with configurable tracks and motion policy. |
+|  | [`MetricsView`](../../api/generated/gui_forms.MetricsView.rst) | GUI.Forms-only | View over the structured Window metrics snapshot. |
+|  | [`TypographySpecimen`](../../api/generated/gui_forms.TypographySpecimen.rst) | GUI.Forms-only | Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status. |
+|  | [`VisualInspectorOverlay`](../../api/generated/gui_forms.VisualInspectorOverlay.rst) | GUI.Forms-only | Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing. |
+|  | [`VisualInspectorView`](../../api/generated/gui_forms.VisualInspectorView.rst) | GUI.Forms-only | Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics. |
+| Components | [`Binding`](../../api/generated/gui_forms.Binding.rst) | Binding | Connects one Control property to one BindingSource field with validated conversion, update timing, and error routing. |
+|  | [`BindingContext`](../../api/generated/gui_forms.BindingContext.rst) | BindingContext | Window-scoped weak membership and disposal subscriptions for BindingSources. |
+|  | [`BindingSource`](../../api/generated/gui_forms.BindingSource.rst) | BindingSource | Owns stable rows, currency, edit snapshots, list and error events, and the active Bindings for one Window. |
+|  | [`ErrorProvider`](../../api/generated/gui_forms.ErrorProvider.rst) | ErrorProvider | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
+|  | [`HelpProvider`](../../api/generated/gui_forms.HelpProvider.rst) | HelpProvider | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
+|  | [`ImageList`](../../api/generated/gui_forms.ImageList.rst) | ImageList | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
+|  | [`SemanticFeedback`](../../api/generated/gui_forms.SemanticFeedback.rst) | GUI.Forms-only | Turns one-shot application transitions into bounded, traceable host cues. |
+|  | [`Timer`](../../api/generated/gui_forms.Timer.rst) | Timer | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |

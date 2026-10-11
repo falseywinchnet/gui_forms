@@ -65,6 +65,9 @@ it to the exclude list with a comment saying why.
 - Keep a hand-written page to roughly 150 lines; split rather than scroll.
 - Control and type documentation belongs in `library/docstrings/`, not in a
   hand-written page; the generator turns it into the reference page.
+- When a page moves or is renamed, add its old docname to `MOVED_PAGES` in
+  `conf.py`. The build then writes a forwarding page at the old address, and
+  fails if the old address is still a page or the new one is not.
 
 ## Page count and build time
 
