@@ -33,5 +33,22 @@ if(symbols MATCHES "[0-9a-fA-F]+ T __ZN(2Gr|5skgpu8graphite)")
     message(FATAL_ERROR "Defined GPU backend symbol found in CPU-only Skia archive")
 endif()
 
-message(STATUS "Skia archive policy passed: PNG-only decoder and no GPU backend implementation")
+# ADR-004 phase 7: text is GUI.Forms' own HarfBuzz/FreeType engine. Skia's
+# font managers, platform typefaces and its bundled FreeType are forbidden.
+set(forbidden_font_backend_patterns
+    "SkFontMgr_New_"
+    "SkFontMgr_Custom"
+    "SkTypeface_Mac"
+    "SkTypeface_FreeType"
+    "SkScalerContext_Mac"
+    "SkScalerContext_FreeType"
+    "FT_Init_FreeType"
+)
+foreach(pattern IN LISTS forbidden_font_backend_patterns)
+    if(symbols MATCHES "${pattern}")
+        message(FATAL_ERROR "Forbidden font backend symbol found: ${pattern}")
+    endif()
+endforeach()
+
+message(STATUS "Skia archive policy passed: PNG-only decoder, no GPU backend implementation, no font backend")
 

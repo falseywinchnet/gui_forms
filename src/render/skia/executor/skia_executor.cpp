@@ -21,11 +21,7 @@
 #include "include/effects/SkGradient.h"
 #include "include/encode/SkPngEncoder.h"
 #if defined(__APPLE__)
-#include "include/core/SkFontMgr.h"
-#include "include/core/SkFontStyle.h"
-#include "include/core/SkStream.h"
-#include "include/core/SkTypeface.h"
-#include "include/ports/SkFontMgr_mac_ct.h"
+#include "core_text_font_bytes.hpp"
 #endif
 
 #include "../../../core/text/composite/text_composite.hpp"
@@ -616,8 +612,6 @@ public:
     // Keyed by ASCII-lowercased family name.
     std::unordered_map<std::string, std::unique_ptr<TextFamily>> families;
 #if defined(__APPLE__)
-    // Locates families nobody registered; only their bytes are used.
-    sk_sp<SkFontMgr> font_manager{SkFontMgr_New_CoreText(nullptr)};
     // Family and bold bit already asked of the host catalog.
     std::unordered_set<std::string> located_requests;
 #endif
@@ -686,24 +680,16 @@ public:
         if (family.empty() || !located_requests.insert(key + (bold ? "\x1f" "1" : "\x1f" "0")).second) {
             return registered(family);
         }
-        const SkFontStyle requested(bold ? SkFontStyle::kBold_Weight : SkFontStyle::kNormal_Weight,
-                                    SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant);
-        const sk_sp<SkTypeface> platform = (*font_manager).matchFamilyStyle(std::string(family).c_str(), requested);
-        if (!platform) return registered(family);
-        int index = 0;
-        const std::unique_ptr<SkStreamAsset> stream = (*platform).openStream(&index);
-        if (!stream || !(*stream).hasLength() || (*stream).getLength() == 0U ||
-            (*stream).getLength() > maximum_font_bytes || index < 0) {
-            return registered(family);
-        }
-        std::vector<std::byte> bytes((*stream).getLength());
-        if ((*stream).read(bytes.data(), bytes.size()) != bytes.size()) return registered(family);
+        std::optional<std::vector<std::byte>> located = core_text_font_bytes(family, bold, maximum_font_bytes);
+        if (!located) return registered(family);
         const std::shared_ptr<const std::vector<std::byte>> owner =
-            std::make_shared<const std::vector<std::byte>>(std::move(bytes));
-        const FreeTypeFace face(library.get(), *owner, index);
+            std::make_shared<const std::vector<std::byte>>(std::move(*located));
+        const FreeTypeFace face(library.get(), *owner, 0);
         if (face.get() == nullptr || !FT_IS_SCALABLE(face.get())) return registered(family);
-        const std::size_t slot = (*platform).fontStyle().weight() >= 600 ? 1U : 0U;
-        install(key, slot, FaceRecord{owner, static_cast<std::uint32_t>(index), face_metrics(face.get())}, true);
+        // The face CoreText chose may not be the requested weight; its own
+        // weight decides the slot.
+        const std::size_t slot = face_weight(face.get()) >= 600 ? 1U : 0U;
+        install(key, slot, FaceRecord{owner, 0U, face_metrics(face.get())}, true);
         return registered(family);
 #else
         static_cast<void>(bold);

@@ -1,6 +1,6 @@
 # ADR-004: One text rasterization engine with identical output on every platform
 
-Status: accepted
+Status: accepted; implemented (phases 1–7, 2026-10-11)
 
 Date: 2026-10-11
 
@@ -109,7 +109,9 @@ Candidate 3, with this profile:
    shared rasterizer.
 6. Windows ordinary text on the shared rasterizer; GDI text (including tooltips)
    and Uniscribe removed.
-7. Skia built without a host font backend.
+7. Skia built without a host font backend (no CoreText, FreeType or font
+   manager in any Skia archive, enforced by the archive policy test); the
+   executor's macOS lookup reads a face's tables through CoreText directly.
 
 A cross-platform identity test, comparing rendered text against checked-in
 hashes on every CI platform, enforces the decision from phase 3 onward.

@@ -256,6 +256,20 @@ shared identity scene (`tests/text_identity_scene.hpp`, Carlito) against the
 same hashes. The Win32 host now requires `GUI_FORMS_ENABLE_HARFBUZZ_TEXT`, which
 defaults on with it, and no longer links `usp10`.
 
+ADR-004 phase 7 builds Skia without any font backend: no CoreText font host,
+no FreeType, no font manager, on macOS, Linux and the MinGW archive. Skia
+draws no text. `SkiaRaster` requires `GUI_FORMS_ENABLE_HARFBUZZ_TEXT`; its
+font registration validates faces through the shared engine alone, and where a
+canvas cannot be composited directly it draws the shared rasterizer's coverage
+as an alpha mask instead of falling back to Skia glyphs. On macOS the C drawing
+API still finds families nobody registered: `core_text_font_bytes` asks
+CoreText for the family (upright, normal width, weight 400 or 700, family name
+mandatory, as Skia's manager did) and rebuilds the matched face as a single
+sfnt from its tables; the face's own OS/2 weight selects the regular or bold
+slot. `gui_forms_skia_archive_policy` rejects font-backend symbols in
+`libskia.a`, and `gui_drawing_skia_tests` checks that Helvetica is located on
+macOS while an absent family falls back to Portsmouth Rapids.
+
 ## GUI.Drawing renderer-free core
 
 `drawing.hpp` defines the drawing substrate independently of the Forms tree. It

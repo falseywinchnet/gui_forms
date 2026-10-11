@@ -2,6 +2,7 @@
 #include "skia_raster.hpp"
 #include "text_identity_scene.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -50,6 +51,49 @@ std::uint64_t draw_case(const std::size_t kind_index, const std::size_t scale_in
     return raster_hash(raster, kind_index, scale_index);
 }
 
+// Paints white, then black text inside the frame (shared compositor) or after
+// end_frame, where the raster has no recorded clips and draws the same
+// coverage as a Skia alpha mask (ADR-004 phase 7: there are no Skia glyphs).
+void draw_white_and_text(render::SkiaRaster& raster, const double scale, const bool inside_frame) {
+    require(raster.resize(text_identity::scene_size, scale), "raster allocated");
+    require(raster.register_typeface_file(FontRole::content, 400, false, GUI_FORMS_TEST_CONTROL_FONT), "font registered");
+    DamageRegion damage{};
+    damage.add({0.0, 0.0, text_identity::scene_size.width, text_identity::scene_size.height});
+    const FontSpec font{FontRole::content, 15, 400, false, 0.0};
+    raster.begin_frame(damage);
+    raster.fill_rect({0.0, 0.0, text_identity::scene_size.width, text_identity::scene_size.height},
+                     Color::rgba(255, 255, 255));
+    if (inside_frame) raster.draw_text_utf8({4.25, 30.0}, "Hamburgefonstiv", font, Color::rgba(0, 0, 0));
+    raster.end_frame();
+    if (!inside_frame) raster.draw_text_utf8({4.25, 30.0}, "Hamburgefonstiv", font, Color::rgba(0, 0, 0));
+}
+
+// The mask path draws the shared rasterizer's coverage, so it differs from
+// the shared compositor only by Skia's blend rounding.
+void check_mask_fallback() {
+    for (const double scale : text_identity::scales) {
+        render::SkiaRaster direct{};
+        render::SkiaRaster masked{};
+        draw_white_and_text(direct, scale, true);
+        draw_white_and_text(masked, scale, false);
+        const std::uint8_t* const expected = static_cast<const std::uint8_t*>(direct.pixels());
+        const std::uint8_t* const observed = static_cast<const std::uint8_t*>(masked.pixels());
+        require(expected != nullptr && observed != nullptr, "rasters readable");
+        int largest = 0;
+        std::size_t ink = 0;
+        for (std::uint32_t row = 0; row < direct.pixel_height(); ++row) {
+            for (std::size_t column = 0; column < static_cast<std::size_t>(direct.pixel_width()) * 4U; ++column) {
+                const std::size_t offset = static_cast<std::size_t>(row) * direct.row_bytes() + column;
+                largest = std::max(largest, std::abs(static_cast<int>(expected[offset]) - static_cast<int>(observed[offset])));
+                if (column % 4U == 0U && observed[offset] < 128U) ++ink;
+            }
+        }
+        std::printf("mask-fallback %.1f max-difference=%d ink=%zu\n", scale, largest, ink);
+        require(ink > 40U, "mask fallback draws the text");
+        require(largest <= 2, "mask fallback matches the shared compositor within blend rounding");
+    }
+}
+
 } // namespace
 
 int main() {
@@ -65,5 +109,6 @@ int main() {
         }
     }
     require(printing || !mismatch, "text output differs from the cross-platform expectation");
+    check_mask_fallback();
     return 0;
 }
