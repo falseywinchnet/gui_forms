@@ -49,7 +49,7 @@ int main() {
 
 Controls are created once with a `StableId`, the tree owns them, mutation is
 imperative, and painting uses accumulated damage bounds. The longer walkthrough is
-in [Your first window](docs/user/first-window.md).
+in [Your first window](https://gui-forms.readthedocs.io/en/latest/user/first-window.html).
 
 ![GUI.Forms Gallery on macOS](docs/images/gallery-macos.png)
 
@@ -82,7 +82,7 @@ compiler-cache archives for CI, not downloads.
 - **Windows** builds are unsigned. SmartScreen shows "More info", then
   "Run anyway".
 
-See [Download](docs/user/download.md) for the full platform notes.
+See [Download](https://gui-forms.readthedocs.io/en/latest/user/download.html) for the full platform notes.
 
 ## Features
 
@@ -111,78 +111,78 @@ Every stock control, grouped by function; the table is generated from
 <!-- controls:start -->
 | Control | Function | Description |
 |---|---|---|
-| `Button` | Commands | Push button with accept/cancel dialog results, default-button state, and four visual policies. |
-| `ButtonBase` |  | Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize. |
-| `CommandBar` |  | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
-| `DropDownButton` |  | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
-| `LinkLabel` |  | Command presented as underlined link text with retained visited state and link semantics. |
-| `TextBox` | Text editing | Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
-| `Label` | Information display | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
-| `PictureBox` |  | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
-| `ProgressBar` |  | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |
-| `ReviewCard` |  | Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws. |
-| `BreadcrumbTrail` | Selection from a list | Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing. |
-| `CheckedListBox` |  | ListBox with an independently retained three-state check model, cancellable pre-change events, and optional check-on-click. |
-| `ChoiceGroup` |  | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
-| `ComboBox` |  | Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup. |
-| `CorrespondenceView` |  | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
-| `ListBox` |  | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
-| `ObjectView` |  | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
-| `TreeView` |  | Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants. |
-| `CheckBox` | Value setting | Two- or three-state selection control with optional automatic cycling, three indicator families, and ordered state events. |
-| `ColorValueEditor` |  | Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion. |
-| `FlagsValueEditor` |  | Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases. |
-| `InstrumentRack` |  | Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement. |
-| `NumericUpDown` |  | Composite numeric editor over an owned TextBox and source-private spin buttons with ordered ranges, bounded step and precision, and decimal or hexadecimal formatting. |
-| `PropertyGrid` |  | Metadata-driven inspector and editor over one or more selected Controls that projects descriptors into a PropertyList. |
-| `PropertyList` |  | Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane. |
-| `RadioButton` |  | Retained checked state with container-scoped named exclusion groups, optional automatic checking, and radio semantics. |
-| `RangeControl` |  | Nonvisual retained authority for ordered bounds, a constrained value, small/large changes, and orientation that TrackBar, ProgressBar, and ScrollBar specialize. |
-| `TrackBar` |  | Slider over RangeControl with bounded tick frequency, absolute pointer positioning, keyboard movement, and slider semantics. |
-| `DateTimePicker` | Date setting | Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation. |
-| `Card` | Grouping | Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement. |
-| `ContainerControl` |  | ScrollableControl with descendant-scoped active-control authority and inherited validation policy. |
-| `ExpandableSections` |  | Stack of captioned sections whose content controls expand and collapse individually or in single-open mode. |
-| `GroupBox` |  | Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics. |
-| `MaterialPanel` |  | Content-agnostic container painted with a SurfaceMaterial. |
-| `Panel` |  | Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics. |
-| `ScaledGroupBox` |  | GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds. |
-| `TabControl` |  | Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics. |
-| `TabPage` |  | Panel surface owned by a TabControl with bounded caption text and page semantics. |
-| `UserControl` |  | Authored-container base that distinguishes current attachment from first committed load and counts attachment epochs. |
-| `CommandOverflowPanel` | Layout | Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer. |
-| `FlowLayoutPanel` |  | Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks. |
-| `MasterDetailView` |  | Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse. |
-| `ResponsiveTrackPanel` |  | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
-| `ScaledPanel` |  | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
-| `SplitContainer` |  | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
-| `SplitterPanel` |  | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
-| `TableLayoutPanel` |  | Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans. |
-| `HScrollBar` | Scrolling | Explicit horizontal ScrollBar leaf type. |
-| `ScrollableControl` |  | Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics. |
-| `ScrollBar` |  | RangeControl with bounded button and thumb geometry, proportional thumb allocation, drag and track interaction, and retained auto-repeat. |
-| `VScrollBar` |  | Explicit vertical ScrollBar leaf type. |
-| `Command` | Menus and commands | Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation. |
-| `ContextMenu` |  | Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands. |
-| `MenuStrip` |  | Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances. |
-| `AnchoredPopupLayer` | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
-| `ToolTip` |  | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
-| `DrawingSurface` | Drawing | Owner-render surface configured through the renderer-neutral Painter vocabulary without a Control subclass. |
-| `LiveSurface` |  | Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one. |
-| `RasterCanvas` |  | Viewport over an owned GUI.Drawing bitmap that handles presentation, coordinate transforms, resource synchronization, and local invalidation. |
-| `EasingPreview` | Diagnostics | Animation and easing conformance surface over an owned AnimationTimeline with configurable tracks and motion policy. |
-| `MetricsView` |  | View over the structured Window metrics snapshot. |
-| `TypographySpecimen` |  | Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status. |
-| `VisualInspectorOverlay` |  | Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing. |
-| `VisualInspectorView` |  | Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics. |
-| `Binding` | Components | Connects one Control property to one BindingSource field with validated conversion, update timing, and error routing. |
-| `BindingContext` |  | Window-scoped weak membership and disposal subscriptions for BindingSources. |
-| `BindingSource` |  | Owns stable rows, currency, edit snapshots, list and error events, and the active Bindings for one Window. |
-| `ErrorProvider` |  | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
-| `HelpProvider` |  | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
-| `ImageList` |  | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
-| `SemanticFeedback` |  | Turns one-shot application transitions into bounded, traceable host cues. |
-| `Timer` |  | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
+| [`Button`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Button.html) | Commands | Push button with accept/cancel dialog results, default-button state, and four visual policies. |
+| [`ButtonBase`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ButtonBase.html) |  | Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize. |
+| [`CommandBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CommandBar.html) |  | Horizontal row of retained item buttons built from a replaceable CommandItem list that raises one group notification per replacement. |
+| [`DropDownButton`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.DropDownButton.html) |  | Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region. |
+| [`LinkLabel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.LinkLabel.html) |  | Command presented as underlined link text with retained visited state and link semantics. |
+| [`TextBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TextBox.html) | Text editing | Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events. |
+| [`Label`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Label.html) | Information display | Noninteractive text primitive with inherited typography roles, alignment, word wrapping, a bounded line count, and mnemonics. |
+| [`PictureBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.PictureBox.html) |  | Noninteractive image presenter over Window-owned generational image resources with the five PictureBoxSizeMode policies and bounded opacity. |
+| [`ProgressBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ProgressBar.html) |  | Noninteractive range visualization with continuous, segmented, and marquee modes whose motion follows the Window frame scheduler and reduced-motion policy. |
+| [`ReviewCard`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ReviewCard.html) |  | Typed review projection over Card that owns title, body, and verdict labels and projects pending/rejected state through ordinary Card laws. |
+| [`BreadcrumbTrail`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.BreadcrumbTrail.html) | Selection from a list | Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing. |
+| [`CheckedListBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CheckedListBox.html) |  | ListBox with an independently retained three-state check model, cancellable pre-change events, and optional check-on-click. |
+| [`ChoiceGroup`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ChoiceGroup.html) |  | Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value. |
+| [`ComboBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ComboBox.html) |  | Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup. |
+| [`CorrespondenceView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CorrespondenceView.html) |  | Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item. |
+| [`ListBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ListBox.html) |  | Virtual-row selector with single, multi-simple, and multi-extended selection policies, stable item identities, and scroll-window projection. |
+| [`ObjectView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ObjectView.html) |  | Stable-ID virtual object collection with icon and details projections that owns no per-item controls. |
+| [`TreeView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TreeView.html) |  | Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants. |
+| [`CheckBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CheckBox.html) | Value setting | Two- or three-state selection control with optional automatic cycling, three indicator families, and ordered state events. |
+| [`ColorValueEditor`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ColorValueEditor.html) |  | Compound editor that delegates editing to a real TextBox and adds a checker-backed swatch with canonical #RRGGBBAA conversion. |
+| [`FlagsValueEditor`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FlagsValueEditor.html) |  | Compact editor for independent-bit enumeration values that opens a real CheckedListBox popup under Window popup and focus-scope leases. |
+| [`InstrumentRack`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.InstrumentRack.html) |  | Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement. |
+| [`NumericUpDown`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.NumericUpDown.html) |  | Composite numeric editor over an owned TextBox and source-private spin buttons with ordered ranges, bounded step and precision, and decimal or hexadecimal formatting. |
+| [`PropertyGrid`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.PropertyGrid.html) |  | Metadata-driven inspector and editor over one or more selected Controls that projects descriptors into a PropertyList. |
+| [`PropertyList`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.PropertyList.html) |  | Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane. |
+| [`RadioButton`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RadioButton.html) |  | Retained checked state with container-scoped named exclusion groups, optional automatic checking, and radio semantics. |
+| [`RangeControl`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RangeControl.html) |  | Nonvisual retained authority for ordered bounds, a constrained value, small/large changes, and orientation that TrackBar, ProgressBar, and ScrollBar specialize. |
+| [`TrackBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TrackBar.html) |  | Slider over RangeControl with bounded tick frequency, absolute pointer positioning, keyboard movement, and slider semantics. |
+| [`DateTimePicker`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.DateTimePicker.html) | Date setting | Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation. |
+| [`Card`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Card.html) | Grouping | Header/body/footer composition that owns each installed section as an ordinary visual child and returns the detached predecessor on replacement. |
+| [`ContainerControl`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ContainerControl.html) |  | ScrollableControl with descendant-scoped active-control authority and inherited validation policy. |
+| [`ExpandableSections`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ExpandableSections.html) |  | Stack of captioned sections whose content controls expand and collapse individually or in single-open mode. |
+| [`GroupBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.GroupBox.html) |  | Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics. |
+| [`MaterialPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.MaterialPanel.html) |  | Content-agnostic container painted with a SurfaceMaterial. |
+| [`Panel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Panel.html) |  | Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics. |
+| [`ScaledGroupBox`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ScaledGroupBox.html) |  | GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds. |
+| [`TabControl`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TabControl.html) |  | Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics. |
+| [`TabPage`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TabPage.html) |  | Panel surface owned by a TabControl with bounded caption text and page semantics. |
+| [`UserControl`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.UserControl.html) |  | Authored-container base that distinguishes current attachment from first committed load and counts attachment epochs. |
+| [`CommandOverflowPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.CommandOverflowPanel.html) | Layout | Horizontal command-group container that owns only layout collapse and the overflow actuator's availability while command authority stays with the consumer. |
+| [`FlowLayoutPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.FlowLayoutPanel.html) |  | Directional packing container with four flow directions, optional wrapping, bounded spacing, per-child margins, and stable flow breaks. |
+| [`MasterDetailView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.MasterDetailView.html) |  | Content-agnostic master/detail shell with responsive presentation, a draggable and keyboard-operable splitter, and focus transfer on collapse. |
+| [`ResponsiveTrackPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ResponsiveTrackPanel.html) |  | Track-based container that places each child in one authored track and collapses tracks as an effective-layout state without changing author visibility. |
+| [`ScaledPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ScaledPanel.html) |  | Panel that maps caller-authored design-space child rectangles into the current content bounds while retaining slot identity independently of child order. |
+| [`SplitContainer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SplitContainer.html) |  | Two-pane allocation container with bounded splitter distance, fixed-pane resize preservation, pointer and keyboard seam input, and collapse. |
+| [`SplitterPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SplitterPanel.html) |  | Allocated pane surface owned by SplitContainer that paints its own background from committed bounds. |
+| [`TableLayoutPanel`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TableLayoutPanel.html) |  | Grid container with bounded rows and columns, absolute/percent/auto tracks, explicit or automatic placement, and row/column spans. |
+| [`HScrollBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.HScrollBar.html) | Scrolling | Explicit horizontal ScrollBar leaf type. |
+| [`ScrollableControl`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ScrollableControl.html) |  | Retained scrolling state machine with overflow discovery, viewport rectangles, two axis policies, wheel/track/thumb interaction, and virtual scrollbar semantics. |
+| [`ScrollBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ScrollBar.html) |  | RangeControl with bounded button and thumb geometry, proportional thumb allocation, drag and track interaction, and retained auto-repeat. |
+| [`VScrollBar`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.VScrollBar.html) |  | Explicit vertical ScrollBar leaf type. |
+| [`Command`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Command.html) | Menus and commands | Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation. |
+| [`ContextMenu`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ContextMenu.html) |  | Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands. |
+| [`MenuStrip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.MenuStrip.html) |  | Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances. |
+| [`AnchoredPopupLayer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.AnchoredPopupLayer.html) | Dialogs and popups | Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests. |
+| [`ToolTip`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ToolTip.html) |  | Nonvisual provider that maps Controls to tooltip text and presents a retained, input-transparent overlay owned by each target. |
+| [`DrawingSurface`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.DrawingSurface.html) | Drawing | Owner-render surface configured through the renderer-neutral Painter vocabulary without a Control subclass. |
+| [`LiveSurface`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.LiveSurface.html) |  | Latest-frame surface where a producer publishes complete frame candidates and painters acquire only the newest immutable one. |
+| [`RasterCanvas`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.RasterCanvas.html) |  | Viewport over an owned GUI.Drawing bitmap that handles presentation, coordinate transforms, resource synchronization, and local invalidation. |
+| [`EasingPreview`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.EasingPreview.html) | Diagnostics | Animation and easing conformance surface over an owned AnimationTimeline with configurable tracks and motion policy. |
+| [`MetricsView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.MetricsView.html) |  | View over the structured Window metrics snapshot. |
+| [`TypographySpecimen`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.TypographySpecimen.html) |  | Typography review control that draws one committed text run with its logical line box, resolved baseline, and provider status. |
+| [`VisualInspectorOverlay`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.VisualInspectorOverlay.html) |  | Transparent companion overlay that draws a target's arranged, visual, and effective clipped bounds without altering hit testing. |
+| [`VisualInspectorView`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.VisualInspectorView.html) |  | Presentation of the Window visual-inspection snapshot for demoboards and local diagnostics. |
+| [`Binding`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Binding.html) | Components | Connects one Control property to one BindingSource field with validated conversion, update timing, and error routing. |
+| [`BindingContext`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.BindingContext.html) |  | Window-scoped weak membership and disposal subscriptions for BindingSources. |
+| [`BindingSource`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.BindingSource.html) |  | Owns stable rows, currency, edit snapshots, list and error events, and the active Bindings for one Window. |
+| [`ErrorProvider`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ErrorProvider.html) |  | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
+| [`HelpProvider`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.HelpProvider.html) |  | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
+| [`ImageList`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ImageList.html) |  | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
+| [`SemanticFeedback`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SemanticFeedback.html) |  | Turns one-shot application transitions into bounded, traceable host cues. |
+| [`Timer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Timer.html) |  | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
 <!-- controls:end -->
 
 ## Supported platforms
@@ -202,7 +202,7 @@ platform specific.
 Prerequisites: CMake 3.25+, Ninja, LLVM 22.1 (selected by
 [`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. Native builds
 require an explicit `sh third_party/fetch_text_stack.sh` before configuration.
-Follow [Install](docs/user/install.md) for the platform-specific renderer,
+Follow [Install](https://gui-forms.readthedocs.io/en/latest/user/install.html) for the platform-specific renderer,
 host and dependency preparation. CI publishes a compiler cache;
 see [docs/COMPILER_CACHE.md](docs/COMPILER_CACHE.md).
 
@@ -226,7 +226,7 @@ After configuring a native build as described in Install, run the Gallery:
   `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`
 
 Per-platform toolchain setup and every build option are in
-[Build from source](docs/building/index.md).
+[Build from source](https://gui-forms.readthedocs.io/en/latest/building/index.html).
 
 ## Consume the SDK
 
@@ -243,17 +243,17 @@ Install with `cmake --install build`, then configure your project with
 `-DCMAKE_PREFIX_PATH=<prefix>` and the same toolchain file. Never link
 `GUIForms::Core` or `GUIForms::Controls` into a program that links
 `GUIForms::Application`; CMake rejects the combination. Details and runtime
-files to ship: [Consume the SDK](docs/user/consume-the-sdk.md).
+files to ship: [Consume the SDK](https://gui-forms.readthedocs.io/en/latest/user/consume-the-sdk.html).
 `examples/reference/` is a complete consumer built against the installed SDK
 in CI.
 
 ## Documentation
 
 - [gui-forms.readthedocs.io](https://gui-forms.readthedocs.io/): the rendered
-  site, built from [`docs/index.md`](docs/index.md).
-- [Controls by function](docs/controls/generated/by-function.md): every stock
+  site, built from [`docs/`](docs/).
+- [Controls by function](https://gui-forms.readthedocs.io/en/latest/controls/generated/by-function.html): every stock
   control, its WinForms counterpart and a one-line description.
-- [API reference](docs/api/index.rst): every public type, member and
+- [API reference](https://gui-forms.readthedocs.io/en/latest/api/index.html): every public type, member and
   enumeration, generated from the headers.
 - [`decisions/`](decisions/): architecture decision records.
 - [`planning/`](planning/): internal plans and working notes, kept as records

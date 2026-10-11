@@ -1,12 +1,15 @@
 """Sphinx configuration for the GUI.Forms documentation site.
 
-The site is Markdown (MyST) rendered with the Furo theme and is built with
+The site is Markdown (MyST) and reStructuredText rendered with the PyData Sphinx
+Theme, in the layout of the NumPy documentation, and is built with
 ``sphinx-build -W`` locally, in CI and on Read the Docs, so every warning is
 an error. See ``docs/README.md`` for maintainer notes.
 """
 
 from __future__ import annotations
 
+import html
+import os
 import re
 from pathlib import Path
 
@@ -127,3 +130,99 @@ html_sidebars = {
 }
 copybutton_prompt_text = r"\$ "
 copybutton_prompt_is_regexp = True
+
+# Pages that moved when the site took the NumPy layout (2026-10-11). Each old
+# address keeps a small page that forwards to the new one, so bookmarks and
+# links into the previous layout still arrive. Keys and values are docnames.
+USER_GUIDE_PAGES: tuple[str, ...] = (
+    "retained-tree",
+    "update-scopes-and-dirtiness",
+    "layout",
+    "painting-and-damage",
+    "text-engine",
+    "input-and-focus",
+    "threading",
+    "lifecycle",
+    "hosts-and-capabilities",
+)
+LIBRARY_AREAS: tuple[str, ...] = (
+    "animation-and-threading",
+    "application-and-hosts",
+    "audio",
+    "c-abi",
+    "control-and-component",
+    "data-binding",
+    "drawing",
+    "events-values-and-commands",
+    "geometry-and-appearance",
+    "images-and-resources",
+    "input-and-semantics",
+    "text",
+    "window",
+)
+CONTROL_CATEGORIES: tuple[str, ...] = (
+    "commands",
+    "components",
+    "date-setting",
+    "diagnostics",
+    "dialogs-and-popups",
+    "drawing",
+    "grouping",
+    "information-display",
+    "layout",
+    "menus-and-commands",
+    "scrolling",
+    "selection-from-a-list",
+    "text-editing",
+    "value-setting",
+)
+DECISION_RECORDS: tuple[str, ...] = ("001", "002", "003", "004", "006", "013", "014")
+MOVED_PAGES: dict[str, str] = {
+    "start/install": "user/install",
+    "start/consume-the-sdk": "user/consume-the-sdk",
+    "start/first-window": "user/first-window",
+    "start/download": "user/download",
+    "start/build-from-source": "building/index",
+    "controls/index": "user/controls",
+    "project/decisions": "dev/decisions",
+    "project/roadmap": "dev/roadmap",
+    "project/contributing": "dev/contributing",
+    "project/evidence": "dev/evidence",
+    **{f"concepts/{page}": f"user/{page}" for page in USER_GUIDE_PAGES},
+    **{f"api/{area}": f"api/library.{area}" for area in LIBRARY_AREAS},
+    **{f"api/{category}-controls": f"api/controls.{category}" for category in CONTROL_CATEGORIES},
+    **{f"project/adr/ADR-{number}": f"dev/adr/ADR-{number}" for number in DECISION_RECORDS},
+}
+
+REDIRECT_PAGE: str = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="0; url={target}">
+<title>Page moved</title>
+<script>location.replace("{target}" + location.hash);</script>
+</head>
+<body><p>This page has moved to <a href="{target}">{target}</a>.</p></body>
+</html>
+"""
+
+
+def write_moved_pages(app, exception) -> None:
+    """Write a forwarding page at each old address after a successful HTML build."""
+    if exception is not None or app.builder.name != "html":
+        return
+    output: Path = Path(app.outdir)
+    for old, new in MOVED_PAGES.items():
+        if old in app.env.all_docs:
+            raise ValueError(f"moved page {old} is still a page of the site")
+        if new not in app.env.all_docs:
+            raise ValueError(f"moved page {old} forwards to {new}, which is not a page")
+        source: Path = output / f"{old}.html"
+        target: str = Path(os.path.relpath(output / f"{new}.html", source.parent)).as_posix()
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_text(REDIRECT_PAGE.format(target=html.escape(target)), encoding="utf-8")
+
+
+def setup(app) -> None:
+    app.connect("build-finished", write_moved_pages)

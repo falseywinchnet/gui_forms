@@ -25,7 +25,7 @@ import re
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT: Path = Path(__file__).resolve().parent.parent
 REGISTRY_PATH: Path = ROOT / "manifests" / "controls.json"
@@ -34,6 +34,8 @@ HEADER_ROOT: Path = INCLUDE_ROOT / "gui_forms"
 GENERATED_DIR: Path = ROOT / "docs" / "controls" / "generated"
 BY_FUNCTION_NAME: str = "by-function.md"
 ALPHABETICAL_NAME: str = "alphabetical.md"
+# The published documentation site; the README links each control to its page there.
+SITE_URL: str = "https://gui-forms.readthedocs.io/en/latest/"
 README_START: str = "<!-- controls:start -->"
 README_END: str = "<!-- controls:end -->"
 GALLERY_CATALOG_PATH: Path = ROOT / "demo" / "gallery_catalog.inc"
@@ -369,6 +371,17 @@ def _code(text: str) -> str:
     return f"`{text}`"
 
 
+def _page_link(record: ControlRecord) -> str:
+    """The control's name linked to its reference page, relative to docs/controls/generated/."""
+    return f"[`{record.type}`](../../{record.doc})"
+
+
+def _site_link(record: ControlRecord) -> str:
+    """The control's name linked to its reference page on the published site."""
+    page: str = PurePosixPath(record.doc).with_suffix(".html").as_posix()
+    return f"[`{record.type}`]({SITE_URL}{page})"
+
+
 def _table(headers: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
     lines: list[str] = ["| " + " | ".join(headers) + " |", "|" + "|".join("---" for _ in headers) + "|"]
     for row in rows:
@@ -380,7 +393,7 @@ def render_by_function(registry: Registry) -> str:
     rows: list[Sequence[str]] = []
     for category, members in registry.by_category().items():
         for position, record in enumerate(members):
-            rows.append((category if position == 0 else "", _code(record.type), record.winforms, record.purpose))
+            rows.append((category if position == 0 else "", _page_link(record), record.winforms, record.purpose))
     lines: list[str] = [
         "# Controls by function",
         "",
@@ -395,7 +408,7 @@ def render_by_function(registry: Registry) -> str:
 def render_alphabetical(registry: Registry) -> str:
     ordered: list[ControlRecord] = sorted(registry.records, key=lambda record: record.type.lower())
     rows: list[Sequence[str]] = [
-        (_code(record.type), record.category, _code(record.header), record.status, record.purpose) for record in ordered
+        (_page_link(record), record.category, _code(record.header), record.status, record.purpose) for record in ordered
     ]
     lines: list[str] = [
         "# Controls, alphabetical",
@@ -412,7 +425,7 @@ def render_readme_table(registry: Registry) -> str:
     rows: list[Sequence[str]] = []
     for category, members in registry.by_category().items():
         for position, record in enumerate(members):
-            rows.append((_code(record.type), category if position == 0 else "", record.purpose))
+            rows.append((_site_link(record), category if position == 0 else "", record.purpose))
     return "\n".join(_table(("Control", "Function", "Description"), rows)) + "\n"
 
 
