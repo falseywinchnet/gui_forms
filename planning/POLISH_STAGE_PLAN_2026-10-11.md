@@ -240,6 +240,30 @@ and Outlaw, built from `demo/` and only public seams.
    the instrumentation snapshot (the "diagnostics panel" the proving slice
    already requires), so a download is self-describing.
 
+### W5.7. Gallery pages onto the current authoring (open; next branch)
+
+Status after the 2026-10-11 rework: the Gallery shell is registry-driven,
+but its sixteen migrated pages are the Showcase bodies unchanged: 62 raw
+subscribe/connect calls, no `gf::on`, no `Value<T>`, no `Command`, and none
+of ChoiceGroup, CommandBar, ExpandableSections, DropDownButton or
+BreadcrumbTrail. Twenty-nine registry records have no page (DropDownButton,
+CommandBar, ReviewCard, TreeView, ObjectView, CorrespondenceView,
+ChoiceGroup, BreadcrumbTrail, ColorValueEditor, FlagsValueEditor,
+PropertyList, InstrumentRack, GroupBox, Card, ExpandableSections,
+ResponsiveTrackPanel, CommandOverflowPanel, MasterDetailView,
+ScrollableControl, MenuStrip, ContextMenu, Command, AnchoredPopupLayer,
+LiveSurface, TypographySpecimen, VisualInspectorView,
+VisualInspectorOverlay, SemanticFeedback, BindingContext). Correspondence is
+the only program written on the current authoring (owned `on(...)`
+subscriptions, Commands, CommandBar).
+
+Work, one page per commit, built and tested on the M4 through `m4build`:
+rewrite each page body on `gf::on`, `Value<T>` and `Command` as
+`docs/CONCISE_STATE_AND_COLLECTIONS.md` describes; add a page for every
+record above (grouped by registry category) so `gallery_page` is non-null
+for all 72; keep `tests/gallery_pages_tests.cpp` green per page; regenerate
+the catalog, tables and README after each batch.
+
 ### W6. Release pipeline
 
 1. **Keep cache publications here; prune and label.** App releases use
