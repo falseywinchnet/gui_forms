@@ -15,16 +15,26 @@ void test_ranges_and_progress(gui_forms::Window& window) {
         window.find("gallery.ranges.scroll.horizontal"));
     std::shared_ptr<gui_forms::VScrollBar> vertical_scroll = std::dynamic_pointer_cast<VScrollBar>(
         window.find("gallery.ranges.scroll.vertical"));
-    require(slider && progress && horizontal_scroll && vertical_scroll,
+    const std::shared_ptr<gui_forms::Label> shared = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.ranges.shared"));
+    require(slider && progress && horizontal_scroll && vertical_scroll && shared,
             "range proving controls must retain public slider, progress, and scrollbar types");
+    require((*slider).value() == 52.0 && (*progress).value() == 52.0 &&
+                (*horizontal_scroll).value() == 52.0 && (*vertical_scroll).value() == 52.0 &&
+                (*shared).text().find("level = 52") != std::string::npos,
+            "every range control must start from the one bound Value<double>");
     const Rect track = (*slider).absolute_bounds();
     const Point from{track.x + track.width * 0.2, track.y + track.height * 0.5};
     const Point to{track.x + track.width * 0.82, track.y + track.height * 0.5};
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, from}) &&
                 window.dispatch_pointer({PointerAction::move, PointerButton::none, to}) &&
                 window.dispatch_pointer({PointerAction::up, PointerButton::primary, to}) &&
-                (*slider).value() > 75.0 && (*progress).value() == (*slider).value(),
-            "gallery TrackBar drag must update linked ProgressBar continuously");
+                (*slider).value() > 75.0 && (*progress).value() == (*slider).value() &&
+                (*horizontal_scroll).value() == (*slider).value() &&
+                (*vertical_scroll).value() == (*slider).value(),
+            "gallery TrackBar drag must move every control bound to the shared Value");
+    require((*shared).text().find("last input: Filled rail") != std::string::npos,
+            "the input-only scroll event must name the control the user dragged");
     const Rect scroll_bounds = (*horizontal_scroll).absolute_bounds();
     const Rect scroll_thumb = (*horizontal_scroll).thumb_bounds();
     const Point scroll_from{scroll_bounds.x + scroll_thumb.x + scroll_thumb.width * 0.5,
@@ -39,8 +49,18 @@ void test_ranges_and_progress(gui_forms::Window& window) {
                 window.dispatch_pointer({PointerAction::up, PointerButton::primary,
                                          scroll_to}) &&
                 (*horizontal_scroll).value() > 95.0 &&
-                (*vertical_scroll).value() == (*horizontal_scroll).value(),
-            "gallery ScrollBar drag must track continuously and synchronize orientations");
+                (*vertical_scroll).value() == (*horizontal_scroll).value() &&
+                (*slider).value() == (*horizontal_scroll).value(),
+            "gallery ScrollBar drag must track continuously and move the bound slider");
+    require((*shared).text().find("horizontal ScrollBar") != std::string::npos,
+            "the status must report the scrollbar as the last input source");
+    // A programmatic state change reaches every bound control and the state
+    // observer, but synthesizes no input event.
+    (*progress).set_value(40.0);
+    require((*slider).value() == 40.0 && (*vertical_scroll).value() == 40.0 &&
+                (*shared).text().find("level = 40") != std::string::npos &&
+                (*shared).text().find("horizontal ScrollBar") != std::string::npos,
+            "a programmatic set_value must propagate through the Value without a new input report");
 
     // Reproduce the reported interaction family without depending on wall
     // clock luck: mutate a captured slider continuously, release it, replace

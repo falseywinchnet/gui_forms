@@ -57,7 +57,7 @@ void test_dates_and_calendar(gui_forms::Window& window) {
                 (*spinner).value().day == 6U,
             "date spinner must step its civil value through keyboard input");
 
-    click(window, window.find("gallery.date.open"));
+    click(window, window.find("gallery.date.commands.item.3"));
     require((*primary).dropped_down() && window.focus_scope_depth() == 1U &&
                 window.find("gallery.date.primary.popup.calendar") &&
                 window.semantic_snapshot().to_json().find(
@@ -70,13 +70,33 @@ void test_dates_and_calendar(gui_forms::Window& window) {
                 !(*primary).dropped_down() && window.focus_scope_depth() == 0U,
             "semantic date-cell commit must share pointer commit and restore focus");
 
-    click(window, window.find("gallery.date.open"));
+    click(window, window.find("gallery.date.commands.item.3"));
+    const std::shared_ptr<gui_forms::CommandBar> commands = std::dynamic_pointer_cast<CommandBar>(
+        window.find("gallery.date.commands"));
+    require(commands && (*commands).items().size() == 3U && !(*commands).item(2).enabled(),
+            "the open-calendar Command must disable its button while the calendar is open");
     require(window.dispatch_key({KeyAction::down, PhysicalKey::left}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::escape}) &&
-                (*primary).value().day == 12U && !(*primary).dropped_down(),
+                (*primary).value().day == 12U && !(*primary).dropped_down() &&
+                (*commands).item(2).enabled(),
             "calendar Escape must discard popup-local navigation without mutation");
 
-    click(window, window.find("gallery.date.open"));
+    // The previous/next Commands follow the bounded range; their buttons
+    // project that enabled state and clicking one moves the date once.
+    (*primary).set_value({2026, 8U, 31U});
+    require(!(*commands).item(1).enabled() && (*commands).item(0).enabled(),
+            "the next-day Command must disable at the range maximum");
+    click(window, window.find("gallery.date.commands.item.1"));
+    require((*primary).value().day == 30U && (*commands).item(1).enabled() &&
+                (*std::dynamic_pointer_cast<Label>(window.find("gallery.date.status")))
+                        .text().find("Committed") != std::string::npos,
+            "the previous-day Command must move the bounded date and re-enable next day");
+    (*primary).set_value({2026, 8U, 1U});
+    require(!(*commands).item(0).enabled() && (*commands).item(1).enabled(),
+            "the previous-day Command must disable at the range minimum");
+    (*primary).set_value({2026, 8U, 12U});
+
+    click(window, window.find("gallery.date.commands.item.3"));
     (*window.find("gallery.surface.dates-and-calendar")).set_visible(false);
     require(!(*primary).dropped_down() && window.focus_scope_depth() == 0U &&
                 !window.find("gallery.date.primary.popup.calendar"),

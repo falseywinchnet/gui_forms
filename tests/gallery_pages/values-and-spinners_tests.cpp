@@ -48,24 +48,31 @@ void test_values_and_spinners_binding(gui_forms::Window& window) {
             "gallery PropertyGrid numeric factory must commit through the inspected NumericUpDown's registered Value property");
     const std::shared_ptr<gui_forms::ComboBox> items_target = std::dynamic_pointer_cast<ComboBox>(
         window.find("gallery.values.items-target"));
-    click(window, window.find("gallery.values.inspect-items"));
+    const std::shared_ptr<gui_forms::CommandBar> inspector_commands =
+        std::dynamic_pointer_cast<CommandBar>(
+            window.find("gallery.values.inspector-commands"));
+    require(inspector_commands && (*inspector_commands).items().size() == 4U &&
+                (*inspector_commands).items()[1].command != nullptr &&
+                (*inspector_commands).item(1).enabled(),
+            "gallery inspector actions must be application Commands shown through one CommandBar");
+    click(window, window.find("gallery.values.inspector-commands.item.2"));
     require(items_target && (*property_grid).selected_object() == items_target &&
                 (*property_grid).property_expanded("Items") == true &&
                 (*std::dynamic_pointer_cast<TextBox>(
                     (*property_grid).editor("Items[1]"))).text() == "FM",
             "gallery must expose the stock ComboBox.Items collection through the same recursive PropertyGrid");
-    click(window, window.find("gallery.values.add-item"));
+    click(window, window.find("gallery.values.inspector-commands.item.4"));
     require((*items_target).items().size() == 4U &&
                 (*items_target).items().back() == "CW" &&
                 (*std::dynamic_pointer_cast<TextBox>(
                     (*property_grid).editor("Items[3]"))).text() == "CW",
             "gallery collection command must mutate the real stock Items property rather than a local display model");
-    click(window, window.find("gallery.values.inspect-numeric"));
+    click(window, window.find("gallery.values.inspector-commands.item.1"));
     require((*property_grid).selected_object() == inspected_numeric,
             "gallery inspector target switching must restore the stock numeric specimen without stale collection rows");
     const std::shared_ptr<gui_forms::Label> inspection_status = std::dynamic_pointer_cast<Label>(
         window.find("gallery.values.status"));
-    click(window, window.find("gallery.values.inspect-style"));
+    click(window, window.find("gallery.values.inspector-commands.item.3"));
     const std::shared_ptr<gui_forms::ColorValueEditor> color_editor = std::dynamic_pointer_cast<ColorValueEditor>(
         (*property_grid).editor("ForeColor"));
     const std::shared_ptr<gui_forms::FlagsValueEditor> flags_editor = std::dynamic_pointer_cast<FlagsValueEditor>(
