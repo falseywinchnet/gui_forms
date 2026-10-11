@@ -11,12 +11,6 @@
 namespace gui_forms::gallery {
 namespace {
 
-[[nodiscard]] bool is_category(std::string_view id) noexcept
-{
-    return id == "gallery.category.basics" || id == "gallery.category.values" ||
-           id == "gallery.category.collections" || id == "gallery.category.instrument";
-}
-
 [[nodiscard]] bool is_collection_row(std::string_view id) noexcept
 {
     return id == "gallery.collection.alpha" || id == "gallery.collection.beta" ||
@@ -59,8 +53,6 @@ bool GalleryModel::activate(std::string_view stable_id)
     } else if (stable_id == "gallery.radio.quiet") {
         changed = state_.style_mode != StyleMode::quiet_relief;
         state_.style_mode = StyleMode::quiet_relief;
-    } else if (is_category(stable_id)) {
-        changed = select_category(stable_id);
     } else if (is_collection_row(stable_id)) {
         changed = select_collection_row(stable_id);
     } else {
@@ -68,7 +60,7 @@ bool GalleryModel::activate(std::string_view stable_id)
     }
 
     ++state_.activations;
-    if (changed && !is_category(stable_id) && !is_collection_row(stable_id)) {
+    if (changed && !is_collection_row(stable_id)) {
         note_change();
     }
     return true;
@@ -102,13 +94,12 @@ bool GalleryModel::set_slider_value(double value)
     return true;
 }
 
-bool GalleryModel::select_category(std::string_view stable_id)
+bool GalleryModel::select_page(std::string_view page_id)
 {
-    if (!is_category(stable_id) || dml::find(stable_id) == nullptr ||
-        state_.selected_category == stable_id) {
+    if (page_id.empty() || state_.selected_page == page_id) {
         return false;
     }
-    state_.selected_category.assign(stable_id);
+    state_.selected_page.assign(page_id);
     note_change();
     return true;
 }
@@ -128,9 +119,11 @@ void GalleryModel::reset()
 {
     const std::uint64_t next_revision = state_.revision + 1U;
     const std::uint64_t activation_count = state_.activations;
+    std::string selected_page = std::move(state_.selected_page);
     state_ = GalleryState {};
     state_.revision = next_revision;
     state_.activations = activation_count;
+    state_.selected_page = std::move(selected_page);
 }
 
 void GalleryModel::note_change() noexcept

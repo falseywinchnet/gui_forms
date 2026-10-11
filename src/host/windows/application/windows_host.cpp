@@ -24,6 +24,8 @@
 #include "gui_forms/detail/bound_member_function.hpp"
 
 #include "../paint_endpoint/windows_compatibility_paint_endpoint_metrics.hpp"
+#include "../../../core/host/frame_capture/frame_capture.hpp"
+#include "../../../core/image/png_writer.hpp"
 
 #include <windows.h>
 #include <windowsx.h>
@@ -49,6 +51,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -974,6 +977,34 @@ public:
                         written == pixel_bytes;
         CloseHandle(output);
         return ok;
+    }
+
+    // Encodes the presented front pixels as an opaque PNG through the
+    // renderer-neutral core writer. The DIB is 32-bit BGRX whose alpha byte
+    // GDI leaves undefined, so the alpha channel is deliberately dropped.
+    [[nodiscard]] bool encode_png(std::vector<std::byte>& output) const {
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const detail::DibFrontView front = frames_.front();
+        const std::uint32_t* saved_pixels = front.pixels.data();
+        const int saved_width = front.width;
+        const int saved_height = front.height;
+#else
+        const std::uint32_t* saved_pixels = pixels_;
+        const int saved_width = width_;
+        const int saved_height = height_;
+#endif
+        output.clear();
+        if (saved_pixels == nullptr || saved_width <= 0 || saved_height <= 0) return false;
+        gui_forms::image::PngEncodeInput input;
+        input.width = static_cast<std::uint32_t>(saved_width);
+        input.height = static_cast<std::uint32_t>(saved_height);
+        input.row_bytes = static_cast<std::uint64_t>(saved_width) * 4U;
+        input.pixels = std::span<const std::byte>(
+            reinterpret_cast<const std::byte*>(saved_pixels),
+            static_cast<std::size_t>(saved_width) * static_cast<std::size_t>(saved_height) * 4U);
+        input.order = gui_forms::image::PngChannelOrder::bgra;
+        input.opaque = true;
+        return gui_forms::image::encode_png(input, output);
     }
 
     void save() override { states_.push_back(state()); }
@@ -2806,6 +2837,24 @@ private:
         resize();
     }
 
+    // Portable frame capture (capture_path host option): runs once, after the
+    // first presented frame whose update rectangle covers the whole client
+    // area, then requests close through the ordinary WM_CLOSE path.
+    void complete_frame_capture_if_due(const RECT& painted) {
+        if (frame_capture_completed_ || options_.capture_path.empty() || hwnd_ == nullptr) return;
+        RECT client{};
+        if (!GetClientRect(hwnd_, &client) || client.right <= client.left ||
+            client.bottom <= client.top) return;
+        if (painted.left > client.left || painted.top > client.top ||
+            painted.right < client.right || painted.bottom < client.bottom) return;
+        frame_capture_completed_ = true;
+        std::vector<std::byte> encoded;
+        if (!raster_.encode_png(encoded)) encoded.clear();
+        frame_capture_saved_ = detail::complete_frame_capture(options_.capture_path, encoded);
+        PostMessageW(hwnd_, WM_CLOSE, 0, 0);
+    }
+    [[nodiscard]] bool frame_capture_saved() const noexcept { return frame_capture_saved_; }
+
     void collect_damage() {
         static_cast<void>((*model_).poll_frame_schedule(FrameClock::now()));
         accessibility_.notify(scale_);
@@ -2958,7 +3007,10 @@ private:
                 acknowledged = (*model_).notify_presented(*receipt,
                     static_cast<std::uint64_t>(elapsed.count()));
             }
-            if (acknowledged) pending_damage_.clear();
+            if (acknowledged) {
+                pending_damage_.clear();
+                complete_frame_capture_if_due(paint_state.rcPaint);
+            }
         }
         if (!presented) {
             // One exposure-only recovery pass; retain damage until a later
@@ -2991,6 +3043,7 @@ private:
             (*model_).notify_presented(*receipt,
                                      static_cast<std::uint64_t>(elapsed.count()))) {
             pending_damage_.clear();
+            complete_frame_capture_if_due(paint_state.rcPaint);
         }
         collect_damage();
 #endif
@@ -3454,6 +3507,8 @@ private:
     bool in_size_move_{};
     std::shared_ptr<TitleCallbackState> title_state_{std::make_shared<TitleCallbackState>()};
     bool closed_{};
+    bool frame_capture_completed_{};
+    bool frame_capture_saved_{};
     NativePhase native_phase_{NativePhase::creating};
     TooltipPopup tooltip_;
 };
@@ -3504,6 +3559,7 @@ HostCapabilities windows_capabilities() {
     return {HostCapabilities::current_protocol_version,
             "win32-dib",
             HostCapability::lifecycle |
+                HostCapability::frame_capture |
                 HostCapability::scale_notifications |
                 HostCapability::scheduled_wake |
                 HostCapability::pointer_input |
@@ -3541,8 +3597,10 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     const DWORD style = options.popup_window ? (WS_POPUP | WS_BORDER) :
         (options.minimizable ? WS_OVERLAPPEDWINDOW : (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
     const double initial_scale = query_scale(nullptr);
-    RECT frame{0, 0, static_cast<LONG>(std::ceil(options.initial_size.width * initial_scale)),
-               static_cast<LONG>(std::ceil(options.initial_size.height * initial_scale))};
+    const Size initial_size = options.capture_size.has_value()
+        ? *options.capture_size : options.initial_size;
+    RECT frame{0, 0, static_cast<LONG>(std::ceil(initial_size.width * initial_scale)),
+               static_cast<LONG>(std::ceil(initial_size.height * initial_scale))};
     adjust_client_frame(frame, style, 0, initial_scale);
     const std::wstring title = wide_from_utf8(options.title);
     const int initial_x = options.popup_window
@@ -3627,6 +3685,9 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     }
     if (options.final_snapshot) options.final_snapshot(metrics, host);
     if (SUCCEEDED(com_status)) CoUninitialize();
+    // Portable contract: a requested capture that was never saved fails the
+    // process even when the window closed normally.
+    if (!options.capture_path.empty() && !state.frame_capture_saved()) return 6;
     return static_cast<int>(message.wParam);
 }
 
@@ -3700,9 +3761,11 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
                                             (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
             const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
             const double initial_scale = query_scale(owner);
+            const Size initial_size = entry.options.capture_size.has_value()
+                ? *entry.options.capture_size : entry.options.initial_size;
             RECT frame{0, 0,
-                       static_cast<LONG>(std::ceil(entry.options.initial_size.width * initial_scale)),
-                       static_cast<LONG>(std::ceil(entry.options.initial_size.height * initial_scale))};
+                       static_cast<LONG>(std::ceil(initial_size.width * initial_scale)),
+                       static_cast<LONG>(std::ceil(initial_size.height * initial_scale))};
             adjust_client_frame(frame, style, ex_style, initial_scale);
             const std::wstring title = wide_from_utf8(entry.options.title);
             HWND window = CreateWindowExW(
@@ -3826,8 +3889,16 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
         }
     }
     std::fflush(stdout);
+    bool capture_failed{};
+    for (std::size_t index = 0; index < windows.size(); ++index) {
+        if (!windows[index].options.capture_path.empty() &&
+            !(*states[index]).frame_capture_saved()) {
+            capture_failed = true;
+        }
+    }
     states.clear();
     if (SUCCEEDED(com_status)) CoUninitialize();
+    if (capture_failed) return 6;
     return static_cast<int>(message.wParam);
 }
 

@@ -32,10 +32,14 @@ until WINEDEBUG=-all "$wine_binary" "$probe" snapshot >/dev/null 2>&1; do
     sleep 0.1
 done
 
+# Pages are registry-driven; a click on a navigation row ("gallery.page.<id>")
+# selects the page whose compiled-DML controls the next clicks address.
 for stable_id in \
+    gallery.page.basics \
     gallery.checkbox \
     gallery.radio.quiet \
-    gallery.category.values \
+    gallery.page.values \
+    gallery.page.retained-rows \
     gallery.collection.gamma
 do
     WINEDEBUG=-all "$wine_binary" "$probe" click "$stable_id" >/dev/null
@@ -55,7 +59,7 @@ WINEDEBUG=-all "$wine_binary" "$probe" close >/dev/null
 wait "$gallery_pid"
 trap - EXIT INT TERM
 
-test "$(rg -c '"automation":"click".*"handled":true' "$log")" -eq 4
+test "$(rg -c '"automation":"click".*"handled":true' "$log")" -eq 6
 rg -q '"automation":"capture","saved":true' "$log"
 rg -q '"renderer_name":"Win32 DIB CPU · HarfBuzz/FreeType text · WIC PNG · bundled fonts"' "$log"
 rg -q '"events_rejected":0' "$log"

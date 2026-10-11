@@ -19,10 +19,24 @@ def run(*arguments: str | Path | int) -> None:
     subprocess.run(command, check=True)
 
 
-def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
+def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
+    """Resolve whether the demo programs are configured.
+
+    The default stays OFF: CI builds only the toolkit and its tests. The
+    release pipeline passes --gallery or sets GUI_FORMS_CI_BUILD_GALLERY to
+    1/true/on/yes to add the Gallery and lab executables.
+    """
+    if flag:
+        return True
+    value: str = environ.get('GUI_FORMS_CI_BUILD_GALLERY', '').strip().lower()
+    return value in ('1', 'true', 'on', 'yes')
+
+
+def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False) -> None:
     """Build, test, then install only into the explicitly supplied build SDK."""
     toolkit: Path = build / 'gui-forms'
     options: list[str] = []
+    gallery_option: str = 'ON' if gallery else 'OFF'
     miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
     if (miniaudio / 'miniaudio.h').is_file():
         # Source was restored from the pinned dependency cache. Audio.cmake
@@ -55,7 +69,7 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int) -> None:
     run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
-        '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DGUI_FORMS_BUILD_GALLERY=OFF',
+        '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', f'-DGUI_FORMS_BUILD_GALLERY={gallery_option}',
         '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON',
         '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
     run('cmake', '--build', toolkit, '--parallel', jobs)
@@ -95,6 +109,9 @@ def check_alternate_audio(build: Path, jobs: int) -> None:
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--gallery', action='store_true',
+                        help='also configure GUI_FORMS_BUILD_GALLERY=ON '
+                             '(or set GUI_FORMS_CI_BUILD_GALLERY=1); default OFF')
     args: argparse.Namespace = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
@@ -106,7 +123,8 @@ def main() -> None:
     build: Path = ROOT / '.build' / ('native-' + host + '-' + architecture)
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
-    build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs)
+    build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
+                  gallery_enabled(args.gallery, dict(os.environ)))
     check_alternate_audio(build, args.jobs)
 
 

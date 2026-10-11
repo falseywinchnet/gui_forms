@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -19,6 +20,17 @@ struct WindowsHostOptions final {
     std::string title{"GUI.Forms Application"};
     Size initial_size{1120.0, 680.0};
     Size minimum_size{150.0, 150.0};
+    // Portable frame capture (identical on every host). When capture_path is
+    // non-empty, after the first presented frame that covers the whole window
+    // the host encodes the presented framebuffer as PNG to that path, prints
+    // one JSON line {"automation":"capture","saved":true|false,"path":"..."}
+    // to stdout, and requests close. The process exit code is 0 when the file
+    // was saved and non-zero otherwise. Only how the adapter obtains its
+    // framebuffer differs between hosts.
+    std::string capture_path{};
+    // When set, the window is created at this logical size instead of
+    // initial_size.
+    std::optional<Size> capture_size{};
     bool print_metrics_on_close{true};
     bool automation_enabled{};
     bool close_after_launch_for_testing{};

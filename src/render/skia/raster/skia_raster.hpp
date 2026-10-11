@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <vector>
 
 namespace gui_forms::render {
 
@@ -63,6 +64,10 @@ public:
     [[nodiscard]] std::uint32_t pixel_width() const noexcept;
     [[nodiscard]] std::uint32_t pixel_height() const noexcept;
     [[nodiscard]] std::size_t byte_size() const noexcept;
+    // Encodes the presented (front) raster as a straight-alpha RGBA8 PNG.
+    // Returns an empty vector when no front surface exists or encoding fails.
+    // Private adapter seam for host frame capture; no Skia type escapes.
+    [[nodiscard]] std::vector<std::byte> encode_png() const;
 
     void save() override;
     void restore() override;

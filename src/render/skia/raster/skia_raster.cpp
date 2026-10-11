@@ -27,10 +27,12 @@
 #include "include/core/SkRRect.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
+#include "include/encode/SkPngEncoder.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "include/effects/SkGradient.h"
 
 #include <algorithm>
+#include <cstring>
 #include <cmath>
 #include <limits>
 #include <optional>
@@ -619,6 +621,25 @@ std::uint32_t SkiaRaster::pixel_height() const noexcept {
 
 std::size_t SkiaRaster::byte_size() const noexcept {
     return row_bytes() * pixel_height();
+}
+
+std::vector<std::byte> SkiaRaster::encode_png() const {
+    std::vector<std::byte> result;
+    SkPixmap pixmap{};
+    SkSurface* const surface = (*impl_).front_surface();
+    if (surface == nullptr || !(*surface).peekPixels(&pixmap) ||
+        pixmap.width() <= 0 || pixmap.height() <= 0) {
+        return result;
+    }
+    // The front surface is premultiplied RGBA8; the encoder unpremultiplies
+    // so the file carries straight alpha as every PNG consumer expects.
+    SkDynamicMemoryWStream stream;
+    if (!SkPngEncoder::Encode(&stream, pixmap, {})) return result;
+    const sk_sp<SkData> data = stream.detachAsData();
+    if (!data || (*data).size() == 0) return result;
+    result.resize((*data).size());
+    std::memcpy(result.data(), (*data).data(), result.size());
+    return result;
 }
 
 void SkiaRaster::save() {

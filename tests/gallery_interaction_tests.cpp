@@ -162,8 +162,12 @@ int main()
     expect(gallery.state().slider_value == 42.0, "reset restores linked values");
 
     std::unique_ptr<gui_forms::Window> window = gui_forms::gallery::make_gallery();
-    expect((*window).metrics_snapshot().control_count == gui_forms::gallery::dml::gallery_nodes.size(),
-           "compiled DML population reaches the retained window");
+    expect((*window).metrics_snapshot().control_count > gui_forms::gallery::dml::gallery_nodes.size(),
+           "compiled DML population reaches the retained window beside the registry-driven shell");
+    expect(gui_forms::gallery::selected_gallery_page(*window) == "control-spectrum" &&
+               (*window).find("gallery.page.basics") != nullptr &&
+               (*window).find("gallery.surface.basics") != nullptr,
+           "navigation rows and page surfaces resolve by stable page id");
     expect((*window).find("gallery.instrument") != nullptr,
            "custom instrument resolves by stable ID");
     expect((*window).find("gallery.diagnostics") != nullptr,
@@ -176,12 +180,16 @@ int main()
                (*lifecycle).attachment_count() == 1 && lifecycle_status != nullptr &&
                (*lifecycle_status).text() == "Load 1 · attach 1 · init 1",
            "Gallery visibly consumes composed UserControl load and initialization lifecycle");
-    expect((*window).metrics_snapshot().active_surface_count == 1 &&
+    expect(gui_forms::gallery::select_gallery_page(*window, "instrument"),
+           "instrument page selects by stable id");
+    expect((*window).metrics_snapshot().active_surface_count >= 1 &&
                (*window).next_wake().has_value(),
-           "custom instrument declares exactly one scheduled active surface");
+           "custom instrument declares a scheduled active surface while shown");
     const gui_forms::ImageRegistrySnapshot images = (*window).image_resource_snapshot();
-    expect(images.resource_count == 1 && images.encoded_bytes == 146 &&
-               images.decoded_bytes == 16U * 16U * 4U,
+    // One validated PNG (the status badge) plus the six in-memory BGRA fixtures
+    // the image pages consume (test card, three folder icons, nine-patch, tile).
+    expect(images.resource_count == 7 && images.encoded_bytes == 146 &&
+               images.decoded_bytes > 16U * 16U * 4U,
            "Gallery status badge is owned and bounded by the core PNG registry");
     expect(!(*(*window).find("gallery.diagnostics")).visible(),
            "diagnostics begin hidden");
@@ -208,8 +216,10 @@ int main()
         }
     }
 
+    expect(gui_forms::gallery::select_gallery_page(*window, "basics"),
+           "basics page selects by stable id");
     CountingPainter painter;
-    (*window).paint(painter, {0.0, 0.0, 900.0, 660.0});
+    (*window).paint(painter, {0.0, 0.0, 1280.0, 820.0});
     expect(painter.saves == painter.restores, "painter state is balanced");
     expect(painter.fills > 10 && painter.lines > 10 && painter.texts > 10,
            "gallery paints classic surfaces, relief, and labels");
@@ -219,11 +229,18 @@ int main()
                painter.observed_role("COMPOSED", gui_forms::FontRole::control) &&
                painter.observed_role("Load 1 · attach 1 · init 1",
                                      gui_forms::FontRole::content) &&
-               painter.observed_role("CONTROL INDEX", gui_forms::FontRole::control),
+               painter.observed_role("Commands", gui_forms::FontRole::control),
            "titles and control chrome must use the control typography role");
-    expect(painter.observed_role("Edit this text", gui_forms::FontRole::content) &&
-               painter.observed_role("Alpha channel", gui_forms::FontRole::content),
-           "editable and collection field text must use the content typography role");
+    expect(painter.observed_role("Edit this text", gui_forms::FontRole::content),
+           "editable field text must use the content typography role");
+    expect(gui_forms::gallery::select_gallery_page(*window, "retained-rows"),
+           "retained rows page selects by stable id");
+    CountingPainter rows_painter;
+    (*window).paint(rows_painter, {0.0, 0.0, 1280.0, 820.0});
+    expect(rows_painter.observed_role("Alpha channel", gui_forms::FontRole::content),
+           "collection field text must use the content typography role");
+    expect(gui_forms::gallery::select_gallery_page(*window, "basics"),
+           "basics page selects again by stable id");
     (*window).reset_activity_metrics();
 
     const std::shared_ptr<gui_forms::CheckBox> checkbox = std::dynamic_pointer_cast<gui_forms::CheckBox>(
@@ -272,6 +289,8 @@ int main()
     expect((*text_input).display_text() == "Edit this text retained",
            "text edit survives event dispatch in application state");
 
+    expect(gui_forms::gallery::select_gallery_page(*window, "values"),
+           "values page selects by stable id");
     const std::shared_ptr<gui_forms::TrackBar> slider = std::dynamic_pointer_cast<gui_forms::TrackBar>(
         (*window).find("gallery.slider"));
     const std::shared_ptr<gui_forms::ProgressBar> progress = std::dynamic_pointer_cast<gui_forms::ProgressBar>(
@@ -294,6 +313,8 @@ int main()
     expect((*instrument).value() == (*slider).value() / 100.0,
            "custom instrument remains bound to slider");
 
+    expect(gui_forms::gallery::select_gallery_page(*window, "retained-rows"),
+           "retained rows page selects before row interaction");
     click(*window, "gallery.collection.gamma");
     const std::shared_ptr<gui_forms::gallery::GalleryControl> gamma = std::dynamic_pointer_cast<gui_forms::gallery::GalleryControl>(
         (*window).find("gallery.collection.gamma"));

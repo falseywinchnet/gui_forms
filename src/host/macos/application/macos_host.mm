@@ -10,6 +10,7 @@
 #include "gui_forms/text/types/text_types.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
+#include "../../../core/host/frame_capture/frame_capture.hpp"
 
 #include <algorithm>
 #include <array>
@@ -844,12 +845,20 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
         _semanticAccessibilityElements;
     BOOL _transparentFullSizeContent;
     std::vector<std::string> _windowDragRegionIds;
+    // Portable frame capture (capture_path host option). Completed once,
+    // after the first presented frame whose dirty rect covers the view.
+    std::string _frameCapturePath;
+    BOOL _frameCaptureCompleted;
+    BOOL _frameCaptureSaved;
 }
 - (instancetype)initWithModel:(std::unique_ptr<Window>)model
        transparentFullSizeContent:(BOOL)transparentFullSizeContent
               windowDragRegionIds:(std::vector<std::string>)windowDragRegionIds;
 - (BOOL)initializeHost;
 - (void)installCloseRequestHandler:(std::function<void(HostCloseRequest&)>)handler;
+- (void)installFrameCapturePath:(std::string)path;
+- (BOOL)frameCaptureSaved;
+- (void)completeFrameCaptureIfDue:(NSRect)dirtyRect presented:(BOOL)presented;
 - (HostDispatchResult)dispatchHostPayload:(HostEventPayload)payload
                          timestampNanoseconds:(std::uint64_t)timestamp;
 - (BOOL)requestCloseHiding:(BOOL)hiding;
@@ -1334,6 +1343,31 @@ private:
     return result.accepted() && result.close_allowed;
 }
 
+- (void)installFrameCapturePath:(std::string)path {
+    _frameCapturePath = std::move(path);
+    _frameCaptureCompleted = NO;
+    _frameCaptureSaved = NO;
+}
+- (BOOL)frameCaptureSaved {
+    return _frameCaptureSaved;
+}
+- (void)completeFrameCaptureIfDue:(NSRect)dirtyRect presented:(BOOL)presented {
+    if (_frameCaptureCompleted || _frameCapturePath.empty() || presented == NO ||
+        !NSContainsRect(dirtyRect, self.bounds) || NSIsEmptyRect(self.bounds)) {
+        return;
+    }
+    _frameCaptureCompleted = YES;
+    // The front raster is the presented framebuffer: premultiplied RGBA8 that
+    // CGContextDrawImage copied above. Encode it through the private Skia
+    // adapter seam and report through the shared portable contract.
+    const std::vector<std::byte> encoded = _raster.encode_png();
+    _frameCaptureSaved = gui_forms::host::detail::complete_frame_capture(
+        _frameCapturePath, encoded) ? YES : NO;
+    NSWindow* window = self.window;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [window performClose:nil];
+    });
+}
 - (void)notifyClosed {
     if (_hostAttached == NO) return;
     static_cast<void>([self dispatchHostPayload:HostClosedEvent{HostCloseReason::user}
@@ -2226,6 +2260,7 @@ private:
             _pendingDamage.clear();
         }
     }
+    [self completeFrameCaptureIfDue:dirtyRect presented:(presented && receipt) ? YES : NO];
     // Do not collect the next model invalidation from inside AppKit's paint
     // transaction. setNeedsDisplayInRect: may leave the view dirty without
     // enqueueing a second draw when invoked synchronously by drawRect:, which
@@ -2666,6 +2701,7 @@ HostCapabilities macos_capabilities() {
     return {HostCapabilities::current_protocol_version,
             "appkit-macos",
             HostCapability::lifecycle |
+                HostCapability::frame_capture |
                 HostCapability::scale_notifications |
                 HostCapability::occlusion |
                 HostCapability::scheduled_wake |
@@ -2884,14 +2920,17 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
             *model, windowDragRegionIds).accepted()) {
         return 2;
     }
+    int exitCode = 0;
     @autoreleasepool {
         NSApplication* application = [NSApplication sharedApplication];
         [application setActivationPolicy:NSApplicationActivationPolicyRegular];
         install_application_menu();
 
+        const Size initialSize = options.capture_size.has_value()
+            ? *options.capture_size : options.initial_size;
         const NSRect frame = NSMakeRect(0.0, 0.0,
-                                        options.initial_size.width,
-                                        options.initial_size.height);
+                                        initialSize.width,
+                                        initialSize.height);
         const bool transparentFullSizeContent =
             options.titlebar_presentation ==
             MacTitlebarPresentation::transparent_full_size_content;
@@ -2915,6 +2954,9 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
             transparentFullSizeContent:transparentFullSizeContent
             windowDragRegionIds:std::move(windowDragRegionIds)];
         [view installCloseRequestHandler:std::move(options.close_request)];
+        if (!options.capture_path.empty()) {
+            [view installFrameCapturePath:options.capture_path];
+        }
         GUIFormsWindowDelegate* delegate =
             [[GUIFormsWindowDelegate alloc] initWithView:view
                                  stopsApplicationOnClose:YES
@@ -2982,15 +3024,22 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         if (options.final_snapshot) {
             options.final_snapshot(metrics, host);
         }
+        // Portable contract: a requested capture that was never saved (no
+        // covering frame before close, or an encode/write failure) fails the
+        // process.
+        if (!options.capture_path.empty() && [view frameCaptureSaved] == NO) {
+            exitCode = 6;
+        }
         [view prepareForShutdown];
         [nativeWindow setDelegate:nil];
         [nativeWindow setContentView:nil];
     }
-    return 0;
+    return exitCode;
 }
 
 int run_macos_application(std::vector<MacApplicationWindow> windows) {
     if (windows.empty()) return 2;
+    int exitCode = 0;
     std::unordered_set<std::string> identities;
     std::size_t primary_count{};
     for (const MacApplicationWindow& entry : windows) {
@@ -3043,9 +3092,11 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             [[NSMutableArray alloc] initWithCapacity:windows.size()];
 
         for (MacApplicationWindow& entry : windows) {
+            const Size initialSize = entry.options.capture_size.has_value()
+                ? *entry.options.capture_size : entry.options.initial_size;
             const NSRect frame = NSMakeRect(0.0, 0.0,
-                                            entry.options.initial_size.width,
-                                            entry.options.initial_size.height);
+                                            initialSize.width,
+                                            initialSize.height);
             const bool transparentFullSizeContent =
                 entry.options.titlebar_presentation ==
                 MacTitlebarPresentation::transparent_full_size_content;
@@ -3079,6 +3130,9 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
                 transparentFullSizeContent:transparentFullSizeContent
                 windowDragRegionIds:std::move(windowDragRegionIds)];
             [view installCloseRequestHandler:std::move(entry.options.close_request)];
+            if (!entry.options.capture_path.empty()) {
+                [view installFrameCapturePath:entry.options.capture_path];
+            }
             const BOOL primary = entry.owner_id.empty() && !entry.tool_window;
             GUIFormsWindowDelegate* delegate =
                 [[GUIFormsWindowDelegate alloc] initWithView:view
@@ -3210,13 +3264,16 @@ int run_macos_application(std::vector<MacApplicationWindow> windows) {
             if (entry.options.final_snapshot) {
                 entry.options.final_snapshot(metrics, host);
             }
+            if (!entry.options.capture_path.empty() && [view frameCaptureSaved] == NO) {
+                exitCode = 6;
+            }
             [view prepareForShutdown];
             [nativeWindow setDelegate:nil];
             [nativeWindow setContentView:nil];
         }
         std::fflush(stdout);
     }
-    return 0;
+    return exitCode;
 }
 
 } // namespace gui_forms::host

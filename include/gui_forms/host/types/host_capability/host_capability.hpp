@@ -25,6 +25,10 @@ enum class HostCapability : std::uint64_t {
     typed_drag_source = 1ULL << 16U,
     sound_cues = 1ULL << 17U,
     clipboard_images = 1ULL << 18U,
+    // The adapter can encode its presented framebuffer to a PNG file on
+    // request (see the capture_path host option). Additive flag; no protocol
+    // version change.
+    frame_capture = 1ULL << 19U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

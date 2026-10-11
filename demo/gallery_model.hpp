@@ -13,7 +13,9 @@ enum class StyleMode {
 
 struct GalleryState final {
     std::string text {"Edit this text"};
-    std::string selected_category {"gallery.category.basics"};
+    // Gallery page id (demo/gallery_page_specs.hpp) currently shown; the shell
+    // records it so page selection is an observable model mutation.
+    std::string selected_page;
     std::string selected_collection_row {"gallery.collection.alpha"};
     bool precise_updates {true};
     bool diagnostics_visible {false};
@@ -34,7 +36,7 @@ public:
     bool activate(std::string_view stable_id);
     bool replace_text(std::string text);
     bool set_slider_value(double value);
-    bool select_category(std::string_view stable_id);
+    bool select_page(std::string_view page_id);
     bool select_collection_row(std::string_view stable_id);
     void reset();
 
