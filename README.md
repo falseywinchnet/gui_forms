@@ -262,11 +262,7 @@ in CI.
 
 ## Project boundaries
 
-GUI.Forms is a control toolkit, not an application: it is not File Manager and
-not a file browser. `file_manager_demoboard/` is an admitted first-party
-consumer that reproduces a file-explorer interface over deterministic
-in-memory fixtures through public seams only; it never reads the real
-filesystem. Deliberately excluded: GPU rendering (no Ganesh, Graphite, GL,
+GUI.Forms is a control toolkit. Deliberately excluded: GPU rendering (no Ganesh, Graphite, GL,
 Vulkan, Metal, Direct3D or WebGPU), .NET, Java, browser engines, Godot,
 immediate-mode control APIs, host font catalogues for control text, and image codecs other than
 PNG. AppKit stays in `src/host/macos/`, Win32 in `src/host/windows/`, X11 in
