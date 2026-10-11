@@ -5614,7 +5614,7 @@
       "visual": false,
       "page": "live_surface.md",
       "status": "OBSERVED: bundle 008 high-throughput surface review; focused M4 tests pass",
-      "sourceStatus": "header-only or distributed",
+      "sourceStatus": "isolated per type",
       "reviewed": true,
       "capture": null,
       "search": "livesurface include/gui_forms/live_surface/surface/live_surface.hpp livesurface is a renderer-neutral newest-frame exchange with configurable retained buffering, nonblocking producer acquisition, immutable reader leases, bounded configuration, telemetry, and revocable wake signaling. enable_shared_from_this"
