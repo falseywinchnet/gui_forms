@@ -2154,6 +2154,19 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_owned_event_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_owned_event_tests COMMAND gui_forms_owned_event_tests)
 
+    # Every example in the API reference, generated from docs/library/docstrings/
+    # by tools/generate_library_docs.py, compiled and run without a host.
+    add_executable(gui_forms_doc_examples_tests tests/doc_examples_tests.cpp)
+    target_link_libraries(gui_forms_doc_examples_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_doc_examples_tests COMMAND gui_forms_doc_examples_tests)
+    # The examples marked `// compile only` need a native host: they are
+    # compiled against the Application library but never linked or run.
+    if(TARGET gui_forms_application)
+        add_library(gui_forms_doc_examples_compile_only OBJECT
+            tests/doc_examples_compile_only.cpp)
+        target_link_libraries(gui_forms_doc_examples_compile_only PRIVATE gui_forms_application)
+    endif()
+
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)

@@ -39,13 +39,24 @@ copyright = "GUI.Forms contributors"
 release = read_project_version()
 version = release
 
+# The site follows the layout and appearance of the NumPy documentation:
+# the PyData Sphinx Theme, sphinx-design overview cards, numpydoc-style
+# reference pages and copy buttons on code blocks.
 extensions = [
     "myst_parser",
+    "sphinx_design",
+    "sphinx_copybutton",
 ]
 
 source_suffix = {
+    ".rst": "restructuredtext",
     ".md": "markdown",
 }
+
+primary_domain = "cpp"
+# Like NumPy's pages, "On this page" lists sections, not every declaration.
+toc_object_entries = False
+highlight_language = "cpp"
 
 master_doc = "index"
 
@@ -88,10 +99,39 @@ exclude_patterns = [
     "CURRENT_API_REFERENCE.md",
 ]
 
-html_theme = "furo"
-html_title = f"GUI.Forms {release}"
+html_theme = "pydata_sphinx_theme"
+html_title = f"{project} v{version} Manual"
+html_favicon = "_static/gui_forms_mark.svg"
+html_static_path = ["_static"]
+html_css_files = ["gui_forms.css"]
+html_last_updated_fmt = "%b %d, %Y"
+html_context = {"default_mode": "light"}
+html_copy_source = False
+html_domain_indices = False
 html_theme_options = {
-    "source_repository": "https://github.com/falseywinchnet/gui_forms/",
-    "source_branch": "main",
-    "source_directory": "docs/",
+    "logo": {
+        "text": "GUI.Forms",
+        "image_light": "_static/gui_forms_mark.svg",
+        "image_dark": "_static/gui_forms_mark_dark.svg",
+    },
+    "github_url": "https://github.com/falseywinchnet/gui_forms",
+    "collapse_navigation": True,
+    "header_links_before_dropdown": 6,
+    "navbar_end": [
+        "search-button",
+        "theme-switcher",
+        "navbar-icon-links",
+    ],
+    "navbar_persistent": [],
+    "secondary_sidebar_items": {"**": ["page-toc"], "index": []},
+    "footer_start": ["copyright"],
+    "footer_end": ["sphinx-version", "theme-version"],
 }
+# As on NumPy's site: section navigation only (no collapse button), and no
+# primary sidebar on the landing page.
+html_sidebars = {
+    "**": ["sidebar-nav-bs"],
+    "index": [],
+}
+copybutton_prompt_text = r"\$ "
+copybutton_prompt_is_regexp = True

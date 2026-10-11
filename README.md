@@ -49,7 +49,7 @@ int main() {
 
 Controls are created once with a `StableId`, the tree owns them, mutation is
 imperative, and painting uses accumulated damage bounds. The longer walkthrough is
-in [Your first window](docs/start/first-window.md).
+in [Your first window](docs/user/first-window.md).
 
 ![GUI.Forms Gallery on macOS](docs/images/gallery-macos.png)
 
@@ -82,7 +82,7 @@ compiler-cache archives for CI, not downloads.
 - **Windows** builds are unsigned. SmartScreen shows "More info", then
   "Run anyway".
 
-See [Download](docs/start/download.md) for the full platform notes.
+See [Download](docs/user/download.md) for the full platform notes.
 
 ## Features
 
@@ -202,7 +202,7 @@ platform specific.
 Prerequisites: CMake 3.25+, Ninja, LLVM 22.1 (selected by
 [`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. Native builds
 require an explicit `sh third_party/fetch_text_stack.sh` before configuration.
-Follow [Install](docs/start/install.md) for the platform-specific renderer,
+Follow [Install](docs/user/install.md) for the platform-specific renderer,
 host and dependency preparation. CI publishes a compiler cache;
 see [docs/COMPILER_CACHE.md](docs/COMPILER_CACHE.md).
 
@@ -226,7 +226,7 @@ After configuring a native build as described in Install, run the Gallery:
   `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`
 
 Per-platform toolchain setup and every build option are in
-[Build from source](docs/start/build-from-source.md).
+[Build from source](docs/building/index.md).
 
 ## Consume the SDK
 
@@ -243,7 +243,7 @@ Install with `cmake --install build`, then configure your project with
 `-DCMAKE_PREFIX_PATH=<prefix>` and the same toolchain file. Never link
 `GUIForms::Core` or `GUIForms::Controls` into a program that links
 `GUIForms::Application`; CMake rejects the combination. Details and runtime
-files to ship: [Consume the SDK](docs/start/consume-the-sdk.md).
+files to ship: [Consume the SDK](docs/user/consume-the-sdk.md).
 `examples/reference/` is a complete consumer built against the installed SDK
 in CI.
 
@@ -253,7 +253,7 @@ in CI.
   site, built from [`docs/index.md`](docs/index.md).
 - [Controls by function](docs/controls/generated/by-function.md): every stock
   control, its WinForms counterpart and a one-line description.
-- [API reference](docs/api/index.md): every public type, member and
+- [API reference](docs/api/index.rst): every public type, member and
   enumeration, generated from the headers.
 - [`decisions/`](decisions/): architecture decision records.
 - [`planning/`](planning/): internal plans and working notes, kept as records

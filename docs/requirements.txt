@@ -1,3 +1,7 @@
-sphinx>=7.2
-furo>=2024.1.29
-myst-parser>=2.0
+# The documentation site's build requirements, pinned to the versions it is
+# built and checked with. Read the Docs and the docs CI job install this file.
+sphinx==9.1.0
+myst-parser==5.1.0
+pydata-sphinx-theme==0.23.0
+sphinx-design==0.7.0
+sphinx-copybutton==0.5.2

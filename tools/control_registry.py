@@ -329,8 +329,9 @@ def validate(registry: Registry, include_root: Path = INCLUDE_ROOT) -> list[str]
             problems.append(f"{label}: purpose must be a single sentence")
         if not record.winforms.strip():
             problems.append(f"{label}: winforms is empty (use 'GUI.Forms-only')")
-        if record.doc != f"controls/{record.id}.md":
-            problems.append(f"{label}: doc must be 'controls/{record.id}.md', got '{record.doc}'")
+        expected_doc = f"api/generated/gui_forms.{record.type}.rst"
+        if record.doc != expected_doc:
+            problems.append(f"{label}: doc must be '{expected_doc}', got '{record.doc}'")
         if record.gallery_page is not None and not KEBAB_CASE.match(record.gallery_page):
             problems.append(f"{label}: gallery_page '{record.gallery_page}' must be null or a kebab-case page id")
         if not record.header.startswith("gui_forms/") or not record.header.endswith(".hpp"):

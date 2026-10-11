@@ -25,7 +25,7 @@ def _record(**overrides: object) -> dict[str, object]:
         "winforms": "GUI.Forms-only",
         "status": "stable",
         "gallery_page": None,
-        "doc": "controls/widget.md",
+        "doc": "api/generated/gui_forms.Widget.rst",
     }
     base.update(overrides)
     return base
@@ -163,7 +163,7 @@ class ValidatorTests(unittest.TestCase):
         self.assertIn("category 'Nope'", joined)
         self.assertIn("status 'beta'", joined)
         self.assertIn("single sentence", joined)
-        self.assertIn("doc must be 'controls/widget.md'", joined)
+        self.assertIn("doc must be 'api/generated/gui_forms.Widget.rst'", joined)
 
     def test_header_must_exist_and_declare_type(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
