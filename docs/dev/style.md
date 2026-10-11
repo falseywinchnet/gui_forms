@@ -6,9 +6,8 @@ visible at the point of use. The text below is the complete style, included
 from `planning/PROGRAMMING_HOUSE_STYLE.md`; edit that file, not this page.
 
 Part of the style is checked mechanically. The `house-style` job in
-`.github/workflows/native.yml` runs `tools/check_house_style.py` over an
-explicit list of sources and fails on any finding; the `stx-vorbis` workflow
-runs it over all of `stx_vorbis/`. The scanner ignores
+`.github/workflows/native.yml` runs `tools/check_house_style.py` over every
+first-party directory and fails on any finding. The scanner ignores
 comments and literals and reports `auto`, `->` (pointer member access and
 trailing return types), coroutine keywords, `std::ranges` and `std::views`
 pipelines, defaulted comparison operators, and bracket sequences that may be

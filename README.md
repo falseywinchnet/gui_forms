@@ -203,8 +203,9 @@ Prerequisites: CMake 3.25+, Ninja, LLVM 22.1 (selected by
 [`cmake/llvm22.cmake`](cmake/llvm22.cmake)) and Python 3.12+. Native builds
 require an explicit `sh third_party/fetch_text_stack.sh` before configuration.
 Follow [Install](https://gui-forms.readthedocs.io/en/latest/user/install.html) for the platform-specific renderer,
-host and dependency preparation. CI publishes a compiler cache;
-see [docs/COMPILER_CACHE.md](docs/COMPILER_CACHE.md).
+host and dependency preparation. CI reuses tested trees and publishes a
+compiler cache per platform; see
+[Fast, reproducible builds](https://gui-forms.readthedocs.io/en/latest/building/fast-builds.html).
 
 A renderer-free build for core and control tests needs no Skia or text fetch:
 

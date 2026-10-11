@@ -98,7 +98,7 @@ The API is declared stable only when all of the following hold:
   conformance tests against the installed SDK.
 - A machine-readable manifest lists every control and member as supported,
   deferred or excluded, and the documentation is generated from it.
-- Windows, macOS and the selected Linux host pass the same normative traces,
+- Windows, macOS and the X11 host pass the same normative traces,
   including lifecycle, input order, focus and paint receipts.
 - Native accessibility publication of the semantic tree exists on every
   host and is exercised by a test, not only the deterministic snapshot.
@@ -116,8 +116,15 @@ style can address part by part, is proposed but not implemented
 GPU rendering of any kind; a browser engine, CSS or an HTML runtime; a .NET,
 Java or Godot dependency in the native runtime; immediate-mode controls or a
 perpetual redraw loop; host font discovery for control text; LCD subpixel
-text; ActiveX, browser hosting, printing, MDI and obsolete Forms families;
-Wayland (the X11 host runs under XWayland).
+text; ActiveX, browser hosting, printing, MDI and obsolete Forms families.
+
+## Linux and other Unix desktops
+
+GUI.Forms aims to be agnostic about the display server and to target what
+already works everywhere. Today that is the X11 host: it runs on X11 desktops
+and, through XWayland, in Wayland sessions, with the same behaviour. A
+Wayland-native adapter is not planned. FreeBSD is a desired target; it has
+not yet been built or tested.
 
 ## Known gaps
 

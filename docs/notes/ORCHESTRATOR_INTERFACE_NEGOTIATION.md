@@ -626,7 +626,7 @@ This is local in-process execution, with borrowed context and explicit join;
 it adds no Orchestrator service, wire capability, hostile-worker supervision,
 or registry edge. Retained controls remain owned by their UI execution context.
 Compiler/cache and native pacing validation are recorded separately from
-application and API/ABI negotiation. See `docs/COMPILER_CACHE.md` and `docs/user/threading.md`.
+application and API/ABI negotiation. See `docs/notes/COMPILER_CACHE.md` and `docs/user/threading.md`.
 
 ## 2026-10-07 Audio cancellation and shared worker ownership
 
