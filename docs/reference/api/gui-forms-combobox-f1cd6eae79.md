@@ -14,7 +14,7 @@ ComboBox is a retained noneditable choice field with authoritative item selectio
 class ComboBox final : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

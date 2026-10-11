@@ -14,7 +14,7 @@ NumericUpDown is a retained composite numeric editor over an owned TextBox and s
 class NumericUpDown final : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

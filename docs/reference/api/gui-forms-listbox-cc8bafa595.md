@@ -14,7 +14,7 @@ ListBox is a retained virtual-row selector with single, multi-simple, and multi-
 class ListBox : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

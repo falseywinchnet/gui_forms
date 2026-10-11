@@ -12,7 +12,7 @@
 class ReviewCard final : public Card
 ```
 
-Inherits: [`gui_forms::Card`](gui-forms-card-2f974b5d7f.md).
+Inherits: `Card`.
 
 ## Public members
 

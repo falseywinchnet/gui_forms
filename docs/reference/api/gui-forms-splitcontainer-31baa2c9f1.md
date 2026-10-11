@@ -14,7 +14,7 @@ SplitContainer is a retained two-pane allocation state machine with lazy owned i
 class SplitContainer final : public ContainerControl
 ```
 
-Inherits: [`gui_forms::ContainerControl`](gui-forms-containercontrol-451746795c.md).
+Inherits: `ContainerControl`.
 
 ## Remarks
 

@@ -14,7 +14,7 @@ Label is a noninteractive retained text primitive with inherited typography role
 class Label : public Control
 ```
 
-Inherits: [`gui_forms::Control`](gui-forms-control-afc74eab91.md).
+Inherits: `Control`.
 
 ## Remarks
 

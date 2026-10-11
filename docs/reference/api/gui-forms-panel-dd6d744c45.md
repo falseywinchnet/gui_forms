@@ -14,7 +14,7 @@ Panel is the reusable retained scroll-capable surface primitive with theme-role 
 class Panel : public ScrollableControl
 ```
 
-Inherits: [`gui_forms::ScrollableControl`](gui-forms-scrollablecontrol-dd031c05c7.md).
+Inherits: `ScrollableControl`.
 
 ## Remarks
 

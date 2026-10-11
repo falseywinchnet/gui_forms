@@ -12,7 +12,7 @@
 class PathGradientBrush final : public Brush
 ```
 
-Inherits: [`gui_drawing::Brush`](gui-drawing-brush-4a09f59abb.md).
+Inherits: `Brush`.
 
 ## Public members
 

@@ -14,7 +14,7 @@ Control is the retained visual root and invariant owner for stable/runtime ident
 class Control : public Component, public std::enable_shared_from_this<Control>
 ```
 
-Inherits: [`gui_forms::Component`](gui-forms-component-117adf1500.md), `std::enable_shared_from_this<gui_forms::Control>`.
+Inherits: `Component`, `std::enable_shared_from_this<gui_forms::Control>`.
 
 ## Remarks
 

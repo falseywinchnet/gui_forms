@@ -14,7 +14,7 @@ MenuStrip is the retained top-level menu coordinator. It lays out root items, tr
 class MenuStrip final : public Control
 ```
 
-Inherits: [`gui_forms::Control`](gui-forms-control-afc74eab91.md).
+Inherits: `Control`.
 
 ## Remarks
 

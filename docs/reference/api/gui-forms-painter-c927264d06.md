@@ -12,7 +12,7 @@
 class Painter : public TextMetricsProvider
 ```
 
-Inherits: [`gui_forms::TextMetricsProvider`](gui-forms-textmetricsprovider-61d19f686c.md).
+Inherits: `TextMetricsProvider`.
 
 ## Public members
 

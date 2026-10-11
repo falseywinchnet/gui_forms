@@ -13,7 +13,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -898,7 +898,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -2652,7 +2652,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -2952,7 +2952,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -3455,7 +3455,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -4469,7 +4469,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::Brush"
+        "Brush"
       ],
       "members": [
         {
@@ -4641,7 +4641,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -4871,7 +4871,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -5220,7 +5220,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::Brush"
+        "Brush"
       ],
       "members": [
         {
@@ -6153,7 +6153,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::Brush"
+        "Brush"
       ],
       "members": [
         {
@@ -6481,7 +6481,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -7687,7 +7687,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -8110,7 +8110,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::Brush"
+        "Brush"
       ],
       "members": [
         {
@@ -8319,7 +8319,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::DrawingObject"
+        "DrawingObject"
       ],
       "members": [
         {
@@ -8803,7 +8803,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_drawing::Brush"
+        "Brush"
       ],
       "members": [
         {
@@ -9488,7 +9488,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -13634,7 +13634,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component",
+        "Component",
         "std::enable_shared_from_this<gui_forms::Binding>"
       ],
       "members": [
@@ -14157,7 +14157,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -15365,7 +15365,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component",
+        "Component",
         "std::enable_shared_from_this<gui_forms::BindingSource>"
       ],
       "members": [
@@ -17109,7 +17109,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -17768,7 +17768,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ButtonBase"
+        "ButtonBase"
       ],
       "members": [
         {
@@ -18079,7 +18079,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -19693,7 +19693,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -20467,7 +20467,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ButtonBase"
+        "ButtonBase"
       ],
       "members": [
         {
@@ -20995,7 +20995,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ListBox"
+        "ListBox"
       ],
       "members": [
         {
@@ -21515,7 +21515,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -22115,7 +22115,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -22447,7 +22447,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -22965,7 +22965,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -23399,7 +23399,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -24258,7 +24258,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -25724,7 +25724,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ScrollableControl"
+        "ScrollableControl"
       ],
       "members": [
         {
@@ -26111,7 +26111,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -26359,7 +26359,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component",
+        "Component",
         "std::enable_shared_from_this<gui_forms::Control>"
       ],
       "members": [
@@ -32513,7 +32513,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -33240,7 +33240,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::BindingManagerBase"
+        "BindingManagerBase"
       ],
       "members": [
         {
@@ -35171,7 +35171,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -39513,7 +39513,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -39774,7 +39774,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Button"
+        "Button"
       ],
       "members": [
         {
@@ -40368,7 +40368,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -41197,7 +41197,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -42405,7 +42405,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -42656,7 +42656,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -43179,7 +43179,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -45499,7 +45499,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -45693,7 +45693,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ScrollBar"
+        "ScrollBar"
       ],
       "members": [
         {
@@ -45840,7 +45840,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -51866,7 +51866,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -55000,7 +55000,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -55966,7 +55966,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -56730,7 +56730,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ButtonBase"
+        "ButtonBase"
       ],
       "members": [
         {
@@ -56867,7 +56867,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -59218,7 +59218,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -60916,7 +60916,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -61519,7 +61519,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -64099,7 +64099,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -64602,7 +64602,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -65801,7 +65801,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -67903,7 +67903,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::TextMetricsProvider"
+        "TextMetricsProvider"
       ],
       "members": [
         {
@@ -68791,7 +68791,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ScrollableControl"
+        "ScrollableControl"
       ],
       "members": [
         {
@@ -70004,7 +70004,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -74010,7 +74010,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::RangeControl"
+        "RangeControl"
       ],
       "members": [
         {
@@ -76161,7 +76161,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -77179,7 +77179,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -79720,7 +79720,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ButtonBase"
+        "ButtonBase"
       ],
       "members": [
         {
@@ -80132,7 +80132,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -80670,7 +80670,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -81989,7 +81989,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -82973,7 +82973,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Card"
+        "Card"
       ],
       "members": [
         {
@@ -83427,7 +83427,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::GroupBox"
+        "GroupBox"
       ],
       "members": [
         {
@@ -83607,7 +83607,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -83904,7 +83904,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::RangeControl"
+        "RangeControl"
       ],
       "members": [
         {
@@ -85180,7 +85180,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -86502,7 +86502,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -88838,7 +88838,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -90346,7 +90346,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -91188,7 +91188,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -91780,7 +91780,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -92109,7 +92109,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -92872,7 +92872,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -99082,7 +99082,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -99289,7 +99289,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -99893,7 +99893,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::RangeControl"
+        "RangeControl"
       ],
       "members": [
         {
@@ -100348,7 +100348,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Panel"
+        "Panel"
       ],
       "members": [
         {
@@ -101112,7 +101112,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -101602,7 +101602,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ContainerControl"
+        "ContainerControl"
       ],
       "members": [
         {
@@ -101961,7 +101961,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::ScrollBar"
+        "ScrollBar"
       ],
       "members": [
         {
@@ -102230,7 +102230,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Component"
+        "Component"
       ],
       "members": [
         {
@@ -103710,7 +103710,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {
@@ -103889,7 +103889,7 @@
       "comment": "",
       "access": "public",
       "bases": [
-        "gui_forms::Control"
+        "Control"
       ],
       "members": [
         {

@@ -14,7 +14,7 @@ GroupBox is a titled Panel specialization with validated typography, mnemonic fo
 class GroupBox : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

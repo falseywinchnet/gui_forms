@@ -14,7 +14,7 @@ LinkLabel is a ButtonBase command presented as underlined link text, with retain
 class LinkLabel : public ButtonBase
 ```
 
-Inherits: [`gui_forms::ButtonBase`](gui-forms-buttonbase-7585b84528.md).
+Inherits: `ButtonBase`.
 
 ## Remarks
 

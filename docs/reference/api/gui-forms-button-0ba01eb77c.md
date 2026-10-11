@@ -14,7 +14,7 @@ Button specializes ButtonBase with accept/cancel dialog results, default-button 
 class Button : public ButtonBase
 ```
 
-Inherits: [`gui_forms::ButtonBase`](gui-forms-buttonbase-7585b84528.md).
+Inherits: `ButtonBase`.
 
 ## Remarks
 

@@ -14,7 +14,7 @@ ProgressBar is a noninteractive RangeControl visualization with continuous, segm
 class ProgressBar : public RangeControl
 ```
 
-Inherits: [`gui_forms::RangeControl`](gui-forms-rangecontrol-525ccda62c.md).
+Inherits: `RangeControl`.
 
 ## Remarks
 

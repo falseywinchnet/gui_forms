@@ -14,7 +14,7 @@ TabControl owns TabPage lifetime, selection, active-page attachment, per-page fo
 class TabControl final : public ContainerControl
 ```
 
-Inherits: [`gui_forms::ContainerControl`](gui-forms-containercontrol-451746795c.md).
+Inherits: `ContainerControl`.
 
 ## Remarks
 

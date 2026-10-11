@@ -14,7 +14,7 @@ CheckBox specializes ButtonBase with validated two/three-state selection, option
 class CheckBox : public ButtonBase
 ```
 
-Inherits: [`gui_forms::ButtonBase`](gui-forms-buttonbase-7585b84528.md).
+Inherits: `ButtonBase`.
 
 ## Remarks
 

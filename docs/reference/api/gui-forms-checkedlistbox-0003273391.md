@@ -14,7 +14,7 @@ CheckedListBox extends ListBox with an independently retained three-state check 
 class CheckedListBox final : public ListBox
 ```
 
-Inherits: [`gui_forms::ListBox`](gui-forms-listbox-cc8bafa595.md).
+Inherits: `ListBox`.
 
 ## Remarks
 

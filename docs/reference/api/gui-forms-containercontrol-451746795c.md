@@ -12,7 +12,7 @@
 class ContainerControl : public ScrollableControl
 ```
 
-Inherits: [`gui_forms::ScrollableControl`](gui-forms-scrollablecontrol-dd031c05c7.md).
+Inherits: `ScrollableControl`.
 
 ## Public members
 

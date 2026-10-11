@@ -14,7 +14,7 @@ Timer schedules coalescing callbacks through the owning Window scheduler and ser
 class Timer final : public Component
 ```
 
-Inherits: [`gui_forms::Component`](gui-forms-component-117adf1500.md).
+Inherits: `Component`.
 
 ## Remarks
 

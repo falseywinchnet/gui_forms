@@ -12,7 +12,7 @@
 class ScaledGroupBox final : public GroupBox
 ```
 
-Inherits: [`gui_forms::GroupBox`](gui-forms-groupbox-56a999f66d.md).
+Inherits: `GroupBox`.
 
 ## Public members
 

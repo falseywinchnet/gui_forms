@@ -14,7 +14,7 @@ RadioButton specializes ButtonBase with retained checked state, container-scoped
 class RadioButton : public ButtonBase
 ```
 
-Inherits: [`gui_forms::ButtonBase`](gui-forms-buttonbase-7585b84528.md).
+Inherits: `ButtonBase`.
 
 ## Remarks
 

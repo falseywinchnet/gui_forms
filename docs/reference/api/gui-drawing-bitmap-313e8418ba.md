@@ -12,7 +12,7 @@
 class Bitmap final : public DrawingObject
 ```
 
-Inherits: [`gui_drawing::DrawingObject`](gui-drawing-drawingobject-9b1f9b5be0.md).
+Inherits: `DrawingObject`.
 
 ## Public members
 
