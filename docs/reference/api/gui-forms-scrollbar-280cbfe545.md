@@ -14,7 +14,7 @@ ScrollBar specializes RangeControl with independently bounded button/thumb/repea
 class ScrollBar : public RangeControl
 ```
 
-Inherits: [`gui_forms::RangeControl`](gui-forms-rangecontrol-525ccda62c.md).
+Inherits: `RangeControl`.
 
 ## Remarks
 

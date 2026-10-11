@@ -12,7 +12,7 @@
 class MetricsView final : public Control
 ```
 
-Inherits: [`gui_forms::Control`](gui-forms-control-afc74eab91.md).
+Inherits: `Control`.
 
 ## Public members
 

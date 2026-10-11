@@ -12,7 +12,7 @@
 class BindingSource final : public Component, public std::enable_shared_from_this<BindingSource>
 ```
 
-Inherits: [`gui_forms::Component`](gui-forms-component-117adf1500.md), `std::enable_shared_from_this<gui_forms::BindingSource>`.
+Inherits: `Component`, `std::enable_shared_from_this<gui_forms::BindingSource>`.
 
 ## Public members
 

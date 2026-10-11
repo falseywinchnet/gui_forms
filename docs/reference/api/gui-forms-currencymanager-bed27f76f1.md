@@ -12,7 +12,7 @@
 class CurrencyManager final : public BindingManagerBase
 ```
 
-Inherits: [`gui_forms::BindingManagerBase`](gui-forms-bindingmanagerbase-344f781379.md).
+Inherits: `BindingManagerBase`.
 
 ## Public members
 

@@ -12,7 +12,7 @@
 template <typename T> class Value final : public Component
 ```
 
-Inherits: [`gui_forms::Component`](gui-forms-component-117adf1500.md).
+Inherits: `Component`.
 
 ## Public members
 

@@ -12,7 +12,7 @@
 class VScrollBar final : public ScrollBar
 ```
 
-Inherits: [`gui_forms::ScrollBar`](gui-forms-scrollbar-280cbfe545.md).
+Inherits: `ScrollBar`.
 
 ## Public members
 

@@ -12,7 +12,7 @@
 class DateTimePicker final : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Public members
 

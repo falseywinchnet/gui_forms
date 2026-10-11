@@ -12,7 +12,7 @@
 class MasterDetailView final : public ContainerControl
 ```
 
-Inherits: [`gui_forms::ContainerControl`](gui-forms-containercontrol-451746795c.md).
+Inherits: `ContainerControl`.
 
 ## Public members
 

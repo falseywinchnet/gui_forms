@@ -14,7 +14,7 @@ ToolTip is a nonvisual window-bound provider that tokenizes help text to live co
 class ToolTip final : public Component
 ```
 
-Inherits: [`gui_forms::Component`](gui-forms-component-117adf1500.md).
+Inherits: `Component`.
 
 ## Remarks
 

@@ -14,7 +14,7 @@ TrackBar specializes RangeControl with bounded tick frequency, optional ticks, e
 class TrackBar : public RangeControl
 ```
 
-Inherits: [`gui_forms::RangeControl`](gui-forms-rangecontrol-525ccda62c.md).
+Inherits: `RangeControl`.
 
 ## Remarks
 

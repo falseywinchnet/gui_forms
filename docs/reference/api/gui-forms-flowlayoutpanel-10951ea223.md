@@ -14,7 +14,7 @@ FlowLayoutPanel is a retained directional packing algorithm with four flow direc
 class FlowLayoutPanel final : public ContainerControl
 ```
 
-Inherits: [`gui_forms::ContainerControl`](gui-forms-containercontrol-451746795c.md).
+Inherits: `ContainerControl`.
 
 ## Remarks
 

@@ -14,7 +14,7 @@ TreeView is a virtualized retained hierarchy over caller-owned stable item ident
 class TreeView final : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

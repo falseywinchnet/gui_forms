@@ -14,7 +14,7 @@ TextBox is a retained single-line Unicode editor with scalar-safe navigation, di
 class TextBox final : public Panel
 ```
 
-Inherits: [`gui_forms::Panel`](gui-forms-panel-dd6d744c45.md).
+Inherits: `Panel`.
 
 ## Remarks
 

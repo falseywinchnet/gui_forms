@@ -12,7 +12,7 @@
 class DropDownButton final : public Button
 ```
 
-Inherits: [`gui_forms::Button`](gui-forms-button-0ba01eb77c.md).
+Inherits: `Button`.
 
 ## Public members
 
