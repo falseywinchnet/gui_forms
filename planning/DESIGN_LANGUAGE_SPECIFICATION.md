@@ -313,7 +313,8 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 
 | Relief | Construction | Typical parts | Source |
 |---|---|---|---|
-| Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | button, command tile, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
+| Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | push button, chip, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
+| Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; both fall off steeply (power about 1.5 over the half-width) and melt back into the plane before the part's bounds; pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
 | Pressed | face darkened, inner lines inverted (dark top/left, light bottom/right), contact shadow removed | button, command, segment | Plan Paint pressed tile |
 | Active tool | warm gold gradient plate, deeper gold border, flat | selected tool, current choice in a strip | Plan Paint gold; CRM pair B-prime |
@@ -1090,9 +1091,9 @@ bit tweaked to look nicer" than its references (owner direction).
    and a double right keyline (`#D1E0F5` inside `#496C9F`); every tab casts a
    hard 2 px `#496C9F` edge and a soft (3, 1) shadow to its right; the selected
    tab runs into the ribbon with no bottom edge. Tabs abut on a flat `#93ADD0`
-   rail; the selected tab is slightly larger. Every ribbon button, at rest,
-   carries the slight 3D pill of §3.1, and the command plane deepens from
-   near-white to royale blue toward its foot.
+   rail; the selected tab is slightly larger. Every ribbon button is a bulge in
+   the ribbon cloth (§3.5 Bulge), and the command plane deepens from near-white
+   to royale blue toward its foot.
 9. **Beside it.** Windows-familiar themes ship too: Classic and a modern flat
    look first, a few more later (§12.3). Literal Windows rendering lives only
    there (owner revision 3).
@@ -1216,11 +1217,11 @@ These supersede the conflicting sources and options of the first draft.
 ### 12.4 Owner decisions, second round, 2026-10-12
 
 - **Default reference.** Pearl Ribbon, moved a little toward Plan Paint's
-  royale blue. Every ribbon button gets the slight 3D pill effect (the "faint
-  bubble"), which is Plan Paint's own button shading: inner light top and left,
-  inner dark bottom and right, a one-pixel contact shadow. This clarifies owner
-  revision 4: "no raised buttons" rules out lifted bevels, not this shading.
-  Tabs emulate Plan Paint's tab shadowing exactly (§11 item 8).
+  royale blue. Every ribbon button gets the faint pill or bubble effect: a
+  bulge in the ribbon cloth, as if a fingertip were pushed into it from behind
+  (§3.5 Bulge). It has no edge of any kind; an edge fails it. Tabs emulate Plan
+  Paint's tab shadowing exactly (§11 item 8). Push buttons keep Plan Paint's
+  plate (§3.1 Rendering).
 - **Dark variant.** The derived dark form drawn in the studies (Phosphor pair:
   black with green `#82B361`, complement `#B36182` for the File tab and active
   tool) is accepted.
