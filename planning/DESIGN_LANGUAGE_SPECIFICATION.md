@@ -113,9 +113,11 @@ code" (owner direction).
 ### 2.1 Affordance through depth
 
 1. Physical, click-capable controls belong to the language (V052, V057, V216),
-   but buttons are not raised. An action is a flat plate: a soft tinted
-   gradient face and a thin border, distinct from the plane by colour and edge,
-   never by a raise, keylines or a cast shadow (owner revision 4, Plan Paint).
+   but buttons are not raised in the Windows sense. An action is a slight 3D
+   pill: a soft tinted gradient face, a thin border and Plan Paint's inner
+   light-over-dark shading with a one-pixel contact shadow, which reads as a
+   convex face resting on its plane, never as a lifted bevel (owner revision 4
+   as clarified in §12.4; Plan Paint `action_material`).
    Deep heavy bevelling is rejected (V077 R).
 2. A tinted flat plate means actionable, inset means editable or instrumented,
    the recessed work pane means content, shadow means real overlap (DNA-04;
@@ -245,11 +247,10 @@ Windows 95 appearance family M101–M105 accepted in full):
 | window and plane shadows only where they establish real layering | M051; DNA-F06 |
 | one surface may combine recessed content, inset instruments and flat tinted actions | M026; owner revision 4 |
 
-**Rendering.** In the house look an action plate is flat: a gently graded
-tinted face, one thin coloured border and 2–3 logical px corners, with no
-light/dark keyline pair and no cast shadow, as Plan Paint's buttons and command
-tiles appear (owner revisions 3 and 4). Depth in the house look is carried by
-recess: entry wells and the work pane sink; nothing rises. Grey square bevels,
+**Rendering.** In the house look an action plate is a slight pill, exactly
+Plan Paint's `action_material`: a `#D2E4FB` to `#A3C1EC` face, a thin `#6384B2` border, a white highlight inside the top and left edge, a darker blue line (`#315686` at about 53 %) inside the bottom and right, and a one-pixel contact shadow below (`#294B77` at about 33 %), with 3 logical px corners (owner revisions 3 and 4; §12.4).
+The deep depth of the house look is recess: entry wells and the work pane sink;
+nothing is lifted by a bevel. Grey square bevels,
 raised buttons, sunken status cells and classic dialog buttons belong only to
 the Windows-familiar Classic theme (§12.3).
 
@@ -284,21 +285,21 @@ owner (owner revision 2):
 |---|---|---|
 | Key light | upper left; azimuth 135° from +x | M101; angle (proposed) |
 | Cast shadow | down and slightly right; horizontal offset at most half the vertical | Plan Paint sheet shadow (1.5, 2.5); ratio (proposed) |
-| Plate edge | one thin coloured border; no light/dark keyline pair on plates | owner revision 4; Plan Paint |
+| Plate edge | one thin coloured border, with Plan Paint's inner light top/left and dark bottom/right lines inside it | owner revision 4 as clarified in §12.4; Plan Paint |
 | Plate face | soft vertical tinted gradient, lighter at the top, following the key light | M101; Plan Paint |
 | Inset well | inner top shade line, outer bottom highlight, thin border | Plan Paint gallery well; atlas |
 
 ### 3.4 Depth levels
 
 Shadow strength follows real overlap; internal regions use edges rather than
-cast shadows, and controls carry no shadows at all (DNA-F06; M051; owner revision 4).
+cast shadows; a control carries only Plan Paint's one-pixel contact shadow (DNA-F06; M051; §12.4).
 
 | Level | Meaning | Reference treatment |
 |---|---|---|
 | S2 deep recess | entry well; work pane | inner top-left shade, crisp boundary; Plan Paint surround, sheet shadow (1.5, 2.5) blur 6 about 29 % |
 | S1 recess | instrument, gallery and preview wells | 1 px border, inner top line 14–29 %, white bottom highlight (Plan Paint gallery) |
 | E0 flush | chassis, side panels, resting flat members, paper inside a well | none |
-| E1 plate | resting control, flush with its plane | tinted gradient face and thin border; no shadow (owner revision 4) |
+| E1 plate | resting control on its plane | slight pill: tinted gradient face, thin border, inner light/dark lines, one-pixel contact shadow (§12.4) |
 | E2 selected tab | the selected tab joins the ribbon field | lighter face, open bottom edge (Plan Paint tab) |
 | E3 floating | expanded result, floating capsule, completion list | `0 3px 8px` to `0 5px 10px` at 20–33 % (atlas) |
 | E4 overlay | popup, menu, drawer | `0 13px 32px` about 33 % plus `0 2px 5px` about 40 % (atlas) |
@@ -312,9 +313,9 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 
 | Relief | Construction | Typical parts | Source |
 |---|---|---|---|
-| Tinted plate | soft vertical tinted gradient, one thin coloured border, no keylines, no shadow | button, command tile, thumb | owner revision 4; Plan Paint |
+| Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | button, command tile, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
-| Pressed | face and border darkened; no shadow; content does not move | button, command, segment | Plan Paint pressed tile; owner revision 4 |
+| Pressed | face darkened, inner lines inverted (dark top/left, light bottom/right), contact shadow removed | button, command, segment | Plan Paint pressed tile |
 | Active tool | warm gold gradient plate, deeper gold border, flat | selected tool, current choice in a strip | Plan Paint gold; CRM pair B-prime |
 | Default | second dark perimeter around the plate | default button | M105; theme types `default_ring` |
 | Disabled | contrast reduced, faint border, paler face | any | M104; Plan Paint disabled tile |
@@ -1057,7 +1058,7 @@ bit tweaked to look nicer" than its references (owner direction).
    | tab rail | 27 px, solid pale blue `#9BB5D8`; selected tab face `#E8F2FF` runs into the plane without a closing edge |
    | File tab | solid blue gradient `#528BE0` to `#173F88`, white text |
    | command plane | pale blue gradient `#E8F2FF`, `#CADEFB`, `#A5C4F1`, `#769FDF`; white top line, shade line beneath |
-   | command tile | `#D2E4FB` to `#A3C1EC`, radius 3, border `#6384B2` (hot `#355E96`), flat: no keylines and no shadow, ink `#153765` |
+   | command tile | `#D2E4FB` to `#A3C1EC`, radius 3, border `#6384B2` (hot `#355E96`), inner white top/left and `#315686` bottom/right lines, one-pixel contact shadow, ink `#153765` |
    | active tool | gold `#FFEDBA` to `#FFCF66`, border `#C49332`, radius 2 |
    | gallery well | white `#F8FBFF` to `#FFFFFF`, thin blue-grey border `#94ACC8`, faint inner top shade |
    | groups | labels `#485B70` beneath thin etched dividers fading at both ends |
@@ -1088,9 +1089,10 @@ bit tweaked to look nicer" than its references (owner direction).
    selected, with a top wash fading out by 72 % of the height; a white top line
    and a double right keyline (`#D1E0F5` inside `#496C9F`); every tab casts a
    hard 2 px `#496C9F` edge and a soft (3, 1) shadow to its right; the selected
-   tab runs into the ribbon with no bottom edge. Ribbon buttons carry a slight
-   3D pill: a soft highlight across the upper face and a faint shade at the
-   bottom, drawn by shading alone, with one thin border and no cast shadow.
+   tab runs into the ribbon with no bottom edge. Tabs abut on a flat `#93ADD0`
+   rail; the selected tab is slightly larger. Every ribbon button, at rest,
+   carries the slight 3D pill of §3.1, and the command plane deepens from
+   near-white to royale blue toward its foot.
 9. **Beside it.** Windows-familiar themes ship too: Classic and a modern flat
    look first, a few more later (§12.3). Literal Windows rendering lives only
    there (owner revision 3).
@@ -1186,11 +1188,11 @@ These supersede the conflicting sources and options of the first draft.
   dividers between groups and shading on the strip. A faint button that needs
   some presence at rest gets quiet relief through shading, not a full face.
   Hover and press bring full relief.
-- **No raised buttons (owner revision 4).** Plan Paint has no raised buttons.
-  In the house look every button, command tile, chip and actuator is a flat
-  plate: a soft tinted gradient face and one thin coloured border, with no
-  light/dark keyline pair and no shadow. Hover brightens it and press darkens
-  it; nothing rises or sinks. Depth comes from recess only: entry fields and
+- **No raised buttons (owner revision 4).** Plan Paint has no raised buttons:
+  nothing is lifted by a Windows-style bevel. Every button, command tile, chip
+  and actuator is a slight 3D pill drawn as Plan Paint draws it (§3.1
+  Rendering; clarified in §12.4). Hover brightens it and press darkens it and
+  inverts its inner shading. Depth comes from recess only: entry fields and
   the work pane. Raised buttons survive only in the Windows-familiar Classic
   theme.
 - **Focus.** A text field draws its focus ring whenever it has focus,
@@ -1214,8 +1216,11 @@ These supersede the conflicting sources and options of the first draft.
 ### 12.4 Owner decisions, second round, 2026-10-12
 
 - **Default reference.** Pearl Ribbon, moved a little toward Plan Paint's
-  royale blue. Ribbon buttons get a slight 3D pill effect (the "faint bubble"),
-  by shading alone. Tabs emulate Plan Paint's tab shadowing exactly (§11 item 8).
+  royale blue. Every ribbon button gets the slight 3D pill effect (the "faint
+  bubble"), which is Plan Paint's own button shading: inner light top and left,
+  inner dark bottom and right, a one-pixel contact shadow. This clarifies owner
+  revision 4: "no raised buttons" rules out lifted bevels, not this shading.
+  Tabs emulate Plan Paint's tab shadowing exactly (§11 item 8).
 - **Dark variant.** The derived dark form drawn in the studies (Phosphor pair:
   black with green `#82B361`, complement `#B36182` for the File tab and active
   tool) is accepted.
