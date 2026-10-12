@@ -6,6 +6,92 @@ summary of the planning documents in the repository's `planning/` directory,
 which remain the detailed source; where they disagree with the code, the code
 and its tests are the authority.
 
+```{image} ../_static/roadmap.svg
+:alt: Releases toward 1.0: 0.1 Shipped, 0.2 Verified, 0.3 Themeable, 0.4 Flexible, 0.5 ABI candidate, 1.0 Stable, then 1.x Beyond.
+:width: 100%
+:class: roadmap-figure
+```
+
+## 0.1 Shipped
+
+What GUI.Forms is today, tested in CI on macOS, Windows and Linux. The
+details are under [Done and tested](#done-and-tested).
+
+- A retained core with explicit ownership, typed dirtiness and nested update
+  scopes, painted on the CPU only where something changed.
+- One text engine with identical output on every platform.
+- More than 70 stock Forms controls, with menus, commands and data binding.
+- Native hosts for macOS, Windows and X11, which also runs under XWayland.
+- An installed CMake SDK with fast, reproducible cached builds.
+
+## 0.2 Verified
+
+- **Accessibility verified on every host.** Tests read each platform's own
+  accessibility API; Windows gains a UI Automation provider and text fields
+  expose editable text ranges; then the capability is advertised.
+- **Font substitution.** Families that applications ask for map to bundled
+  faces with matching metrics.
+- **Articulated controls.** Every control is built from named parts with
+  states and public geometry, described by one schema that the C++ API, form
+  documents, themes and the visual tools share.
+
+## 0.3 Themeable
+
+- **A theme engine.** Themes are data: properties, layered effects,
+  transitions and state machines, and bounded expressions with pointer
+  position and application values as inputs. New kinds of effect are added to
+  the engine in C++. An idle window still draws nothing.
+- **CSS-syntax themes** addressed to the named parts.
+- **The default theme**, in light and dark, following the
+  design-language specification (`planning/DESIGN_LANGUAGE_SPECIFICATION.md`).
+- **Windows-familiar themes** beside it.
+- **Compositor cooperation:** transparency, glass and behind-window materials
+  where the host provides them.
+
+## 0.4 Flexible
+
+- **Flex and grid layout** containers, checked against a browser's layout.
+- **Form documents that round-trip:** hand edits and visual edits never
+  overwrite each other.
+- **Damage-preserving painting:** each damaged region is painted and presented
+  on its own, not as one bounding box.
+
+## 0.5 ABI candidate
+
+- **An installed, versioned C ABI** with an error model.
+- **A breaking-change audit** of its function tables, with the C++ wrappers as
+  conveniences over them rather than a second contract.
+- **Two independent native consumers** passing the ownership, thread and
+  callback conformance tests against the installed SDK.
+
+## 1.0 Stable
+
+The API is declared stable only when all of the following hold:
+
+- The C function tables and error model pass a breaking-change audit, and the
+  C++ wrappers are RAII conveniences over them rather than a second contract.
+- Two independent native consumers pass the ownership, thread and callback
+  conformance tests against the installed SDK.
+- A machine-readable manifest lists every control and member as supported,
+  deferred or excluded, and the documentation is generated from it.
+- Windows, macOS and the X11 host pass the same normative traces,
+  including lifecycle, input order, focus and paint receipts.
+- Native accessibility publication of the semantic tree exists on every
+  host and is exercised by a test, not only the deterministic snapshot.
+- Packaging is reproducible: licences, integrity metadata and a software bill
+  of materials ship with every artefact.
+
+## 1.x Beyond
+
+- **C# bindings** over the stable C ABI with a Windows Forms-shaped API, so a
+  Windows Forms project can switch to GUI.Forms and run on macOS and Linux.
+- **An interface builder** written in GUI.Forms.
+- **HTML import and a layout designer** for static HTML and CSS.
+- **A theme designer.**
+
+The full plan, with a measured gate for each stage, is
+`planning/FORWARD_PROGRAMME.md`.
+
 ## Milestones
 
 The implementation programme is a chain of independently testable contracts.
@@ -87,70 +173,6 @@ Hosts
 : Input-method preedit on Windows and X11, a Windows UI Automation provider,
   drag and drop on Windows, outbound drag on every host, and advertising the
   accessibility capability where native publication already exists.
-
-## What comes next
-
-The next programme turns the toolkit's look into data and adds the tools to
-edit it. The full plan, with a measured gate for each stage, is
-`planning/FORWARD_PROGRAMME.md`; the visual rules are
-`planning/DESIGN_LANGUAGE_SPECIFICATION.md`.
-
-Articulated controls
-: Every control is built from named parts with states and public geometry,
-  described by one schema that the C++ API, form documents, themes and the
-  visual tools share.
-
-One theme engine
-: Themes are data written in a CSS-syntax subset addressed to those parts:
-  properties, layered effects, transitions and state machines, and bounded
-  expressions, with pointer position and application values as inputs. The
-  engine runs them; new kinds of effect are added to the engine in C++.
-  Transparency, reflections, glass and animation are capabilities; an idle
-  window still draws nothing.
-
-A default look of its own
-: The default theme follows the design-language specification and keeps
-  depth where controls carry meaning. Windows-familiar themes ship beside it.
-
-Accessibility verified on every host
-: Tests that read each platform's own accessibility API, a UI Automation
-  provider on Windows and editable text ranges, before the capability is
-  advertised.
-
-Real dynamic layout
-: Flex and grid layout containers checked against a browser's layout.
-
-Tools
-: A visual interface builder written in GUI.Forms, whose documents can also be
-  edited by hand without anything being overwritten; a WYSIWYG layout designer
-  that imports static HTML and CSS; and a WYSIWYG theme designer.
-
-C# bindings
-: Bindings over the stable C ABI with a Windows Forms-shaped API, so a Windows
-  Forms project can switch to GUI.Forms and run on macOS and Linux.
-
-## Before 1.0
-
-The API is declared stable only when all of the following hold:
-
-- The C function tables and error model pass a breaking-change audit, and the
-  C++ wrappers are RAII conveniences over them rather than a second contract.
-- Two independent native consumers pass the ownership, thread and callback
-  conformance tests against the installed SDK.
-- A machine-readable manifest lists every control and member as supported,
-  deferred or excluded, and the documentation is generated from it.
-- Windows, macOS and the X11 host pass the same normative traces,
-  including lifecycle, input order, focus and paint receipts.
-- Native accessibility publication of the semantic tree exists on every
-  host and is exercised by a test, not only the deterministic snapshot.
-- Packaging is reproducible: licences, integrity metadata and a software bill
-  of materials ship with every artefact.
-
-A design-language and theming model, in which controls are nested regions a
-style can address part by part, is proposed but not implemented
-(`planning/DESIGN_LANGUAGE_SYSTEM_MODEL.md`,
-`planning/CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md`,
-`planning/AUTHORITATIVE_CONTROL_REGIONS.md`).
 
 ## Not planned
 
