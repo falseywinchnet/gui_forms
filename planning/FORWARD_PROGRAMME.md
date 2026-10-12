@@ -291,9 +291,11 @@ united text engine's shipped profile is authoritative (no LCD text); Carlito
 is the body face; the proposed contrast gate; PlaySuite's character but not
 its specifics, with its effects as engine capability requirements; geometry
 and hit regions defined by the engine, never by a theme; Classic and a modern
-flat look as the first Windows-familiar themes.
+flat look as the first Windows-familiar themes; command-strip commands may be
+flat at rest when dividers and strip shading carry the structure, with quiet
+relief through shading for faint buttons; text fields draw focus whenever
+focused, other controls only after keyboard use.
 
-Still open, and not assumed anywhere: flat-at-rest commands in a relief
-command strip, when focus is drawn, ambient animation in the default theme,
+Still open, and not assumed anywhere: ambient animation in the default theme,
 a dark default variant, the high-contrast authorities, and the starting
 tokens.

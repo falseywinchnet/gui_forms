@@ -766,9 +766,15 @@ These supersede the conflicting sources and options above.
 - **Windows-familiar themes (Q8).** Classic and a modern flat look first; a
   few more may be added.
 
-Still open: flat-at-rest commands in a relief command strip (conflict 8; the
-owner is choosing between flat at rest with relief on hover, as Plan Paint's
-ribbon does, quiet relief at rest, and full relief at rest), when focus is
-drawn (Q6), ambient animation in the default theme (Q2), a dark default
+- **Flat commands (conflict 8).** Commands in a command strip may be flat at
+  rest, as Plan Paint's ribbon is, provided the strip carries the structure:
+  dividers between groups and shading on the strip. A faint button that needs
+  some presence at rest gets quiet relief through shading, not a full face.
+  Hover and press bring full relief.
+- **Focus (Q6).** A text field draws its focus ring whenever it has focus,
+  however focus arrived. Every other control draws its focus ring only after
+  keyboard use.
+
+Still open: ambient animation in the default theme (Q2), a dark default
 variant (Q4), the high-contrast authorities (Q9) and the starting tokens
 (Q10).
