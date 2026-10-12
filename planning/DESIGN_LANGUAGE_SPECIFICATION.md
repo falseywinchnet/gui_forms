@@ -16,7 +16,7 @@ decisions in §12.3.
 | Citation | Source |
 |---|---|
 | (owner direction) | owner direction relayed with the first drafting request, 2026-10-12 |
-| (owner revision n) | owner direction during this revision, 2026-10-12: 1 palette fusion, 2 depth-map correction, 3 not a Windows skin |
+| (owner revision n) | owner direction during this revision, 2026-10-12: 1 palette fusion, 2 depth-map correction, 3 not a Windows skin, 4 no raised buttons |
 | (Vnnn), (Mnnn), (Cnnn) | visual, material-depth and ceremonial verdicts: cue text from `visual-atlas.html`, `material-depth-atlas.html`, `ceremonial-software-atlas.html`; verdicts from `VERDICTS_001.md`, `MATERIAL_VERDICTS_001.md`, `CEREMONIAL_VERDICTS_001.md` |
 | (material doctrine), (depth map), (depth loci) | named sections of `MATERIAL_VERDICTS_001.md`; loci D0–D4 of `MATERIAL_DEPTH_ROUND_001.md` |
 | (progress grammar), (ceremony round) | `CEREMONIAL_VERDICTS_001.md` section; `CEREMONIAL_SOFTWARE_ROUND_001.md` scope and guardrails |
@@ -112,12 +112,14 @@ code" (owner direction).
 
 ### 2.1 Affordance through depth
 
-1. Physical, click-capable controls belong to the language: crisp raised wells,
-   buttons and scroll tracks, machined controls, small controls that stay
-   visibly physical (V052, V057, V216). Deep heavy bevelling is rejected
-   (V077 R): relief is crisp and shallow (VERDICTS_001 synthesis).
-2. Raised means actionable, inset means editable or instrumented, a calm plane
-   means content, shadow means real overlap (DNA-04; M023).
+1. Physical, click-capable controls belong to the language (V052, V057, V216),
+   but buttons are not raised. An action is a flat plate: a soft tinted
+   gradient face and a thin border, distinct from the plane by colour and edge,
+   never by a raise, keylines or a cast shadow (owner revision 4, Plan Paint).
+   Deep heavy bevelling is rejected (V077 R).
+2. A tinted flat plate means actionable, inset means editable or instrumented,
+   the recessed work pane means content, shadow means real overlap (DNA-04;
+   M023 as revised by owner revision 4).
 3. Depth explains physical role; colour explains semantic state. A deeper
    control gets no extra chroma; a coloured selection does not flatten (CRM §6;
    VISUAL §2).
@@ -232,7 +234,7 @@ Windows 95 appearance family M101–M105 accepted in full):
 | Rule | Source |
 |---|---|
 | one global light | M101 |
-| raised action plates, inset edit wells | M023 |
+| action plates and inset edit wells; plates are flat and tinted, not raised (owner revision 4) | M023 |
 | a precise two-step edge, outer contrast plus inner highlight, as the standard boundary; consistent one-pixel highlight and shadow logic suffices | M103, M024 |
 | physical distinction without gradients, blur or large radii as the floor | M102 |
 | etched semantic groupings | M022 |
@@ -241,14 +243,15 @@ Windows 95 appearance family M101–M105 accepted in full):
 | default action marked by a second dark perimeter, not colour, glow or pulse | M105; V116 R |
 | deeper instruments inside shallower command structure | M066, M033 |
 | window and plane shadows only where they establish real layering | M051; DNA-F06 |
-| one surface may combine flat data, inset instruments and raised actions | M026 |
+| one surface may combine recessed content, inset instruments and flat tinted actions | M026; owner revision 4 |
 
-**Rendering.** In the house look the two-step edge is tinted and softened: a
-thin coloured border, light top and left keylines, darker bottom and right
-keylines, a gently graded face, 2–3 logical px corners, as Plan Paint's command
-tiles are (owner revision 3; Plan Paint `action_material`). Grey square bevels,
-sunken status cells and classic dialog buttons belong only to the
-Windows-familiar Classic theme (§12.3).
+**Rendering.** In the house look an action plate is flat: a gently graded
+tinted face, one thin coloured border and 2–3 logical px corners, with no
+light/dark keyline pair and no cast shadow, as Plan Paint's buttons and command
+tiles appear (owner revisions 3 and 4). Depth in the house look is carried by
+recess: entry wells and the work pane sink; nothing rises. Grey square bevels,
+raised buttons, sunken status cells and classic dialog buttons belong only to
+the Windows-familiar Classic theme (§12.3).
 
 ### 3.2 Depth map
 
@@ -260,7 +263,7 @@ owner (owner revision 2):
 | Entry fields | **deepest**: inset well, local occlusion shadow, clear editing boundary and focus | owner revision 2; depth map; M023; PALETTE rule 4 |
 | Work pane | **deepest**: a recessed inset plane sunk below the chrome around it; its content stays calm, with explicit selection and grounded objects | owner revision 2 (supersedes the depth map's "calm plane"); M012 R; Plan Paint canvas surround |
 | Instrument | inset, deeper than commands; may use dark or live-data material | depth map; M061, M066, M021 |
-| Action | shallow raised plate with a physical press | depth map; M023; DNA-C09 |
+| Action | flat tinted plate, not raised; press darkens the face | owner revision 4; M023; DNA-C09 |
 | Command-strip member | flat or quietly shaded at rest; shallow relief on hover and press | §12.3, flat commands |
 | Grouping | etched or geometrically bounded, not carded | depth map; M022 |
 | Side panels | **not raised**: flat at chassis level, or receding | owner revision 2 |
@@ -268,8 +271,8 @@ owner (owner revision 2):
 | Window, popup | shadow and separation proportional to actual stacking | depth map; M051; DNA-F06, DNA-F07 |
 | Ceremony | may become a complete illustrated or procedural world | depth map; D4; §10 |
 
-1. Command plates and buttons stay shallow; no side panel rises above the
-   chassis to compete with the work pane (owner revision 2).
+1. Command plates and buttons are flat; nothing rises above the chassis, and
+   no side panel competes with the work pane (owner revisions 2 and 4).
 2. The work pane has an inner top-left shade and a crisp boundary around calm
    paper or a canvas. Objects on it are grounded by geometry, grouping or an
    authored surface, never floating on bare white and never carded (M012 R;
@@ -281,27 +284,27 @@ owner (owner revision 2):
 |---|---|---|
 | Key light | upper left; azimuth 135° from +x | M101; angle (proposed) |
 | Cast shadow | down and slightly right; horizontal offset at most half the vertical | Plan Paint sheet shadow (1.5, 2.5); ratio (proposed) |
-| Top and left edge | 1 logical px light keyline, white at 70–90 % on raised faces | M103; Plan Paint tile |
-| Bottom and right edge | 1 logical px darker keyline in the chrome hue, about 50 % | M103; Plan Paint tile |
+| Plate edge | one thin coloured border; no light/dark keyline pair on plates | owner revision 4; Plan Paint |
+| Plate face | soft vertical tinted gradient, lighter at the top, following the key light | M101; Plan Paint |
 | Inset well | inner top shade line, outer bottom highlight, thin border | Plan Paint gallery well; atlas |
 
 ### 3.4 Depth levels
 
 Shadow strength follows real overlap; internal regions use edges rather than
-cast shadows, and controls carry only contact shadows (DNA-F06; M051).
+cast shadows, and controls carry no shadows at all (DNA-F06; M051; owner revision 4).
 
 | Level | Meaning | Reference treatment |
 |---|---|---|
 | S2 deep recess | entry well; work pane | inner top-left shade, crisp boundary; Plan Paint surround, sheet shadow (1.5, 2.5) blur 6 about 29 % |
 | S1 recess | instrument, gallery and preview wells | 1 px border, inner top line 14–29 %, white bottom highlight (Plan Paint gallery) |
 | E0 flush | chassis, side panels, resting flat members, paper inside a well | none |
-| E1 seated | resting raised control | light top and left keylines, contact shadow `0 1px` hard about 33 % (Plan Paint tile) |
-| E2 lifted | hot or popped control; selected tab | E1 with darker hot border; tab shadows (2, 0) hard and (3, 1) blur 2 about 22 % (Plan Paint tab) |
+| E1 plate | resting control, flush with its plane | tinted gradient face and thin border; no shadow (owner revision 4) |
+| E2 selected tab | the selected tab joins the ribbon field | lighter face, open bottom edge (Plan Paint tab) |
 | E3 floating | expanded result, floating capsule, completion list | `0 3px 8px` to `0 5px 10px` at 20–33 % (atlas) |
 | E4 overlay | popup, menu, drawer | `0 13px 32px` about 33 % plus `0 2px 5px` about 40 % (atlas) |
 | E5 window | separate floating window | `0 16px 34px` about 40 % plus `0 2px 5px` about 53 %, 1 px light inner rim (atlas) |
 
-Hover or pop raises a part by at most one level; press returns it to E1 or below
+Hover brightens a plate and darkens its border; press darkens the face; neither raises nor lowers it
 (VISUAL §7; DNA-C08, DNA-C09). A shadow stays inside the overflow its parent
 grants (REGIONS §2). Values are starting tokens (§12.3).
 
@@ -309,12 +312,12 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 
 | Relief | Construction | Typical parts | Source |
 |---|---|---|---|
-| Raised plate | soft vertical gradient, thin tinted border, light top/left and dark bottom/right keylines, contact shadow | button, command tile, thumb | M103; Plan Paint tile |
+| Tinted plate | soft vertical tinted gradient, one thin coloured border, no keylines, no shadow | button, command tile, thumb | owner revision 4; Plan Paint |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
-| Pressed | face darkened and its gradient reversed, keylines inverted, contact shadow removed, content 1 logical px down-right | button, command, segment | Plan Paint pressed tile; theme types `pressed_content_offset {1,1}`; DNA-C09 |
-| Active tool | warm gold gradient plate, deeper gold border, pale top keyline | selected tool, current choice in a strip | Plan Paint gold; CRM pair B-prime |
+| Pressed | face and border darkened; no shadow; content does not move | button, command, segment | Plan Paint pressed tile; owner revision 4 |
+| Active tool | warm gold gradient plate, deeper gold border, flat | selected tool, current choice in a strip | Plan Paint gold; CRM pair B-prime |
 | Default | second dark perimeter around the plate | default button | M105; theme types `default_ring` |
-| Disabled | contrast and depth reduced, side keylines dropped, faint border | any | M104; Plan Paint disabled tile |
+| Disabled | contrast reduced, faint border, paler face | any | M104; Plan Paint disabled tile |
 | Etched | shade and light 1 px line pair, fading at both ends | dividers, group boxes | M022; Plan Paint `paint_separator` |
 | Seam | thin parent-owned boundary, wider hit area | splitter, breadcrumb and tab joins | VISUAL §3.2; REGIONS §4; DDV-007-04 |
 | Actuator | separate attached plates with their own press | spinner and scroll arrows | M025 |
@@ -367,7 +370,7 @@ Image fills serve backplane and client assets, never control faces (§12.3).
 | Cobalt plane | pale blue vertical gradient, light top line, shade line below | command planes | Plan Paint ribbon; STYLE Office Pearl adapted |
 | Pearl | low-contrast pearl-grey bounded plane, never borderless | status strip, dialogs, information panes | M053; DNA-V05 |
 | Ivory stock | neutral low-chroma ivory, never warm-tinted beside blue | side panels, captions, explanation regions | owner revision 1 |
-| Tile | soft blue-gradient raised plate (§3.5) | command and action buttons | Plan Paint `action_material` |
+| Tile | soft blue-gradient flat tinted plate (§3.5) | command and action buttons | Plan Paint; owner revision 4 |
 | Gold | warm gold gradient plate | active or selected tool | Plan Paint gallery recipe |
 | Gloss | four-stop gradient with a hard break near mid-face (0, .48, .52, 1); 1 px shine under a flat top | loud themes; candy controls adapted | PlaySuite `suite.cpp`; V122 D |
 | Felt, graphite | middle-value grey, sub-3 % texture, never near-black, never behind body text | work-pane surround, chassis, seams | Plan Paint surround; DNA-V04, DNA-P10, DNA-V12 |
@@ -564,8 +567,8 @@ constant across atmospheres (PALETTE; V010; V198; M036).
 | 12 | Phosphor Violet | `#2B4247 → #4C9571 → #76509B` | `#FFFFFF` | `#CBD5D2` | `#DCEBE3` | `#487662` |
 
 1. Every atmosphere shares one material stack: upper-left light; fresco of a
-   three-stop gradient and three blooms; raised plates with bright top keyline
-   and darker lower edge; inset wells with local occlusion; deeper borders only
+   three-stop gradient and three blooms; flat tinted plates with one thin
+   border (owner revision 4; the atlas's raised plates are superseded); inset wells with local occlusion; deeper borders only
    at plane boundaries; semantic selection as a pair; white or pearl paper with
    no coloured wallpaper; object icons independent of chrome tint (PALETTE).
 2. Paper stays white, pearl or almost imperceptibly tinted (V194); in a blue
@@ -760,8 +763,8 @@ revision 3; Plan Paint tiles 3, gold plates 2, tabs 4).
    composition and preview extent adapt while keeping relationships; then
    regions collapse by declared priority; controls never shrink below usable
    targets (DDV-007-02; DNA-C12).
-4. Scroll bars stay visible and physical, crisp raised tracks rather than
-   disappearing hints, without becoming prominent instruments (V052; V058 R).
+4. Scroll bars stay visible and physical, crisp tinted thumbs in inset tracks
+   rather than disappearing hints, without becoming prominent instruments (V052; V058 R).
 
 ## 8. Control anatomy and states
 
@@ -778,7 +781,7 @@ owner direction; §12.1 item 1).
 | shadow | contact or cast shadow, including backshadow | button, segment, popup |
 | face | main material surface | button, tab, thumb, capsule |
 | edge | outer boundary stroke and silhouette | every bounded part |
-| keyline | inner highlight or lowlight on one edge | raised top highlight |
+| keyline | inner highlight or lowlight on one edge | the lower specular line of the identity band |
 | perimeter | second outer ring | default action (M105) |
 | sheen | specular or reflective layer over a face | gloss band, cursor sheen |
 | seam | parent-owned shared boundary | splitter, breadcrumb or tab join |
@@ -794,7 +797,7 @@ owner direction; §12.1 item 1).
 | caret | insertion point | editors |
 | disclosure | open/close affordance | menu arrow, tree expander |
 | grip | seam or panel actuator | collapse grip, resize grip |
-| chip | small soft raised status cell | size, zoom (Plan Paint status strip) |
+| chip | small flat tinted status cell | size, zoom (Plan Paint status strip) |
 | focus, default, selection, validation, drop | state cues | §8.4 |
 
 Sources: CONTROL_DNA §3.3–3.5; MICROFEATURE §6.3; theme types (`text`,
@@ -802,7 +805,7 @@ Sources: CONTROL_DNA §3.3–3.5; MICROFEATURE §6.3; theme types (`text`,
 `GUI_FORMS_CONTROLS_PROPOSAL.md` step 4; Plan Paint.
 
 ```text
-button         shadow, face (+keyline, sheen), edge, perimeter?, icon?, label, disclosure?, focus
+button         face (+sheen), edge, perimeter?, icon?, label, disclosure?, focus
 check box      well, indicator, label, focus
 spin box       well, content, caret, actuator x 2, focus
 scroll bar     track (well), thumb (face, edge), arrow actuators (button systems)
@@ -1053,7 +1056,7 @@ bit tweaked to look nicer" than its references (owner direction).
    | tab rail | 27 px, solid pale blue `#9BB5D8`; selected tab face `#E8F2FF` runs into the plane without a closing edge |
    | File tab | solid blue gradient `#528BE0` to `#173F88`, white text |
    | command plane | pale blue gradient `#E8F2FF`, `#CADEFB`, `#A5C4F1`, `#769FDF`; white top line, shade line beneath |
-   | command tile | `#D2E4FB` to `#A3C1EC`, radius 3, border `#6384B2` (hot `#355E96`), light top/left and dark bottom/right keylines, 1 px contact shadow, ink `#153765` |
+   | command tile | `#D2E4FB` to `#A3C1EC`, radius 3, border `#6384B2` (hot `#355E96`), flat: no keylines and no shadow, ink `#153765` |
    | active tool | gold `#FFEDBA` to `#FFCF66`, border `#C49332`, radius 2 |
    | gallery well | white `#F8FBFF` to `#FFFFFF`, thin blue-grey border `#94ACC8`, faint inner top shade |
    | groups | labels `#485B70` beneath thin etched dividers fading at both ends |
@@ -1142,7 +1145,7 @@ bit tweaked to look nicer" than its references (owner direction).
    | V064 square corners; owner revision 3 points to 2–3 px plates; M075, M052 admit soft corners | containers square, plates softened (§7.1) |
    | M014, V061 D give colour to objects; V202 R, V204 R, V217 R reject plain grey chrome | chrome tinted and shaded, never competing with objects (§5.5 rule 2) |
    | V052 accepts crisp raised scroll tracks; V058 R rejects prominent instrument scroll bars | visible and physical but quiet (§7.4 rule 4) |
-   | DNA-F06 keeps cast shadows for real layers; MICROFEATURE §6 needs a breadcrumb backshadow; PlaySuite buttons cast shadows | controls carry contact shadows only; a backshadow is one (M051; §3.4) |
+   | DNA-F06 keeps cast shadows for real layers; MICROFEATURE §6 needs a breadcrumb backshadow; PlaySuite buttons cast shadows | controls carry no shadows (owner revision 4); a breadcrumb backshadow is a real layer edge, not a control shadow (M051; §3.4) |
 
 ### 12.2 Questions for the owner
 
@@ -1203,6 +1206,13 @@ These supersede the conflicting sources and options of the first draft.
   dividers between groups and shading on the strip. A faint button that needs
   some presence at rest gets quiet relief through shading, not a full face.
   Hover and press bring full relief.
+- **No raised buttons (owner revision 4).** Plan Paint has no raised buttons.
+  In the house look every button, command tile, chip and actuator is a flat
+  plate: a soft tinted gradient face and one thin coloured border, with no
+  light/dark keyline pair and no shadow. Hover brightens it and press darkens
+  it; nothing rises or sinks. Depth comes from recess only: entry fields and
+  the work pane. Raised buttons survive only in the Windows-familiar Classic
+  theme.
 - **Focus.** A text field draws its focus ring whenever it has focus,
   however focus arrived. Every other control draws its focus ring only after
   keyboard use.
