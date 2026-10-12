@@ -168,7 +168,7 @@ code" (owner direction).
 2. Dark primary surfaces lie outside the direction; a dark charcoal transient
    menu with soft corners, mild gradient, explicit boundaries and clear hover
    and focus is within bounds (M071). The derived dark variant is an owner
-   decision (§12.3); its reach is open (§12.2 Q4).
+   decision (§12.3); it reaches whole windows (§12.4).
 3. Warm and cool are not fused as stock: warm caption stock or apricot beside
    blue chrome is jarring; neutral ivory panel stock on blue works (owner
    revision 1). Warmth enters as state, signal or rare ceremony (§5.5).
@@ -497,12 +497,12 @@ Ochre.
 
 ### 5.3 Seed palette and derivation
 
-1. The classic Office Word font-colour gallery seeds base hues, tints and shades
-   for selection, focus, live data, icon families, frescoes, ceremony and signals
-   (CRM §3). Plan Paint uses the Office 2007–2010 default theme row (`#1F497D`,
-   `#EEECE1`, `#4F81BD`, `#C0504D`, `#9BBB59`, `#8064A2`, `#4BACC6`, `#F79646`
-   with tints) (Plan Paint `office_color`); that is the **(proposed)** pin
-   (§12.2 Q5).
+1. Plan Paint's MS Paint-style default colour swatches come from the Office
+   2007–2010 default theme row (`#1F497D`, `#EEECE1`, `#4F81BD`, `#C0504D`,
+   `#9BBB59`, `#8064A2`, `#4BACC6`, `#F79646` with tints; Plan Paint
+   `office_color`). That row is a swatch set for colour pickers, not a seed for
+   themes; theme colours derive from the colour pairs, the phase diamond and
+   the atmospheres (CRM §1–§2; §12.4).
 2. Derivation (CRM §4): choose an anchor hue; derive the pair in OKLCH by a
    declared phase relation; adjust lightness and chroma jointly for the contrast
    class; gamut-map the pair together; derive hover, pressed, selected, disabled,
@@ -610,7 +610,7 @@ the gradient stop beneath it, through translucency, with selection applied
    preference and user-overridable; the light stays upper left, inset stays
    inset, highlights dim and shadows deepen; complementary colours with pair B
    (black `#000000`, green `#82B361`, accent `#B36182`) as reference (§12.3;
-   §5.2). Its reach is open (§12.2 Q4).
+   §5.2). It reaches whole windows (§12.4).
 
 ### 5.9 Colour never carries meaning alone
 
@@ -991,8 +991,9 @@ surface is its counterpart.
 | Motion | Installation may have a friendly choreographed arrival that ordinary launch does not; between stages panels are replaced in place | C081; C074 R, C082 R, C102 R |
 | Motion | Illustrative activity may run during long work and stops completely at completion | C004 D; C114 D |
 
-How ceremonial motion meets the default theme's progress-only ambient rule is
-open (§12.1 item 6; §12.2 Q2).
+Ceremonial surfaces may animate in this way while their work runs; the
+progress-only ambient rule applies to the default theme's everyday surfaces
+(§12.4).
 
 ### 10.2 Instrumentation: the progress grammar
 
@@ -1064,12 +1065,10 @@ bit tweaked to look nicer" than its references (owner direction).
    | type | Portsmouth Rapids throughout the chrome |
    | work pane | canvas recessed in a textured mid-grey felt surround; sheet shadow (1.5, 2.5) blur 6 |
 
-5. **Identity band.** A Watercolor fresco inside the band (V003): three-stop
-   gradient with broad blooms, lower specular keyline, crisp dark boundary, white
-   title text with a 1 px shadow, no animated aurora (PALETTE; VISUAL §7; §12.3).
-   In Sapphire Dusk its stops are `#17347F`, `#3A68CB`, `#D96872`. Its apricot
-   bloom is dropped from the default (owner revision 1); the coral endpoint and
-   the band's presence beside a solid File tab are open (§12.2 Q3).
+5. **Identity.** As in Plan Paint: the solid blue File tab, the tab rail and
+   the command-plane gradient carry identity; the default has no fresco band
+   (§12.4). A Watercolor fresco (V003; three-stop gradient with broad blooms) stays
+   available to themes and to ceremony.
 6. **Atmosphere.** Sapphire Dusk roles: chrome ramp `#FAFDFF`, `#E7EDF6`,
    `#C9D4E5`, `#AEBBD1`; ink `#1D2D4B` on white paper; selection `#DBE6FF` with
    line `#436FBD`; focus `#294F91`; accent `#3E61A3`; coral signal `#DF6B65`
@@ -1081,10 +1080,12 @@ bit tweaked to look nicer" than its references (owner direction).
    easing; boxes that lift with a growing shadow when selected (PlaySuite
    `suite.cpp`, `capsule.cpp`, `shelf.cpp`). The default takes this character,
    not its specifics (§12.3).
-8. **Studies pending.** Four browser studies were published for the owner:
-   House Composite in Sapphire Dusk, Watercolor Instrument in Encarta Cobalt,
-   Studio 2003 in Apricot Modem, and Machined Workstation in Phosphor Violet.
-   The choice among them is pending (§12.2 Q1).
+8. **Reference study.** The default follows the published Pearl Ribbon study,
+   moved toward Plan Paint's royale blue (§12.4): a near-white-to-pale-blue
+   command plane, flat tinted plates, gold for the active tool, neutral ivory
+   side planes, a recessed work pane. The selected tab is shaded more subtly than
+   the earlier studies: a faint, horizontally stretched bubble highlight and a
+   slight accent indent along its top edge, warping gently toward the ends.
 9. **Beside it.** Windows-familiar themes ship too: Classic and a modern flat
    look first, a few more later (§12.3). Literal Windows rendering lives only
    there (owner revision 3).
@@ -1149,33 +1150,10 @@ bit tweaked to look nicer" than its references (owner direction).
 
 ### 12.2 Questions for the owner
 
-**Q1. Which published study becomes the default reference?** A. House Composite
-in Sapphire Dusk. B. Watercolor Instrument in Encarta Cobalt. C. Studio 2003 in
-Apricot Modem. D. Machined Workstation in Phosphor Violet.
-
-**Q2. Do ceremonial surfaces (installer, first run, rare long tasks) follow the
-progress-only ambient rule?** A. Yes; only progress fill and activity object
-move. B. They may add one slow ambient background flourish while the task runs,
-stopping at completion (C112, C114 D). C. Ceremony is the application's own
-theme layer and may use the full engine budget.
-
-**Q3. What carries identity above the command plane?** A. A Sapphire fresco band
-with its coral endpoint. B. A fresco band in blues and violet only. C. No fresco
-band; the solid blue File tab and the command-plane gradient carry identity, as
-in Plan Paint.
-
-**Q4. How far does the derived dark variant reach?** A. Every surface, content
-paper included (black paper, green ink, as Phosphor). B. Everything dark except
-the identity band, gold state and object icons, which keep light-theme
-brightness. C. Chrome dark; the work pane's paper stays light.
-
-**Q5. Which Office revision seeds the palette (CRM §3)?** A. The Office 2007–2010
-default theme row, as Plan Paint uses. B. A later revision, to be named. C. No
-pin; the phase diamond and atmospheres suffice.
-
 **Q6. Which icons does the modern flat Windows-familiar theme use?** A. The same
 high-colour material icons as every theme (C152 holds everywhere). B. Its own
-flatter glyph set, confined to that theme.
+flatter glyph set, confined to that theme. A side-by-side comparison is
+published with the theme studies.
 
 ### 12.3 Owner decisions, 2026-10-12
 
@@ -1230,6 +1208,23 @@ These supersede the conflicting sources and options of the first draft.
   is a separate, near-colourless rebuild.
 - **Starting tokens.** The proposed numbers are accepted as starting
   tokens and revisited once the engine renders a native specimen sheet.
+
+### 12.4 Owner decisions, second round, 2026-10-12
+
+- **Default reference.** Pearl Ribbon, moved a little toward Plan Paint's
+  royale blue. Selected-tab shading is subtler than in the studies: a slight
+  accent indent with a gentle horizontal warp, like a faint bubble.
+- **Ceremonial motion.** The ceremonial verdicts concern progress and
+  animations that show activity going on; animation is allowed. Rare
+  ceremonial surfaces (installation, first run, long tasks) may carry slow
+  ambient life and an activity object while work runs, within the motion rules
+  of §9 and stopping at completion (C033, C072, C101, C112, C114 D). The
+  progress-only rule of §12.3 governs everyday surfaces of the default theme.
+- **Identity.** As in Plan Paint: no fresco band in the default; the File tab,
+  tab rail and command plane carry identity.
+- **Dark variant.** It reaches whole windows.
+- **Office palette.** It is only the origin of the MS Paint-style default colour
+  swatches, not a seed for themes; nothing is pinned.
 
 ## Appendix A. Anti-models
 
