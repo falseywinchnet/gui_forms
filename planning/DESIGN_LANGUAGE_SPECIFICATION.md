@@ -1083,9 +1083,14 @@ bit tweaked to look nicer" than its references (owner direction).
 8. **Reference study.** The default follows the published Pearl Ribbon study,
    moved toward Plan Paint's royale blue (§12.4): a near-white-to-pale-blue
    command plane, flat tinted plates, gold for the active tool, neutral ivory
-   side planes, a recessed work pane. The selected tab is shaded more subtly than
-   the earlier studies: a faint, horizontally stretched bubble highlight and a
-   slight accent indent along its top edge, warping gently toward the ends.
+   side planes, a recessed work pane. Tabs copy Plan Paint's tab stack
+   (`make_tab_theme`): faces `#9BB6DA` at rest, `#ACC6E7` hot, `#E8F2FF`
+   selected, with a top wash fading out by 72 % of the height; a white top line
+   and a double right keyline (`#D1E0F5` inside `#496C9F`); every tab casts a
+   hard 2 px `#496C9F` edge and a soft (3, 1) shadow to its right; the selected
+   tab runs into the ribbon with no bottom edge. Ribbon buttons carry a slight
+   3D pill: a soft highlight across the upper face and a faint shade at the
+   bottom, drawn by shading alone, with one thin border and no cast shadow.
 9. **Beside it.** Windows-familiar themes ship too: Classic and a modern flat
    look first, a few more later (§12.3). Literal Windows rendering lives only
    there (owner revision 3).
@@ -1150,10 +1155,7 @@ bit tweaked to look nicer" than its references (owner direction).
 
 ### 12.2 Questions for the owner
 
-**Q6. Which icons does the modern flat Windows-familiar theme use?** A. The same
-high-colour material icons as every theme (C152 holds everywhere). B. Its own
-flatter glyph set, confined to that theme. A side-by-side comparison is
-published with the theme studies.
+None open. New questions are added here as they arise.
 
 ### 12.3 Owner decisions, 2026-10-12
 
@@ -1212,8 +1214,14 @@ These supersede the conflicting sources and options of the first draft.
 ### 12.4 Owner decisions, second round, 2026-10-12
 
 - **Default reference.** Pearl Ribbon, moved a little toward Plan Paint's
-  royale blue. Selected-tab shading is subtler than in the studies: a slight
-  accent indent with a gentle horizontal warp, like a faint bubble.
+  royale blue. Ribbon buttons get a slight 3D pill effect (the "faint bubble"),
+  by shading alone. Tabs emulate Plan Paint's tab shadowing exactly (§11 item 8).
+- **Dark variant.** The derived dark form drawn in the studies (Phosphor pair:
+  black with green `#82B361`, complement `#B36182` for the File tab and active
+  tool) is accepted.
+- **Icons in the modern flat theme (Q6).** High-colour material icons, as in
+  every theme; a monochrome glyph set is too trivial and lacks character (C152
+  holds everywhere).
 - **Ceremonial motion.** The ceremonial verdicts concern progress and
   animations that show activity going on; animation is allowed. Rare
   ceremonial surfaces (installation, first run, long tasks) may carry slow
