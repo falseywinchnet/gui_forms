@@ -86,6 +86,11 @@ python3 tools/control_registry.py render         # writes controls/generated/
 python3 tools/generate_library_docs.py           # writes api/ and tests/doc_examples_tests.cpp
 ```
 
+The chevron bar at the top of the Roadmap page, `_static/roadmap.svg`, is drawn
+by `python3 tools/make_roadmap_svg.py`. When a release changes, edit its `STAGES`
+list and the matching section of `dev/roadmap.md` together, then commit the
+regenerated image.
+
 The `docs` CI job builds the site. The `house-style` job runs the registry
 checks, the generator's unit tests and `generate_library_docs.py --check`; a
 stale generated page fails the job rather than being rewritten silently. The
