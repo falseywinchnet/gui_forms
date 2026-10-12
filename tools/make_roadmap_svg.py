@@ -56,18 +56,20 @@ STAGES = [
         "Error model and breaking-change audit",
         "Two independent consumers",
     ]),
+    ("0.6", "Bindings", "stage", [
+        "C# bindings with a Windows Forms shape",
+    ]),
+    ("0.7", "Designers", "stage", [
+        "Interface builder",
+        "HTML import and layout designer",
+        "Theme designer",
+    ]),
     ("1.0", "Stable", "stable", [
         "Same traces on every host",
         "Native accessibility tested",
         "Reproducible packages, SBOM",
         "Docs generated from the control manifest",
         "API frozen",
-    ]),
-    ("1.x", "Beyond", "after", [
-        "C# Windows Forms swap-in",
-        "Interface builder",
-        "HTML import and layout designer",
-        "Theme designer",
     ]),
 ]
 
