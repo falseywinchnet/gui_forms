@@ -88,6 +88,47 @@ Hosts
   drag and drop on Windows, outbound drag on every host, and advertising the
   accessibility capability where native publication already exists.
 
+## What comes next
+
+The next programme turns the toolkit's look into data and adds the tools to
+edit it. The full plan, with a measured gate for each stage, is
+`planning/FORWARD_PROGRAMME.md`; the visual rules are
+`planning/DESIGN_LANGUAGE_SPECIFICATION.md`.
+
+Articulated controls
+: Every control is built from named parts with states and public geometry,
+  described by one schema that the C++ API, form documents, themes and the
+  visual tools share.
+
+One theme engine
+: Themes are data written in a CSS-syntax subset addressed to those parts:
+  properties, layered effects, transitions and state machines, and bounded
+  expressions, with pointer position and application values as inputs. The
+  engine runs them; new kinds of effect are added to the engine in C++.
+  Transparency, reflections, glass and animation are capabilities; an idle
+  window still draws nothing.
+
+A default look of its own
+: The default theme follows the design-language specification and keeps
+  depth where controls carry meaning. Windows-familiar themes ship beside it.
+
+Accessibility verified on every host
+: Tests that read each platform's own accessibility API, a UI Automation
+  provider on Windows and editable text ranges, before the capability is
+  advertised.
+
+Real dynamic layout
+: Flex and grid layout containers checked against a browser's layout.
+
+Tools
+: A visual interface builder written in GUI.Forms, whose documents can also be
+  edited by hand without anything being overwritten; a WYSIWYG layout designer
+  that imports static HTML and CSS; and a WYSIWYG theme designer.
+
+C# bindings
+: Bindings over the stable C ABI with a Windows Forms-shaped API, so a Windows
+  Forms project can switch to GUI.Forms and run on macOS and Linux.
+
 ## Before 1.0
 
 The API is declared stable only when all of the following hold:
