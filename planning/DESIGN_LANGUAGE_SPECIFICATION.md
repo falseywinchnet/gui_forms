@@ -1117,8 +1117,8 @@ bit tweaked to look nicer" than its references (owner direction).
    it hand-authors high-contrast arrays per role (theme types); the owner wants
    GUI.Forms' own default and derived variants. Plan Paint builds its look as
    overrides of `windows-professional` (Plan Paint `ribbon.cpp`).
-3. **Location.** The `planning/interview/` records exist on branch
-   `claude/style-summary-and-interview-ledger`, not yet on `main`.
+3. **Location.** Resolved: the `planning/interview/` records are on `main`
+   (merged 2026-10-12).
 4. **Work-pane depth (owner revision 2 over the depth map).** The depth map
    gives content a "calm plane" and the first draft made paper flush. The work
    pane is now a recessed inset plane and, with entry fields, the deepest locus;

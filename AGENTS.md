@@ -79,7 +79,10 @@ visual tools) is defined in `planning/FORWARD_PROGRAMME.md`, with the visual
 rules in `planning/DESIGN_LANGUAGE_SPECIFICATION.md`. Find your stage there,
 start it only once its dependencies' gates are recorded, and record your own
 gate's measurement. Open owner decisions are listed in both files; do not
-assume them. A readable stage board for sibling threads is published at
+assume them. Each stage has a working brief in `planning/stages/` (why, what,
+how, current code, house-style points, open decisions and lessons from the
+owner's discussions); read `planning/stages/README.md` and your stage's
+brief before starting. A readable stage board for sibling threads is published at
 https://claude.ai/artifact/D9d2SUvkiKQETiVnmwnEt4 (read it with the Artifact
 tool); the planning files are authoritative where they differ.
 

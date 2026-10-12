@@ -68,16 +68,23 @@ T3 Theme language front end ─────────────────�
 T4 Default theme + Windows-familiar themes ────┤       │              │
 T5 Compositor cooperation ─────────────────────┤ (parallel after T2)  │
 L  Real dynamic layout (flex, grid, flow) ─────┤ (parallel after T1)  │
+FD Form documents ─────────────────────────────┤ needs T1, T3         │
+DP Damage-preserving painting (no dependencies)│                      │
 R  SDRSharp reflection, current technique ─────┴── needs T4, F        │
 C  Stable installed C ABI ─────────────── needs T1, T2 ───────────────┤
 S  C# sibling: Windows Forms swap-in ──── needs R, C                  │
-D  Interface builder (dogfooded) ──────── needs T3, L, form documents │
+D  Interface builder (dogfooded) ──────── needs T3, L, FD             │
 H  HTML import + WYSIWYG layout designer ─ needs L, T3                │
 V  WYSIWYG theme designer ─────────────── needs T4, D core ───────────┘
 ```
 
-A, F and T1 can start now; A and F run beside everything else. T1 to T4 are
-the spine.
+A, F, T1 and DP can start now; A and F run beside everything else. T1 to T4
+are the spine. FD and DP were added on 2026-10-12 to match the public
+roadmap's 0.4 release; their scopes and gates are proposals for owner review.
+
+Each stage has a working brief in `planning/stages/<stage>/README.md` with
+the owner's reasons, the current code, the agreed approach, house-style
+points and open decisions. Read `planning/stages/README.md` first.
 
 ## 3. Foundations
 
@@ -186,6 +193,31 @@ Gate: a corpus of layout fixtures matches Chromium's boxes within a recorded
 tolerance at several window sizes, using the fidelity oracle approach of the
 earlier Web.Forms experiments (`file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md`).
 
+### FD. Form documents
+
+A compact form-document format that serializes the T1 schema: objects with
+stable IDs, z-order, layers, properties, layout containers, presentational
+state machines and references to named handlers. Hand edits are legal and
+round-trip; generated C++ and C# are disposable (interview GF014). The syntax
+is an open owner decision (the provisional `demo/gallery.dml` block syntax, a
+CSS-family syntax shared with T3, or another).
+
+Gate (proposed): untouched documents round-trip byte for byte; a scripted
+one-property edit changes only that property's bytes; every Gallery page can
+be expressed as a document whose generated C++ compiles against the installed
+SDK and passes its tests.
+
+### DP. Damage-preserving painting
+
+Paint and present each damage rectangle of the bounded set instead of their
+bounding box, report partial present as an optional host extension, and
+publish the presentation availability record
+(`PAINT_PIPELINE_AVAILABILITY.md`).
+
+Gate (proposed): with two distant damaged rectangles, the painted area equals
+their sum on every host and pixels outside them are untouched; the
+paint-pipeline acceptance tests still pass.
+
 ## 5. Reflection and the C# sibling
 
 ### R. SDRSharp reflection, current technique
@@ -267,6 +299,7 @@ propagated; the saved theme passes T3 conformance and T4's reference images.
 
 ## 7. Working rules for siblings
 
+- Read `planning/stages/README.md` and your stage's brief before starting.
 - Follow `AGENTS.md`, the house style, and the build method in
   `docs/building/fast-builds.md`; do not improvise CI, caching or toolchains.
 - Record each gate's measurement with workload, machine and commands.
@@ -303,6 +336,13 @@ two authorities (the host palette under host high contrast, GUI.Forms' own
 near-colourless rebuild otherwise); the proposed tokens are the starting
 tokens, revisited after a native specimen sheet.
 
-Default theme candidates for T4 are sketched in the published theme studies
-(Sapphire Dusk, Pearl Works, Chrome and Gold, Graphite Studio); the owner has
-not chosen one yet.
+Decided in later rounds (`DESIGN_LANGUAGE_SPECIFICATION.md` §12.4, §12.5):
+the default follows the Pearl Ribbon study moved toward Plan Paint's royale
+blue, with Plan Paint's tab stack, ribbon buttons as a cloth bulge with no
+edge, push buttons as Plan Paint's action plate, near-white `#F4F4F5` stock
+and no fresco band; the derived dark variant drawn in the studies is accepted
+and reaches whole windows; every theme keeps high-colour icons. Still open:
+whether the default's ribbon buttons ship flat, as the smooth bulge or as the
+dithered bulge (§12.5); whether to create an interim `gui-forms` default on
+today's recipe system before T4; how independent the two 1.0 consumers must
+be; the form-document syntax (FD); where the C# layer lives (S).

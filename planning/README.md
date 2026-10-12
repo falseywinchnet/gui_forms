@@ -20,6 +20,7 @@ collection of theme callbacks.
 | [`CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md`](CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md) | Proposes the superset vocabulary of regions, parts, relationships, states, and projections that a design language must be able to address. |
 | [`AUTHORITATIVE_CONTROL_REGIONS.md`](AUTHORITATIVE_CONTROL_REGIONS.md) | Records the first authority axiom and derives parent-owned visual order, interactive order, overlap, clipping, projection, and transition rules. |
 | [`FORWARD_PROGRAMME.md`](FORWARD_PROGRAMME.md) | The current programme: stages, dependencies and measured gates for articulated controls, the theme engine, accessibility, the C ABI, the C# sibling and the visual tools. |
+| [`stages/`](stages/README.md) | One working brief per programme stage for a worker starting without the owner's conversation history: why, what, how, current code, house-style points, open decisions. |
 | [`DESIGN_LANGUAGE_SPECIFICATION.md`](DESIGN_LANGUAGE_SPECIFICATION.md) | The formal design language, in artistic and effect terms, that the default theme and the engine are measured against. Draft for owner review. |
 | [`interview/`](interview/README.md) | The original owner interview ledger and its four companion records, copied from `file_manager` at `867180e`. |
 | [`MICROFEATURE_CONSERVATION_PROTOCOL.md`](MICROFEATURE_CONSERVATION_PROTOCOL.md) | Defines an interview-to-source-to-native conservation ledger and uses the broken breadcrumb as the first corrective case. |
