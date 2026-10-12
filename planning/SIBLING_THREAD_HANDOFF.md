@@ -48,7 +48,7 @@ Read these files completely and follow the nearest AGENTS.md:
 4. /Users/quentinkuttenkuler/file_manager/planning/EVIDENCE_REGISTER.md
 5. /Users/quentinkuttenkuler/file_manager/planning/DECISION_PROTOCOL.md
 6. /Users/quentinkuttenkuler/file_manager/planning/SURFACE_PIPELINE.md
-7. /Users/quentinkuttenkuler/file_manager/planning/gui_forms/GUI_FORMS_INTERVIEW_LEDGER.md
+7. planning/interview/GUI_FORMS_INTERVIEW_LEDGER.md
 8. /Users/quentinkuttenkuler/file_manager/gui_forms/AGENTS.md
 9. /Users/quentinkuttenkuler/file_manager/gui_forms/README.md
 10. /Users/quentinkuttenkuler/file_manager/gui_forms/PROVING_SLICE.md

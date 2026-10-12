@@ -11,7 +11,7 @@ needs it. It does not put File Manager code, filesystem objects, Engine
 contracts, Orchestrator contracts, or plugin authority inside `gui_forms/`.
 
 The companion owner verdicts and investigation are in
-`../../planning/gui_forms/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md`. The
+`interview/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md`. The
 visual consumer constitution remains under `../../frontend/planning/visual/`.
 
 ## 1. Admission rule

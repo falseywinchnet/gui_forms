@@ -19,6 +19,7 @@ collection of theme callbacks.
 | [`DESIGN_LANGUAGE_SYSTEM_MODEL.md`](DESIGN_LANGUAGE_SYSTEM_MODEL.md) | States the recursively nested system model, the HTML/CSS/C++ separation, and the shared failure mode of non-composable theme addressability. |
 | [`CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md`](CONTROL_DNA_AND_STYLE_ADDRESSABILITY.md) | Proposes the superset vocabulary of regions, parts, relationships, states, and projections that a design language must be able to address. |
 | [`AUTHORITATIVE_CONTROL_REGIONS.md`](AUTHORITATIVE_CONTROL_REGIONS.md) | Records the first authority axiom and derives parent-owned visual order, interactive order, overlap, clipping, projection, and transition rules. |
+| [`interview/`](interview/README.md) | The original owner interview ledger and its four companion records, copied from `file_manager` at `867180e`. |
 | [`MICROFEATURE_CONSERVATION_PROTOCOL.md`](MICROFEATURE_CONSERVATION_PROTOCOL.md) | Defines an interview-to-source-to-native conservation ledger and uses the broken breadcrumb as the first corrective case. |
 
 These records are inputs to both GUI.Forms and Web.Forms. GUI.Forms owns the
