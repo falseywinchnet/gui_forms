@@ -775,6 +775,19 @@ These supersede the conflicting sources and options above.
   however focus arrived. Every other control draws its focus ring only after
   keyboard use.
 
-Still open: ambient animation in the default theme (Q2), a dark default
-variant (Q4), the high-contrast authorities (Q9) and the starting tokens
-(Q10).
+- **Ambient animation (Q2).** In the default theme only progress bars
+  animate ambiently; nothing else animates at rest. Themes may do more within
+  the engine's budget.
+- **Dark variant (Q4).** The default ships a dark variant, derived by rule
+  from the light theme (the light stays upper left, inset stays inset), that
+  follows the host's dark preference and can be overridden by the user. It
+  makes use of complementary colours; the reference is Plan Paint's
+  "Phosphor" pair, a soothing black `#000000` with soft green `#82b361`,
+  accented by its complement `#b36182` (Plan Paint `src/color_palette.cpp`).
+- **High contrast (Q9).** Two authorities, as in §5.3 rule 2: under the host's
+  high-contrast mode the host palette wins; GUI.Forms' own high-contrast mode
+  is a separate, near-colourless rebuild.
+- **Starting tokens (Q10).** The proposed numbers are accepted as starting
+  tokens and revisited once the engine renders a native specimen sheet.
+
+All §12.2 questions are now decided.

@@ -296,6 +296,13 @@ flat at rest when dividers and strip shading carry the structure, with quiet
 relief through shading for faint buttons; text fields draw focus whenever
 focused, other controls only after keyboard use.
 
-Still open, and not assumed anywhere: ambient animation in the default theme,
-a dark default variant, the high-contrast authorities, and the starting
-tokens.
+Also decided: in the default theme only progress bars animate ambiently; a
+derived dark variant follows the host preference and uses complementary
+colours (reference: Plan Paint's Phosphor black and green); high contrast has
+two authorities (the host palette under host high contrast, GUI.Forms' own
+near-colourless rebuild otherwise); the proposed tokens are the starting
+tokens, revisited after a native specimen sheet.
+
+Default theme candidates for T4 are sketched in the published theme studies
+(Sapphire Dusk, Pearl Works, Chrome and Gold, Graphite Studio); the owner has
+not chosen one yet.
