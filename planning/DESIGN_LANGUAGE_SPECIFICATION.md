@@ -172,7 +172,7 @@ code" (owner direction).
    and focus is within bounds (M071). The derived dark variant is an owner
    decision (§12.3); it reaches whole windows (§12.4).
 3. Warm and cool are not fused as stock: warm caption stock or apricot beside
-   blue chrome is jarring; neutral near-white panel stock on blue works (`#F0F1F1`; §12.5) (owner
+   blue chrome is jarring; neutral near-white panel stock on blue works (`#F4F4F5`; §12.5) (owner
    revision 1). Warmth enters as state, signal or rare ceremony (§5.5).
 
 ### 2.5 Honest structure, composed density
@@ -372,7 +372,7 @@ Image fills serve backplane and client assets, never control faces (§12.3).
 | Paper | white or near-white, no structural texture | inside the work pane, documents, wells | V006, V194; VISUAL §7 |
 | Cobalt plane | pale blue vertical gradient, light top line, shade line below | command planes | Plan Paint ribbon; STYLE Office Pearl adapted |
 | Pearl | low-contrast pearl-grey bounded plane, never borderless | status strip, dialogs, information panes | M053; DNA-V05 |
-| Near-white stock | the near-white `#F0F1F1` ("ivory" in the owner's words; owner-chosen, after Windows' `#F0F0F0`), never warm-tinted beside blue | side panels, captions, dialog stock, explanation regions | owner revision 1, clarified in §12.5 |
+| Near-white stock | the near-white `#F4F4F5` ("ivory" in the owner's words; owner-chosen, after Windows' `#F0F0F0`), never warm-tinted beside blue | side panels, captions, dialog stock, explanation regions | owner revision 1, clarified in §12.5 |
 | Tile | soft blue-gradient flat tinted plate (§3.5) | command and action buttons | Plan Paint; owner revision 4 |
 | Gold | warm gold gradient plate | active or selected tool | Plan Paint gallery recipe |
 | Gloss | four-stop gradient with a hard break near mid-face (0, .48, .52, 1); 1 px shine under a flat top | loud themes; candy controls adapted | PlaySuite `suite.cpp`; V122 D |
@@ -462,7 +462,7 @@ generalized:
 |---|---|---|
 | Identity band, command planes | Watercolor fresco; Office ribbon anatomy | fresco band; tab rail; command plane with thin dividers and group labels |
 | Chassis | Workshop Graphite, corrected | middle-value textured graphite, never black; seams 3 px or thinner, wider hit targets |
-| Side panels, information panes | Studio 2003 | compact captions, fine blue-grey edges, compact section bars, factual density, neutral near-white stock (`#F0F1F1`) (owner revision 1) |
+| Side panels, information panes | Studio 2003 | compact captions, fine blue-grey edges, compact section bars, factual density, neutral near-white stock (`#F4F4F5`) (owner revision 1) |
 | Work pane | classic object field | recessed inset plane with white paper or a canvas (owner revision 2) |
 | Objects | classic-iOS material lineage | upper-left light, local gradients, occlusion, restrained shadow, specular rim, per-size drawing |
 | Status | technical desktop instrument | flat pale strip, separated factual cells, small soft chips, no sunken cells (owner revision 3; Plan Paint) |
@@ -1049,7 +1049,7 @@ bit tweaked to look nicer" than its references (owner direction).
    Watercolor fields (§2.4).
 3. **Reference zoning.** House Composite in Sapphire Dusk (§4.7, §5.6): identity
    band and command planes above, a graphite chassis, side panels flat in
-   neutral near-white stock (`#F0F1F1`), a recessed work pane, high-colour material objects, a
+   neutral near-white stock (`#F4F4F5`), a recessed work pane, high-colour material objects, a
    flat pale status strip.
 4. **Reference realization.** Plan Paint shows the look built on GUI.Forms
    (owner revision 3). Reference values, not tokens; tokens descend from the
@@ -1085,7 +1085,7 @@ bit tweaked to look nicer" than its references (owner direction).
    not its specifics (§12.3).
 8. **Reference study.** The default follows the published Pearl Ribbon study,
    moved toward Plan Paint's royale blue (§12.4): a near-white-to-pale-blue
-   command plane, flat tinted plates, gold for the active tool, neutral near-white (`#F0F1F1`)
+   command plane, flat tinted plates, gold for the active tool, neutral near-white (`#F4F4F5`)
    side planes, a recessed work pane. Tabs copy Plan Paint's tab stack
    (`make_tab_theme`): faces `#9BB6DA` at rest, `#ACC6E7` hot, `#E8F2FF`
    selected, with a top wash fading out by 72 % of the height; a white top line
@@ -1126,7 +1126,7 @@ bit tweaked to look nicer" than its references (owner direction).
 5. **Warm stock (owner revision 1 over STYLE and VISUAL).** House Composite's
    Studio 2003 zone names "warm-neutral caption stock" (STYLE; DNA-P04,
    DNA-P09) and the reference fresco carries an apricot bloom (VISUAL §7).
-   Owner revision 1 wins: neutral near-white stock (`#F0F1F1`), no apricot beside blue chrome.
+   Owner revision 1 wins: neutral near-white stock (`#F4F4F5`), no apricot beside blue chrome.
    Warmth as state, signal and rare ceremony survives (C041, V014; §5.5); the
    coral endpoint is asked in Q3.
 6. **Ceremonial ambient motion (verdicts beside a 2026-10-12 decision).** C033,
@@ -1250,7 +1250,7 @@ These supersede the conflicting sources and options of the first draft.
   bulge and dithered bulge are engine-level renderings of one part role; which
   one the default theme ships is the owner's call.
 - **Ivory.** By "neutral Windows ivory" the owner means a near-white in the
-  manner of Windows' `#F0F0F0`, not a cream. The owner chose `#F0F1F1`; side
+  manner of Windows' `#F0F0F0`, not a cream. The owner chose `#F4F4F5`; side
   planes and dialog stock use it.
 
 ## Appendix A. Anti-models
