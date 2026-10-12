@@ -7,7 +7,7 @@ which remain the detailed source; where they disagree with the code, the code
 and its tests are the authority.
 
 ```{image} ../_static/roadmap.svg
-:alt: Releases toward 1.0: 0.1 Shipped, 0.2 Verified, 0.3 Themeable, 0.4 Flexible, 0.5 ABI candidate, 1.0 Stable, then 1.x Beyond.
+:alt: Releases toward 1.0: 0.1 Shipped, 0.2 Verified, 0.3 Themeable, 0.4 Flexible, 0.5 ABI candidate, 0.6 Bindings, 0.7 Designers, then 1.0 Stable.
 :width: 100%
 :class: roadmap-figure
 ```
@@ -64,6 +64,18 @@ details are under [Done and tested](#done-and-tested).
 - **Two independent native consumers** passing the ownership, thread and
   callback conformance tests against the installed SDK.
 
+## 0.6 Bindings
+
+- **C# bindings** over the C ABI with a Windows Forms-shaped API, so a Windows
+  Forms project can switch to GUI.Forms and run on macOS and Linux.
+
+## 0.7 Designers
+
+- **An interface builder** written in GUI.Forms, whose documents can also be
+  edited by hand without anything being overwritten.
+- **HTML import and a layout designer** for static HTML and CSS.
+- **A theme designer.**
+
 ## 1.0 Stable
 
 The API is declared stable only when all of the following hold:
@@ -80,14 +92,6 @@ The API is declared stable only when all of the following hold:
   host and is exercised by a test, not only the deterministic snapshot.
 - Packaging is reproducible: licences, integrity metadata and a software bill
   of materials ship with every artefact.
-
-## 1.x Beyond
-
-- **C# bindings** over the stable C ABI with a Windows Forms-shaped API, so a
-  Windows Forms project can switch to GUI.Forms and run on macOS and Linux.
-- **An interface builder** written in GUI.Forms.
-- **HTML import and a layout designer** for static HTML and CSS.
-- **A theme designer.**
 
 The full plan, with a measured gate for each stage, is
 `planning/FORWARD_PROGRAMME.md`.
