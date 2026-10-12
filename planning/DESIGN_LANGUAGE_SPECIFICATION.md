@@ -665,7 +665,14 @@ accepted File Manager reference (VISUAL; atlas):
 
 1. **Authoring model.** The owner addresses parts by name, not a CSS tree;
    SYSTEM_MODEL §2 says an ideal theme is "nearly entirely" CSS over Web.Forms
-   HTML. This document states capabilities and leaves syntax open.
+   HTML. **Resolved 2026-10-12 (owner):** themes are written in a CSS-syntax
+   subset addressed to the named anatomy (`::part()`, `:state()`, stable IDs),
+   not a CSS document tree. Engine inputs (pointer position, published
+   application values) are custom properties only the engine sets. A
+   presentational state machine is part specification and part interaction:
+   its states, transitions and timings are declared in the theme; the machine
+   that runs them lives in the engine. New kinds of effect are added as C++
+   engine primitives, never as theme code.
 2. **Bitmaps.** The owner keeps control rendering procedural; resources §2.1 lets
    themes carry "PNG and precompiled bitmap assets"; the PlaySuite proposal
    admits nine-slice skins; the material engine supports nine-patch fills.

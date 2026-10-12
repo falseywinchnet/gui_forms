@@ -71,6 +71,18 @@ python3 -B tools/check_house_style.py include src demo tests examples tools file
 The check covers spelling only. Ownership, lifetime, initialization and
 naming still need review against the full document.
 
+## Forward programme (read before starting new work)
+
+The current programme (articulated controls, one theme engine, the design
+language, accessibility verification, the C ABI, the C# sibling and the
+visual tools) is defined in `planning/FORWARD_PROGRAMME.md`, with the visual
+rules in `planning/DESIGN_LANGUAGE_SPECIFICATION.md`. Find your stage there,
+start it only once its dependencies' gates are recorded, and record your own
+gate's measurement. Open owner decisions are listed in both files; do not
+assume them. A readable stage board for sibling threads is published at
+https://claude.ai/artifact/D9d2SUvkiKQETiVnmwnEt4 (read it with the Artifact
+tool); the planning files are authoritative where they differ.
+
 ## Scope of the first proving slice
 
 Build a native macOS control-gallery demonstration and automated tests proving:
