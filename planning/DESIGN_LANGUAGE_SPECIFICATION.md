@@ -315,6 +315,7 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 |---|---|---|---|
 | Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | push button, chip, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
 | Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; each holds near its peak across the bulge and falls off over a narrow band at the rim: intensity × (1 − t^q) with q about 2.2 over the half-width t (a tighter slope means a larger q; a curve concentrated at the centre, such as (1 − t)^p, reads looser and is wrong) and melt back into the plane before the part's bounds; pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
+| Dithered bulge | the bulge field above, subsampled onto a regular lattice (1 logical px dots every 2 px) with an ordered 4×4 threshold: a light dot where the lit slope exceeds the threshold, a dark dot where the shaded slope does, the plane showing between; no edge; pressed and active as for Bulge | ribbon command buttons (studies); a theme choice | owner, §12.4 |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
 | Pressed | face darkened, inner lines inverted (dark top/left, light bottom/right), contact shadow removed | button, command, segment | Plan Paint pressed tile |
 | Active tool | warm gold gradient plate, deeper gold border, flat | selected tool, current choice in a strip | Plan Paint gold; CRM pair B-prime |
@@ -1239,6 +1240,15 @@ These supersede the conflicting sources and options of the first draft.
 - **Dark variant.** It reaches whole windows.
 - **Office palette.** It is only the origin of the MS Paint-style default colour
   swatches, not a seed for themes; nothing is pinned.
+
+### 12.5 Owner decisions, third round, 2026-10-12
+
+- **Ribbon button rendering.** The smooth cloth bulge is accepted as an
+  alternative to flat ribbon buttons. The owner then asked for it to be
+  replaced with dithering: the same bulge subsampled as a lattice of dots
+  (§3.5 Dithered bulge), which the published studies now draw. Flat, smooth
+  bulge and dithered bulge are engine-level renderings of one part role; which
+  one the default theme ships is the owner's call.
 
 ## Appendix A. Anti-models
 
