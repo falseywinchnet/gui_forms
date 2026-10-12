@@ -1949,11 +1949,11 @@ idle. It must not freeze the C ABI or replace the Skia/AppKit adapters.
 - `../README.md`
 - `../PROVING_SLICE.md`
 - `../../planning/SURFACE_PIPELINE.md`
-- `../../planning/gui_forms/GUI_FORMS_BACKEND_DECISION_MAP.md`
-- `../../planning/gui_forms/GUI_FORMS_INTERVIEW_LEDGER.md`
-- `../../planning/gui_forms/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md`
-- `../../planning/gui_forms/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md`
+- `interview/GUI_FORMS_BACKEND_DECISION_MAP.md`
+- `interview/GUI_FORMS_INTERVIEW_LEDGER.md`
+- `interview/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md`
+- `interview/GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md`
 - `FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`
-- `../../planning/gui_forms/WINFORMS_CONTROL_INVENTORY.md`
+- `interview/WINFORMS_CONTROL_INVENTORY.md`
 - `../../planning/gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md`
 - `../third_party/SKIA_BUILD_EVIDENCE.md`

@@ -75,7 +75,7 @@ A family is `supported` only when it has all applicable items:
 
 Evidence locators abbreviate:
 
-- `WF` — `planning/gui_forms/WINFORMS_CONTROL_INVENTORY.md`;
+- `WF` — `planning/interview/WINFORMS_CONTROL_INVENTORY.md`;
 - `SDR` — `planning/gui_forms/retired compatibility specimen_COMPATIBILITY_INVENTORY.md`;
 - `GF` — the current `gui_forms/` proving slice and tests.
 
