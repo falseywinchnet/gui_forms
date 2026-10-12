@@ -283,13 +283,17 @@ propagated; the saved theme passes T3 conformance and T4's reference images.
   earlier programme and ledgers.
 - `docs/dev/roadmap.md`: the public summary.
 
-## 9. Open owner decisions
+## 9. Owner decisions
 
-Recorded in `DESIGN_LANGUAGE_SPECIFICATION.md` section 12.2 and not assumed
-here: the PlaySuite share of the default theme, ambient animation in the
-default theme, bitmap faces in third-party themes, a dark default variant, the
-contrast gate, when focus is drawn, how far a theme may reshape a control,
-which Windows-familiar themes ship, the high-contrast authorities, and the
-starting tokens. Also open: LCD text (excluded by ADR-004), the body face
-(Carlito in code, unselected in the records), and flat-at-rest commands in a
-relief command strip.
+Decided 2026-10-12 and recorded in `DESIGN_LANGUAGE_SPECIFICATION.md` §12.3:
+atlases and PNG only for client and theme assets, never control faces; the
+united text engine's shipped profile is authoritative (no LCD text); Carlito
+is the body face; the proposed contrast gate; PlaySuite's character but not
+its specifics, with its effects as engine capability requirements; geometry
+and hit regions defined by the engine, never by a theme; Classic and a modern
+flat look as the first Windows-familiar themes.
+
+Still open, and not assumed anywhere: flat-at-rest commands in a relief
+command strip, when focus is drawn, ambient animation in the default theme,
+a dark default variant, the high-contrast authorities, and the starting
+tokens.

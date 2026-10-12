@@ -740,3 +740,35 @@ mode only; no local mode.
 **Q10. Are the proposed numbers acceptable starting tokens?** A. Yes. B. Yes,
 except elevation alphas, pending a native specimen review. C. No; choose from a
 native specimen sheet first.
+
+### 12.3 Owner decisions, 2026-10-12
+
+These supersede the conflicting sources and options above.
+
+- **Bitmaps (Q3, conflict 2).** Image atlases and PNG are allowed for client
+  and theme assets, for example a custom tiling background. They are never
+  used for control faces such as buttons; controls stay procedural.
+- **LCD text (conflict 6).** Resolved by the united HarfBuzz/FreeType text
+  engine: its shipped profile (light auto-hinting, grayscale coverage, one
+  blending rule; `docs/user/text-engine.md`) is the default and is
+  authoritative. LCD subpixel rendering stays excluded; the earlier
+  accessibility-round admission is superseded.
+- **Body face (conflict 7).** Carlito.
+- **Contrast gate (Q5).** The §5.2 proposal is accepted.
+- **PlaySuite (Q1).** The default theme takes PlaySuite's character, not its
+  specifics. Its effects (gloss, lift, rings) are capability requirements on
+  the engine, which must support them; no theme has to carry them globally.
+- **Reshaping (Q7).** Geometry belongs to the engine and the control
+  anatomy, not to the theme, so the engine also defines each part's hit
+  region. A theme chooses among the shape parameters the engine provides; the
+  engine derives the hit region from the geometry it computes. Themes never
+  set hit regions directly.
+- **Windows-familiar themes (Q8).** Classic and a modern flat look first; a
+  few more may be added.
+
+Still open: flat-at-rest commands in a relief command strip (conflict 8; the
+owner is choosing between flat at rest with relief on hover, as Plan Paint's
+ribbon does, quiet relief at rest, and full relief at rest), when focus is
+drawn (Q6), ambient animation in the default theme (Q2), a dark default
+variant (Q4), the high-contrast authorities (Q9) and the starting tokens
+(Q10).
