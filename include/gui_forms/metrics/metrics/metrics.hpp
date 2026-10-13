@@ -67,6 +67,12 @@ public:
     void record_occlusion_transition(bool occluded) noexcept;
     void record_occluded_frame_poll() noexcept;
     void record_present(std::uint64_t duration_nanoseconds) noexcept;
+    // A retained present that copied `device_pixels` in `rectangles`.
+    void record_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels,
+                        std::uint64_t rectangles) noexcept;
+    // One live-surface frame copied to the screen.
+    void record_live_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels,
+                             std::uint64_t rectangles) noexcept;
     void set_renderer(std::string_view name, bool cpu_only);
 
 private:

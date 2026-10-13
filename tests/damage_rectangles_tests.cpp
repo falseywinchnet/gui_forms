@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -201,6 +202,38 @@ void accumulated_damage_paints_as_rectangles() {
     expect(window.take_damage().empty(), "the painted rectangles consume their damage");
 }
 
+// Hosts report what each present copied to the screen, retained and live
+// apart, so the copy cost is a counter on every host.
+void presentation_counters_record_copied_area() {
+    Scene scene = make_scene();
+    Window window(scene.root, Size{400.0, 300.0});
+    window.perform_layout();
+    ClipTrackingPainter painter(Rect{0.0, 0.0, 400.0, 300.0});
+    const std::optional<PaintReceipt> receipt = window.paint(painter);
+    expect(receipt.has_value(), "the first frame paints");
+    PresentedArea retained;
+    retained.device_pixels = 2400U;
+    retained.rectangles = 2U;
+    expect(window.notify_presented(*receipt, 1000U, retained), "the receipt is accepted");
+    PresentedArea live;
+    live.device_pixels = 10000U;
+    live.rectangles = 1U;
+    window.notify_live_presented(500U, live);
+    window.notify_live_presented(500U, live);
+    const MetricsSnapshot metrics = window.metrics_snapshot();
+    expect(metrics.frames_presented == 1U && metrics.retained_pixels_presented == 2400U &&
+               metrics.retained_rectangles_presented == 2U,
+           "a retained present records its copied pixels and rectangles");
+    expect(metrics.live_frames_presented == 2U && metrics.live_pixels_presented == 20000U &&
+               metrics.live_rectangles_presented == 2U &&
+               metrics.live_present_duration_nanoseconds == 1000U,
+           "live frames are counted apart from retained presents");
+    const std::string json = metrics.to_json();
+    expect(json.find("\"live_pixels_presented\":20000") != std::string::npos &&
+               json.find("\"retained_pixels_presented\":2400") != std::string::npos,
+           "the counters appear in the metrics JSON");
+}
+
 } // namespace
 
 int main() {
@@ -208,6 +241,7 @@ int main() {
     nearly_touching_rectangles_merge();
     single_rectangle_paint_is_unchanged();
     accumulated_damage_paints_as_rectangles();
+    presentation_counters_record_copied_area();
     std::cout << "gui_forms_damage_rectangles_tests: all tests passed\n";
     return EXIT_SUCCESS;
 }

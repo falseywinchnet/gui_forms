@@ -99,6 +99,12 @@ std::string MetricsSnapshot::to_json() const {
            << "\"frames_presented\":" << frames_presented << ','
            << "\"present_duration_nanoseconds\":" << present_duration_nanoseconds << ','
            << "\"worst_present_duration_nanoseconds\":" << worst_present_duration_nanoseconds << ','
+           << "\"retained_pixels_presented\":" << retained_pixels_presented << ','
+           << "\"retained_rectangles_presented\":" << retained_rectangles_presented << ','
+           << "\"live_frames_presented\":" << live_frames_presented << ','
+           << "\"live_pixels_presented\":" << live_pixels_presented << ','
+           << "\"live_rectangles_presented\":" << live_rectangles_presented << ','
+           << "\"live_present_duration_nanoseconds\":" << live_present_duration_nanoseconds << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';

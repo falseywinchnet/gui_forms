@@ -317,6 +317,12 @@ public:
     // that case.
     [[nodiscard]] bool notify_presented(
         PaintReceipt receipt, std::uint64_t duration_nanoseconds = 0U);
+    // The same release, also recording the screen area the present copied.
+    [[nodiscard]] bool notify_presented(
+        PaintReceipt receipt, std::uint64_t duration_nanoseconds, PresentedArea presented);
+    // Records one live-surface frame the host copied to the screen. Live
+    // frames carry no paint receipt; this only counts their cost.
+    void notify_live_presented(std::uint64_t duration_nanoseconds, PresentedArea presented);
     // Synchronous compatibility spelling. It acknowledges the latest complete
     // receipt in the current epoch; asynchronous/native hosts must use the
     // exact-receipt overload above.

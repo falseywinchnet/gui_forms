@@ -2879,6 +2879,13 @@ private:
         return device;
     }
 
+    // The device pixels a native rectangle covers; zero when it is empty.
+    [[nodiscard]] static std::uint64_t device_pixels(const RECT& device) noexcept {
+        if (device.right <= device.left || device.bottom <= device.top) return 0U;
+        return static_cast<std::uint64_t>(device.right - device.left) *
+               static_cast<std::uint64_t>(device.bottom - device.top);
+    }
+
     [[nodiscard]] Rect logical_rect(const RECT& device) const noexcept {
         const Rect logical{device.left / scale_, device.top / scale_,
                            (device.right - device.left) / scale_,
@@ -2989,8 +2996,17 @@ private:
             return;
         }
         for (const gui_forms::LiveSurfacePresentation& update : updates) {
+            const std::chrono::steady_clock::time_point update_started =
+                std::chrono::steady_clock::now();
             if (raster_.present_live_surface(target, update)) {
                 ++live_updates_presented_;
+                PresentedArea copied;
+                copied.device_pixels = device_pixels(device_rect(update.clip));
+                copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
+                const std::uint64_t update_duration = static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - update_started).count());
+                (*model_).notify_live_presented(update_duration, copied);
             } else {
                 ++live_updates_failed_;
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
@@ -3055,8 +3071,12 @@ private:
             bool acknowledged = current.surface_epoch == (*receipt).surface_epoch &&
                 current.presented_revision == (*receipt).rendered_revision;
             if (!acknowledged) {
+                // The transactional store commits the whole update box.
+                PresentedArea copied;
+                copied.device_pixels = device_pixels(paint_state.rcPaint);
+                copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
                 acknowledged = (*model_).notify_presented(*receipt,
-                    static_cast<std::uint64_t>(elapsed.count()));
+                    static_cast<std::uint64_t>(elapsed.count()), copied);
             }
             if (acknowledged) {
                 pending_damage_.clear();
@@ -3100,9 +3120,15 @@ private:
         const std::chrono::nanoseconds elapsed =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started);
+        PresentedArea copied;
+        for (std::size_t index = 0; index < present_rectangles.size(); ++index) {
+            const std::uint64_t pixels = device_pixels(present_rectangles[index]);
+            copied.device_pixels += pixels;
+            if (pixels != 0U) ++copied.rectangles;
+        }
         if (presented &&
             (*model_).notify_presented(*receipt,
-                                     static_cast<std::uint64_t>(elapsed.count()))) {
+                                     static_cast<std::uint64_t>(elapsed.count()), copied)) {
             pending_damage_.clear();
             complete_frame_capture_if_due(paint_state.rcPaint);
         }

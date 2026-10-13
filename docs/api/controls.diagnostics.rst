@@ -279,6 +279,14 @@ Related types
 
       Counts presentation, total duration, and worst duration.
 
+   .. cpp:function:: void record_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels, std::uint64_t rectangles) noexcept
+
+      Counts presentation, total duration, and worst duration.
+
+   .. cpp:function:: void record_live_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels, std::uint64_t rectangles) noexcept
+
+      One live-surface frame copied to the screen.
+
    .. cpp:function:: void set_population(std::uint64_t controls, std::uint64_t stable_ids) noexcept
 
       Sets live control and stable-ID counts.
@@ -449,6 +457,20 @@ Related types
    .. cpp:member:: std::uint64_t present_duration_nanoseconds
 
    .. cpp:member:: std::uint64_t worst_present_duration_nanoseconds
+
+   .. cpp:member:: std::uint64_t retained_pixels_presented
+
+      What hosts copied to the screen (stage DP), in device pixels: four bytes each in today's 32-bit rasters. Retained presents are reported through Window::notify_presented and live-surface frames through Window::notify_live_presented, so a frame's copy cost is a number that compares across hosts. A host that does not report areas leaves the pixel and rectangle counters at zero.
+
+   .. cpp:member:: std::uint64_t retained_rectangles_presented
+
+   .. cpp:member:: std::uint64_t live_frames_presented
+
+   .. cpp:member:: std::uint64_t live_pixels_presented
+
+   .. cpp:member:: std::uint64_t live_rectangles_presented
+
+   .. cpp:member:: std::uint64_t live_present_duration_nanoseconds
 
    .. cpp:member:: std::string renderer_name
 

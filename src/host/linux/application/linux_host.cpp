@@ -113,6 +113,23 @@ void convert_prepared_pixels_generic(XImage& image, const PreparedNativePixels& 
 
 // Submits only coherent front pixels. Source and native conversion storage are
 // disjoint; both borrows end before the renderer can begin another transaction.
+// The device pixels the X11 host copies for a damage bounding box at scale 1:
+// the box widened to whole pixels and clipped to the window (stage DP).
+PresentedArea presented_box(const Rect bounds, const Size window_size) {
+  PresentedArea copied;
+  const Rect extent{0.0, 0.0, window_size.width, window_size.height};
+  const Rect clipped = Rect::intersection(bounds, extent);
+  if (clipped.empty()) return copied;
+  const double left = std::floor(clipped.x);
+  const double top = std::floor(clipped.y);
+  const double right = std::ceil(clipped.right());
+  const double bottom = std::ceil(clipped.bottom());
+  copied.device_pixels = static_cast<std::uint64_t>(right - left) *
+                         static_cast<std::uint64_t>(bottom - top);
+  copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
+  return copied;
+}
+
 bool present_prepared_front(NativeWindow& window, const Rect requested) {
   render::SkiaRaster& raster = window.raster;
   const std::uint32_t width = raster.pixel_width();
@@ -206,7 +223,8 @@ bool update_prepared_window(NativeWindow& window) {
   const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
   const std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started);
   const std::uint64_t elapsed = static_cast<std::uint64_t>(duration.count());
-  const bool acknowledged = (*window.entry.model).notify_presented(*committed, elapsed);
+  const PresentedArea copied = presented_box(window.damage.bounds(), window.size);
+  const bool acknowledged = (*window.entry.model).notify_presented(*committed, elapsed, copied);
   if (acknowledged) window.damage.clear();
   else {
     // An exposure can repaint an already acknowledged revision. Clear only if
@@ -960,7 +978,10 @@ void NativeWindow::update() {
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now() - started)
           .count());
-  if ((*entry.model).notify_presented(*receipt, elapsed)) {
+  PresentedArea copied;
+  copied.device_pixels = static_cast<std::uint64_t>(width) * static_cast<std::uint64_t>(height);
+  copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
+  if ((*entry.model).notify_presented(*receipt, elapsed, copied)) {
     damage.clear();
     frame_capture_if_due(covers_window);
   }

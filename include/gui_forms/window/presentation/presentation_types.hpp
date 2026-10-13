@@ -26,6 +26,13 @@ struct PresentationSettings final {
     }
 };
 
+// The screen area one presentation copied (stage DP): device pixels, and the
+// rectangles they were copied in.
+struct PresentedArea final {
+    std::uint64_t device_pixels{};
+    std::uint64_t rectangles{};
+};
+
 // Immutable host placement for the newest generation of one live surface.
 struct LiveSurfacePresentation final {
     RuntimeId control{};
