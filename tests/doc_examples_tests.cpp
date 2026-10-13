@@ -82,7 +82,7 @@ void example() {
     gf::BindingOptions options;
     options.data_source_update_mode = gf::DataSourceUpdateMode::on_property_changed;
     std::shared_ptr<gf::Binding> binding =
-        (*name).data_bindings().add("Text", people, "name", options);
+        (*name).data_bindings().add("text", people, "name", options);
     // the text box shows "Ada"
     (*name).set_text("Ada Lovelace");
     // the current record's "name" field is now "Ada Lovelace"
@@ -113,7 +113,7 @@ void example() {
     options.data_source_update_mode = gf::DataSourceUpdateMode::on_property_changed;
     PriceField field;
     std::shared_ptr<gf::Binding> binding =
-        (*price).data_bindings().add("Text", items, "price", options);
+        (*price).data_bindings().add("text", items, "price", options);
     gf::on((*binding).parse(), field, &PriceField::on_parse);
     // the text box shows "12.50"
     (*price).set_text("$13.25");
@@ -1062,7 +1062,7 @@ void example() {
     field_errors["email"] = "Enter a complete e-mail address.";
     std::shared_ptr<gf::BindingSource> people = std::make_shared<gf::BindingSource>(window);
     (*people).set_records({gf::BindingRecord("person.1", fields, true, field_errors)});
-    (*email).data_bindings().add("Text", people, "email");
+    (*email).data_bindings().add("text", people, "email");
 
     gf::ErrorProvider errors(window);
     errors.bind_to_data_and_errors(people);
@@ -1867,8 +1867,8 @@ void example() {
     std::shared_ptr<gf::PropertyGrid> inspector =
         gf::make_control<gf::PropertyGrid>(gf::StableId("options.inspector"));
     (*inspector).set_selected_object(wrap);
-    (*inspector).try_set_property_text("Text", "Wrap long lines");
-    (*inspector).try_set_property_value("Checked", gf::BindingValue{true});
+    (*inspector).try_set_property_text("text", "Wrap long lines");
+    (*inspector).try_set_property_value("checked", gf::BindingValue{true});
     // the check box now reads "Wrap long lines" and is checked
 }
 }  // namespace doc_example_PropertyGrid_1
@@ -1897,8 +1897,8 @@ struct Inspector final : gf::Component {
 
 void example() {
     Inspector inspector;
-    (*inspector.grid).try_set_property_value("Checked", gf::BindingValue{true});
-    // changed is "Checked"
+    (*inspector.grid).try_set_property_value("checked", gf::BindingValue{true});
+    // changed is "checked"
     (*inspector.grid).try_set_property_value(
         "TabIndex", gf::BindingValue{std::string("-1")});
     // rejected is "TabIndex"; the tab index is unchanged
