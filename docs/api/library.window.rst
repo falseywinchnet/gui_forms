@@ -75,6 +75,8 @@ Related types
      - PopupToken is a move-only revocation handle for one Window-owned retained overlay root; dropping or disconnecting it closes the overlay through the same ordered state machine.
    * - :cpp:class:`PresentationSettings <gui_forms::PresentationSettings>`
      - PresentationSettings keeps logical text scaling, contrast, motion, and sound preferences independent from device scale and native host mechanics.
+   * - :cpp:class:`PresentedArea <gui_forms::PresentedArea>`
+     - The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
    * - :cpp:class:`ValidationSnapshot <gui_forms::ValidationSnapshot>`
      - ValidationSnapshot reports attempts, outcomes, focus blocks, reentrancy rejection, bulk visits, and active transaction state.
 
@@ -620,6 +622,18 @@ Related types
    .. cpp:member:: bool sound_enabled
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PresentedArea final
+
+   ``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+   The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
+
+   .. cpp:member:: std::uint64_t device_pixels
+
+   .. cpp:member:: std::uint64_t rectangles
 
 .. cpp:namespace:: gui_forms
 

@@ -415,6 +415,20 @@ std::optional<PaintReceipt> Window::paint_rectangles(
 
 bool Window::notify_presented(PaintReceipt receipt,
                               std::uint64_t duration_nanoseconds) {
+    const PresentedArea unreported;
+    return notify_presented(receipt, duration_nanoseconds, unreported);
+}
+
+void Window::notify_live_presented(std::uint64_t duration_nanoseconds,
+                                   PresentedArea presented) {
+    require_ui_thread("live surface presentation report");
+    metrics_.record_live_present(duration_nanoseconds, presented.device_pixels,
+                                 presented.rectangles);
+}
+
+bool Window::notify_presented(PaintReceipt receipt,
+                              std::uint64_t duration_nanoseconds,
+                              PresentedArea presented) {
     require_ui_thread("paint presentation release");
     const bool current_epoch = receipt.surface_epoch == surface_epoch_;
     const bool complete_revision = receipt.rendered_revision != 0U &&
@@ -427,7 +441,8 @@ bool Window::notify_presented(PaintReceipt receipt,
     }
     presented_revision_ = receipt.rendered_revision;
     ++presentation_receipts_accepted_;
-    metrics_.record_present(duration_nanoseconds);
+    metrics_.record_present(duration_nanoseconds, presented.device_pixels,
+                            presented.rectangles);
     update_paint_lease_state();
     return true;
 }

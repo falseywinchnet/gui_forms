@@ -221,6 +221,8 @@ gui_forms::Window
         - Paints pending damage with a :cpp:class:`Painter <gui_forms::Painter>`.
       * - :cpp:func:`notify_presented <gui_forms::Window::notify_presented>`
         - Preferred host release.
+      * - :cpp:func:`notify_live_presented <gui_forms::Window::notify_live_presented>`
+        - Records one live-surface frame the host copied to the screen.
       * - :cpp:func:`queue_live_surface_presentation <gui_forms::Window::queue_live_surface_presentation>`
         -  
       * - :cpp:func:`take_live_surface_presentations <gui_forms::Window::take_live_surface_presentations>`
@@ -717,6 +719,14 @@ gui_forms::Window
    .. cpp:function:: bool notify_presented(PaintReceipt receipt, std::uint64_t duration_nanoseconds = 0U)
 
       Preferred host release. Returns false for a duplicate, out-of-order, or replaced-epoch receipt and never advances the presentation revision in that case.
+
+   .. cpp:function:: bool notify_presented(PaintReceipt receipt, std::uint64_t duration_nanoseconds, PresentedArea presented)
+
+      The same release, also recording the screen area the present copied.
+
+   .. cpp:function:: void notify_live_presented(std::uint64_t duration_nanoseconds, PresentedArea presented)
+
+      Records one live-surface frame the host copied to the screen. Live frames carry no paint receipt; this only counts their cost.
 
    .. cpp:function:: void notify_presented(std::uint64_t duration_nanoseconds = 0U)
 

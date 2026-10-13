@@ -78,6 +78,18 @@ struct MetricsSnapshot {
     std::uint64_t frames_presented{};
     std::uint64_t present_duration_nanoseconds{};
     std::uint64_t worst_present_duration_nanoseconds{};
+    // What hosts copied to the screen (stage DP), in device pixels: four bytes
+    // each in today's 32-bit rasters. Retained presents are reported through
+    // Window::notify_presented and live-surface frames through
+    // Window::notify_live_presented, so a frame's copy cost is a number that
+    // compares across hosts. A host that does not report areas leaves the
+    // pixel and rectangle counters at zero.
+    std::uint64_t retained_pixels_presented{};
+    std::uint64_t retained_rectangles_presented{};
+    std::uint64_t live_frames_presented{};
+    std::uint64_t live_pixels_presented{};
+    std::uint64_t live_rectangles_presented{};
+    std::uint64_t live_present_duration_nanoseconds{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

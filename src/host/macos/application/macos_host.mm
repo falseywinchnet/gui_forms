@@ -2290,11 +2290,51 @@ private:
     // A taken region is validated only by a presented raster, as EndPaint
     // validates an update region. Otherwise the next pass copies everything.
     if (regionsTaken) _liveRegionLost = livePresented ? NO : YES;
+    // What this flush copied to the screen (stage DP). AppKit clips the copy
+    // to the rectangles being drawn; the live frames' regions are reported as
+    // live and the rest as retained. Live frames are copied inside this one
+    // present, so a flush with a receipt carries the duration and a live-only
+    // flush divides it among its frames.
+    gui_forms::PresentedArea retainedCopied;
+    std::uint64_t liveFramesCopied = 0U;
+    double liveArea = 0.0;
+    const double devicePixelsPerPoint = scale * scale;
+    if (presented) {
+        double drawnArea = 0.0;
+        for (NSInteger index = 0; index < drawnCount; ++index) {
+            drawnArea += drawnRects[index].size.width * drawnRects[index].size.height;
+        }
+        if (drawnCount == 0) drawnArea = nativeDamage.width * nativeDamage.height;
+        if (livePresented) {
+            for (const GFRect region : _liveRegions) {
+                if (region.empty()) continue;
+                liveArea += region.width * region.height;
+                ++liveFramesCopied;
+            }
+        }
+        const double retainedArea = std::max(0.0, drawnArea - liveArea);
+        retainedCopied.device_pixels =
+            static_cast<std::uint64_t>(std::llround(retainedArea * devicePixelsPerPoint));
+        retainedCopied.rectangles =
+            drawnCount > 0 ? static_cast<std::uint64_t>(drawnCount) : 1U;
+    }
     if (presented) {
         if (receipt &&
             (*_model).notify_presented(*receipt,
-                static_cast<std::uint64_t>(elapsed.count()))) {
+                static_cast<std::uint64_t>(elapsed.count()), retainedCopied)) {
             _pendingDamage.clear();
+        }
+    }
+    if (liveFramesCopied != 0U) {
+        const std::uint64_t liveDuration = receipt ? 0U :
+            static_cast<std::uint64_t>(elapsed.count()) / liveFramesCopied;
+        for (const GFRect region : _liveRegions) {
+            if (region.empty()) continue;
+            gui_forms::PresentedArea liveCopied;
+            liveCopied.device_pixels = static_cast<std::uint64_t>(
+                std::llround(region.width * region.height * devicePixelsPerPoint));
+            liveCopied.rectangles = 1U;
+            (*_model).notify_live_presented(liveDuration, liveCopied);
         }
     }
     [self completeFrameCaptureIfDue:dirtyRect presented:(presented && receipt) ? YES : NO];

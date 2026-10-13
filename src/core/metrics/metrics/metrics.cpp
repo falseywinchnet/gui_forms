@@ -188,6 +188,19 @@ void Metrics::record_present(std::uint64_t duration) noexcept {
     values_.worst_present_duration_nanoseconds =
         std::max(values_.worst_present_duration_nanoseconds, duration);
 }
+void Metrics::record_present(std::uint64_t duration, std::uint64_t device_pixels,
+                             std::uint64_t rectangles) noexcept {
+    record_present(duration);
+    values_.retained_pixels_presented += device_pixels;
+    values_.retained_rectangles_presented += rectangles;
+}
+void Metrics::record_live_present(std::uint64_t duration, std::uint64_t device_pixels,
+                                  std::uint64_t rectangles) noexcept {
+    ++values_.live_frames_presented;
+    values_.live_pixels_presented += device_pixels;
+    values_.live_rectangles_presented += rectangles;
+    values_.live_present_duration_nanoseconds += duration;
+}
 void Metrics::set_renderer(std::string_view name, bool cpu_only) {
     values_.renderer_name.assign(name);
     values_.cpu_only = cpu_only;

@@ -138,3 +138,16 @@ close to `requested_damage_area`. A sparse frame shows `painted_damage_area`
 well below `paint_bounding_area`, the summed bounding box of each pass's
 painted rectangles. `cpu_only` is always true; the field exists so that a
 snapshot states it.
+
+What reaches the screen is counted apart, in device pixels (four bytes each
+in today's rasters). `retained_pixels_presented` and
+`retained_rectangles_presented` count what each retained present copied;
+`live_frames_presented`, `live_pixels_presented`,
+`live_rectangles_presented` and `live_present_duration_nanoseconds` count
+live-surface frames. Divide by `frames_presented` or `live_frames_presented`
+for the copy per frame. A host that presents its rectangles separately shows
+`retained_rectangles_presented` above `frames_presented`; one that copies a
+bounding box shows them equal. The Windows default host copies each damage
+rectangle; the Windows transactional profile and the X11 host copy the
+bounding box; the macOS host copies the rectangles AppKit draws, with live
+frames counted inside the same copy.
