@@ -36,6 +36,38 @@ public:
 private:
     std::weak_ptr<LiveSurfaceIdleWake> state_{};
 };
+
+// The window rectangle in which a live surface's newest frame may differ
+// from the frame its presenter last sampled. Only the next generation of the
+// sampled epoch can be narrowed to the frame's own damage, because the damage
+// of skipped generations is not retained here; anything else is the whole
+// destination. The damage widens by one surface pixel, as a filtered, scaled
+// draw also changes neighbours that sample a changed pixel.
+Rect live_change_in_window(const LiveSurface& surface,
+                           const std::uint64_t next_epoch,
+                           const std::uint64_t next_generation,
+                           const bool next_of_sampled,
+                           const Rect destination) {
+    if (!next_of_sampled) return destination;
+    const LiveSurfaceFrame frame = surface.acquire_latest();
+    if (!frame || frame.epoch() != next_epoch ||
+        frame.generation() != next_generation || frame.damage().empty() ||
+        frame.width() == 0U || frame.height() == 0U) {
+        return destination;
+    }
+    const double width = static_cast<double>(frame.width());
+    const double height = static_cast<double>(frame.height());
+    const Rect damage = frame.damage();
+    const Rect widened = Rect::intersection(
+        {damage.x - 1.0, damage.y - 1.0, damage.width + 2.0, damage.height + 2.0},
+        {0.0, 0.0, width, height});
+    const double horizontal = destination.width / width;
+    const double vertical = destination.height / height;
+    const Rect changed{destination.x + widened.x * horizontal,
+                       destination.y + widened.y * vertical,
+                       widened.width * horizontal, widened.height * vertical};
+    return changed;
+}
 } // namespace detail
 
 void Window::set_framebuffer_painter(Painter* const painter) {
@@ -600,7 +632,8 @@ Window::take_live_surface_presentations(const bool include_unchanged,
         if (!valid || clip.empty()) registration.placed = false;
         if (valid && !clip.empty()) {
             // Overlays crossing this clip, in tree order. Their pixels belong
-            // to retained painting, which also draws the live frame beneath.
+            // to retained painting, which also draws the live frame beneath;
+            // a new generation damages the share of them it changed (below).
             std::vector<Rect> overlays;
             for (const Rect& overlay : overlay_rectangles) {
                 if (!Rect::intersection(clip, overlay).empty()) {
@@ -626,6 +659,32 @@ Window::take_live_surface_presentations(const bool include_unchanged,
                 registration.placed_destination == destination &&
                 registration.placed_clip == clip &&
                 registration.placed_overlays == overlays;
+            // The live lane never draws beneath an overlay, so a new frame
+            // reaches those pixels only through retained painting. Damage the
+            // share of each overlay the frame changed; an overlay the change
+            // does not reach keeps its retained pixels and is not repainted.
+            if (!same_generation && !overlays.empty()) {
+                const bool next_of_sampled = registration.placed &&
+                    registration.sampled_epoch == snapshot.epoch &&
+                    snapshot.published_generation ==
+                        registration.sampled_generation + 1U;
+                const Rect changed = Rect::intersection(
+                    clip, detail::live_change_in_window(
+                              *registration.surface, snapshot.epoch,
+                              snapshot.published_generation, next_of_sampled,
+                              destination));
+                bool damaged = false;
+                for (const Rect& overlay : overlays) {
+                    const Rect beneath = Rect::intersection(overlay, changed);
+                    if (beneath.empty()) continue;
+                    add_damage_all_planes(beneath);
+                    damaged = true;
+                }
+                if (damaged) {
+                    paint_dirty_ = true;
+                    touch_paint();
+                }
+            }
             // An unchanged generation is presented again only when its
             // placement changed; a static overlay does not keep it ticking.
             if (include_unchanged || !same_generation || !same_placement) {
