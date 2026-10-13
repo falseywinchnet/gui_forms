@@ -927,7 +927,16 @@ void NativeWindow::update() {
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now() - started)
           .count());
-  if (report_presented(*receipt, elapsed, copied)) {
+  // The copy reached the window. A tick that only presents live frames paints
+  // the revision already presented: the window refuses that receipt as not
+  // newer, but the frame is on screen, so the damage is done (as the
+  // prepared-text path checks).
+  const bool acknowledged = report_presented(*receipt, elapsed, copied);
+  const PaintLeaseSnapshot lease = (*entry.model).paint_lease_snapshot();
+  const bool shown = acknowledged ||
+      (lease.surface_epoch == (*receipt).surface_epoch &&
+       lease.presented_revision == (*receipt).rendered_revision);
+  if (shown) {
     damage.clear();
     if (regions_taken) live_region_lost = false;
     frame_capture_if_due(covers_window);
