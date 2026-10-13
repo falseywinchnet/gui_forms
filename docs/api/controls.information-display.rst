@@ -35,10 +35,78 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`Label::Parts <gui_forms::Label::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts); its states are Control's.
+   * - :cpp:class:`PictureBox::Parts <gui_forms::PictureBox::Parts>`
+     - Stage T1 anatomy, as dot members: Panel's parts and the image.
+   * - :cpp:class:`ProgressBar::Parts <gui_forms::ProgressBar::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`ProgressBar::States <gui_forms::ProgressBar::States>`
+     -  
    * - :cpp:class:`ProgressBarAnimationAppearance <gui_forms::ProgressBarAnimationAppearance>`
      - ProgressBarAnimationAppearance is the validated value object for stripe width, gap, angle, and opacity used by painter-neutral progress animation.
    * - :cpp:class:`ReviewRecord <gui_forms::ReviewRecord>`
      - ReviewRecord owns the stable author, timestamp, score/status, title, body, and metadata projected by ReviewCard.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Label::Parts final
+
+   ``#include <gui_forms/controls/label/label.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts); its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PictureBox::Parts final
+
+   ``#include <gui_forms/controls/panel/picture_box/picture_box.hpp>``
+
+   Stage T1 anatomy, as dot members: Panel's parts and the image.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry image
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ProgressBar::Parts final
+
+   ``#include <gui_forms/controls/range_control/progress_bar/progress_bar.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry track
+
+   .. cpp:member:: PartGeometry fill
+
+   .. cpp:member:: PartGeometry activity
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ProgressBar::States final
+
+   ``#include <gui_forms/controls/range_control/progress_bar/progress_bar.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool indeterminate
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool reduced_motion
 
 .. cpp:namespace:: gui_forms
 

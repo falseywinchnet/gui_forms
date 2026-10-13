@@ -56,9 +56,11 @@ gui_forms::Panel
          :cpp:enumerator:`ControlVisualRole::window <gui_forms::ControlVisualRole::window>` or :cpp:enumerator:`ControlVisualRole::card <gui_forms::ControlVisualRole::card>`. Any other role
          throws ``std::invalid_argument``.
 
+      **parts** : ``Parts``, read-only
+
    :Inherited:
 
-      From :cpp:class:`ScrollableControl <gui_forms::ScrollableControl>`: properties :cpp:func:`auto_scroll <gui_forms::ScrollableControl::auto_scroll>`, :cpp:func:`auto_scroll_margin <gui_forms::ScrollableControl::auto_scroll_margin>`, :cpp:func:`auto_scroll_min_size <gui_forms::ScrollableControl::auto_scroll_min_size>`, :cpp:func:`auto_scroll_position <gui_forms::ScrollableControl::auto_scroll_position>`, :cpp:func:`scroll_position <gui_forms::ScrollableControl::scroll_position>`, :cpp:func:`viewport_rectangle <gui_forms::ScrollableControl::viewport_rectangle>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`, :cpp:func:`hscroll <gui_forms::ScrollableControl::hscroll>`, :cpp:func:`vscroll <gui_forms::ScrollableControl::vscroll>`, :cpp:func:`last_scroll_event <gui_forms::ScrollableControl::last_scroll_event>`, :cpp:func:`scroll_event_revision <gui_forms::ScrollableControl::scroll_event_revision>`, :cpp:func:`scroll_snapshot <gui_forms::ScrollableControl::scroll_snapshot>`; events :cpp:func:`scroll <gui_forms::ScrollableControl::scroll>`; methods :cpp:func:`get_scroll_state <gui_forms::ScrollableControl::get_scroll_state>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`scroll_by <gui_forms::ScrollableControl::scroll_by>`, :cpp:func:`scroll_control_into_view <gui_forms::ScrollableControl::scroll_control_into_view>`, :cpp:func:`scroll_to <gui_forms::ScrollableControl::scroll_to>`, :cpp:func:`set_scroll_state <gui_forms::ScrollableControl::set_scroll_state>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`.
+      From :cpp:class:`ScrollableControl <gui_forms::ScrollableControl>`: properties :cpp:func:`auto_scroll <gui_forms::ScrollableControl::auto_scroll>`, :cpp:func:`auto_scroll_margin <gui_forms::ScrollableControl::auto_scroll_margin>`, :cpp:func:`auto_scroll_min_size <gui_forms::ScrollableControl::auto_scroll_min_size>`, :cpp:func:`auto_scroll_position <gui_forms::ScrollableControl::auto_scroll_position>`, :cpp:func:`scroll_position <gui_forms::ScrollableControl::scroll_position>`, :cpp:func:`viewport_rectangle <gui_forms::ScrollableControl::viewport_rectangle>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`, :cpp:func:`hscroll <gui_forms::ScrollableControl::hscroll>`, :cpp:func:`vscroll <gui_forms::ScrollableControl::vscroll>`, :cpp:func:`last_scroll_event <gui_forms::ScrollableControl::last_scroll_event>`, :cpp:func:`scroll_event_revision <gui_forms::ScrollableControl::scroll_event_revision>`, :cpp:func:`scroll_snapshot <gui_forms::ScrollableControl::scroll_snapshot>`, :cpp:func:`states <gui_forms::ScrollableControl::states>`; events :cpp:func:`scroll <gui_forms::ScrollableControl::scroll>`; methods :cpp:func:`get_scroll_state <gui_forms::ScrollableControl::get_scroll_state>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`scroll_by <gui_forms::ScrollableControl::scroll_by>`, :cpp:func:`scroll_control_into_view <gui_forms::ScrollableControl::scroll_control_into_view>`, :cpp:func:`scroll_to <gui_forms::ScrollableControl::scroll_to>`, :cpp:func:`set_scroll_state <gui_forms::ScrollableControl::set_scroll_state>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`.
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
 
@@ -210,6 +212,8 @@ gui_forms::Panel
 
       Sets :cpp:func:`visual_role <gui_forms::Panel::visual_role>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
 
    .. rubric:: Methods
 
@@ -248,3 +252,9 @@ gui_forms::Panel
    .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*
+
+   .. cpp:function:: Parts panel_parts() const
+
+      *Protected.*
+
+      The scrollable parts, the face, and the edge when a border style is set.

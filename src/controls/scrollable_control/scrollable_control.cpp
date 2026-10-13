@@ -805,27 +805,33 @@ const ControlAnatomy& ScrollableControl::anatomy() const noexcept {
     return scrollable_control_anatomy;
 }
 
-void ScrollableControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    const ControlAnatomy& declared = anatomy();
+ScrollableControl::Parts ScrollableControl::scrollable_parts() const {
     const Rect region = client_rectangle();
     const AxisGeometry horizontal = axis_geometry(ScrollOrientation::horizontal);
     const AxisGeometry vertical = axis_geometry(ScrollOrientation::vertical);
-    set_part_geometry(declared, geometry, "region", region);
-    set_part_geometry(declared, geometry, "viewport", viewport_rectangle_);
-    set_part_geometry(declared, geometry, "horizontal-decrement-arrow", horizontal.first_button);
-    set_part_geometry(declared, geometry, "horizontal-track", horizontal.track);
-    set_part_geometry(declared, geometry, "horizontal-thumb", horizontal.thumb);
-    set_part_geometry(declared, geometry, "horizontal-increment-arrow", horizontal.last_button);
-    set_part_geometry(declared, geometry, "vertical-decrement-arrow", vertical.first_button);
-    set_part_geometry(declared, geometry, "vertical-track", vertical.track);
-    set_part_geometry(declared, geometry, "vertical-thumb", vertical.thumb);
-    set_part_geometry(declared, geometry, "vertical-increment-arrow", vertical.last_button);
+    Parts record;
+    record.region = PartGeometry::from_bounds(region);
+    record.viewport = PartGeometry::from_bounds(viewport_rectangle_);
+    record.horizontal_decrement_arrow = PartGeometry::from_bounds(horizontal.first_button);
+    record.horizontal_track = PartGeometry::from_bounds(horizontal.track);
+    record.horizontal_thumb = PartGeometry::from_bounds(horizontal.thumb);
+    record.horizontal_increment_arrow = PartGeometry::from_bounds(horizontal.last_button);
+    record.vertical_decrement_arrow = PartGeometry::from_bounds(vertical.first_button);
+    record.vertical_track = PartGeometry::from_bounds(vertical.track);
+    record.vertical_thumb = PartGeometry::from_bounds(vertical.thumb);
+    record.vertical_increment_arrow = PartGeometry::from_bounds(vertical.last_button);
     if (hscroll() && vscroll()) {
         const Rect corner{viewport_rectangle_.width, viewport_rectangle_.height,
                           scrollbar_thickness_, scrollbar_thickness_};
-        set_part_geometry(declared, geometry, "scroll-corner", corner);
+        record.scroll_corner = PartGeometry::from_bounds(corner);
     }
-    set_part_geometry(declared, geometry, "focus", region);
+    record.focus = PartGeometry::from_bounds(region);
+    return record;
+}
+
+void ScrollableControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Parts record = scrollable_parts();
+    write_parts(anatomy(), scrollable_detail::part_fields, record, geometry);
 }
 
 AnatomyStateSet ScrollableControl::anatomy_states() const {
@@ -836,6 +842,19 @@ AnatomyStateSet ScrollableControl::anatomy_states() const {
         states.insert(AnatomyState::captured);
     }
     return states;
+}
+
+ScrollableControl::Parts ScrollableControl::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(), record);
+    return record;
+}
+
+ScrollableControl::States ScrollableControl::states() const {
+    States record;
+    read_states(scrollable_detail::state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

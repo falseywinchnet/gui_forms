@@ -278,6 +278,10 @@ gui_forms::Control
 
       **property_descriptors** : ``std::vector<PropertyDescriptor>``, read-only
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **name_changed** : ``Event<const std::string&>``
@@ -424,8 +428,6 @@ gui_forms::Control
         - Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor.
       * - :cpp:func:`fill_part_geometry <gui_forms::Control::fill_part_geometry>`
         - Fills one record per declared part, in declaration order, in local coordinates after layout.
-      * - :cpp:func:`part_geometry <gui_forms::Control::part_geometry>`
-        - Geometry of one declared part, or nullopt when the type declares no part with that name.
       * - :cpp:func:`set_child_index <gui_forms::Control::set_child_index>`
         - Moves a child to a z-order index, where 0 is frontmost.
       * - :cpp:func:`set_bounds <gui_forms::Control::set_bounds>`
@@ -966,6 +968,10 @@ gui_forms::Control
 
    .. cpp:function:: std::vector<PropertyDescriptor> property_descriptors() const
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -1220,11 +1226,7 @@ gui_forms::Control
 
    .. cpp:function:: void fill_part_geometry(std::span<PartGeometry> geometry) const
 
-      Fills one record per declared part, in declaration order, in local coordinates after layout. ``geometry`` must hold exactly anatomy().parts.size() records; otherwise this throws std::invalid_argument and leaves ``geometry`` unchanged.
-
-   .. cpp:function:: std::optional<PartGeometry> part_geometry(std::string_view part_name) const
-
-      Geometry of one declared part, or nullopt when the type declares no part with that name.
+      Fills one record per declared part, in declaration order, in local coordinates after layout. ``geometry`` must hold exactly anatomy().parts.size() records; otherwise this throws std::invalid_argument and leaves ``geometry`` unchanged. This is the generic path for the engine, inspection and tools; C++ callers read parts() instead.
 
    .. cpp:function:: bool set_child_index(RuntimeId child, std::size_t index)
 
@@ -1378,6 +1380,12 @@ gui_forms::Control
       *Protected.*
 
       Called by fill_part_geometry with ``geometry`` already sized to anatomy().parts.size() and every record reset to absent.
+
+   .. cpp:function:: PartGeometryBuffer published_part_geometry() const
+
+      *Protected.*
+
+      The geometry publish_part_geometry produces for the dynamic type.
 
    .. cpp:function:: AnatomyStateSet base_anatomy_states() const
 

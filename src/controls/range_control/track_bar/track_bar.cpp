@@ -63,24 +63,35 @@ Size TrackBar::measure(Size available) {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 6> track_bar_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "track", .role = PartRole::track, .composed_from = {}},
-    {.name = "fill", .role = PartRole::fill, .composed_from = {}},
-    {.name = "ticks", .role = PartRole::glyph, .composed_from = {}},
-    {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+constexpr std::array<PartField<TrackBar::Parts>, 6> track_bar_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &TrackBar::Parts::region},
+    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {}},
+     .member = &TrackBar::Parts::track},
+    {.declaration = {.name = "fill", .role = PartRole::fill, .composed_from = {}},
+     .member = &TrackBar::Parts::fill},
+    {.declaration = {.name = "ticks", .role = PartRole::glyph, .composed_from = {}},
+     .member = &TrackBar::Parts::ticks},
+    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
+     .member = &TrackBar::Parts::thumb},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &TrackBar::Parts::focus},
 }};
 
-constexpr std::array<AnatomyState, 7> track_bar_states{
-    AnatomyState::normal,
-    AnatomyState::pressed,
-    AnatomyState::captured,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-};
+constexpr std::array<StateField<TrackBar::States>, 7> track_bar_state_fields{{
+    {.state = AnatomyState::normal, .member = &TrackBar::States::normal},
+    {.state = AnatomyState::pressed, .member = &TrackBar::States::pressed},
+    {.state = AnatomyState::captured, .member = &TrackBar::States::captured},
+    {.state = AnatomyState::enabled, .member = &TrackBar::States::enabled},
+    {.state = AnatomyState::disabled, .member = &TrackBar::States::disabled},
+    {.state = AnatomyState::focused, .member = &TrackBar::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &TrackBar::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 6> track_bar_parts =
+    part_declarations(track_bar_part_fields);
+constexpr std::array<AnatomyState, 7> track_bar_states =
+    state_declarations(track_bar_state_fields);
 
 constexpr ControlAnatomy track_bar_anatomy{
     .control_id = "track-bar",
@@ -88,11 +99,6 @@ constexpr ControlAnatomy track_bar_anatomy{
     .states = track_bar_states,
     .custom_states = {},
 };
-
-void publish_part(std::span<PartGeometry> geometry, std::size_t index, Rect bounds) {
-    geometry[index].bounds = bounds;
-    geometry[index].present = !bounds.empty();
-}
 
 } // namespace
 
@@ -183,13 +189,15 @@ const ControlAnatomy& TrackBar::anatomy() const noexcept {
 
 void TrackBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect thumb = thumb_bounds();
-    publish_part(geometry, 0U, local_bounds());
-    publish_part(geometry, 1U, track_bounds());
-    publish_part(geometry, 2U, fill_bounds());
-    publish_part(geometry, 3U, ticks_bounds());
-    publish_part(geometry, 4U, thumb);
+    Parts record;
+    record.region = PartGeometry::from_bounds(local_bounds());
+    record.track = PartGeometry::from_bounds(track_bounds());
+    record.fill = PartGeometry::from_bounds(fill_bounds());
+    record.ticks = PartGeometry::from_bounds(ticks_bounds());
+    record.thumb = PartGeometry::from_bounds(thumb);
     // The track bar shows focus on its thumb.
-    publish_part(geometry, 5U, thumb);
+    record.focus = PartGeometry::from_bounds(thumb);
+    write_parts(anatomy(), track_bar_part_fields, record, geometry);
 }
 
 AnatomyStateSet TrackBar::anatomy_states() const {
@@ -200,6 +208,19 @@ AnatomyStateSet TrackBar::anatomy_states() const {
         states.insert(AnatomyState::captured);
     }
     return states;
+}
+
+TrackBar::Parts TrackBar::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), track_bar_part_fields, published.parts(), record);
+    return record;
+}
+
+TrackBar::States TrackBar::states() const {
+    States record;
+    read_states(track_bar_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void TrackBar::on_paint(Painter& painter, Rect) {

@@ -140,11 +140,6 @@ constexpr ControlAnatomy scroll_bar_anatomy{
     .custom_states = {},
 };
 
-void publish_part(std::span<PartGeometry> geometry, std::size_t index, Rect bounds) {
-    geometry[index].bounds = bounds;
-    geometry[index].present = !bounds.empty();
-}
-
 } // namespace
 
 const ControlAnatomy& ScrollBar::anatomy() const noexcept {
@@ -153,13 +148,15 @@ const ControlAnatomy& ScrollBar::anatomy() const noexcept {
 
 void ScrollBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect thumb = thumb_bounds();
-    publish_part(geometry, 0U, local_bounds());
-    publish_part(geometry, 1U, decrement_button_bounds());
-    publish_part(geometry, 2U, increment_button_bounds());
-    publish_part(geometry, 3U, track_bounds());
-    publish_part(geometry, 4U, thumb);
+    Parts record;
+    record.region = PartGeometry::from_bounds(local_bounds());
+    record.decrement_arrow = PartGeometry::from_bounds(decrement_button_bounds());
+    record.increment_arrow = PartGeometry::from_bounds(increment_button_bounds());
+    record.track = PartGeometry::from_bounds(track_bounds());
+    record.thumb = PartGeometry::from_bounds(thumb);
     // The scroll bar shows focus on its thumb.
-    publish_part(geometry, 5U, thumb);
+    record.focus = PartGeometry::from_bounds(thumb);
+    write_parts(anatomy(), scroll_bar_detail::part_fields, record, geometry);
 }
 
 AnatomyStateSet ScrollBar::anatomy_states() const {
@@ -172,6 +169,19 @@ AnatomyStateSet ScrollBar::anatomy_states() const {
         states.insert(AnatomyState::captured);
     }
     return states;
+}
+
+ScrollBar::Parts ScrollBar::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scroll_bar_detail::part_fields, published.parts(), record);
+    return record;
+}
+
+ScrollBar::States ScrollBar::states() const {
+    States record;
+    read_states(scroll_bar_detail::state_fields, anatomy_states(), record);
+    return record;
 }
 
 double ScrollBar::value_from_thumb_coordinate(double coordinate) const noexcept {

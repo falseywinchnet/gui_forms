@@ -148,6 +148,27 @@ public:
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry face;
+        PartGeometry icon;
+        PartGeometry label;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool hot{};
+        bool pressed{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool open{};
+        bool closed{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
@@ -178,10 +199,8 @@ protected:
     [[nodiscard]] ContentLayout published_content_layout(
         Rect face, bool selected, bool command_alignment) const;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
-    // Publishes region, face, icon, label, focus and, where the type declares
-    // it, preselect for a push-style button whose face is the whole control.
-    void publish_push_button_parts(std::span<PartGeometry> geometry,
-                                   bool selected, bool command_alignment) const;
+    // The parts of a push-style button whose face is the whole control.
+    [[nodiscard]] Parts push_button_parts(bool selected, bool command_alignment) const;
     // The interaction, availability, focus and disclosure states every
     // button shares.
     [[nodiscard]] AnatomyStateSet button_anatomy_states() const;

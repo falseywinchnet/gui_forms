@@ -1,6 +1,6 @@
 #include "gui_forms/controls/panel/material_panel/material_panel.hpp"
 #include "gui_forms/window.hpp"
-#include "../../scrollable_control/scrollable_anatomy.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <stdexcept>
 #include <utility>
@@ -62,7 +62,7 @@ namespace {
 
 constexpr ControlAnatomy material_panel_anatomy{
     .control_id = "material-panel",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
 };
@@ -75,8 +75,11 @@ const ControlAnatomy& MaterialPanel::anatomy() const noexcept {
 
 void MaterialPanel::publish_part_geometry(std::span<PartGeometry> geometry) const {
     // The material is the whole face; Panel's border style is not painted.
-    ScrollableControl::publish_part_geometry(geometry);
-    set_part_geometry(anatomy(), geometry, "face", client_rectangle());
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.face = PartGeometry::from_bounds(client_rectangle());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), panel_detail::extra_fields, record, geometry);
 }
 
 } // namespace gui_forms

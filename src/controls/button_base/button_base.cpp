@@ -742,25 +742,35 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
 
 namespace {
 
-constexpr std::array<PartDeclaration, 5> button_base_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "face", .role = PartRole::face, .composed_from = {}},
-    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
-    {.name = "label", .role = PartRole::label, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+constexpr std::array<PartField<ButtonBase::Parts>, 5> button_base_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &ButtonBase::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &ButtonBase::Parts::face},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &ButtonBase::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &ButtonBase::Parts::label},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &ButtonBase::Parts::focus},
 }};
 
-constexpr std::array<AnatomyState, 9> button_base_states{
-    AnatomyState::normal,
-    AnatomyState::hot,
-    AnatomyState::pressed,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-    AnatomyState::open,
-    AnatomyState::closed,
-};
+constexpr std::array<StateField<ButtonBase::States>, 9> button_base_state_fields{{
+    {.state = AnatomyState::normal, .member = &ButtonBase::States::normal},
+    {.state = AnatomyState::hot, .member = &ButtonBase::States::hot},
+    {.state = AnatomyState::pressed, .member = &ButtonBase::States::pressed},
+    {.state = AnatomyState::enabled, .member = &ButtonBase::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ButtonBase::States::disabled},
+    {.state = AnatomyState::focused, .member = &ButtonBase::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &ButtonBase::States::focus_visible},
+    {.state = AnatomyState::open, .member = &ButtonBase::States::open},
+    {.state = AnatomyState::closed, .member = &ButtonBase::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 5> button_base_parts =
+    part_declarations(button_base_part_fields);
+constexpr std::array<AnatomyState, 9> button_base_states =
+    state_declarations(button_base_state_fields);
 
 constexpr ControlAnatomy button_base_anatomy{
     .control_id = "button-base",
@@ -776,29 +786,29 @@ const ControlAnatomy& ButtonBase::anatomy() const noexcept {
 }
 
 void ButtonBase::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    publish_push_button_parts(geometry, false, false);
+    const Parts record = push_button_parts(false, false);
+    write_parts(anatomy(), button_base_part_fields, record, geometry);
 }
 
-void ButtonBase::publish_push_button_parts(std::span<PartGeometry> geometry,
-                                           bool selected,
-                                           bool command_alignment) const {
-    const ControlAnatomy& declared = anatomy();
+ButtonBase::Parts ButtonBase::push_button_parts(bool selected,
+                                                bool command_alignment) const {
     const Rect bounds = local_bounds();
     const ContentLayout layout =
         published_content_layout(bounds, selected, command_alignment);
-    set_part_geometry(declared, geometry, "region", bounds);
-    set_part_geometry(declared, geometry, "face", bounds);
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
     if (layout.has_image) {
-        set_part_geometry(declared, geometry, "icon", layout.image);
+        record.icon = PartGeometry::from_bounds(layout.image);
     }
     if (layout.has_text) {
-        set_part_geometry(declared, geometry, "label", layout.text);
+        record.label = PartGeometry::from_bounds(layout.text);
     }
-    // Cue parts publish the face they mark. Where the ring is stroked
+    // A cue part publishes the face it marks. Where the ring is stroked
     // relative to it is a theme recipe parameter until the engine (T2)
     // owns cue geometry.
-    set_part_geometry(declared, geometry, "preselect", bounds);
-    set_part_geometry(declared, geometry, "focus", bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    return record;
 }
 
 AnatomyStateSet ButtonBase::button_anatomy_states() const {
@@ -825,6 +835,19 @@ AnatomyStateSet ButtonBase::button_anatomy_states() const {
 
 AnatomyStateSet ButtonBase::anatomy_states() const {
     return button_anatomy_states();
+}
+
+ButtonBase::Parts ButtonBase::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), button_base_part_fields, published.parts(), record);
+    return record;
+}
+
+ButtonBase::States ButtonBase::states() const {
+    States record;
+    read_states(button_base_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,

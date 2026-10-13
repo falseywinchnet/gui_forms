@@ -1,5 +1,5 @@
 #include "gui_forms/controls/panel/card/card.hpp"
-#include "../../scrollable_control/scrollable_anatomy.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <array>
 #include <algorithm>
@@ -350,21 +350,24 @@ bool Card::on_semantic_action(SemanticAction action, std::string_view value) {
 
 namespace {
 
-constexpr std::array<AnatomyState, 9> card_states{
-    AnatomyState::normal,
-    AnatomyState::hot,
-    AnatomyState::pressed,
-    AnatomyState::captured,
-    AnatomyState::selected,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-};
+constexpr std::array<StateField<Card::States>, 9> card_state_fields{{
+    {.state = AnatomyState::normal, .member = &Card::States::normal},
+    {.state = AnatomyState::hot, .member = &Card::States::hot},
+    {.state = AnatomyState::pressed, .member = &Card::States::pressed},
+    {.state = AnatomyState::captured, .member = &Card::States::captured},
+    {.state = AnatomyState::selected, .member = &Card::States::selected},
+    {.state = AnatomyState::enabled, .member = &Card::States::enabled},
+    {.state = AnatomyState::disabled, .member = &Card::States::disabled},
+    {.state = AnatomyState::focused, .member = &Card::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &Card::States::focus_visible},
+}};
+
+constexpr std::array<AnatomyState, 9> card_states =
+    state_declarations(card_state_fields);
 
 constexpr ControlAnatomy card_anatomy{
     .control_id = "card",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = card_states,
     .custom_states = {},
 };
@@ -380,8 +383,11 @@ void Card::publish_part_geometry(std::span<PartGeometry> geometry) const {
         Panel::publish_part_geometry(geometry);
         return;
     }
-    ScrollableControl::publish_part_geometry(geometry);
-    set_part_geometry(anatomy(), geometry, "face", client_rectangle());
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.face = PartGeometry::from_bounds(client_rectangle());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), panel_detail::extra_fields, record, geometry);
 }
 
 AnatomyStateSet Card::anatomy_states() const {
@@ -398,6 +404,12 @@ AnatomyStateSet Card::anatomy_states() const {
         states.insert(AnatomyState::selected);
     }
     return states;
+}
+
+Card::States Card::states() const {
+    States record;
+    read_states(card_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

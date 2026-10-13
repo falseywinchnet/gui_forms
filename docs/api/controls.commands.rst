@@ -38,12 +38,118 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`Button::Parts <gui_forms::Button::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`Button::States <gui_forms::Button::States>`
+     -  
+   * - :cpp:class:`ButtonBase::Parts <gui_forms::ButtonBase::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`ButtonBase::States <gui_forms::ButtonBase::States>`
+     -  
    * - :cpp:class:`ChoiceItem <gui_forms::ChoiceItem>`
      -  
    * - :cpp:class:`CommandItem <gui_forms::CommandItem>`
      -  
+   * - :cpp:class:`DropDownButton::Parts <gui_forms::DropDownButton::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`DropDownButton::States <gui_forms::DropDownButton::States>`
+     -  
+   * - :cpp:class:`LinkLabel::Parts <gui_forms::LinkLabel::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`LinkLabel::States <gui_forms::LinkLabel::States>`
+     -  
    * - :cpp:class:`SectionItem <gui_forms::SectionItem>`
      -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Button::Parts final
+
+   ``#include <gui_forms/controls/button_base/button/button.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry preselect
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Button::States final
+
+   ``#include <gui_forms/controls/button_base/button/button.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool preselect
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ButtonBase::Parts final
+
+   ``#include <gui_forms/controls/button_base/button_base.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ButtonBase::States final
+
+   ``#include <gui_forms/controls/button_base/button_base.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
 
 .. cpp:namespace:: gui_forms
 
@@ -80,6 +186,100 @@ Related types
    .. cpp:member:: Command* command
 
       Borrowed at set_items; subsequent access is token-guarded.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DropDownButton::Parts final
+
+   ``#include <gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry drop_down
+
+   .. cpp:member:: PartGeometry disclosure
+
+   .. cpp:member:: PartGeometry preselect
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DropDownButton::States final
+
+   ``#include <gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool preselect
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LinkLabel::Parts final
+
+   ``#include <gui_forms/controls/button_base/link_label/link_label.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry underline
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: LinkLabel::States final
+
+   ``#include <gui_forms/controls/button_base/link_label/link_label.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool visited
 
 .. cpp:namespace:: gui_forms
 

@@ -21,6 +21,14 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: a face, the frame and the caption.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry caption;
+    };
+    [[nodiscard]] Parts parts() const;
 
 protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;

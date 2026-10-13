@@ -59,6 +59,10 @@ gui_forms::RadioButton
          checked indicator in the accent colour, but only for a button given its
          own style with ``set_style``; under the theme it looks like ``classic``.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **checked_changed** : ``Event<bool>``
@@ -207,6 +211,10 @@ gui_forms::RadioButton
    .. cpp:function:: void set_indicator_style(ChoiceIndicatorStyle style)
 
       Sets :cpp:func:`indicator_style <gui_forms::RadioButton::indicator_style>`; see the property's description above.
+
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
 
 
    .. rubric:: Events

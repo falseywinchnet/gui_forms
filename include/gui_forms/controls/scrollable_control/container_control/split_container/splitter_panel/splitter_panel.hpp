@@ -17,6 +17,12 @@ public:
     void set_background(Color color);
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: the scrollable parts and the face.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+    };
+    [[nodiscard]] Parts parts() const;
 
 protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;

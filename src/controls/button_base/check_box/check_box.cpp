@@ -124,29 +124,41 @@ void CheckBox::set_indicator_style(ChoiceIndicatorStyle style_value) {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 7> check_box_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "face", .role = PartRole::face, .composed_from = {}},
-    {.name = "well", .role = PartRole::well, .composed_from = {}},
-    {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
-    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
-    {.name = "label", .role = PartRole::label, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+constexpr std::array<PartField<CheckBox::Parts>, 7> check_box_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &CheckBox::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &CheckBox::Parts::face},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+     .member = &CheckBox::Parts::well},
+    {.declaration = {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
+     .member = &CheckBox::Parts::indicator},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &CheckBox::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &CheckBox::Parts::label},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &CheckBox::Parts::focus},
 }};
 
-constexpr std::array<AnatomyState, 11> check_box_states{
-    AnatomyState::normal,
-    AnatomyState::hot,
-    AnatomyState::pressed,
-    AnatomyState::checked,
-    AnatomyState::indeterminate,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-    AnatomyState::open,
-    AnatomyState::closed,
-};
+constexpr std::array<StateField<CheckBox::States>, 11> check_box_state_fields{{
+    {.state = AnatomyState::normal, .member = &CheckBox::States::normal},
+    {.state = AnatomyState::hot, .member = &CheckBox::States::hot},
+    {.state = AnatomyState::pressed, .member = &CheckBox::States::pressed},
+    {.state = AnatomyState::checked, .member = &CheckBox::States::checked},
+    {.state = AnatomyState::indeterminate, .member = &CheckBox::States::indeterminate},
+    {.state = AnatomyState::enabled, .member = &CheckBox::States::enabled},
+    {.state = AnatomyState::disabled, .member = &CheckBox::States::disabled},
+    {.state = AnatomyState::focused, .member = &CheckBox::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &CheckBox::States::focus_visible},
+    {.state = AnatomyState::open, .member = &CheckBox::States::open},
+    {.state = AnatomyState::closed, .member = &CheckBox::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 7> check_box_parts =
+    part_declarations(check_box_part_fields);
+constexpr std::array<AnatomyState, 11> check_box_states =
+    state_declarations(check_box_state_fields);
 
 constexpr ControlAnatomy check_box_anatomy{
     .control_id = "check-box",
@@ -162,14 +174,20 @@ const ControlAnatomy& CheckBox::anatomy() const noexcept {
 }
 
 void CheckBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
     if (appearance_ == CheckBoxAppearance::button) {
         // The button appearance is a push button whose selection is the
         // check state; it has a face and no well or indicator.
         const bool layout_selected = !has_style_override() && checked();
-        publish_push_button_parts(geometry, layout_selected, false);
+        const ButtonBase::Parts base = push_button_parts(layout_selected, false);
+        record.region = base.region;
+        record.face = base.face;
+        record.icon = base.icon;
+        record.label = base.label;
+        record.focus = base.focus;
+        write_parts(anatomy(), check_box_part_fields, record, geometry);
         return;
     }
-    const ControlAnatomy& declared = anatomy();
     const Rect bounds = local_bounds();
     const double indicator_width =
         indicator_style_ == ChoiceIndicatorStyle::toggle ? 30.0 : 15.0;
@@ -193,16 +211,17 @@ void CheckBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
                             bounds.height};
     const ContentLayout layout =
         published_content_layout(content_face, checked(), false);
-    set_part_geometry(declared, geometry, "region", bounds);
-    set_part_geometry(declared, geometry, "well", box);
-    set_part_geometry(declared, geometry, "indicator", mark);
+    record.region = PartGeometry::from_bounds(bounds);
+    record.well = PartGeometry::from_bounds(box);
+    record.indicator = PartGeometry::from_bounds(mark);
     if (layout.has_image) {
-        set_part_geometry(declared, geometry, "icon", layout.image);
+        record.icon = PartGeometry::from_bounds(layout.image);
     }
     if (layout.has_text) {
-        set_part_geometry(declared, geometry, "label", layout.text);
+        record.label = PartGeometry::from_bounds(layout.text);
     }
-    set_part_geometry(declared, geometry, "focus", bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), check_box_part_fields, record, geometry);
 }
 
 AnatomyStateSet CheckBox::anatomy_states() const {
@@ -213,6 +232,19 @@ AnatomyStateSet CheckBox::anatomy_states() const {
         states.insert(AnatomyState::indeterminate);
     }
     return states;
+}
+
+CheckBox::Parts CheckBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), check_box_part_fields, published.parts(), record);
+    return record;
+}
+
+CheckBox::States CheckBox::states() const {
+    States record;
+    read_states(check_box_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void CheckBox::on_paint(Painter& painter, Rect) {

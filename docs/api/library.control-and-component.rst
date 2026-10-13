@@ -38,6 +38,10 @@ Related types
      - The result of validate_control_anatomy: the first defect found, or none.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
+   * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
+     - The parts and states every control publishes, as dot members.
+   * - :cpp:class:`Control::States <gui_forms::Control::States>`
+     -  
    * - :cpp:class:`ControlAnatomy <gui_forms::ControlAnatomy>`
      - The anatomy of one control type.
    * - :cpp:class:`ControlFactory <gui_forms::ControlFactory>`
@@ -56,12 +60,18 @@ Related types
      -  
    * - :cpp:class:`PartDeclaration <gui_forms::PartDeclaration>`
      - One declared part.
+   * - :cpp:class:`PartField <gui_forms::PartField>`
+     - One member of a parts record and the part it publishes.
    * - :cpp:class:`PartGeometry <gui_forms::PartGeometry>`
      - Geometry of one declared part in the control's local coordinate space after layout.
+   * - :cpp:class:`PartGeometryBuffer <gui_forms::PartGeometryBuffer>`
+     - Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
    * - :cpp:class:`PartIndex <gui_forms::PartIndex>`
      - Position of a part in its control type's declaration list.
    * - :cpp:class:`RuntimeId <gui_forms::RuntimeId>`
      - RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
+   * - :cpp:class:`StateField <gui_forms::StateField>`
+     - One member of a states record and the standard state it reports.
    * - :cpp:class:`StaticNode <gui_forms::StaticNode>`
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
 
@@ -153,6 +163,34 @@ Related types
    .. cpp:function:: void dispose()
 
       Atomically retires the container and disposes the captured sequence in ownership order.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Control::Parts final
+
+   ``#include <gui_forms/control/control/control.hpp>``
+
+   The parts and states every control publishes, as dot members. A type that declares its own anatomy hides these with records of its own. Every record reads the control's published geometry and states, so a record read through a base type agrees with the dynamic type.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Control::States final
+
+   ``#include <gui_forms/control/control/control.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 
@@ -295,15 +333,49 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: template <typename Record> PartField final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One member of a parts record and the part it publishes.
+
+   .. cpp:member:: PartDeclaration declaration
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartGeometry final
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
    Geometry of one declared part in the control's local coordinate space after layout. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused.
 
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static constexpr PartGeometry from_bounds(Rect bounds) noexcept
+
+      A part that is present exactly when ``bounds`` is not empty.
+
    .. cpp:member:: Rect bounds
 
    .. cpp:member:: bool present
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartGeometryBuffer final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const PartGeometry> parts() const noexcept
+
+   .. cpp:member:: std::array<PartGeometry, maximum_control_parts> geometry
+
+   .. cpp:member:: std::size_t count
 
 .. cpp:namespace:: gui_forms
 
@@ -324,6 +396,18 @@ Related types
    RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
 
    .. cpp:member:: std::uint64_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: template <typename Record> StateField final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One member of a states record and the standard state it reports.
+
+   .. cpp:member:: AnatomyState state
+
+      Default: ``{AnatomyState::normal}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -749,9 +833,21 @@ Functions, constants and aliases
 
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
 
-.. cpp:function:: void set_part_geometry(const ControlAnatomy& anatomy, std::span<PartGeometry> geometry, std::string_view part_name, Rect bounds) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<PartDeclaration, Count> part_declarations(const std::array<PartField<Record>, Count>& fields)
 
-   Publishes ``bounds`` for the declared part named ``part_name``; the part is present when ``bounds`` is not empty. A name the anatomy does not declare is ignored, so a shared publisher can serve types that declare a subset. ``geometry`` must hold one record per declared part.
+.. cpp:function:: template <std::size_t First, std::size_t Second> constexpr std::array<PartDeclaration, First + Second> joined_declarations(const std::array<PartDeclaration, First>& first, const std::array<PartDeclaration, Second>& second)
+
+.. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<AnatomyState, Count> state_declarations(const std::array<StateField<Record>, Count>& fields)
+
+.. cpp:function:: template <typename Record, std::size_t Count> void write_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+
+   Publishes every member of ``record`` into the part ``anatomy`` declares with that member's name. A part the anatomy does not declare is skipped, so a base type's record publishes into a subclass's longer declaration list. ``geometry`` holds one record per declared part.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+
+   Reads the published geometry back into ``record``; a member whose part the anatomy does not declare is left absent.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_states(const std::array<StateField<Record>, Count>& fields, const AnatomyStateSet& active, Record& record) noexcept
 
 .. cpp:function:: std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept
 

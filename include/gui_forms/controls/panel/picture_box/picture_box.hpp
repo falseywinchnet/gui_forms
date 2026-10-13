@@ -42,6 +42,14 @@ public:
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: Panel's parts and the image.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry image;
+    };
+    [[nodiscard]] Parts parts() const;
 
 protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;

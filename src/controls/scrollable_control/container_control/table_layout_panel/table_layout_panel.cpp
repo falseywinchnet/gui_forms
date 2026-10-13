@@ -712,11 +712,14 @@ SemanticDescriptor TableLayoutPanel::semantic_descriptor() const {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 1> table_layout_panel_extra{{
-    {.name = "cell-grid", .role = PartRole::divider, .composed_from = {}},
+constexpr std::array<PartField<TableLayoutPanel::Parts>, 1> table_layout_panel_extra_fields{{
+    {.declaration = {.name = "cell-grid", .role = PartRole::divider, .composed_from = {}},
+     .member = &TableLayoutPanel::Parts::cell_grid},
 }};
+
 constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
-    table_layout_panel_parts = scrollable_detail::with_parts(table_layout_panel_extra);
+    table_layout_panel_parts = joined_declarations(
+        scrollable_detail::parts, part_declarations(table_layout_panel_extra_fields));
 
 constexpr ControlAnatomy table_layout_panel_anatomy{
     .control_id = "table-layout-panel",
@@ -732,22 +735,33 @@ const ControlAnatomy& TableLayoutPanel::anatomy() const noexcept {
 }
 
 void TableLayoutPanel::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    ContainerControl::publish_part_geometry(geometry);
-    if (cell_border_style_ == TableCellBorderStyle::none ||
-        column_widths_.empty() || row_heights_.empty()) {
-        return;
+    Parts record;
+    record.scrollable = scrollable_parts();
+    if (cell_border_style_ != TableCellBorderStyle::none &&
+        !column_widths_.empty() && !row_heights_.empty()) {
+        // The extent on_paint rules: every track and the spacing between
+        // them, from the padding origin.
+        const Insets inset = padding();
+        const double width = std::accumulate(column_widths_.begin(),
+                                             column_widths_.end(), 0.0) +
+            track_spacing_.width * static_cast<double>(column_widths_.size() - 1U);
+        const double height = std::accumulate(row_heights_.begin(),
+                                              row_heights_.end(), 0.0) +
+            track_spacing_.height * static_cast<double>(row_heights_.size() - 1U);
+        const Rect grid{inset.left, inset.top, width, height};
+        record.cell_grid = PartGeometry::from_bounds(grid);
     }
-    // The extent on_paint rules: every track and the spacing between them,
-    // from the padding origin.
-    const Insets inset = padding();
-    const double width = std::accumulate(column_widths_.begin(),
-                                         column_widths_.end(), 0.0) +
-        track_spacing_.width * static_cast<double>(column_widths_.size() - 1U);
-    const double height = std::accumulate(row_heights_.begin(),
-                                          row_heights_.end(), 0.0) +
-        track_spacing_.height * static_cast<double>(row_heights_.size() - 1U);
-    const Rect grid{inset.left, inset.top, width, height};
-    set_part_geometry(anatomy(), geometry, "cell-grid", grid);
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), table_layout_panel_extra_fields, record, geometry);
+}
+
+TableLayoutPanel::Parts TableLayoutPanel::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), table_layout_panel_extra_fields, published.parts(), record);
+    return record;
 }
 
 } // namespace gui_forms

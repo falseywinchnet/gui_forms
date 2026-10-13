@@ -44,6 +44,26 @@ public:
     [[nodiscard]] ScrollBarPart part_at(Point local_point) const noexcept;
 
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry decrement_arrow;
+        PartGeometry increment_arrow;
+        PartGeometry track;
+        PartGeometry thumb;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
     [[nodiscard]] Size measure(Size available) override;

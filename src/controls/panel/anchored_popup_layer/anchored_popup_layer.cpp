@@ -2,7 +2,7 @@
 
 #include "anchored_popup_placement_utilities.hpp"
 #include "gui_forms/window.hpp"
-#include "../../scrollable_control/scrollable_anatomy.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -147,7 +147,7 @@ namespace {
 
 constexpr ControlAnatomy anchored_popup_layer_anatomy{
     .control_id = "anchored-popup-layer",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
 };

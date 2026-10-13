@@ -1,6 +1,6 @@
 #include "gui_forms/controls/panel/scaled_panel/scaled_panel.hpp"
 #include "../../scrollable_control/container_control/scaled_layout_utilities.hpp"
-#include "../../scrollable_control/scrollable_anatomy.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -75,7 +75,7 @@ namespace {
 
 constexpr ControlAnatomy scaled_panel_anatomy{
     .control_id = "scaled-panel",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
 };

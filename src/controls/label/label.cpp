@@ -443,10 +443,14 @@ void Label::paint_label_text(Painter& painter, const std::string_view text) cons
 
 namespace {
 
-constexpr std::array<PartDeclaration, 2> label_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "label", .role = PartRole::label, .composed_from = {}},
+constexpr std::array<PartField<Label::Parts>, 2> label_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &Label::Parts::region},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &Label::Parts::label},
 }};
+
+constexpr std::array<PartDeclaration, 2> label_parts = part_declarations(label_part_fields);
 
 constexpr std::array<AnatomyState, 5> label_states{
     AnatomyState::normal,
@@ -470,10 +474,18 @@ const ControlAnatomy& Label::anatomy() const noexcept {
 }
 
 void Label::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    const ControlAnatomy& declared = anatomy();
     const TextLayout layout = layout_label_text(display_text(), nullptr);
-    set_part_geometry(declared, geometry, "region", client_rectangle());
-    set_part_geometry(declared, geometry, "label", layout.block);
+    Parts record;
+    record.region = PartGeometry::from_bounds(client_rectangle());
+    record.label = PartGeometry::from_bounds(layout.block);
+    write_parts(anatomy(), label_part_fields, record, geometry);
+}
+
+Label::Parts Label::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), label_part_fields, published.parts(), record);
+    return record;
 }
 
 void Label::on_paint(Painter& painter, Rect) {

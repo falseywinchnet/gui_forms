@@ -4,7 +4,7 @@
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
-#include "../../scrollable_control/scrollable_anatomy.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <array>
 #include <algorithm>
@@ -224,13 +224,18 @@ SemanticDescriptor PictureBox::semantic_descriptor() const {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 3> picture_box_extra{{
-    {.name = "face", .role = PartRole::face, .composed_from = {}},
-    {.name = "edge", .role = PartRole::edge, .composed_from = {}},
-    {.name = "image", .role = PartRole::icon, .composed_from = {}},
+constexpr std::array<PartField<PictureBox::Parts>, 3> picture_box_extra_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &PictureBox::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &PictureBox::Parts::edge},
+    {.declaration = {.name = "image", .role = PartRole::icon, .composed_from = {}},
+     .member = &PictureBox::Parts::image},
 }};
+
 constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
-    picture_box_parts = scrollable_detail::with_parts(picture_box_extra);
+    picture_box_parts = joined_declarations(scrollable_detail::parts,
+                                            part_declarations(picture_box_extra_fields));
 
 constexpr ControlAnatomy picture_box_anatomy{
     .control_id = "picture-box",
@@ -246,10 +251,25 @@ const ControlAnatomy& PictureBox::anatomy() const noexcept {
 }
 
 void PictureBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    Panel::publish_part_geometry(geometry);
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    record.face = panel.face;
+    record.edge = panel.edge;
     if (has_valid_image() && image_opacity_ > 0.0) {
-        set_part_geometry(anatomy(), geometry, "image", image_bounds());
+        record.image = PartGeometry::from_bounds(image_bounds());
     }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), picture_box_extra_fields, record, geometry);
+}
+
+PictureBox::Parts PictureBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), picture_box_extra_fields, published.parts(), record);
+    return record;
 }
 
 } // namespace gui_forms

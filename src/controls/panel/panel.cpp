@@ -2,7 +2,7 @@
 #include "../basic/basic_control_rendering.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
-#include "../scrollable_control/scrollable_anatomy.hpp"
+#include "panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -155,7 +155,7 @@ namespace {
 
 constexpr ControlAnatomy panel_anatomy{
     .control_id = "panel",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
 };
@@ -166,14 +166,30 @@ const ControlAnatomy& Panel::anatomy() const noexcept {
     return panel_anatomy;
 }
 
-void Panel::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    ScrollableControl::publish_part_geometry(geometry);
-    const ControlAnatomy& declared = anatomy();
+Panel::Parts Panel::panel_parts() const {
     const Rect bounds = local_bounds();
-    set_part_geometry(declared, geometry, "face", bounds);
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.face = PartGeometry::from_bounds(bounds);
     if (border_style_ != BorderStyle::none) {
-        set_part_geometry(declared, geometry, "edge", bounds);
+        record.edge = PartGeometry::from_bounds(bounds);
     }
+    return record;
+}
+
+void Panel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Parts record = panel_parts();
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), panel_detail::extra_fields, record, geometry);
+}
+
+Panel::Parts Panel::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), panel_detail::extra_fields, published.parts(), record);
+    return record;
 }
 
 } // namespace gui_forms

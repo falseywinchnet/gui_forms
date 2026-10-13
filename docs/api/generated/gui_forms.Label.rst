@@ -87,6 +87,8 @@ gui_forms::Label
          Whether ``&`` in :cpp:func:`text <gui_forms::Label::text>` marks a mnemonic. When false the ampersand is drawn
          and Alt shortcuts are ignored.
 
+      **parts** : ``Parts``, read-only
+
    :Events:
 
       **text_changed** : ``Event<const std::string&>``
@@ -279,6 +281,8 @@ gui_forms::Label
    .. cpp:function:: void set_use_mnemonic(bool value)
 
       Sets :cpp:func:`use_mnemonic <gui_forms::Label::use_mnemonic>`; see the property's description above.
+
+   .. cpp:function:: Parts parts() const
 
 
    .. rubric:: Events

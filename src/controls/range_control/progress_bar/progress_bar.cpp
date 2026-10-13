@@ -218,20 +218,29 @@ Size ProgressBar::measure(Size available) {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 4> progress_bar_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "track", .role = PartRole::track, .composed_from = {}},
-    {.name = "fill", .role = PartRole::fill, .composed_from = {}},
-    {.name = "activity", .role = PartRole::activity, .composed_from = {}},
+constexpr std::array<PartField<ProgressBar::Parts>, 4> progress_bar_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &ProgressBar::Parts::region},
+    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {}},
+     .member = &ProgressBar::Parts::track},
+    {.declaration = {.name = "fill", .role = PartRole::fill, .composed_from = {}},
+     .member = &ProgressBar::Parts::fill},
+    {.declaration = {.name = "activity", .role = PartRole::activity, .composed_from = {}},
+     .member = &ProgressBar::Parts::activity},
 }};
 
-constexpr std::array<AnatomyState, 5> progress_bar_states{
-    AnatomyState::normal,
-    AnatomyState::indeterminate,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::reduced_motion,
-};
+constexpr std::array<StateField<ProgressBar::States>, 5> progress_bar_state_fields{{
+    {.state = AnatomyState::normal, .member = &ProgressBar::States::normal},
+    {.state = AnatomyState::indeterminate, .member = &ProgressBar::States::indeterminate},
+    {.state = AnatomyState::enabled, .member = &ProgressBar::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ProgressBar::States::disabled},
+    {.state = AnatomyState::reduced_motion, .member = &ProgressBar::States::reduced_motion},
+}};
+
+constexpr std::array<PartDeclaration, 4> progress_bar_parts =
+    part_declarations(progress_bar_part_fields);
+constexpr std::array<AnatomyState, 5> progress_bar_states =
+    state_declarations(progress_bar_state_fields);
 
 constexpr ControlAnatomy progress_bar_anatomy{
     .control_id = "progress-bar",
@@ -280,20 +289,21 @@ const ControlAnatomy& ProgressBar::anatomy() const noexcept {
 void ProgressBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect bounds = local_bounds();
     const Rect indicator = indicator_bounds();
-    const bool marquee = visual_style_ == ProgressBarVisualStyle::marquee;
-    geometry[0].bounds = bounds;
-    geometry[0].present = true;
-    geometry[1].bounds = bounds;
-    geometry[1].present = true;
+    Parts record;
+    record.region.bounds = bounds;
+    record.region.present = true;
+    record.track.bounds = bounds;
+    record.track.present = true;
     // The fill exists for every determinate style even at zero value, so its
     // presence follows the style, not the value.
-    if (marquee) {
-        geometry[3].bounds = indicator;
-        geometry[3].present = true;
+    if (visual_style_ == ProgressBarVisualStyle::marquee) {
+        record.activity.bounds = indicator;
+        record.activity.present = true;
     } else {
-        geometry[2].bounds = indicator;
-        geometry[2].present = true;
+        record.fill.bounds = indicator;
+        record.fill.present = true;
     }
+    write_parts(anatomy(), progress_bar_part_fields, record, geometry);
 }
 
 AnatomyStateSet ProgressBar::anatomy_states() const {
@@ -306,6 +316,19 @@ AnatomyStateSet ProgressBar::anatomy_states() const {
         states.insert(AnatomyState::reduced_motion);
     }
     return states;
+}
+
+ProgressBar::Parts ProgressBar::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), progress_bar_part_fields, published.parts(), record);
+    return record;
+}
+
+ProgressBar::States ProgressBar::states() const {
+    States record;
+    read_states(progress_bar_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void ProgressBar::on_paint(Painter& painter, Rect) {

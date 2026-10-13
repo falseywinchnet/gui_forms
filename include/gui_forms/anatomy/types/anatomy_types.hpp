@@ -2,6 +2,7 @@
 
 #include "gui_forms/types.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -169,9 +170,29 @@ struct PartGeometry final {
     Rect bounds{};
     bool present{};
 
+    // A part that is present exactly when `bounds` is not empty.
+    [[nodiscard]] static constexpr PartGeometry from_bounds(Rect bounds) noexcept {
+        PartGeometry geometry;
+        geometry.bounds = bounds;
+        geometry.present = !bounds.empty();
+        return geometry;
+    }
+
     friend constexpr bool operator==(const PartGeometry& left,
                                      const PartGeometry& right) noexcept {
         return left.bounds == right.bounds && left.present == right.present;
+    }
+};
+
+// Storage for one control's published part geometry: `count` live records,
+// one per declared part, in declaration order.
+struct PartGeometryBuffer final {
+    std::array<PartGeometry, maximum_control_parts> geometry{};
+    std::size_t count{};
+
+    [[nodiscard]] std::span<const PartGeometry> parts() const noexcept {
+        const std::span<const PartGeometry> live(geometry.data(), count);
+        return live;
     }
 };
 
@@ -243,13 +264,103 @@ private:
 [[nodiscard]] bool declares_state(const ControlAnatomy& anatomy,
                                   AnatomyState state) noexcept;
 
-// Publishes `bounds` for the declared part named `part_name`; the part is
-// present when `bounds` is not empty. A name the anatomy does not declare is
-// ignored, so a shared publisher can serve types that declare a subset.
-// `geometry` must hold one record per declared part.
-void set_part_geometry(const ControlAnatomy& anatomy,
-                       std::span<PartGeometry> geometry,
-                       std::string_view part_name, Rect bounds) noexcept;
+// Typed records (stage T1). C++ reads a control's parts and states as dot
+// members of a record (`parts.thumb.bounds`, `states.pressed`); kebab-case
+// names are identities for documents and tools only. A field table pairs
+// each record member with the declaration it publishes, so a type's
+// declared names and its record members come from one table.
+
+// One member of a parts record and the part it publishes.
+template <typename Record>
+struct PartField final {
+    PartDeclaration declaration;
+    PartGeometry Record::*member{};
+};
+
+// One member of a states record and the standard state it reports.
+template <typename Record>
+struct StateField final {
+    AnatomyState state{AnatomyState::normal};
+    bool Record::*member{};
+};
+
+template <typename Record, std::size_t Count>
+[[nodiscard]] constexpr std::array<PartDeclaration, Count> part_declarations(
+    const std::array<PartField<Record>, Count>& fields) {
+    std::array<PartDeclaration, Count> declarations{};
+    for (std::size_t index = 0; index < Count; ++index) {
+        declarations[index] = fields[index].declaration;
+    }
+    return declarations;
+}
+
+template <std::size_t First, std::size_t Second>
+[[nodiscard]] constexpr std::array<PartDeclaration, First + Second> joined_declarations(
+    const std::array<PartDeclaration, First>& first,
+    const std::array<PartDeclaration, Second>& second) {
+    std::array<PartDeclaration, First + Second> joined{};
+    for (std::size_t index = 0; index < First; ++index) {
+        joined[index] = first[index];
+    }
+    for (std::size_t index = 0; index < Second; ++index) {
+        joined[First + index] = second[index];
+    }
+    return joined;
+}
+
+template <typename Record, std::size_t Count>
+[[nodiscard]] constexpr std::array<AnatomyState, Count> state_declarations(
+    const std::array<StateField<Record>, Count>& fields) {
+    std::array<AnatomyState, Count> states{};
+    for (std::size_t index = 0; index < Count; ++index) {
+        states[index] = fields[index].state;
+    }
+    return states;
+}
+
+// Publishes every member of `record` into the part `anatomy` declares with
+// that member's name. A part the anatomy does not declare is skipped, so a
+// base type's record publishes into a subclass's longer declaration list.
+// `geometry` holds one record per declared part.
+template <typename Record, std::size_t Count>
+void write_parts(const ControlAnatomy& anatomy,
+                 const std::array<PartField<Record>, Count>& fields,
+                 const Record& record, std::span<PartGeometry> geometry) noexcept {
+    for (std::size_t index = 0; index < Count; ++index) {
+        const std::optional<PartIndex> part =
+            find_part(anatomy, fields[index].declaration.name);
+        if (!part.has_value() || (*part).value >= geometry.size()) {
+            continue;
+        }
+        const PartGeometry& published = record.*(fields[index].member);
+        geometry[(*part).value] = published;
+    }
+}
+
+// Reads the published geometry back into `record`; a member whose part the
+// anatomy does not declare is left absent.
+template <typename Record, std::size_t Count>
+void read_parts(const ControlAnatomy& anatomy,
+                const std::array<PartField<Record>, Count>& fields,
+                std::span<const PartGeometry> geometry, Record& record) noexcept {
+    for (std::size_t index = 0; index < Count; ++index) {
+        const std::optional<PartIndex> part =
+            find_part(anatomy, fields[index].declaration.name);
+        PartGeometry value;
+        if (part.has_value() && (*part).value < geometry.size()) {
+            value = geometry[(*part).value];
+        }
+        record.*(fields[index].member) = value;
+    }
+}
+
+template <typename Record, std::size_t Count>
+void read_states(const std::array<StateField<Record>, Count>& fields,
+                 const AnatomyStateSet& active, Record& record) noexcept {
+    for (std::size_t index = 0; index < Count; ++index) {
+        record.*(fields[index].member) = active.contains(fields[index].state);
+    }
+}
 
 // Reasons a declared anatomy is malformed.
 enum class AnatomyDefect : std::uint8_t {

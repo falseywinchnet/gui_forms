@@ -117,8 +117,6 @@ const ControlAnatomy& GroupBox::anatomy() const noexcept {
 }
 
 void GroupBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    ScrollableControl::publish_part_geometry(geometry);
-    const ControlAnatomy& declared = anatomy();
     const Rect bounds = local_bounds();
     const FontSpec font = effective_font(font_);
     const double caption_height = std::max(16.0, font.size + 4.0);
@@ -126,9 +124,22 @@ void GroupBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
     // The one-unit frame stroked half a unit inside the rule line.
     const Rect frame{0.0, rule_y - 0.5, bounds.width,
                      std::max(0.0, bounds.height - rule_y + 0.5)};
-    set_part_geometry(declared, geometry, "face", bounds);
-    set_part_geometry(declared, geometry, "edge", frame);
-    set_part_geometry(declared, geometry, "caption", caption_bounds());
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.face = PartGeometry::from_bounds(bounds);
+    record.edge = PartGeometry::from_bounds(frame);
+    record.caption = PartGeometry::from_bounds(caption_bounds());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), group_box_detail::extra_fields, record, geometry);
+}
+
+GroupBox::Parts GroupBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), group_box_detail::extra_fields, published.parts(), record);
+    return record;
 }
 
 } // namespace gui_forms

@@ -41,10 +41,36 @@ public:
     [[nodiscard]] Insets visual_outsets() const noexcept override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry face;
+        PartGeometry icon;
+        PartGeometry label;
+        PartGeometry preselect;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool hot{};
+        bool pressed{};
+        bool preselect{};
+        bool selected{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool open{};
+        bool closed{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    // The button's parts computed for its current style.
+    [[nodiscard]] Parts button_parts() const;
 
 private:
     Event<bool> selected_changed_{};

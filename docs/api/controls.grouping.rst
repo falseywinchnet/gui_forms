@@ -53,10 +53,42 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`Card::States <gui_forms::Card::States>`
+     - Stage T1 states, as dot members; Card's parts are Panel's.
    * - :cpp:class:`CardLayout <gui_forms::CardLayout>`
      - CardLayout defines validated logical padding, section gaps, and footer/header allocation used by Card measurement and arrangement.
+   * - :cpp:class:`GroupBox::Parts <gui_forms::GroupBox::Parts>`
+     - Stage T1 anatomy, as dot members: a face, the frame and the caption.
+   * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
+     - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
    * - :cpp:class:`TabSelectionChange <gui_forms::TabSelectionChange>`
      - TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Card::States final
+
+   ``#include <gui_forms/controls/panel/card/card.hpp>``
+
+   Stage T1 states, as dot members; Card's parts are Panel's.
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 
@@ -81,6 +113,36 @@ Related types
    .. cpp:member:: double footer_extent
 
       Default: ``{30.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GroupBox::Parts final
+
+   ``#include <gui_forms/controls/panel/group_box/group_box.hpp>``
+
+   Stage T1 anatomy, as dot members: a face, the frame and the caption.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry caption
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Panel::Parts final
+
+   ``#include <gui_forms/controls/panel/panel.hpp>``
+
+   Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
 
 .. cpp:namespace:: gui_forms
 

@@ -130,6 +130,10 @@ gui_forms::ButtonBase
          to the accessibility tree. Setting a different value raises
          :cpp:func:`expanded_changed <gui_forms::ButtonBase::expanded_changed>`.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **expanded_changed** : ``Event<std::optional<bool>>``
@@ -438,6 +442,10 @@ gui_forms::ButtonBase
 
       Sets :cpp:func:`expanded_state <gui_forms::ButtonBase::expanded_state>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -553,11 +561,11 @@ gui_forms::ButtonBase
 
       *Protected.*
 
-   .. cpp:function:: void publish_push_button_parts(std::span<PartGeometry> geometry, bool selected, bool command_alignment) const
+   .. cpp:function:: Parts push_button_parts(bool selected, bool command_alignment) const
 
       *Protected.*
 
-      Publishes region, face, icon, label, focus and, where the type declares it, preselect for a push-style button whose face is the whole control.
+      The parts of a push-style button whose face is the whole control.
 
    .. cpp:function:: AnatomyStateSet button_anatomy_states() const
 

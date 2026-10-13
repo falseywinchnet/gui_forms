@@ -71,8 +71,12 @@ Related types
      -  
    * - :cpp:class:`SplitSeamSnapshot <gui_forms::SplitSeamSnapshot>`
      -  
+   * - :cpp:class:`SplitterPanel::Parts <gui_forms::SplitterPanel::Parts>`
+     - Stage T1 anatomy, as dot members: the scrollable parts and the face.
    * - :cpp:class:`TableLayoutCellPosition <gui_forms::TableLayoutCellPosition>`
      - TableLayoutCellPosition names a zero-based row and column for exact retained child placement.
+   * - :cpp:class:`TableLayoutPanel::Parts <gui_forms::TableLayoutPanel::Parts>`
+     - Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
    * - :cpp:class:`TableLayoutStyle <gui_forms::TableLayoutStyle>`
      - TableLayoutStyle pairs absolute, autosize, or percentage sizing policy with its validated authored value.
 
@@ -381,6 +385,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: SplitterPanel::Parts final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.hpp>``
+
+   Stage T1 anatomy, as dot members: the scrollable parts and the face.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TableLayoutCellPosition final
 
    ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
@@ -390,6 +406,18 @@ Related types
    .. cpp:member:: std::size_t column
 
    .. cpp:member:: std::size_t row
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TableLayoutPanel::Parts final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp>``
+
+   Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry cell_grid
 
 .. cpp:namespace:: gui_forms
 

@@ -1,5 +1,5 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
-#include "../../../scrollable_anatomy.hpp"
+#include "../../../../panel/panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -42,7 +42,7 @@ namespace {
 
 constexpr ControlAnatomy tab_page_anatomy{
     .control_id = "tab-page",
-    .parts = scrollable_detail::panel_parts,
+    .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
 };

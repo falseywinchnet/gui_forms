@@ -60,6 +60,10 @@ gui_forms::DropDownButton
          edge, and reports itself to accessibility as expanded. The button never
          changes it; the application sets it while its menu is shown.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
       **drop_down_bounds** : ``Rect``, read-only
          The disclosure segment at the selected edge, in local coordinates.
 
@@ -233,6 +237,10 @@ gui_forms::DropDownButton
    .. cpp:function:: void set_drop_down_open(bool open)
 
       Sets :cpp:func:`drop_down_open <gui_forms::DropDownButton::drop_down_open>`; see the property's description above.
+
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
 
    .. cpp:function:: Rect drop_down_bounds() const noexcept
 

@@ -96,26 +96,6 @@ constexpr std::array<std::string_view, 14> anatomy_defect_names{
 static_assert(anatomy_defect_names.size() ==
               static_cast<std::size_t>(AnatomyDefect::duplicate_custom_state) + 1U);
 
-constexpr std::array<PartDeclaration, 2> base_control_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
-}};
-
-constexpr std::array<AnatomyState, 5> base_control_states{
-    AnatomyState::normal,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-};
-
-constexpr ControlAnatomy base_anatomy{
-    .control_id = "control",
-    .parts = base_control_parts,
-    .states = base_control_states,
-    .custom_states = {},
-};
-
 [[nodiscard]] bool is_lowercase_letter(char character) noexcept {
     return character >= 'a' && character <= 'z';
 }
@@ -224,18 +204,6 @@ bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept 
     return false;
 }
 
-void set_part_geometry(const ControlAnatomy& anatomy,
-                       std::span<PartGeometry> geometry,
-                       std::string_view part_name, Rect bounds) noexcept {
-    const std::optional<PartIndex> index = find_part(anatomy, part_name);
-    if (!index.has_value() || (*index).value >= geometry.size()) {
-        return;
-    }
-    PartGeometry& part = geometry[(*index).value];
-    part.bounds = bounds;
-    part.present = !bounds.empty();
-}
-
 std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept {
     const std::size_t index = static_cast<std::size_t>(defect);
     if (index >= anatomy_defect_names.size()) {
@@ -302,10 +270,6 @@ AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexce
     }
     AnatomyValidation valid;
     return valid;
-}
-
-const ControlAnatomy& base_control_anatomy() noexcept {
-    return base_anatomy;
 }
 
 } // namespace gui_forms

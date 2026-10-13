@@ -98,6 +98,12 @@ public:
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts); its states are Control's.
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry label;
+    };
+    [[nodiscard]] Parts parts() const;
 
 protected:
     // The lines of a label's text placed in its arranged bounds (stage T1):

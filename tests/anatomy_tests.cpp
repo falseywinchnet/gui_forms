@@ -1,6 +1,7 @@
 #include "gui_forms/anatomy.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
+#include "gui_forms/material.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
 
@@ -28,14 +29,6 @@ void require(bool condition, const std::string& message) {
 
 bool near(double left, double right) {
     return std::abs(left - right) <= 1.0e-9;
-}
-
-PartGeometry required_part(const Control& control, std::string_view part_name) {
-    const std::optional<PartGeometry> geometry = control.part_geometry(part_name);
-    require(geometry.has_value(),
-            std::string(control.anatomy().control_id) + " must declare part " +
-                std::string(part_name));
-    return *geometry;
 }
 
 // Every published standard state must be declared by the control's anatomy.
@@ -235,10 +228,10 @@ void test_track_bar_geometry_matches_pointer_mapping() {
     window.perform_layout();
 
     const Rect span = (*slider).value_span_bounds();
-    const PartGeometry track = required_part(*slider, "track");
-    const PartGeometry thumb = required_part(*slider, "thumb");
-    const PartGeometry fill = required_part(*slider, "fill");
-    const PartGeometry ticks = required_part(*slider, "ticks");
+    const PartGeometry track = (*slider).parts().track;
+    const PartGeometry thumb = (*slider).parts().thumb;
+    const PartGeometry fill = (*slider).parts().fill;
+    const PartGeometry ticks = (*slider).parts().ticks;
     require(track.present && thumb.present && ticks.present,
             "classic track bar must publish track, thumb and ticks");
     require(!fill.present, "classic track bar has no fill");
@@ -257,27 +250,25 @@ void test_track_bar_geometry_matches_pointer_mapping() {
     down.pointer_id = 3;
     require(window.dispatch_pointer(down) && near((*slider).value(), 75.0),
             "pointer at three quarters of the published span must select 75");
-    const AnatomyStateSet dragging = (*slider).anatomy_states();
-    require(dragging.contains(AnatomyState::pressed) &&
-                dragging.contains(AnatomyState::captured) &&
-                !dragging.contains(AnatomyState::normal),
+    const TrackBar::States dragging = (*slider).states();
+    require(dragging.pressed && dragging.captured && !dragging.normal,
             "dragging must publish pressed and captured");
     require_declared_states(*slider);
     PointerEvent up = down;
     up.action = PointerAction::up;
     require(window.dispatch_pointer(up), "pointer up must be handled");
-    require((*slider).anatomy_states().contains(AnatomyState::normal),
+    require((*slider).states().normal,
             "release must return to normal");
 
     (*slider).set_visual_style(TrackBarVisualStyle::filled);
-    const PartGeometry filled = required_part(*slider, "fill");
-    const PartGeometry groove = required_part(*slider, "track");
+    const PartGeometry filled = (*slider).parts().fill;
+    const PartGeometry groove = (*slider).parts().track;
     require(filled.present && near(filled.bounds.x, span.x) &&
                 near(filled.bounds.width, span.width * 0.75) &&
                 near(groove.bounds.width, span.width),
             "filled style must publish the value portion of the groove");
     (*slider).set_visual_style(TrackBarVisualStyle::compact);
-    require(!required_part(*slider, "ticks").present,
+    require(!(*slider).parts().ticks.present,
             "compact style draws no ticks");
     require_parts_within_region(*slider);
 }
@@ -299,10 +290,10 @@ void test_scroll_bar_geometry_and_states() {
     const std::array<std::shared_ptr<ScrollBar>, 2> bars{horizontal, vertical};
     for (std::size_t index = 0; index < bars.size(); ++index) {
         const ScrollBar& bar = *bars[index];
-        require(required_part(bar, "decrement-arrow").bounds == bar.decrement_button_bounds() &&
-                    required_part(bar, "increment-arrow").bounds == bar.increment_button_bounds() &&
-                    required_part(bar, "track").bounds == bar.track_bounds() &&
-                    required_part(bar, "thumb").bounds == bar.thumb_bounds(),
+        require(bar.parts().decrement_arrow.bounds == bar.decrement_button_bounds() &&
+                    bar.parts().increment_arrow.bounds == bar.increment_button_bounds() &&
+                    bar.parts().track.bounds == bar.track_bounds() &&
+                    bar.parts().thumb.bounds == bar.thumb_bounds(),
                 "scroll bar parts must equal its public geometry");
         require_parts_within_region(bar);
         require_declared_states(bar);
@@ -322,18 +313,16 @@ void test_scroll_bar_geometry_and_states() {
     down.position = {absolute.x + thumb.x + thumb.width * 0.5,
                      absolute.y + thumb.y + thumb.height * 0.5};
     require(window.dispatch_pointer(down), "thumb press must be handled");
-    const AnatomyStateSet dragging = (*horizontal).anatomy_states();
-    require(dragging.contains(AnatomyState::pressed) &&
-                dragging.contains(AnatomyState::captured),
+    const ScrollBar::States dragging = (*horizontal).states();
+    require(dragging.pressed && dragging.captured,
             "thumb drag must publish pressed and captured");
     PointerEvent up = down;
     up.action = PointerAction::up;
     require(window.dispatch_pointer(up), "thumb release must be handled");
 
     (*horizontal).set_enabled(false);
-    const AnatomyStateSet disabled = (*horizontal).anatomy_states();
-    require(disabled.contains(AnatomyState::disabled) &&
-                !disabled.contains(AnatomyState::enabled),
+    const ScrollBar::States disabled = (*horizontal).states();
+    require(disabled.disabled && !disabled.enabled,
             "a disabled control must publish disabled, not enabled");
 }
 
@@ -344,20 +333,20 @@ void test_progress_bar_geometry_and_states() {
     Window window(progress, {204.0, 20.0});
     window.perform_layout();
 
-    const PartGeometry fill = required_part(*progress, "fill");
-    const PartGeometry activity = required_part(*progress, "activity");
+    const PartGeometry fill = (*progress).parts().fill;
+    const PartGeometry activity = (*progress).parts().activity;
     require(fill.present && !activity.present,
             "a determinate bar publishes its fill and no activity");
     require(near(fill.bounds.x, 2.0) && near(fill.bounds.width, 100.0),
             "fill must cover the value's share of the interior");
-    require(!(*progress).anatomy_states().contains(AnatomyState::indeterminate),
+    require(!(*progress).states().indeterminate,
             "a determinate bar is not indeterminate");
 
     (*progress).set_visual_style(ProgressBarVisualStyle::marquee);
-    require(!required_part(*progress, "fill").present &&
-                required_part(*progress, "activity").present,
+    require(!(*progress).parts().fill.present &&
+                (*progress).parts().activity.present,
             "a marquee bar publishes its activity band instead of a fill");
-    require((*progress).anatomy_states().contains(AnatomyState::indeterminate),
+    require((*progress).states().indeterminate,
             "a marquee bar is indeterminate");
     require_parts_within_region(*progress);
     require_declared_states(*progress);
@@ -377,10 +366,10 @@ void test_base_anatomy_for_undeclared_controls() {
     window.perform_layout();
     require(&(*plain).anatomy() == &base_control_anatomy(),
             "a type that declares nothing inherits the base anatomy");
-    const PartGeometry region = required_part(*plain, "region");
+    const PartGeometry region = (*plain).parts().region;
     require(region.present && region.bounds == (*plain).client_rectangle(),
             "the base region is the client rectangle");
-    require(!(*plain).part_geometry("thumb").has_value(),
+    require(!find_part((*plain).anatomy(), "thumb").has_value(),
             "an undeclared part name must not resolve");
     require_declared_states(*plain);
 }
@@ -430,13 +419,13 @@ void test_button_label_matches_painted_text() {
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none &&
                 anatomy.control_id == "button",
             "Button must publish a valid anatomy");
-    const PartGeometry face = required_part(*button, "face");
-    const PartGeometry label = required_part(*button, "label");
+    const PartGeometry face = (*button).parts().face;
+    const PartGeometry label = (*button).parts().label;
     require(face.present && face.bounds == (*button).client_rectangle(),
             "the button face is its whole client rectangle");
     require(label.present && label.bounds.width > 0.0 && label.bounds.height > 0.0,
             "a button with text publishes its label");
-    require(!required_part(*button, "icon").present,
+    require(!(*button).parts().icon.present,
             "a button without an image publishes no icon");
     require(near(label.bounds.x + label.bounds.width * 0.5, face.bounds.width * 0.5),
             "a centred label is centred in the face");
@@ -451,20 +440,19 @@ void test_button_label_matches_painted_text() {
             "the painted baseline must fall inside the published label");
     window.set_text_metrics_provider(nullptr);
 
-    require(!(*button).anatomy_states().contains(AnatomyState::preselect),
+    require(!(*button).states().preselect,
             "a button is not preselected until the form makes it the accept target");
     window.set_accept_button(button);
-    require((*button).anatomy_states().contains(AnatomyState::preselect),
+    require((*button).states().preselect,
             "the accept button publishes preselect");
-    require(required_part(*button, "preselect").present,
+    require((*button).parts().preselect.present,
             "the preselect cue part is present whether or not it is shown");
 
     const PointerEvent down{PointerAction::down, PointerButton::primary,
                             {absolute.x + 10.0, absolute.y + 10.0}};
     require(window.dispatch_pointer(down), "button press must be handled");
-    const AnatomyStateSet pressed = (*button).anatomy_states();
-    require(pressed.contains(AnatomyState::pressed) &&
-                !pressed.contains(AnatomyState::normal),
+    const Button::States pressed = (*button).states();
+    require(pressed.pressed && !pressed.normal,
             "a pressed button publishes pressed, not normal");
     require_declared_states(*button);
     require_parts_within_region(*button);
@@ -482,65 +470,68 @@ void test_check_box_and_radio_button_parts() {
     Window window(root, {300.0, 120.0});
     window.perform_layout();
 
-    const std::array<const Control*, 2> choices{check.get(), radio.get()};
-    for (std::size_t index = 0; index < choices.size(); ++index) {
-        const Control& choice = *choices[index];
-        require(validate_control_anatomy(choice.anatomy()).defect == AnatomyDefect::none,
-                std::string(choice.anatomy().control_id) + " anatomy is malformed");
-        const PartGeometry well = required_part(choice, "well");
-        const PartGeometry label = required_part(choice, "label");
+    require(validate_control_anatomy((*check).anatomy()).defect == AnatomyDefect::none &&
+                validate_control_anatomy((*radio).anatomy()).defect == AnatomyDefect::none,
+            "CheckBox and RadioButton must publish valid anatomies");
+    const CheckBox::Parts check_parts = (*check).parts();
+    const RadioButton::Parts radio_parts = (*radio).parts();
+    const std::array<PartGeometry, 2> wells{check_parts.well, radio_parts.well};
+    const std::array<PartGeometry, 2> labels{check_parts.label, radio_parts.label};
+    const std::array<PartGeometry, 2> marks{check_parts.indicator, radio_parts.indicator};
+    for (std::size_t index = 0; index < wells.size(); ++index) {
+        const PartGeometry well = wells[index];
+        const PartGeometry label = labels[index];
         require(well.present && near(well.bounds.x, 1.0) &&
                     near(well.bounds.width, 15.0) && near(well.bounds.height, 15.0) &&
                     near(well.bounds.y, (24.0 - 15.0) * 0.5),
-                std::string(choice.anatomy().control_id) +
-                    " publishes its 15-unit well, centred vertically");
+                "a choice publishes its 15-unit well, centred vertically");
         require(label.present && label.bounds.x >= well.bounds.right(),
                 "the label follows the well");
-        require(!required_part(choice, "indicator").present,
-                "an unchecked choice shows no mark");
-        require_declared_states(choice);
-        require_parts_within_region(choice);
+        require(!marks[index].present, "an unchecked choice shows no mark");
     }
-    require(!required_part(*check, "face").present,
+    require_declared_states(*check);
+    require_declared_states(*radio);
+    require_parts_within_region(*check);
+    require_parts_within_region(*radio);
+    require(!(*check).parts().face.present,
             "a normal-appearance check box has no button face");
 
     (*check).set_checked(true);
     (*radio).set_checked(true);
-    const PartGeometry check_mark = required_part(*check, "indicator");
-    const PartGeometry radio_dot = required_part(*radio, "indicator");
-    const Rect check_well = required_part(*check, "well").bounds;
-    const Rect radio_well = required_part(*radio, "well").bounds;
+    const PartGeometry check_mark = (*check).parts().indicator;
+    const PartGeometry radio_dot = (*radio).parts().indicator;
+    const Rect check_well = (*check).parts().well.bounds;
+    const Rect radio_well = (*radio).parts().well.bounds;
     require(check_mark.present && check_well.contains(check_mark.bounds),
             "a checked box publishes its mark inside the well");
     require(radio_dot.present && radio_well.contains(radio_dot.bounds) &&
                 near(radio_dot.bounds.width, 7.0),
             "a checked radio publishes its 7-unit dot inside the well");
-    require((*check).anatomy_states().contains(AnatomyState::checked) &&
-                (*radio).anatomy_states().contains(AnatomyState::checked),
+    require((*check).states().checked &&
+                (*radio).states().checked,
             "checked choices publish checked");
 
     (*check).set_three_state(true);
     (*check).set_check_state(CheckState::indeterminate);
-    const AnatomyStateSet mixed = (*check).anatomy_states();
-    require(mixed.contains(AnatomyState::indeterminate) &&
-                !mixed.contains(AnatomyState::checked) &&
-                required_part(*check, "indicator").present,
+    const CheckBox::States mixed = (*check).states();
+    require(mixed.indeterminate && !mixed.checked &&
+                (*check).parts().indicator.present,
             "an indeterminate box publishes indeterminate and its bar");
 
     (*check).set_indicator_style(ChoiceIndicatorStyle::toggle);
     (*check).set_check_state(CheckState::unchecked);
-    const PartGeometry knob_off = required_part(*check, "indicator");
+    const PartGeometry knob_off = (*check).parts().indicator;
     (*check).set_check_state(CheckState::checked);
-    const PartGeometry knob_on = required_part(*check, "indicator");
+    const PartGeometry knob_on = (*check).parts().indicator;
     require(knob_off.present && knob_on.present &&
                 knob_on.bounds.x > knob_off.bounds.x &&
-                near(required_part(*check, "well").bounds.width, 30.0),
+                near((*check).parts().well.bounds.width, 30.0),
             "a toggle publishes its knob, which moves when checked");
 
     (*check).set_appearance(CheckBoxAppearance::button);
-    require(required_part(*check, "face").present &&
-                !required_part(*check, "well").present &&
-                !required_part(*check, "indicator").present,
+    require((*check).parts().face.present &&
+                !(*check).parts().well.present &&
+                !(*check).parts().indicator.present,
             "the button appearance publishes a face instead of a well");
     require_parts_within_region(*check);
 }
@@ -555,13 +546,12 @@ void test_link_label_custom_visited_state() {
             "LinkLabel must publish a valid anatomy");
     const std::optional<CustomStateIndex> visited = find_custom_state(anatomy, "visited");
     require(visited.has_value(), "LinkLabel declares a visited state");
-    require(!(*link).anatomy_states().contains(*visited),
-            "a new link is not visited");
+    require(!(*link).states().visited, "a new link is not visited");
     (*link).set_visited(true);
-    require((*link).anatomy_states().contains(*visited),
+    require((*link).states().visited && (*link).anatomy_states().contains(*visited),
             "a visited link publishes its visited state");
-    const PartGeometry label = required_part(*link, "label");
-    const PartGeometry underline = required_part(*link, "underline");
+    const PartGeometry label = (*link).parts().label;
+    const PartGeometry underline = (*link).parts().underline;
     require(label.present && underline.present &&
                 near(label.bounds.x, underline.bounds.x) &&
                 near(label.bounds.width, underline.bounds.width) &&
@@ -579,8 +569,8 @@ void test_drop_down_button_disclosure() {
     require(validate_control_anatomy((*button).anatomy()).defect == AnatomyDefect::none &&
                 (*button).anatomy().control_id == "drop-down-button",
             "DropDownButton must publish its own valid anatomy");
-    const PartGeometry segment = required_part(*button, "drop-down");
-    const PartGeometry arrow = required_part(*button, "disclosure");
+    const PartGeometry segment = (*button).parts().drop_down;
+    const PartGeometry arrow = (*button).parts().disclosure;
     const Rect region = (*button).client_rectangle();
     require(segment.present && segment.bounds == (*button).drop_down_bounds() &&
                 near(segment.bounds.right(), region.right()) &&
@@ -588,11 +578,11 @@ void test_drop_down_button_disclosure() {
             "the drop-down segment sits at the trailing edge");
     require(arrow.present && segment.bounds.contains(arrow.bounds),
             "the disclosure arrow lies inside its segment");
-    require((*button).anatomy_states().contains(AnatomyState::closed),
+    require((*button).states().closed,
             "a shut drop-down publishes closed");
     (*button).set_drop_down_open(true);
-    const AnatomyStateSet open = (*button).anatomy_states();
-    require(open.contains(AnatomyState::open) && !open.contains(AnatomyState::closed),
+    const DropDownButton::States open = (*button).states();
+    require(open.open && !open.closed,
             "an open drop-down publishes open");
     require_declared_states(*button);
     require_parts_within_region(*button);
@@ -609,19 +599,19 @@ void test_panel_and_scrollable_parts() {
     require(validate_control_anatomy((*panel).anatomy()).defect == AnatomyDefect::none &&
                 (*panel).anatomy().control_id == "panel",
             "Panel must publish its own valid anatomy");
-    require(required_part(*panel, "face").present && !required_part(*panel, "edge").present,
+    require((*panel).parts().face.present && !(*panel).parts().edge.present,
             "a borderless panel publishes a face and no edge");
     (*panel).set_border_style(BorderStyle::line);
-    require(required_part(*panel, "edge").present,
+    require((*panel).parts().edge.present,
             "a bordered panel publishes its edge");
-    require(!required_part(*panel, "vertical-thumb").present,
+    require(!(*panel).parts().scrollable.vertical_thumb.present,
             "without auto-scroll no scroll axis is published");
 
     (*panel).set_auto_scroll(true);
     window.perform_layout();
-    const PartGeometry track = required_part(*panel, "vertical-track");
-    const PartGeometry thumb = required_part(*panel, "vertical-thumb");
-    const PartGeometry viewport = required_part(*panel, "viewport");
+    const PartGeometry track = (*panel).parts().scrollable.vertical_track;
+    const PartGeometry thumb = (*panel).parts().scrollable.vertical_thumb;
+    const PartGeometry viewport = (*panel).parts().scrollable.viewport;
     require(track.present && thumb.present && track.bounds.contains(thumb.bounds),
             "an overflowing auto-scroll panel publishes its vertical thumb inside its track");
     require(viewport.present && viewport.bounds.right() <= track.bounds.x,
@@ -649,14 +639,14 @@ void test_group_box_and_label_parts() {
     window.set_text_metrics_provider(&painter);
     window.perform_layout();
 
-    const PartGeometry caption = required_part(*group, "caption");
-    const PartGeometry edge = required_part(*group, "edge");
+    const PartGeometry caption = (*group).parts().caption;
+    const PartGeometry edge = (*group).parts().edge;
     require(caption.present && edge.present && caption.bounds.y < edge.bounds.y &&
                 caption.bounds.bottom() > edge.bounds.y,
             "the group caption sits across the top of its frame");
     require((*group).anatomy().control_id == "group-box", "GroupBox publishes its own id");
 
-    const PartGeometry text = required_part(*label, "label");
+    const PartGeometry text = (*label).parts().label;
     require(text.present && text.bounds.width > 0.0 && near(text.bounds.x, 2.0),
             "a near-aligned label publishes its text block from the left inset");
     static_cast<void>(window.paint(painter, {0.0, 0.0, 320.0, 200.0}));
@@ -676,6 +666,28 @@ void test_group_box_and_label_parts() {
     require_parts_within_region(*label);
 }
 
+// A record read through a base type agrees with what the dynamic type
+// publishes: MaterialPanel paints no border, so even with a border style set
+// its Panel view has no edge.
+void test_base_record_follows_dynamic_type() {
+    std::shared_ptr<MaterialPanel> material =
+        make_control<MaterialPanel>(StableId("anatomy.material"));
+    (*material).set_requested_bounds({0.0, 0.0, 120.0, 60.0});
+    (*material).set_border_style(BorderStyle::line);
+    Window window(material, {120.0, 60.0});
+    window.perform_layout();
+    const Panel& as_panel = *material;
+    const Panel::Parts parts = as_panel.parts();
+    require(parts.face.present && !parts.edge.present,
+            "a base-type record must report the dynamic type's parts");
+    require(parts.scrollable.region.bounds == (*material).client_rectangle(),
+            "composed records carry the scrollable parts");
+    const Control& as_control = *material;
+    const Control::States states = as_control.states();
+    require(states.normal && states.enabled && !states.disabled,
+            "the base states record reads the dynamic type's states");
+}
+
 } // namespace
 
 int main() {
@@ -693,6 +705,7 @@ int main() {
         test_drop_down_button_disclosure();
         test_panel_and_scrollable_parts();
         test_group_box_and_label_parts();
+        test_base_record_follows_dynamic_type();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

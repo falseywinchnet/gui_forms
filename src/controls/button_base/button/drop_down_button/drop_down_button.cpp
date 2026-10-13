@@ -79,30 +79,43 @@ bool DropDownButton::perform_drop_down() {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 8> drop_down_button_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "face", .role = PartRole::face, .composed_from = {}},
-    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
-    {.name = "label", .role = PartRole::label, .composed_from = {}},
-    {.name = "drop-down", .role = PartRole::actuator, .composed_from = {}},
-    {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
-    {.name = "preselect", .role = PartRole::preselect, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &DropDownButton::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &DropDownButton::Parts::face},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &DropDownButton::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &DropDownButton::Parts::label},
+    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = {}},
+     .member = &DropDownButton::Parts::drop_down},
+    {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &DropDownButton::Parts::disclosure},
+    {.declaration = {.name = "preselect", .role = PartRole::preselect, .composed_from = {}},
+     .member = &DropDownButton::Parts::preselect},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &DropDownButton::Parts::focus},
 }};
 
-constexpr std::array<AnatomyState, 11> drop_down_button_states{
-    AnatomyState::normal,
-    AnatomyState::hot,
-    AnatomyState::pressed,
-    AnatomyState::preselect,
-    AnatomyState::selected,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-    AnatomyState::open,
-    AnatomyState::closed,
-};
+constexpr std::array<StateField<DropDownButton::States>, 11> drop_down_button_state_fields{{
+    {.state = AnatomyState::normal, .member = &DropDownButton::States::normal},
+    {.state = AnatomyState::hot, .member = &DropDownButton::States::hot},
+    {.state = AnatomyState::pressed, .member = &DropDownButton::States::pressed},
+    {.state = AnatomyState::preselect, .member = &DropDownButton::States::preselect},
+    {.state = AnatomyState::selected, .member = &DropDownButton::States::selected},
+    {.state = AnatomyState::enabled, .member = &DropDownButton::States::enabled},
+    {.state = AnatomyState::disabled, .member = &DropDownButton::States::disabled},
+    {.state = AnatomyState::focused, .member = &DropDownButton::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &DropDownButton::States::focus_visible},
+    {.state = AnatomyState::open, .member = &DropDownButton::States::open},
+    {.state = AnatomyState::closed, .member = &DropDownButton::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 8> drop_down_button_parts =
+    part_declarations(drop_down_button_part_fields);
+constexpr std::array<AnatomyState, 11> drop_down_button_states =
+    state_declarations(drop_down_button_state_fields);
 
 constexpr ControlAnatomy drop_down_button_anatomy{
     .control_id = "drop-down-button",
@@ -131,19 +144,27 @@ Rect DropDownButton::drop_down_bounds() const noexcept {
 }
 
 void DropDownButton::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    Button::publish_part_geometry(geometry);
-    const ControlAnatomy& declared = anatomy();
+    const Button::Parts base = button_parts();
+    Parts record;
+    record.region = base.region;
+    record.face = base.face;
+    record.icon = base.icon;
+    record.label = base.label;
+    record.preselect = base.preselect;
+    record.focus = base.focus;
     const Rect bounds = local_bounds();
-    if (bounds.width <= 0.0 || bounds.height <= 0.0) return;
-    const Rect segment = drop_down_bounds();
-    const bool bottom = edge_ == DropDownButtonEdge::bottom;
-    // The 7 x 4 arrow at rest, as on_paint draws it before the pressed or
-    // open offset.
-    const double center_x = bottom ? bounds.width * 0.5 : segment.x + segment.width * 0.5;
-    const double center_y = bottom ? segment.y + segment.height * 0.5 : bounds.height * 0.5;
-    const Rect arrow{std::floor(center_x) - 3.0, std::floor(center_y) - 1.0, 7.0, 4.0};
-    set_part_geometry(declared, geometry, "drop-down", segment);
-    set_part_geometry(declared, geometry, "disclosure", arrow);
+    if (bounds.width > 0.0 && bounds.height > 0.0) {
+        const Rect segment = drop_down_bounds();
+        const bool bottom = edge_ == DropDownButtonEdge::bottom;
+        // The 7 x 4 arrow at rest, as on_paint draws it before the pressed or
+        // open offset.
+        const double center_x = bottom ? bounds.width * 0.5 : segment.x + segment.width * 0.5;
+        const double center_y = bottom ? segment.y + segment.height * 0.5 : bounds.height * 0.5;
+        const Rect arrow{std::floor(center_x) - 3.0, std::floor(center_y) - 1.0, 7.0, 4.0};
+        record.drop_down = PartGeometry::from_bounds(segment);
+        record.disclosure = PartGeometry::from_bounds(arrow);
+    }
+    write_parts(anatomy(), drop_down_button_part_fields, record, geometry);
 }
 
 AnatomyStateSet DropDownButton::anatomy_states() const {
@@ -156,6 +177,19 @@ AnatomyStateSet DropDownButton::anatomy_states() const {
         states.insert(AnatomyState::closed);
     }
     return states;
+}
+
+DropDownButton::Parts DropDownButton::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), drop_down_button_part_fields, published.parts(), record);
+    return record;
+}
+
+DropDownButton::States DropDownButton::states() const {
+    States record;
+    read_states(drop_down_button_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void DropDownButton::on_paint(Painter& painter, const Rect local_damage) {

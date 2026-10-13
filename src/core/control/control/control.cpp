@@ -2491,6 +2491,39 @@ void Control::on_focus_changed(bool) {}
 void Control::on_focus_cue_changed(bool) {}
 void Control::on_activate() {}
 
+namespace {
+
+constexpr std::array<PartField<Control::Parts>, 2> control_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &Control::Parts::region},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &Control::Parts::focus},
+}};
+
+constexpr std::array<StateField<Control::States>, 5> control_state_fields{{
+    {.state = AnatomyState::normal, .member = &Control::States::normal},
+    {.state = AnatomyState::enabled, .member = &Control::States::enabled},
+    {.state = AnatomyState::disabled, .member = &Control::States::disabled},
+    {.state = AnatomyState::focused, .member = &Control::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &Control::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 2> control_parts = part_declarations(control_part_fields);
+constexpr std::array<AnatomyState, 5> control_states = state_declarations(control_state_fields);
+
+constexpr ControlAnatomy base_anatomy{
+    .control_id = "control",
+    .parts = control_parts,
+    .states = control_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& base_control_anatomy() noexcept {
+    return base_anatomy;
+}
+
 const ControlAnatomy& Control::anatomy() const noexcept {
     return base_control_anatomy();
 }
@@ -2501,25 +2534,18 @@ void Control::fill_part_geometry(std::span<PartGeometry> geometry) const {
         throw std::invalid_argument(
             "part geometry storage must hold one record per declared part");
     }
-    std::array<PartGeometry, maximum_control_parts> published{};
-    const std::span<PartGeometry> published_parts(published.data(),
-                                                  declared.parts.size());
-    publish_part_geometry(published_parts);
-    std::copy(published_parts.begin(), published_parts.end(), geometry.begin());
+    const PartGeometryBuffer published = published_part_geometry();
+    const std::span<const PartGeometry> parts = published.parts();
+    std::copy(parts.begin(), parts.end(), geometry.begin());
 }
 
-std::optional<PartGeometry> Control::part_geometry(std::string_view part_name) const {
+PartGeometryBuffer Control::published_part_geometry() const {
+    PartGeometryBuffer buffer;
     const ControlAnatomy& declared = anatomy();
-    const std::optional<PartIndex> index = find_part(declared, part_name);
-    if (!index.has_value()) {
-        return std::nullopt;
-    }
-    std::array<PartGeometry, maximum_control_parts> published{};
-    const std::span<PartGeometry> published_parts(published.data(),
-                                                  declared.parts.size());
-    fill_part_geometry(published_parts);
-    const PartGeometry found = published_parts[(*index).value];
-    return found;
+    buffer.count = std::min(declared.parts.size(), maximum_control_parts);
+    const std::span<PartGeometry> parts(buffer.geometry.data(), buffer.count);
+    publish_part_geometry(parts);
+    return buffer;
 }
 
 AnatomyStateSet Control::anatomy_states() const {
@@ -2527,17 +2553,26 @@ AnatomyStateSet Control::anatomy_states() const {
 }
 
 void Control::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    // Region and focus parts cover the client rectangle; any other declared
-    // part stays absent until its type publishes it.
-    const ControlAnatomy& declared = anatomy();
+    // The region and the focus cue cover the client rectangle; any other
+    // declared part stays absent until its type publishes it.
     const Rect client = client_rectangle();
-    for (std::size_t index = 0; index < declared.parts.size(); ++index) {
-        const PartRole role = declared.parts[index].role;
-        if (role == PartRole::region || role == PartRole::focus) {
-            geometry[index].bounds = client;
-            geometry[index].present = true;
-        }
-    }
+    Parts record;
+    record.region = PartGeometry::from_bounds(client);
+    record.focus = PartGeometry::from_bounds(client);
+    write_parts(anatomy(), control_part_fields, record, geometry);
+}
+
+Control::Parts Control::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), control_part_fields, published.parts(), record);
+    return record;
+}
+
+Control::States Control::states() const {
+    States record;
+    read_states(control_state_fields, anatomy_states(), record);
+    return record;
 }
 
 AnatomyStateSet Control::base_anatomy_states() const {

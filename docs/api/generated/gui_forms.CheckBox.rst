@@ -60,6 +60,10 @@ gui_forms::CheckBox
          The indicator drawn for :cpp:func:`appearance <gui_forms::CheckBox::appearance>` ``normal``: a classic box, a modern
          box or a toggle switch.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **check_state_changed** : ``Event<CheckState>``
@@ -201,6 +205,10 @@ gui_forms::CheckBox
    .. cpp:function:: void set_indicator_style(ChoiceIndicatorStyle style)
 
       Sets :cpp:func:`indicator_style <gui_forms::CheckBox::indicator_style>`; see the property's description above.
+
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
 
 
    .. rubric:: Events

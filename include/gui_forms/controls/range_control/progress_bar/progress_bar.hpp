@@ -98,6 +98,22 @@ public:
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry track;
+        PartGeometry fill;
+        PartGeometry activity;
+    };
+    struct States final {
+        bool normal{};
+        bool indeterminate{};
+        bool enabled{};
+        bool disabled{};
+        bool reduced_motion{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
