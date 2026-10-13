@@ -69,6 +69,10 @@ Related types
      - InstrumentModuleSpec is the authoritative caller model for one stable named module, its fields, status/state, priority, enablement, and removal policy.
    * - :cpp:class:`InstrumentModuleToggle <gui_forms::InstrumentModuleToggle>`
      - InstrumentModuleToggle carries stable module identity and the committed enabled state.
+   * - :cpp:class:`NumericUpDown::Parts <gui_forms::NumericUpDown::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`NumericUpDown::States <gui_forms::NumericUpDown::States>`
+     -  
    * - :cpp:class:`PropertyConversionContext <gui_forms::PropertyConversionContext>`
      - PropertyConversionContext is an inspector-local culture label, decimal/group separator policy, and grouping flag.
    * - :cpp:class:`PropertyEditorBinding <gui_forms::PropertyEditorBinding>`
@@ -271,6 +275,50 @@ Related types
    .. cpp:member:: std::string module_id
 
    .. cpp:member:: bool enabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NumericUpDown::Parts final
+
+   ``#include <gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry field
+
+   .. cpp:member:: PartGeometry increment_arrow
+
+   .. cpp:member:: PartGeometry decrement_arrow
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NumericUpDown::States final
+
+   ``#include <gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
 
 .. cpp:namespace:: gui_forms
 

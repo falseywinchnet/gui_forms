@@ -26,8 +26,60 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`TextBox::Parts <gui_forms::TextBox::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`TextBox::States <gui_forms::TextBox::States>`
+     -  
    * - :cpp:class:`TextSelection <gui_forms::TextSelection>`
      - TextSelection is TextBox's normalized byte-boundary selection value.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TextBox::Parts final
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry caret
+
+   .. cpp:member:: PartGeometry selection
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TextBox::States final
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
 
 .. cpp:namespace:: gui_forms
 
