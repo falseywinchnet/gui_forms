@@ -1188,6 +1188,12 @@ private:
     self = [super initWithFrame:NSMakeRect(0.0, 0.0, 980.0, 680.0)];
     if (self != nil) {
         _model = std::move(model);
+        // The availability record (stage DP): AppKit clips each copy to the
+        // rectangles being drawn, so the host presents a rectangle set.
+        gui_forms::PresentationDeclaration presentation;
+        presentation.contract_version = gui_forms::paint_contract_version;
+        presentation.extensions.partial_present = true;
+        (*_model).declare_presentation(presentation);
         _hostServices = gui_forms::host::make_macos_host_services();
         _hostSession = std::make_unique<HostSession>(
             *_model, gui_forms::host::macos_capabilities(), _hostServices.get());
@@ -2292,24 +2298,31 @@ private:
     if (regionsTaken) _liveRegionLost = livePresented ? NO : YES;
     // What this flush copied to the screen (stage DP). AppKit clips the copy
     // to the rectangles being drawn; the live frames' regions are reported as
-    // live and the rest as retained. Live frames are copied inside this one
-    // present, so a flush with a receipt carries the duration and a live-only
-    // flush divides it among its frames.
+    // live and the rest as retained, and the duration is split between them
+    // by area. A surface's clip arrives as fragments around overlays: each
+    // surface frame is one live frame, its fragments its rectangles.
     gui_forms::PresentedArea retainedCopied;
     std::uint64_t liveFramesCopied = 0U;
     double liveArea = 0.0;
+    double drawnArea = 0.0;
     const double devicePixelsPerPoint = scale * scale;
     if (presented) {
-        double drawnArea = 0.0;
         for (NSInteger index = 0; index < drawnCount; ++index) {
             drawnArea += drawnRects[index].size.width * drawnRects[index].size.height;
         }
         if (drawnCount == 0) drawnArea = nativeDamage.width * nativeDamage.height;
         if (livePresented) {
-            for (const GFRect region : _liveRegions) {
-                if (region.empty()) continue;
-                liveArea += region.width * region.height;
-                ++liveFramesCopied;
+            for (std::size_t index = 0; index < _liveRegions.size(); ++index) {
+                if (_liveRegions[index].empty()) continue;
+                liveArea += _liveRegions[index].width * _liveRegions[index].height;
+                bool firstOfFrame = true;
+                for (std::size_t earlier = 0; earlier < index; ++earlier) {
+                    if (_liveFrameSources[earlier] == _liveFrameSources[index] &&
+                        !_liveRegions[earlier].empty()) {
+                        firstOfFrame = false;
+                    }
+                }
+                if (firstOfFrame) ++liveFramesCopied;
             }
         }
         const double retainedArea = std::max(0.0, drawnArea - liveArea);
@@ -2318,22 +2331,32 @@ private:
         retainedCopied.rectangles =
             drawnCount > 0 ? static_cast<std::uint64_t>(drawnCount) : 1U;
     }
+    const std::uint64_t elapsedNanoseconds = static_cast<std::uint64_t>(elapsed.count());
+    const double copiedArea = std::max(drawnArea, liveArea);
+    const std::uint64_t liveElapsed = copiedArea <= 0.0 ? 0U :
+        static_cast<std::uint64_t>(static_cast<double>(elapsedNanoseconds) * liveArea / copiedArea);
     if (presented) {
         if (receipt &&
-            (*_model).notify_presented(*receipt,
-                static_cast<std::uint64_t>(elapsed.count()), retainedCopied)) {
+            (*_model).notify_presented(*receipt, elapsedNanoseconds - liveElapsed,
+                                       retainedCopied)) {
             _pendingDamage.clear();
         }
     }
     if (liveFramesCopied != 0U) {
-        const std::uint64_t liveDuration = receipt ? 0U :
-            static_cast<std::uint64_t>(elapsed.count()) / liveFramesCopied;
-        for (const GFRect region : _liveRegions) {
-            if (region.empty()) continue;
+        const std::uint64_t liveDuration =
+            (receipt ? liveElapsed : elapsedNanoseconds) / liveFramesCopied;
+        for (std::size_t index = 0; index < _liveRegions.size(); ++index) {
+            // One report per surface frame, at its first fragment.
+            if (_liveFrameSources[index] != index) continue;
             gui_forms::PresentedArea liveCopied;
-            liveCopied.device_pixels = static_cast<std::uint64_t>(
-                std::llround(region.width * region.height * devicePixelsPerPoint));
-            liveCopied.rectangles = 1U;
+            for (std::size_t fragment = index; fragment < _liveRegions.size(); ++fragment) {
+                if (_liveFrameSources[fragment] != index || _liveRegions[fragment].empty()) continue;
+                const GFRect region = _liveRegions[fragment];
+                liveCopied.device_pixels += static_cast<std::uint64_t>(
+                    std::llround(region.width * region.height * devicePixelsPerPoint));
+                ++liveCopied.rectangles;
+            }
+            if (liveCopied.rectangles == 0U) continue;
             (*_model).notify_live_presented(liveDuration, liveCopied);
         }
     }

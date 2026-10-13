@@ -50,6 +50,13 @@ public:
     [[nodiscard]] DibFrameStatus begin(int width, int height);
     [[nodiscard]] DibSurfaceView candidate() noexcept;
     [[nodiscard]] DibFrameStatus commit(HDC target, const RECT& damage, DibFrameKey key);
+    // Partial present (stage DP): copies each rectangle of the candidate to
+    // `target`, then makes the candidate the front. The swap stays
+    // all-or-nothing: if any copy fails, the rectangles already copied get the
+    // old front back (best effort, as for one rectangle), the front is
+    // unchanged and the failure is returned. An empty set presents nothing
+    // and still commits.
+    [[nodiscard]] DibFrameStatus commit(HDC target, std::span<const RECT> damage, DibFrameKey key);
     void abort() noexcept;
     [[nodiscard]] DibFrameStatus expose(HDC target, const RECT& damage) const;
     [[nodiscard]] DibFrontView front() const noexcept;

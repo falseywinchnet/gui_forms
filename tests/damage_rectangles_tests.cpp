@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -234,6 +235,37 @@ void presentation_counters_record_copied_area() {
            "the counters appear in the metrics JSON");
 }
 
+// A host declares the paint contract it meets and the extensions it offers;
+// one that cannot meet the contract cannot attach.
+void availability_record_reports_the_declaration() {
+    Scene scene = make_scene();
+    Window window(scene.root, Size{400.0, 300.0});
+    expect(window.presentation_availability().contract_version == 0U,
+           "a window no host has declared reports no contract");
+    PresentationDeclaration outdated;
+    bool rejected = false;
+    try {
+        window.declare_presentation(outdated);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    expect(rejected, "a host below the paint contract fails attachment");
+    PresentationDeclaration declared;
+    declared.contract_version = paint_contract_version;
+    declared.extensions.partial_present = true;
+    window.declare_presentation(declared);
+    const PresentationAvailability availability = window.presentation_availability();
+    expect(availability.contract_version == paint_contract_version &&
+               availability.extensions.partial_present &&
+               !availability.extensions.zero_copy_import &&
+               availability.lease.surface_epoch == window.paint_lease_snapshot().surface_epoch,
+           "the record carries the declaration and the live lease");
+    const std::string json = availability.to_json();
+    expect(json.find("\"partial_present\":true") != std::string::npos &&
+               json.find("\"contract_version\":1") != std::string::npos,
+           "the record serializes for diagnostics");
+}
+
 } // namespace
 
 int main() {
@@ -242,6 +274,7 @@ int main() {
     single_rectangle_paint_is_unchanged();
     accumulated_damage_paints_as_rectangles();
     presentation_counters_record_copied_area();
+    availability_record_reports_the_declaration();
     std::cout << "gui_forms_damage_rectangles_tests: all tests passed\n";
     return EXIT_SUCCESS;
 }

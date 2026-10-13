@@ -5,6 +5,7 @@
 #include <compare>
 #include <cstdint>
 #include <memory>
+#include <string>
 
 namespace gui_forms {
 
@@ -73,6 +74,52 @@ struct PaintLeaseSnapshot final {
     std::uint64_t presentation_receipts_rejected{};
     bool render_wake_queued{};
     bool dirty_after_render{};
+};
+
+// The presentation availability record (stage DP; planning/
+// PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract
+// (coherent latest-state presentation: mutation may outpace rendering and
+// rendering may outpace presentation, with no unbounded queue and no
+// incomplete frame visible) is reported as a version, never as a capability:
+// a host that cannot meet it fails attachment. Only optional extensions are
+// reported as available or not, and only truthfully.
+inline constexpr std::uint32_t paint_contract_version = 1U;
+
+struct PresentationExtensions final {
+    // The host copies a bounded rectangle set to the screen, not its union.
+    bool partial_present{};
+    // Completed private pixels reach the screen without a CPU copy.
+    bool zero_copy_import{};
+    // The host can tell submission apart from compositor acknowledgement.
+    bool presentation_fence{};
+    // An opaque platform surface lease exists; no native handle enters the
+    // portable control API.
+    bool native_surface_lease{};
+
+    friend constexpr bool operator==(const PresentationExtensions& left,
+                                     const PresentationExtensions& right) noexcept {
+        return left.partial_present == right.partial_present &&
+               left.zero_copy_import == right.zero_copy_import &&
+               left.presentation_fence == right.presentation_fence &&
+               left.native_surface_lease == right.native_surface_lease;
+    }
+};
+
+// What a host declares when it attaches a window.
+struct PresentationDeclaration final {
+    std::uint32_t contract_version{};
+    PresentationExtensions extensions;
+};
+
+// The record a window publishes: the host's declaration and the live
+// paint-lease snapshot. A contract version of zero means no host has
+// declared one (a window that is not attached, or a test painter).
+struct PresentationAvailability final {
+    std::uint32_t contract_version{};
+    PresentationExtensions extensions;
+    PaintLeaseSnapshot lease;
+
+    [[nodiscard]] std::string to_json() const;
 };
 
 // Proof that one coherent retained transaction finished replaying into a

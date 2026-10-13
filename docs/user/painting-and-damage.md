@@ -144,10 +144,20 @@ in today's rasters). `retained_pixels_presented` and
 `retained_rectangles_presented` count what each retained present copied;
 `live_frames_presented`, `live_pixels_presented`,
 `live_rectangles_presented` and `live_present_duration_nanoseconds` count
-live-surface frames. Divide by `frames_presented` or `live_frames_presented`
+live-surface frames: one per surface per new frame, with the fragments its
+clip is cut into around overlays as its rectangles. When one present copies
+both, the duration is split by the pixels each copied. Divide by `frames_presented` or `live_frames_presented`
 for the copy per frame. A host that presents its rectangles separately shows
 `retained_rectangles_presented` above `frames_presented`; one that copies a
-bounding box shows them equal. The Windows default host copies each damage
-rectangle; the Windows transactional profile and the X11 host copy the
-bounding box; the macOS host copies the rectangles AppKit draws, with live
-frames counted inside the same copy.
+bounding box shows them equal. Both Windows profiles copy each damage
+rectangle (the transactional one still swaps its whole candidate only after
+every rectangle is copied); the X11 host copies the bounding box; the macOS
+host copies the rectangles AppKit draws, with live frames counted inside the
+same copy.
+
+`Window::presentation_availability()` reports what the attached host offers:
+the paint-contract version it meets (`paint_contract_version`; a host that
+cannot meet it fails to attach), whether it presents rectangle sets
+(`partial_present`) and the other optional extensions, and the live paint
+lease. `to_json()` serializes it, and the Windows host includes it in its
+host diagnostics.

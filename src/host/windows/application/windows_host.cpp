@@ -5,6 +5,7 @@
 #include "../services/windows_cursor.hpp"
 #include "../input/windows_key_translation.hpp"
 #include "../input/windows_message_queue.hpp"
+#include "../../../core/damage/device_damage/device_damage.hpp"
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
 #include "../raster/dib_frame_store.hpp"
 #endif
@@ -794,6 +795,12 @@ public:
         return matches;
     }
     [[nodiscard]] bool commit_frame(HDC target, const RECT& damage, PaintReceipt receipt) {
+        const std::span<const RECT> single(&damage, 1U);
+        return commit_frame(target, single, receipt);
+    }
+    // Commits the candidate and presents exactly `damage` (stage DP partial
+    // present); the swap stays all-or-nothing.
+    [[nodiscard]] bool commit_frame(HDC target, std::span<const RECT> damage, PaintReceipt receipt) {
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT)
         if (prepared_frame_failed_) { abort_frame(); return false; }
         // Retain owners before acquiring guards. abort_frame clears the member
@@ -903,6 +910,24 @@ public:
                       memory_dc_, left, top, SRCCOPY) != FALSE;
 #endif
     }
+
+#if !defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    // Draws one live frame into the raster under its clip without presenting
+    // it; the frame sequence presents afterwards (stage DP decision 2). The
+    // clip returns to the whole surface so retained painting can follow in
+    // the same frame.
+    [[nodiscard]] bool compose_live_surface_frame(const LiveSurfaceFrame& frame,
+                                                  const Rect destination, const Rect region) {
+        if (!frame || destination.empty() || region.empty() || states_.empty()) {
+            return false;
+        }
+        const Rect whole = states_.back().clip;
+        states_.back().clip = region;
+        draw_live_surface_frame(frame, destination, 1.0);
+        states_.back().clip = whole;
+        return true;
+    }
+#endif
 
     [[nodiscard]] bool present_live_surface(
         HDC target, const LiveSurfacePresentation& presentation) {
@@ -1379,13 +1404,21 @@ public:
 
     void draw_live_surface(const std::shared_ptr<LiveSurface> surface,
                            const Rect destination, const double opacity) override {
+        if (!surface) return;
+        const LiveSurfaceFrame frame = (*surface).acquire_latest();
+        draw_live_surface_frame(frame, destination, opacity);
+    }
+
+    // Draws a frame already acquired: the frame sequence takes each surface's
+    // frame once, with its presentation region, and draws every fragment of
+    // its clip from it.
+    void draw_live_surface_frame(const LiveSurfaceFrame& frame, const Rect destination,
+                                 const double opacity) {
         const PixelRect area = pixel_rect(destination);
-        if (!surface || area.empty() || destination.empty() ||
-            !destination.finite() ||
+        if (area.empty() || destination.empty() || !destination.finite() ||
             !std::isfinite(opacity) || opacity <= 0.0 || memory_dc_ == nullptr) {
             return;
         }
-        const LiveSurfaceFrame frame = (*surface).acquire_latest();
         if (!frame || frame.width() == 0U || frame.height() == 0U ||
             frame.row_bytes() != static_cast<std::uint64_t>(frame.width()) * 4U ||
             frame.pixels().empty()) {
@@ -2227,6 +2260,12 @@ public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
           services_(), session_(*model_, windows_capabilities(), &services_) {
+        // The availability record (stage DP). Both the default host and the
+        // transactional store present each damage rectangle.
+        PresentationDeclaration presentation;
+        presentation.contract_version = paint_contract_version;
+        presentation.extensions.partial_present = true;
+        (*model_).declare_presentation(presentation);
         live_frame_clock_ = CreateWaitableTimerExW(
             nullptr, nullptr, 0, TIMER_ALL_ACCESS);
         if (live_frame_clock_ == nullptr) {
@@ -2580,6 +2619,7 @@ public:
     std::string host_json() const {
         return "{\"session\":" + session_.snapshot().to_json() +
                ",\"services\":" + services_.snapshot().to_json() +
+               ",\"presentation\":" + (*model_).presentation_availability().to_json() +
                ",\"compatibility_surfaces\":" +
                detail::compatibility_paint_metrics_json() +
                ",\"live_presentations\":{" +
@@ -2595,6 +2635,10 @@ public:
                    std::to_string(live_present_duration_nanoseconds_) +
                ",\"worst_duration_nanoseconds\":" +
                    std::to_string(live_worst_present_duration_nanoseconds_) +
+               ",\"retained_with_frames\":" +
+                   std::to_string(live_sequence_retained_presented_) +
+               ",\"retained_deferred\":" +
+                   std::to_string(live_sequence_retained_deferred_) +
                "}}";
     }
 
@@ -2972,6 +3016,159 @@ private:
         }
     }
 
+#if !defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    // The frame sequence for new live frames (stage DP decision 2), in one
+    // tick: gather the frames and the retained damage they caused (an
+    // overlay's share above a changed frame, #69) with any damage still
+    // pending; compose the frames, then the retained painting over them, into
+    // the raster; present the combined rectangles once. An overlay is never a
+    // wake behind the frame beneath it, and the screen stays a copy of the
+    // raster.
+    void present_live_frame_sequence(const std::vector<LiveSurfacePresentation>& updates) {
+        const std::chrono::steady_clock::time_point started =
+            std::chrono::steady_clock::now();
+        const DamageRegion taken = (*model_).take_damage();
+        const std::span<const Rect> taken_rectangles = taken.rectangles();
+        for (std::size_t index = 0; index < taken_rectangles.size(); ++index) {
+            pending_damage_.add(taken_rectangles[index]);
+        }
+        // Gather and compose. Each surface's frame is taken once, with the
+        // region it changed since this host last drew it; the core splits a
+        // clip around overlays, and every fragment draws from that one frame.
+        // Where the placement is unchanged and the frame opaque, only the
+        // changed region is drawn and copied: outside it the raster already
+        // holds this frame's pixels (as on macOS).
+        raster_.begin_frame();
+        static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
+        const bool regions_usable = !live_region_lost_;
+        DamageRegion screen;
+        std::uint64_t live_pixels = 0U;
+        bool regions_taken = false;
+        live_frames_.clear();
+        live_frame_sources_.clear();
+        composed_live_pixels_.clear();
+        composed_live_rectangles_.clear();
+        for (std::size_t index = 0; index < updates.size(); ++index) {
+            const gui_forms::LiveSurfacePresentation& update = updates[index];
+            std::size_t source = live_frames_.size();
+            for (std::size_t earlier = 0; earlier < index; ++earlier) {
+                if (updates[earlier].surface == update.surface) {
+                    source = live_frame_sources_[earlier];
+                    break;
+                }
+            }
+            if (source == live_frames_.size()) {
+                LiveSurfaceFrame taken_frame{};
+                if (update.surface) {
+                    taken_frame = (*update.surface).acquire_for_presentation(this);
+                    if (taken_frame) regions_taken = true;
+                }
+                live_frames_.push_back(std::move(taken_frame));
+                composed_live_pixels_.push_back(0U);
+                composed_live_rectangles_.push_back(0U);
+            }
+            live_frame_sources_.push_back(source);
+            const LiveSurfaceFrame& frame = live_frames_[source];
+            if (!frame) continue;
+            Rect region = update.clip;
+            if (regions_usable && update.damage_limited && frame.opaque()) {
+                const Rect changed = gui_forms::detail::live_damage_in_window(
+                    frame.damage(), update.destination, frame.width(), frame.height(), scale_);
+                region = Rect::intersection(update.clip, changed);
+            }
+            if (region.empty()) continue;
+            if (!raster_.compose_live_surface_frame(frame, update.destination, region)) {
+                ++live_updates_failed_;
+                continue;
+            }
+            screen.add(region);
+            const std::uint64_t pixels = device_pixels(device_rect(region));
+            composed_live_pixels_[source] += pixels;
+            ++composed_live_rectangles_[source];
+            live_pixels += pixels;
+        }
+        std::uint64_t live_composed = 0U;
+        for (std::size_t index = 0; index < composed_live_rectangles_.size(); ++index) {
+            if (composed_live_rectangles_[index] != 0U) ++live_composed;
+        }
+        std::optional<PaintReceipt> receipt;
+        if (!pending_damage_.empty()) {
+            receipt = (*model_).paint(raster_, pending_damage_.rectangles());
+            if (receipt) {
+                const std::span<const Rect> painted = pending_damage_.rectangles();
+                for (std::size_t index = 0; index < painted.size(); ++index) {
+                    screen.add(painted[index]);
+                }
+            }
+        }
+        // Present: each rectangle once, and none left for WM_PAINT to repeat.
+        HDC target = GetDC(hwnd_);
+        if (target == nullptr) {
+            live_updates_failed_ += live_composed;
+            return;
+        }
+        bool presented = true;
+        PresentedArea copied;
+        const std::span<const Rect> presented_rectangles = screen.rectangles();
+        for (std::size_t index = 0; index < presented_rectangles.size(); ++index) {
+            const RECT device = device_rect(presented_rectangles[index]);
+            const std::uint64_t pixels = device_pixels(device);
+            if (pixels == 0U) continue;
+            if (raster_.present(target, device)) {
+                ValidateRect(hwnd_, &device);
+                copied.device_pixels += pixels;
+                ++copied.rectangles;
+            } else {
+                presented = false;
+            }
+        }
+        ReleaseDC(hwnd_, target);
+        const std::uint64_t elapsed = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started).count());
+        // A region taken from a surface is cleared; only a presented raster
+        // keeps it valid, so after a failure the next tick copies whole clips.
+        if (regions_taken) live_region_lost_ = !presented;
+        // Live frames are copied inside this one present: their regions are
+        // reported as live and the rest as retained, and the duration is
+        // split between them by pixel share.
+        PresentedArea retained;
+        retained.device_pixels = copied.device_pixels > live_pixels ?
+            copied.device_pixels - live_pixels : 0U;
+        retained.rectangles = copied.rectangles;
+        const std::uint64_t all_pixels = retained.device_pixels + live_pixels;
+        const std::uint64_t live_elapsed = all_pixels == 0U ? 0U :
+            static_cast<std::uint64_t>(static_cast<double>(elapsed) *
+                static_cast<double>(live_pixels) / static_cast<double>(all_pixels));
+        if (presented && receipt &&
+            (*model_).notify_presented(*receipt, elapsed - live_elapsed, retained)) {
+            pending_damage_.clear();
+        }
+        // Retained damage the sequence painted with the frames, or left for a
+        // later WM_PAINT (a declined paint or a failed copy).
+        if (!pending_damage_.empty()) {
+            ++live_sequence_retained_deferred_;
+        } else if (receipt) {
+            ++live_sequence_retained_presented_;
+        }
+        if (!presented) {
+            live_updates_failed_ += live_composed;
+            return;
+        }
+        live_updates_presented_ += live_composed;
+        const std::uint64_t live_duration = live_composed == 0U ? 0U :
+            (receipt ? live_elapsed : elapsed) / live_composed;
+        // One report per surface frame; its fragments are its rectangles.
+        for (std::size_t index = 0; index < composed_live_pixels_.size(); ++index) {
+            if (composed_live_rectangles_[index] == 0U) continue;
+            PresentedArea live;
+            live.device_pixels = composed_live_pixels_[index];
+            live.rectangles = composed_live_rectangles_[index];
+            (*model_).notify_live_presented(live_duration, live);
+        }
+    }
+#endif
+
     void present_live_surface_updates() {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         // Placements are model-current. Never consume their generations while
@@ -2990,6 +3187,7 @@ private:
             live_clock_armed_ = false;
         }
         if (updates.empty() || hwnd_ == nullptr) return;
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         HDC target = GetDC(hwnd_);
         if (target == nullptr) {
             live_updates_failed_ += updates.size();
@@ -3009,14 +3207,15 @@ private:
                 (*model_).notify_live_presented(update_duration, copied);
             } else {
                 ++live_updates_failed_;
-#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
                 pending_damage_.add(update.clip);
                 recovery_expose_pending_ = true;
                 InvalidateRect(hwnd_, nullptr, FALSE);
-#endif
             }
         }
         ReleaseDC(hwnd_, target);
+#else
+        present_live_frame_sequence(updates);
+#endif
         const std::uint64_t duration = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started).count());
@@ -3043,6 +3242,15 @@ private:
         // region even when logical damage exists, so all drawing operations
         // restore the same pixel edges and native exposures are not omitted.
         if (!update_region_read) pending_damage_.add(logical_rect(paint_state.rcPaint));
+        // Present exactly the rectangles painted (stage DP partial present):
+        // the candidate carries the front's pixels everywhere else.
+        const std::span<const Rect> painted_rectangles = pending_damage_.rectangles();
+        std::vector<RECT> present_rectangles;
+        present_rectangles.reserve(painted_rectangles.size());
+        for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
+            const RECT device = device_rect(painted_rectangles[index]);
+            if (device_pixels(device) != 0U) present_rectangles.push_back(device);
+        }
         std::optional<PaintReceipt> receipt{};
         bool presented = false;
         try {
@@ -3051,7 +3259,7 @@ private:
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
                 if (images_ready) {
                     receipt = (*model_).paint(raster_, pending_damage_.rectangles());
-                    if (receipt) presented = raster_.commit_frame(dc, paint_state.rcPaint, *receipt);
+                    if (receipt) presented = raster_.commit_frame(dc, present_rectangles, *receipt);
                 }
             }
         } catch (...) {
@@ -3071,10 +3279,11 @@ private:
             bool acknowledged = current.surface_epoch == (*receipt).surface_epoch &&
                 current.presented_revision == (*receipt).rendered_revision;
             if (!acknowledged) {
-                // The transactional store commits the whole update box.
                 PresentedArea copied;
-                copied.device_pixels = device_pixels(paint_state.rcPaint);
-                copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
+                for (std::size_t index = 0; index < present_rectangles.size(); ++index) {
+                    copied.device_pixels += device_pixels(present_rectangles[index]);
+                    ++copied.rectangles;
+                }
                 acknowledged = (*model_).notify_presented(*receipt,
                     static_cast<std::uint64_t>(elapsed.count()), copied);
             }
@@ -3572,6 +3781,16 @@ private:
     WINDOWPLACEMENT restore_placement_{};
     DibPainter raster_;
     DamageRegion pending_damage_;
+    // The frame sequence's per-tick storage, reused across ticks: each
+    // surface's frame, the frame each presentation draws from, and the device
+    // pixels and rectangles composed per frame.
+    std::vector<LiveSurfaceFrame> live_frames_;
+    std::vector<std::size_t> live_frame_sources_;
+    std::vector<std::uint64_t> composed_live_pixels_;
+    std::vector<std::uint64_t> composed_live_rectangles_;
+    // A taken presentation region that was never presented: the next tick
+    // copies whole clips.
+    bool live_region_lost_{};
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     bool recovery_expose_pending_{};
 #endif
@@ -3587,6 +3806,10 @@ private:
     std::uint64_t live_clock_signals_{};
     std::uint64_t live_presentation_drains_{};
     std::uint64_t live_updates_sampled_{};
+    // Frame-sequence ticks whose retained damage went out with the live frames,
+    // and ticks that left it for a later WM_PAINT (stage DP).
+    std::uint64_t live_sequence_retained_presented_{};
+    std::uint64_t live_sequence_retained_deferred_{};
     std::uint64_t live_updates_presented_{};
     std::uint64_t live_updates_failed_{};
     std::uint64_t live_present_duration_nanoseconds_{};

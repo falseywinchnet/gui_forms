@@ -328,6 +328,13 @@ public:
     // exact-receipt overload above.
     void notify_presented(std::uint64_t duration_nanoseconds = 0U);
     [[nodiscard]] PaintLeaseSnapshot paint_lease_snapshot() const noexcept;
+    // Called by a host when it attaches this window (stage DP). Throws
+    // std::invalid_argument when the declared contract version is older than
+    // paint_contract_version: such a host fails attachment rather than
+    // presenting in a degraded mode.
+    void declare_presentation(PresentationDeclaration declaration);
+    // The availability record: the host's declaration and the live lease.
+    [[nodiscard]] PresentationAvailability presentation_availability() const noexcept;
 
     [[nodiscard]] bool queue_live_surface_presentation(
         const Control::Ptr& control, std::shared_ptr<LiveSurface> surface);
@@ -851,6 +858,7 @@ private:
     std::uint64_t paint_wakes_coalesced_{};
     std::uint64_t presentation_receipts_accepted_{};
     std::uint64_t presentation_receipts_rejected_{};
+    PresentationDeclaration presentation_declaration_{};
     bool dirty_after_render_{};
     std::deque<DeferredInput> deferred_inputs_;
     std::uint64_t deferred_inputs_received_{};

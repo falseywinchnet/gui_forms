@@ -78,6 +78,9 @@ gui_forms::Window
       **paint_lease_snapshot** : ``PaintLeaseSnapshot``, read-only
          Returns revision, epoch, lease, wake, deferral, and receipt counters plus current lease state.
 
+      **presentation_availability** : ``PresentationAvailability``, read-only
+         The availability record: the host's declaration and the live lease.
+
       **has_live_surface_presentations** : ``bool``, read-only
          Reports whether durable live-layer registrations keep a native display clock relevant.
 
@@ -223,6 +226,8 @@ gui_forms::Window
         - Preferred host release.
       * - :cpp:func:`notify_live_presented <gui_forms::Window::notify_live_presented>`
         - Records one live-surface frame the host copied to the screen.
+      * - :cpp:func:`declare_presentation <gui_forms::Window::declare_presentation>`
+        - Called by a host when it attaches this window (stage DP).
       * - :cpp:func:`queue_live_surface_presentation <gui_forms::Window::queue_live_surface_presentation>`
         -  
       * - :cpp:func:`take_live_surface_presentations <gui_forms::Window::take_live_surface_presentations>`
@@ -521,6 +526,10 @@ gui_forms::Window
 
    .. cpp:function:: PaintLeaseSnapshot paint_lease_snapshot() const noexcept
 
+   .. cpp:function:: PresentationAvailability presentation_availability() const noexcept
+
+      The availability record: the host's declaration and the live lease.
+
    .. cpp:function:: bool has_live_surface_presentations() const noexcept
 
       A registration is retained while its control remains attached. Native display clocks use this to stay armed without polling the control tree or requiring one UI callback per producer publication.
@@ -731,6 +740,10 @@ gui_forms::Window
    .. cpp:function:: void notify_presented(std::uint64_t duration_nanoseconds = 0U)
 
       Synchronous compatibility spelling. It acknowledges the latest complete receipt in the current epoch; asynchronous/native hosts must use the exact-receipt overload above.
+
+   .. cpp:function:: void declare_presentation(PresentationDeclaration declaration)
+
+      Called by a host when it attaches this window (stage DP). Throws std::invalid_argument when the declared contract version is older than paint_contract_version: such a host fails attachment rather than presenting in a degraded mode.
 
    .. cpp:function:: bool queue_live_surface_presentation(const Control::Ptr& control, std::shared_ptr<LiveSurface> surface)
 

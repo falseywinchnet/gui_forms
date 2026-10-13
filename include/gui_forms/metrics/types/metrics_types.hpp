@@ -83,7 +83,10 @@ struct MetricsSnapshot {
     // Window::notify_presented and live-surface frames through
     // Window::notify_live_presented, so a frame's copy cost is a number that
     // compares across hosts. A host that does not report areas leaves the
-    // pixel and rectangle counters at zero.
+    // pixel and rectangle counters at zero. A live frame is one surface's new
+    // frame; the core splits its clip around overlays, and those fragments
+    // are its rectangles. Durations are split between retained and live by
+    // the pixels each copied.
     std::uint64_t retained_pixels_presented{};
     std::uint64_t retained_rectangles_presented{};
     std::uint64_t live_frames_presented{};

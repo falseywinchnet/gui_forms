@@ -73,6 +73,12 @@ Related types
      - PopupOptions distinguishes interactive overlays that require an enabled owner from passive providers that require only live visible attachment.
    * - :cpp:class:`PopupToken <gui_forms::PopupToken>`
      - PopupToken is a move-only revocation handle for one Window-owned retained overlay root; dropping or disconnecting it closes the overlay through the same ordered state machine.
+   * - :cpp:class:`PresentationAvailability <gui_forms::PresentationAvailability>`
+     - The record a window publishes: the host's declaration and the live paint-lease snapshot.
+   * - :cpp:class:`PresentationDeclaration <gui_forms::PresentationDeclaration>`
+     - What a host declares when it attaches a window.
+   * - :cpp:class:`PresentationExtensions <gui_forms::PresentationExtensions>`
+     -  
    * - :cpp:class:`PresentationSettings <gui_forms::PresentationSettings>`
      - PresentationSettings keeps logical text scaling, contrast, motion, and sound preferences independent from device scale and native host mechanics.
    * - :cpp:class:`PresentedArea <gui_forms::PresentedArea>`
@@ -605,6 +611,59 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PresentationAvailability final
+
+   ``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+   The record a window publishes: the host's declaration and the live paint-lease snapshot. A contract version of zero means no host has declared one (a window that is not attached, or a test painter).
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::string to_json() const
+
+   .. cpp:member:: std::uint32_t contract_version
+
+   .. cpp:member:: PresentationExtensions extensions
+
+   .. cpp:member:: PaintLeaseSnapshot lease
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PresentationDeclaration final
+
+   ``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+   What a host declares when it attaches a window.
+
+   .. cpp:member:: std::uint32_t contract_version
+
+   .. cpp:member:: PresentationExtensions extensions
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PresentationExtensions final
+
+   ``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+   .. cpp:member:: bool partial_present
+
+      The host copies a bounded rectangle set to the screen, not its union.
+
+   .. cpp:member:: bool zero_copy_import
+
+      Completed private pixels reach the screen without a CPU copy.
+
+   .. cpp:member:: bool presentation_fence
+
+      The host can tell submission apart from compositor acknowledgement.
+
+   .. cpp:member:: bool native_surface_lease
+
+      An opaque platform surface lease exists; no native handle enters the portable control API.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PresentationSettings final
 
    ``#include <gui_forms/window/presentation/presentation_types.hpp>``
@@ -858,6 +917,14 @@ Functions, constants and aliases
 .. cpp:var:: constexpr FrameInterval minimum_ui_timer_interval
 
    Value: ``std::chrono::milliseconds(1)``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/window/presentation/presentation_types.hpp>``
+
+.. cpp:var:: constexpr std::uint32_t paint_contract_version
+
+   The presentation availability record (stage DP; planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Value: ``1U``.
 
 .. cpp:namespace:: gui_forms
 

@@ -192,9 +192,58 @@ void test_executor_and_cleanup() {
 }
 } // namespace
 
+// Partial present (stage DP): a rectangle set reaches the target and nothing
+// else; a failed copy keeps the old front and restores what was copied.
+void test_rectangle_set_commit() {
+    DibFrameStore destination{};
+    const DibFrameStatus destination_status = destination.begin(8, 8);
+    require(destination_status == DibFrameStatus::success, "destination allocation");
+    const DibSurfaceView output = destination.candidate();
+    DibFrameStore store{};
+    const DibFrameKey first{.revision = 1, .epoch = 3, .scale = 1.0};
+    const DibFrameKey next{.revision = 2, .epoch = 3, .scale = 1.0};
+    const RECT whole{0, 0, 8, 8};
+    require(store.begin(8, 8) == DibFrameStatus::success, "initial begin");
+    fill_candidate(store, 0x00111111U);
+    require(store.commit(output.dc, whole, first) == DibFrameStatus::success, "initial commit");
+
+    std::fill(output.pixels.begin(), output.pixels.end(), 0U);
+    require(store.begin(8, 8) == DibFrameStatus::success, "partial begin");
+    fill_candidate(store, 0x00222222U);
+    const std::array<RECT, 2> corners{RECT{0, 0, 2, 2}, RECT{6, 6, 8, 8}};
+    require(store.commit(output.dc, corners, next) == DibFrameStatus::success, "rectangle-set commit");
+    for (std::size_t row = 0; row < 8; ++row) {
+        for (std::size_t column = 0; column < 8; ++column) {
+            const bool inside = (row < 2 && column < 2) || (row >= 6 && column >= 6);
+            const std::uint32_t expected = inside ? 0x00222222U : 0U;
+            require(output.pixels[row * 8 + column] == expected,
+                    "only the rectangle set reaches the target");
+        }
+    }
+    require_front(store, next, 8, 8, 0x00222222U);
+
+    std::fill(output.pixels.begin(), output.pixels.end(), 0U);
+    require(store.begin(8, 8) == DibFrameStatus::success, "failing begin");
+    fill_candidate(store, 0x00333333U);
+    store.inject_failure(DibFrameFault::present);
+    const DibFrameKey third{.revision = 3, .epoch = 3, .scale = 1.0};
+    require(store.commit(output.dc, corners, third) == DibFrameStatus::present_failed,
+            "a failed rectangle-set present is refused");
+    require_front(store, next, 8, 8, 0x00222222U);
+    for (std::size_t row = 0; row < 8; ++row) {
+        for (std::size_t column = 0; column < 8; ++column) {
+            const bool inside = (row < 2 && column < 2) || (row >= 6 && column >= 6);
+            const std::uint32_t expected = inside ? 0x00222222U : 0U;
+            require(output.pixels[row * 8 + column] == expected,
+                    "a failed commit restores the old front over its rectangles");
+        }
+    }
+}
+
 int main() {
     try {
         test_failures_and_exposure();
+        test_rectangle_set_commit();
         test_resize_and_validation();
         test_executor_and_cleanup();
         std::cout << "DIB store offscreen transaction fixtures passed; native Window lifecycle not exercised\n";
