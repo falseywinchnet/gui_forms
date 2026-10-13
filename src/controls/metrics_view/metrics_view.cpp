@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
@@ -88,6 +89,71 @@ SemanticDescriptor MetricsView::semantic_descriptor() const {
     descriptor.value = metrics_text();
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<MetricsView::Parts>, 4> metrics_view_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &MetricsView::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &MetricsView::Parts::face},
+    {.declaration = {.name = "accent-strip", .role = PartRole::keyline, .composed_from = {}},
+     .member = &MetricsView::Parts::accent_strip},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &MetricsView::Parts::focus},
+}};
+
+constexpr std::array<StateField<MetricsView::States>, 5> metrics_view_state_fields{{
+    {.state = AnatomyState::normal, .member = &MetricsView::States::normal},
+    {.state = AnatomyState::enabled, .member = &MetricsView::States::enabled},
+    {.state = AnatomyState::disabled, .member = &MetricsView::States::disabled},
+    {.state = AnatomyState::focused, .member = &MetricsView::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &MetricsView::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 4> metrics_view_parts =
+    part_declarations(metrics_view_part_fields);
+constexpr std::array<AnatomyState, 5> metrics_view_states =
+    state_declarations(metrics_view_state_fields);
+
+constexpr ControlAnatomy metrics_view_anatomy{
+    .control_id = "metrics-view",
+    .parts = metrics_view_parts,
+    .states = metrics_view_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& MetricsView::anatomy() const noexcept {
+    return metrics_view_anatomy;
+}
+
+void MetricsView::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = client_rectangle();
+    const Rect strip{0.0, 0.0, accent_width_, bounds.height};
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    record.accent_strip = PartGeometry::from_bounds(Rect::intersection(strip, bounds));
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), metrics_view_part_fields, record, geometry);
+}
+
+MetricsView::Parts MetricsView::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), metrics_view_part_fields, published.parts(), record);
+    return record;
+}
+
+MetricsView::States MetricsView::states() const {
+    States record;
+    read_states(metrics_view_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

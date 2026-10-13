@@ -6,7 +6,9 @@
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/detail/weak_member_callback.hpp"
 #include "gui_forms/text.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -534,6 +536,116 @@ void ComboBox::on_detached_from_window() noexcept {
     popup_layer_.reset();
     dropped_down_ = false;
     focused_ = false;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<ComboBox::Parts>, 7> combo_box_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &ComboBox::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &ComboBox::Parts::edge},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+     .member = &ComboBox::Parts::well},
+    {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
+     .member = &ComboBox::Parts::content},
+    {.declaration = {.name = "divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &ComboBox::Parts::divider},
+    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &ComboBox::Parts::drop_down},
+    {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &ComboBox::Parts::disclosure},
+}};
+
+constexpr std::array<StateField<ComboBox::States>, 9> combo_box_state_fields{{
+    {.state = AnatomyState::normal, .member = &ComboBox::States::normal},
+    {.state = AnatomyState::pressed, .member = &ComboBox::States::pressed},
+    {.state = AnatomyState::captured, .member = &ComboBox::States::captured},
+    {.state = AnatomyState::enabled, .member = &ComboBox::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ComboBox::States::disabled},
+    {.state = AnatomyState::focused, .member = &ComboBox::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &ComboBox::States::focus_visible},
+    {.state = AnatomyState::open, .member = &ComboBox::States::open},
+    {.state = AnatomyState::closed, .member = &ComboBox::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 7>
+    combo_box_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(combo_box_extra_part_fields));
+constexpr std::array<AnatomyState, 9> combo_box_states =
+    state_declarations(combo_box_state_fields);
+
+constexpr ControlAnatomy combo_box_anatomy{
+    .control_id = "combo-box",
+    .parts = combo_box_parts,
+    .states = combo_box_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ComboBox::anatomy() const noexcept {
+    return combo_box_anatomy;
+}
+
+ComboBox::Parts ComboBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), combo_box_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+ComboBox::States ComboBox::states() const {
+    States record;
+    read_states(combo_box_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void ComboBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    if (!themed) {
+        record.face = panel.face;
+        record.edge = panel.edge;
+    }
+    record.well = PartGeometry::from_bounds(bounds);
+    const double button_width = std::min(24.0, bounds.width);
+    const Rect button{std::max(0.0, bounds.width - button_width), 1.0,
+                      std::max(0.0, button_width - 1.0),
+                      std::max(0.0, bounds.height - 2.0)};
+    const Rect content{5.0, 2.0, std::max(0.0, bounds.width - button_width - 8.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    // The one-unit divider stroked on the button's left edge.
+    const Rect divider{bounds.width - button_width - 0.5, 1.0, 1.0,
+                       std::max(0.0, bounds.height - 2.0)};
+    // The 7 x 4 arrow, which flips and moves when the list is open.
+    const double center_x = bounds.width - button_width * 0.5;
+    const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
+    const double arrow_top = dropped_down_ ? std::floor(center_y) - 2.0
+                                           : std::floor(center_y) - 1.0;
+    const Rect arrow{std::floor(center_x) - 3.0, arrow_top, 7.0, 4.0};
+    record.content = PartGeometry::from_bounds(content);
+    record.divider = PartGeometry::from_bounds(divider);
+    record.drop_down = PartGeometry::from_bounds(button);
+    record.disclosure = PartGeometry::from_bounds(arrow);
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), combo_box_extra_part_fields, record, geometry);
+}
+
+AnatomyStateSet ComboBox::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (dropped_down_) {
+        states.insert(AnatomyState::open);
+    } else {
+        states.insert(AnatomyState::closed);
+    }
+    return states;
 }
 
 } // namespace gui_forms

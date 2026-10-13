@@ -1,4 +1,5 @@
 #include "gui_forms/controls/container/master_detail_view/master_detail_view.hpp"
+#include "../../scrollable_control/scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -298,6 +299,23 @@ SemanticDescriptor MasterDetailView::semantic_descriptor() const {
     descriptor.exposed = !descriptor.name.empty() ||
                          !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+// Its panes and members are child controls, which publish their own anatomies.
+constexpr ControlAnatomy master_detail_view_anatomy{
+    .control_id = "master-detail-view",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& MasterDetailView::anatomy() const noexcept {
+    return master_detail_view_anatomy;
 }
 
 } // namespace gui_forms

@@ -45,6 +45,10 @@ gui_forms::MetricsView
          Width of the accent bar at the left edge, in layout units. It must be
          finite and from 1 to 32, or ``std::invalid_argument`` is thrown.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -141,6 +145,10 @@ gui_forms::MetricsView
 
       Sets :cpp:func:`accent_width <gui_forms::MetricsView::accent_width>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Extension points
 
@@ -149,3 +157,9 @@ gui_forms::MetricsView
    .. cpp:function:: bool hit_test_local(Point local_point) const override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

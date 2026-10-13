@@ -1,7 +1,8 @@
 # Stage T1: anatomy — articulated controls and one schema
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
-through them, almost everything else. Status 2026-10-13: started on branch
+through them, almost everything else. Status 2026-10-13: gate measured
+(`results/2026-10-13-t1-anatomy-gate`), owner review pending; built on branch
 `claude/t1-anatomy`, with stacked `claude/t1-*` branches (schema types; range
 controls; the button family; containers and labels; a Gallery coverage
 test).
@@ -140,6 +141,15 @@ no longer needed. Record the coverage table and test run under `results/`.
    address. C++ never reads or sets a part, state or property by such a
    name: it uses typed records with dot members
    (`(*track).parts().thumb.bounds`, `(*button).states().preselect`).
+5. **Repeated items are item systems, not controls** (owner, 2026-10-13).
+   A list, tree or grid declares one item anatomy (row, label, icon,
+   check, expander) with per-item states and publishes its realized
+   (visible) items as typed value records; nothing is created per scrolled
+   row. An item's identity is its semantic virtual child's stable ID, so
+   accessibility, theming and inspection agree. A row that hosts
+   interactive controls keeps them as real child controls; the item record
+   covers what the list itself paints. Theme documents address items like
+   parts: `::part(row):state(selected)`.
 
 ## Read first
 

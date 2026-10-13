@@ -30,6 +30,7 @@ public:
     [[nodiscard]] Control* part(std::string_view name, int index) const;
     void arrange(Rect bounds) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     struct Entry;

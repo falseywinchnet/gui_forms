@@ -84,6 +84,10 @@ gui_forms::RasterCanvas
          The part of the bitmap visible in the canvas, in bitmap pixels and
          clamped to the bitmap. It is empty when there is no bitmap.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -316,6 +320,10 @@ gui_forms::RasterCanvas
       The part of the bitmap visible in the canvas, in bitmap pixels and
       clamped to the bitmap. It is empty when there is no bitmap.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Methods
 
@@ -362,6 +370,8 @@ gui_forms::RasterCanvas
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*
@@ -375,5 +385,9 @@ gui_forms::RasterCanvas
       *Protected.*
 
    .. cpp:function:: void on_dispose() noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

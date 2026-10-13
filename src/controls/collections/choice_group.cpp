@@ -1,6 +1,7 @@
 #include "gui_forms/controls/collections/choice_group.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel/panel_anatomy.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -264,6 +265,23 @@ SemanticDescriptor ChoiceGroup::semantic_descriptor() const {
     descriptor.role = SemanticRole::radio_group;
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+// Its members are child controls, which publish their own anatomies.
+constexpr ControlAnatomy choice_group_anatomy{
+    .control_id = "choice-group",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ChoiceGroup::anatomy() const noexcept {
+    return choice_group_anatomy;
 }
 
 } // namespace gui_forms

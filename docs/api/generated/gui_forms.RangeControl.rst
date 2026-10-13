@@ -68,6 +68,10 @@ gui_forms::RangeControl
       **style** : ``BasicControlStyle``
          The colours the derived control draws with.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **range_changed** : ``Event<double, double>``
@@ -250,6 +254,10 @@ gui_forms::RangeControl
 
       Sets :cpp:func:`style <gui_forms::RangeControl::style>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -307,10 +315,16 @@ gui_forms::RangeControl
 
    .. rubric:: Extension points
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: Rect local_bounds() const noexcept
 
       *Protected.*
 
    .. cpp:function:: bool set_value_from_input(double value, RangeAction action)
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

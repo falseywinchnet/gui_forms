@@ -1,6 +1,12 @@
 #include "gui_forms/anatomy.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
+#include "gui_forms/menu_controls.hpp"
+#include "gui_forms/collection_controls.hpp"
+#include "gui_forms/date_time_picker.hpp"
+#include "gui_forms/diagnostic_controls.hpp"
+#include "gui_forms/inspection_controls.hpp"
+#include "gui_forms/input_controls.hpp"
 #include "gui_forms/material.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
@@ -688,6 +694,372 @@ void test_base_record_follows_dynamic_type() {
             "the base states record reads the dynamic type's states");
 }
 
+void test_text_box_caret_and_selection() {
+    std::shared_ptr<TextBox> box = make_control<TextBox>(StableId("anatomy.text"), "hello world");
+    (*box).set_requested_bounds({0.0, 0.0, 200.0, 28.0});
+    Window window(box, {200.0, 28.0});
+    TextOriginPainter painter;
+    window.set_text_metrics_provider(&painter);
+    window.perform_layout();
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 200.0, 28.0}));
+
+    (*box).select(Utf8Offset(0U), Utf8Offset(0U));
+    const PartGeometry start_caret = (*box).parts().caret;
+    (*box).select(Utf8Offset(5U), Utf8Offset(5U));
+    const TextBox::Parts at_five = (*box).parts();
+    require(at_five.well.present && at_five.content.present,
+            "a text box publishes its well and content");
+    require(start_caret.present && at_five.caret.present &&
+                at_five.caret.bounds.x > start_caret.bounds.x &&
+                at_five.content.bounds.contains(at_five.caret.bounds),
+            "the caret moves with the insertion point inside the content");
+    require(!at_five.selection.present, "an empty selection publishes no highlight");
+
+    (*box).select(Utf8Offset(0U), Utf8Offset(5U));
+    const TextBox::Parts selected = (*box).parts();
+    require(selected.selection.present && !selected.caret.present &&
+                near(selected.selection.bounds.x, at_five.content.bounds.x) &&
+                near(selected.selection.bounds.right(), at_five.caret.bounds.x + 0.5),
+            "a selection publishes its highlight between the two boundaries");
+    window.set_text_metrics_provider(nullptr);
+
+    (*box).set_read_only(true);
+    (*box).set_visual_status(ControlVisualStatus::invalid);
+    const TextBox::States states = (*box).states();
+    require(states.read_only && states.invalid && !states.pending,
+            "read-only and validity are published states");
+    require_declared_states(*box);
+    require_parts_within_region(*box);
+}
+
+void test_spin_combo_and_picker_parts() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.inputs.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 320.0, 160.0});
+    std::shared_ptr<NumericUpDown> spin = make_control<NumericUpDown>(StableId("anatomy.spin"));
+    (*spin).set_requested_bounds({10.0, 10.0, 120.0, 26.0});
+    std::shared_ptr<ComboBox> combo = make_control<ComboBox>(StableId("anatomy.combo"));
+    (*combo).set_requested_bounds({10.0, 50.0, 160.0, 26.0});
+    (*combo).set_items({"One", "Two"});
+    std::shared_ptr<DateTimePicker> picker = make_control<DateTimePicker>(StableId("anatomy.picker"));
+    (*picker).set_requested_bounds({10.0, 90.0, 200.0, 26.0});
+    (*root).add_child(spin);
+    (*root).add_child(combo);
+    (*root).add_child(picker);
+    Window window(root, {320.0, 160.0});
+    window.perform_layout();
+
+    const NumericUpDown::Parts spin_parts = (*spin).parts();
+    require(spin_parts.field.present && spin_parts.increment_arrow.present &&
+                spin_parts.decrement_arrow.present &&
+                near(spin_parts.field.bounds.right(), spin_parts.increment_arrow.bounds.x) &&
+                near(spin_parts.increment_arrow.bounds.bottom(),
+                     spin_parts.decrement_arrow.bounds.y),
+            "a spin box publishes its field and the two halves of its actuator");
+    const ControlAnatomy& spin_anatomy = (*spin).anatomy();
+    const std::optional<PartIndex> field = find_part(spin_anatomy, "field");
+    require(field.has_value() &&
+                spin_anatomy.parts[(*field).value].composed_from == "text-box",
+            "the spin box field is composed from the text box system");
+
+    const ComboBox::Parts closed = (*combo).parts();
+    require(closed.drop_down.present && closed.disclosure.present &&
+                closed.drop_down.bounds.contains(closed.disclosure.bounds) &&
+                closed.content.bounds.right() <= closed.divider.bounds.x,
+            "a combo box publishes its field, divider, drop-down and arrow");
+    require((*combo).states().closed, "a shut combo box is closed");
+    (*combo).set_dropped_down(true);
+    require((*combo).states().open && !(*combo).states().closed,
+            "an open combo box publishes open");
+    (*combo).set_dropped_down(false);
+
+    require((*picker).parts().drop_down.present && !(*picker).parts().well.present,
+            "a plain picker has a drop-down and no check box");
+    (*picker).set_show_check_box(true);
+    (*picker).set_checked(true);
+    const DateTimePicker::Parts checked = (*picker).parts();
+    require(checked.well.present && checked.indicator.present &&
+                checked.well.bounds.contains(checked.indicator.bounds) &&
+                checked.content.bounds.x >= checked.well.bounds.right() &&
+                (*picker).states().checked,
+            "a checked picker publishes its check well, mark and state");
+    (*picker).set_show_up_down(true);
+    const DateTimePicker::Parts spinning = (*picker).parts();
+    require(!spinning.drop_down.present && spinning.increment_arrow.present &&
+                spinning.decrement_arrow.present,
+            "the up-down picker publishes actuators instead of a drop-down");
+    const std::array<const Control*, 3> controls{spin.get(), combo.get(), picker.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "every input anatomy must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
+void test_list_rows_are_item_records() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.lists.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 400.0, 200.0});
+    std::shared_ptr<ListBox> list = make_control<ListBox>(StableId("anatomy.list"));
+    (*list).set_requested_bounds({10.0, 10.0, 160.0, 120.0});
+    (*list).set_items({"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta"});
+    std::shared_ptr<CheckedListBox> checks = make_control<CheckedListBox>(StableId("anatomy.checks"));
+    (*checks).set_requested_bounds({200.0, 10.0, 160.0, 120.0});
+    (*checks).set_items({"Wrap", "Spell", "Grammar"});
+    (*root).add_child(list);
+    (*root).add_child(checks);
+    Window window(root, {400.0, 200.0});
+    window.perform_layout();
+
+    require(validate_control_anatomy((*list).anatomy()).defect == AnatomyDefect::none &&
+                validate_control_anatomy((*checks).anatomy()).defect == AnatomyDefect::none,
+            "list anatomies with item parts must validate");
+    (*list).select_index(1U);
+    const std::vector<ListBox::Item> rows = (*list).realized_items();
+    require(rows.size() == (*list).realized_item_count() && rows.size() >= 4U &&
+                rows.size() < 7U,
+            "a list realizes only the rows that fit, plus one");
+    const std::vector<SemanticNode> semantic = (*list).semantic_virtual_children();
+    for (std::size_t item = 0; item < rows.size(); ++item) {
+        const ListBox::Item& row = rows[item];
+        require(row.index == item && row.stable_id == semantic[row.index].stable_id,
+                "an item's identity is its semantic virtual child's stable ID");
+        require(row.parts.row.present && row.parts.label.present &&
+                    row.parts.row.bounds.contains(row.parts.label.bounds),
+                "each row publishes its label inside its row");
+        if (item > 0U) {
+            require(near(row.parts.row.bounds.y, rows[item - 1U].parts.row.bounds.bottom()),
+                    "rows stack without gaps");
+        }
+    }
+    require(rows[1].states.selected && rows[1].states.current && !rows[0].states.selected,
+            "item states are per row");
+
+    (*checks).set_item_check_state(2U, CheckState::checked);
+    const std::vector<CheckedListBox::Item> checked_rows = (*checks).realized_items();
+    require(checked_rows.size() == 3U && checked_rows[2].states.checked &&
+                !checked_rows[0].states.checked,
+            "checked rows publish checked per item");
+    require(checked_rows[2].parts.check.present && !checked_rows[0].parts.check.present &&
+                checked_rows[2].parts.check_well.bounds.contains(checked_rows[2].parts.check.bounds) &&
+                checked_rows[2].parts.label.bounds.x >= checked_rows[2].parts.check_well.bounds.right(),
+            "a checked row publishes its mark inside its check well, before the label");
+
+    const ListBox& as_list = *checks;
+    require(as_list.realized_items().size() == 3U,
+            "a base-type item view reads the dynamic type's rows");
+    bool rejected = false;
+    std::vector<PartGeometry> wrong(1U);
+    try {
+        (*list).fill_realized_item_geometry(0U, wrong);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "item geometry storage of the wrong size must be rejected");
+    rejected = false;
+    std::vector<PartGeometry> sized((*list).anatomy().item_parts.size());
+    try {
+        (*list).fill_realized_item_geometry(rows.size(), sized);
+    } catch (const std::out_of_range&) {
+        rejected = true;
+    }
+    require(rejected, "an item past the realized rows must be rejected");
+}
+
+constexpr std::array<PartDeclaration, 1> clashing_item_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+}};
+
+void test_item_names_never_repeat_control_parts() {
+    const ControlAnatomy clashing{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_parts = clashing_item_parts, .item_states = {}};
+    require(validate_control_anatomy(clashing).defect == AnatomyDefect::duplicate_item_part_name,
+            "an item part may not reuse a control part's name");
+}
+
+// FlagsValueEditor needs an enum descriptor; the Gallery coverage test
+// checks it with the Gallery's own.
+void test_value_editors_and_diagnostic_views() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.editors.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 360.0, 200.0});
+    std::shared_ptr<ColorValueEditor> color = make_control<ColorValueEditor>(StableId("anatomy.color"));
+    (*color).set_requested_bounds({10.0, 10.0, 200.0, 28.0});
+    std::shared_ptr<MetricsView> metrics = make_control<MetricsView>(StableId("anatomy.metrics"));
+    (*metrics).set_requested_bounds({10.0, 90.0, 300.0, 90.0});
+    (*root).add_child(color);
+    (*root).add_child(metrics);
+    Window window(root, {360.0, 200.0});
+    window.perform_layout();
+
+    const ColorValueEditor::Parts color_parts = (*color).parts();
+    require(color_parts.swatch.present && color_parts.field.present &&
+                color_parts.swatch.bounds.right() <= color_parts.field.bounds.x,
+            "the colour editor's swatch sits before its text field");
+    const MetricsView::Parts metric_parts = (*metrics).parts();
+    require(metric_parts.accent_strip.present &&
+                near(metric_parts.accent_strip.bounds.width, (*metrics).accent_width()) &&
+                near(metric_parts.accent_strip.bounds.x, 0.0),
+            "the metrics view publishes its accent strip on the leading edge");
+    const std::array<const Control*, 2> controls{color.get(), metrics.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "every editor and view anatomy must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
+void test_tabs_menus_and_breadcrumbs_are_items() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.nav.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 640.0, 360.0});
+    std::shared_ptr<TabControl> tabs = make_control<TabControl>(StableId("anatomy.tabs"));
+    (*tabs).set_requested_bounds({10.0, 10.0, 400.0, 160.0});
+    (*tabs).add_page(make_control<TabPage>(StableId("anatomy.tabs.general"), "General"));
+    (*tabs).add_page(make_control<TabPage>(StableId("anatomy.tabs.advanced"), "Advanced"));
+    std::shared_ptr<MenuStrip> menu = make_control<MenuStrip>(StableId("anatomy.menu"));
+    (*menu).set_requested_bounds({10.0, 180.0, 400.0, 28.0});
+    // Every top-level item needs a menu of its own.
+    const std::shared_ptr<Command> open = std::make_shared<Command>("anatomy.open", "Open");
+    MenuStripItemSpec file;
+    file.stable_id = "anatomy.menu.file";
+    file.text = "&File";
+    file.items = {{"anatomy.menu.file.open", MenuItemKind::command, open}};
+    MenuStripItemSpec hidden;
+    hidden.stable_id = "anatomy.menu.hidden";
+    hidden.text = "Hidden";
+    hidden.items = {{"anatomy.menu.hidden.open", MenuItemKind::command, open}};
+    hidden.visible = false;
+    MenuStripItemSpec edit;
+    edit.stable_id = "anatomy.menu.edit";
+    edit.text = "&Edit";
+    edit.items = {{"anatomy.menu.edit.open", MenuItemKind::command, open}};
+    edit.enabled = false;
+    (*menu).set_items({file, hidden, edit});
+    std::shared_ptr<BreadcrumbTrail> trail = make_control<BreadcrumbTrail>(StableId("anatomy.trail"));
+    (*trail).set_requested_bounds({10.0, 220.0, 420.0, 30.0});
+    BreadcrumbSegment home;
+    home.stable_id = "anatomy.trail.home";
+    home.text = "Home";
+    BreadcrumbSegment docs;
+    docs.stable_id = "anatomy.trail.docs";
+    docs.text = "Documents";
+    (*trail).set_segments({home, docs});
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("anatomy.split"));
+    (*split).set_requested_bounds({10.0, 260.0, 400.0, 90.0});
+    (*root).add_child(tabs);
+    (*root).add_child(menu);
+    (*root).add_child(trail);
+    (*root).add_child(split);
+    Window window(root, {640.0, 360.0});
+    window.perform_layout();
+
+    const std::vector<TabControl::Item> tab_items = (*tabs).realized_items();
+    require(tab_items.size() == 2U && tab_items[0].stable_id == "anatomy.tabs.general.tab" &&
+                tab_items[0].states.selected && !tab_items[1].states.selected,
+            "each tab is an item with the semantic tree's id and its own selected state");
+    require(tab_items[0].parts.tab_seam.present && !tab_items[1].parts.tab_seam.present &&
+                tab_items[0].parts.tab.bounds.contains(tab_items[0].parts.tab_label.bounds),
+            "only the selected tab publishes its seam with the display");
+    require((*tabs).parts().display.present, "the tab control publishes its display");
+
+    const std::vector<MenuStrip::Item> menu_items = (*menu).realized_items();
+    require(menu_items.size() == 2U && menu_items[0].index == 0U && menu_items[1].index == 2U &&
+                menu_items[1].states.disabled && !menu_items[0].states.disabled,
+            "hidden menu items are not realized; indices stay model positions");
+    require(menu_items[0].parts.menu_label.present &&
+                menu_items[0].parts.menu_item.bounds.right() <= menu_items[1].parts.menu_item.bounds.x,
+            "menu items publish their labels and run left to right");
+    require((*menu).parts().divider.present, "the menu strip publishes its bottom rule");
+
+    const std::vector<BreadcrumbTrail::Item> segments = (*trail).realized_items();
+    require(segments.size() >= 2U, "the breadcrumb realizes its visible segments");
+    require(segments.front().parts.segment_cap.present && !segments.back().parts.segment_cap.present,
+            "every segment but the last ends in a chevron cap");
+
+    const SplitContainer::Parts split_parts = (*split).parts();
+    require(split_parts.seam.present && split_parts.seam.bounds.height > 0.0,
+            "the split container publishes its seam");
+    const std::array<const Control*, 4> controls{tabs.get(), menu.get(), trail.get(), split.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "navigation anatomies must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
+void test_tree_and_correspondence_items() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.trees.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 700.0, 400.0});
+    std::shared_ptr<TreeView> tree = make_control<TreeView>(StableId("anatomy.tree"));
+    (*tree).set_requested_bounds({10.0, 10.0, 220.0, 160.0});
+    TreeViewItem parent;
+    parent.stable_id = "anatomy.tree.parent";
+    parent.text = "Parent";
+    parent.expandable = true;
+    parent.expanded = true;
+    TreeViewItem child;
+    child.stable_id = "anatomy.tree.child";
+    child.text = "Child";
+    child.depth = 1U;
+    child.enabled = false;
+    (*tree).set_items({parent, child});
+    std::shared_ptr<CorrespondenceView> view =
+        make_control<CorrespondenceView>(StableId("anatomy.correspondence"));
+    (*view).set_requested_bounds({250.0, 10.0, 420.0, 300.0});
+    CorrespondenceItem first;
+    first.stable_id = "anatomy.correspondence.first";
+    first.title = "First";
+    first.stale = true;
+    CorrespondenceItem second;
+    second.stable_id = "anatomy.correspondence.second";
+    second.title = "Second";
+    second.unavailable = true;
+    (*view).set_items({first, second});
+    (*root).add_child(tree);
+    (*root).add_child(view);
+    Window window(root, {700.0, 400.0});
+    window.perform_layout();
+
+    const std::vector<TreeView::Item> nodes = (*tree).realized_items();
+    require(nodes.size() == 2U && nodes[0].stable_id == "anatomy.tree.parent" &&
+                nodes[0].states.open && nodes[0].parts.expander.present &&
+                !nodes[1].parts.expander.present && nodes[1].states.disabled,
+            "tree nodes publish their expander, open state and availability per node");
+    require(nodes[1].parts.label.bounds.x > nodes[0].parts.label.bounds.x,
+            "a deeper node's label is indented");
+
+    const ControlAnatomy& anatomy = (*view).anatomy();
+    require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none &&
+                find_item_custom_state(anatomy, "pinned").has_value() &&
+                find_item_custom_state(anatomy, "stale").has_value(),
+            "correspondence rows declare their own pinned and stale states");
+    const std::vector<CorrespondenceView::Item> cards = (*view).realized_items();
+    require(cards.size() == 2U && cards[0].states.stale && !cards[1].states.stale &&
+                cards[1].states.unavailable && !cards[0].states.pinned,
+            "custom and standard item states are published per card");
+    require(cards[0].parts.card.bounds.contains(cards[0].parts.glyph.bounds) &&
+                cards[0].parts.status_rail.present,
+            "each card publishes its rail and glyph inside the card");
+}
+
+constexpr std::array<CustomStateDeclaration, 1> shadowing_item_custom_state{{
+    {.name = "selected"},
+}};
+
+void test_item_custom_states_never_shadow_standard_states() {
+    const ControlAnatomy shadowing{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_parts = {}, .item_states = {},
+        .item_custom_states = shadowing_item_custom_state};
+    require(validate_control_anatomy(shadowing).defect ==
+                AnatomyDefect::item_custom_state_shadows_standard_state,
+            "an item custom state may not reuse a standard state's name");
+}
+
 } // namespace
 
 int main() {
@@ -706,6 +1078,14 @@ int main() {
         test_panel_and_scrollable_parts();
         test_group_box_and_label_parts();
         test_base_record_follows_dynamic_type();
+        test_text_box_caret_and_selection();
+        test_spin_combo_and_picker_parts();
+        test_list_rows_are_item_records();
+        test_item_names_never_repeat_control_parts();
+        test_value_editors_and_diagnostic_views();
+        test_tabs_menus_and_breadcrumbs_are_items();
+        test_tree_and_correspondence_items();
+        test_item_custom_states_never_shadow_standard_states();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

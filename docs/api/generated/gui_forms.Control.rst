@@ -428,6 +428,8 @@ gui_forms::Control
         - Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor.
       * - :cpp:func:`fill_part_geometry <gui_forms::Control::fill_part_geometry>`
         - Fills one record per declared part, in declaration order, in local coordinates after layout.
+      * - :cpp:func:`fill_realized_item_geometry <gui_forms::Control::fill_realized_item_geometry>`
+        - Fills one record per declared item part for one realized item.
       * - :cpp:func:`set_child_index <gui_forms::Control::set_child_index>`
         - Moves a child to a z-order index, where 0 is frontmost.
       * - :cpp:func:`set_bounds <gui_forms::Control::set_bounds>`
@@ -1228,6 +1230,10 @@ gui_forms::Control
 
       Fills one record per declared part, in declaration order, in local coordinates after layout. ``geometry`` must hold exactly anatomy().parts.size() records; otherwise this throws std::invalid_argument and leaves ``geometry`` unchanged. This is the generic path for the engine, inspection and tools; C++ callers read parts() instead.
 
+   .. cpp:function:: void fill_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const
+
+      Fills one record per declared item part for one realized item. Throws std::out_of_range for an item past realized_item_count() and std::invalid_argument when ``geometry`` does not hold exactly anatomy().item_parts.size() records; ``geometry`` is then unchanged.
+
    .. cpp:function:: bool set_child_index(RuntimeId child, std::size_t index)
 
       Moves a child to a z-order index, where 0 is frontmost. An index past
@@ -1375,6 +1381,14 @@ gui_forms::Control
 
       The active states. Every standard state in the result is one anatomy().states declares, and every custom index is in range.
 
+   .. cpp:function:: virtual std::size_t realized_item_count() const
+
+      Repeated items (stage T1, owner decision 5). A list, tree or grid publishes its realized (visible) items, each with the item parts and states anatomy() declares and the stable ID of its semantic virtual child. ``item`` counts realized items in paint order, not model positions. This is the generic path; item-bearing types also offer typed records through realized_items().
+
+   .. cpp:function:: virtual std::string realized_item_stable_id(std::size_t item) const
+
+   .. cpp:function:: virtual AnatomyStateSet realized_item_anatomy_states(std::size_t item) const
+
    .. cpp:function:: virtual void publish_part_geometry(std::span<PartGeometry> geometry) const
 
       *Protected.*
@@ -1386,6 +1400,16 @@ gui_forms::Control
       *Protected.*
 
       The geometry publish_part_geometry produces for the dynamic type.
+
+   .. cpp:function:: virtual void publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const
+
+      *Protected.*
+
+      Called by fill_realized_item_geometry with ``geometry`` sized to anatomy().item_parts.size(), every record absent, and ``item`` in range.
+
+   .. cpp:function:: PartGeometryBuffer published_realized_item_geometry(std::size_t item) const
+
+      *Protected.*
 
    .. cpp:function:: AnatomyStateSet base_anatomy_states() const
 

@@ -36,6 +36,14 @@ Related types
      - MenuItemInvocation reports the exact stable item identity and source owner for one accepted menu activation.
    * - :cpp:class:`MenuItemSpec <gui_forms::MenuItemSpec>`
      - MenuItemSpec owns stable identity, mnemonic text, shortcut display, enabled/checked/separator state, optional command, and nested items for one context-menu entry.
+   * - :cpp:class:`MenuStrip::Item <gui_forms::MenuStrip::Item>`
+     -  
+   * - :cpp:class:`MenuStrip::ItemParts <gui_forms::MenuStrip::ItemParts>`
+     -  
+   * - :cpp:class:`MenuStrip::ItemStates <gui_forms::MenuStrip::ItemStates>`
+     -  
+   * - :cpp:class:`MenuStrip::Parts <gui_forms::MenuStrip::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`MenuStripInvocation <gui_forms::MenuStripInvocation>`
      - MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation.
    * - :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>`
@@ -83,6 +91,62 @@ Related types
    .. cpp:member:: std::string text
 
    .. cpp:member:: std::vector<MenuItemSpec> children
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MenuStrip::Item final
+
+   ``#include <gui_forms/controls/menu_strip/menu_strip.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MenuStrip::ItemParts final
+
+   ``#include <gui_forms/controls/menu_strip/menu_strip.hpp>``
+
+   .. cpp:member:: PartGeometry menu_item
+
+   .. cpp:member:: PartGeometry menu_label
+
+   .. cpp:member:: PartGeometry menu_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MenuStrip::ItemStates final
+
+   ``#include <gui_forms/controls/menu_strip/menu_strip.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MenuStrip::Parts final
+
+   ``#include <gui_forms/controls/menu_strip/menu_strip.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry divider
+
+   .. cpp:member:: PartGeometry focus
 
 .. cpp:namespace:: gui_forms
 

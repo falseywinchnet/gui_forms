@@ -1,6 +1,7 @@
 #include "support.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <array>
 #include <cmath>
 #include <span>
@@ -13,47 +14,15 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 33> anatomy_pending{
-    "command-bar",
-    "text-box",
-    "review-card",
-    "list-box",
-    "checked-list-box",
-    "combo-box",
-    "tree-view",
-    "object-view",
-    "correspondence-view",
-    "choice-group",
-    "breadcrumb-trail",
-    "range-control",
-    "numeric-up-down",
-    "color-value-editor",
-    "flags-value-editor",
-    "property-grid",
-    "property-list",
-    "instrument-rack",
-    "date-time-picker",
-    "expandable-sections",
-    "tab-control",
-    "split-container",
-    "command-overflow-panel",
-    "master-detail-view",
-    "menu-strip",
-    "context-menu",
-    "drawing-surface",
-    "raster-canvas",
-    "easing-preview",
-    "metrics-view",
-    "typography-specimen",
-    "visual-inspector-view",
-    "visual-inspector-overlay",
+constexpr std::array<std::string_view, 0> anatomy_pending{
 };
 
 // Registry entries that are not controls: nonvisual components and the
 // LiveSurface service type. They have no parts; a component that shows
-// something does so through an internal control.
-constexpr std::array<std::string_view, 11> nonvisual_entries{
+// something (a context menu, a tool tip) does so through an internal control.
+constexpr std::array<std::string_view, 12> nonvisual_entries{
     "command",
+    "context-menu",
     "tool-tip",
     "timer",
     "image-list",
@@ -65,6 +34,41 @@ constexpr std::array<std::string_view, 11> nonvisual_entries{
     "binding-context",
     "live-surface",
 };
+
+// Prints one control type's declared anatomy as a table row: id, parts
+// with roles, states, and the item anatomy when there is one.
+void print_anatomy_row(const ControlAnatomy& anatomy) {
+    std::string parts;
+    for (std::size_t index = 0; index < anatomy.parts.size(); ++index) {
+        if (index > 0U) parts += ", ";
+        parts += std::string(anatomy.parts[index].name) + " (" +
+                 std::string(part_role_name(anatomy.parts[index].role)) + ")";
+    }
+    std::string states;
+    for (std::size_t index = 0; index < anatomy.states.size(); ++index) {
+        if (index > 0U) states += ", ";
+        states += std::string(anatomy_state_name(anatomy.states[index]));
+    }
+    for (std::size_t index = 0; index < anatomy.custom_states.size(); ++index) {
+        states += ", " + std::string(anatomy.custom_states[index].name) + " (custom)";
+    }
+    std::string items;
+    for (std::size_t index = 0; index < anatomy.item_parts.size(); ++index) {
+        if (index > 0U) items += ", ";
+        items += std::string(anatomy.item_parts[index].name) + " (" +
+                 std::string(part_role_name(anatomy.item_parts[index].role)) + ")";
+    }
+    std::string item_states;
+    for (std::size_t index = 0; index < anatomy.item_states.size(); ++index) {
+        if (index > 0U) item_states += ", ";
+        item_states += std::string(anatomy_state_name(anatomy.item_states[index]));
+    }
+    for (std::size_t index = 0; index < anatomy.item_custom_states.size(); ++index) {
+        item_states += ", " + std::string(anatomy.item_custom_states[index].name) + " (custom)";
+    }
+    std::cout << "| " << anatomy.control_id << " | " << parts << " | " << states << " | "
+              << items << " | " << item_states << " |\n";
+}
 
 bool finite_rect(Rect rect) {
     return std::isfinite(rect.x) && std::isfinite(rect.y) &&
@@ -120,8 +124,53 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
                                      std::string(anatomy_state_name(state)));
         }
     }
+    // Every realized item: identity, geometry and states.
+    const std::size_t items = control.realized_item_count();
+    std::vector<PartGeometry> item_geometry(anatomy.item_parts.size());
+    for (std::size_t item = 0; item < items; ++item) {
+        if (control.realized_item_stable_id(item).empty()) {
+            throw std::runtime_error(std::string(anatomy.control_id) +
+                                     " publishes an item without a stable ID");
+        }
+        control.fill_realized_item_geometry(item, item_geometry);
+        for (std::size_t index = 0; index < item_geometry.size(); ++index) {
+            const PartGeometry& part = item_geometry[index];
+            if (!finite_rect(part.bounds) || (!part.present && !part.bounds.empty())) {
+                throw std::runtime_error(std::string(anatomy.control_id) + " item part " +
+                                         std::string(anatomy.item_parts[index].name) +
+                                         " publishes invalid geometry");
+            }
+        }
+        const AnatomyStateSet item_states = control.realized_item_anatomy_states(item);
+        const unsigned int declared_custom =
+            (1U << static_cast<unsigned int>(anatomy.item_custom_states.size())) - 1U;
+        if ((static_cast<unsigned int>(item_states.custom_bits()) & ~declared_custom) != 0U) {
+            throw std::runtime_error(std::string(anatomy.control_id) +
+                                     " publishes an undeclared item custom state");
+        }
+        for (std::size_t index = 0; index < anatomy_state_count; ++index) {
+            const AnatomyState state = static_cast<AnatomyState>(index);
+            bool declared = false;
+            for (std::size_t position = 0; position < anatomy.item_states.size(); ++position) {
+                if (anatomy.item_states[position] == state) declared = true;
+            }
+            if (item_states.contains(state) && !declared) {
+                throw std::runtime_error(std::string(anatomy.control_id) +
+                                         " publishes undeclared item state " +
+                                         std::string(anatomy_state_name(state)));
+            }
+        }
+    }
     const std::string id(anatomy.control_id);
-    if (!contains_id(seen_ids, id)) seen_ids.push_back(id);
+    if (!contains_id(seen_ids, id)) {
+        seen_ids.push_back(id);
+        // GUI_FORMS_ANATOMY_TABLE=1 prints the coverage table the T1 gate
+        // record keeps under results/.
+        const char* table = std::getenv("GUI_FORMS_ANATOMY_TABLE");
+        if (table != nullptr && std::string_view(table) == "1") {
+            print_anatomy_row(anatomy);
+        }
+    }
 }
 
 void inspect_tree(const Control::Ptr& root, std::vector<std::string>& seen_ids,
@@ -165,10 +214,13 @@ void test_anatomy_coverage() {
     const std::shared_ptr<AnchoredPopupLayer> popup_layer = make_control<AnchoredPopupLayer>(
         StableId("anatomy.coverage.anchored-popup-layer"), button_base,
         AnchoredPopupPlacement{});
+    const std::shared_ptr<RangeControl> range_control =
+        make_control<RangeControl>(StableId("anatomy.coverage.range-control"));
     inspect_control(*button_base, seen_ids);
     inspect_control(*scroll_bar, seen_ids);
     inspect_control(*popup_layer, seen_ids);
-    inspected += 3U;
+    inspect_control(*range_control, seen_ids);
+    inspected += 4U;
 
     std::string unexpected_gaps;
     std::string stale_pending;

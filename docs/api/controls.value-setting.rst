@@ -57,6 +57,14 @@ Related types
      - Stage T1 anatomy, as dot members (see Control::Parts).
    * - :cpp:class:`CheckBox::States <gui_forms::CheckBox::States>`
      -  
+   * - :cpp:class:`ColorValueEditor::Parts <gui_forms::ColorValueEditor::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`ColorValueEditor::States <gui_forms::ColorValueEditor::States>`
+     -  
+   * - :cpp:class:`FlagsValueEditor::Parts <gui_forms::FlagsValueEditor::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`FlagsValueEditor::States <gui_forms::FlagsValueEditor::States>`
+     -  
    * - :cpp:class:`InstrumentFieldChange <gui_forms::InstrumentFieldChange>`
      - InstrumentFieldChange carries stable module and field identities, previous/current text, and whether the transition is a committed edit.
    * - :cpp:class:`InstrumentFieldSpec <gui_forms::InstrumentFieldSpec>`
@@ -69,6 +77,10 @@ Related types
      - InstrumentModuleSpec is the authoritative caller model for one stable named module, its fields, status/state, priority, enablement, and removal policy.
    * - :cpp:class:`InstrumentModuleToggle <gui_forms::InstrumentModuleToggle>`
      - InstrumentModuleToggle carries stable module identity and the committed enabled state.
+   * - :cpp:class:`NumericUpDown::Parts <gui_forms::NumericUpDown::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`NumericUpDown::States <gui_forms::NumericUpDown::States>`
+     -  
    * - :cpp:class:`PropertyConversionContext <gui_forms::PropertyConversionContext>`
      - PropertyConversionContext is an inspector-local culture label, decimal/group separator policy, and grouping flag.
    * - :cpp:class:`PropertyEditorBinding <gui_forms::PropertyEditorBinding>`
@@ -87,6 +99,14 @@ Related types
      - PropertyGroupChange carries stable group identity and committed disclosure state.
    * - :cpp:class:`PropertyGroupSpec <gui_forms::PropertyGroupSpec>`
      - PropertyGroupSpec is a stable titled collection of PropertyRowSpec records plus retained expanded state.
+   * - :cpp:class:`PropertyList::Item <gui_forms::PropertyList::Item>`
+     -  
+   * - :cpp:class:`PropertyList::ItemParts <gui_forms::PropertyList::ItemParts>`
+     -  
+   * - :cpp:class:`PropertyList::ItemStates <gui_forms::PropertyList::ItemStates>`
+     -  
+   * - :cpp:class:`PropertyList::Parts <gui_forms::PropertyList::Parts>`
+     - Stage T1 anatomy, as dot members.
    * - :cpp:class:`PropertyResetRequest <gui_forms::PropertyResetRequest>`
      - PropertyResetRequest identifies the stable authored row whose reset action the consumer must authorize.
    * - :cpp:class:`PropertyRowExpansionChange <gui_forms::PropertyRowExpansionChange>`
@@ -102,6 +122,10 @@ Related types
    * - :cpp:class:`RadioButton::Parts <gui_forms::RadioButton::Parts>`
      - Stage T1 anatomy, as dot members (see Control::Parts).
    * - :cpp:class:`RadioButton::States <gui_forms::RadioButton::States>`
+     -  
+   * - :cpp:class:`RangeControl::Parts <gui_forms::RangeControl::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`RangeControl::States <gui_forms::RangeControl::States>`
      -  
    * - :cpp:class:`RangeScrollEvent <gui_forms::RangeScrollEvent>`
      - RangeScrollEvent is the typed transition payload shared by interactive range controls.
@@ -159,6 +183,94 @@ Related types
    .. cpp:member:: bool open
 
    .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ColorValueEditor::Parts final
+
+   ``#include <gui_forms/controls/panel/color_value_editor/color_value_editor.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry swatch
+
+   .. cpp:member:: PartGeometry field
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ColorValueEditor::States final
+
+   ``#include <gui_forms/controls/panel/color_value_editor/color_value_editor.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlagsValueEditor::Parts final
+
+   ``#include <gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry divider
+
+   .. cpp:member:: PartGeometry drop_down
+
+   .. cpp:member:: PartGeometry disclosure
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlagsValueEditor::States final
+
+   ``#include <gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
 
 .. cpp:namespace:: gui_forms
 
@@ -271,6 +383,50 @@ Related types
    .. cpp:member:: std::string module_id
 
    .. cpp:member:: bool enabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NumericUpDown::Parts final
+
+   ``#include <gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry field
+
+   .. cpp:member:: PartGeometry increment_arrow
+
+   .. cpp:member:: PartGeometry decrement_arrow
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NumericUpDown::States final
+
+   ``#include <gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
 
 .. cpp:namespace:: gui_forms
 
@@ -444,6 +600,74 @@ Related types
    .. cpp:member:: bool expanded
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::Item final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::ItemParts final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: PartGeometry group_header
+
+   .. cpp:member:: PartGeometry group_expander
+
+   .. cpp:member:: PartGeometry group_title
+
+   .. cpp:member:: PartGeometry property_row
+
+   .. cpp:member:: PartGeometry property_name
+
+   .. cpp:member:: PartGeometry property_value
+
+   .. cpp:member:: PartGeometry row_expander
+
+   .. cpp:member:: PartGeometry validation
+
+   .. cpp:member:: PartGeometry row_divider
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::ItemStates final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool group_header
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::Parts final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
 
 .. cpp:namespace:: gui_forms
 
@@ -663,6 +887,34 @@ Related types
    .. cpp:member:: bool open
 
    .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RangeControl::Parts final
+
+   ``#include <gui_forms/controls/range_control/range_control.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RangeControl::States final
+
+   ``#include <gui_forms/controls/range_control/range_control.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 

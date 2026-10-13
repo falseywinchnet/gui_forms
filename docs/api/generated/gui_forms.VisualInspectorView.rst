@@ -41,6 +41,10 @@ gui_forms::VisualInspectorView
          The stable ID of the inspected control. When no control in the window has
          it, the view shows ``Target not found:`` and the ID.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -124,6 +128,10 @@ gui_forms::VisualInspectorView
 
       Sets :cpp:func:`target_stable_id <gui_forms::VisualInspectorView::target_stable_id>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Methods
 
@@ -144,3 +152,9 @@ gui_forms::VisualInspectorView
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

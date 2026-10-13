@@ -70,6 +70,40 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] std::size_t realized_item_count() const override;
+    [[nodiscard]] std::string realized_item_stable_id(std::size_t item) const override;
+    [[nodiscard]] AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const override;
+    // Stage T1 anatomy, as dot members. Rows are an item system: each
+    // realized row is a value record, not a control (owner decision 5).
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry well;
+        PartGeometry content;
+    };
+    struct ItemParts final {
+        PartGeometry row;
+        PartGeometry label;
+        PartGeometry row_focus;
+    };
+    struct ItemStates final {
+        bool selected{};
+        bool hot{};
+        bool current{};
+    };
+    struct Item final {
+        std::size_t index{};
+        std::string stable_id;
+        ItemParts parts;
+        ItemStates states;
+    };
+    [[nodiscard]] Parts parts() const;
+    // The rows currently realized, top to bottom; `index` is the row's model
+    // position and `stable_id` its semantic virtual child's identity.
+    [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
     [[nodiscard]] virtual double row_text_left() const noexcept;
@@ -81,6 +115,16 @@ protected:
     [[nodiscard]] bool focused_for_extension() const noexcept { return focused_; }
     [[nodiscard]] std::optional<std::size_t> index_at(
         Point absolute) const noexcept;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    void publish_realized_item_geometry(std::size_t item,
+                                        std::span<PartGeometry> geometry) const override;
+    // The model position of a realized row.
+    [[nodiscard]] std::size_t realized_item_index(std::size_t item) const noexcept;
+    // A realized row's own parts in local coordinates, clipped to the list's
+    // content.
+    [[nodiscard]] ItemParts list_item_parts(std::size_t item) const;
+    // The row's states the list itself tracks.
+    [[nodiscard]] AnatomyStateSet list_item_states(std::size_t index) const;
 
 private:
     void apply_selection(std::vector<std::size_t> selection,

@@ -2,7 +2,11 @@
 
 #include "../collection_control_utilities.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <vector>
+#include <string>
+#include <array>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -497,5 +501,171 @@ bool TreeView::on_semantic_child_action(std::string_view id,
     return true;
 }
 
+
+
+namespace {
+
+constexpr std::array<PartField<TreeView::Parts>, 3> tree_view_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &TreeView::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &TreeView::Parts::edge},
+    {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
+     .member = &TreeView::Parts::content},
+}};
+
+constexpr std::array<PartField<TreeView::ItemParts>, 5> tree_view_item_part_fields{{
+    {.declaration = {.name = "row", .role = PartRole::region, .composed_from = {}},
+     .member = &TreeView::ItemParts::row},
+    {.declaration = {.name = "expander", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &TreeView::ItemParts::expander},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &TreeView::ItemParts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &TreeView::ItemParts::label},
+    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &TreeView::ItemParts::row_focus},
+}};
+
+constexpr std::array<StateField<TreeView::ItemStates>, 6> tree_view_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &TreeView::ItemStates::selected},
+    {.state = AnatomyState::hot, .member = &TreeView::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &TreeView::ItemStates::current},
+    {.state = AnatomyState::open, .member = &TreeView::ItemStates::open},
+    {.state = AnatomyState::closed, .member = &TreeView::ItemStates::closed},
+    {.state = AnatomyState::disabled, .member = &TreeView::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 5> tree_view_item_parts =
+    part_declarations(tree_view_item_part_fields);
+constexpr std::array<AnatomyState, 6> tree_view_item_states =
+    state_declarations(tree_view_item_state_fields);
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
+    tree_view_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(tree_view_extra_part_fields));
+
+constexpr ControlAnatomy tree_view_anatomy{
+    .control_id = "tree-view",
+    .parts = tree_view_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = tree_view_item_parts,
+    .item_states = tree_view_item_states,
+};
+
+} // namespace
+
+const ControlAnatomy& TreeView::anatomy() const noexcept {
+    return tree_view_anatomy;
+}
+
+void TreeView::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const Panel::Parts panel = panel_parts();
+    record.face = panel.face;
+    record.edge = panel.edge;
+    const Rect bounds = local_bounds();
+    record.content = PartGeometry::from_bounds(
+        {2.0, 2.0, std::max(0.0, bounds.width - 4.0), std::max(0.0, bounds.height - 4.0)});
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), tree_view_extra_part_fields, record, geometry);
+}
+
+TreeView::Parts TreeView::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), tree_view_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t TreeView::realized_item_count() const {
+    if (top_row_ >= visible_.size()) return 0U;
+    // Paint realizes one row past the fully visible ones.
+    const std::size_t end = std::min(visible_.size(), top_row_ + visible_row_count() + 1U);
+    return end - top_row_;
+}
+
+std::string TreeView::realized_item_stable_id(std::size_t item) const {
+    return items_[visible_[top_row_ + item]].stable_id;
+}
+
+void TreeView::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    const Rect bounds = local_bounds();
+    const Rect content{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    const TreeViewItem& node = items_[visible_[top_row_ + item]];
+    const double text_scale = effective_text_scale();
+    const double row_height = item_height_ * text_scale;
+    const double y = 2.0 + static_cast<double>(item) * row_height;
+    const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
+    const double indent = 7.0 + static_cast<double>(node.depth) * indentation_ * text_scale;
+    if (show_expanders_ && node.expandable) {
+        // The extent of the two 1.4-unit strokes on_paint draws.
+        const Rect expander = node.expanded
+            ? Rect{indent - 0.7, y + 8.3, 9.4, 5.4}
+            : Rect{indent + 1.3, y + 6.3, 5.4, 9.4};
+        record.expander = PartGeometry::from_bounds(Rect::intersection(expander, content));
+    }
+    double content_x = indent + 14.0;
+    if (image_list_ && (*image_list_).is_alive() && !node.image_key.empty()) {
+        // The image slot; on_paint fits the image inside it.
+        const Size logical = (*image_list_).image_size();
+        const double slot_height = std::min(logical.height, std::max(0.0, row_height - 4.0));
+        const double slot_width = logical.height > 0.0
+            ? logical.width * slot_height / logical.height : 0.0;
+        if (slot_width > 0.0 && slot_height > 0.0) {
+            const Rect slot{content_x, y + (row_height - slot_height) * 0.5,
+                            slot_width, slot_height};
+            record.icon = PartGeometry::from_bounds(Rect::intersection(slot, content));
+            content_x += slot_width + 5.0;
+        }
+    }
+    const double text_width =
+        resolve_text_layout_utf8(node.text, effective_font(font_)).logical_size.width;
+    const Rect label{content_x, y, text_width, row_height};
+    record.row = PartGeometry::from_bounds(Rect::intersection(row, content));
+    record.label = PartGeometry::from_bounds(Rect::intersection(Rect::intersection(label, row), content));
+    record.row_focus = record.row;
+    write_item_parts(anatomy(), tree_view_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet TreeView::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const std::size_t row = top_row_ + item;
+    const TreeViewItem& node = items_[visible_[row]];
+    if (node.stable_id == selected_id_) states.insert(AnatomyState::selected);
+    if (hovered_row_ == row) states.insert(AnatomyState::hot);
+    if (node.stable_id == active_id_) states.insert(AnatomyState::current);
+    if (node.expandable) {
+        states.insert(node.expanded ? AnatomyState::open : AnatomyState::closed);
+    }
+    if (!node.enabled) states.insert(AnatomyState::disabled);
+    return states;
+}
+
+std::vector<TreeView::Item> TreeView::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = visible_[top_row_ + item];
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), tree_view_item_part_fields, published.parts(), record.parts);
+        const AnatomyStateSet item_states = realized_item_anatomy_states(item);
+        read_states(tree_view_item_state_fields, item_states, record.states);
+        records.push_back(record);
+    }
+    return records;
+}
 
 } // namespace gui_forms

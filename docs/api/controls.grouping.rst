@@ -61,6 +61,14 @@ Related types
      - Stage T1 anatomy, as dot members: a face, the frame and the caption.
    * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
+   * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
+     -  
+   * - :cpp:class:`TabControl::ItemParts <gui_forms::TabControl::ItemParts>`
+     -  
+   * - :cpp:class:`TabControl::ItemStates <gui_forms::TabControl::ItemStates>`
+     -  
+   * - :cpp:class:`TabControl::Parts <gui_forms::TabControl::Parts>`
+     - Stage T1 anatomy, as dot members.
    * - :cpp:class:`TabSelectionChange <gui_forms::TabSelectionChange>`
      - TabSelectionChange reports previous/current tab indices and stable page identities after one accepted selection.
 
@@ -143,6 +151,56 @@ Related types
    .. cpp:member:: PartGeometry face
 
    .. cpp:member:: PartGeometry edge
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TabControl::Item final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TabControl::ItemParts final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   .. cpp:member:: PartGeometry tab
+
+   .. cpp:member:: PartGeometry tab_label
+
+   .. cpp:member:: PartGeometry tab_focus
+
+   .. cpp:member:: PartGeometry tab_seam
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TabControl::ItemStates final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   .. cpp:member:: bool selected
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TabControl::Parts final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry display
 
 .. cpp:namespace:: gui_forms
 

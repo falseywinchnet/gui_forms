@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -371,6 +372,79 @@ void RasterCanvas::on_dispose() noexcept {
     tiles_.clear();
     presented_generation_ = 0U;
     Control::on_dispose();
+}
+
+
+namespace {
+
+constexpr std::array<PartField<RasterCanvas::Parts>, 4> raster_canvas_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &RasterCanvas::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &RasterCanvas::Parts::face},
+    {.declaration = {.name = "image", .role = PartRole::icon, .composed_from = {}},
+     .member = &RasterCanvas::Parts::image},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &RasterCanvas::Parts::focus},
+}};
+
+constexpr std::array<StateField<RasterCanvas::States>, 5> raster_canvas_state_fields{{
+    {.state = AnatomyState::normal, .member = &RasterCanvas::States::normal},
+    {.state = AnatomyState::enabled, .member = &RasterCanvas::States::enabled},
+    {.state = AnatomyState::disabled, .member = &RasterCanvas::States::disabled},
+    {.state = AnatomyState::focused, .member = &RasterCanvas::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &RasterCanvas::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 4> raster_canvas_parts =
+    part_declarations(raster_canvas_part_fields);
+constexpr std::array<AnatomyState, 5> raster_canvas_states =
+    state_declarations(raster_canvas_state_fields);
+
+constexpr ControlAnatomy raster_canvas_anatomy{
+    .control_id = "raster-canvas",
+    .parts = raster_canvas_parts,
+    .states = raster_canvas_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& RasterCanvas::anatomy() const noexcept {
+    return raster_canvas_anatomy;
+}
+
+void RasterCanvas::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    if (bitmap_ && !tiles_.empty()) {
+        // The visible part of the bitmap, where on_paint draws its tiles.
+        const gui_drawing::RectF visible = visible_bitmap_bounds();
+        if (!visible.empty()) {
+            const Rect destination{(visible.x - view_origin_.x) * zoom_,
+                                   (visible.y - view_origin_.y) * zoom_,
+                                   visible.width * zoom_, visible.height * zoom_};
+            record.image = PartGeometry::from_bounds(destination);
+        }
+    }
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), raster_canvas_part_fields, record, geometry);
+}
+
+RasterCanvas::Parts RasterCanvas::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), raster_canvas_part_fields, published.parts(), record);
+    return record;
+}
+
+RasterCanvas::States RasterCanvas::states() const {
+    States record;
+    read_states(raster_canvas_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

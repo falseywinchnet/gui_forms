@@ -70,6 +70,7 @@ public:
     void on_pointer_bubble(PointerEvent& event) override;
     void on_key_preview(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
     void on_dispose() noexcept override;

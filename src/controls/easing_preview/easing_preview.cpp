@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -255,6 +256,69 @@ void EasingPreview::register_frames() {
     const FrameInterval interval = policy.frame_interval(16ms);
     frames_ = (*window()).activate_surface(
         shared_from_this(), interval, FrameClock::now() + interval);
+}
+
+
+namespace {
+
+constexpr std::array<PartField<EasingPreview::Parts>, 4> easing_preview_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &EasingPreview::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &EasingPreview::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &EasingPreview::Parts::edge},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &EasingPreview::Parts::focus},
+}};
+
+constexpr std::array<StateField<EasingPreview::States>, 5> easing_preview_state_fields{{
+    {.state = AnatomyState::normal, .member = &EasingPreview::States::normal},
+    {.state = AnatomyState::enabled, .member = &EasingPreview::States::enabled},
+    {.state = AnatomyState::disabled, .member = &EasingPreview::States::disabled},
+    {.state = AnatomyState::focused, .member = &EasingPreview::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &EasingPreview::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 4> easing_preview_parts =
+    part_declarations(easing_preview_part_fields);
+constexpr std::array<AnatomyState, 5> easing_preview_states =
+    state_declarations(easing_preview_state_fields);
+
+constexpr ControlAnatomy easing_preview_anatomy{
+    .control_id = "easing-preview",
+    .parts = easing_preview_parts,
+    .states = easing_preview_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& EasingPreview::anatomy() const noexcept {
+    return easing_preview_anatomy;
+}
+
+void EasingPreview::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    record.edge = PartGeometry::from_bounds(bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), easing_preview_part_fields, record, geometry);
+}
+
+EasingPreview::Parts EasingPreview::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), easing_preview_part_fields, published.parts(), record);
+    return record;
+}
+
+EasingPreview::States EasingPreview::states() const {
+    States record;
+    read_states(easing_preview_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

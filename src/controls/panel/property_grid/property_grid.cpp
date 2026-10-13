@@ -5,6 +5,7 @@
 #include "property_grid_utilities.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1445,6 +1446,23 @@ void PropertyGrid::on_dispose() noexcept {
     (*impl_).selected.clear();
     (*impl_).list.reset();
     Control::on_dispose();
+}
+
+
+namespace {
+
+// Its rows, modules and toolbars are child controls with their own anatomies.
+constexpr ControlAnatomy property_grid_anatomy{
+    .control_id = "property-grid",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& PropertyGrid::anatomy() const noexcept {
+    return property_grid_anatomy;
 }
 
 } // namespace gui_forms

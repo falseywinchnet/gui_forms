@@ -2569,6 +2569,44 @@ Control::Parts Control::parts() const {
     return record;
 }
 
+std::size_t Control::realized_item_count() const {
+    return 0U;
+}
+
+std::string Control::realized_item_stable_id(std::size_t) const {
+    return {};
+}
+
+void Control::fill_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    if (item >= realized_item_count()) {
+        throw std::out_of_range("realized item index is past the realized items");
+    }
+    if (geometry.size() != anatomy().item_parts.size()) {
+        throw std::invalid_argument(
+            "item geometry storage must hold one record per declared item part");
+    }
+    const PartGeometryBuffer published = published_realized_item_geometry(item);
+    const std::span<const PartGeometry> parts = published.parts();
+    std::copy(parts.begin(), parts.end(), geometry.begin());
+}
+
+AnatomyStateSet Control::realized_item_anatomy_states(std::size_t) const {
+    AnatomyStateSet states;
+    return states;
+}
+
+void Control::publish_realized_item_geometry(std::size_t, std::span<PartGeometry>) const {}
+
+PartGeometryBuffer Control::published_realized_item_geometry(std::size_t item) const {
+    PartGeometryBuffer buffer;
+    const ControlAnatomy& declared = anatomy();
+    buffer.count = std::min(declared.item_parts.size(), maximum_control_parts);
+    const std::span<PartGeometry> parts(buffer.geometry.data(), buffer.count);
+    publish_realized_item_geometry(item, parts);
+    return buffer;
+}
+
 Control::States Control::states() const {
     States record;
     read_states(control_state_fields, anatomy_states(), record);

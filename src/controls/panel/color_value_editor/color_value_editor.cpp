@@ -1,6 +1,8 @@
 #include "gui_forms/controls/panel/color_value_editor/color_value_editor.hpp"
 #include "gui_forms/detail/weak_member_callback.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -208,6 +210,88 @@ void ColorValueEditor::on_dispose() noexcept {
     cancelled_.disconnect();
     editor_.reset();
     Control::on_dispose();
+}
+
+
+namespace {
+
+constexpr std::array<PartField<ColorValueEditor::Parts>, 2> color_value_editor_extra_part_fields{{
+    {.declaration = {.name = "swatch", .role = PartRole::chip, .composed_from = {}},
+     .member = &ColorValueEditor::Parts::swatch},
+    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text-box"},
+     .member = &ColorValueEditor::Parts::field},
+}};
+
+constexpr std::array<StateField<ColorValueEditor::States>, 9> color_value_editor_state_fields{{
+    {.state = AnatomyState::normal, .member = &ColorValueEditor::States::normal},
+    {.state = AnatomyState::pressed, .member = &ColorValueEditor::States::pressed},
+    {.state = AnatomyState::captured, .member = &ColorValueEditor::States::captured},
+    {.state = AnatomyState::enabled, .member = &ColorValueEditor::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ColorValueEditor::States::disabled},
+    {.state = AnatomyState::focused, .member = &ColorValueEditor::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &ColorValueEditor::States::focus_visible},
+    {.state = AnatomyState::invalid, .member = &ColorValueEditor::States::invalid},
+    {.state = AnatomyState::pending, .member = &ColorValueEditor::States::pending},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
+    color_value_editor_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(color_value_editor_extra_part_fields));
+constexpr std::array<AnatomyState, 9> color_value_editor_states =
+    state_declarations(color_value_editor_state_fields);
+
+constexpr ControlAnatomy color_value_editor_anatomy{
+    .control_id = "color-value-editor",
+    .parts = color_value_editor_parts,
+    .states = color_value_editor_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ColorValueEditor::anatomy() const noexcept {
+    return color_value_editor_anatomy;
+}
+
+void ColorValueEditor::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = local_bounds();
+    const double swatch_width = std::min(swatch_width_, bounds.width);
+    const Rect swatch{2.0, 2.0, std::max(0.0, swatch_width - 5.0),
+                      std::max(0.0, bounds.height - 4.0)};
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.swatch = PartGeometry::from_bounds(swatch);
+    if (editor_) {
+        record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), color_value_editor_extra_part_fields, record, geometry);
+}
+
+ColorValueEditor::Parts ColorValueEditor::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), color_value_editor_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+AnatomyStateSet ColorValueEditor::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (visual_status() == ControlVisualStatus::invalid) {
+        states.insert(AnatomyState::invalid);
+    } else if (visual_status() == ControlVisualStatus::pending) {
+        states.insert(AnatomyState::pending);
+    }
+    return states;
+}
+
+ColorValueEditor::States ColorValueEditor::states() const {
+    States record;
+    read_states(color_value_editor_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

@@ -3,7 +3,9 @@
 #include "spin_buttons.hpp"
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -244,6 +246,103 @@ bool NumericUpDown::on_semantic_action(SemanticAction action,
         return (*window()).request_focus(editor_);
     }
     return Panel::on_semantic_action(action, value_text);
+}
+
+
+namespace {
+
+constexpr std::array<PartField<NumericUpDown::Parts>, 5> numeric_up_down_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &NumericUpDown::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &NumericUpDown::Parts::edge},
+    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text-box"},
+     .member = &NumericUpDown::Parts::field},
+    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &NumericUpDown::Parts::increment_arrow},
+    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &NumericUpDown::Parts::decrement_arrow},
+}};
+
+constexpr std::array<StateField<NumericUpDown::States>, 9> numeric_up_down_state_fields{{
+    {.state = AnatomyState::normal, .member = &NumericUpDown::States::normal},
+    {.state = AnatomyState::pressed, .member = &NumericUpDown::States::pressed},
+    {.state = AnatomyState::captured, .member = &NumericUpDown::States::captured},
+    {.state = AnatomyState::enabled, .member = &NumericUpDown::States::enabled},
+    {.state = AnatomyState::disabled, .member = &NumericUpDown::States::disabled},
+    {.state = AnatomyState::focused, .member = &NumericUpDown::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &NumericUpDown::States::focus_visible},
+    {.state = AnatomyState::invalid, .member = &NumericUpDown::States::invalid},
+    {.state = AnatomyState::pending, .member = &NumericUpDown::States::pending},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 5>
+    numeric_up_down_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(numeric_up_down_extra_part_fields));
+constexpr std::array<AnatomyState, 9> numeric_up_down_states =
+    state_declarations(numeric_up_down_state_fields);
+
+constexpr ControlAnatomy numeric_up_down_anatomy{
+    .control_id = "numeric-up-down",
+    .parts = numeric_up_down_parts,
+    .states = numeric_up_down_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& NumericUpDown::anatomy() const noexcept {
+    return numeric_up_down_anatomy;
+}
+
+NumericUpDown::Parts NumericUpDown::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), numeric_up_down_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+NumericUpDown::States NumericUpDown::states() const {
+    States record;
+    read_states(numeric_up_down_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void NumericUpDown::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    record.face = panel.face;
+    record.edge = panel.edge;
+    // The field is the child text box, which publishes its own well, content
+    // and caret; the actuators are the halves of the spin control, split at
+    // the row its divider is drawn on.
+    if (editor_) {
+        record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
+    }
+    if (spinner_) {
+        const Rect spinner = (*spinner_).committed_arranged_bounds();
+        const double middle = std::floor(spinner.height * 0.5);
+        const Rect upper{spinner.x, spinner.y, spinner.width, middle};
+        const Rect lower{spinner.x, spinner.y + middle, spinner.width,
+                         std::max(0.0, spinner.height - middle)};
+        record.increment_arrow = PartGeometry::from_bounds(upper);
+        record.decrement_arrow = PartGeometry::from_bounds(lower);
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), numeric_up_down_extra_part_fields, record, geometry);
+}
+
+AnatomyStateSet NumericUpDown::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (visual_status() == ControlVisualStatus::invalid) {
+        states.insert(AnatomyState::invalid);
+    } else if (visual_status() == ControlVisualStatus::pending) {
+        states.insert(AnatomyState::pending);
+    }
+    return states;
 }
 
 } // namespace gui_forms

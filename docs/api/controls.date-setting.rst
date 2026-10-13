@@ -28,6 +28,10 @@ Related types
 
    * - :cpp:class:`DateTimeFormatProvider <gui_forms::DateTimeFormatProvider>`
      - DateTimeFormatProvider is an immutable caller-substitutable vocabulary and pattern bundle for DateTimePicker formatting.
+   * - :cpp:class:`DateTimePicker::Parts <gui_forms::DateTimePicker::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`DateTimePicker::States <gui_forms::DateTimePicker::States>`
+     -  
    * - :cpp:class:`DateTimeValue <gui_forms::DateTimeValue>`
      - DateTimeValue is DateTimePicker's timezone-free civil date/time value.
 
@@ -73,6 +77,60 @@ Related types
    .. cpp:member:: std::string pm_designator
 
       Default: ``{"PM"}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DateTimePicker::Parts final
+
+   ``#include <gui_forms/controls/panel/date_time_picker/date_time_picker.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry drop_down
+
+   .. cpp:member:: PartGeometry disclosure
+
+   .. cpp:member:: PartGeometry increment_arrow
+
+   .. cpp:member:: PartGeometry decrement_arrow
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry indicator
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DateTimePicker::States final
+
+   ``#include <gui_forms/controls/panel/date_time_picker/date_time_picker.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool checked
 
 .. cpp:namespace:: gui_forms
 

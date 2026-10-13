@@ -1,5 +1,5 @@
 #include "gui_forms/controls/panel/card/card.hpp"
-#include "../panel_anatomy.hpp"
+#include "card_anatomy.hpp"
 
 #include <array>
 #include <algorithm>
@@ -350,25 +350,10 @@ bool Card::on_semantic_action(SemanticAction action, std::string_view value) {
 
 namespace {
 
-constexpr std::array<StateField<Card::States>, 9> card_state_fields{{
-    {.state = AnatomyState::normal, .member = &Card::States::normal},
-    {.state = AnatomyState::hot, .member = &Card::States::hot},
-    {.state = AnatomyState::pressed, .member = &Card::States::pressed},
-    {.state = AnatomyState::captured, .member = &Card::States::captured},
-    {.state = AnatomyState::selected, .member = &Card::States::selected},
-    {.state = AnatomyState::enabled, .member = &Card::States::enabled},
-    {.state = AnatomyState::disabled, .member = &Card::States::disabled},
-    {.state = AnatomyState::focused, .member = &Card::States::focused},
-    {.state = AnatomyState::focus_visible, .member = &Card::States::focus_visible},
-}};
-
-constexpr std::array<AnatomyState, 9> card_states =
-    state_declarations(card_state_fields);
-
 constexpr ControlAnatomy card_anatomy{
     .control_id = "card",
     .parts = panel_detail::parts,
-    .states = card_states,
+    .states = card_detail::states,
     .custom_states = {},
 };
 
@@ -408,7 +393,7 @@ AnatomyStateSet Card::anatomy_states() const {
 
 Card::States Card::states() const {
     States record;
-    read_states(card_state_fields, anatomy_states(), record);
+    read_states(card_detail::state_fields, anatomy_states(), record);
     return record;
 }
 

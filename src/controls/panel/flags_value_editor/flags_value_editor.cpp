@@ -3,7 +3,9 @@
 #include "property_editor_drop_down_layer/property_editor_drop_down_layer.hpp"
 #include "gui_forms/detail/weak_member_callback.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -373,6 +375,114 @@ void FlagsValueEditor::on_detached_from_window() noexcept {
     popup_choice_indices_.clear();
     dropped_down_ = false;
     focused_ = false;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<FlagsValueEditor::Parts>, 6> flags_value_editor_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &FlagsValueEditor::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &FlagsValueEditor::Parts::edge},
+    {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
+     .member = &FlagsValueEditor::Parts::content},
+    {.declaration = {.name = "divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &FlagsValueEditor::Parts::divider},
+    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &FlagsValueEditor::Parts::drop_down},
+    {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &FlagsValueEditor::Parts::disclosure},
+}};
+
+constexpr std::array<StateField<FlagsValueEditor::States>, 11> flags_value_editor_state_fields{{
+    {.state = AnatomyState::normal, .member = &FlagsValueEditor::States::normal},
+    {.state = AnatomyState::pressed, .member = &FlagsValueEditor::States::pressed},
+    {.state = AnatomyState::captured, .member = &FlagsValueEditor::States::captured},
+    {.state = AnatomyState::enabled, .member = &FlagsValueEditor::States::enabled},
+    {.state = AnatomyState::disabled, .member = &FlagsValueEditor::States::disabled},
+    {.state = AnatomyState::focused, .member = &FlagsValueEditor::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &FlagsValueEditor::States::focus_visible},
+    {.state = AnatomyState::open, .member = &FlagsValueEditor::States::open},
+    {.state = AnatomyState::closed, .member = &FlagsValueEditor::States::closed},
+    {.state = AnatomyState::invalid, .member = &FlagsValueEditor::States::invalid},
+    {.state = AnatomyState::pending, .member = &FlagsValueEditor::States::pending},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 6>
+    flags_value_editor_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(flags_value_editor_extra_part_fields));
+constexpr std::array<AnatomyState, 11> flags_value_editor_states =
+    state_declarations(flags_value_editor_state_fields);
+
+constexpr ControlAnatomy flags_value_editor_anatomy{
+    .control_id = "flags-value-editor",
+    .parts = flags_value_editor_parts,
+    .states = flags_value_editor_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& FlagsValueEditor::anatomy() const noexcept {
+    return flags_value_editor_anatomy;
+}
+
+void FlagsValueEditor::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = local_bounds();
+    const Panel::Parts panel = panel_parts();
+    const double button_width = std::min(24.0, bounds.width);
+    const double divider_x = std::max(0.0, bounds.width - button_width);
+    const Rect button{divider_x, 1.0, std::max(0.0, button_width - 1.0),
+                      std::max(0.0, bounds.height - 2.0)};
+    const Rect divider{divider_x - 0.5, 1.0, 1.0, std::max(0.0, bounds.height - 2.0)};
+    const Rect content{4.0, 2.0, std::max(0.0, divider_x - 8.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    // The chevron's two one-unit strokes span 8 x 4 about the button centre.
+    const double center_x = bounds.width - button_width * 0.5;
+    const double center_y = bounds.height * 0.5;
+    const Rect chevron{center_x - 4.5, center_y - 2.5, 9.0, 5.0};
+    Parts record;
+    record.scrollable = panel.scrollable;
+    record.face = panel.face;
+    record.edge = panel.edge;
+    record.content = PartGeometry::from_bounds(content);
+    record.divider = PartGeometry::from_bounds(divider);
+    record.drop_down = PartGeometry::from_bounds(button);
+    record.disclosure = PartGeometry::from_bounds(chevron);
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), flags_value_editor_extra_part_fields, record, geometry);
+}
+
+FlagsValueEditor::Parts FlagsValueEditor::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), flags_value_editor_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+AnatomyStateSet FlagsValueEditor::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (dropped_down_) {
+        states.insert(AnatomyState::open);
+    } else {
+        states.insert(AnatomyState::closed);
+    }
+    if (visual_status() == ControlVisualStatus::invalid) {
+        states.insert(AnatomyState::invalid);
+    } else if (visual_status() == ControlVisualStatus::pending) {
+        states.insert(AnatomyState::pending);
+    }
+    return states;
+}
+
+FlagsValueEditor::States FlagsValueEditor::states() const {
+    States record;
+    read_states(flags_value_editor_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms
