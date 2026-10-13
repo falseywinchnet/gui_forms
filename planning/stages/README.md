@@ -29,18 +29,18 @@ stage's brief, then the documents the brief lists under "Read first".
 Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 `tools/make_roadmap_svg.py`). Everything listed is before 1.0.
 
-| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-12 |
+| Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-13 |
 |---|---|---|---|---|
 | A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | not started |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | not started |
-| T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | closed 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off |
-| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | not started |
+| T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
+| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | not started; ready (T1 gate recorded) |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | not started |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
 | T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started |
-| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started |
+| L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
-| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | started 2026-10-13 (`claude/dp-*`): core rectangle-set paint on every host |
+| DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
 | W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4 | not started |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
@@ -50,8 +50,22 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |
 | 1.0 | [Release gate](release-1.0/README.md) | 1.0 Stable | all of the above | conditions defined |
 
-A, F, T1 and DP can start now. A and F run beside everything else. T1 to T4
-are the spine: almost every later stage reads the anatomy and the engine.
+A, F, T1 and DP could start at once. A and F run beside everything else. T1
+to T4 are the spine: almost every later stage reads the anatomy and the
+engine.
+
+**Where to pick up (2026-10-13).** T1 is complete; its gate is recorded and
+the owner has declared it sealed. The next spine stage is **T2, the engine
+core**, now unblocked; T1's decision 6 hands it two items (hit regions
+derived from part geometry, and text published as layout slots), listed in
+the T1 brief's hand-off. **L** is also unblocked; **C** waits for T2 and
+**FD** for T3. **DP** is open only for its macOS and X11 gate records (see
+its brief), and A and F have not started. Open pull requests at hand-off:
+#80 (X11 draws opaque live frames directly, DP) and #81 (stacked on it:
+`ApplicationWindowHandle::request_client_size`, the portable native resize
+request). Read `planning/stages/T1-anatomy/README.md` "Hand-off" before
+starting T2, T3, L, FD or C: the schema, the name rules and the anatomy API
+those stages build on are summarized there.
 
 When a stage starts or a gate is recorded, update the status column here, the
 stage brief's status line, and the stage board linked from `AGENTS.md`.

@@ -1,4 +1,4 @@
-A weak handle for asking the host to show, hide, retitle or close a running window.
+A weak handle for asking the host to show, hide, retitle, resize or close a running window.
 
 The `ready` callback in `ApplicationWindowOptions` hands you a handle for its
 window; keep a copy wherever you need to act on the native window later, for
@@ -34,6 +34,17 @@ set_title
     65536 bytes, malformed UTF-8 or an embedded NUL returns
     `HostServiceError::invalid_argument` and is not sent to the host. The
     text is only borrowed for the call.
+request_client_size
+    Asks the host to make the window's client area a given size in logical
+    units, as if the user had dragged its edge. Each side must be from 1 to
+    32768 and at least the window's `minimum_size`, or the request returns
+    `HostServiceError::invalid_argument`. A window that is full screen,
+    maximized or minimized returns `HostServiceError::unsupported`. The model
+    takes the new size only when the host's resize event arrives, and the
+    platform or window manager may give a different size; read
+    `Window::client_size` afterwards rather than assuming the request's size.
+    `Window::resize` is the host's side of this and does not resize the native
+    window.
 
 See Also
 --------
@@ -54,7 +65,7 @@ native adapter is reported as `HostServiceError::backend_failure`.
 
 An accepted request means the host received it. The native window may carry
 it out later in the same event loop, so do not expect the window to be
-hidden or closed when the call returns.
+hidden, resized or closed when the call returns.
 
 Handles are cheap to copy. After the window closes, or after
 `Application::run` returns, every request returns

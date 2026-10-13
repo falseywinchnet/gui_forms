@@ -252,6 +252,9 @@ public:
     // Synchronous client-DIP placement. Success is a native request, not a
     // fabricated motion/click; OS motion may be delivered or coalesced normally.
     [[nodiscard]] CursorStatus warp_cursor(CursorMetrics metrics, Point target);
+    // Host-only: a host calls this after its native window's client area
+    // changed size. It does not resize the native window; an application
+    // asks for a size with ApplicationWindowHandle::request_client_size.
     void resize(Size client_size);
     void set_scale(double scale);
     [[nodiscard]] double scale() const noexcept { return scale_; }

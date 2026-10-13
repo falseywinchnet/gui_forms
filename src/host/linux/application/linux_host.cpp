@@ -48,6 +48,57 @@ struct WindowTitle final {
     } catch (...) { return {HostServiceError::backend_failure}; }
   }
 };
+// True when the window manager holds the window full screen or maximized
+// (_NET_WM_STATE); a size request would fight it.
+bool window_state_fixed(NativeWindow& window) {
+  Atom type{};
+  int format{};
+  unsigned long count{}, remaining{};
+  unsigned char* data = nullptr;
+  bool fixed = false;
+  if (XGetWindowProperty(window.runtime.display, window.xid, window.runtime.atom("_NET_WM_STATE"),
+                         0, 64, False, XA_ATOM, &type, &format, &count, &remaining,
+                         &data) == Success && type == XA_ATOM && format == 32) {
+    const Atom fullscreen = window.runtime.atom("_NET_WM_STATE_FULLSCREEN");
+    const Atom maximized_vertical = window.runtime.atom("_NET_WM_STATE_MAXIMIZED_VERT");
+    const Atom maximized_horizontal = window.runtime.atom("_NET_WM_STATE_MAXIMIZED_HORZ");
+    const Atom hidden = window.runtime.atom("_NET_WM_STATE_HIDDEN");
+    const Atom* atoms = reinterpret_cast<const Atom*>(data);
+    for (unsigned long index = 0; index < count; ++index) {
+      if (atoms[index] == fullscreen || atoms[index] == maximized_vertical ||
+          atoms[index] == maximized_horizontal || atoms[index] == hidden) fixed = true;
+    }
+  }
+  if (data != nullptr) XFree(data);
+  return fixed;
+}
+// Asks for a client area of `client_size` logical units (device pixels; the
+// X11 host runs at scale 1). The server or window manager answers with
+// ConfigureNotify, which resizes the model on a later event.
+struct WindowClientSize final {
+  std::weak_ptr<NativeWindow> owner{};
+  const std::thread::id thread{std::this_thread::get_id()};
+  HostServiceStatus operator()(const Size client_size) const {
+    if (thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
+    const std::shared_ptr<NativeWindow> window = owner.lock();
+    if (!window || (*window).closed) return {HostServiceError::after_shutdown};
+    try {
+      NativeWindow& native = *window;
+      if (!std::isfinite(client_size.width) || !std::isfinite(client_size.height) ||
+          client_size.width > 32768.0 || client_size.height > 32768.0 ||
+          client_size.width < std::max(1.0, native.entry.options.minimum_size.width) ||
+          client_size.height < std::max(1.0, native.entry.options.minimum_size.height))
+        return {HostServiceError::invalid_argument};
+      if (native.fallback_fullscreen || window_state_fixed(native))
+        return {HostServiceError::unsupported};
+      XResizeWindow(native.runtime.display, native.xid,
+                    static_cast<unsigned>(std::lround(client_size.width)),
+                    static_cast<unsigned>(std::lround(client_size.height)));
+      XFlush(native.runtime.display);
+      return {};
+    } catch (...) { return {HostServiceError::backend_failure}; }
+  }
+};
 struct PresentationImage final {
   XImage* value{};
   PresentationImage() = default;
@@ -253,7 +304,7 @@ bool update_prepared_window(NativeWindow& window) {
   const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
   const std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started);
   const std::uint64_t elapsed = static_cast<std::uint64_t>(duration.count());
-  const bool acknowledged = window.report_presented(*committed, elapsed, copied);
+  const bool acknowledged = window.report_presented(committed, elapsed, copied);
   if (acknowledged) window.damage.clear();
   else {
     // An exposure can repaint an already acknowledged revision. Clear only if
@@ -648,6 +699,8 @@ void NativeWindow::ready() {
         weak_from_this(), runtime.actions, ActionKind::fullscreen});
   if (entry.options.title_ready)
     entry.options.title_ready(WindowTitle{weak_from_this()});
+  if (entry.options.client_size_ready)
+    entry.options.client_size_ready(WindowClientSize{weak_from_this()});
   if (entry.options.visibility_ready)
     entry.options.visibility_ready(show, hide);
 }
@@ -924,20 +977,30 @@ void NativeWindow::update() {
   static_cast<void>(
       (*entry.model).poll_frame_schedule(std::chrono::steady_clock::now()));
   if (accessibility && !closed) { (*accessibility).update(); }
-  const bool regions_taken = gather_live_damage();
+  // Gather before taking damage: a new frame beneath an overlay damages the
+  // overlay's share (#69), and that damage is taken with the rest.
+  const bool regions_taken = gather_live_frames();
   const DamageRegion fresh = (*entry.model).take_damage();
   for (std::size_t i = 0; i < fresh.rectangles().size(); ++i)
     damage.add(fresh.rectangles()[i]);
   // A taken region stays valid only if this tick presents it.
   if (regions_taken) live_region_lost = true;
-  if (!visible || damage.empty())
+  // The screen rectangles: retained damage and the frames drawn directly.
+  DamageRegion screen = damage;
+  for (std::size_t index = 0; index < live_regions.size(); ++index) {
+    if (!live_regions[index].empty()) screen.add(live_regions[index]);
+  }
+  if (!visible || screen.empty()) {
+    live_frames.clear();
     return;
-  const Rect frame_bounds = damage.bounds();
+  }
+  const Rect frame_bounds = screen.bounds();
   const bool covers_window =
       frame_bounds.x <= 0.0 && frame_bounds.y <= 0.0 &&
       frame_bounds.x + frame_bounds.width >= size.width &&
       frame_bounds.y + frame_bounds.height >= size.height;
 #if defined(GUI_FORMS_PREPARED_TEXT)
+  live_frames.clear();
   const bool prepared_presented = update_prepared_window(*this);
   if (prepared_presented && regions_taken) live_region_lost = false;
   frame_capture_if_due(covers_window && prepared_presented);
@@ -948,64 +1011,82 @@ void NativeWindow::update() {
       raster.synchronize_images((*entry.model).image_resources()));
   const std::chrono::steady_clock::time_point started =
       std::chrono::steady_clock::now();
-  raster.begin_frame(damage);
-  const std::optional<PaintReceipt> receipt =
-      (*entry.model).paint(raster, damage.rectangles());
+  // Compose: the new frames first, then retained painting of the damage
+  // (overlay shares among it) over them, into the raster.
+  raster.begin_frame(screen);
+  compose_live_frames();
+  std::optional<PaintReceipt> receipt{};
+  if (!damage.empty()) {
+    receipt = (*entry.model).paint(raster, damage.rectangles());
+    // A fragment that fell back to retained painting is in `damage`.
+    const std::span<const Rect> painted = damage.rectangles();
+    for (std::size_t index = 0; index < painted.size(); ++index) screen.add(painted[index]);
+  }
   raster.end_frame();
-  if (!receipt)
+  live_frames.clear();
+  // A declined paint presents nothing; the damage and the lost regions stay.
+  if (!damage.empty() && !receipt)
     return;
+  // Present: the rectangle set, once.
   PresentedArea copied;
-  if (!present_raster_rectangles(*this, damage.rectangles(), copied))
+  if (!present_raster_rectangles(*this, screen.rectangles(), copied))
     return;
   const std::uint64_t elapsed = static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now() - started)
           .count());
-  // The copy reached the window. A tick that only presents live frames paints
-  // the revision already presented: the window refuses that receipt as not
-  // newer, but the frame is on screen, so the damage is done (as the
-  // prepared-text path checks).
-  const bool acknowledged = report_presented(*receipt, elapsed, copied);
+  if (regions_taken) live_region_lost = false;
+  const bool acknowledged = report_presented(receipt, elapsed, copied);
+  if (!receipt) {
+    frame_capture_if_due(covers_window);
+    return;
+  }
+  // The copy reached the window. A receipt for the revision already
+  // presented is refused as not newer, but the frame is on screen, so the
+  // damage is done (as the prepared-text path checks).
   const PaintLeaseSnapshot lease = (*entry.model).paint_lease_snapshot();
   const bool shown = acknowledged ||
       (lease.surface_epoch == (*receipt).surface_epoch &&
        lease.presented_revision == (*receipt).rendered_revision);
   if (shown) {
     damage.clear();
-    if (regions_taken) live_region_lost = false;
     frame_capture_if_due(covers_window);
   }
 #endif
 }
 // Frame sequence, gather (stage DP decision 2). Each surface's new frame is
 // taken once with the region it changed since this host last drew it; the
-// core splits its clip around overlays, and each fragment adds the changed
-// part (or, after a change of placement or a lost region, all of it) to the
-// window's damage. Retained painting then composes the frame and whatever
-// lies above it, so overlays are drawn over the new frame in the same pass.
-bool NativeWindow::gather_live_damage() {
-  live_surfaces.clear();
+// core splits its clip around overlays, and each fragment is drawn from that
+// one frame. Where the placement is unchanged, only the changed region is
+// drawn and copied: outside it the raster already holds this frame's pixels.
+// An opaque frame is drawn directly (as on Windows and macOS); one that is
+// not, or any frame on the prepared-text raster, adds its region to the
+// damage and retained painting composes it over what lies beneath.
+bool NativeWindow::gather_live_frames() {
+  live_updates.clear();
+  live_frames.clear();
+  live_frame_sources.clear();
+  live_regions.clear();
   live_frame_pixels.clear();
   live_frame_rectangles.clear();
   if (!(*entry.model).has_live_surface_presentations()) return false;
-  const std::vector<LiveSurfacePresentation> updates =
-      (*entry.model).take_live_surface_presentations();
+  live_updates = (*entry.model).take_live_surface_presentations();
   const bool regions_usable = !live_region_lost;
   bool regions_taken = false;
   std::vector<Rect> changed_regions;
-  changed_regions.reserve(updates.size());
-  for (std::size_t index = 0; index < updates.size(); ++index) {
-    const LiveSurfacePresentation& update = updates[index];
-    if (!update.surface) continue;
-    std::size_t frame = live_surfaces.size();
-    for (std::size_t earlier = 0; earlier < live_surfaces.size(); ++earlier) {
-      if (live_surfaces[earlier] == update.surface.get()) {
-        frame = earlier;
+  changed_regions.reserve(live_updates.size());
+  for (std::size_t index = 0; index < live_updates.size(); ++index) {
+    const LiveSurfacePresentation& update = live_updates[index];
+    std::size_t source = live_frames.size();
+    for (std::size_t earlier = 0; earlier < index; ++earlier) {
+      if (live_updates[earlier].surface == update.surface) {
+        source = live_frame_sources[earlier];
         break;
       }
     }
-    if (frame == live_surfaces.size()) {
-      const LiveSurfaceFrame taken = (*update.surface).acquire_for_presentation(this);
+    if (source == live_frames.size()) {
+      LiveSurfaceFrame taken{};
+      if (update.surface) taken = (*update.surface).acquire_for_presentation(this);
       if (taken) regions_taken = true;
       Rect changed = update.clip;
       if (!taken) {
@@ -1014,53 +1095,90 @@ bool NativeWindow::gather_live_damage() {
         changed = gui_forms::detail::live_damage_in_window(
             taken.damage(), update.destination, taken.width(), taken.height(), 1.0);
       }
-      live_surfaces.push_back(update.surface.get());
+      live_frames.push_back(std::move(taken));
       changed_regions.push_back(changed);
       live_frame_pixels.push_back(0U);
       live_frame_rectangles.push_back(0U);
     }
-    const Rect changed = changed_regions[frame];
+    live_frame_sources.push_back(source);
+    live_regions.push_back(Rect{});
+    const Rect changed = changed_regions[source];
     const Rect region = update.damage_limited && regions_usable
         ? Rect::intersection(update.clip, changed) : (changed.empty() ? Rect{} : update.clip);
     if (region.empty()) continue;
-    damage.add(region);
+#if defined(GUI_FORMS_PREPARED_TEXT)
+    // The prepared raster publishes only retained paint transactions.
+    const bool direct = false;
+#else
+    const bool direct = live_frames[source].opaque();
+#endif
+    if (direct) live_regions[index] = region;
+    else damage.add(region);
     const Rect device = gui_forms::detail::align_damage_outward(region, 1.0);
-    live_frame_pixels[frame] += static_cast<std::uint64_t>(device.width) *
-                                static_cast<std::uint64_t>(device.height);
-    ++live_frame_rectangles[frame];
+    live_frame_pixels[source] += static_cast<std::uint64_t>(device.width) *
+                                 static_cast<std::uint64_t>(device.height);
+    ++live_frame_rectangles[source];
   }
   return regions_taken;
 }
 
+// Frame sequence, compose (stage DP). Inside begin_frame and before retained
+// painting, so anything retained over a frame is painted after it.
+void NativeWindow::compose_live_frames() {
+  for (std::size_t index = 0; index < live_regions.size(); ++index) {
+    const Rect region = live_regions[index];
+    if (region.empty()) continue;
+    raster.save();
+    raster.clip_rect(region);
+    const bool drawn = raster.draw_live_surface_frame(
+        live_frames[live_frame_sources[index]], live_updates[index].destination, 1.0);
+    raster.restore();
+    if (drawn) continue;
+    // Retained painting draws the surface's latest frame there instead.
+    live_regions[index] = {};
+    damage.add(region);
+  }
+}
+
 // Frame sequence, report (stage DP). One present copied `copied`; the live
 // frames gathered this tick are its live share, the rest retained, and the
-// duration is split between them by the pixels each copied.
-bool NativeWindow::report_presented(const PaintReceipt receipt, const std::uint64_t elapsed,
-                                    const PresentedArea copied) {
+// duration is split between them by the pixels each copied. A live-only tick
+// has no receipt: its copy time is reported with the first live frame.
+bool NativeWindow::report_presented(const std::optional<PaintReceipt>& receipt,
+                                    const std::uint64_t elapsed, const PresentedArea copied) {
   std::uint64_t live_pixels = 0U;
-  std::uint64_t live_frames = 0U;
+  std::uint64_t live_frames_copied = 0U;
   for (std::size_t index = 0; index < live_frame_rectangles.size(); ++index) {
     if (live_frame_rectangles[index] == 0U) continue;
     live_pixels += live_frame_pixels[index];
-    ++live_frames;
+    ++live_frames_copied;
   }
   if (live_pixels > copied.device_pixels) live_pixels = copied.device_pixels;
-  PresentedArea retained;
-  retained.device_pixels = copied.device_pixels - live_pixels;
-  retained.rectangles = copied.rectangles;
-  // The window records the copy time with this report, accepted or not.
-  retained.copy_nanoseconds = copied.copy_nanoseconds;
-  const std::uint64_t live_elapsed = copied.device_pixels == 0U ? 0U :
-      static_cast<std::uint64_t>(static_cast<double>(elapsed) *
-          static_cast<double>(live_pixels) / static_cast<double>(copied.device_pixels));
-  const bool acknowledged =
-      (*entry.model).notify_presented(receipt, elapsed - live_elapsed, retained);
-  const std::uint64_t live_duration = live_frames == 0U ? 0U : live_elapsed / live_frames;
+  bool acknowledged = false;
+  std::uint64_t live_elapsed = elapsed;
+  std::uint64_t unreported_copy = copied.copy_nanoseconds;
+  if (receipt) {
+    PresentedArea retained;
+    retained.device_pixels = copied.device_pixels - live_pixels;
+    retained.rectangles = copied.rectangles;
+    // The window records the copy time with this report, accepted or not.
+    retained.copy_nanoseconds = copied.copy_nanoseconds;
+    unreported_copy = 0U;
+    live_elapsed = copied.device_pixels == 0U ? 0U :
+        static_cast<std::uint64_t>(static_cast<double>(elapsed) *
+            static_cast<double>(live_pixels) / static_cast<double>(copied.device_pixels));
+    acknowledged =
+        (*entry.model).notify_presented(*receipt, elapsed - live_elapsed, retained);
+  }
+  const std::uint64_t live_duration =
+      live_frames_copied == 0U ? 0U : live_elapsed / live_frames_copied;
   for (std::size_t index = 0; index < live_frame_rectangles.size(); ++index) {
     if (live_frame_rectangles[index] == 0U) continue;
     PresentedArea live;
     live.device_pixels = live_frame_pixels[index];
     live.rectangles = live_frame_rectangles[index];
+    live.copy_nanoseconds = unreported_copy;
+    unreported_copy = 0U;
     (*entry.model).notify_live_presented(live_duration, live);
   }
   live_frame_rectangles.clear();

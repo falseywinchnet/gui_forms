@@ -3,14 +3,20 @@
 Release: 0.4 Flexible. Depends on: nothing; it can start now. It matters
 more once the engine (T2) animates small parts such as a cursor sheen or an
 ambient progress fill. Status 2026-10-13: rectangle-set paint on every host
-(#59, #60) and presentation counters (#71) merged; the Windows live frame
-sequence (#72) confirmed on screen by the owner; the availability record and
-transactional partial present on Windows on `claude/dp-availability-record`.
-Partial present is offered by both Windows profiles and by macOS; the X11
-frame sequence (live frames as damage, rectangle-set present, a 16 ms live
-clock) is on `claude/dp-x11-frame-sequence`, awaiting CI and PlaySuite's Lima
-runs. Decision 3's amendment of `PAINT_PIPELINE_AVAILABILITY.md` follows once
-X11 is verified. Authority: the "Damage-preserving painting" and
+(#59, #60), presentation counters (#71, #74), the Windows live frame
+sequence (#72, confirmed on screen by the owner), the availability record and
+transactional partial present (#73), the X11 frame sequence (#76), the copy
+timer (#77) and paint contract version 2 (#78) are merged. PlaySuite's Lima
+runs after #77 showed X11 spending most of a live frame outside the copy: X11
+composed live frames by retained painting of their regions (everything under
+and over them), while Windows and macOS draw them directly. On
+`claude/dp-x11-direct-live` (#80), X11 draws opaque frames directly as well,
+so all three hosts compose live frames one way; Untangle in the Lima guest is
+the check. Remaining for the gate: the macOS and X11 records under
+`results/`. PlaySuite's screen checks already pass the "no pixel outside the
+damaged rectangles changes" condition on both (macOS through screencapture,
+X11 through xwd in the Lima guest, against #77); the records wait for their
+re-runs against #80. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage

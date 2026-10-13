@@ -77,6 +77,10 @@ struct Probe final {
     bool primary_hide_rejected{};
     bool recursive_rejected{};
     bool system_close{};
+    // The model's client size when close was first requested, after the
+    // size request made in ready has been delivered.
+    Window* window{};
+    Size closing_size{};
 };
 struct Ready final {
     Probe* probe{};
@@ -90,6 +94,10 @@ struct Ready final {
             "native Unicode title not applied");
 #endif
         require(handle.set_title("GUI.Forms portable application contract").accepted(), "native title restore refused");
+        require(handle.request_client_size({100.0, 100.0}).error == HostServiceError::invalid_argument,
+            "size below the window minimum accepted");
+        require(handle.request_client_size({420.0, 260.0}).accepted(), "native client size request refused");
+        (*probe).window = &window;
         const HostServiceStatus hidden = handle.hide();
         (*probe).primary_hide_rejected = hidden.error == HostServiceError::invalid_argument;
         std::unique_ptr<Window> recursive_window = make_window();
@@ -115,6 +123,7 @@ struct Closing final {
     Probe* probe{};
     void operator()(HostCloseRequest& request) const {
         ++(*probe).closing;
+        if ((*probe).closing == 1U) (*probe).closing_size = (*(*probe).window).client_size();
         if ((*probe).closing == 1U) {
             request.cancel = true;
             const HostServiceStatus closed = (*probe).handle.request_close();
@@ -237,6 +246,9 @@ int main() {
     const ApplicationResult system_result = run_probe(system_close);
     require(system_result.accepted() && system_close.closing == 2U && system_close.closed == 1U,
             "Alt+F4 must reach ordinary close cancellation and teardown");
+    // The resize arrives as the host's resize event, after ready returns and
+    // before the close it posted (X11 answers later; see linux_host_tests).
+    require(system_close.closing_size == Size{420.0, 260.0}, "native client size did not reach the model");
 #endif
     Probe normal{};
     const ApplicationResult result = run_probe(normal);
