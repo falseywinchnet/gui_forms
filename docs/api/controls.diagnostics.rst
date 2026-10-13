@@ -163,7 +163,7 @@ Related types
 
       Counts one arrange pass, visited nodes, and callbacks.
 
-   .. cpp:function:: void record_paint(std::uint64_t nodes_visited, std::uint64_t controls, std::uint64_t invalidations_consumed, std::uint64_t chunks_rebuilt, std::uint64_t chunks_reused, std::uint64_t commands_replayed, double area, bool full_window) noexcept
+   .. cpp:function:: void record_paint(std::uint64_t nodes_visited, std::uint64_t controls, std::uint64_t invalidations_consumed, std::uint64_t chunks_rebuilt, std::uint64_t chunks_reused, std::uint64_t commands_replayed, double area, double bounding_area, std::uint64_t rectangles, bool full_window) noexcept
 
       Counts paint traversal, invalidations, display cache work, replay, area, and full/partial classification.
 
@@ -351,6 +351,12 @@ Related types
    .. cpp:member:: double requested_damage_area
 
    .. cpp:member:: double painted_damage_area
+
+   .. cpp:member:: double paint_bounding_area
+
+      The summed bounding box of each pass's painted rectangles. A sparse frame paints far less than its bounding box; equal values mean the rectangles were adjacent or the host requested one box.
+
+   .. cpp:member:: std::uint64_t damage_rectangles_painted
 
    .. cpp:member:: std::uint64_t full_window_paints
 

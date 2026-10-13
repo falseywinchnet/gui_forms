@@ -709,6 +709,11 @@ gui_forms::Window
       Paints pending damage with a :cpp:class:`Painter <gui_forms::Painter>`. Native hosts call it; tests can
       call it with their own painter.
 
+   .. cpp:function:: std::optional<PaintReceipt> paint(Painter& painter, std::span<const Rect> requested_damage)
+
+      Paints pending damage with a :cpp:class:`Painter <gui_forms::Painter>`. Native hosts call it; tests can
+      call it with their own painter.
+
    .. cpp:function:: bool notify_presented(PaintReceipt receipt, std::uint64_t duration_nanoseconds = 0U)
 
       Preferred host release. Returns false for a duplicate, out-of-order, or replaced-epoch receipt and never advances the presentation revision in that case.

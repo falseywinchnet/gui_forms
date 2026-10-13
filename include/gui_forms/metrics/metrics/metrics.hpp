@@ -28,6 +28,8 @@ public:
                       std::uint64_t chunks_reused,
                       std::uint64_t commands_replayed,
                       double area,
+                      double bounding_area,
+                      std::uint64_t rectangles,
                       bool full_window) noexcept;
     void set_display_cache(std::uint64_t entries,
                            std::uint64_t generation) noexcept;
