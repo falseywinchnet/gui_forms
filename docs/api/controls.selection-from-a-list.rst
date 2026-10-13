@@ -49,6 +49,12 @@ Related types
 
    * - :cpp:class:`BreadcrumbSegment <gui_forms::BreadcrumbSegment>`
      -  
+   * - :cpp:class:`CheckedListBox::Item <gui_forms::CheckedListBox::Item>`
+     -  
+   * - :cpp:class:`CheckedListBox::ItemParts <gui_forms::CheckedListBox::ItemParts>`
+     - Stage T1 item records: ListBox's row parts and states plus the check.
+   * - :cpp:class:`CheckedListBox::ItemStates <gui_forms::CheckedListBox::ItemStates>`
+     -  
    * - :cpp:class:`ComboBox::Parts <gui_forms::ComboBox::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`ComboBox::States <gui_forms::ComboBox::States>`
@@ -63,6 +69,14 @@ Related types
      - CorrespondenceSelectionChange reports old/new optional stable identities and the initiating interaction.
    * - :cpp:class:`ItemCheckEvent <gui_forms::ItemCheckEvent>`
      - ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
+   * - :cpp:class:`ListBox::Item <gui_forms::ListBox::Item>`
+     -  
+   * - :cpp:class:`ListBox::ItemParts <gui_forms::ListBox::ItemParts>`
+     -  
+   * - :cpp:class:`ListBox::ItemStates <gui_forms::ListBox::ItemStates>`
+     -  
+   * - :cpp:class:`ListBox::Parts <gui_forms::ListBox::Parts>`
+     - Stage T1 anatomy, as dot members.
    * - :cpp:class:`ListSelectionChange <gui_forms::ListSelectionChange>`
      - ListSelectionChange reports previous/current indices plus the exact selected-index snapshot after one mutation.
    * - :cpp:class:`ObjectColumnId <gui_forms::ObjectColumnId>`
@@ -103,6 +117,54 @@ Related types
    .. cpp:member:: bool enabled
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CheckedListBox::Item final
+
+   ``#include <gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CheckedListBox::ItemParts final
+
+   ``#include <gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp>``
+
+   Stage T1 item records: ListBox's row parts and states plus the check.
+
+   .. cpp:member:: PartGeometry row
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry row_focus
+
+   .. cpp:member:: PartGeometry check_well
+
+   .. cpp:member:: PartGeometry check
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CheckedListBox::ItemStates final
+
+   ``#include <gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool indeterminate
 
 .. cpp:namespace:: gui_forms
 
@@ -253,6 +315,62 @@ Related types
       Default: ``{CheckState::unchecked}``.
 
    .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListBox::Item final
+
+   ``#include <gui_forms/controls/panel/list_box/list_box.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListBox::ItemParts final
+
+   ``#include <gui_forms/controls/panel/list_box/list_box.hpp>``
+
+   .. cpp:member:: PartGeometry row
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry row_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListBox::ItemStates final
+
+   ``#include <gui_forms/controls/panel/list_box/list_box.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListBox::Parts final
+
+   ``#include <gui_forms/controls/panel/list_box/list_box.hpp>``
+
+   Stage T1 anatomy, as dot members. Rows are an item system: each realized row is a value record, not a control (owner decision 5).
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry content
 
 .. cpp:namespace:: gui_forms
 

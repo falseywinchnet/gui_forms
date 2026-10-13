@@ -703,12 +703,35 @@ public:
     [[nodiscard]] Parts parts() const;
     [[nodiscard]] States states() const;
 
+    // Repeated items (stage T1, owner decision 5). A list, tree or grid
+    // publishes its realized (visible) items, each with the item parts and
+    // states anatomy() declares and the stable ID of its semantic virtual
+    // child. `item` counts realized items in paint order, not model
+    // positions. This is the generic path; item-bearing types also offer
+    // typed records through realized_items().
+    [[nodiscard]] virtual std::size_t realized_item_count() const;
+    [[nodiscard]] virtual std::string realized_item_stable_id(std::size_t item) const;
+    // Fills one record per declared item part for one realized item.
+    // Throws std::out_of_range for an item past realized_item_count() and
+    // std::invalid_argument when `geometry` does not hold exactly
+    // anatomy().item_parts.size() records; `geometry` is then unchanged.
+    void fill_realized_item_geometry(std::size_t item,
+                                     std::span<PartGeometry> geometry) const;
+    [[nodiscard]] virtual AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const;
+
 protected:
     // Called by fill_part_geometry with `geometry` already sized to
     // anatomy().parts.size() and every record reset to absent.
     virtual void publish_part_geometry(std::span<PartGeometry> geometry) const;
     // The geometry publish_part_geometry produces for the dynamic type.
     [[nodiscard]] PartGeometryBuffer published_part_geometry() const;
+    // Called by fill_realized_item_geometry with `geometry` sized to
+    // anatomy().item_parts.size(), every record absent, and `item` in range.
+    virtual void publish_realized_item_geometry(std::size_t item,
+                                                std::span<PartGeometry> geometry) const;
+    [[nodiscard]] PartGeometryBuffer published_realized_item_geometry(
+        std::size_t item) const;
     // The base states every control shares: normal, enabled or disabled,
     // focused and focus-visible. Overrides start from this and add their own.
     [[nodiscard]] AnatomyStateSet base_anatomy_states() const;

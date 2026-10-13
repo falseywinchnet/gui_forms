@@ -4,6 +4,7 @@
 #include "gui_forms/controls/button_base/check_box/check_box.hpp"
 
 #include <cstddef>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,12 +52,39 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const override;
+    // Stage T1 item records: ListBox's row parts and states plus the check.
+    struct ItemParts final {
+        PartGeometry row;
+        PartGeometry label;
+        PartGeometry row_focus;
+        PartGeometry check_well;
+        PartGeometry check;
+    };
+    struct ItemStates final {
+        bool selected{};
+        bool hot{};
+        bool current{};
+        bool checked{};
+        bool indeterminate{};
+    };
+    struct Item final {
+        std::size_t index{};
+        std::string stable_id;
+        ItemParts parts;
+        ItemStates states;
+    };
+    [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
     [[nodiscard]] double row_text_left() const noexcept override;
     void paint_row_adornment(Painter& painter, std::size_t index,
                              Rect row_bounds, bool selected,
                              bool focused) const override;
+    void publish_realized_item_geometry(std::size_t item,
+                                        std::span<PartGeometry> geometry) const override;
 
 private:
     std::vector<CheckState> check_states_;

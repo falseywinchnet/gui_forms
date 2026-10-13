@@ -1,9 +1,11 @@
 #include "gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp"
+#include "../list_box_anatomy.hpp"
 
 #include "gui_forms/detail/algorithm/binary_search.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <stdexcept>
@@ -235,6 +237,107 @@ bool CheckedListBox::on_semantic_child_action(std::string_view stable_id,
     select_index(index, false, false);
     if (is_alive()) toggle_item(index);
     return true;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<CheckedListBox::ItemParts>, 5> checked_item_part_fields{{
+    {.declaration = {.name = "row", .role = PartRole::region, .composed_from = {}},
+     .member = &CheckedListBox::ItemParts::row},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &CheckedListBox::ItemParts::label},
+    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &CheckedListBox::ItemParts::row_focus},
+    {.declaration = {.name = "check-well", .role = PartRole::well, .composed_from = {}},
+     .member = &CheckedListBox::ItemParts::check_well},
+    {.declaration = {.name = "check", .role = PartRole::indicator, .composed_from = {}},
+     .member = &CheckedListBox::ItemParts::check},
+}};
+
+constexpr std::array<StateField<CheckedListBox::ItemStates>, 5> checked_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &CheckedListBox::ItemStates::selected},
+    {.state = AnatomyState::hot, .member = &CheckedListBox::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &CheckedListBox::ItemStates::current},
+    {.state = AnatomyState::checked, .member = &CheckedListBox::ItemStates::checked},
+    {.state = AnatomyState::indeterminate, .member = &CheckedListBox::ItemStates::indeterminate},
+}};
+
+constexpr std::array<PartDeclaration, 5> checked_item_parts_declared =
+    part_declarations(checked_item_part_fields);
+constexpr std::array<AnatomyState, 5> checked_item_states_declared =
+    state_declarations(checked_item_state_fields);
+
+constexpr ControlAnatomy checked_list_box_anatomy{
+    .control_id = "checked-list-box",
+    .parts = list_box_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = checked_item_parts_declared,
+    .item_states = checked_item_states_declared,
+};
+
+} // namespace
+
+const ControlAnatomy& CheckedListBox::anatomy() const noexcept {
+    return checked_list_box_anatomy;
+}
+
+void CheckedListBox::publish_realized_item_geometry(std::size_t item,
+                                                    std::span<PartGeometry> geometry) const {
+    const ListBox::ItemParts base = list_item_parts(item);
+    ItemParts record;
+    record.row = base.row;
+    record.label = base.label;
+    record.row_focus = base.row_focus;
+    const std::size_t index = realized_item_index(item);
+    if (base.row.present && index < check_states_.size()) {
+        // The check box paint_row_adornment draws, centred in the row.
+        const Rect row = base.row.bounds;
+        const double size = std::min(indicator_size_, std::max(8.0, row.height - 8.0));
+        const double x = row.x + 5.0;
+        const double y = row.y + (row.height - size) * 0.5;
+        record.check_well = PartGeometry::from_bounds({x, y, size, size});
+        if (check_states_[index] == CheckState::checked) {
+            // Two-unit strokes from (3, 0.52 size) to (size - 2.5, 2.5).
+            const Rect mark{x + 2.0, y + 1.5, std::max(0.0, size - 3.5),
+                            std::max(0.0, size - 3.5)};
+            record.check = PartGeometry::from_bounds(mark);
+        } else if (check_states_[index] == CheckState::indeterminate) {
+            const Rect bar{x + 3.0, y + size * 0.5 - 1.5, std::max(0.0, size - 6.0), 3.0};
+            record.check = PartGeometry::from_bounds(bar);
+        }
+    }
+    write_item_parts(anatomy(), checked_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet CheckedListBox::realized_item_anatomy_states(std::size_t item) const {
+    const std::size_t index = realized_item_index(item);
+    AnatomyStateSet states = list_item_states(index);
+    if (index < check_states_.size()) {
+        if (check_states_[index] == CheckState::checked) {
+            states.insert(AnatomyState::checked);
+        } else if (check_states_[index] == CheckState::indeterminate) {
+            states.insert(AnatomyState::indeterminate);
+        }
+    }
+    return states;
+}
+
+std::vector<CheckedListBox::Item> CheckedListBox::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = realized_item_index(item);
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), checked_item_part_fields, published.parts(), record.parts);
+        read_states(checked_item_state_fields, realized_item_anatomy_states(item), record.states);
+        records.push_back(record);
+    }
+    return records;
 }
 
 } // namespace gui_forms

@@ -1,4 +1,5 @@
 #include "gui_forms/controls/panel/list_box/list_box.hpp"
+#include "list_box_anatomy.hpp"
 
 #include "../input_control_utilities.hpp"
 #include "gui_forms/detail/algorithm/binary_search.hpp"
@@ -6,6 +7,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <charconv>
 #include <cmath>
 #include <stdexcept>
@@ -489,6 +491,152 @@ bool ListBox::on_semantic_child_action(std::string_view child_stable_id,
         item_activated_.emit(index);
     }
     return true;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<ListBox::ItemParts>, 3> list_item_part_fields{{
+    {.declaration = {.name = "row", .role = PartRole::region, .composed_from = {}},
+     .member = &ListBox::ItemParts::row},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &ListBox::ItemParts::label},
+    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &ListBox::ItemParts::row_focus},
+}};
+
+constexpr std::array<StateField<ListBox::ItemStates>, 3> list_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &ListBox::ItemStates::selected},
+    {.state = AnatomyState::hot, .member = &ListBox::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &ListBox::ItemStates::current},
+}};
+
+constexpr std::array<PartDeclaration, 3> list_item_parts_declared =
+    part_declarations(list_item_part_fields);
+constexpr std::array<AnatomyState, 3> list_item_states_declared =
+    state_declarations(list_item_state_fields);
+
+constexpr ControlAnatomy list_box_anatomy{
+    .control_id = "list-box",
+    .parts = list_box_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = list_item_parts_declared,
+    .item_states = list_item_states_declared,
+};
+
+} // namespace
+
+const ControlAnatomy& ListBox::anatomy() const noexcept {
+    return list_box_anatomy;
+}
+
+void ListBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    if (!themed) {
+        record.face = panel.face;
+        record.edge = panel.edge;
+    }
+    record.well = PartGeometry::from_bounds(bounds);
+    const Rect content{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    record.content = PartGeometry::from_bounds(content);
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), list_box_detail::extra_fields, record, geometry);
+}
+
+ListBox::Parts ListBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), list_box_detail::extra_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t ListBox::realized_item_count() const {
+    if (top_index_ >= items_.size()) return 0U;
+    // Paint realizes one row past the fully visible ones.
+    const std::size_t end = std::min(items_.size(), top_index_ + visible_row_count() + 1U);
+    const std::size_t count = end - top_index_;
+    return count;
+}
+
+std::size_t ListBox::realized_item_index(std::size_t item) const noexcept {
+    const std::size_t index = top_index_ + item;
+    return index;
+}
+
+std::string ListBox::realized_item_stable_id(std::size_t item) const {
+    const std::string stable_id = item_stable_id(realized_item_index(item));
+    return stable_id;
+}
+
+ListBox::ItemParts ListBox::list_item_parts(std::size_t item) const {
+    const Rect bounds = local_bounds();
+    const Rect content{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    const double row_height = item_height_ * effective_text_scale();
+    const double y = 2.0 + static_cast<double>(item) * row_height;
+    const Rect row{2.0, y, std::max(0.0, bounds.width - 4.0), row_height};
+    const std::size_t index = realized_item_index(item);
+    const FontSpec font = effective_font(font_);
+    const ResolvedTextLayout text = resolve_text_layout_utf8(items_[index], font);
+    const double label_left = row_text_left();
+    const double label_width = std::min(text.logical_size.width,
+                                        std::max(0.0, row.right() - label_left));
+    const Rect label{label_left, y, label_width, row_height};
+    ItemParts record;
+    record.row = PartGeometry::from_bounds(Rect::intersection(row, content));
+    record.label = PartGeometry::from_bounds(Rect::intersection(label, content));
+    // The current row's focus cue marks the row.
+    record.row_focus = record.row;
+    return record;
+}
+
+void ListBox::publish_realized_item_geometry(std::size_t item,
+                                             std::span<PartGeometry> geometry) const {
+    const ItemParts record = list_item_parts(item);
+    write_item_parts(anatomy(), list_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet ListBox::list_item_states(std::size_t index) const {
+    AnatomyStateSet states;
+    if (detail::binary_search_contains(std::span<const std::size_t>(selected_), index)) {
+        states.insert(AnatomyState::selected);
+    }
+    if (hovered_index_ == index) {
+        states.insert(AnatomyState::hot);
+    }
+    if (active_index_ == index) {
+        states.insert(AnatomyState::current);
+    }
+    return states;
+}
+
+AnatomyStateSet ListBox::realized_item_anatomy_states(std::size_t item) const {
+    const AnatomyStateSet states = list_item_states(realized_item_index(item));
+    return states;
+}
+
+std::vector<ListBox::Item> ListBox::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = realized_item_index(item);
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), list_item_part_fields, published.parts(), record.parts);
+        read_states(list_item_state_fields, realized_item_anatomy_states(item), record.states);
+        records.push_back(record);
+    }
+    return records;
 }
 
 } // namespace gui_forms

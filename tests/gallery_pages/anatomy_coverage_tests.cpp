@@ -13,11 +13,9 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 29> anatomy_pending{
+constexpr std::array<std::string_view, 27> anatomy_pending{
     "command-bar",
     "review-card",
-    "list-box",
-    "checked-list-box",
     "tree-view",
     "object-view",
     "correspondence-view",
@@ -114,6 +112,37 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
             throw std::runtime_error(std::string(anatomy.control_id) +
                                      " publishes undeclared state " +
                                      std::string(anatomy_state_name(state)));
+        }
+    }
+    // Every realized item: identity, geometry and states.
+    const std::size_t items = control.realized_item_count();
+    std::vector<PartGeometry> item_geometry(anatomy.item_parts.size());
+    for (std::size_t item = 0; item < items; ++item) {
+        if (control.realized_item_stable_id(item).empty()) {
+            throw std::runtime_error(std::string(anatomy.control_id) +
+                                     " publishes an item without a stable ID");
+        }
+        control.fill_realized_item_geometry(item, item_geometry);
+        for (std::size_t index = 0; index < item_geometry.size(); ++index) {
+            const PartGeometry& part = item_geometry[index];
+            if (!finite_rect(part.bounds) || (!part.present && !part.bounds.empty())) {
+                throw std::runtime_error(std::string(anatomy.control_id) + " item part " +
+                                         std::string(anatomy.item_parts[index].name) +
+                                         " publishes invalid geometry");
+            }
+        }
+        const AnatomyStateSet item_states = control.realized_item_anatomy_states(item);
+        for (std::size_t index = 0; index < anatomy_state_count; ++index) {
+            const AnatomyState state = static_cast<AnatomyState>(index);
+            bool declared = false;
+            for (std::size_t position = 0; position < anatomy.item_states.size(); ++position) {
+                if (anatomy.item_states[position] == state) declared = true;
+            }
+            if (item_states.contains(state) && !declared) {
+                throw std::runtime_error(std::string(anatomy.control_id) +
+                                         " publishes undeclared item state " +
+                                         std::string(anatomy_state_name(state)));
+            }
         }
     }
     const std::string id(anatomy.control_id);

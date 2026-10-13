@@ -159,6 +159,11 @@ struct ControlAnatomy final {
     std::span<const PartDeclaration> parts;
     std::span<const AnatomyState> states;
     std::span<const CustomStateDeclaration> custom_states;
+    // The anatomy of one repeated item (a list row, a tree node), empty for
+    // a control without items. Item part names never repeat the control's
+    // own part names, so a document addresses either by name alone.
+    std::span<const PartDeclaration> item_parts;
+    std::span<const AnatomyState> item_states;
 };
 
 // Geometry of one declared part in the control's local coordinate space
@@ -256,8 +261,13 @@ private:
 // hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
 [[nodiscard]] bool is_kebab_case_name(std::string_view name) noexcept;
 
-// Lookup by declared name within one control type's anatomy.
+// Lookup by declared name within one declaration list, within a control
+// type's own parts, or within its item parts.
+[[nodiscard]] std::optional<PartIndex> find_declared_part(
+    std::span<const PartDeclaration> declared, std::string_view part_name) noexcept;
 [[nodiscard]] std::optional<PartIndex> find_part(
+    const ControlAnatomy& anatomy, std::string_view part_name) noexcept;
+[[nodiscard]] std::optional<PartIndex> find_item_part(
     const ControlAnatomy& anatomy, std::string_view part_name) noexcept;
 [[nodiscard]] std::optional<CustomStateIndex> find_custom_state(
     const ControlAnatomy& anatomy, std::string_view state_name) noexcept;
@@ -323,12 +333,12 @@ template <typename Record, std::size_t Count>
 // base type's record publishes into a subclass's longer declaration list.
 // `geometry` holds one record per declared part.
 template <typename Record, std::size_t Count>
-void write_parts(const ControlAnatomy& anatomy,
-                 const std::array<PartField<Record>, Count>& fields,
-                 const Record& record, std::span<PartGeometry> geometry) noexcept {
+void write_declared_parts(std::span<const PartDeclaration> declared,
+                          const std::array<PartField<Record>, Count>& fields,
+                          const Record& record, std::span<PartGeometry> geometry) noexcept {
     for (std::size_t index = 0; index < Count; ++index) {
         const std::optional<PartIndex> part =
-            find_part(anatomy, fields[index].declaration.name);
+            find_declared_part(declared, fields[index].declaration.name);
         if (!part.has_value() || (*part).value >= geometry.size()) {
             continue;
         }
@@ -340,18 +350,48 @@ void write_parts(const ControlAnatomy& anatomy,
 // Reads the published geometry back into `record`; a member whose part the
 // anatomy does not declare is left absent.
 template <typename Record, std::size_t Count>
-void read_parts(const ControlAnatomy& anatomy,
-                const std::array<PartField<Record>, Count>& fields,
-                std::span<const PartGeometry> geometry, Record& record) noexcept {
+void read_declared_parts(std::span<const PartDeclaration> declared,
+                         const std::array<PartField<Record>, Count>& fields,
+                         std::span<const PartGeometry> geometry, Record& record) noexcept {
     for (std::size_t index = 0; index < Count; ++index) {
         const std::optional<PartIndex> part =
-            find_part(anatomy, fields[index].declaration.name);
+            find_declared_part(declared, fields[index].declaration.name);
         PartGeometry value;
         if (part.has_value() && (*part).value < geometry.size()) {
             value = geometry[(*part).value];
         }
         record.*(fields[index].member) = value;
     }
+}
+
+template <typename Record, std::size_t Count>
+void write_parts(const ControlAnatomy& anatomy,
+                 const std::array<PartField<Record>, Count>& fields,
+                 const Record& record, std::span<PartGeometry> geometry) noexcept {
+    write_declared_parts(anatomy.parts, fields, record, geometry);
+}
+
+template <typename Record, std::size_t Count>
+void read_parts(const ControlAnatomy& anatomy,
+                const std::array<PartField<Record>, Count>& fields,
+                std::span<const PartGeometry> geometry, Record& record) noexcept {
+    read_declared_parts(anatomy.parts, fields, geometry, record);
+}
+
+// The same mapping over one realized item's geometry and the anatomy's
+// item parts.
+template <typename Record, std::size_t Count>
+void write_item_parts(const ControlAnatomy& anatomy,
+                      const std::array<PartField<Record>, Count>& fields,
+                      const Record& record, std::span<PartGeometry> geometry) noexcept {
+    write_declared_parts(anatomy.item_parts, fields, record, geometry);
+}
+
+template <typename Record, std::size_t Count>
+void read_item_parts(const ControlAnatomy& anatomy,
+                     const std::array<PartField<Record>, Count>& fields,
+                     std::span<const PartGeometry> geometry, Record& record) noexcept {
+    read_declared_parts(anatomy.item_parts, fields, geometry, record);
 }
 
 template <typename Record, std::size_t Count>
@@ -378,13 +418,20 @@ enum class AnatomyDefect : std::uint8_t {
     custom_state_not_kebab_case,
     custom_state_shadows_standard_state,
     duplicate_custom_state,
+    too_many_item_parts,
+    item_part_name_not_kebab_case,
+    duplicate_item_part_name,
+    item_part_role_out_of_range,
+    item_state_out_of_range,
+    duplicate_item_state,
 };
 
 // The result of validate_control_anatomy: the first defect found, or none.
 struct AnatomyValidation final {
     AnatomyDefect defect{AnatomyDefect::none};
-    // Index into the list the defect concerns (parts, states or custom
-    // states); zero when the defect concerns the anatomy as a whole.
+    // Index into the list the defect concerns (parts, states, custom states,
+    // item parts or item states); zero when the defect concerns the anatomy
+    // as a whole.
     std::size_t index{};
 };
 

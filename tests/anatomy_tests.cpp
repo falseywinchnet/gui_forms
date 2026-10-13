@@ -793,6 +793,87 @@ void test_spin_combo_and_picker_parts() {
     }
 }
 
+void test_list_rows_are_item_records() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.lists.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 400.0, 200.0});
+    std::shared_ptr<ListBox> list = make_control<ListBox>(StableId("anatomy.list"));
+    (*list).set_requested_bounds({10.0, 10.0, 160.0, 120.0});
+    (*list).set_items({"Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta"});
+    std::shared_ptr<CheckedListBox> checks = make_control<CheckedListBox>(StableId("anatomy.checks"));
+    (*checks).set_requested_bounds({200.0, 10.0, 160.0, 120.0});
+    (*checks).set_items({"Wrap", "Spell", "Grammar"});
+    (*root).add_child(list);
+    (*root).add_child(checks);
+    Window window(root, {400.0, 200.0});
+    window.perform_layout();
+
+    require(validate_control_anatomy((*list).anatomy()).defect == AnatomyDefect::none &&
+                validate_control_anatomy((*checks).anatomy()).defect == AnatomyDefect::none,
+            "list anatomies with item parts must validate");
+    (*list).select_index(1U);
+    const std::vector<ListBox::Item> rows = (*list).realized_items();
+    require(rows.size() == (*list).realized_item_count() && rows.size() >= 4U &&
+                rows.size() < 7U,
+            "a list realizes only the rows that fit, plus one");
+    const std::vector<SemanticNode> semantic = (*list).semantic_virtual_children();
+    for (std::size_t item = 0; item < rows.size(); ++item) {
+        const ListBox::Item& row = rows[item];
+        require(row.index == item && row.stable_id == semantic[row.index].stable_id,
+                "an item's identity is its semantic virtual child's stable ID");
+        require(row.parts.row.present && row.parts.label.present &&
+                    row.parts.row.bounds.contains(row.parts.label.bounds),
+                "each row publishes its label inside its row");
+        if (item > 0U) {
+            require(near(row.parts.row.bounds.y, rows[item - 1U].parts.row.bounds.bottom()),
+                    "rows stack without gaps");
+        }
+    }
+    require(rows[1].states.selected && rows[1].states.current && !rows[0].states.selected,
+            "item states are per row");
+
+    (*checks).set_item_check_state(2U, CheckState::checked);
+    const std::vector<CheckedListBox::Item> checked_rows = (*checks).realized_items();
+    require(checked_rows.size() == 3U && checked_rows[2].states.checked &&
+                !checked_rows[0].states.checked,
+            "checked rows publish checked per item");
+    require(checked_rows[2].parts.check.present && !checked_rows[0].parts.check.present &&
+                checked_rows[2].parts.check_well.bounds.contains(checked_rows[2].parts.check.bounds) &&
+                checked_rows[2].parts.label.bounds.x >= checked_rows[2].parts.check_well.bounds.right(),
+            "a checked row publishes its mark inside its check well, before the label");
+
+    const ListBox& as_list = *checks;
+    require(as_list.realized_items().size() == 3U,
+            "a base-type item view reads the dynamic type's rows");
+    bool rejected = false;
+    std::vector<PartGeometry> wrong(1U);
+    try {
+        (*list).fill_realized_item_geometry(0U, wrong);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "item geometry storage of the wrong size must be rejected");
+    rejected = false;
+    std::vector<PartGeometry> sized((*list).anatomy().item_parts.size());
+    try {
+        (*list).fill_realized_item_geometry(rows.size(), sized);
+    } catch (const std::out_of_range&) {
+        rejected = true;
+    }
+    require(rejected, "an item past the realized rows must be rejected");
+}
+
+constexpr std::array<PartDeclaration, 1> clashing_item_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+}};
+
+void test_item_names_never_repeat_control_parts() {
+    const ControlAnatomy clashing{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_parts = clashing_item_parts, .item_states = {}};
+    require(validate_control_anatomy(clashing).defect == AnatomyDefect::duplicate_item_part_name,
+            "an item part may not reuse a control part's name");
+}
+
 } // namespace
 
 int main() {
@@ -813,6 +894,8 @@ int main() {
         test_base_record_follows_dynamic_type();
         test_text_box_caret_and_selection();
         test_spin_combo_and_picker_parts();
+        test_list_rows_are_item_records();
+        test_item_names_never_repeat_control_parts();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

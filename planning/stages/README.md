@@ -33,7 +33,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 |---|---|---|---|---|
 | A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | not started |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | not started |
-| T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | started 2026-10-13 (`claude/t1-*` PRs): schema, typed records, range, button, container and input controls; Gallery coverage 32 of 61 |
+| T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | started 2026-10-13 (`claude/t1-*` PRs): schema, typed records, range, button, container and input controls, list item systems; Gallery coverage 34 of 61 |
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | not started |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | not started |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
