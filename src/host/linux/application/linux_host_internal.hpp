@@ -7,6 +7,7 @@
 #include <atomic>
 #include <deque>
 #include <mutex>
+#include <optional>
 
 namespace gui_forms::host::linux_detail {
 class Runtime;
@@ -76,14 +77,20 @@ public:
   // Portable frame capture (capture_path host option): runs once after the
   // first presented frame whose damage covered the whole window, then closes.
   void frame_capture_if_due(bool covers_window);
-  // The frame sequence (stage DP decision 2). Gathers each live surface's new
-  // frame as damage, so retained painting composes it with everything above
-  // it (overlays) into the raster; returns true when a presentation region
-  // was taken from a surface.
-  bool gather_live_damage();
+  // The frame sequence (stage DP decision 2), gather: takes each live
+  // surface's new frame once and the region of each fragment to draw; returns
+  // true when a presentation region was taken from a surface. A frame that is
+  // not opaque (or any frame, on the prepared-text raster) is composed by
+  // retained painting instead: its region is added to `damage`.
+  bool gather_live_frames();
+  // Compose: draws each gathered frame into the raster under its region. A
+  // fragment that fails to draw falls back to retained painting.
+  void compose_live_frames();
   // Reports one present that copied `copied`: the live frames' share as live
-  // frames, the rest as the retained present, the duration split by pixels.
-  bool report_presented(PaintReceipt receipt, std::uint64_t elapsed, PresentedArea copied);
+  // frames, the rest as the retained present (when `receipt` is set), the
+  // duration split by pixels. Returns whether the window accepted the receipt.
+  bool report_presented(const std::optional<PaintReceipt>& receipt, std::uint64_t elapsed,
+                        PresentedArea copied);
   HostDispatchResult dispatch(HostEventPayload payload);
   HostDialogResult dialog(const HostDialogRequest &request);
   Runtime &runtime;
@@ -114,9 +121,16 @@ public:
   unsigned last_click_button{};
   unsigned click_count{};
   std::vector<char> presentation;
-  // Per tick: the device pixels and rectangles gathered for each live
-  // surface's frame, reused across ticks.
-  std::vector<const LiveSurface*> live_surfaces;
+  // Per tick, reused across ticks. Each surface's frame is taken once
+  // (`live_frames`, holding its read lease until the tick is composed), with
+  // the device pixels and rectangles presented for it. Each fragment of a
+  // clip (`live_updates`) names its frame in `live_frame_sources` and the
+  // region to draw directly in `live_regions`, empty when retained painting
+  // composes it or nothing changed.
+  std::vector<LiveSurfacePresentation> live_updates;
+  std::vector<LiveSurfaceFrame> live_frames;
+  std::vector<std::size_t> live_frame_sources;
+  std::vector<Rect> live_regions;
   std::vector<std::uint64_t> live_frame_pixels;
   std::vector<std::uint64_t> live_frame_rectangles;
   // A taken presentation region that was never presented: the next tick

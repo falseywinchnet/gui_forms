@@ -1,4 +1,5 @@
 #include "../src/host/linux/application/linux_host_internal.hpp"
+#include "gui_forms/live_surface.hpp"
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
@@ -357,6 +358,115 @@ void dialog(Runtime &runtime, NativeWindow &window,
   wait_child(runtime, child);
 }
 } // namespace
+// The frame sequence (stage DP): an opaque live frame is drawn into the
+// raster directly, and an overlay above a changed frame keeps its pixels
+// through retained painting of its share.
+class SolidControl final : public Control {
+public:
+  SolidControl(StableId id, const Color color) : Control(std::move(id)), color_(color) {}
+  void on_paint(Painter &painter, Rect) override { painter.fill_rect(client_rectangle(), color_); }
+
+private:
+  Color color_{};
+};
+class LiveControl final : public Control {
+public:
+  LiveControl(StableId id, std::shared_ptr<LiveSurface> surface)
+      : Control(std::move(id)), surface_(std::move(surface)) {}
+  void on_paint(Painter &painter, Rect) override {
+    painter.draw_live_surface(surface_, client_rectangle(), 1.0);
+  }
+
+private:
+  std::shared_ptr<LiveSurface> surface_;
+};
+// Fills `area` of a 100 x 80 RGBA frame with `color` and publishes it as
+// the frame's damage; the rest of the frame keeps its published pixels.
+void publish_color(LiveSurface &surface, const Rect area, const Color color) {
+  LiveSurfaceWriteLease write = surface.try_acquire_write(true);
+  require(static_cast<bool>(write), "Live write lease refused");
+  const std::size_t stride = static_cast<std::size_t>(write.row_bytes());
+  std::span<std::byte> pixels = write.pixels();
+  for (int y = static_cast<int>(area.y); y < static_cast<int>(area.bottom()); ++y) {
+    for (int x = static_cast<int>(area.x); x < static_cast<int>(area.right()); ++x) {
+      const std::size_t offset = static_cast<std::size_t>(y) * stride + static_cast<std::size_t>(x) * 4U;
+      pixels[offset] = static_cast<std::byte>(color.red);
+      pixels[offset + 1U] = static_cast<std::byte>(color.green);
+      pixels[offset + 2U] = static_cast<std::byte>(color.blue);
+      pixels[offset + 3U] = std::byte{255};
+    }
+  }
+  require(write.publish(area) != 0U, "Live frame not published");
+}
+// Reads one pixel of the window's raster (RGBA).
+Color raster_pixel(const NativeWindow &window, const std::size_t x, const std::size_t y) {
+  const unsigned char *row = static_cast<const unsigned char *>(window.raster.pixels()) +
+                             y * window.raster.row_bytes();
+  return Color::rgba(row[x * 4U], row[x * 4U + 1U], row[x * 4U + 2U], row[x * 4U + 3U]);
+}
+void live_frame_sequence(Runtime &runtime) {
+  const Color red = Color::rgba(255, 0, 0);
+  const Color green = Color::rgba(0, 255, 0);
+  const Color blue = Color::rgba(0, 0, 255);
+  const Color white = Color::rgba(255, 255, 255);
+  const Color yellow = Color::rgba(255, 255, 0);
+  const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+      {.width = 100U, .height = 80U,
+       .pixel_format = LiveSurfacePixelFormat::rgba32_premultiplied_srgb, .opaque = true});
+  require(static_cast<bool>(surface), "Live surface not created");
+  publish_color(*surface, {0.0, 0.0, 100.0, 80.0}, blue);
+  const std::shared_ptr<SolidControl> root = make_control<SolidControl>(StableId("live.root"), red);
+  const std::shared_ptr<LiveControl> scene = make_control<LiveControl>(StableId("live.scene"), surface);
+  const std::shared_ptr<SolidControl> capsule = make_control<SolidControl>(StableId("live.capsule"), green);
+  (*scene).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+  (*capsule).set_requested_bounds({10.0, 10.0, 20.0, 10.0});
+  (*capsule).set_paint_plane(PaintPlane::overlay);
+  (*root).add_child(scene);
+  (*root).add_child(capsule);
+  host::LinuxApplicationWindow entry;
+  entry.stable_id = "live";
+  entry.options.title = "GUI.Forms X11 frame sequence check";
+  entry.options.initial_size = {100, 80};
+  entry.model = std::make_unique<gui_forms::Window>(root, entry.options.initial_size);
+  const std::shared_ptr<NativeWindow> window = runtime.add(std::move(entry));
+  (*window).ready();
+  gui_forms::Window &model = *(*window).entry.model;
+  require(model.queue_live_surface_presentation(scene, surface), "Live surface not registered");
+  for (int tick = 0; tick < 8; ++tick) runtime.step(10);
+  require((*window).visible, "Frame sequence window is not shown");
+  require(raster_pixel(*window, 60U, 60U) == blue && raster_pixel(*window, 15U, 15U) == green,
+          "First frame and overlay not composed");
+
+  // A change away from the overlay: a live-only tick copies the changed
+  // region and paints nothing retained.
+  const MetricsSnapshot before = model.metrics_snapshot();
+  publish_color(*surface, {50.0, 50.0, 5.0, 5.0}, white);
+  runtime.step(0);
+  const MetricsSnapshot moved = model.metrics_snapshot();
+  require(moved.live_frames_presented == before.live_frames_presented + 1U,
+          "Live-only tick did not present one frame");
+  require(moved.live_pixels_presented == before.live_pixels_presented + 25U,
+          "Live-only tick copied more than the changed region");
+  require(moved.paint_passes == before.paint_passes &&
+              moved.retained_pixels_presented == before.retained_pixels_presented,
+          "Live-only tick painted retained content");
+  require(raster_pixel(*window, 52U, 52U) == white && raster_pixel(*window, 60U, 60U) == blue,
+          "Changed region not drawn directly");
+
+  // A change beneath the overlay: retained painting repaints the overlay's
+  // share over the new frame.
+  publish_color(*surface, {5.0, 5.0, 30.0, 10.0}, yellow);
+  runtime.step(0);
+  const MetricsSnapshot covered = model.metrics_snapshot();
+  require(covered.live_frames_presented == moved.live_frames_presented + 1U,
+          "Overlay tick did not present one frame");
+  require(covered.retained_pixels_presented > moved.retained_pixels_presented,
+          "Overlay share was not repainted");
+  require(raster_pixel(*window, 6U, 6U) == yellow && raster_pixel(*window, 15U, 12U) == green,
+          "Overlay lost its pixels over a changed frame");
+  (*window).close(HostCloseReason::application, true);
+  runtime.step(0);
+}
 int main() {
   try {
     Runtime runtime;
@@ -500,9 +610,10 @@ int main() {
     dialog(runtime, *window, directory, false);
     dialog(runtime, *window, directory, true);
     std::filesystem::remove_all(directory);
+    live_frame_sequence(runtime);
     (*window).close(HostCloseReason::application, true);
     std::cout << "X11 services: cross-process text and PNG INCR, preserved "
-                 "input, local file drops, open/save dialogs passed\n";
+                 "input, local file drops, open/save dialogs, live frame sequence passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

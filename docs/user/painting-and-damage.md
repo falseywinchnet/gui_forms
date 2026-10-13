@@ -156,8 +156,11 @@ bounding box shows them equal. Both Windows profiles copy each damage
 rectangle (the transactional one still swaps its whole candidate only after
 every rectangle is copied); the X11 host copies each damage rectangle; the
 macOS host copies the rectangles AppKit draws, with live frames counted inside
-the same copy. On X11 a new live frame becomes damage and retained painting
-composes it, with any overlay above it, in the same frame.
+the same copy. Every host composes a new opaque live frame the same way: the
+frame's changed region is drawn straight into the raster, and retained
+painting covers only real damage, such as the share of an overlay above the
+change, in the same frame. On X11 a frame that is not opaque is composed by
+retained painting over what lies beneath it.
 
 `Window::presentation_availability()` reports what the attached host offers:
 the paint-contract version it meets (`paint_contract_version`, now 2; a host
