@@ -6,7 +6,9 @@
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/host.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -1258,6 +1260,158 @@ void TextBox::on_detached_from_window() noexcept {
     caret_frame_.disconnect();
     focused_ = false;
     selecting_ = false;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<TextBox::Parts>, 6> text_box_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &TextBox::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &TextBox::Parts::edge},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+     .member = &TextBox::Parts::well},
+    {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
+     .member = &TextBox::Parts::content},
+    {.declaration = {.name = "caret", .role = PartRole::caret, .composed_from = {}},
+     .member = &TextBox::Parts::caret},
+    {.declaration = {.name = "selection", .role = PartRole::selection, .composed_from = {}},
+     .member = &TextBox::Parts::selection},
+}};
+
+constexpr std::array<StateField<TextBox::States>, 10> text_box_state_fields{{
+    {.state = AnatomyState::normal, .member = &TextBox::States::normal},
+    {.state = AnatomyState::pressed, .member = &TextBox::States::pressed},
+    {.state = AnatomyState::captured, .member = &TextBox::States::captured},
+    {.state = AnatomyState::enabled, .member = &TextBox::States::enabled},
+    {.state = AnatomyState::disabled, .member = &TextBox::States::disabled},
+    {.state = AnatomyState::focused, .member = &TextBox::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &TextBox::States::focus_visible},
+    {.state = AnatomyState::read_only, .member = &TextBox::States::read_only},
+    {.state = AnatomyState::invalid, .member = &TextBox::States::invalid},
+    {.state = AnatomyState::pending, .member = &TextBox::States::pending},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 6>
+    text_box_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(text_box_extra_part_fields));
+constexpr std::array<AnatomyState, 10> text_box_states =
+    state_declarations(text_box_state_fields);
+
+constexpr ControlAnatomy text_box_anatomy{
+    .control_id = "text-box",
+    .parts = text_box_parts,
+    .states = text_box_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& TextBox::anatomy() const noexcept {
+    return text_box_anatomy;
+}
+
+TextBox::Parts TextBox::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), text_box_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+TextBox::States TextBox::states() const {
+    States record;
+    read_states(text_box_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void TextBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    // Text is laid out while painting, so the caret and selection follow the
+    // layout of the last paint, which is what the window shows; before the
+    // first paint they use the estimated layout.
+    const Rect bounds = local_bounds();
+    const bool themed = !has_background_override() && !has_style_override();
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    if (!themed) {
+        record.face = panel.face;
+        record.edge = panel.edge;
+    }
+    record.well = PartGeometry::from_bounds(bounds);
+    if (multiline_) {
+        const Rect viewport = multiline_text_rectangle();
+        record.content = PartGeometry::from_bounds(viewport);
+        if (!visual_lines_.empty()) {
+            const Point offset = scroll_offset();
+            if (selection_.empty()) {
+                const std::size_t row = caret_line();
+                const double x = text_left_ - offset.x + multiline_boundary_x(row, selection_.caret);
+                const double y = 4.0 + static_cast<double>(row) * line_height_ - offset.y;
+                // The one-unit caret stroke is centred on its boundary.
+                const Rect caret{x - 0.5, y, 1.0, line_height_};
+                record.caret = PartGeometry::from_bounds(Rect::intersection(caret, viewport));
+            } else {
+                // The union of the selected rows' highlights, as paint draws them.
+                const FontSpec font = effective_font(font_);
+                Rect united{};
+                bool any = false;
+                for (std::size_t index = 0; index < visual_lines_.size(); ++index) {
+                    const VisualLine& row = visual_lines_[index];
+                    const bool selected = selection_.start().value() <= row.offsets.back() &&
+                                          selection_.end().value() > row.offsets.front();
+                    if (!selected) continue;
+                    const double y = 4.0 + static_cast<double>(index) * line_height_ - offset.y;
+                    const double origin = text_left_ - offset.x;
+                    const double left = multiline_boundary_x(index, selection_.start());
+                    double right = multiline_boundary_x(index, selection_.end());
+                    if (selection_.end().value() > row.offsets.back()) {
+                        right += std::max(3.0, font.size * 0.35);
+                    }
+                    const Rect highlight{origin + left, y, std::max(0.0, right - left), line_height_};
+                    united = any ? Rect::united(united, highlight) : highlight;
+                    any = true;
+                }
+                if (any) {
+                    record.selection = PartGeometry::from_bounds(Rect::intersection(united, viewport));
+                }
+            }
+        }
+    } else {
+        const double right = std::max(text_left_, bounds.width - 4.0);
+        const double viewport_width = std::max(0.0, right - text_left_);
+        const Rect content{text_left_, 2.0, viewport_width, std::max(0.0, bounds.height - 4.0)};
+        record.content = PartGeometry::from_bounds(content);
+        const double origin_x = text_left_ - horizontal_offset_;
+        if (selection_.empty()) {
+            const double caret_x = origin_x + boundary_x(selection_.caret);
+            const Rect caret{caret_x - 0.5, 4.0, 1.0, std::max(0.0, bounds.height - 8.0)};
+            record.caret = PartGeometry::from_bounds(Rect::intersection(caret, content));
+        } else {
+            const double start_x = origin_x + boundary_x(selection_.start());
+            const double end_x = origin_x + boundary_x(selection_.end());
+            const Rect highlight{start_x, 3.0, std::max(0.0, end_x - start_x),
+                                 std::max(0.0, bounds.height - 6.0)};
+            record.selection = PartGeometry::from_bounds(Rect::intersection(highlight, content));
+        }
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), text_box_extra_part_fields, record, geometry);
+}
+
+AnatomyStateSet TextBox::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (read_only_) {
+        states.insert(AnatomyState::read_only);
+    }
+    if (visual_status() == ControlVisualStatus::invalid) {
+        states.insert(AnatomyState::invalid);
+    } else if (visual_status() == ControlVisualStatus::pending) {
+        states.insert(AnatomyState::pending);
+    }
+    return states;
 }
 
 } // namespace gui_forms

@@ -1,6 +1,8 @@
 #include "gui_forms/anatomy.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
+#include "gui_forms/date_time_picker.hpp"
+#include "gui_forms/input_controls.hpp"
 #include "gui_forms/material.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
@@ -688,6 +690,109 @@ void test_base_record_follows_dynamic_type() {
             "the base states record reads the dynamic type's states");
 }
 
+void test_text_box_caret_and_selection() {
+    std::shared_ptr<TextBox> box = make_control<TextBox>(StableId("anatomy.text"), "hello world");
+    (*box).set_requested_bounds({0.0, 0.0, 200.0, 28.0});
+    Window window(box, {200.0, 28.0});
+    TextOriginPainter painter;
+    window.set_text_metrics_provider(&painter);
+    window.perform_layout();
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 200.0, 28.0}));
+
+    (*box).select(Utf8Offset(0U), Utf8Offset(0U));
+    const PartGeometry start_caret = (*box).parts().caret;
+    (*box).select(Utf8Offset(5U), Utf8Offset(5U));
+    const TextBox::Parts at_five = (*box).parts();
+    require(at_five.well.present && at_five.content.present,
+            "a text box publishes its well and content");
+    require(start_caret.present && at_five.caret.present &&
+                at_five.caret.bounds.x > start_caret.bounds.x &&
+                at_five.content.bounds.contains(at_five.caret.bounds),
+            "the caret moves with the insertion point inside the content");
+    require(!at_five.selection.present, "an empty selection publishes no highlight");
+
+    (*box).select(Utf8Offset(0U), Utf8Offset(5U));
+    const TextBox::Parts selected = (*box).parts();
+    require(selected.selection.present && !selected.caret.present &&
+                near(selected.selection.bounds.x, at_five.content.bounds.x) &&
+                near(selected.selection.bounds.right(), at_five.caret.bounds.x + 0.5),
+            "a selection publishes its highlight between the two boundaries");
+    window.set_text_metrics_provider(nullptr);
+
+    (*box).set_read_only(true);
+    (*box).set_visual_status(ControlVisualStatus::invalid);
+    const TextBox::States states = (*box).states();
+    require(states.read_only && states.invalid && !states.pending,
+            "read-only and validity are published states");
+    require_declared_states(*box);
+    require_parts_within_region(*box);
+}
+
+void test_spin_combo_and_picker_parts() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.inputs.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 320.0, 160.0});
+    std::shared_ptr<NumericUpDown> spin = make_control<NumericUpDown>(StableId("anatomy.spin"));
+    (*spin).set_requested_bounds({10.0, 10.0, 120.0, 26.0});
+    std::shared_ptr<ComboBox> combo = make_control<ComboBox>(StableId("anatomy.combo"));
+    (*combo).set_requested_bounds({10.0, 50.0, 160.0, 26.0});
+    (*combo).set_items({"One", "Two"});
+    std::shared_ptr<DateTimePicker> picker = make_control<DateTimePicker>(StableId("anatomy.picker"));
+    (*picker).set_requested_bounds({10.0, 90.0, 200.0, 26.0});
+    (*root).add_child(spin);
+    (*root).add_child(combo);
+    (*root).add_child(picker);
+    Window window(root, {320.0, 160.0});
+    window.perform_layout();
+
+    const NumericUpDown::Parts spin_parts = (*spin).parts();
+    require(spin_parts.field.present && spin_parts.increment_arrow.present &&
+                spin_parts.decrement_arrow.present &&
+                near(spin_parts.field.bounds.right(), spin_parts.increment_arrow.bounds.x) &&
+                near(spin_parts.increment_arrow.bounds.bottom(),
+                     spin_parts.decrement_arrow.bounds.y),
+            "a spin box publishes its field and the two halves of its actuator");
+    const ControlAnatomy& spin_anatomy = (*spin).anatomy();
+    const std::optional<PartIndex> field = find_part(spin_anatomy, "field");
+    require(field.has_value() &&
+                spin_anatomy.parts[(*field).value].composed_from == "text-box",
+            "the spin box field is composed from the text box system");
+
+    const ComboBox::Parts closed = (*combo).parts();
+    require(closed.drop_down.present && closed.disclosure.present &&
+                closed.drop_down.bounds.contains(closed.disclosure.bounds) &&
+                closed.content.bounds.right() <= closed.divider.bounds.x,
+            "a combo box publishes its field, divider, drop-down and arrow");
+    require((*combo).states().closed, "a shut combo box is closed");
+    (*combo).set_dropped_down(true);
+    require((*combo).states().open && !(*combo).states().closed,
+            "an open combo box publishes open");
+    (*combo).set_dropped_down(false);
+
+    require((*picker).parts().drop_down.present && !(*picker).parts().well.present,
+            "a plain picker has a drop-down and no check box");
+    (*picker).set_show_check_box(true);
+    (*picker).set_checked(true);
+    const DateTimePicker::Parts checked = (*picker).parts();
+    require(checked.well.present && checked.indicator.present &&
+                checked.well.bounds.contains(checked.indicator.bounds) &&
+                checked.content.bounds.x >= checked.well.bounds.right() &&
+                (*picker).states().checked,
+            "a checked picker publishes its check well, mark and state");
+    (*picker).set_show_up_down(true);
+    const DateTimePicker::Parts spinning = (*picker).parts();
+    require(!spinning.drop_down.present && spinning.increment_arrow.present &&
+                spinning.decrement_arrow.present,
+            "the up-down picker publishes actuators instead of a drop-down");
+    const std::array<const Control*, 3> controls{spin.get(), combo.get(), picker.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "every input anatomy must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -706,6 +811,8 @@ int main() {
         test_panel_and_scrollable_parts();
         test_group_box_and_label_parts();
         test_base_record_follows_dynamic_type();
+        test_text_box_caret_and_selection();
+        test_spin_combo_and_picker_parts();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

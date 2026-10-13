@@ -5,7 +5,9 @@
 #include "calendar_popup_layer/calendar_popup_layer.hpp"
 #include "date_time_utilities.hpp"
 #include "gui_forms/text.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -449,6 +451,137 @@ void DateTimePicker::on_detached_from_window() noexcept {
         close_drop_down();
     } catch (...) {
     }
+}
+
+
+namespace {
+
+constexpr std::array<PartField<DateTimePicker::Parts>, 9> date_time_picker_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &DateTimePicker::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &DateTimePicker::Parts::edge},
+    {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
+     .member = &DateTimePicker::Parts::content},
+    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &DateTimePicker::Parts::drop_down},
+    {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &DateTimePicker::Parts::disclosure},
+    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &DateTimePicker::Parts::increment_arrow},
+    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+     .member = &DateTimePicker::Parts::decrement_arrow},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+     .member = &DateTimePicker::Parts::well},
+    {.declaration = {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
+     .member = &DateTimePicker::Parts::indicator},
+}};
+
+constexpr std::array<StateField<DateTimePicker::States>, 10> date_time_picker_state_fields{{
+    {.state = AnatomyState::normal, .member = &DateTimePicker::States::normal},
+    {.state = AnatomyState::pressed, .member = &DateTimePicker::States::pressed},
+    {.state = AnatomyState::captured, .member = &DateTimePicker::States::captured},
+    {.state = AnatomyState::enabled, .member = &DateTimePicker::States::enabled},
+    {.state = AnatomyState::disabled, .member = &DateTimePicker::States::disabled},
+    {.state = AnatomyState::focused, .member = &DateTimePicker::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &DateTimePicker::States::focus_visible},
+    {.state = AnatomyState::open, .member = &DateTimePicker::States::open},
+    {.state = AnatomyState::closed, .member = &DateTimePicker::States::closed},
+    {.state = AnatomyState::checked, .member = &DateTimePicker::States::checked},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 9>
+    date_time_picker_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(date_time_picker_extra_part_fields));
+constexpr std::array<AnatomyState, 10> date_time_picker_states =
+    state_declarations(date_time_picker_state_fields);
+
+constexpr ControlAnatomy date_time_picker_anatomy{
+    .control_id = "date-time-picker",
+    .parts = date_time_picker_parts,
+    .states = date_time_picker_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& DateTimePicker::anatomy() const noexcept {
+    return date_time_picker_anatomy;
+}
+
+DateTimePicker::Parts DateTimePicker::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), date_time_picker_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+DateTimePicker::States DateTimePicker::states() const {
+    States record;
+    read_states(date_time_picker_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void DateTimePicker::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
+                      committed_arranged_bounds().height};
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    record.face = panel.face;
+    record.edge = panel.edge;
+    const double button_width = std::min(24.0, bounds.width);
+    const double button_x = std::max(0.0, bounds.width - button_width);
+    const Rect button{button_x, 1.0, std::max(0.0, button_width - 1.0),
+                      std::max(0.0, bounds.height - 2.0)};
+    const double center_x = button_x + button_width * 0.5;
+    if (show_up_down_) {
+        // The up/down actuators are the button's halves at the divider row.
+        const double middle = std::floor(bounds.height * 0.5);
+        const Rect upper{button.x, button.y, button.width, std::max(0.0, middle - button.y)};
+        const Rect lower{button.x, middle, button.width,
+                         std::max(0.0, button.bottom() - middle)};
+        record.increment_arrow = PartGeometry::from_bounds(upper);
+        record.decrement_arrow = PartGeometry::from_bounds(lower);
+    } else {
+        // The chevron's two one-unit strokes span 8 x 4 about its centre.
+        const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
+        const Rect chevron{center_x - 4.5, center_y - 2.5, 9.0, 5.0};
+        record.drop_down = PartGeometry::from_bounds(button);
+        record.disclosure = PartGeometry::from_bounds(chevron);
+    }
+    double text_left = 7.0;
+    if (show_check_box_) {
+        const double check_y = std::max(3.0, (bounds.height - 14.0) * 0.5);
+        const Rect box{5.0, check_y, 14.0, 14.0};
+        record.well = PartGeometry::from_bounds(box);
+        if (checked_) {
+            // Two-unit strokes through (8, 7), (11, 10) and (17, 3.5) from the box top.
+            const Rect mark{7.0, check_y + 2.5, 11.0, 8.5};
+            record.indicator = PartGeometry::from_bounds(mark);
+        }
+        text_left = 25.0;
+    }
+    const Rect content{text_left, 2.0, std::max(0.0, button_x - text_left - 3.0),
+                       std::max(0.0, bounds.height - 4.0)};
+    record.content = PartGeometry::from_bounds(content);
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), date_time_picker_extra_part_fields, record, geometry);
+}
+
+AnatomyStateSet DateTimePicker::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (dropped_down_) {
+        states.insert(AnatomyState::open);
+    } else {
+        states.insert(AnatomyState::closed);
+    }
+    if (show_check_box_ && checked_) {
+        states.insert(AnatomyState::checked);
+    }
+    return states;
 }
 
 } // namespace gui_forms

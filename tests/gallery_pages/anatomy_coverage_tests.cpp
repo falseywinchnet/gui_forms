@@ -13,26 +13,22 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 33> anatomy_pending{
+constexpr std::array<std::string_view, 29> anatomy_pending{
     "command-bar",
-    "text-box",
     "review-card",
     "list-box",
     "checked-list-box",
-    "combo-box",
     "tree-view",
     "object-view",
     "correspondence-view",
     "choice-group",
     "breadcrumb-trail",
     "range-control",
-    "numeric-up-down",
     "color-value-editor",
     "flags-value-editor",
     "property-grid",
     "property-list",
     "instrument-rack",
-    "date-time-picker",
     "expandable-sections",
     "tab-control",
     "split-container",

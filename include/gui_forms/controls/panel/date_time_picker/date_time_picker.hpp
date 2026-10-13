@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -80,9 +81,39 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+    // Stage T1 anatomy, as dot members.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry content;
+        PartGeometry drop_down;
+        PartGeometry disclosure;
+        PartGeometry increment_arrow;
+        PartGeometry decrement_arrow;
+        PartGeometry well;
+        PartGeometry indicator;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool open{};
+        bool closed{};
+        bool checked{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
 
 protected:
     void on_detached_from_window() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     enum class HitPart : std::uint8_t { none, check, body, arrow_up, arrow_down };

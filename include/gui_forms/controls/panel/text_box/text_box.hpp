@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -153,10 +154,37 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+    // Stage T1 anatomy, as dot members.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry well;
+        PartGeometry content;
+        PartGeometry caret;
+        PartGeometry selection;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool read_only{};
+        bool invalid{};
+        bool pending{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
 
 protected:
     void on_scroll_position_changed() override;
     void on_detached_from_window() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     struct VisualRun final {

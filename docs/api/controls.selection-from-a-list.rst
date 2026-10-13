@@ -49,6 +49,10 @@ Related types
 
    * - :cpp:class:`BreadcrumbSegment <gui_forms::BreadcrumbSegment>`
      -  
+   * - :cpp:class:`ComboBox::Parts <gui_forms::ComboBox::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`ComboBox::States <gui_forms::ComboBox::States>`
+     -  
    * - :cpp:class:`CorrespondenceExpansionChange <gui_forms::CorrespondenceExpansionChange>`
      - CorrespondenceExpansionChange reports the exact hierarchical row and resulting expanded state.
    * - :cpp:class:`CorrespondenceItem <gui_forms::CorrespondenceItem>`
@@ -99,6 +103,54 @@ Related types
    .. cpp:member:: bool enabled
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ComboBox::Parts final
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry divider
+
+   .. cpp:member:: PartGeometry drop_down
+
+   .. cpp:member:: PartGeometry disclosure
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ComboBox::States final
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
 
 .. cpp:namespace:: gui_forms
 
