@@ -117,7 +117,7 @@ Related types
 
    .. cpp:member:: std::size_t index
 
-      Index into the list the defect concerns (parts, states or custom states); zero when the defect concerns the anatomy as a whole.
+      Index into the list the defect concerns (parts, states, custom states, item parts or item states); zero when the defect concerns the anatomy as a whole.
 
 .. cpp:namespace:: gui_forms
 
@@ -209,6 +209,12 @@ Related types
    .. cpp:member:: std::span<const AnatomyState> states
 
    .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
+
+   .. cpp:member:: std::span<const PartDeclaration> item_parts
+
+      The anatomy of one repeated item (a list row, a tree node), empty for a control without items. Item part names never repeat the control's own part names, so a document addresses either by name alone.
+
+   .. cpp:member:: std::span<const AnatomyState> item_states
 
 .. cpp:namespace:: gui_forms
 
@@ -461,6 +467,18 @@ Enumerations
    .. cpp:enumerator:: custom_state_shadows_standard_state
 
    .. cpp:enumerator:: duplicate_custom_state
+
+   .. cpp:enumerator:: too_many_item_parts
+
+   .. cpp:enumerator:: item_part_name_not_kebab_case
+
+   .. cpp:enumerator:: duplicate_item_part_name
+
+   .. cpp:enumerator:: item_part_role_out_of_range
+
+   .. cpp:enumerator:: item_state_out_of_range
+
+   .. cpp:enumerator:: duplicate_item_state
 
 .. cpp:namespace:: gui_forms
 
@@ -825,9 +843,13 @@ Functions, constants and aliases
 
    True when ``name`` is non-empty lowercase ASCII words joined by single hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
 
+.. cpp:function:: std::optional<PartIndex> find_declared_part(std::span<const PartDeclaration> declared, std::string_view part_name) noexcept
+
+   Lookup by declared name within one declaration list, within a control type's own parts, or within its item parts.
+
 .. cpp:function:: std::optional<PartIndex> find_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
 
-   Lookup by declared name within one control type's anatomy.
+.. cpp:function:: std::optional<PartIndex> find_item_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
 
 .. cpp:function:: std::optional<CustomStateIndex> find_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
 
@@ -839,13 +861,23 @@ Functions, constants and aliases
 
 .. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<AnatomyState, Count> state_declarations(const std::array<StateField<Record>, Count>& fields)
 
-.. cpp:function:: template <typename Record, std::size_t Count> void write_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void write_declared_parts(std::span<const PartDeclaration> declared, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
 
    Publishes every member of ``record`` into the part ``anatomy`` declares with that member's name. A part the anatomy does not declare is skipped, so a base type's record publishes into a subclass's longer declaration list. ``geometry`` holds one record per declared part.
 
-.. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void read_declared_parts(std::span<const PartDeclaration> declared, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
    Reads the published geometry back into ``record``; a member whose part the anatomy does not declare is left absent.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void write_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+
+.. cpp:function:: template <typename Record, std::size_t Count> void write_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+
+   The same mapping over one realized item's geometry and the anatomy's item parts.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> void read_states(const std::array<StateField<Record>, Count>& fields, const AnatomyStateSet& active, Record& record) noexcept
 
