@@ -160,8 +160,9 @@ the same copy. On X11 a new live frame becomes damage and retained painting
 composes it, with any overlay above it, in the same frame.
 
 `Window::presentation_availability()` reports what the attached host offers:
-the paint-contract version it meets (`paint_contract_version`; a host that
-cannot meet it fails to attach), whether it presents rectangle sets
-(`partial_present`) and the other optional extensions, and the live paint
-lease. `to_json()` serializes it, and the Windows host includes it in its
+the paint-contract version it meets (`paint_contract_version`, now 2; a host
+that cannot meet it fails to attach), the optional extensions, and the live
+paint lease. Since version 2 every host presents the rectangle set it paints,
+never their union; `partial_present` is reported true for readers of
+version 1. `to_json()` serializes it, and the Windows host includes it in its
 host diagnostics.

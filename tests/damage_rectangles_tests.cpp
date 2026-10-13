@@ -258,6 +258,15 @@ void availability_record_reports_the_declaration() {
         rejected = true;
     }
     expect(rejected, "a host below the paint contract fails attachment");
+    PresentationDeclaration without_rectangles;
+    without_rectangles.contract_version = paint_contract_version;
+    rejected = false;
+    try {
+        window.declare_presentation(without_rectangles);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    expect(rejected, "contract version 2 requires presenting rectangle sets");
     PresentationDeclaration declared;
     declared.contract_version = paint_contract_version;
     declared.extensions.partial_present = true;
@@ -270,7 +279,7 @@ void availability_record_reports_the_declaration() {
            "the record carries the declaration and the live lease");
     const std::string json = availability.to_json();
     expect(json.find("\"partial_present\":true") != std::string::npos &&
-               json.find("\"contract_version\":1") != std::string::npos,
+               json.find("\"contract_version\":2") != std::string::npos,
            "the record serializes for diagnostics");
 }
 

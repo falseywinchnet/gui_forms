@@ -84,11 +84,15 @@ struct PaintLeaseSnapshot final {
 // rendering may outpace presentation, with no unbounded queue and no
 // incomplete frame visible) is reported as a version, never as a capability:
 // a host that cannot meet it fails attachment. Only optional extensions are
-// reported as available or not, and only truthfully.
-inline constexpr std::uint32_t paint_contract_version = 1U;
+// reported as available or not, and only truthfully. Version 2 (2026-10-13)
+// adds damage-preserving partial present to the contract: the host presents
+// the bounded rectangle set it paints, not their union.
+inline constexpr std::uint32_t paint_contract_version = 2U;
 
 struct PresentationExtensions final {
     // The host copies a bounded rectangle set to the screen, not its union.
+    // Required since contract version 2, and reported for readers of
+    // version 1.
     bool partial_present{};
     // Completed private pixels reach the screen without a CPU copy.
     bool zero_copy_import{};

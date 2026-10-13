@@ -105,7 +105,10 @@ of `PAINT_PIPELINE_AVAILABILITY.md` "Acceptance" still pass. Record under
    profile presents rectangle sets correctly (unchanged pixels carried into
    the candidate, only the rectangles presented, the all-or-nothing swap
    kept). Until then it stays an optional extension, and
-   `PAINT_PIPELINE_AVAILABILITY.md` is amended when it changes.
+   `PAINT_PIPELINE_AVAILABILITY.md` is amended when it changes. Done
+   2026-10-13: the transactional profile (#73) and X11 (#76) present
+   rectangle sets, the document is amended, and `paint_contract_version` is 2;
+   a host that claims it without partial present cannot attach.
 4. **Measure before settling the copy cost.** The cost in question is a
    second copy of live frames, which scales with each frame's changed area.
    PlaySuite measures Stillwater, Mowing and Maze 95 before and after with

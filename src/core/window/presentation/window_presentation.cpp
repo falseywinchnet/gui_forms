@@ -461,6 +461,11 @@ void Window::declare_presentation(PresentationDeclaration declaration) {
         throw std::invalid_argument(
             "GUI.Forms host does not meet the paint contract and cannot attach");
     }
+    // Contract version 2 includes damage-preserving partial present.
+    if (declaration.contract_version >= 2U && !declaration.extensions.partial_present) {
+        throw std::invalid_argument(
+            "GUI.Forms paint contract 2 requires presenting rectangle sets");
+    }
     presentation_declaration_ = declaration;
 }
 
