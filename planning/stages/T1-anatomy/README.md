@@ -133,6 +133,13 @@ no longer needed. Record the coverage table and test run under `results/`.
 3. **The default-action cue is named `preselect`** (owner, 2026-10-13),
    as both the part role and the state: no part or state name reuses a C++
    keyword, and `default` is one.
+4. **Names are identities; state is dot members** (owner, 2026-10-13:
+   "names and ids: kebab operators. strictly objective ontological
+   participatory state items: dot operators"). Part, state and control
+   names and ids are kebab-case declarations that documents and tools
+   address. C++ never reads or sets a part, state or property by such a
+   name: it uses typed records with dot members
+   (`(*track).parts().thumb.bounds`, `(*button).states().preselect`).
 
 ## Read first
 
