@@ -22,6 +22,7 @@ using ShimScrollWindowEx = int(WINAPI*)(HWND, int, int, const RECT*,
 using ShimSendMessageW = LRESULT(WINAPI*)(HWND, UINT, WPARAM, LPARAM);
 using ShimSelectObject = HGDIOBJ(WINAPI*)(HDC, HGDIOBJ);
 using ShimDeleteObject = BOOL(WINAPI*)(HGDIOBJ);
+using ShimDeleteDC = BOOL(WINAPI*)(HDC);
 
 template <typename Function>
 Function entry(HMODULE module, const char* name) {
@@ -101,12 +102,14 @@ bool run_lifetime(const gf_api_v0& api, HMODULE shim, int lifetime,
         entry<ShimSelectObject>(shim, "SelectObject");
     const ShimDeleteObject delete_object =
         entry<ShimDeleteObject>(shim, "DeleteObject");
+    const ShimDeleteDC delete_dc = entry<ShimDeleteDC>(shim, "DeleteDC");
     const ShimScrollWindowEx scroll_window =
         entry<ShimScrollWindowEx>(shim, "ScrollWindowEx");
     const ShimSendMessageW send_message =
         entry<ShimSendMessageW>(shim, "SendMessageW");
     if (!get_dc || !release_dc || !bit_blt || !create_bitmap || !create_dc ||
-        !select_object || !delete_object || !scroll_window || !send_message) {
+        !select_object || !delete_object || !delete_dc || !scroll_window ||
+        !send_message) {
         std::fprintf(stderr, "shim-gate=failure|stage:exports\n");
         return false;
     }
@@ -275,7 +278,7 @@ cleanup:
         select_object(producer, producer_previous);
     }
     if (producer_bitmap != nullptr) delete_object(producer_bitmap);
-    if (producer != nullptr) DeleteDC(producer);
+    if (producer != nullptr) delete_dc(producer);
     if (endpoint_dc != nullptr) {
         release_dc(reinterpret_cast<HWND>(window_value), endpoint_dc);
     }
@@ -298,8 +301,9 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
         entry<ShimSelectObject>(shim, "SelectObject");
     const ShimDeleteObject delete_object =
         entry<ShimDeleteObject>(shim, "DeleteObject");
+    const ShimDeleteDC delete_dc = entry<ShimDeleteDC>(shim, "DeleteDC");
     if (!get_dc || !release_dc || !bit_blt || !create_bitmap || !create_dc ||
-        !select_object || !delete_object) return false;
+        !select_object || !delete_object || !delete_dc) return false;
 
     gf_handle control{};
     std::uint64_t endpoint{};
@@ -355,7 +359,7 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
         select_object(producer, producer_previous);
     }
     delete_object(producer_bitmap);
-    DeleteDC(producer);
+    delete_dc(producer);
     release_dc(reinterpret_cast<HWND>(window_value), endpoint_dc);
     gf_windows_paint_endpoint_release_v1(endpoint);
     api.dispose(control);
@@ -366,14 +370,51 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
     return true;
 }
 
+// GDI recycles DC handle values, and the shim keys its DC classification by
+// value. A module that does not import the shim may hand it a DC (classified
+// ordinary after the ABI declines it) and later destroy that DC with gdi32.
+// Repeat that cycle across the handle table so the endpoint DC acquired next
+// is likely to reuse a value the shim still records as ordinary. The shim's
+// GetDC must reclassify the endpoint DC regardless.
+bool seed_recycled_dc_classifications(HMODULE shim) {
+    const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
+    if (bit_blt == nullptr) return false;
+    constexpr int recycled_dc_count = 4096;
+    for (int index = 0; index < recycled_dc_count; ++index) {
+        HDC dc = CreateCompatibleDC(nullptr);
+        if (dc == nullptr) return false;
+        const BOOL copied = bit_blt(dc, 0, 0, 1, 1, dc, 0, 0, SRCCOPY);
+        DeleteDC(dc);
+        if (copied == FALSE) return false;
+    }
+    return true;
+}
+
+// Scrolls a 32-bit DIB down one row onto itself through the shim's BitBlt.
+// The bottom-up case uses an operating-system DIB section; the top-down case
+// uses the shim's compatible bitmap for a GUI.Forms endpoint DC, which the
+// shim creates as a tracked top-down DIB section. Windows reports a positive
+// biHeight for both orientations, so the case verifies the orientation it
+// fills before checking the overlapping copy.
 bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
+    const ShimGetDC get_dc = entry<ShimGetDC>(shim, "GetDC");
+    const ShimReleaseDC release_dc =
+        entry<ShimReleaseDC>(shim, "ReleaseDC");
     const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
     const ShimCreateCompatibleBitmap create_bitmap =
         entry<ShimCreateCompatibleBitmap>(
         shim, "CreateCompatibleBitmap");
     const ShimCreateCompatibleDC create_dc = entry<ShimCreateCompatibleDC>(
         shim, "CreateCompatibleDC");
-    if (bit_blt == nullptr || create_bitmap == nullptr || create_dc == nullptr) {
+    const ShimSelectObject select_object =
+        entry<ShimSelectObject>(shim, "SelectObject");
+    const ShimDeleteObject delete_object =
+        entry<ShimDeleteObject>(shim, "DeleteObject");
+    const ShimDeleteDC delete_dc = entry<ShimDeleteDC>(shim, "DeleteDC");
+    if (get_dc == nullptr || release_dc == nullptr || bit_blt == nullptr ||
+        create_bitmap == nullptr || create_dc == nullptr ||
+        select_object == nullptr || delete_object == nullptr ||
+        delete_dc == nullptr) {
         return false;
     }
 
@@ -386,125 +427,131 @@ bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
     info.bmiHeader.biPlanes = 1;
     info.bmiHeader.biBitCount = 32;
     info.bmiHeader.biCompression = BI_RGB;
+    const char* orientation = top_down ? "top-down" : "bottom-up";
     gf_handle endpoint_control{};
     std::uint64_t endpoint{};
     std::uintptr_t endpoint_window{};
-    std::uintptr_t endpoint_dc_value{};
-    HDC compatibility_dc{};
-    if (top_down &&
-        (api.control_create_kind(GF_CONTROL_CUSTOM,
-                                 text("shim.top-down.overlap"),
-                                 &endpoint_control) != GF_OK ||
-         gf_windows_paint_endpoint_acquire_v1(
-             endpoint_control, width, height, &endpoint,
-             &endpoint_window) != GF_OK ||
-         gf_windows_paint_endpoint_get_dc_v1(
-             endpoint_window, &endpoint_dc_value) != GF_OK)) {
-        if (endpoint != 0U) gf_windows_paint_endpoint_release_v1(endpoint);
-        if (endpoint_control.slot != 0U || endpoint_control.generation != 0U) {
-            api.dispose(endpoint_control);
-        }
-        return false;
-    }
-    compatibility_dc = reinterpret_cast<HDC>(endpoint_dc_value);
+    HDC endpoint_dc{};
     void* storage{};
-    HBITMAP bitmap = top_down
-        ? create_bitmap(compatibility_dc, width, height)
-        : CreateDIBSection(nullptr, &info, DIB_RGB_COLORS,
-                           &storage, nullptr, 0);
-    HDC dc = top_down ? create_dc(compatibility_dc)
-                      : CreateCompatibleDC(nullptr);
-    HGDIOBJ previous = dc != nullptr && bitmap != nullptr
-        ? SelectObject(dc, bitmap) : nullptr;
-    if (bitmap == nullptr || dc == nullptr || (!top_down && storage == nullptr) ||
-        previous == nullptr || previous == HGDI_ERROR) {
-        if (bitmap != nullptr) DeleteObject(bitmap);
-        if (dc != nullptr) DeleteDC(dc);
-        if (endpoint_dc_value != 0U) {
-            gf_windows_paint_endpoint_release_dc_v1(
-                endpoint_window, endpoint_dc_value);
+    HBITMAP bitmap{};
+    HDC dc{};
+    HGDIOBJ previous{};
+    DIBSECTION observed{};
+    std::uint32_t* pixels{};
+    COLORREF first_row{};
+    bool rows_match = false;
+
+    if (top_down) {
+        if (!seed_recycled_dc_classifications(shim)) {
+            std::fprintf(stderr,
+                         "shim-gate=failure|stage:dib-overlap-seed\n");
+            goto cleanup;
         }
-        if (endpoint != 0U) gf_windows_paint_endpoint_release_v1(endpoint);
-        if (endpoint_control.slot != 0U || endpoint_control.generation != 0U) {
-            api.dispose(endpoint_control);
+        if (api.control_create_kind(GF_CONTROL_CUSTOM,
+                                    text("shim.top-down.overlap"),
+                                    &endpoint_control) != GF_OK ||
+            gf_windows_paint_endpoint_acquire_v1(
+                endpoint_control, width, height, &endpoint,
+                &endpoint_window) != GF_OK) {
+            std::fprintf(stderr,
+                         "shim-gate=failure|stage:dib-overlap-acquire\n");
+            goto cleanup;
         }
-        return false;
+        // A consumer receives an endpoint DC only through the shim's GetDC
+        // or BeginPaint, which classify it as an endpoint. The ABI's own DC
+        // lookup would leave a recycled value's ordinary classification in
+        // place, and the shim would then create a bottom-up compatible bitmap.
+        endpoint_dc = get_dc(reinterpret_cast<HWND>(endpoint_window));
+        if (endpoint_dc == nullptr) {
+            std::fprintf(stderr,
+                         "shim-gate=failure|stage:dib-overlap-get-dc\n");
+            goto cleanup;
+        }
+        bitmap = create_bitmap(endpoint_dc, width, height);
+        dc = create_dc(endpoint_dc);
+    } else {
+        bitmap = CreateDIBSection(nullptr, &info, DIB_RGB_COLORS,
+                                  &storage, nullptr, 0);
+        dc = create_dc(nullptr);
+    }
+    if (bitmap == nullptr || dc == nullptr) {
+        std::fprintf(stderr,
+                     "shim-gate=failure|stage:dib-overlap-create|"
+                     "orientation:%s\n", orientation);
+        goto cleanup;
+    }
+    previous = select_object(dc, bitmap);
+    if (previous == nullptr || previous == HGDI_ERROR) {
+        previous = nullptr;
+        std::fprintf(stderr,
+                     "shim-gate=failure|stage:dib-overlap-select|"
+                     "orientation:%s\n", orientation);
+        goto cleanup;
+    }
+    if (GetObjectW(bitmap, sizeof(observed), &observed) <
+            static_cast<int>(sizeof(observed)) ||
+        observed.dsBm.bmBits == nullptr) {
+        std::fprintf(stderr,
+                     "shim-gate=failure|stage:dib-overlap-object|"
+                     "orientation:%s\n", orientation);
+        goto cleanup;
     }
 
-    DIBSECTION observed{};
-    const int observed_size = GetObjectW(bitmap, sizeof(observed), &observed);
-    if (observed_size < static_cast<int>(sizeof(observed))) {
-        SelectObject(dc, previous);
-        DeleteObject(bitmap);
-        DeleteDC(dc);
-        if (endpoint_dc_value != 0U) {
-            gf_windows_paint_endpoint_release_dc_v1(
-                endpoint_window, endpoint_dc_value);
-        }
-        if (endpoint != 0U) gf_windows_paint_endpoint_release_v1(endpoint);
-        if (endpoint_control.slot != 0U || endpoint_control.generation != 0U) {
-            api.dispose(endpoint_control);
-        }
-        return false;
-    }
-    if (top_down) storage = observed.dsBm.bmBits;
-    if (storage == nullptr) {
-        SelectObject(dc, previous);
-        DeleteObject(bitmap);
-        DeleteDC(dc);
-        gf_windows_paint_endpoint_release_dc_v1(
-            endpoint_window, endpoint_dc_value);
-        gf_windows_paint_endpoint_release_v1(endpoint);
-        api.dispose(endpoint_control);
-        return false;
-    }
-    std::uint32_t* pixels = static_cast<std::uint32_t*>(storage);
+    // Logical row y holds gray level y + 1 in every column.
+    pixels = static_cast<std::uint32_t*>(observed.dsBm.bmBits);
     for (int y = 0; y < height; ++y) {
+        const int storage_y = top_down ? y : height - 1 - y;
         for (int x = 0; x < width; ++x) {
-            const int storage_y = top_down ? y : height - 1 - y;
             pixels[storage_y * width + x] =
                 0xff000000U | static_cast<std::uint32_t>((y + 1) * 0x010101);
         }
     }
-    const bool copied = bit_blt(dc, 0, 1, width, height - 1,
-                                dc, 0, 0, SRCCOPY) != FALSE;
-    bool rows_match = copied;
+    first_row = GetPixel(dc, 0, 0);
+    if (first_row != RGB(1, 1, 1)) {
+        std::fprintf(stderr,
+                     "shim-gate=failure|stage:dib-orientation|"
+                     "orientation:%s|logical-row-0:%06lx\n",
+                     orientation, static_cast<unsigned long>(first_row));
+        goto cleanup;
+    }
+
+    rows_match = bit_blt(dc, 0, 1, width, height - 1,
+                         dc, 0, 0, SRCCOPY) != FALSE;
     for (int y = 1; y < height && rows_match; ++y) {
         const std::uint32_t expected =
             0xff000000U | static_cast<std::uint32_t>(y * 0x010101);
+        const int storage_y = top_down ? y : height - 1 - y;
         for (int x = 0; x < width; ++x) {
-            const int storage_y = top_down ? y : height - 1 - y;
-            if (pixels[storage_y * width + x] != expected) {
+            const std::uint32_t actual = pixels[storage_y * width + x];
+            if (actual != expected) {
                 std::fprintf(stderr,
                              "shim-gate=diagnostic|stage:dib-overlap|y:%d|"
                              "x:%d|actual:%08lx|expected:%08lx\n",
-                             y, x,
-                             static_cast<unsigned long>(
-                                 pixels[storage_y * width + x]),
+                             y, x, static_cast<unsigned long>(actual),
                              static_cast<unsigned long>(expected));
                 rows_match = false;
                 break;
             }
         }
     }
-    SelectObject(dc, previous);
-    DeleteObject(bitmap);
-    DeleteDC(dc);
-    if (endpoint_dc_value != 0U) {
-        gf_windows_paint_endpoint_release_dc_v1(
-            endpoint_window, endpoint_dc_value);
+    if (!rows_match) {
+        std::fprintf(stderr,
+                     "shim-gate=failure|stage:dib-overlap|orientation:%s\n",
+                     orientation);
+    }
+
+cleanup:
+    // Objects the shim created are destroyed through the shim so that it
+    // forgets their handle values before GDI recycles them.
+    if (previous != nullptr) select_object(dc, previous);
+    if (bitmap != nullptr) delete_object(bitmap);
+    if (dc != nullptr) delete_dc(dc);
+    if (endpoint_dc != nullptr) {
+        release_dc(reinterpret_cast<HWND>(endpoint_window), endpoint_dc);
     }
     if (endpoint != 0U) gf_windows_paint_endpoint_release_v1(endpoint);
     if (endpoint_control.slot != 0U || endpoint_control.generation != 0U) {
         api.dispose(endpoint_control);
-    }
-    if (!rows_match) {
-        std::fprintf(stderr,
-                     "shim-gate=failure|stage:dib-overlap|orientation:%s|"
-                     "bm-height:%ld|bi-height:%ld\n",
-                     top_down ? "top-down" : "bottom-up",
-                     static_cast<long>(observed.dsBm.bmHeight),
-                     static_cast<long>(observed.dsBmih.biHeight));
     }
     return rows_match;
 }

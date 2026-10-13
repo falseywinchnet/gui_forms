@@ -18,6 +18,11 @@ using EndEndpointWrite = int(__cdecl*)(std::uint64_t, std::uint32_t);
 
 std::mutex bitmap_orientation_mutex;
 std::unordered_set<HBITMAP> top_down_bitmaps;
+// DC classifications are keyed by handle value, and GDI recycles DC values.
+// A DC destroyed outside the shim leaves its classification behind, so a
+// recycled value may be recorded as ordinary although it is now an endpoint
+// DC. Consumers receive endpoint DCs only through GetDC or BeginPaint, which
+// reclassify the value before it is used.
 std::mutex endpoint_dc_mutex;
 std::unordered_set<HDC> endpoint_dcs;
 std::unordered_set<HDC> ordinary_dcs;
