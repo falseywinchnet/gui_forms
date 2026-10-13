@@ -304,6 +304,14 @@ public:
     // valid for renderer-neutral inspection; a native host must require it.
     std::optional<PaintReceipt> paint(
         Painter& painter, Rect requested_damage = {});
+    // Damage-preserving paint (stage DP): one lease and one receipt for a
+    // bounded set of rectangles, each painted under its own clip so pixels
+    // between them are untouched. Rectangles that overlap or nearly touch are
+    // merged first; more than DamageRegion::maximum_rectangles collapse to
+    // their bounds. An empty set paints the accumulated damage rectangles
+    // rather than their bounding box.
+    std::optional<PaintReceipt> paint(
+        Painter& painter, std::span<const Rect> requested_damage);
     // Preferred host release. Returns false for a duplicate, out-of-order, or
     // replaced-epoch receipt and never advances the presentation revision in
     // that case.
@@ -790,10 +798,16 @@ private:
     void collect_paint_checkpoints(
         const Control::Ptr& control, PaintControlCheckpointList& checkpoints);
     void abandon_paint(const PaintControlCheckpointList& checkpoints,
-                       std::uint64_t generation_before, Rect paint_bounds);
-    [[nodiscard]] Rect paint_plane_bounds(
-        std::size_t index, Rect requested_damage, Rect paint_bounds,
-        Rect window_bounds) const;
+                       std::uint64_t generation_before,
+                       std::span<const Rect> painted_rectangles);
+    // One paint pass over `rectangles` (window coordinates, disjoint after
+    // merging). With `explicit_request`, every plane paints each rectangle;
+    // otherwise each plane paints only where it holds damage.
+    std::optional<PaintReceipt> paint_rectangles(
+        Painter& painter, std::span<const Rect> rectangles,
+        bool explicit_request);
+    [[nodiscard]] Rect plane_paint_bounds(std::size_t index, Rect rectangle,
+                                          bool explicit_request) const;
     [[nodiscard]] bool has_popup_paint_dirty() const noexcept;
     [[nodiscard]] bool has_plane_damage() const noexcept;
     void collect_visible_overlay_rectangles(

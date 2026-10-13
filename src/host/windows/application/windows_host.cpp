@@ -2860,26 +2860,73 @@ public:
 
 private:
 
+    // The whole device pixels covering a logical rectangle, clipped to the
+    // client area.
+    [[nodiscard]] RECT device_rect(Rect logical) const noexcept {
+        RECT client{};
+        GetClientRect(hwnd_, &client);
+        const RECT device{
+            std::clamp<LONG>(static_cast<LONG>(std::floor(logical.x * scale_)),
+                             client.left, client.right),
+            std::clamp<LONG>(static_cast<LONG>(std::floor(logical.y * scale_)),
+                             client.top, client.bottom),
+            std::clamp<LONG>(static_cast<LONG>(std::ceil(
+                                 (logical.x + logical.width) * scale_)),
+                             client.left, client.right),
+            std::clamp<LONG>(static_cast<LONG>(std::ceil(
+                                 (logical.y + logical.height) * scale_)),
+                             client.top, client.bottom)};
+        return device;
+    }
+
+    [[nodiscard]] Rect logical_rect(const RECT& device) const noexcept {
+        const Rect logical{device.left / scale_, device.top / scale_,
+                           (device.right - device.left) / scale_,
+                           (device.bottom - device.top) / scale_};
+        return logical;
+    }
+
+    // Adds the window's update region to the pending damage rectangle by
+    // rectangle. It must run before BeginPaint, which validates the region.
+    // Windows exposes whole device pixels, so painting these rectangles
+    // restores the same pixel edges a native exposure needs. Returns false
+    // when the region cannot be read; the caller then falls back to rcPaint.
+    bool add_update_region_damage() {
+        HRGN region = CreateRectRgn(0, 0, 0, 0);
+        if (region == nullptr) return false;
+        bool added = false;
+        const int kind = GetUpdateRgn(hwnd_, region, FALSE);
+        if (kind == SIMPLEREGION || kind == COMPLEXREGION) {
+            const DWORD bytes = GetRegionData(region, 0, nullptr);
+            // RGNDATA needs DWORD alignment, so the buffer is held in DWORDs.
+            std::vector<DWORD> storage((bytes + sizeof(DWORD) - 1U) / sizeof(DWORD));
+            RGNDATA* data = reinterpret_cast<RGNDATA*>(storage.data());
+            if (bytes != 0U && GetRegionData(region, bytes, data) == bytes) {
+                const RECT* rectangles = reinterpret_cast<const RECT*>((*data).Buffer);
+                const DWORD count = (*data).rdh.nCount;
+                for (DWORD index = 0; index < count; ++index) {
+                    pending_damage_.add(logical_rect(rectangles[index]));
+                }
+                added = count != 0U;
+            }
+        } else if (kind == NULLREGION) {
+            added = true;
+        }
+        DeleteObject(region);
+        return added;
+    }
+
     void collect_damage() {
         static_cast<void>((*model_).poll_frame_schedule(FrameClock::now()));
         accessibility_.notify(scale_);
         DamageRegion damage = (*model_).take_damage();
-        if (!damage.empty()) {
-            const Rect bounds = damage.bounds();
-            pending_damage_.add(bounds);
-            RECT client{};
-            GetClientRect(hwnd_, &client);
-            RECT native_damage{
-                std::clamp<LONG>(static_cast<LONG>(std::floor(bounds.x * scale_)),
-                                 client.left, client.right),
-                std::clamp<LONG>(static_cast<LONG>(std::floor(bounds.y * scale_)),
-                                 client.top, client.bottom),
-                std::clamp<LONG>(static_cast<LONG>(std::ceil(
-                                     (bounds.x + bounds.width) * scale_)),
-                                 client.left, client.right),
-                std::clamp<LONG>(static_cast<LONG>(std::ceil(
-                                     (bounds.y + bounds.height) * scale_)),
-                                 client.top, client.bottom)};
+        // Each rectangle is invalidated on its own (stage DP): Windows keeps
+        // them as one update region, so distant changes do not repaint what
+        // lies between them.
+        const std::span<const Rect> rectangles = damage.rectangles();
+        for (std::size_t index = 0; index < rectangles.size(); ++index) {
+            pending_damage_.add(rectangles[index]);
+            const RECT native_damage = device_rect(rectangles[index]);
             if (native_damage.right > native_damage.left &&
                 native_damage.bottom > native_damage.top) {
                 InvalidateRect(hwnd_, &native_damage, FALSE);
@@ -2964,6 +3011,7 @@ private:
 
     void paint() {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+        const bool update_region_read = add_update_region_damage();
         PAINTSTRUCT paint_state{};
         HDC dc = BeginPaint(hwnd_, &paint_state);
         const PaintLeaseSnapshot before = (*model_).paint_lease_snapshot();
@@ -2976,11 +3024,9 @@ private:
         }
         const std::chrono::steady_clock::time_point started = std::chrono::steady_clock::now();
         // Windows exposes whole device pixels. Include its complete update
-        // bounds even when logical damage exists, so all drawing operations
+        // region even when logical damage exists, so all drawing operations
         // restore the same pixel edges and native exposures are not omitted.
-        pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
-            (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
-            (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
+        if (!update_region_read) pending_damage_.add(logical_rect(paint_state.rcPaint));
         std::optional<PaintReceipt> receipt{};
         bool presented = false;
         try {
@@ -2988,7 +3034,7 @@ private:
             if (begun) {
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
                 if (images_ready) {
-                    receipt = (*model_).paint(raster_, pending_damage_.bounds());
+                    receipt = (*model_).paint(raster_, pending_damage_.rectangles());
                     if (receipt) presented = raster_.commit_frame(dc, paint_state.rcPaint, *receipt);
                 }
             }
@@ -3026,20 +3072,30 @@ private:
         }
         collect_damage();
 #else
+        const bool update_region_read = add_update_region_damage();
         PAINTSTRUCT paint_state{};
         HDC dc = BeginPaint(hwnd_, &paint_state);
         const std::chrono::steady_clock::time_point started =
             std::chrono::steady_clock::now();
-        // Match the whole device pixels that BeginPaint will present. A
+        // Match the whole device pixels that the update region covers. A
         // narrower fractional clip can leave stripes from previous frames.
-        pending_damage_.add({paint_state.rcPaint.left / scale_, paint_state.rcPaint.top / scale_,
-                             (paint_state.rcPaint.right - paint_state.rcPaint.left) / scale_,
-                             (paint_state.rcPaint.bottom - paint_state.rcPaint.top) / scale_});
+        if (!update_region_read) pending_damage_.add(logical_rect(paint_state.rcPaint));
+        // Present exactly the rectangles painted: the raster keeps the last
+        // frame everywhere else, and the window already shows it there.
+        const std::span<const Rect> painted_rectangles = pending_damage_.rectangles();
+        std::vector<RECT> present_rectangles;
+        present_rectangles.reserve(painted_rectangles.size());
+        for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
+            present_rectangles.push_back(device_rect(painted_rectangles[index]));
+        }
         raster_.begin_frame();
         static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
         const std::optional<PaintReceipt> receipt =
-            (*model_).paint(raster_, pending_damage_.bounds());
-        const bool presented = receipt && raster_.present(dc, paint_state.rcPaint);
+            (*model_).paint(raster_, pending_damage_.rectangles());
+        bool presented = receipt.has_value();
+        for (std::size_t index = 0; presented && index < present_rectangles.size(); ++index) {
+            presented = raster_.present(dc, present_rectangles[index]);
+        }
         EndPaint(hwnd_, &paint_state);
         const std::chrono::nanoseconds elapsed =
             std::chrono::duration_cast<std::chrono::nanoseconds>(

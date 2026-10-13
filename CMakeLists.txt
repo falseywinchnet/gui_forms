@@ -2052,6 +2052,13 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_canvas_raster_tests PRIVATE
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_canvas_raster_tests COMMAND gui_forms_windows_canvas_raster_tests)
+        add_executable(gui_forms_windows_damage_rectangles_tests tests/windows_damage_rectangles_tests.cpp)
+        target_compile_definitions(gui_forms_windows_damage_rectangles_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_damage_rectangles_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_damage_rectangles_tests
+                 COMMAND gui_forms_windows_damage_rectangles_tests)
         add_executable(gui_forms_windows_text_tests tests/windows_text_tests.cpp)
         target_compile_definitions(gui_forms_windows_text_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -2112,6 +2119,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_damage_clip_tests COMMAND gui_forms_damage_clip_tests)
+
+    add_executable(gui_forms_damage_rectangles_tests tests/damage_rectangles_tests.cpp)
+    target_link_libraries(gui_forms_damage_rectangles_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_damage_rectangles_tests COMMAND gui_forms_damage_rectangles_tests)
 
     add_executable(gui_forms_binary_search_tests tests/binary_search_tests.cpp)
     target_link_libraries(gui_forms_binary_search_tests PRIVATE gui_forms_core)

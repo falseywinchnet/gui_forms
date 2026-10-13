@@ -24,10 +24,16 @@ tracked separately and can be consumed with `take_damage(plane)`, but this
 does not guarantee separate native surfaces or eliminate repainting beneath
 an overlay.
 
-`Window::paint` accepts one requested rectangle. With no explicit rectangle,
-it uses the bounding rectangle of accumulated damage (and bounds per plane),
-so gaps between damaged rectangles can also be repainted. Preserving sparse
-regions through painting remains open work.
+`Window::paint` takes either one rectangle or a set of rectangles. Given a
+set, one paint pass paints each rectangle under its own clip, so pixels
+between distant changes are left alone; rectangles that overlap or lie
+within two logical units of each other are merged first, and an empty set
+paints the accumulated damage rectangles. Given one rectangle, or none, it
+paints that rectangle or the bounding rectangle of accumulated damage, as
+before. The Windows host invalidates each damage rectangle separately, reads
+the update region rectangle by rectangle, paints that set and copies each
+rectangle to the window. The macOS and X11 hosts still paint the bounding
+rectangle.
 
 ## Display chunks
 
@@ -122,10 +128,13 @@ host's native order so a producer can avoid a conversion.
 
 `MetricsSnapshot` carries `paint_passes`, `controls_painted`,
 `paint_invalidations_consumed`, `requested_damage_area`,
-`painted_damage_area`, `full_window_paints`, `partial_paints`,
+`painted_damage_area`, `paint_bounding_area`, `damage_rectangles_painted`,
+`full_window_paints`, `partial_paints`,
 `frames_presented`, `present_duration_nanoseconds`,
 `worst_present_duration_nanoseconds`, `renderer_name` and `cpu_only`. A
 healthy interaction shows `partial_paints` climbing while
 `full_window_paints` stays at the resize count, and `painted_damage_area`
-close to `requested_damage_area`. `cpu_only` is always true; the field exists
-so that a snapshot states it.
+close to `requested_damage_area`. A sparse frame shows `painted_damage_area`
+well below `paint_bounding_area`, the summed bounding box of each pass's
+painted rectangles. `cpu_only` is always true; the field exists so that a
+snapshot states it.

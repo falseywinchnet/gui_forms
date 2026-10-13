@@ -8,7 +8,10 @@
 #include "../popup/popup_attachment.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
+#include <cstddef>
+#include <span>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -60,7 +63,7 @@ void Window::collect_paint_checkpoints(
 
 void Window::abandon_paint(
     const PaintControlCheckpointList& checkpoints,
-    std::uint64_t generation_before, Rect paint_bounds) {
+    std::uint64_t generation_before, std::span<const Rect> painted_rectangles) {
     for (const PaintControlCheckpoint& checkpoint : checkpoints) {
         if (!checkpoint.control || !(*checkpoint.control).is_alive()) continue;
         (*checkpoint.control).display_chunk_ = checkpoint.chunk;
@@ -70,7 +73,9 @@ void Window::abandon_paint(
         static_cast<void>(recompute_subtree_dirty(root_));
     }
     display_generation_ = generation_before;
-    add_damage_all_planes(paint_bounds);
+    for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
+        add_damage_all_planes(painted_rectangles[index]);
+    }
     paint_dirty_ = true;
     dirty_after_render_ = true;
     in_paint_ = false;
@@ -84,11 +89,11 @@ void Window::abandon_paint(
     }
 }
 
-Rect Window::paint_plane_bounds(std::size_t index, Rect requested_damage,
-                                Rect paint_bounds,
-                                Rect window_bounds) const {
-    if (!requested_damage.empty()) return paint_bounds;
-    return Rect::intersection(plane_damage_[index].bounds(), window_bounds);
+Rect Window::plane_paint_bounds(std::size_t index, Rect rectangle,
+                                bool explicit_request) const {
+    if (explicit_request) return rectangle;
+    const Rect plane = Rect::intersection(plane_damage_[index].bounds(), rectangle);
+    return plane;
 }
 
 bool Window::has_popup_paint_dirty() const noexcept {
@@ -108,8 +113,95 @@ bool Window::has_plane_damage() const noexcept {
     return false;
 }
 
+namespace {
+
+// Rectangles closer than this, in logical units, paint as one: replaying a
+// hairline gap costs less than replaying the chunks that straddle it twice.
+constexpr double damage_merge_distance = 2.0;
+
+bool nearly_touch(Rect left, Rect right) noexcept {
+    const Rect grown{left.x - damage_merge_distance, left.y - damage_merge_distance,
+                     left.width + damage_merge_distance * 2.0,
+                     left.height + damage_merge_distance * 2.0};
+    const bool touching = !Rect::intersection(grown, right).empty();
+    return touching;
+}
+
+// Clips `input` to `window_bounds`, merges rectangles that overlap or nearly
+// touch until none do, and fills `merged`. A set larger than the damage
+// region's capacity collapses to its bounds, as DamageRegion does.
+void merge_paint_rectangles(std::span<const Rect> input, Rect window_bounds,
+                            std::vector<Rect>& merged) {
+    merged.clear();
+    merged.reserve(input.size());
+    for (std::size_t index = 0; index < input.size(); ++index) {
+        const Rect clipped = Rect::intersection(input[index], window_bounds);
+        if (!clipped.empty()) merged.push_back(clipped);
+    }
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (std::size_t first = 0; first < merged.size() && !changed; ++first) {
+            for (std::size_t second = first + 1U; second < merged.size(); ++second) {
+                if (!nearly_touch(merged[first], merged[second])) continue;
+                merged[first] = Rect::united(merged[first], merged[second]);
+                merged.erase(merged.begin() + static_cast<std::ptrdiff_t>(second));
+                changed = true;
+                break;
+            }
+        }
+    }
+    if (merged.size() > DamageRegion::maximum_rectangles) {
+        Rect bounds = merged.front();
+        for (std::size_t index = 1; index < merged.size(); ++index) {
+            bounds = Rect::united(bounds, merged[index]);
+        }
+        merged.clear();
+        merged.push_back(bounds);
+    }
+}
+
+bool covered_by(Rect pending, std::span<const Rect> painted) noexcept {
+    for (std::size_t index = 0; index < painted.size(); ++index) {
+        if (painted[index].contains(pending)) return true;
+    }
+    return false;
+}
+
+} // namespace
+
 std::optional<PaintReceipt> Window::paint(Painter& painter,
                                           Rect requested_damage) {
+    // One rectangle: the request, or else the bounds of all damage.
+    if (!requested_damage.empty()) {
+        const std::array<Rect, 1> request{requested_damage};
+        return paint_rectangles(painter, request, true);
+    }
+    DamageRegion aggregate;
+    for (const DamageRegion& plane : plane_damage_) {
+        for (const Rect rect : plane.rectangles()) {
+            aggregate.add(rect);
+        }
+    }
+    const std::array<Rect, 1> bounds{aggregate.bounds()};
+    return paint_rectangles(painter, bounds, false);
+}
+
+std::optional<PaintReceipt> Window::paint(Painter& painter,
+                                          std::span<const Rect> requested_damage) {
+    if (!requested_damage.empty()) {
+        return paint_rectangles(painter, requested_damage, true);
+    }
+    std::vector<Rect> pending;
+    for (const DamageRegion& plane : plane_damage_) {
+        const std::span<const Rect> rectangles = plane.rectangles();
+        pending.insert(pending.end(), rectangles.begin(), rectangles.end());
+    }
+    return paint_rectangles(painter, pending, false);
+}
+
+std::optional<PaintReceipt> Window::paint_rectangles(
+    Painter& painter, std::span<const Rect> rectangles, bool explicit_request) {
     require_ui_thread("paint");
     if (in_paint_) {
         // Refresh/Update/native paint recursion requests a later pass. It must
@@ -132,20 +224,17 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         return std::nullopt;
     }
 
-    Rect paint_bounds = requested_damage;
-    if (paint_bounds.empty()) {
-        DamageRegion aggregate;
-        for (const DamageRegion& plane : plane_damage_) {
-            for (const Rect rect : plane.rectangles()) {
-                aggregate.add(rect);
-            }
-        }
-        paint_bounds = aggregate.bounds();
-    }
     const Rect window_bounds{0.0, 0.0, client_size_.width, client_size_.height};
-    paint_bounds = Rect::intersection(paint_bounds, window_bounds);
-    if (paint_bounds.empty()) {
+    std::vector<Rect> painted;
+    merge_paint_rectangles(rectangles, window_bounds, painted);
+    if (painted.empty()) {
         return std::nullopt;
+    }
+    Rect paint_bounds = painted.front();
+    double painted_area = 0.0;
+    for (std::size_t index = 0; index < painted.size(); ++index) {
+        paint_bounds = Rect::united(paint_bounds, painted[index]);
+        painted_area += painted[index].area();
     }
 
     PaintControlCheckpointList checkpoints;
@@ -176,20 +265,22 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // its application root is a transparent layout container. Replaying
         // only children cannot erase pixels formerly occupied by an overlay
         // in the gaps between those children. Resolve the immutable Window
-        // recipe in full-window coordinates, then clip it to this transaction
-        // so partial gradient repainting never shifts its authored geometry.
+        // recipe in full-window coordinates, then clip it to each painted
+        // rectangle so partial gradient repainting never shifts its authored
+        // geometry.
         ControlVisualContext backplane_context;
         backplane_context.surface = active_
             ? ControlSurfaceState::normal
             : ControlSurfaceState::deactivated;
         backplane_context.high_contrast = presentation_settings_.high_contrast;
-        candidate.save();
-        candidate.clip_rect(paint_bounds);
-        paint_surface_material(
-            candidate, window_bounds,
-            (*theme_).resolve(ControlVisualRole::window,
-                            backplane_context).material);
-        candidate.restore();
+        const SurfaceMaterial& backplane =
+            (*theme_).resolve(ControlVisualRole::window, backplane_context).material;
+        for (std::size_t index = 0; index < painted.size(); ++index) {
+            candidate.save();
+            candidate.clip_rect(painted[index]);
+            paint_surface_material(candidate, window_bounds, backplane);
+            candidate.restore();
+        }
         std::vector<Control::Ptr> popup_roots;
         popup_roots.reserve(popups_.size());
         for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) popup_roots.push_back((*popup).popup());
@@ -197,14 +288,19 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // popup root. A popup is one composited retained surface; interleaving
         // its backplane with later application planes lets ordinary content
         // paint over the popup and leaves only overlay-plane pixels visible.
+        // Painted rectangles are disjoint, so each is a separate clip; a
+        // chunk that touches several is replayed once per rectangle and
+        // rebuilt at most once.
         for (std::size_t index = 0; index < paint_plane_count; ++index) {
-            const Rect plane_bounds = Window::paint_plane_bounds(
-                index, requested_damage, paint_bounds, window_bounds);
-            if (plane_bounds.empty()) continue;
             const PaintPlane plane = static_cast<PaintPlane>(index);
-            paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes,
-                            painted_controls, consumed_invalidations, chunks_rebuilt,
-                            chunks_reused, commands_replayed);
+            for (std::size_t rectangle = 0; rectangle < painted.size(); ++rectangle) {
+                const Rect plane_bounds =
+                    plane_paint_bounds(index, painted[rectangle], explicit_request);
+                if (plane_bounds.empty()) continue;
+                paint_recursive(root_, candidate, plane_bounds, plane, visited_nodes,
+                                painted_controls, consumed_invalidations, chunks_rebuilt,
+                                chunks_reused, commands_replayed);
+            }
         }
         // Window-owned popup roots are composited after all application
         // content, in opening order and independently of consumer layout.
@@ -213,10 +309,11 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
                 continue;
             }
             for (std::size_t index = 0; index < paint_plane_count; ++index) {
-                const Rect plane_bounds = Window::paint_plane_bounds(
-                    index, requested_damage, paint_bounds, window_bounds);
-                if (!plane_bounds.empty()) {
-                    const PaintPlane plane = static_cast<PaintPlane>(index);
+                const PaintPlane plane = static_cast<PaintPlane>(index);
+                for (std::size_t rectangle = 0; rectangle < painted.size(); ++rectangle) {
+                    const Rect plane_bounds =
+                        plane_paint_bounds(index, painted[rectangle], explicit_request);
+                    if (plane_bounds.empty()) continue;
                     paint_recursive(overlay, candidate, plane_bounds, plane,
                                     visited_nodes, painted_controls,
                                     consumed_invalidations, chunks_rebuilt,
@@ -228,7 +325,7 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
             candidate.finish(
             display_generation_, PaintPlane::control, window_bounds);
         if (lease_epoch != surface_epoch_ || !(*root_).is_alive()) {
-            abandon_paint(checkpoints, generation_before, paint_bounds);
+            abandon_paint(checkpoints, generation_before, painted);
             return std::nullopt;
         }
         static_cast<void>(detail::replay_display_chunk(*transaction, painter));
@@ -237,11 +334,11 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
         // invalidates the candidate even though every draw command returned.
         // The host receives no receipt and therefore cannot publish it.
         if (lease_epoch != surface_epoch_ || !(*root_).is_alive()) {
-            abandon_paint(checkpoints, generation_before, paint_bounds);
+            abandon_paint(checkpoints, generation_before, painted);
             return std::nullopt;
         }
     } catch (...) {
-        abandon_paint(checkpoints, generation_before, paint_bounds);
+        abandon_paint(checkpoints, generation_before, painted);
         throw;
     }
 
@@ -250,29 +347,28 @@ std::optional<PaintReceipt> Window::paint(Painter& painter,
     rendered_revision_ = lease_revision;
 
     // Damage that arrived while callbacks were running belongs to the next
-    // revision. Never consume it as though it were part of this lease.
+    // revision. Never consume it as though it were part of this lease. A
+    // plane's damage is consumed only when a painted rectangle covers each
+    // of its pending rectangles.
     const bool changed_while_rendering =
         dirty_after_render_ || content_revision_ != lease_revision;
     if (!changed_while_rendering) {
         for (std::size_t index = 0; index < paint_plane_count; ++index) {
-            Rect plane_bounds = paint_bounds;
-            if (requested_damage.empty()) {
-                plane_bounds = Rect::intersection(plane_damage_[index].bounds(),
-                                                  window_bounds);
+            const std::span<const Rect> pending = plane_damage_[index].rectangles();
+            bool covered = true;
+            for (std::size_t rectangle = 0; rectangle < pending.size(); ++rectangle) {
+                const Rect visible = Rect::intersection(pending[rectangle], window_bounds);
+                if (!visible.empty() && !covered_by(visible, painted)) covered = false;
             }
-            const Rect pending_bounds =
-                Rect::intersection(plane_damage_[index].bounds(), window_bounds);
-            if (pending_bounds.empty() ||
-                Rect::intersection(plane_bounds, pending_bounds) == pending_bounds) {
-                plane_damage_[index].clear();
-            }
+            if (covered) plane_damage_[index].clear();
         }
     }
 
-    const bool full_window = paint_bounds.area() >= window_bounds.area();
+    const bool full_window = painted_area >= window_bounds.area();
     metrics_.record_paint(visited_nodes, painted_controls, consumed_invalidations,
                           chunks_rebuilt, chunks_reused, commands_replayed,
-                          paint_bounds.area(), full_window);
+                          painted_area, paint_bounds.area(),
+                          static_cast<std::uint64_t>(painted.size()), full_window);
     update_display_cache_metrics();
 
     const bool popup_paint_dirty = has_popup_paint_dirty();

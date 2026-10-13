@@ -48,6 +48,8 @@ std::string MetricsSnapshot::to_json() const {
            << "\"display_generation\":" << display_generation << ','
            << "\"requested_damage_area\":" << requested_damage_area << ','
            << "\"painted_damage_area\":" << painted_damage_area << ','
+           << "\"paint_bounding_area\":" << paint_bounding_area << ','
+           << "\"damage_rectangles_painted\":" << damage_rectangles_painted << ','
            << "\"full_window_paints\":" << full_window_paints << ','
            << "\"partial_paints\":" << partial_paints << ','
            << "\"input_events\":" << input_events << ','

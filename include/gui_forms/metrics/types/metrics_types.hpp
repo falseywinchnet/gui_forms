@@ -27,6 +27,11 @@ struct MetricsSnapshot {
     std::uint64_t display_generation{};
     double requested_damage_area{};
     double painted_damage_area{};
+    // The summed bounding box of each pass's painted rectangles. A sparse
+    // frame paints far less than its bounding box; equal values mean the
+    // rectangles were adjacent or the host requested one box.
+    double paint_bounding_area{};
+    std::uint64_t damage_rectangles_painted{};
     std::uint64_t full_window_paints{};
     std::uint64_t partial_paints{};
     std::uint64_t input_events{};

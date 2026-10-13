@@ -2,8 +2,8 @@
 
 Release: 0.4 Flexible. Depends on: nothing; it can start now. It matters
 more once the engine (T2) animates small parts such as a cursor sheen or an
-ambient progress fill. Status 2026-10-12: planned in the paint-pipeline
-records, not started. Authority: the "Damage-preserving painting" and
+ambient progress fill. Status 2026-10-13: started on `claude/dp-damage-rectangles`
+(core rectangle-set paint and the Windows host; macOS and X11 next). Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage

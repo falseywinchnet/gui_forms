@@ -66,7 +66,8 @@ void Metrics::record_paint(std::uint64_t nodes_visited,
                            std::uint64_t chunks_rebuilt,
                            std::uint64_t chunks_reused,
                            std::uint64_t commands_replayed,
-                           double area, bool full_window) noexcept {
+                           double area, double bounding_area,
+                           std::uint64_t rectangles, bool full_window) noexcept {
     ++values_.paint_passes;
     values_.paint_nodes_visited += nodes_visited;
     values_.controls_painted += controls;
@@ -75,6 +76,8 @@ void Metrics::record_paint(std::uint64_t nodes_visited,
     values_.display_chunks_reused += chunks_reused;
     values_.display_commands_replayed += commands_replayed;
     values_.painted_damage_area += area;
+    values_.paint_bounding_area += bounding_area;
+    values_.damage_rectangles_painted += rectangles;
     ++(full_window ? values_.full_window_paints : values_.partial_paints);
 }
 void Metrics::set_display_cache(std::uint64_t entries,
