@@ -76,7 +76,7 @@ void ScaledGroupBox::arrange(Rect final_bounds) {
 namespace {
 
 constexpr ControlAnatomy scaled_group_box_anatomy{
-    .control_id = "scaled-group-box",
+    .control_id = "scaled_group_box",
     .parts = group_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

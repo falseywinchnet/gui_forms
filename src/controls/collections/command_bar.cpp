@@ -260,7 +260,7 @@ namespace {
 
 // Its members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy command_bar_anatomy{
-    .control_id = "command-bar",
+    .control_id = "command_bar",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

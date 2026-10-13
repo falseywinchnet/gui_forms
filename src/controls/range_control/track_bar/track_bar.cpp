@@ -99,7 +99,7 @@ constexpr std::array<AnatomyState, 7> track_bar_states =
     state_declarations(track_bar_state_fields);
 
 constexpr ControlAnatomy track_bar_anatomy{
-    .control_id = "track-bar",
+    .control_id = "track_bar",
     .parts = track_bar_parts,
     .states = track_bar_states,
     .custom_states = {},

@@ -178,7 +178,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
             *this, &ButtonBase::should_serialize_image)});
 
     PropertyDescriptor content_padding;
-    content_padding.name = "content-padding";
+    content_padding.name = "content_padding";
     content_padding.kind = BindingValueKind::insets;
     content_padding.category = "Layout";
     content_padding.description =
@@ -773,7 +773,7 @@ constexpr std::array<AnatomyState, 9> button_base_states =
     state_declarations(button_base_state_fields);
 
 constexpr ControlAnatomy button_base_anatomy{
-    .control_id = "button-base",
+    .control_id = "button_base",
     .parts = button_base_parts,
     .states = button_base_states,
     .custom_states = {},
@@ -1038,9 +1038,9 @@ namespace {
 
 // The events ButtonBase adds to those of Control, in declaration order.
 constexpr std::array<InteractionDeclaration, 3> button_base_interactions{{
-    {.name = "expanded-changed", .payload = "std::optional<bool>", .mutable_payload = false},
+    {.name = "expanded_changed", .payload = "std::optional<bool>", .mutable_payload = false},
     {.name = "clicked", .payload = "ButtonBase", .mutable_payload = true},
-    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
 }};
 
 } // namespace

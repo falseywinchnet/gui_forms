@@ -90,7 +90,7 @@ constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_
      .member = &DropDownButton::Parts::icon},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &DropDownButton::Parts::label},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = {},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = {},
                      .states = drop_down_segment_states},
      .member = &DropDownButton::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
@@ -121,7 +121,7 @@ constexpr std::array<AnatomyState, 11> drop_down_button_states =
     state_declarations(drop_down_button_state_fields);
 
 constexpr ControlAnatomy drop_down_button_anatomy{
-    .control_id = "drop-down-button",
+    .control_id = "drop_down_button",
     .parts = drop_down_button_parts,
     .states = drop_down_button_states,
     .custom_states = {},
@@ -303,8 +303,8 @@ namespace {
 
 // The events DropDownButton adds to those of Button, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> drop_down_button_interactions{{
-    {.name = "drop-down-requested", .payload = "DropDownButton", .mutable_payload = true},
-    {.name = "drop-down-close-requested", .payload = "DropDownButton", .mutable_payload = true},
+    {.name = "drop_down_requested", .payload = "DropDownButton", .mutable_payload = true},
+    {.name = "drop_down_close_requested", .payload = "DropDownButton", .mutable_payload = true},
 }};
 
 } // namespace

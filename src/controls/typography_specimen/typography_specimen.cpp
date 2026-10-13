@@ -246,7 +246,7 @@ constexpr std::array<AnatomyState, 5> typography_specimen_states =
     state_declarations(typography_specimen_state_fields);
 
 constexpr ControlAnatomy typography_specimen_anatomy{
-    .control_id = "typography-specimen",
+    .control_id = "typography_specimen",
     .parts = typography_specimen_parts,
     .states = typography_specimen_states,
     .custom_states = {},

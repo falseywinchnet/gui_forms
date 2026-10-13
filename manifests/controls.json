@@ -8,7 +8,7 @@
   ],
   "controls": [
     {
-      "id": "button-base",
+      "id": "button_base",
       "type": "ButtonBase",
       "header": "gui_forms/controls/button_base/button_base.hpp",
       "category": "Commands",
@@ -30,7 +30,7 @@
       "doc": "api/generated/gui_forms.Button.rst"
     },
     {
-      "id": "drop-down-button",
+      "id": "drop_down_button",
       "type": "DropDownButton",
       "header": "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp",
       "category": "Commands",
@@ -41,7 +41,7 @@
       "doc": "api/generated/gui_forms.DropDownButton.rst"
     },
     {
-      "id": "link-label",
+      "id": "link_label",
       "type": "LinkLabel",
       "header": "gui_forms/controls/button_base/link_label/link_label.hpp",
       "category": "Commands",
@@ -52,7 +52,7 @@
       "doc": "api/generated/gui_forms.LinkLabel.rst"
     },
     {
-      "id": "command-bar",
+      "id": "command_bar",
       "type": "CommandBar",
       "header": "gui_forms/controls/collections/command_bar.hpp",
       "category": "Commands",
@@ -63,7 +63,7 @@
       "doc": "api/generated/gui_forms.CommandBar.rst"
     },
     {
-      "id": "text-box",
+      "id": "text_box",
       "type": "TextBox",
       "header": "gui_forms/controls/panel/text_box/text_box.hpp",
       "category": "Text editing",
@@ -85,7 +85,7 @@
       "doc": "api/generated/gui_forms.Label.rst"
     },
     {
-      "id": "picture-box",
+      "id": "picture_box",
       "type": "PictureBox",
       "header": "gui_forms/controls/panel/picture_box/picture_box.hpp",
       "category": "Information display",
@@ -96,7 +96,7 @@
       "doc": "api/generated/gui_forms.PictureBox.rst"
     },
     {
-      "id": "progress-bar",
+      "id": "progress_bar",
       "type": "ProgressBar",
       "header": "gui_forms/controls/range_control/progress_bar/progress_bar.hpp",
       "category": "Information display",
@@ -107,7 +107,7 @@
       "doc": "api/generated/gui_forms.ProgressBar.rst"
     },
     {
-      "id": "review-card",
+      "id": "review_card",
       "type": "ReviewCard",
       "header": "gui_forms/controls/panel/card/review_card/review_card.hpp",
       "category": "Information display",
@@ -118,7 +118,7 @@
       "doc": "api/generated/gui_forms.ReviewCard.rst"
     },
     {
-      "id": "list-box",
+      "id": "list_box",
       "type": "ListBox",
       "header": "gui_forms/controls/panel/list_box/list_box.hpp",
       "category": "Selection from a list",
@@ -129,7 +129,7 @@
       "doc": "api/generated/gui_forms.ListBox.rst"
     },
     {
-      "id": "checked-list-box",
+      "id": "checked_list_box",
       "type": "CheckedListBox",
       "header": "gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp",
       "category": "Selection from a list",
@@ -140,7 +140,7 @@
       "doc": "api/generated/gui_forms.CheckedListBox.rst"
     },
     {
-      "id": "combo-box",
+      "id": "combo_box",
       "type": "ComboBox",
       "header": "gui_forms/controls/panel/combo_box/combo_box.hpp",
       "category": "Selection from a list",
@@ -151,7 +151,7 @@
       "doc": "api/generated/gui_forms.ComboBox.rst"
     },
     {
-      "id": "tree-view",
+      "id": "tree_view",
       "type": "TreeView",
       "header": "gui_forms/controls/panel/tree_view/tree_view.hpp",
       "category": "Selection from a list",
@@ -162,7 +162,7 @@
       "doc": "api/generated/gui_forms.TreeView.rst"
     },
     {
-      "id": "object-view",
+      "id": "object_view",
       "type": "ObjectView",
       "header": "gui_forms/controls/panel/object_view/object_view.hpp",
       "category": "Selection from a list",
@@ -173,7 +173,7 @@
       "doc": "api/generated/gui_forms.ObjectView.rst"
     },
     {
-      "id": "correspondence-view",
+      "id": "correspondence_view",
       "type": "CorrespondenceView",
       "header": "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
       "category": "Selection from a list",
@@ -184,7 +184,7 @@
       "doc": "api/generated/gui_forms.CorrespondenceView.rst"
     },
     {
-      "id": "choice-group",
+      "id": "choice_group",
       "type": "ChoiceGroup",
       "header": "gui_forms/controls/collections/choice_group.hpp",
       "category": "Selection from a list",
@@ -195,7 +195,7 @@
       "doc": "api/generated/gui_forms.ChoiceGroup.rst"
     },
     {
-      "id": "breadcrumb-trail",
+      "id": "breadcrumb_trail",
       "type": "BreadcrumbTrail",
       "header": "gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp",
       "category": "Selection from a list",
@@ -206,7 +206,7 @@
       "doc": "api/generated/gui_forms.BreadcrumbTrail.rst"
     },
     {
-      "id": "check-box",
+      "id": "check_box",
       "type": "CheckBox",
       "header": "gui_forms/controls/button_base/check_box/check_box.hpp",
       "category": "Value setting",
@@ -217,7 +217,7 @@
       "doc": "api/generated/gui_forms.CheckBox.rst"
     },
     {
-      "id": "radio-button",
+      "id": "radio_button",
       "type": "RadioButton",
       "header": "gui_forms/controls/button_base/radio_button/radio_button.hpp",
       "category": "Value setting",
@@ -228,7 +228,7 @@
       "doc": "api/generated/gui_forms.RadioButton.rst"
     },
     {
-      "id": "range-control",
+      "id": "range_control",
       "type": "RangeControl",
       "header": "gui_forms/controls/range_control/range_control.hpp",
       "category": "Value setting",
@@ -239,7 +239,7 @@
       "doc": "api/generated/gui_forms.RangeControl.rst"
     },
     {
-      "id": "track-bar",
+      "id": "track_bar",
       "type": "TrackBar",
       "header": "gui_forms/controls/range_control/track_bar/track_bar.hpp",
       "category": "Value setting",
@@ -250,7 +250,7 @@
       "doc": "api/generated/gui_forms.TrackBar.rst"
     },
     {
-      "id": "numeric-up-down",
+      "id": "numeric_up_down",
       "type": "NumericUpDown",
       "header": "gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp",
       "category": "Value setting",
@@ -261,7 +261,7 @@
       "doc": "api/generated/gui_forms.NumericUpDown.rst"
     },
     {
-      "id": "color-value-editor",
+      "id": "color_value_editor",
       "type": "ColorValueEditor",
       "header": "gui_forms/controls/panel/color_value_editor/color_value_editor.hpp",
       "category": "Value setting",
@@ -272,7 +272,7 @@
       "doc": "api/generated/gui_forms.ColorValueEditor.rst"
     },
     {
-      "id": "flags-value-editor",
+      "id": "flags_value_editor",
       "type": "FlagsValueEditor",
       "header": "gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp",
       "category": "Value setting",
@@ -283,7 +283,7 @@
       "doc": "api/generated/gui_forms.FlagsValueEditor.rst"
     },
     {
-      "id": "property-grid",
+      "id": "property_grid",
       "type": "PropertyGrid",
       "header": "gui_forms/controls/panel/property_grid/property_grid.hpp",
       "category": "Value setting",
@@ -294,7 +294,7 @@
       "doc": "api/generated/gui_forms.PropertyGrid.rst"
     },
     {
-      "id": "property-list",
+      "id": "property_list",
       "type": "PropertyList",
       "header": "gui_forms/controls/panel/property_list/property_list.hpp",
       "category": "Value setting",
@@ -305,7 +305,7 @@
       "doc": "api/generated/gui_forms.PropertyList.rst"
     },
     {
-      "id": "instrument-rack",
+      "id": "instrument_rack",
       "type": "InstrumentRack",
       "header": "gui_forms/controls/panel/instrument_rack/instrument_rack.hpp",
       "category": "Value setting",
@@ -316,7 +316,7 @@
       "doc": "api/generated/gui_forms.InstrumentRack.rst"
     },
     {
-      "id": "date-time-picker",
+      "id": "date_time_picker",
       "type": "DateTimePicker",
       "header": "gui_forms/controls/panel/date_time_picker/date_time_picker.hpp",
       "category": "Date setting",
@@ -338,7 +338,7 @@
       "doc": "api/generated/gui_forms.Panel.rst"
     },
     {
-      "id": "group-box",
+      "id": "group_box",
       "type": "GroupBox",
       "header": "gui_forms/controls/panel/group_box/group_box.hpp",
       "category": "Grouping",
@@ -349,7 +349,7 @@
       "doc": "api/generated/gui_forms.GroupBox.rst"
     },
     {
-      "id": "scaled-group-box",
+      "id": "scaled_group_box",
       "type": "ScaledGroupBox",
       "header": "gui_forms/controls/panel/group_box/scaled_group_box/scaled_group_box.hpp",
       "category": "Grouping",
@@ -360,7 +360,7 @@
       "doc": "api/generated/gui_forms.ScaledGroupBox.rst"
     },
     {
-      "id": "material-panel",
+      "id": "material_panel",
       "type": "MaterialPanel",
       "header": "gui_forms/controls/panel/material_panel/material_panel.hpp",
       "category": "Grouping",
@@ -382,7 +382,7 @@
       "doc": "api/generated/gui_forms.Card.rst"
     },
     {
-      "id": "expandable-sections",
+      "id": "expandable_sections",
       "type": "ExpandableSections",
       "header": "gui_forms/controls/collections/expandable_sections.hpp",
       "category": "Grouping",
@@ -393,7 +393,7 @@
       "doc": "api/generated/gui_forms.ExpandableSections.rst"
     },
     {
-      "id": "container-control",
+      "id": "container_control",
       "type": "ContainerControl",
       "header": "gui_forms/controls/scrollable_control/container_control/container_control.hpp",
       "category": "Grouping",
@@ -404,7 +404,7 @@
       "doc": "api/generated/gui_forms.ContainerControl.rst"
     },
     {
-      "id": "user-control",
+      "id": "user_control",
       "type": "UserControl",
       "header": "gui_forms/controls/scrollable_control/container_control/user_control/user_control.hpp",
       "category": "Grouping",
@@ -415,7 +415,7 @@
       "doc": "api/generated/gui_forms.UserControl.rst"
     },
     {
-      "id": "tab-control",
+      "id": "tab_control",
       "type": "TabControl",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp",
       "category": "Grouping",
@@ -426,7 +426,7 @@
       "doc": "api/generated/gui_forms.TabControl.rst"
     },
     {
-      "id": "tab-page",
+      "id": "tab_page",
       "type": "TabPage",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp",
       "category": "Grouping",
@@ -437,7 +437,7 @@
       "doc": "api/generated/gui_forms.TabPage.rst"
     },
     {
-      "id": "flow-layout-panel",
+      "id": "flow_layout_panel",
       "type": "FlowLayoutPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp",
       "category": "Layout",
@@ -448,7 +448,7 @@
       "doc": "api/generated/gui_forms.FlowLayoutPanel.rst"
     },
     {
-      "id": "table-layout-panel",
+      "id": "table_layout_panel",
       "type": "TableLayoutPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp",
       "category": "Layout",
@@ -459,7 +459,7 @@
       "doc": "api/generated/gui_forms.TableLayoutPanel.rst"
     },
     {
-      "id": "responsive-track-panel",
+      "id": "responsive_track_panel",
       "type": "ResponsiveTrackPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/responsive_track_panel/responsive_track_panel.hpp",
       "category": "Layout",
@@ -470,7 +470,7 @@
       "doc": "api/generated/gui_forms.ResponsiveTrackPanel.rst"
     },
     {
-      "id": "scaled-panel",
+      "id": "scaled_panel",
       "type": "ScaledPanel",
       "header": "gui_forms/controls/panel/scaled_panel/scaled_panel.hpp",
       "category": "Layout",
@@ -481,7 +481,7 @@
       "doc": "api/generated/gui_forms.ScaledPanel.rst"
     },
     {
-      "id": "split-container",
+      "id": "split_container",
       "type": "SplitContainer",
       "header": "gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp",
       "category": "Layout",
@@ -492,7 +492,7 @@
       "doc": "api/generated/gui_forms.SplitContainer.rst"
     },
     {
-      "id": "splitter-panel",
+      "id": "splitter_panel",
       "type": "SplitterPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.hpp",
       "category": "Layout",
@@ -503,7 +503,7 @@
       "doc": "api/generated/gui_forms.SplitterPanel.rst"
     },
     {
-      "id": "command-overflow-panel",
+      "id": "command_overflow_panel",
       "type": "CommandOverflowPanel",
       "header": "gui_forms/controls/scrollable_control/container_control/command_overflow_panel/command_overflow_panel.hpp",
       "category": "Layout",
@@ -514,7 +514,7 @@
       "doc": "api/generated/gui_forms.CommandOverflowPanel.rst"
     },
     {
-      "id": "master-detail-view",
+      "id": "master_detail_view",
       "type": "MasterDetailView",
       "header": "gui_forms/controls/container/master_detail_view/master_detail_view.hpp",
       "category": "Layout",
@@ -525,7 +525,7 @@
       "doc": "api/generated/gui_forms.MasterDetailView.rst"
     },
     {
-      "id": "scrollable-control",
+      "id": "scrollable_control",
       "type": "ScrollableControl",
       "header": "gui_forms/controls/scrollable_control/scrollable_control.hpp",
       "category": "Scrolling",
@@ -536,7 +536,7 @@
       "doc": "api/generated/gui_forms.ScrollableControl.rst"
     },
     {
-      "id": "scroll-bar",
+      "id": "scroll_bar",
       "type": "ScrollBar",
       "header": "gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp",
       "category": "Scrolling",
@@ -547,7 +547,7 @@
       "doc": "api/generated/gui_forms.ScrollBar.rst"
     },
     {
-      "id": "h-scroll-bar",
+      "id": "h_scroll_bar",
       "type": "HScrollBar",
       "header": "gui_forms/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.hpp",
       "category": "Scrolling",
@@ -558,7 +558,7 @@
       "doc": "api/generated/gui_forms.HScrollBar.rst"
     },
     {
-      "id": "v-scroll-bar",
+      "id": "v_scroll_bar",
       "type": "VScrollBar",
       "header": "gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp",
       "category": "Scrolling",
@@ -569,7 +569,7 @@
       "doc": "api/generated/gui_forms.VScrollBar.rst"
     },
     {
-      "id": "menu-strip",
+      "id": "menu_strip",
       "type": "MenuStrip",
       "header": "gui_forms/controls/menu_strip/menu_strip.hpp",
       "category": "Menus and commands",
@@ -580,7 +580,7 @@
       "doc": "api/generated/gui_forms.MenuStrip.rst"
     },
     {
-      "id": "context-menu",
+      "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",
       "category": "Menus and commands",
@@ -602,7 +602,7 @@
       "doc": "api/generated/gui_forms.Command.rst"
     },
     {
-      "id": "anchored-popup-layer",
+      "id": "anchored_popup_layer",
       "type": "AnchoredPopupLayer",
       "header": "gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp",
       "category": "Dialogs and popups",
@@ -613,7 +613,7 @@
       "doc": "api/generated/gui_forms.AnchoredPopupLayer.rst"
     },
     {
-      "id": "tool-tip",
+      "id": "tool_tip",
       "type": "ToolTip",
       "header": "gui_forms/components/tool_tip/tool_tip.hpp",
       "category": "Dialogs and popups",
@@ -624,7 +624,7 @@
       "doc": "api/generated/gui_forms.ToolTip.rst"
     },
     {
-      "id": "drawing-surface",
+      "id": "drawing_surface",
       "type": "DrawingSurface",
       "header": "gui_forms/controls/drawing_surface/drawing_surface.hpp",
       "category": "Drawing",
@@ -635,7 +635,7 @@
       "doc": "api/generated/gui_forms.DrawingSurface.rst"
     },
     {
-      "id": "raster-canvas",
+      "id": "raster_canvas",
       "type": "RasterCanvas",
       "header": "gui_forms/controls/raster_canvas/raster_canvas.hpp",
       "category": "Drawing",
@@ -646,7 +646,7 @@
       "doc": "api/generated/gui_forms.RasterCanvas.rst"
     },
     {
-      "id": "live-surface",
+      "id": "live_surface",
       "type": "LiveSurface",
       "header": "gui_forms/live_surface/surface/live_surface.hpp",
       "category": "Drawing",
@@ -657,7 +657,7 @@
       "doc": "api/generated/gui_forms.LiveSurface.rst"
     },
     {
-      "id": "easing-preview",
+      "id": "easing_preview",
       "type": "EasingPreview",
       "header": "gui_forms/controls/easing_preview/easing_preview.hpp",
       "category": "Diagnostics",
@@ -668,7 +668,7 @@
       "doc": "api/generated/gui_forms.EasingPreview.rst"
     },
     {
-      "id": "metrics-view",
+      "id": "metrics_view",
       "type": "MetricsView",
       "header": "gui_forms/controls/metrics_view/metrics_view.hpp",
       "category": "Diagnostics",
@@ -679,7 +679,7 @@
       "doc": "api/generated/gui_forms.MetricsView.rst"
     },
     {
-      "id": "typography-specimen",
+      "id": "typography_specimen",
       "type": "TypographySpecimen",
       "header": "gui_forms/controls/typography_specimen/typography_specimen.hpp",
       "category": "Diagnostics",
@@ -690,7 +690,7 @@
       "doc": "api/generated/gui_forms.TypographySpecimen.rst"
     },
     {
-      "id": "visual-inspector-view",
+      "id": "visual_inspector_view",
       "type": "VisualInspectorView",
       "header": "gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp",
       "category": "Diagnostics",
@@ -701,7 +701,7 @@
       "doc": "api/generated/gui_forms.VisualInspectorView.rst"
     },
     {
-      "id": "visual-inspector-overlay",
+      "id": "visual_inspector_overlay",
       "type": "VisualInspectorOverlay",
       "header": "gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp",
       "category": "Diagnostics",
@@ -723,7 +723,7 @@
       "doc": "api/generated/gui_forms.Timer.rst"
     },
     {
-      "id": "image-list",
+      "id": "image_list",
       "type": "ImageList",
       "header": "gui_forms/image_list/image_list/image_list.hpp",
       "category": "Components",
@@ -734,7 +734,7 @@
       "doc": "api/generated/gui_forms.ImageList.rst"
     },
     {
-      "id": "error-provider",
+      "id": "error_provider",
       "type": "ErrorProvider",
       "header": "gui_forms/components/error_provider/error_provider.hpp",
       "category": "Components",
@@ -745,7 +745,7 @@
       "doc": "api/generated/gui_forms.ErrorProvider.rst"
     },
     {
-      "id": "help-provider",
+      "id": "help_provider",
       "type": "HelpProvider",
       "header": "gui_forms/components/help_provider/help_provider.hpp",
       "category": "Components",
@@ -756,7 +756,7 @@
       "doc": "api/generated/gui_forms.HelpProvider.rst"
     },
     {
-      "id": "semantic-feedback",
+      "id": "semantic_feedback",
       "type": "SemanticFeedback",
       "header": "gui_forms/feedback/semantic_feedback/semantic_feedback.hpp",
       "category": "Components",
@@ -778,7 +778,7 @@
       "doc": "api/generated/gui_forms.Binding.rst"
     },
     {
-      "id": "binding-source",
+      "id": "binding_source",
       "type": "BindingSource",
       "header": "gui_forms/binding/binding_source/binding_source.hpp",
       "category": "Components",
@@ -789,7 +789,7 @@
       "doc": "api/generated/gui_forms.BindingSource.rst"
     },
     {
-      "id": "binding-context",
+      "id": "binding_context",
       "type": "BindingContext",
       "header": "gui_forms/binding/binding_context/binding_context.hpp",
       "category": "Components",

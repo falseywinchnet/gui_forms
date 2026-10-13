@@ -1075,7 +1075,7 @@ namespace {
 
 // Its rows, modules and toolbars are child controls with their own anatomies.
 constexpr ControlAnatomy instrument_rack_anatomy{
-    .control_id = "instrument-rack",
+    .control_id = "instrument_rack",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -1091,11 +1091,11 @@ namespace {
 
 // The events InstrumentRack adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 5> instrument_rack_interactions{{
-    {.name = "field-changed", .payload = "InstrumentFieldChange", .mutable_payload = false},
-    {.name = "field-committed", .payload = "InstrumentFieldChange", .mutable_payload = false},
-    {.name = "module-toggled", .payload = "InstrumentModuleToggle", .mutable_payload = false},
-    {.name = "remove-requested", .payload = "InstrumentModuleRequest", .mutable_payload = false},
-    {.name = "move-requested", .payload = "InstrumentModuleMoveRequest", .mutable_payload = false},
+    {.name = "field_changed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "field_committed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "module_toggled", .payload = "InstrumentModuleToggle", .mutable_payload = false},
+    {.name = "remove_requested", .payload = "InstrumentModuleRequest", .mutable_payload = false},
+    {.name = "move_requested", .payload = "InstrumentModuleMoveRequest", .mutable_payload = false},
 }};
 
 } // namespace

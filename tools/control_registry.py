@@ -81,6 +81,15 @@ ADMITTED_SERVICE_TYPES: Mapping[str, str] = {
 }
 
 KEBAB_CASE: re.Pattern[str] = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# Registry ids are registered names (owner decision 8): snake_case, the words
+# of the C++ type name. CSS-family documents write them in kebab-case.
+SNAKE_CASE: re.Pattern[str] = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
+_TYPE_WORD: re.Pattern[str] = re.compile(r"[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z0-9]+|[A-Z]+")
+
+
+def registered_id(type_name: str) -> str:
+    """The registry id a type's name spells: "HScrollBar" is "h_scroll_bar"."""
+    return "_".join(word.lower() for word in _TYPE_WORD.findall(type_name))
 CPP_IDENTIFIER: re.Pattern[str] = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 # Namespace-level class/struct declarations with a base-clause. Column 0 only:
@@ -309,8 +318,11 @@ def validate(registry: Registry, include_root: Path = INCLUDE_ROOT) -> list[str]
     seen_types: dict[str, int] = {}
     for index, record in enumerate(registry.records):
         label: str = f"record {index} ({record.type or record.id or '?'})"
-        if not KEBAB_CASE.match(record.id):
-            problems.append(f"{label}: id '{record.id}' is not kebab-case")
+        if not SNAKE_CASE.match(record.id):
+            problems.append(f"{label}: id '{record.id}' is not snake_case")
+        elif CPP_IDENTIFIER.match(record.type) and record.id != registered_id(record.type):
+            problems.append(f"{label}: id '{record.id}' is not the words of '{record.type}' "
+                            f"('{registered_id(record.type)}'); renaming a type must not move its id silently")
         if record.id in seen_ids:
             problems.append(f"{label}: duplicate id '{record.id}' (also record {seen_ids[record.id]})")
         seen_ids.setdefault(record.id, index)

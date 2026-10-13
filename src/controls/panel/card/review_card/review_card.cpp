@@ -115,7 +115,7 @@ SemanticDescriptor ReviewCard::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy review_card_anatomy{
-    .control_id = "review-card",
+    .control_id = "review_card",
     .parts = panel_detail::parts,
     .states = card_detail::states,
     .custom_states = {},
@@ -131,7 +131,7 @@ namespace {
 
 // The events ReviewCard adds to those of Card, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> review_card_interactions{{
-    {.name = "record-changed", .payload = "ReviewRecord", .mutable_payload = false},
+    {.name = "record_changed", .payload = "ReviewRecord", .mutable_payload = false},
 }};
 
 } // namespace

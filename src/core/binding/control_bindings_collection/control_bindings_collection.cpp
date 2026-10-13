@@ -79,7 +79,7 @@ void ControlBindingsCollection::clear() noexcept {
 
 std::shared_ptr<Binding> ControlBindingsCollection::find(
     std::string_view property_name) const {
-    const std::string canonical = canonical_property_name(property_name);
+    const std::string canonical = registered_name(property_name);
     BindingList::const_iterator found = bindings_.begin();
     while (found != bindings_.end() &&
            (!*found || (*(*found)).property_name() != canonical)) {

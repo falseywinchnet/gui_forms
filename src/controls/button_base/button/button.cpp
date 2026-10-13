@@ -273,8 +273,8 @@ namespace {
 
 // The events Button adds to those of ButtonBase, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> button_interactions{{
-    {.name = "dialog-result-changed", .payload = "DialogResult", .mutable_payload = false},
-    {.name = "selected-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "dialog_result_changed", .payload = "DialogResult", .mutable_payload = false},
+    {.name = "selected_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

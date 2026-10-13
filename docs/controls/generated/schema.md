@@ -4,19 +4,19 @@ Generated from `manifests/control-schema.json` by `python3 tools/control_schema.
 do not edit. The manifest is written by `gui_forms_gallery_pages_tests` from the run-time
 registry (stage T1), so this page lists what the library publishes.
 
-Part, state, item-system and interaction names are kebab-case identities that theme and
-form documents address (`::part(thumb):state(pressed)`). C++ reads the same anatomy as
+Every name here is a registered name, stored in snake_case (owner decision 8). Theme
+and form documents, which are CSS-family, write the same words in kebab-case
+(`scroll_thumb` is `::part(scroll-thumb)`, `auto_size_mode` is `auto-size-mode`);
+PropertyGrid and C# show them in PascalCase (`AutoSizeMode`). C++ reads the anatomy as
 typed records (`(*bar).parts().thumb`) and registers handlers through each type's events
-(`(*button).clicked()`). Property names are registered in kebab-case too; PropertyGrid
-and C# show the derived display name (`auto-size-mode` is `AutoSizeMode`). An
-interaction's payload is the handler's argument types; *by reference* marks a payload
-the handler receives by mutable reference.
+(`(*button).clicked()`). An interaction's payload is the handler's argument types; *by
+reference* marks a payload the handler receives by mutable reference.
 
-Every control also has these properties: `accessible-description`, `accessible-name`, `allow-drop`, `anchor`, `auto-scroll-offset`, `auto-size`, `auto-size-mode`, `bounds`, `causes-validation`, `dock`, `enabled`, `hit-test-transparent`, `margin`, `maximum-size`, `minimum-size`, `name`, `padding`, `tab-index`, `tab-stop`, `visible`.
+Every control also has these properties: `accessible_description`, `accessible_name`, `allow_drop`, `anchor`, `auto_scroll_offset`, `auto_size`, `auto_size_mode`, `bounds`, `causes_validation`, `dock`, `enabled`, `hit_test_transparent`, `margin`, `maximum_size`, `minimum_size`, `name`, `padding`, `tab_index`, `tab_stop`, `visible`.
 
-Every control also raises these interactions: `name-changed`, `visible-changed`, `enabled-changed`, `auto-size-changed`, `causes-validation-changed`, `validating`, `validated`, `initialization-completed`, `pointer-observed`, `pointer-preview-observed`, `focus-observed`, `arranged-bounds-changed`, `help-requested`.
+Every control also raises these interactions: `name_changed`, `visible_changed`, `enabled_changed`, `auto_size_changed`, `causes_validation_changed`, `validating`, `validated`, `initialization_completed`, `pointer_observed`, `pointer_preview_observed`, `focus_observed`, `arranged_bounds_changed`, `help_requested`.
 
-## `button-base` (ButtonBase, control)
+## `button_base` (ButtonBase, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -26,15 +26,15 @@ Every control also raises these interactions: `name-changed`, `visible-changed`,
 | `label` | label |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
+| `text_changed` | `std::string` |
 
 ## `button` (Button, control)
 
@@ -47,19 +47,19 @@ Properties beyond every control's: `content-padding` (insets), `font` (font), `i
 | `preselect` | preselect |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
-| `dialog-result-changed` | `DialogResult` |
-| `selected-changed` | `bool` |
+| `text_changed` | `std::string` |
+| `dialog_result_changed` | `DialogResult` |
+| `selected_changed` | `bool` |
 
-## `drop-down-button` (DropDownButton, control)
+## `drop_down_button` (DropDownButton, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -67,26 +67,26 @@ Properties beyond every control's: `content-padding` (insets), `font` (font), `i
 | `face` | face |  |  |
 | `icon` | icon |  |  |
 | `label` | label |  |  |
-| `drop-down` | actuator |  | pressed |
+| `drop_down` | actuator |  | pressed |
 | `disclosure` | disclosure |  |  |
 | `preselect` | preselect |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
-| `dialog-result-changed` | `DialogResult` |
-| `selected-changed` | `bool` |
-| `drop-down-requested` | `DropDownButton`, by reference |
-| `drop-down-close-requested` | `DropDownButton`, by reference |
+| `text_changed` | `std::string` |
+| `dialog_result_changed` | `DialogResult` |
+| `selected_changed` | `bool` |
+| `drop_down_requested` | `DropDownButton`, by reference |
+| `drop_down_close_requested` | `DropDownButton`, by reference |
 
-## `link-label` (LinkLabel, control)
+## `link_label` (LinkLabel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -95,36 +95,36 @@ Properties beyond every control's: `content-padding` (insets), `font` (font), `i
 | `underline` | glyph |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`. Application-defined: `visited`.
+States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`. Application-defined: `visited`.
 
-Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
+| `text_changed` | `std::string` |
 
-## `command-bar` (CommandBar, control)
+## `command_bar` (CommandBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -133,21 +133,21 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `invoked` | `CommandItem` |
 
-## `text-box` (TextBox, control)
+## `text_box` (TextBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
@@ -156,15 +156,15 @@ Properties beyond every control's: none.
 | `caret` | caret |  |  |
 | `selection` | selection |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `read-only`, `invalid`, `pending`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`, `invalid`, `pending`.
 
 Properties beyond every control's: `text` (text).
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `text-changed` | `std::string` |
-| `selection-changed` | `TextSelection` |
+| `text_changed` | `std::string` |
+| `selection_changed` | `TextSelection` |
 | `committed` | `std::string` |
 | `cancelled` | none |
 
@@ -175,44 +175,44 @@ Properties beyond every control's: `text` (text).
 | `region` | region |  |  |
 | `label` | label |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
-Properties beyond every control's: `font` (font), `fore-color` (color), `maximum-lines` (unsigned-integer), `text` (text).
+Properties beyond every control's: `font` (font), `fore_color` (color), `maximum_lines` (unsigned_integer), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `text-changed` | `std::string` |
+| `text_changed` | `std::string` |
 
-## `picture-box` (PictureBox, control)
+## `picture_box` (PictureBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `image` | icon |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
-Properties beyond every control's: `image` (image), `image-opacity` (number), `size-mode` (enumeration).
+Properties beyond every control's: `image` (image), `image_opacity` (number), `size_mode` (enumeration).
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `image-changed` | `ImageId` |
+| `image_changed` | `ImageId` |
 
-## `progress-bar` (ProgressBar, control)
+## `progress_bar` (ProgressBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -221,36 +221,36 @@ Properties beyond every control's: `image` (image), `image-opacity` (number), `s
 | `fill` | fill |  |  |
 | `activity` | activity |  |  |
 
-States: `normal`, `indeterminate`, `enabled`, `disabled`, `reduced-motion`.
+States: `normal`, `indeterminate`, `enabled`, `disabled`, `reduced_motion`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `review-card` (ReviewCard, control)
+## `review_card` (ReviewCard, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `hot`, `pressed`, `captured`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `hot`, `pressed`, `captured`, `selected`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -258,31 +258,31 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 | `activated` | `Card`, by reference |
-| `selected-changed` | `bool` |
-| `record-changed` | `ReviewRecord` |
+| `selected_changed` | `bool` |
+| `record_changed` | `ReviewRecord` |
 
-## `list-box` (ListBox, control)
+## `list_box` (ListBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `well` | well |  |  |
 | `content` | content |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
@@ -290,7 +290,7 @@ Item system `item`:
 |---|---|---|---|
 | `row` | region |  |  |
 | `label` | label |  |  |
-| `row-focus` | focus |  |  |
+| `row_focus` | focus |  |  |
 
 Item states: `selected`, `hot`, `current`.
 
@@ -299,31 +299,31 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selection-changed` | `ListSelectionChange` |
-| `item-activated` | `std::size_t` |
+| `selection_changed` | `ListSelectionChange` |
+| `item_activated` | `std::size_t` |
 
-## `checked-list-box` (CheckedListBox, control)
+## `checked_list_box` (CheckedListBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `well` | well |  |  |
 | `content` | content |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
@@ -331,8 +331,8 @@ Item system `item`:
 |---|---|---|---|
 | `row` | region |  |  |
 | `label` | label |  |  |
-| `row-focus` | focus |  |  |
-| `check-well` | well |  |  |
+| `row_focus` | focus |  |  |
+| `check_well` | well |  |  |
 | `check` | indicator |  |  |
 
 Item states: `selected`, `hot`, `current`, `checked`, `indeterminate`.
@@ -342,67 +342,67 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selection-changed` | `ListSelectionChange` |
-| `item-activated` | `std::size_t` |
-| `item-checking` | `ItemCheckEvent`, by reference |
-| `item-check-state-changed` | `std::size_t, CheckState` |
+| `selection_changed` | `ListSelectionChange` |
+| `item_activated` | `std::size_t` |
+| `item_checking` | `ItemCheckEvent`, by reference |
+| `item_check_state_changed` | `std::size_t, CheckState` |
 
-## `combo-box` (ComboBox, control)
+## `combo_box` (ComboBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `well` | well |  |  |
 | `content` | content |  |  |
 | `divider` | divider |  |  |
-| `drop-down` | actuator | `button` |  |
+| `drop_down` | actuator | `button` |  |
 | `disclosure` | disclosure |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `items` (collection), `selected-index` (signed-integer), `text` (text).
+Properties beyond every control's: `items` (collection), `selected_index` (signed_integer), `text` (text).
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selected-index-changed` | `std::optional<std::size_t>` |
-| `drop-down-changed` | `bool` |
-| `items-changed` | none |
+| `selected_index_changed` | `std::optional<std::size_t>` |
+| `drop_down_changed` | `bool` |
+| `items_changed` | none |
 
-## `tree-view` (TreeView, control)
+## `tree_view` (TreeView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `content` | content |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
@@ -412,7 +412,7 @@ Item system `item`:
 | `expander` | disclosure |  |  |
 | `icon` | icon |  |  |
 | `label` | label |  |  |
-| `row-focus` | focus |  |  |
+| `row_focus` | focus |  |  |
 
 Item states: `selected`, `hot`, `current`, `open`, `closed`, `disabled`.
 
@@ -421,31 +421,31 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selection-changed` | `TreeSelectionChange` |
-| `expansion-changed` | `TreeExpansionChange` |
-| `item-activated` | `std::string` |
+| `selection_changed` | `TreeSelectionChange` |
+| `expansion_changed` | `TreeExpansionChange` |
+| `item_activated` | `std::string` |
 
-## `object-view` (ObjectView, control)
+## `object_view` (ObjectView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `header` | face |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
@@ -455,7 +455,7 @@ Item system `item`:
 | `glyph` | icon |  |  |
 | `name` | label |  |  |
 | `secondary` | content |  |  |
-| `cell-focus` | focus |  |  |
+| `cell_focus` | focus |  |  |
 
 Item states: `selected`, `hot`, `current`, `disabled`.
 
@@ -463,58 +463,58 @@ Item system `column`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
-| `column-header` | region |  |  |
-| `column-label` | label |  |  |
-| `sort-glyph` | glyph |  |  |
-| `column-divider` | divider |  |  |
-| `column-grip` | grip |  |  |
-| `column-focus` | focus |  |  |
+| `column_header` | region |  |  |
+| `column_label` | label |  |  |
+| `sort_glyph` | glyph |  |  |
+| `column_divider` | divider |  |  |
+| `column_grip` | grip |  |  |
+| `column_focus` | focus |  |  |
 
-Item states: `pressed`, `captured`, `current`. Application-defined: `sorted-ascending`, `sorted-descending`.
+Item states: `pressed`, `captured`, `current`. Application-defined: `sorted_ascending`, `sorted_descending`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `sort-requested` | `ObjectDetailsSort` |
-| `selection-changed` | `ObjectSelectionChange` |
-| `item-activated` | `std::string` |
-| `context-requested` | `ObjectContextRequest` |
+| `sort_requested` | `ObjectDetailsSort` |
+| `selection_changed` | `ObjectSelectionChange` |
+| `item_activated` | `std::string` |
+| `context_requested` | `ObjectContextRequest` |
 
-## `correspondence-view` (CorrespondenceView, control)
+## `correspondence_view` (CorrespondenceView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `card` | face |  |  |
-| `status-rail` | keyline |  |  |
+| `status_rail` | keyline |  |  |
 | `glyph` | icon |  |  |
 | `title` | label |  |  |
 | `secondary` | content |  |  |
 | `metric` | content |  |  |
 | `evidence` | well |  |  |
-| `card-focus` | focus |  |  |
+| `card_focus` | focus |  |  |
 
 Item states: `selected`, `hot`, `current`, `open`, `unavailable`, `disabled`. Application-defined: `pinned`, `stale`.
 
@@ -523,32 +523,32 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selection-changed` | `CorrespondenceSelectionChange` |
-| `pin-changed` | `CorrespondencePinChange` |
-| `expansion-changed` | `CorrespondenceExpansionChange` |
-| `item-activated` | `std::string` |
-| `context-requested` | `ObjectContextRequest` |
+| `selection_changed` | `CorrespondenceSelectionChange` |
+| `pin_changed` | `CorrespondencePinChange` |
+| `expansion_changed` | `CorrespondenceExpansionChange` |
+| `item_activated` | `std::string` |
+| `context_requested` | `ObjectContextRequest` |
 
-## `choice-group` (ChoiceGroup, control)
+## `choice_group` (ChoiceGroup, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -558,35 +558,35 @@ Properties beyond every control's: none.
 | `changed` | `int` |
 | `activated` | `int` |
 
-## `breadcrumb-trail` (BreadcrumbTrail, control)
+## `breadcrumb_trail` (BreadcrumbTrail, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `segment` | face | `button` |  |
-| `segment-label` | label |  |  |
-| `segment-cap` | cap |  |  |
-| `segment-focus` | focus |  |  |
+| `segment_label` | label |  |  |
+| `segment_cap` | cap |  |  |
+| `segment_focus` | focus |  |  |
 
 Item states: `hot`, `current`, `disabled`.
 
@@ -595,14 +595,14 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `segment-activated` | `std::string` |
-| `overflow-activated` | none |
-| `edit-committed` | `std::string` |
-| `edit-started` | `std::string` |
-| `edit-cancelled` | none |
-| `edit-completion-requested` | none |
+| `segment_activated` | `std::string` |
+| `overflow_activated` | none |
+| `edit_committed` | `std::string` |
+| `edit_started` | `std::string` |
+| `edit_cancelled` | none |
+| `edit_completion_requested` | none |
 
-## `check-box` (CheckBox, control)
+## `check_box` (CheckBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -614,19 +614,19 @@ Properties beyond every control's: none.
 | `label` | label |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `checked`, `indeterminate`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `hot`, `pressed`, `checked`, `indeterminate`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `checked` (boolean), `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `checked` (boolean), `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
-| `check-state-changed` | `CheckState` |
-| `checked-changed` | `bool` |
+| `text_changed` | `std::string` |
+| `check_state_changed` | `CheckState` |
+| `checked_changed` | `bool` |
 
-## `radio-button` (RadioButton, control)
+## `radio_button` (RadioButton, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -637,35 +637,35 @@ Properties beyond every control's: `checked` (boolean), `content-padding` (inset
 | `label` | label |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `hot`, `pressed`, `checked`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
+States: `normal`, `hot`, `pressed`, `checked`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`.
 
-Properties beyond every control's: `checked` (boolean), `content-padding` (insets), `font` (font), `image` (image), `text` (text).
+Properties beyond every control's: `checked` (boolean), `content_padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
-| `expanded-changed` | `std::optional<bool>` |
+| `expanded_changed` | `std::optional<bool>` |
 | `clicked` | `ButtonBase`, by reference |
-| `text-changed` | `std::string` |
-| `checked-changed` | `bool` |
+| `text_changed` | `std::string` |
+| `checked_changed` | `bool` |
 
-## `range-control` (RangeControl, control)
+## `range_control` (RangeControl, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `track-bar` (TrackBar, control)
+## `track_bar` (TrackBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -676,254 +676,254 @@ Properties beyond every control's: `value` (number).
 | `thumb` | thumb |  | pressed, captured |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `numeric-up-down` (NumericUpDown, control)
+## `numeric_up_down` (NumericUpDown, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
-| `field` | well | `text-box` |  |
-| `increment-arrow` | actuator | `button` |  |
-| `decrement-arrow` | actuator | `button` |  |
+| `field` | well | `text_box` |  |
+| `increment_arrow` | actuator | `button` |  |
+| `decrement_arrow` | actuator | `button` |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `invalid`, `pending`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `invalid`, `pending`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `value-changed` | `double` |
+| `value_changed` | `double` |
 
-## `color-value-editor` (ColorValueEditor, control)
+## `color_value_editor` (ColorValueEditor, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `swatch` | chip |  |  |
-| `field` | well | `text-box` |  |
+| `field` | well | `text_box` |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `invalid`, `pending`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `invalid`, `pending`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `value-changed` | `Color` |
-| `edit-failed` | `PropertyEditorInputError` |
+| `value_changed` | `Color` |
+| `edit_failed` | `PropertyEditorInputError` |
 
-## `flags-value-editor` (FlagsValueEditor, control)
+## `flags_value_editor` (FlagsValueEditor, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `content` | content |  |  |
 | `divider` | divider |  |  |
-| `drop-down` | actuator | `button` |  |
+| `drop_down` | actuator | `button` |  |
 | `disclosure` | disclosure |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`, `invalid`, `pending`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`, `invalid`, `pending`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `value-changed` | `PropertyEnumValue` |
-| `drop-down-changed` | `bool` |
+| `value_changed` | `PropertyEnumValue` |
+| `drop_down_changed` | `bool` |
 
-## `property-grid` (PropertyGrid, control)
+## `property_grid` (PropertyGrid, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `selected-object-changed` | `Control::Ptr` |
-| `property-value-changed` | `PropertyGridValueChange` |
-| `edit-failed` | `PropertyGridEditError` |
+| `selected_object_changed` | `Control::Ptr` |
+| `property_value_changed` | `PropertyGridValueChange` |
+| `edit_failed` | `PropertyGridEditError` |
 
-## `property-list` (PropertyList, control)
+## `property_list` (PropertyList, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
-| `group-header` | face |  |  |
-| `group-expander` | disclosure |  |  |
-| `group-title` | caption |  |  |
-| `property-row` | region |  |  |
-| `property-name` | label |  |  |
-| `property-value` | content |  |  |
-| `row-expander` | disclosure |  |  |
+| `group_header` | face |  |  |
+| `group_expander` | disclosure |  |  |
+| `group_title` | caption |  |  |
+| `property_row` | region |  |  |
+| `property_name` | label |  |  |
+| `property_value` | content |  |  |
+| `row_expander` | disclosure |  |  |
 | `validation` | validation |  |  |
-| `row-divider` | divider |  |  |
+| `row_divider` | divider |  |  |
 
-Item states: `open`, `closed`, `invalid`, `read-only`, `disabled`. Application-defined: `group-header`.
+Item states: `open`, `closed`, `invalid`, `read_only`, `disabled`. Application-defined: `group_header`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `value-changed` | `PropertyValueChange` |
-| `value-committed` | `PropertyValueChange` |
-| `group-changed` | `PropertyGroupChange` |
-| `row-expansion-changed` | `PropertyRowExpansionChange` |
-| `reset-requested` | `PropertyResetRequest` |
+| `value_changed` | `PropertyValueChange` |
+| `value_committed` | `PropertyValueChange` |
+| `group_changed` | `PropertyGroupChange` |
+| `row_expansion_changed` | `PropertyRowExpansionChange` |
+| `reset_requested` | `PropertyResetRequest` |
 
-## `instrument-rack` (InstrumentRack, control)
+## `instrument_rack` (InstrumentRack, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `field-changed` | `InstrumentFieldChange` |
-| `field-committed` | `InstrumentFieldChange` |
-| `module-toggled` | `InstrumentModuleToggle` |
-| `remove-requested` | `InstrumentModuleRequest` |
-| `move-requested` | `InstrumentModuleMoveRequest` |
+| `field_changed` | `InstrumentFieldChange` |
+| `field_committed` | `InstrumentFieldChange` |
+| `module_toggled` | `InstrumentModuleToggle` |
+| `remove_requested` | `InstrumentModuleRequest` |
+| `move_requested` | `InstrumentModuleMoveRequest` |
 
-## `date-time-picker` (DateTimePicker, control)
+## `date_time_picker` (DateTimePicker, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `content` | content |  |  |
-| `drop-down` | actuator | `button` |  |
+| `drop_down` | actuator | `button` |  |
 | `disclosure` | disclosure |  |  |
-| `increment-arrow` | actuator | `button` | pressed |
-| `decrement-arrow` | actuator | `button` | pressed |
+| `increment_arrow` | actuator | `button` | pressed |
+| `decrement_arrow` | actuator | `button` | pressed |
 | `well` | well |  | pressed |
 | `indicator` | indicator |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`, `checked`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`, `closed`, `checked`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `value-changed` | `DateTimeValue` |
-| `checked-changed` | `bool` |
-| `drop-down-changed` | `bool` |
+| `value_changed` | `DateTimeValue` |
+| `checked_changed` | `bool` |
+| `drop_down_changed` | `bool` |
 
 ## `panel` (Panel, control)
 
@@ -931,20 +931,20 @@ Properties beyond every control's: none.
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -952,27 +952,27 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `group-box` (GroupBox, control)
+## `group_box` (GroupBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `caption` | caption |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -980,27 +980,27 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `scaled-group-box` (ScaledGroupBox, control)
+## `scaled_group_box` (ScaledGroupBox, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `caption` | caption |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1008,33 +1008,33 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `material-panel` (MaterialPanel, control)
+## `material_panel` (MaterialPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `material-changed` | `SurfaceMaterial` |
+| `material_changed` | `SurfaceMaterial` |
 
 ## `card` (Card, control)
 
@@ -1042,20 +1042,20 @@ Properties beyond every control's: none.
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `hot`, `pressed`, `captured`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `hot`, `pressed`, `captured`, `selected`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1063,28 +1063,28 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 | `activated` | `Card`, by reference |
-| `selected-changed` | `bool` |
+| `selected_changed` | `bool` |
 
-## `expandable-sections` (ExpandableSections, control)
+## `expandable_sections` (ExpandableSections, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1093,88 +1093,88 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `toggled` | `int, bool` |
 
-## `container-control` (ContainerControl, control)
+## `container_control` (ContainerControl, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `user-control` (UserControl, control)
+## `user_control` (UserControl, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 | `loaded` | none |
 
-## `tab-control` (TabControl, control)
+## `tab_control` (TabControl, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `display` | face |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `tab` | face |  |  |
-| `tab-label` | label |  |  |
-| `tab-focus` | focus |  |  |
-| `tab-seam` | seam |  |  |
+| `tab_label` | label |  |  |
+| `tab_focus` | focus |  |  |
+| `tab_seam` | seam |  |  |
 
 Item states: `selected`.
 
@@ -1183,29 +1183,29 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
-| `selected-index-changed` | `TabSelectionChange` |
+| `auto_validate_changed` | `AutoValidate` |
+| `selected_index_changed` | `TabSelectionChange` |
 
-## `tab-page` (TabPage, control)
+## `tab_page` (TabPage, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1213,105 +1213,105 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `flow-layout-panel` (FlowLayoutPanel, control)
+## `flow_layout_panel` (FlowLayoutPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `table-layout-panel` (TableLayoutPanel, control)
+## `table_layout_panel` (TableLayoutPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
-| `cell-grid` | divider |  |  |
+| `cell_grid` | divider |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `responsive-track-panel` (ResponsiveTrackPanel, control)
+## `responsive_track_panel` (ResponsiveTrackPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `scaled-panel` (ScaledPanel, control)
+## `scaled_panel` (ScaledPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1319,133 +1319,133 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `split-container` (SplitContainer, control)
+## `split_container` (SplitContainer, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `seam` | seam |  | hot, pressed, captured |
 | `grip` | grip |  | open, closed |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `hot`, `open`, `closed`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `hot`, `open`, `closed`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
-| `splitter-changed` | `SplitChangeEvent` |
+| `auto_validate_changed` | `AutoValidate` |
+| `splitter_changed` | `SplitChangeEvent` |
 
-## `splitter-panel` (SplitterPanel, control)
+## `splitter_panel` (SplitterPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `command-overflow-panel` (CommandOverflowPanel, control)
+## `command_overflow_panel` (CommandOverflowPanel, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
+| `auto_validate_changed` | `AutoValidate` |
 
-## `master-detail-view` (MasterDetailView, control)
+## `master_detail_view` (MasterDetailView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `auto-validate-changed` | `AutoValidate` |
-| `presentation-changed` | `MasterDetailPresentationChange` |
+| `auto_validate_changed` | `AutoValidate` |
+| `presentation_changed` | `MasterDetailPresentationChange` |
 
-## `scrollable-control` (ScrollableControl, control)
+## `scrollable_control` (ScrollableControl, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1453,70 +1453,70 @@ Properties beyond every control's: none.
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 
-## `scroll-bar` (ScrollBar, control)
+## `scroll_bar` (ScrollBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
-| `decrement-arrow` | actuator | `button` | pressed |
-| `increment-arrow` | actuator | `button` | pressed |
+| `decrement_arrow` | actuator | `button` | pressed |
+| `increment_arrow` | actuator | `button` | pressed |
 | `track` | track |  | pressed |
 | `thumb` | thumb |  | pressed, captured |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `h-scroll-bar` (HScrollBar, control)
+## `h_scroll_bar` (HScrollBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
-| `decrement-arrow` | actuator | `button` | pressed |
-| `increment-arrow` | actuator | `button` | pressed |
+| `decrement_arrow` | actuator | `button` | pressed |
+| `increment_arrow` | actuator | `button` | pressed |
 | `track` | track |  | pressed |
 | `thumb` | thumb |  | pressed, captured |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `v-scroll-bar` (VScrollBar, control)
+## `v_scroll_bar` (VScrollBar, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
-| `decrement-arrow` | actuator | `button` | pressed |
-| `increment-arrow` | actuator | `button` | pressed |
+| `decrement_arrow` | actuator | `button` | pressed |
+| `increment_arrow` | actuator | `button` | pressed |
 | `track` | track |  | pressed |
 | `thumb` | thumb |  | pressed, captured |
 | `focus` | focus |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
-| `range-changed` | `double, double` |
-| `value-changed` | `double` |
+| `range_changed` | `double, double` |
+| `value_changed` | `double` |
 | `scroll` | `RangeScrollEvent` |
 
-## `menu-strip` (MenuStrip, control)
+## `menu_strip` (MenuStrip, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1525,15 +1525,15 @@ Properties beyond every control's: `value` (number).
 | `divider` | divider |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Item system `item`:
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
-| `menu-item` | face |  |  |
-| `menu-label` | label |  |  |
-| `menu-focus` | focus |  |  |
+| `menu_item` | face |  |  |
+| `menu_label` | label |  |  |
+| `menu_focus` | focus |  |  |
 
 Item states: `hot`, `open`, `selected`, `disabled`.
 
@@ -1541,58 +1541,58 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
-| `item-invoked` | `MenuStripInvocation` |
-| `open-changed` | `std::optional<std::size_t>` |
+| `item_invoked` | `MenuStripInvocation` |
+| `open_changed` | `std::optional<std::size_t>` |
 
-## `context-menu` (ContextMenu, component)
+## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |
 |---|---|
-| `item-invoked` | `MenuItemInvocation` |
-| `open-changed` | `bool` |
+| `item_invoked` | `MenuItemInvocation` |
+| `open_changed` | `bool` |
 
 ## `command` (Command, component)
 
 | Interaction | Payload |
 |---|---|
-| `state-changed` | `CommandState` |
+| `state_changed` | `CommandState` |
 | `invoked` | `CommandInvocation` |
 
-## `anchored-popup-layer` (AnchoredPopupLayer, control)
+## `anchored_popup_layer` (AnchoredPopupLayer, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `viewport` | region |  |  |
-| `horizontal-decrement-arrow` | actuator | `button` |  |
-| `horizontal-track` | track |  |  |
-| `horizontal-thumb` | thumb |  | pressed, captured |
-| `horizontal-increment-arrow` | actuator | `button` |  |
-| `vertical-decrement-arrow` | actuator | `button` |  |
-| `vertical-track` | track |  |  |
-| `vertical-thumb` | thumb |  | pressed, captured |
-| `vertical-increment-arrow` | actuator | `button` |  |
-| `scroll-corner` | face |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
 | `focus` | focus |  |  |
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
-| `dismiss-requested` | `PopupDismissReason` |
+| `dismiss_requested` | `PopupDismissReason` |
 
-## `tool-tip` (ToolTip, component)
+## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |
 |---|---|
-| `visibility-changed` | `ToolTipEvent` |
+| `visibility_changed` | `ToolTipEvent` |
 
-## `drawing-surface` (DrawingSurface, control)
+## `drawing_surface` (DrawingSurface, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1600,13 +1600,13 @@ Properties beyond every control's: none.
 | `face` | face |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `raster-canvas` (RasterCanvas, control)
+## `raster_canvas` (RasterCanvas, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1615,17 +1615,17 @@ Interactions beyond every control's: none.
 | `image` | icon |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `live-surface` (LiveSurface, service)
+## `live_surface` (LiveSurface, service)
 
 Interactions: none.
 
-## `easing-preview` (EasingPreview, control)
+## `easing_preview` (EasingPreview, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1634,28 +1634,28 @@ Interactions: none.
 | `edge` | edge |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `metrics-view` (MetricsView, control)
+## `metrics_view` (MetricsView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `face` | face |  |  |
-| `accent-strip` | keyline |  |  |
+| `accent_strip` | keyline |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `typography-specimen` (TypographySpecimen, control)
+## `typography_specimen` (TypographySpecimen, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1664,29 +1664,29 @@ Interactions beyond every control's: none.
 | `edge` | edge |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `visual-inspector-view` (VisualInspectorView, control)
+## `visual_inspector_view` (VisualInspectorView, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
 | `face` | face |  |  |
 | `header` | face |  |  |
-| `accent-strip` | keyline |  |  |
+| `accent_strip` | keyline |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
-## `visual-inspector-overlay` (VisualInspectorOverlay, control)
+## `visual_inspector_overlay` (VisualInspectorOverlay, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
@@ -1694,7 +1694,7 @@ Interactions beyond every control's: none.
 | `highlight` | selection |  |  |
 | `focus` | focus |  |  |
 
-States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
 Properties beyond every control's: none.
 
@@ -1706,28 +1706,28 @@ Interactions beyond every control's: none.
 |---|---|
 | `tick` | none |
 
-## `image-list` (ImageList, component)
+## `image_list` (ImageList, component)
 
 | Interaction | Payload |
 |---|---|
 | `changed` | `ImageListChange` |
 
-## `error-provider` (ErrorProvider, component)
+## `error_provider` (ErrorProvider, component)
 
 | Interaction | Payload |
 |---|---|
-| `right-to-left-changed` | `bool` |
-| `data-source-changed` | none |
-| `data-member-changed` | `std::string` |
-| `error-changed` | `ErrorProviderChange` |
+| `right_to_left_changed` | `bool` |
+| `data_source_changed` | none |
+| `data_member_changed` | `std::string` |
+| `error_changed` | `ErrorProviderChange` |
 
-## `help-provider` (HelpProvider, component)
+## `help_provider` (HelpProvider, component)
 
 | Interaction | Payload |
 |---|---|
-| `help-requested` | `HelpRequestEvent`, by reference |
+| `help_requested` | `HelpRequestEvent`, by reference |
 
-## `semantic-feedback` (SemanticFeedback, component)
+## `semantic_feedback` (SemanticFeedback, component)
 
 | Interaction | Payload |
 |---|---|
@@ -1739,24 +1739,24 @@ Interactions beyond every control's: none.
 |---|---|
 | `format` | `BindingConvertEvent`, by reference |
 | `parse` | `BindingConvertEvent`, by reference |
-| `binding-complete` | `BindingCompleteEvent`, by reference |
+| `binding_complete` | `BindingCompleteEvent`, by reference |
 
-## `binding-source` (BindingSource, component)
-
-| Interaction | Payload |
-|---|---|
-| `list-changed` | `BindingListChange` |
-| `current-changed` | none |
-| `current-item-changed` | none |
-| `position-changed` | `std::ptrdiff_t` |
-| `data-error` | `std::string` |
-| `data-source-changed` | none |
-| `data-member-changed` | `std::string` |
-| `binding-complete` | `BindingCompleteEvent`, by reference |
-| `disposed-event` | none |
-
-## `binding-context` (BindingContext, component)
+## `binding_source` (BindingSource, component)
 
 | Interaction | Payload |
 |---|---|
-| `collection-changed` | `BindingContextChange` |
+| `list_changed` | `BindingListChange` |
+| `current_changed` | none |
+| `current_item_changed` | none |
+| `position_changed` | `std::ptrdiff_t` |
+| `data_error` | `std::string` |
+| `data_source_changed` | none |
+| `data_member_changed` | `std::string` |
+| `binding_complete` | `BindingCompleteEvent`, by reference |
+| `disposed_event` | none |
+
+## `binding_context` (BindingContext, component)
+
+| Interaction | Payload |
+|---|---|
+| `collection_changed` | `BindingContextChange` |

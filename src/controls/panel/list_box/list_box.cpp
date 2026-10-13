@@ -501,7 +501,7 @@ constexpr std::array<PartField<ListBox::ItemParts>, 3> list_item_part_fields{{
      .member = &ListBox::ItemParts::row},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &ListBox::ItemParts::label},
-    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "row_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ListBox::ItemParts::row_focus},
 }};
 
@@ -522,7 +522,7 @@ constexpr std::array<ItemSystemDeclaration, 1> list_box_item_systems{{
 }};
 
 constexpr ControlAnatomy list_box_anatomy{
-    .control_id = "list-box",
+    .control_id = "list_box",
     .parts = list_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -647,8 +647,8 @@ namespace {
 
 // The events ListBox adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> list_box_interactions{{
-    {.name = "selection-changed", .payload = "ListSelectionChange", .mutable_payload = false},
-    {.name = "item-activated", .payload = "std::size_t", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "ListSelectionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::size_t", .mutable_payload = false},
 }};
 
 } // namespace

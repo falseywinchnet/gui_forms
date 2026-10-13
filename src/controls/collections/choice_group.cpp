@@ -273,7 +273,7 @@ namespace {
 
 // Its members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy choice_group_anatomy{
-    .control_id = "choice-group",
+    .control_id = "choice_group",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

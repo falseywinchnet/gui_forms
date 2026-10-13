@@ -317,7 +317,7 @@ namespace {
 
 // The events HelpProvider adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> help_provider_interactions{{
-    {.name = "help-requested", .payload = "HelpRequestEvent", .mutable_payload = true},
+    {.name = "help_requested", .payload = "HelpRequestEvent", .mutable_payload = true},
 }};
 
 } // namespace

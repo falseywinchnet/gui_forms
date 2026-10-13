@@ -156,15 +156,27 @@ std::string_view trimmed(std::string_view value) noexcept {
     return value.substr(first, last - first + 1U);
 }
 
+// The position of the next byte of `name` at or after `index` that is not a
+// word separator ('_' or '-').
+std::size_t next_spelled_byte(std::string_view name, std::size_t index) noexcept {
+    while (index < name.size() && (name[index] == '_' || name[index] == '-')) ++index;
+    return index;
+}
+
+// True when two enumeration choice names spell the same words: ASCII case
+// and the word separators '_' and '-' are ignored, so "StretchImage",
+// "stretch-image" and "stretch_image" are equal (owner decision 8). Choice
+// validation uses the same rule, so no two choices of one type collide.
 bool ascii_name_equal(std::string_view left, std::string_view right) noexcept {
     left = trimmed(left);
     right = trimmed(right);
-    if (left.size() != right.size()) return false;
-    for (std::size_t index = 0; index < left.size(); ++index) {
+    std::size_t left_index = next_spelled_byte(left, 0U);
+    std::size_t right_index = next_spelled_byte(right, 0U);
+    while (left_index < left.size() && right_index < right.size()) {
         const unsigned char left_byte =
-            static_cast<unsigned char>(left[index]);
+            static_cast<unsigned char>(left[left_index]);
         const unsigned char right_byte =
-            static_cast<unsigned char>(right[index]);
+            static_cast<unsigned char>(right[right_index]);
         const unsigned char folded_left =
             left_byte >= 'A' && left_byte <= 'Z' ?
                 static_cast<unsigned char>(left_byte + ('a' - 'A')) :
@@ -174,8 +186,10 @@ bool ascii_name_equal(std::string_view left, std::string_view right) noexcept {
                 static_cast<unsigned char>(right_byte + ('a' - 'A')) :
                 right_byte;
         if (folded_left != folded_right) return false;
+        left_index = next_spelled_byte(left, left_index + 1U);
+        right_index = next_spelled_byte(right, right_index + 1U);
     }
-    return true;
+    return left_index == left.size() && right_index == right.size();
 }
 
 const PropertyEnumChoice* enum_choice_by_name(
@@ -799,6 +813,14 @@ PropertyObjectValue make_property_object(
     std::string type_name, std::vector<PropertyObjectMember> members) {
     std::shared_ptr<gui_forms::PropertyObjectData> data = std::make_shared<PropertyObjectData>();
     (*data).type_name = std::move(type_name);
+    // Member names are registered names, stored in snake_case whichever
+    // spelling the application wrote (owner decision 8). An empty name is
+    // left for the tree validation below to reject.
+    for (PropertyObjectMember& member : members) {
+        if (member.name.find_first_not_of(" \t\r\n") != std::string::npos) {
+            member.name = registered_name(member.name);
+        }
+    }
     (*data).members = std::move(members);
     PropertyObjectValue result = PropertyValueFactoryAccess::object(
         std::move(data));
@@ -876,53 +898,6 @@ std::optional<BindingValue> convert_property_value(
         }
     }
     return {};
-}
-
-std::string property_display_name(std::string_view registered_name) {
-    std::string display;
-    display.reserve(registered_name.size());
-    bool word_start = true;
-    for (std::size_t index = 0; index < registered_name.size(); ++index) {
-        const char character = registered_name[index];
-        if (character == '-') {
-            word_start = true;
-            continue;
-        }
-        const unsigned char byte = static_cast<unsigned char>(character);
-        if (word_start && byte >= 'a' && byte <= 'z') {
-            display += static_cast<char>(byte - ('a' - 'A'));
-        } else {
-            display += character;
-        }
-        word_start = false;
-    }
-    return display;
-}
-
-std::string canonical_property_name(std::string_view name) {
-    const std::string::size_type first = name.find_first_not_of(" \t\r\n");
-    if (first == std::string_view::npos) {
-        throw std::invalid_argument("GUI.Forms property name may not be empty");
-    }
-    const std::string::size_type last = name.find_last_not_of(" \t\r\n");
-    const std::string_view trimmed = name.substr(first, last - first + 1U);
-    std::string registered;
-    registered.reserve(trimmed.size() + 8U);
-    for (std::size_t index = 0; index < trimmed.size(); ++index) {
-        const unsigned char byte = static_cast<unsigned char>(trimmed[index]);
-        if (byte >= 'A' && byte <= 'Z') {
-            if (index > 0U) {
-                const unsigned char previous = static_cast<unsigned char>(trimmed[index - 1U]);
-                const bool after_word = (previous >= 'a' && previous <= 'z') ||
-                                        (previous >= '0' && previous <= '9');
-                if (after_word) registered += '-';
-            }
-            registered += static_cast<char>(byte + ('a' - 'A'));
-        } else {
-            registered += trimmed[index];
-        }
-    }
-    return registered;
 }
 
 std::string canonical_binding_name(std::string_view name) {

@@ -465,14 +465,14 @@ constexpr std::array<PartField<DateTimePicker::Parts>, 9> date_time_picker_extra
      .member = &DateTimePicker::Parts::edge},
     {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
      .member = &DateTimePicker::Parts::content},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = "button"},
      .member = &DateTimePicker::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &DateTimePicker::Parts::disclosure},
-    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button",
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button",
                      .states = date_time_picker_pressable_states},
      .member = &DateTimePicker::Parts::increment_arrow},
-    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button",
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button",
                      .states = date_time_picker_pressable_states},
      .member = &DateTimePicker::Parts::decrement_arrow},
     {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {},
@@ -502,7 +502,7 @@ constexpr std::array<AnatomyState, 10> date_time_picker_states =
     state_declarations(date_time_picker_state_fields);
 
 constexpr ControlAnatomy date_time_picker_anatomy{
-    .control_id = "date-time-picker",
+    .control_id = "date_time_picker",
     .parts = date_time_picker_parts,
     .states = date_time_picker_states,
     .custom_states = {},
@@ -601,9 +601,9 @@ namespace {
 
 // The events DateTimePicker adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 3> date_time_picker_interactions{{
-    {.name = "value-changed", .payload = "DateTimeValue", .mutable_payload = false},
-    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
-    {.name = "drop-down-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "value_changed", .payload = "DateTimeValue", .mutable_payload = false},
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "drop_down_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

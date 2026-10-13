@@ -13,7 +13,7 @@
 namespace gui_forms::gallery {
 
 struct CatalogEntry final {
-    std::string_view id;            // kebab-case registry id, e.g. "track-bar"
+    std::string_view id;            // registry id, snake_case, e.g. "track_bar"
     std::string_view type;          // public C++ type name, e.g. "TrackBar"
     std::string_view header;        // path relative to include/
     std::string_view category;      // one of catalog_categories

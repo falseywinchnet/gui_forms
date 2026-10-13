@@ -62,7 +62,7 @@ Insets MaterialPanel::visual_outsets() const noexcept {
 namespace {
 
 constexpr ControlAnatomy material_panel_anatomy{
-    .control_id = "material-panel",
+    .control_id = "material_panel",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -87,7 +87,7 @@ namespace {
 
 // The events MaterialPanel adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> material_panel_interactions{{
-    {.name = "material-changed", .payload = "SurfaceMaterial", .mutable_payload = false},
+    {.name = "material_changed", .payload = "SurfaceMaterial", .mutable_payload = false},
 }};
 
 } // namespace

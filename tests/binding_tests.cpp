@@ -412,25 +412,31 @@ void test_nested_property_values_are_bounded_immutable_and_structural() {
             "nested property construction must reject ambiguous names, failed homogeneous conversion, and over-depth trees");
 }
 
-// A property has one registered name, in kebab-case; its display name is
-// derived, and either finds the property.
-void test_property_names_are_registered_in_kebab_case() {
-    require(canonical_property_name("AutoSizeMode") == "auto-size-mode" &&
-                canonical_property_name("auto-size-mode") == "auto-size-mode" &&
-                canonical_property_name(" Text ") == "text" &&
-                property_display_name("auto-size-mode") == "AutoSizeMode" &&
-                property_display_name("text") == "Text",
-            "display names and registered names convert one to the other");
+// A property has one registered name, stored in snake_case; its CSS and
+// display spellings are derived, and every spelling finds the property.
+void test_property_names_are_registered_in_snake_case() {
     std::shared_ptr<gui_forms::Panel> panel = make_control<Panel>(StableId("property.names"));
-    const std::optional<PropertyDescriptor> by_registered = (*panel).property_descriptor("auto-size-mode");
+    const std::optional<PropertyDescriptor> by_registered = (*panel).property_descriptor("auto_size_mode");
+    const std::optional<PropertyDescriptor> by_css = (*panel).property_descriptor("auto-size-mode");
     const std::optional<PropertyDescriptor> by_display = (*panel).property_descriptor("AutoSizeMode");
-    require(by_registered && by_display && (*by_registered).name == "auto-size-mode" &&
-                (*by_display).name == "auto-size-mode",
-            "a property is registered in kebab-case and found by either spelling");
+    require(by_registered && by_css && by_display && (*by_registered).name == "auto_size_mode" &&
+                (*by_css).name == "auto_size_mode" && (*by_display).name == "auto_size_mode",
+            "a property is stored in snake_case and found by any of its spellings");
+    require(display_spelling((*by_registered).name) == "AutoSizeMode",
+            "PropertyGrid's label is the derived display spelling");
     const std::vector<PropertyDescriptor> descriptors = (*panel).property_descriptors();
     for (const PropertyDescriptor& descriptor : descriptors) {
-        require(is_kebab_case_name(descriptor.name), "every stock property name is kebab-case");
+        require(is_registered_name(descriptor.name), "every stock property name is snake_case");
     }
+    PropertyDescriptor size_mode;
+    size_mode.kind = BindingValueKind::enumeration;
+    size_mode.enumeration = (*(*panel).property_descriptor("auto_size_mode")).enumeration;
+    const std::optional<BindingValue> grow =
+        convert_property_value(BindingValue{std::string("GrowAndShrink")}, size_mode);
+    const PropertyEnumValue* grow_value = grow ? std::get_if<PropertyEnumValue>(&*grow) : nullptr;
+    require(grow_value != nullptr && (*grow_value).name == "grow_and_shrink" &&
+                (*grow_value).type_name == "auto_size_mode",
+            "an enumeration value written in any spelling is stored by its registered name");
 }
 
 void test_property_metadata_defaults_reset_and_serialization() {
@@ -477,12 +483,12 @@ void test_property_metadata_defaults_reset_and_serialization() {
 
     const std::vector<std::string> names = (*editor).bindable_property_names();
     require(names == std::vector<std::string>{
-                "auto-size", "causes-validation", "enabled", "name", "text",
+                "auto_size", "causes_validation", "enabled", "name", "text",
                 "visible"},
             "bindable property enumeration must be deterministic and use the registered names");
     const std::vector<PropertyDescriptor> descriptors = (*editor).property_descriptors();
     require(descriptors.size() == 21U &&
-                descriptors.front().name == "accessible-description" &&
+                descriptors.front().name == "accessible_description" &&
                 descriptors.back().name == "visible",
             "property descriptor snapshots must follow deterministic canonical order");
 
@@ -510,7 +516,7 @@ void test_property_metadata_defaults_reset_and_serialization() {
                 (*editor).auto_size_mode() == AutoSizeMode::grow_and_shrink &&
                 std::get<PropertyEnumValue>(
                     *(*editor).property_value("Anchor")).name ==
-                    "Bottom, Right" &&
+                    "bottom, right" &&
                 (*editor).should_serialize_property("Bounds") &&
                 (*editor).should_serialize_property("Dock"),
             "generic property access must drive real retained compound, enum, and flags behavior");
@@ -1048,7 +1054,7 @@ int main() {
         test_nested_property_values_are_bounded_immutable_and_structural();
         test_property_enum_schema_bounds_and_unicode();
         test_property_metadata_defaults_reset_and_serialization();
-        test_property_names_are_registered_in_kebab_case();
+        test_property_names_are_registered_in_snake_case();
         test_property_mutation_initialization_thread_and_lifetime_guards();
         test_visual_property_values_drive_stock_controls();
         test_multi_control_two_way_currency_and_event_order();

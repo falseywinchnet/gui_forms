@@ -69,9 +69,9 @@ private:
 std::shared_ptr<const PropertyEnumDescriptor> picture_box_size_mode_enum() {
     static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
         PropertyEnumDescriptor{
-            "System.Windows.Forms.PictureBoxSizeMode",
-            {{"Normal", 0}, {"StretchImage", 1}, {"AutoSize", 2},
-             {"CenterImage", 3}, {"Zoom", 4}},
+            "picture_box_size_mode",
+            {{"normal", 0}, {"stretch_image", 1}, {"auto_size", 2},
+             {"center_image", 3}, {"zoom", 4}},
             false});
     return value;
 }

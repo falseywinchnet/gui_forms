@@ -114,9 +114,9 @@ void draw_owner_decoration_edge(
 std::shared_ptr<const PropertyEnumDescriptor> dock_style_property_enum_impl() {
     static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
         PropertyEnumDescriptor{
-            "System.Windows.Forms.DockStyle",
-            {{"None", 0}, {"Top", 1}, {"Bottom", 2}, {"Left", 3},
-             {"Right", 4}, {"Fill", 5}},
+            "dock_style",
+            {{"none", 0}, {"top", 1}, {"bottom", 2}, {"left", 3},
+             {"right", 4}, {"fill", 5}},
             false});
     return value;
 }
@@ -124,9 +124,9 @@ std::shared_ptr<const PropertyEnumDescriptor> dock_style_property_enum_impl() {
 std::shared_ptr<const PropertyEnumDescriptor> anchor_styles_property_enum_impl() {
     static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
         PropertyEnumDescriptor{
-            "System.Windows.Forms.AnchorStyles",
-            {{"None", 0}, {"Top", 1}, {"Bottom", 2}, {"Left", 4},
-             {"Right", 8}},
+            "anchor_styles",
+            {{"none", 0}, {"top", 1}, {"bottom", 2}, {"left", 4},
+             {"right", 8}},
             true});
     return value;
 }
@@ -134,8 +134,8 @@ std::shared_ptr<const PropertyEnumDescriptor> anchor_styles_property_enum_impl()
 std::shared_ptr<const PropertyEnumDescriptor> auto_size_mode_property_enum_impl() {
     static const std::shared_ptr<const gui_forms::PropertyEnumDescriptor> value = std::make_shared<const PropertyEnumDescriptor>(
         PropertyEnumDescriptor{
-            "System.Windows.Forms.AutoSizeMode",
-            {{"GrowAndShrink", 0}, {"GrowOnly", 1}},
+            "auto_size_mode",
+            {{"grow_and_shrink", 0}, {"grow_only", 1}},
             false});
     return value;
 }
@@ -318,7 +318,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertyConnector<RegisteredProperty::enabled>{this}, {},
         {}});
     define_bindable_property({
-        {"auto-size", BindingValueKind::boolean, "Layout",
+        {"auto_size", BindingValueKind::boolean, "Layout",
          "Whether retained measurement determines this control's size.",
          BindingValue{false}, Dirty::measure | Dirty::arrange |
              Dirty::hit_test | Dirty::semantics | Dirty::accessibility},
@@ -327,7 +327,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertyConnector<RegisteredProperty::auto_size>{this}, {},
         {}});
     define_bindable_property({
-        {"causes-validation", BindingValueKind::boolean, "Behavior",
+        {"causes_validation", BindingValueKind::boolean, "Behavior",
          "Whether moving focus from this control initiates validation.",
          BindingValue{true}, Dirty::none},
         RegisteredPropertyGetter<RegisteredProperty::causes_validation>{this},
@@ -349,7 +349,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::bounds>{this});
 
     PropertyDescriptor minimum_size;
-    minimum_size.name = "minimum-size";
+    minimum_size.name = "minimum_size";
     minimum_size.kind = BindingValueKind::size;
     minimum_size.category = "Layout";
     minimum_size.description = "Minimum retained layout size.";
@@ -361,7 +361,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::minimum_size>{this});
 
     PropertyDescriptor maximum_size;
-    maximum_size.name = "maximum-size";
+    maximum_size.name = "maximum_size";
     maximum_size.kind = BindingValueKind::size;
     maximum_size.category = "Layout";
     maximum_size.description =
@@ -399,7 +399,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::padding>{this});
 
     PropertyDescriptor auto_scroll_offset;
-    auto_scroll_offset.name = "auto-scroll-offset";
+    auto_scroll_offset.name = "auto_scroll_offset";
     auto_scroll_offset.kind = BindingValueKind::point;
     auto_scroll_offset.category = "Layout";
     auto_scroll_offset.description =
@@ -419,7 +419,7 @@ Control::Control(StableId stable_id)
     dock.category = "Layout";
     dock.description = "Edge or fill participation in parent layout.";
     dock.default_value = BindingValue{PropertyEnumValue{
-        "System.Windows.Forms.DockStyle", "None", 0}};
+        "dock_style", "none", 0}};
     dock.invalidation_effects = invalidation::bounds;
     dock.enumeration = dock_style_property_enum();
     define_structural_property(
@@ -433,7 +433,7 @@ Control::Control(StableId stable_id)
     anchor.category = "Layout";
     anchor.description = "Flags retaining distances to parent client edges.";
     anchor.default_value = BindingValue{PropertyEnumValue{
-        "System.Windows.Forms.AnchorStyles", "Top, Left", 5}};
+        "anchor_styles", "top, left", 5}};
     anchor.invalidation_effects = invalidation::bounds;
     anchor.enumeration = anchor_styles_property_enum();
     define_structural_property(
@@ -442,12 +442,12 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::anchor>{this});
 
     PropertyDescriptor auto_size_mode;
-    auto_size_mode.name = "auto-size-mode";
+    auto_size_mode.name = "auto_size_mode";
     auto_size_mode.kind = BindingValueKind::enumeration;
     auto_size_mode.category = "Layout";
     auto_size_mode.description = "Whether automatic sizing may shrink.";
     auto_size_mode.default_value = BindingValue{PropertyEnumValue{
-        "System.Windows.Forms.AutoSizeMode", "GrowOnly", 1}};
+        "auto_size_mode", "grow_only", 1}};
     auto_size_mode.invalidation_effects = Dirty::measure | Dirty::arrange |
         Dirty::hit_test | Dirty::semantics | Dirty::accessibility;
     auto_size_mode.enumeration = auto_size_mode_property_enum();
@@ -457,7 +457,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::auto_size_mode>{this});
 
     PropertyDescriptor tab_index;
-    tab_index.name = "tab-index";
+    tab_index.name = "tab_index";
     tab_index.kind = BindingValueKind::unsigned_integer;
     tab_index.category = "Behavior";
     tab_index.description = "Keyboard traversal order within the retained tree.";
@@ -469,7 +469,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::tab_index>{this});
 
     PropertyDescriptor tab_stop;
-    tab_stop.name = "tab-stop";
+    tab_stop.name = "tab_stop";
     tab_stop.kind = BindingValueKind::boolean;
     tab_stop.category = "Behavior";
     tab_stop.description = "Whether keyboard traversal may focus this control.";
@@ -481,7 +481,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::tab_stop>{this});
 
     PropertyDescriptor allow_drop;
-    allow_drop.name = "allow-drop";
+    allow_drop.name = "allow_drop";
     allow_drop.kind = BindingValueKind::boolean;
     allow_drop.category = "Behavior";
     allow_drop.description = "Whether this control may receive drag data.";
@@ -493,7 +493,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::allow_drop>{this});
 
     PropertyDescriptor hit_test_transparent;
-    hit_test_transparent.name = "hit-test-transparent";
+    hit_test_transparent.name = "hit_test_transparent";
     hit_test_transparent.kind = BindingValueKind::boolean;
     hit_test_transparent.category = "Behavior";
     hit_test_transparent.description =
@@ -510,7 +510,7 @@ Control::Control(StableId stable_id)
             this});
 
     PropertyDescriptor accessible_name;
-    accessible_name.name = "accessible-name";
+    accessible_name.name = "accessible_name";
     accessible_name.kind = BindingValueKind::text;
     accessible_name.category = "Accessibility";
     accessible_name.description = "Authored assistive name override.";
@@ -522,7 +522,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::accessible_name>{this});
 
     PropertyDescriptor accessible_description;
-    accessible_description.name = "accessible-description";
+    accessible_description.name = "accessible_description";
     accessible_description.kind = BindingValueKind::text;
     accessible_description.category = "Accessibility";
     accessible_description.description = "Authored assistive description.";
@@ -745,11 +745,12 @@ void Control::set_tag(std::any tag) {
 
 void Control::define_bindable_property(BindableProperty property) {
     PropertyDescriptor& descriptor = property.descriptor;
-    // A display name is accepted and registered under its kebab-case name.
-    const std::string canonical = canonical_property_name(descriptor.name);
-    if (!is_kebab_case_name(canonical)) {
+    // Any spelling is accepted; the property is registered under its stored
+    // snake_case name.
+    const std::string canonical = registered_name(descriptor.name);
+    if (!is_registered_name(canonical)) {
         throw std::invalid_argument(
-            "GUI.Forms property name must be kebab-case or its display form");
+            "GUI.Forms property name must convert to a snake_case registered name");
     }
     descriptor.name = canonical;
     if (!descriptor.readable && !descriptor.writable) {
@@ -845,7 +846,7 @@ void Control::clear_bindable_properties() {
 const BindableProperty* Control::find_bindable_property(
     std::string_view name) const {
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_property_name(name));
+        bindable_properties_.find(registered_name(name));
     return found == bindable_properties_.end() ||
             !(*found).second.descriptor.bindable
         ? nullptr : &(*found).second;
@@ -871,7 +872,7 @@ std::vector<std::string> Control::bindable_property_names() const {
 std::optional<PropertyDescriptor> Control::property_descriptor(
     std::string_view name) const {
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_property_name(name));
+        bindable_properties_.find(registered_name(name));
     if (found == bindable_properties_.end()) return std::nullopt;
     return (*found).second.descriptor;
 }
@@ -893,7 +894,7 @@ std::optional<BindingValue> Control::property_value(std::string_view name) const
     }
     if (window_) (*window_).require_ui_thread("control property query");
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_property_name(name));
+        bindable_properties_.find(registered_name(name));
     if (found == bindable_properties_.end() ||
         !(*found).second.descriptor.readable || !(*found).second.get) {
         return std::nullopt;
@@ -912,7 +913,7 @@ std::optional<BindingValue> Control::property_value(std::string_view name) const
 
 void Control::set_property_value(std::string_view name, BindingValue value) {
     require_mutable();
-    const std::string canonical = canonical_property_name(name);
+    const std::string canonical = registered_name(name);
     const BindablePropertyMap::iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -937,7 +938,7 @@ void Control::set_property_value(std::string_view name, BindingValue value) {
 SubscriptionToken Control::subscribe_property_changed(
     std::string_view name, Component& owner, std::function<void()> changed) {
     require_mutable();
-    const std::string canonical = canonical_property_name(name);
+    const std::string canonical = registered_name(name);
     const BindablePropertyMap::iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -953,7 +954,7 @@ SubscriptionToken Control::subscribe_property_changed(
 bool Control::reset_property(std::string_view name) {
     require_mutable();
     const BindablePropertyMap::iterator found =
-        bindable_properties_.find(canonical_property_name(name));
+        bindable_properties_.find(registered_name(name));
     if (found == bindable_properties_.end()) return false;
     const PropertyRegistration registration = (*found).second;
     if (registration.reset) {
@@ -974,7 +975,7 @@ bool Control::should_serialize_property(std::string_view name) const {
             "GUI.Forms cannot inspect a disposed control property");
     }
     if (window_) (*window_).require_ui_thread("control property inspection");
-    const std::string canonical = canonical_property_name(name);
+    const std::string canonical = registered_name(name);
     const BindablePropertyMap::const_iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -1003,7 +1004,7 @@ PropertyValueOrigin Control::property_value_origin(
     if (window_) {
         (*window_).require_ui_thread("control property origin inspection");
     }
-    const std::string canonical = canonical_property_name(name);
+    const std::string canonical = registered_name(name);
     const BindablePropertyMap::const_iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -2784,19 +2785,19 @@ namespace {
 
 // The events Control adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 13> control_interactions{{
-    {.name = "name-changed", .payload = "std::string", .mutable_payload = false},
-    {.name = "visible-changed", .payload = "bool", .mutable_payload = false},
-    {.name = "enabled-changed", .payload = "bool", .mutable_payload = false},
-    {.name = "auto-size-changed", .payload = "bool", .mutable_payload = false},
-    {.name = "causes-validation-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "name_changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "visible_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "enabled_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "auto_size_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "causes_validation_changed", .payload = "bool", .mutable_payload = false},
     {.name = "validating", .payload = "ControlValidationEvent", .mutable_payload = true},
     {.name = "validated", .payload = "", .mutable_payload = false},
-    {.name = "initialization-completed", .payload = "Dirty, bool", .mutable_payload = false},
-    {.name = "pointer-observed", .payload = "PointerEvent", .mutable_payload = false},
-    {.name = "pointer-preview-observed", .payload = "PointerEvent", .mutable_payload = false},
-    {.name = "focus-observed", .payload = "bool", .mutable_payload = false},
-    {.name = "arranged-bounds-changed", .payload = "Rect", .mutable_payload = false},
-    {.name = "help-requested", .payload = "HelpRequestEvent", .mutable_payload = true},
+    {.name = "initialization_completed", .payload = "Dirty, bool", .mutable_payload = false},
+    {.name = "pointer_observed", .payload = "PointerEvent", .mutable_payload = false},
+    {.name = "pointer_preview_observed", .payload = "PointerEvent", .mutable_payload = false},
+    {.name = "focus_observed", .payload = "bool", .mutable_payload = false},
+    {.name = "arranged_bounds_changed", .payload = "Rect", .mutable_payload = false},
+    {.name = "help_requested", .payload = "HelpRequestEvent", .mutable_payload = true},
 }};
 
 } // namespace

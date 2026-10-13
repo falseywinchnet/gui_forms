@@ -793,7 +793,7 @@ bool ScrollableControl::on_semantic_child_action(
 namespace {
 
 constexpr ControlAnatomy scrollable_control_anatomy{
-    .control_id = "scrollable-control",
+    .control_id = "scrollable_control",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

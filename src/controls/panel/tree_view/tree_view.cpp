@@ -523,7 +523,7 @@ constexpr std::array<PartField<TreeView::ItemParts>, 5> tree_view_item_part_fiel
      .member = &TreeView::ItemParts::icon},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &TreeView::ItemParts::label},
-    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "row_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &TreeView::ItemParts::row_focus},
 }};
 
@@ -551,7 +551,7 @@ constexpr std::array<ItemSystemDeclaration, 1> tree_view_item_systems{{
 }};
 
 constexpr ControlAnatomy tree_view_anatomy{
-    .control_id = "tree-view",
+    .control_id = "tree_view",
     .parts = tree_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -676,9 +676,9 @@ namespace {
 
 // The events TreeView adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 3> tree_view_interactions{{
-    {.name = "selection-changed", .payload = "TreeSelectionChange", .mutable_payload = false},
-    {.name = "expansion-changed", .payload = "TreeExpansionChange", .mutable_payload = false},
-    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "TreeSelectionChange", .mutable_payload = false},
+    {.name = "expansion_changed", .payload = "TreeExpansionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::string", .mutable_payload = false},
 }};
 
 } // namespace

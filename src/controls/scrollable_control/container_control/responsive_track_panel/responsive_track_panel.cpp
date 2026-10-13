@@ -696,7 +696,7 @@ SemanticDescriptor ResponsiveTrackPanel::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy responsive_track_panel_anatomy{
-    .control_id = "responsive-track-panel",
+    .control_id = "responsive_track_panel",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

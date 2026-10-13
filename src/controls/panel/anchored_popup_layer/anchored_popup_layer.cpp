@@ -147,7 +147,7 @@ SemanticDescriptor AnchoredPopupLayer::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy anchored_popup_layer_anatomy{
-    .control_id = "anchored-popup-layer",
+    .control_id = "anchored_popup_layer",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -163,7 +163,7 @@ namespace {
 
 // The events AnchoredPopupLayer adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> anchored_popup_layer_interactions{{
-    {.name = "dismiss-requested", .payload = "PopupDismissReason", .mutable_payload = false},
+    {.name = "dismiss_requested", .payload = "PopupDismissReason", .mutable_payload = false},
 }};
 
 } // namespace

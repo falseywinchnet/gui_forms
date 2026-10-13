@@ -463,7 +463,7 @@ namespace {
 
 // The events ToolTip adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> tool_tip_interactions{{
-    {.name = "visibility-changed", .payload = "ToolTipEvent", .mutable_payload = false},
+    {.name = "visibility_changed", .payload = "ToolTipEvent", .mutable_payload = false},
 }};
 
 } // namespace

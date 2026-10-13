@@ -82,11 +82,11 @@ void require_parts_within_region(const Control& control) {
     }
 }
 
-void test_names_are_kebab_case_and_round_trip() {
+void test_names_are_registered_and_round_trip() {
     for (std::size_t index = 0; index < part_role_count; ++index) {
         const PartRole role = static_cast<PartRole>(index);
         const std::string_view name = part_role_name(role);
-        require(is_kebab_case_name(name), "part role names must be kebab-case");
+        require(is_registered_name(name), "part role names must be snake_case");
         const std::optional<PartRole> parsed = part_role_from_name(name);
         require(parsed.has_value() && *parsed == role,
                 "part role names must round-trip");
@@ -94,7 +94,7 @@ void test_names_are_kebab_case_and_round_trip() {
     for (std::size_t index = 0; index < anatomy_state_count; ++index) {
         const AnatomyState state = static_cast<AnatomyState>(index);
         const std::string_view name = anatomy_state_name(state);
-        require(is_kebab_case_name(name), "state names must be kebab-case");
+        require(is_registered_name(name), "state names must be snake_case");
         const std::optional<AnatomyState> parsed = anatomy_state_from_name(name);
         require(parsed.has_value() && *parsed == state,
                 "state names must round-trip");
@@ -102,21 +102,34 @@ void test_names_are_kebab_case_and_round_trip() {
     require(part_role_name(PartRole::count).empty() &&
                 anatomy_state_name(AnatomyState::count).empty(),
             "out-of-range enumerators must have no name");
-    require(anatomy_state_name(AnatomyState::drop_accepted) == "drop-accepted" &&
+    require(anatomy_state_name(AnatomyState::drop_accepted) == "drop_accepted" &&
                 part_role_name(PartRole::preselect) == "preselect" &&
                 anatomy_state_name(AnatomyState::preselect) == "preselect",
-            "snake_case enumerators must map to kebab-case names");
+            "snake_case enumerators must map to the same registered names");
     require(!part_role_from_name("Thumb").has_value() &&
-                !anatomy_state_from_name("drop_accepted").has_value(),
-            "lookup must be exact and case-sensitive");
+                !anatomy_state_from_name("drop-accepted").has_value(),
+            "lookup by stored name must be exact");
 
-    require(is_kebab_case_name("scroll-thumb") && is_kebab_case_name("a1-b2"),
-            "kebab-case names must be accepted");
-    require(!is_kebab_case_name("") && !is_kebab_case_name("-thumb") &&
-                !is_kebab_case_name("thumb-") && !is_kebab_case_name("scroll--thumb") &&
-                !is_kebab_case_name("Scroll") && !is_kebab_case_name("scroll_thumb") &&
-                !is_kebab_case_name("1st") && !is_kebab_case_name("scroll thumb"),
+    require(is_registered_name("scroll_thumb") && is_registered_name("a1_b2"),
+            "snake_case names must be accepted");
+    require(!is_registered_name("") && !is_registered_name("_thumb") &&
+                !is_registered_name("thumb_") && !is_registered_name("scroll__thumb") &&
+                !is_registered_name("Scroll") && !is_registered_name("scroll-thumb") &&
+                !is_registered_name("1st") && !is_registered_name("scroll thumb"),
             "malformed names must be rejected");
+
+    // One name, three spellings (owner decision 8).
+    require(registered_name("scroll-thumb") == "scroll_thumb" &&
+                registered_name("ScrollThumb") == "scroll_thumb" &&
+                registered_name("scroll_thumb") == "scroll_thumb" &&
+                registered_name("HScrollBar") == "h_scroll_bar" &&
+                registered_name("Bounds.Width") == "bounds.width" &&
+                registered_name("Font.LetterSpacing") == "font.letter_spacing",
+            "every spelling converts to the stored snake_case name");
+    require(css_spelling("drop_accepted") == "drop-accepted" &&
+                display_spelling("h_scroll_bar") == "HScrollBar" &&
+                display_spelling("font.letter_spacing") == "Font.LetterSpacing",
+            "the CSS and display spellings are derived from the stored name");
 }
 
 constexpr std::array<PartDeclaration, 2> duplicate_parts{{
@@ -154,8 +167,8 @@ void test_validation_rejects_malformed_anatomy() {
     const ControlAnatomy bad_id{
         .control_id = "TrackBar", .parts = single_region, .states = {},
         .custom_states = {}};
-    require(defect_of(bad_id) == AnatomyDefect::control_id_not_kebab_case,
-            "a control id must be kebab-case");
+    require(defect_of(bad_id) == AnatomyDefect::control_id_not_snake_case,
+            "a control id must be snake_case");
 
     const ControlAnatomy duplicated{
         .control_id = "dial", .parts = duplicate_parts, .states = {},
@@ -208,9 +221,9 @@ void test_range_control_anatomies_validate() {
         require(find_part(anatomy, "region").has_value(),
                 std::string(anatomy.control_id) + " must declare its region");
     }
-    require((*track).anatomy().control_id == "track-bar" &&
-                (*scroll).anatomy().control_id == "h-scroll-bar" &&
-                (*progress).anatomy().control_id == "progress-bar",
+    require((*track).anatomy().control_id == "track_bar" &&
+                (*scroll).anatomy().control_id == "h_scroll_bar" &&
+                (*progress).anatomy().control_id == "progress_bar",
             "range controls must publish their registry ids");
     require(&(*track).anatomy() == &(*make_control<TrackBar>(StableId("anatomy.track.2"))).anatomy(),
             "an anatomy belongs to the type, not the instance");
@@ -314,7 +327,7 @@ void test_scroll_bar_geometry_and_states() {
         require_declared_states(bar);
     }
     const ControlAnatomy& anatomy = (*horizontal).anatomy();
-    const std::optional<PartIndex> arrow = find_part(anatomy, "decrement-arrow");
+    const std::optional<PartIndex> arrow = find_part(anatomy, "decrement_arrow");
     require(arrow.has_value() &&
                 anatomy.parts[(*arrow).value].role == PartRole::actuator &&
                 anatomy.parts[(*arrow).value].composed_from == "button",
@@ -600,7 +613,7 @@ void test_drop_down_button_disclosure() {
     Window window(button, {140.0, 28.0});
     window.perform_layout();
     require(validate_control_anatomy((*button).anatomy()).defect == AnatomyDefect::none &&
-                (*button).anatomy().control_id == "drop-down-button",
+                (*button).anatomy().control_id == "drop_down_button",
             "DropDownButton must publish its own valid anatomy");
     const PartGeometry segment = (*button).parts().drop_down;
     const PartGeometry arrow = (*button).parts().disclosure;
@@ -650,7 +663,7 @@ void test_panel_and_scrollable_parts() {
     require(viewport.present && viewport.bounds.right() <= track.bounds.x,
             "the viewport ends where the vertical scroll axis begins");
     const ControlAnatomy& anatomy = (*panel).anatomy();
-    const std::optional<PartIndex> thumb_index = find_part(anatomy, "vertical-thumb");
+    const std::optional<PartIndex> thumb_index = find_part(anatomy, "vertical_thumb");
     require(thumb_index.has_value() &&
                 anatomy.parts[(*thumb_index).value].role == PartRole::thumb,
             "a container's scroll thumb shares the thumb role with ScrollBar");
@@ -677,7 +690,7 @@ void test_group_box_and_label_parts() {
     require(caption.present && edge.present && caption.bounds.y < edge.bounds.y &&
                 caption.bounds.bottom() > edge.bounds.y,
             "the group caption sits across the top of its frame");
-    require((*group).anatomy().control_id == "group-box", "GroupBox publishes its own id");
+    require((*group).anatomy().control_id == "group_box", "GroupBox publishes its own id");
 
     const PartGeometry text = (*label).parts().label;
     require(text.present && text.bounds.width > 0.0 && near(text.bounds.x, 2.0),
@@ -785,7 +798,7 @@ void test_spin_combo_and_picker_parts() {
     const ControlAnatomy& spin_anatomy = (*spin).anatomy();
     const std::optional<PartIndex> field = find_part(spin_anatomy, "field");
     require(field.has_value() &&
-                spin_anatomy.parts[(*field).value].composed_from == "text-box",
+                spin_anatomy.parts[(*field).value].composed_from == "text_box",
             "the spin box field is composed from the text box system");
 
     const ComboBox::Parts closed = (*combo).parts();
@@ -904,7 +917,7 @@ constexpr std::array<PartDeclaration, 1> row_item_parts{{
     {.name = "row", .role = PartRole::region, .composed_from = {}},
 }};
 constexpr std::array<PartDeclaration, 1> column_item_parts{{
-    {.name = "column-header", .role = PartRole::region, .composed_from = {}},
+    {.name = "column_header", .role = PartRole::region, .composed_from = {}},
 }};
 constexpr std::array<ItemSystemDeclaration, 2> row_and_column_systems{{
     {.name = "item", .parts = row_item_parts, .states = {}, .custom_states = {}},
@@ -949,7 +962,7 @@ void test_part_states_are_validated() {
 }
 
 // A type's interactions are its public events, base types first, named in
-// kebab-case with their payload as the accessor spells it.
+// by the accessor's name with their payload as the accessor spells it.
 void test_interactions_follow_the_type() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.interactions.root"));
     std::shared_ptr<Button> button =
@@ -959,15 +972,15 @@ void test_interactions_follow_the_type() {
     const std::vector<InteractionDeclaration> declared = (*button).interactions();
     require(validate_interactions(declared).defect == InteractionDefect::none,
             "a button's interactions validate");
-    const std::size_t visible = find_interaction(declared, "visible-changed");
+    const std::size_t visible = find_interaction(declared, "visible_changed");
     const std::size_t clicked = find_interaction(declared, "clicked");
-    const std::size_t dialog = find_interaction(declared, "dialog-result-changed");
+    const std::size_t dialog = find_interaction(declared, "dialog_result_changed");
     require(visible < clicked && clicked < dialog && dialog < declared.size(),
             "Control's events come before ButtonBase's, and those before Button's");
     require(declared[clicked].payload == "ButtonBase" && declared[clicked].mutable_payload,
             "clicked passes the button by mutable reference");
     const std::size_t validating = find_interaction(declared, "validating");
-    const std::size_t text = find_interaction(declared, "text-changed");
+    const std::size_t text = find_interaction(declared, "text_changed");
     require(declared[validating].mutable_payload && declared[text].payload == "std::string" &&
                 !declared[text].mutable_payload,
             "payloads are spelled without const or reference marks");
@@ -985,16 +998,16 @@ constexpr std::array<InteractionDeclaration, 2> repeated_interactions{{
     {.name = "clicked", .payload = {}, .mutable_payload = false},
     {.name = "clicked", .payload = {}, .mutable_payload = false},
 }};
-constexpr std::array<InteractionDeclaration, 1> snake_interaction{{
-    {.name = "value_changed", .payload = "double", .mutable_payload = false},
+constexpr std::array<InteractionDeclaration, 1> kebab_interaction{{
+    {.name = "value-changed", .payload = "double", .mutable_payload = false},
 }};
 
 void test_interactions_are_validated() {
     require(validate_interactions(repeated_interactions).defect == InteractionDefect::duplicate_name,
             "an interaction name appears once in a type");
-    require(validate_interactions(snake_interaction).defect ==
-                InteractionDefect::name_not_kebab_case,
-            "interaction names are kebab-case");
+    require(validate_interactions(kebab_interaction).defect ==
+                InteractionDefect::name_not_snake_case,
+            "interaction names are snake_case");
 }
 
 void test_item_systems_are_distinct() {
@@ -1005,7 +1018,7 @@ void test_item_systems_are_distinct() {
             "a control may declare a second item system");
     const std::optional<ItemSystemIndex> column = find_item_system(two, "column");
     require(column.has_value() && (*column).value == 1U &&
-                find_item_part(two.item_systems[1], "column-header").has_value() &&
+                find_item_part(two.item_systems[1], "column_header").has_value() &&
                 !find_item_part(two.item_systems[1], "row").has_value(),
             "item parts are found within their own system");
     const ControlAnatomy repeated_part{
@@ -1290,7 +1303,7 @@ void test_item_custom_states_never_shadow_standard_states() {
 
 int main() {
     try {
-        test_names_are_kebab_case_and_round_trip();
+        test_names_are_registered_and_round_trip();
         test_validation_rejects_malformed_anatomy();
         test_range_control_anatomies_validate();
         test_track_bar_geometry_matches_pointer_mapping();

@@ -386,7 +386,7 @@ SemanticDescriptor FlowLayoutPanel::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy flow_layout_panel_anatomy{
-    .control_id = "flow-layout-panel",
+    .control_id = "flow_layout_panel",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

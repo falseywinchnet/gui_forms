@@ -547,11 +547,11 @@ constexpr std::array<PartField<MenuStrip::Parts>, 4> menu_strip_part_fields{{
 }};
 
 constexpr std::array<PartField<MenuStrip::ItemParts>, 3> menu_strip_item_part_fields{{
-    {.declaration = {.name = "menu-item", .role = PartRole::face, .composed_from = {}},
+    {.declaration = {.name = "menu_item", .role = PartRole::face, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_item},
-    {.declaration = {.name = "menu-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "menu_label", .role = PartRole::label, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_label},
-    {.declaration = {.name = "menu-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "menu_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_focus},
 }};
 
@@ -583,7 +583,7 @@ constexpr std::array<ItemSystemDeclaration, 1> menu_strip_item_systems{{
 }};
 
 constexpr ControlAnatomy menu_strip_anatomy{
-    .control_id = "menu-strip",
+    .control_id = "menu_strip",
     .parts = menu_strip_parts,
     .states = menu_strip_states,
     .custom_states = {},
@@ -702,8 +702,8 @@ namespace {
 
 // The events MenuStrip adds to those of Control, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> menu_strip_interactions{{
-    {.name = "item-invoked", .payload = "MenuStripInvocation", .mutable_payload = false},
-    {.name = "open-changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+    {.name = "item_invoked", .payload = "MenuStripInvocation", .mutable_payload = false},
+    {.name = "open_changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
 }};
 
 } // namespace

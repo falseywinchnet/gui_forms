@@ -39,12 +39,12 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
                 *this, &PictureBox::should_serialize_image)});
 
     PropertyDescriptor size_mode;
-    size_mode.name = "size-mode";
+    size_mode.name = "size_mode";
     size_mode.kind = BindingValueKind::enumeration;
     size_mode.category = "Appearance";
     size_mode.description = "Image placement and scaling policy.";
     size_mode.default_value = BindingValue{PropertyEnumValue{
-        "System.Windows.Forms.PictureBoxSizeMode", "Normal", 0}};
+        "picture_box_size_mode", "normal", 0}};
     size_mode.invalidation_effects =
         Dirty::measure | Dirty::paint | Dirty::semantics;
     size_mode.bindable = false;
@@ -59,7 +59,7 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
         {}, {}, {}});
 
     PropertyDescriptor opacity;
-    opacity.name = "image-opacity";
+    opacity.name = "image_opacity";
     opacity.kind = BindingValueKind::number;
     opacity.category = "Appearance";
     opacity.description = "Image opacity from zero through one.";
@@ -238,7 +238,7 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
                                             part_declarations(picture_box_extra_fields));
 
 constexpr ControlAnatomy picture_box_anatomy{
-    .control_id = "picture-box",
+    .control_id = "picture_box",
     .parts = picture_box_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -276,7 +276,7 @@ namespace {
 
 // The events PictureBox adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> picture_box_interactions{{
-    {.name = "image-changed", .payload = "ImageId", .mutable_payload = false},
+    {.name = "image_changed", .payload = "ImageId", .mutable_payload = false},
 }};
 
 } // namespace

@@ -256,11 +256,11 @@ constexpr std::array<PartField<NumericUpDown::Parts>, 5> numeric_up_down_extra_p
      .member = &NumericUpDown::Parts::face},
     {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
      .member = &NumericUpDown::Parts::edge},
-    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text-box"},
+    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text_box"},
      .member = &NumericUpDown::Parts::field},
-    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button"},
      .member = &NumericUpDown::Parts::increment_arrow},
-    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button"},
      .member = &NumericUpDown::Parts::decrement_arrow},
 }};
 
@@ -283,7 +283,7 @@ constexpr std::array<AnatomyState, 9> numeric_up_down_states =
     state_declarations(numeric_up_down_state_fields);
 
 constexpr ControlAnatomy numeric_up_down_anatomy{
-    .control_id = "numeric-up-down",
+    .control_id = "numeric_up_down",
     .parts = numeric_up_down_parts,
     .states = numeric_up_down_states,
     .custom_states = {},
@@ -349,7 +349,7 @@ namespace {
 
 // The events NumericUpDown adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> numeric_up_down_interactions{{
-    {.name = "value-changed", .payload = "double", .mutable_payload = false},
+    {.name = "value_changed", .payload = "double", .mutable_payload = false},
 }};
 
 } // namespace

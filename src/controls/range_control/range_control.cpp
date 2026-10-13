@@ -199,7 +199,7 @@ constexpr std::array<AnatomyState, 5> range_control_states =
     state_declarations(range_control_state_fields);
 
 constexpr ControlAnatomy range_control_anatomy{
-    .control_id = "range-control",
+    .control_id = "range_control",
     .parts = range_control_parts,
     .states = range_control_states,
     .custom_states = {},
@@ -236,8 +236,8 @@ namespace {
 
 // The events RangeControl adds to those of Control, in declaration order.
 constexpr std::array<InteractionDeclaration, 3> range_control_interactions{{
-    {.name = "range-changed", .payload = "double, double", .mutable_payload = false},
-    {.name = "value-changed", .payload = "double", .mutable_payload = false},
+    {.name = "range_changed", .payload = "double, double", .mutable_payload = false},
+    {.name = "value_changed", .payload = "double", .mutable_payload = false},
     {.name = "scroll", .payload = "RangeScrollEvent", .mutable_payload = false},
 }};
 

@@ -247,9 +247,9 @@ constexpr std::array<PartField<CheckedListBox::ItemParts>, 5> checked_item_part_
      .member = &CheckedListBox::ItemParts::row},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &CheckedListBox::ItemParts::label},
-    {.declaration = {.name = "row-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "row_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &CheckedListBox::ItemParts::row_focus},
-    {.declaration = {.name = "check-well", .role = PartRole::well, .composed_from = {}},
+    {.declaration = {.name = "check_well", .role = PartRole::well, .composed_from = {}},
      .member = &CheckedListBox::ItemParts::check_well},
     {.declaration = {.name = "check", .role = PartRole::indicator, .composed_from = {}},
      .member = &CheckedListBox::ItemParts::check},
@@ -274,7 +274,7 @@ constexpr std::array<ItemSystemDeclaration, 1> checked_list_box_item_systems{{
 }};
 
 constexpr ControlAnatomy checked_list_box_anatomy{
-    .control_id = "checked-list-box",
+    .control_id = "checked_list_box",
     .parts = list_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -348,8 +348,8 @@ namespace {
 
 // The events CheckedListBox adds to those of ListBox, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> checked_list_box_interactions{{
-    {.name = "item-checking", .payload = "ItemCheckEvent", .mutable_payload = true},
-    {.name = "item-check-state-changed", .payload = "std::size_t, CheckState", .mutable_payload = false},
+    {.name = "item_checking", .payload = "ItemCheckEvent", .mutable_payload = true},
+    {.name = "item_check_state_changed", .payload = "std::size_t, CheckState", .mutable_payload = false},
 }};
 
 } // namespace

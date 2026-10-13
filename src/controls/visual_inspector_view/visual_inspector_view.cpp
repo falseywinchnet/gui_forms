@@ -297,7 +297,7 @@ constexpr std::array<PartField<VisualInspectorView::Parts>, 5> visual_inspector_
      .member = &VisualInspectorView::Parts::face},
     {.declaration = {.name = "header", .role = PartRole::face, .composed_from = {}},
      .member = &VisualInspectorView::Parts::header},
-    {.declaration = {.name = "accent-strip", .role = PartRole::keyline, .composed_from = {}},
+    {.declaration = {.name = "accent_strip", .role = PartRole::keyline, .composed_from = {}},
      .member = &VisualInspectorView::Parts::accent_strip},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &VisualInspectorView::Parts::focus},
@@ -317,7 +317,7 @@ constexpr std::array<AnatomyState, 5> visual_inspector_view_states =
     state_declarations(visual_inspector_view_state_fields);
 
 constexpr ControlAnatomy visual_inspector_view_anatomy{
-    .control_id = "visual-inspector-view",
+    .control_id = "visual_inspector_view",
     .parts = visual_inspector_view_parts,
     .states = visual_inspector_view_states,
     .custom_states = {},
@@ -383,7 +383,7 @@ constexpr std::array<AnatomyState, 5> visual_inspector_overlay_states =
     state_declarations(visual_inspector_overlay_state_fields);
 
 constexpr ControlAnatomy visual_inspector_overlay_anatomy{
-    .control_id = "visual-inspector-overlay",
+    .control_id = "visual_inspector_overlay",
     .parts = visual_inspector_overlay_parts,
     .states = visual_inspector_overlay_states,
     .custom_states = {},

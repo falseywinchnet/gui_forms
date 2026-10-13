@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/schema/types/schema_types.hpp"
 #include "gui_forms/types.hpp"
 
 #include <array>
@@ -14,10 +15,11 @@ namespace gui_forms {
 // Control anatomy: the named parts and states a control type publishes
 // (design language §8.1 and §8.4; stage T1). Part and state names are a
 // versioned public contract. Within a major version names are only added,
-// never renamed or removed. Theme and form documents spell them in
-// kebab-case; the C++ enumerators below are snake_case and map one to one,
-// an underscore for each hyphen. Names never reuse a C++ keyword: the
-// default-action cue of §8.1 and §8.4 is named `preselect`.
+// never renamed or removed. Names are stored in snake_case and the C++
+// enumerators below match them one to one; theme and form documents write
+// them in kebab-case (see registered_name in gui_forms/schema). Names never
+// reuse a C++ keyword: the default-action cue of §8.1 and §8.4 is named
+// `preselect`.
 
 // Shared part roles. A cue a theme binds to (role, state) reaches every part
 // with that role in every control (§8.2).
@@ -192,8 +194,8 @@ private:
     std::uint16_t custom_bits_{};
 };
 
-// One declared part. `name` is the part's stable kebab-case identity within
-// its control type, as written in `::part(name)`. `composed_from` names the
+// One declared part. `name` is the part's stable registered name within its
+// control type; documents write it in `::part(name)`. `composed_from` names the
 // control id of a simpler system the part reuses (a scroll arrow is a
 // "button"), or is empty.
 struct PartDeclaration final {
@@ -214,7 +216,7 @@ struct CustomStateDeclaration final {
 
 // One kind of repeated item a control paints (owner decision 5): a list
 // row, a tree node, a details-view column header. `name` is the system's
-// kebab-case identity in the schema ("item", "column"). Item part names are
+// registered name in the schema ("item", "column"). Item part names are
 // unique within the control, across its own parts and every item system, so
 // a document addresses an item part by its name alone.
 struct ItemSystemDeclaration final {
@@ -280,17 +282,13 @@ struct PartGeometryBuffer final {
     }
 };
 
-// Kebab-case public names.
+// Registered (snake_case) public names.
 [[nodiscard]] std::string_view part_role_name(PartRole role) noexcept;
 [[nodiscard]] std::string_view anatomy_state_name(AnatomyState state) noexcept;
 [[nodiscard]] std::optional<PartRole> part_role_from_name(
     std::string_view name) noexcept;
 [[nodiscard]] std::optional<AnatomyState> anatomy_state_from_name(
     std::string_view name) noexcept;
-
-// True when `name` is non-empty lowercase ASCII words joined by single
-// hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
-[[nodiscard]] bool is_kebab_case_name(std::string_view name) noexcept;
 
 // Lookup by declared name within one declaration list, within a control
 // type's own parts, or within one of its item systems.
@@ -314,7 +312,7 @@ struct PartGeometryBuffer final {
                                        AnatomyState state) noexcept;
 
 // Typed records (stage T1). C++ reads a control's parts and states as dot
-// members of a record (`parts.thumb.bounds`, `states.pressed`); kebab-case
+// members of a record (`parts.thumb.bounds`, `states.pressed`); registered
 // names are identities for documents and tools only. A field table pairs
 // each record member with the declaration it publishes, so a type's
 // declared names and its record members come from one table.
@@ -444,31 +442,31 @@ void read_states(const std::array<StateField<Record>, Count>& fields,
 // Reasons a declared anatomy is malformed.
 enum class AnatomyDefect : std::uint8_t {
     none,
-    control_id_not_kebab_case,
+    control_id_not_snake_case,
     no_parts,
     too_many_parts,
-    part_name_not_kebab_case,
+    part_name_not_snake_case,
     duplicate_part_name,
     part_role_out_of_range,
-    composed_from_not_kebab_case,
+    composed_from_not_snake_case,
     state_out_of_range,
     duplicate_state,
     too_many_custom_states,
-    custom_state_not_kebab_case,
+    custom_state_not_snake_case,
     custom_state_shadows_standard_state,
     duplicate_custom_state,
     too_many_item_parts,
-    item_part_name_not_kebab_case,
+    item_part_name_not_snake_case,
     duplicate_item_part_name,
     item_part_role_out_of_range,
     item_state_out_of_range,
     duplicate_item_state,
     too_many_item_custom_states,
-    item_custom_state_not_kebab_case,
+    item_custom_state_not_snake_case,
     item_custom_state_shadows_standard_state,
     duplicate_item_custom_state,
     too_many_item_systems,
-    item_system_name_not_kebab_case,
+    item_system_name_not_snake_case,
     duplicate_item_system_name,
     item_system_without_parts,
     part_state_out_of_range,

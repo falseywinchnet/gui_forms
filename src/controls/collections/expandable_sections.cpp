@@ -234,7 +234,7 @@ namespace {
 
 // Its members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy expandable_sections_anatomy{
-    .control_id = "expandable-sections",
+    .control_id = "expandable_sections",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

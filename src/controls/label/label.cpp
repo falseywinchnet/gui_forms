@@ -71,7 +71,7 @@ Label::Label(StableId stable_id, std::string text)
                 *this, &Label::font_property_origin)});
 
     PropertyDescriptor foreground;
-    foreground.name = "fore-color";
+    foreground.name = "fore_color";
     foreground.kind = BindingValueKind::color;
     foreground.category = "Appearance";
     foreground.description =
@@ -93,7 +93,7 @@ Label::Label(StableId stable_id, std::string text)
                 *this, &Label::foreground_property_origin)});
 
     PropertyDescriptor maximum_lines;
-    maximum_lines.name = "maximum-lines";
+    maximum_lines.name = "maximum_lines";
     maximum_lines.kind = BindingValueKind::unsigned_integer;
     maximum_lines.category = "Layout";
     maximum_lines.description =
@@ -521,7 +521,7 @@ namespace {
 
 // The events Label adds to those of Control, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> label_interactions{{
-    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
 }};
 
 } // namespace

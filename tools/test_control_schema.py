@@ -23,11 +23,11 @@ class RealTreeTests(unittest.TestCase):
 class SpellingTests(unittest.TestCase):
     def test_payload_drops_const_and_reference_marks(self) -> None:
         self.assertEqual(cs.interaction_from_accessor("text_changed", "const std::string&"),
-                         cs.Interaction("text-changed", "std::string", False))
+                         cs.Interaction("text_changed", "std::string", False))
         self.assertEqual(cs.interaction_from_accessor("validating", "ControlValidationEvent&"),
                          cs.Interaction("validating", "ControlValidationEvent", True))
         self.assertEqual(cs.interaction_from_accessor("item_check_state_changed", "std::size_t, CheckState"),
-                         cs.Interaction("item-check-state-changed", "std::size_t, CheckState", False))
+                         cs.Interaction("item_check_state_changed", "std::size_t, CheckState", False))
         self.assertEqual(cs.interaction_from_accessor("tick", ""), cs.Interaction("tick", "", False))
 
 

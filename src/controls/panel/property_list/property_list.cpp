@@ -1178,23 +1178,23 @@ constexpr std::array<PartField<PropertyList::Parts>, 1> property_list_extra_part
 }};
 
 constexpr std::array<PartField<PropertyList::ItemParts>, 9> property_list_item_part_fields{{
-    {.declaration = {.name = "group-header", .role = PartRole::face, .composed_from = {}},
+    {.declaration = {.name = "group_header", .role = PartRole::face, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_header},
-    {.declaration = {.name = "group-expander", .role = PartRole::disclosure, .composed_from = {}},
+    {.declaration = {.name = "group_expander", .role = PartRole::disclosure, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_expander},
-    {.declaration = {.name = "group-title", .role = PartRole::caption, .composed_from = {}},
+    {.declaration = {.name = "group_title", .role = PartRole::caption, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_title},
-    {.declaration = {.name = "property-row", .role = PartRole::region, .composed_from = {}},
+    {.declaration = {.name = "property_row", .role = PartRole::region, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_row},
-    {.declaration = {.name = "property-name", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "property_name", .role = PartRole::label, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_name},
-    {.declaration = {.name = "property-value", .role = PartRole::content, .composed_from = {}},
+    {.declaration = {.name = "property_value", .role = PartRole::content, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_value},
-    {.declaration = {.name = "row-expander", .role = PartRole::disclosure, .composed_from = {}},
+    {.declaration = {.name = "row_expander", .role = PartRole::disclosure, .composed_from = {}},
      .member = &PropertyList::ItemParts::row_expander},
     {.declaration = {.name = "validation", .role = PartRole::validation, .composed_from = {}},
      .member = &PropertyList::ItemParts::validation},
-    {.declaration = {.name = "row-divider", .role = PartRole::divider, .composed_from = {}},
+    {.declaration = {.name = "row_divider", .role = PartRole::divider, .composed_from = {}},
      .member = &PropertyList::ItemParts::row_divider},
 }};
 
@@ -1211,7 +1211,7 @@ constexpr std::array<PartDeclaration, 9> property_list_item_parts =
 constexpr std::array<AnatomyState, 5> property_list_item_states =
     state_declarations(property_list_item_state_fields);
 constexpr std::array<CustomStateDeclaration, 1> property_list_item_custom_states{{
-    {.name = "group-header"},
+    {.name = "group_header"},
 }};
 constexpr CustomStateIndex group_header_item_state{0U};
 
@@ -1225,7 +1225,7 @@ constexpr std::array<ItemSystemDeclaration, 1> property_list_item_systems{{
 }};
 
 constexpr ControlAnatomy property_list_anatomy{
-    .control_id = "property-list",
+    .control_id = "property_list",
     .parts = property_list_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -1383,11 +1383,11 @@ namespace {
 
 // The events PropertyList adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 5> property_list_interactions{{
-    {.name = "value-changed", .payload = "PropertyValueChange", .mutable_payload = false},
-    {.name = "value-committed", .payload = "PropertyValueChange", .mutable_payload = false},
-    {.name = "group-changed", .payload = "PropertyGroupChange", .mutable_payload = false},
-    {.name = "row-expansion-changed", .payload = "PropertyRowExpansionChange", .mutable_payload = false},
-    {.name = "reset-requested", .payload = "PropertyResetRequest", .mutable_payload = false},
+    {.name = "value_changed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "value_committed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "group_changed", .payload = "PropertyGroupChange", .mutable_payload = false},
+    {.name = "row_expansion_changed", .payload = "PropertyRowExpansionChange", .mutable_payload = false},
+    {.name = "reset_requested", .payload = "PropertyResetRequest", .mutable_payload = false},
 }};
 
 } // namespace

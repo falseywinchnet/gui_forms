@@ -218,7 +218,7 @@ namespace {
 constexpr std::array<PartField<ColorValueEditor::Parts>, 2> color_value_editor_extra_part_fields{{
     {.declaration = {.name = "swatch", .role = PartRole::chip, .composed_from = {}},
      .member = &ColorValueEditor::Parts::swatch},
-    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text-box"},
+    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text_box"},
      .member = &ColorValueEditor::Parts::field},
 }};
 
@@ -241,7 +241,7 @@ constexpr std::array<AnatomyState, 9> color_value_editor_states =
     state_declarations(color_value_editor_state_fields);
 
 constexpr ControlAnatomy color_value_editor_anatomy{
-    .control_id = "color-value-editor",
+    .control_id = "color_value_editor",
     .parts = color_value_editor_parts,
     .states = color_value_editor_states,
     .custom_states = {},
@@ -298,8 +298,8 @@ namespace {
 
 // The events ColorValueEditor adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> color_value_editor_interactions{{
-    {.name = "value-changed", .payload = "Color", .mutable_payload = false},
-    {.name = "edit-failed", .payload = "PropertyEditorInputError", .mutable_payload = false},
+    {.name = "value_changed", .payload = "Color", .mutable_payload = false},
+    {.name = "edit_failed", .payload = "PropertyEditorInputError", .mutable_payload = false},
 }};
 
 } // namespace

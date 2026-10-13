@@ -706,11 +706,11 @@ constexpr std::array<PartField<BreadcrumbTrail::Parts>, 2> breadcrumb_trail_extr
 constexpr std::array<PartField<BreadcrumbTrail::ItemParts>, 4> breadcrumb_trail_item_part_fields{{
     {.declaration = {.name = "segment", .role = PartRole::face, .composed_from = "button"},
      .member = &BreadcrumbTrail::ItemParts::segment},
-    {.declaration = {.name = "segment-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "segment_label", .role = PartRole::label, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_label},
-    {.declaration = {.name = "segment-cap", .role = PartRole::cap, .composed_from = {}},
+    {.declaration = {.name = "segment_cap", .role = PartRole::cap, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_cap},
-    {.declaration = {.name = "segment-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "segment_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_focus},
 }};
 
@@ -735,7 +735,7 @@ constexpr std::array<ItemSystemDeclaration, 1> breadcrumb_trail_item_systems{{
 }};
 
 constexpr ControlAnatomy breadcrumb_trail_anatomy{
-    .control_id = "breadcrumb-trail",
+    .control_id = "breadcrumb_trail",
     .parts = breadcrumb_trail_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -851,12 +851,12 @@ namespace {
 
 // The events BreadcrumbTrail adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 6> breadcrumb_trail_interactions{{
-    {.name = "segment-activated", .payload = "std::string", .mutable_payload = false},
-    {.name = "overflow-activated", .payload = "", .mutable_payload = false},
-    {.name = "edit-committed", .payload = "std::string", .mutable_payload = false},
-    {.name = "edit-started", .payload = "std::string", .mutable_payload = false},
-    {.name = "edit-cancelled", .payload = "", .mutable_payload = false},
-    {.name = "edit-completion-requested", .payload = "", .mutable_payload = false},
+    {.name = "segment_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "overflow_activated", .payload = "", .mutable_payload = false},
+    {.name = "edit_committed", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit_started", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit_cancelled", .payload = "", .mutable_payload = false},
+    {.name = "edit_completion_requested", .payload = "", .mutable_payload = false},
 }};
 
 } // namespace

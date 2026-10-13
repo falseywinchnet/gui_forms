@@ -313,7 +313,7 @@ Related types
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
-   One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header. ``name`` is the system's kebab-case identity in the schema ("item", "column"). Item part names are unique within the control, across its own parts and every item system, so a document addresses an item part by its name alone.
+   One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header. ``name`` is the system's registered name in the schema ("item", "column"). Item part names are unique within the control, across its own parts and every item system, so a document addresses an item part by its name alone.
 
    .. cpp:member:: std::string_view name
 
@@ -393,7 +393,7 @@ Related types
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
-   One declared part. ``name`` is the part's stable kebab-case identity within its control type, as written in ``::part(name)``. ``composed_from`` names the control id of a simpler system the part reuses (a scroll arrow is a "button"), or is empty.
+   One declared part. ``name`` is the part's stable registered name within its control type; documents write it in ``::part(name)``. ``composed_from`` names the control id of a simpler system the part reuses (a scroll arrow is a "button"), or is empty.
 
    .. cpp:member:: std::string_view name
 
@@ -514,19 +514,19 @@ Enumerations
 
    .. cpp:enumerator:: none
 
-   .. cpp:enumerator:: control_id_not_kebab_case
+   .. cpp:enumerator:: control_id_not_snake_case
 
    .. cpp:enumerator:: no_parts
 
    .. cpp:enumerator:: too_many_parts
 
-   .. cpp:enumerator:: part_name_not_kebab_case
+   .. cpp:enumerator:: part_name_not_snake_case
 
    .. cpp:enumerator:: duplicate_part_name
 
    .. cpp:enumerator:: part_role_out_of_range
 
-   .. cpp:enumerator:: composed_from_not_kebab_case
+   .. cpp:enumerator:: composed_from_not_snake_case
 
    .. cpp:enumerator:: state_out_of_range
 
@@ -534,7 +534,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_custom_states
 
-   .. cpp:enumerator:: custom_state_not_kebab_case
+   .. cpp:enumerator:: custom_state_not_snake_case
 
    .. cpp:enumerator:: custom_state_shadows_standard_state
 
@@ -542,7 +542,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_item_parts
 
-   .. cpp:enumerator:: item_part_name_not_kebab_case
+   .. cpp:enumerator:: item_part_name_not_snake_case
 
    .. cpp:enumerator:: duplicate_item_part_name
 
@@ -554,7 +554,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_item_custom_states
 
-   .. cpp:enumerator:: item_custom_state_not_kebab_case
+   .. cpp:enumerator:: item_custom_state_not_snake_case
 
    .. cpp:enumerator:: item_custom_state_shadows_standard_state
 
@@ -562,7 +562,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_item_systems
 
-   .. cpp:enumerator:: item_system_name_not_kebab_case
+   .. cpp:enumerator:: item_system_name_not_snake_case
 
    .. cpp:enumerator:: duplicate_item_system_name
 
@@ -826,7 +826,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_interactions
 
-   .. cpp:enumerator:: name_not_kebab_case
+   .. cpp:enumerator:: name_not_snake_case
 
    .. cpp:enumerator:: duplicate_name
 
@@ -937,17 +937,13 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view part_role_name(PartRole role) noexcept
 
-   Kebab-case public names.
+   Registered (snake_case) public names.
 
 .. cpp:function:: std::string_view anatomy_state_name(AnatomyState state) noexcept
 
 .. cpp:function:: std::optional<PartRole> part_role_from_name(std::string_view name) noexcept
 
 .. cpp:function:: std::optional<AnatomyState> anatomy_state_from_name(std::string_view name) noexcept
-
-.. cpp:function:: bool is_kebab_case_name(std::string_view name) noexcept
-
-   True when ``name`` is non-empty lowercase ASCII words joined by single hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
 
 .. cpp:function:: std::optional<PartIndex> find_declared_part(std::span<const PartDeclaration> declared, std::string_view part_name) noexcept
 
@@ -1050,6 +1046,26 @@ Functions, constants and aliases
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+.. cpp:function:: bool is_registered_name(std::string_view name) noexcept
+
+   True when ``name`` is lowercase ASCII words joined by single underscores: [a-z][a-z0-9]*(_[a-z0-9]+)*.
+
+.. cpp:function:: std::string registered_name(std::string_view spelling)
+
+   The stored spelling of a name written in any of the three spellings. Hyphens become underscores; a word boundary inside PascalCase or camelCase becomes an underscore ("HScrollBar" is "h_scroll_bar"); ASCII letters are lowercased. Dots and brackets pass through, so a path converts segment by segment ("Bounds.Width" is "bounds.width"), and other characters are kept. Leading and trailing whitespace is ignored. Throws std::invalid_argument for an empty name.
+
+.. cpp:function:: std::string css_spelling(std::string_view registered)
+
+   The kebab-case spelling CSS-family documents write: "auto-size-mode".
+
+.. cpp:function:: std::string display_spelling(std::string_view registered)
+
+   The PascalCase display spelling: "AutoSizeMode", "Bounds.Width".
+
+.. cpp:function:: std::string display_label(std::string_view text)
+
+   How a display shows a name that may not be registered: the display spelling of a registered name, and any other text (an application's own label) unchanged. A flags value ("top, left") is shown name by name ("Top, Left").
 
 .. cpp:function:: std::string_view interaction_defect_name(InteractionDefect defect) noexcept
 

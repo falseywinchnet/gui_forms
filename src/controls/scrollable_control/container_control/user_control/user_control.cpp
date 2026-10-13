@@ -36,7 +36,7 @@ void UserControl::on_detached_from_window() noexcept {
 namespace {
 
 constexpr ControlAnatomy user_control_anatomy{
-    .control_id = "user-control",
+    .control_id = "user_control",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

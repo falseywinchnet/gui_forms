@@ -402,7 +402,7 @@ namespace {
 // The events Card adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> card_interactions{{
     {.name = "activated", .payload = "Card", .mutable_payload = true},
-    {.name = "selected-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "selected_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

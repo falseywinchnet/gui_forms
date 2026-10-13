@@ -1729,7 +1729,7 @@ constexpr std::array<PartField<ObjectView::ItemParts>, 5> object_view_item_part_
      .member = &ObjectView::ItemParts::name},
     {.declaration = {.name = "secondary", .role = PartRole::content, .composed_from = {}},
      .member = &ObjectView::ItemParts::secondary},
-    {.declaration = {.name = "cell-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "cell_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ObjectView::ItemParts::cell_focus},
 }};
 
@@ -1746,17 +1746,17 @@ constexpr std::array<AnatomyState, 4> object_view_item_states =
     state_declarations(object_view_item_state_fields);
 
 constexpr std::array<PartField<ObjectView::ColumnParts>, 6> object_view_column_part_fields{{
-    {.declaration = {.name = "column-header", .role = PartRole::region, .composed_from = {}},
+    {.declaration = {.name = "column_header", .role = PartRole::region, .composed_from = {}},
      .member = &ObjectView::ColumnParts::column_header},
-    {.declaration = {.name = "column-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "column_label", .role = PartRole::label, .composed_from = {}},
      .member = &ObjectView::ColumnParts::column_label},
-    {.declaration = {.name = "sort-glyph", .role = PartRole::glyph, .composed_from = {}},
+    {.declaration = {.name = "sort_glyph", .role = PartRole::glyph, .composed_from = {}},
      .member = &ObjectView::ColumnParts::sort_glyph},
-    {.declaration = {.name = "column-divider", .role = PartRole::divider, .composed_from = {}},
+    {.declaration = {.name = "column_divider", .role = PartRole::divider, .composed_from = {}},
      .member = &ObjectView::ColumnParts::column_divider},
-    {.declaration = {.name = "column-grip", .role = PartRole::grip, .composed_from = {}},
+    {.declaration = {.name = "column_grip", .role = PartRole::grip, .composed_from = {}},
      .member = &ObjectView::ColumnParts::column_grip},
-    {.declaration = {.name = "column-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "column_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ObjectView::ColumnParts::column_focus},
 }};
 
@@ -1767,8 +1767,8 @@ constexpr std::array<StateField<ObjectView::ColumnStates>, 3> object_view_column
 }};
 
 constexpr std::array<CustomStateDeclaration, 2> object_view_column_custom_states{{
-    {.name = "sorted-ascending"},
-    {.name = "sorted-descending"},
+    {.name = "sorted_ascending"},
+    {.name = "sorted_descending"},
 }};
 constexpr CustomStateIndex sorted_ascending_state{0U};
 constexpr CustomStateIndex sorted_descending_state{1U};
@@ -1791,7 +1791,7 @@ constexpr std::array<ItemSystemDeclaration, 2> object_view_item_systems{{
 }};
 
 constexpr ControlAnatomy object_view_anatomy{
-    .control_id = "object-view",
+    .control_id = "object_view",
     .parts = object_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -2044,10 +2044,10 @@ namespace {
 
 // The events ObjectView adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 4> object_view_interactions{{
-    {.name = "sort-requested", .payload = "ObjectDetailsSort", .mutable_payload = false},
-    {.name = "selection-changed", .payload = "ObjectSelectionChange", .mutable_payload = false},
-    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
-    {.name = "context-requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+    {.name = "sort_requested", .payload = "ObjectDetailsSort", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "ObjectSelectionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context_requested", .payload = "ObjectContextRequest", .mutable_payload = false},
 }};
 
 } // namespace

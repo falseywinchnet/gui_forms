@@ -1300,7 +1300,7 @@ constexpr std::array<AnatomyState, 10> text_box_states =
     state_declarations(text_box_state_fields);
 
 constexpr ControlAnatomy text_box_anatomy{
-    .control_id = "text-box",
+    .control_id = "text_box",
     .parts = text_box_parts,
     .states = text_box_states,
     .custom_states = {},
@@ -1418,8 +1418,8 @@ namespace {
 
 // The events TextBox adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 4> text_box_interactions{{
-    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
-    {.name = "selection-changed", .payload = "TextSelection", .mutable_payload = false},
+    {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "TextSelection", .mutable_payload = false},
     {.name = "committed", .payload = "std::string", .mutable_payload = false},
     {.name = "cancelled", .payload = "", .mutable_payload = false},
 }};

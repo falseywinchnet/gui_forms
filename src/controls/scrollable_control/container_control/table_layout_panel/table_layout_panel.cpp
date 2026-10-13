@@ -713,7 +713,7 @@ SemanticDescriptor TableLayoutPanel::semantic_descriptor() const {
 namespace {
 
 constexpr std::array<PartField<TableLayoutPanel::Parts>, 1> table_layout_panel_extra_fields{{
-    {.declaration = {.name = "cell-grid", .role = PartRole::divider, .composed_from = {}},
+    {.declaration = {.name = "cell_grid", .role = PartRole::divider, .composed_from = {}},
      .member = &TableLayoutPanel::Parts::cell_grid},
 }};
 
@@ -722,7 +722,7 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
         scrollable_detail::parts, part_declarations(table_layout_panel_extra_fields));
 
 constexpr ControlAnatomy table_layout_panel_anatomy{
-    .control_id = "table-layout-panel",
+    .control_id = "table_layout_panel",
     .parts = table_layout_panel_parts,
     .states = scrollable_detail::states,
     .custom_states = {},

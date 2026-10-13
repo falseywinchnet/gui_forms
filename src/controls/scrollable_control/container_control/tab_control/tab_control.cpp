@@ -520,11 +520,11 @@ constexpr std::array<PartField<TabControl::Parts>, 2> tab_control_extra_part_fie
 constexpr std::array<PartField<TabControl::ItemParts>, 4> tab_control_item_part_fields{{
     {.declaration = {.name = "tab", .role = PartRole::face, .composed_from = {}},
      .member = &TabControl::ItemParts::tab},
-    {.declaration = {.name = "tab-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "tab_label", .role = PartRole::label, .composed_from = {}},
      .member = &TabControl::ItemParts::tab_label},
-    {.declaration = {.name = "tab-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "tab_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &TabControl::ItemParts::tab_focus},
-    {.declaration = {.name = "tab-seam", .role = PartRole::seam, .composed_from = {}},
+    {.declaration = {.name = "tab_seam", .role = PartRole::seam, .composed_from = {}},
      .member = &TabControl::ItemParts::tab_seam},
 }};
 
@@ -547,7 +547,7 @@ constexpr std::array<ItemSystemDeclaration, 1> tab_control_item_systems{{
 }};
 
 constexpr ControlAnatomy tab_control_anatomy{
-    .control_id = "tab-control",
+    .control_id = "tab_control",
     .parts = tab_control_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -659,7 +659,7 @@ namespace {
 
 // The events TabControl adds to those of ContainerControl, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> tab_control_interactions{{
-    {.name = "selected-index-changed", .payload = "TabSelectionChange", .mutable_payload = false},
+    {.name = "selected_index_changed", .payload = "TabSelectionChange", .mutable_payload = false},
 }};
 
 } // namespace

@@ -136,7 +136,7 @@ namespace {
 
 // The events Command adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> command_interactions{{
-    {.name = "state-changed", .payload = "CommandState", .mutable_payload = false},
+    {.name = "state_changed", .payload = "CommandState", .mutable_payload = false},
     {.name = "invoked", .payload = "CommandInvocation", .mutable_payload = false},
 }};
 

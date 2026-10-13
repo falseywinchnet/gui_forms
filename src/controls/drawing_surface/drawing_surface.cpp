@@ -81,7 +81,7 @@ constexpr std::array<AnatomyState, 5> drawing_surface_states =
     state_declarations(drawing_surface_state_fields);
 
 constexpr ControlAnatomy drawing_surface_anatomy{
-    .control_id = "drawing-surface",
+    .control_id = "drawing_surface",
     .parts = drawing_surface_parts,
     .states = drawing_surface_states,
     .custom_states = {},

@@ -33,8 +33,8 @@ std::string_view value_kind_name(BindingValueKind kind) {
     switch (kind) {
     case BindingValueKind::null: return "null";
     case BindingValueKind::boolean: return "boolean";
-    case BindingValueKind::signed_integer: return "signed-integer";
-    case BindingValueKind::unsigned_integer: return "unsigned-integer";
+    case BindingValueKind::signed_integer: return "signed_integer";
+    case BindingValueKind::unsigned_integer: return "unsigned_integer";
     case BindingValueKind::number: return "number";
     case BindingValueKind::text: return "text";
     case BindingValueKind::point: return "point";
@@ -175,6 +175,16 @@ void append_properties(std::string& out, std::span<const PropertyDescriptor> pro
         } else {
             append_json_string(out, (*property.enumeration).type_name);
         }
+        // The values a document may write for an enumeration.
+        out += ", \"choices\": [";
+        if (property.enumeration != nullptr) {
+            const std::vector<PropertyEnumChoice>& choices = (*property.enumeration).choices;
+            for (std::size_t choice = 0; choice < choices.size(); ++choice) {
+                if (choice > 0U) out += ", ";
+                append_json_string(out, choices[choice].name);
+            }
+        }
+        out += "]";
         out += ", \"readable\": ";
         append_bool(out, property.readable);
         out += ", \"writable\": ";
@@ -293,8 +303,8 @@ std::string render_schema(std::span<const TypeRecord> records) {
            "(stage T1): set GUI_FORMS_CONTROL_SCHEMA_WRITE=1 and run that test to rewrite it. "
            "Do not edit.\",\n";
     out += "    \"Controls list their parts, states, item systems, properties and interactions; "
-           "components list their interactions. Every name is the kebab-case registered "
-           "name; a property's display name (AutoSizeMode) is derived from it.\"\n";
+           "components list their interactions. Every name is stored in snake_case; CSS-family "
+           "documents write it in kebab-case and displays in PascalCase.\"\n";
     out += "  ],\n";
     out += "  \"types\": [";
     for (std::size_t index = 0; index < records.size(); ++index) {
@@ -402,16 +412,16 @@ void test_schema_export() {
         (*bound).data_bindings().add("Text", binding_source, "Name");
     require(binding != nullptr, "a binding to an empty source is created");
     record_component("command", *command, records);
-    record_component("context-menu", *context_menu, records);
-    record_component("tool-tip", *tool_tip, records);
+    record_component("context_menu", *context_menu, records);
+    record_component("tool_tip", *tool_tip, records);
     record_component("timer", *timer, records);
-    record_component("image-list", *image_list, records);
-    record_component("error-provider", *error_provider, records);
-    record_component("help-provider", *help_provider, records);
-    record_component("semantic-feedback", *feedback, records);
+    record_component("image_list", *image_list, records);
+    record_component("error_provider", *error_provider, records);
+    record_component("help_provider", *help_provider, records);
+    record_component("semantic_feedback", *feedback, records);
     record_component("binding", *binding, records);
-    record_component("binding-source", *binding_source, records);
-    record_component("binding-context", *binding_context, records);
+    record_component("binding_source", *binding_source, records);
+    record_component("binding_context", *binding_context, records);
 
     std::size_t services = 0;
     for (std::size_t index = 0; index < records.size(); ++index) {

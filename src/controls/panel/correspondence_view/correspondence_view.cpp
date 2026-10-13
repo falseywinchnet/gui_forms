@@ -983,7 +983,7 @@ constexpr std::array<PartField<CorrespondenceView::Parts>, 2> correspondence_vie
 constexpr std::array<PartField<CorrespondenceView::ItemParts>, 8> correspondence_view_item_part_fields{{
     {.declaration = {.name = "card", .role = PartRole::face, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::card},
-    {.declaration = {.name = "status-rail", .role = PartRole::keyline, .composed_from = {}},
+    {.declaration = {.name = "status_rail", .role = PartRole::keyline, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::status_rail},
     {.declaration = {.name = "glyph", .role = PartRole::icon, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::glyph},
@@ -995,7 +995,7 @@ constexpr std::array<PartField<CorrespondenceView::ItemParts>, 8> correspondence
      .member = &CorrespondenceView::ItemParts::metric},
     {.declaration = {.name = "evidence", .role = PartRole::well, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::evidence},
-    {.declaration = {.name = "card-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "card_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::card_focus},
 }};
 
@@ -1029,7 +1029,7 @@ constexpr std::array<ItemSystemDeclaration, 1> correspondence_view_item_systems{
 }};
 
 constexpr ControlAnatomy correspondence_view_anatomy{
-    .control_id = "correspondence-view",
+    .control_id = "correspondence_view",
     .parts = correspondence_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -1150,11 +1150,11 @@ namespace {
 
 // The events CorrespondenceView adds to those of Panel, in declaration order.
 constexpr std::array<InteractionDeclaration, 5> correspondence_view_interactions{{
-    {.name = "selection-changed", .payload = "CorrespondenceSelectionChange", .mutable_payload = false},
-    {.name = "pin-changed", .payload = "CorrespondencePinChange", .mutable_payload = false},
-    {.name = "expansion-changed", .payload = "CorrespondenceExpansionChange", .mutable_payload = false},
-    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
-    {.name = "context-requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "CorrespondenceSelectionChange", .mutable_payload = false},
+    {.name = "pin_changed", .payload = "CorrespondencePinChange", .mutable_payload = false},
+    {.name = "expansion_changed", .payload = "CorrespondenceExpansionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context_requested", .payload = "ObjectContextRequest", .mutable_payload = false},
 }};
 
 } // namespace

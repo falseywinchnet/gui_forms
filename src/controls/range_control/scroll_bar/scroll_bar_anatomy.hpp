@@ -18,10 +18,10 @@ inline constexpr std::array<AnatomyState, 2> thumb_part_states{{
 inline constexpr std::array<PartField<ScrollBar::Parts>, 6> part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &ScrollBar::Parts::region},
-    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button",
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button",
                      .states = pressable_part_states},
      .member = &ScrollBar::Parts::decrement_arrow},
-    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button",
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button",
                      .states = pressable_part_states},
      .member = &ScrollBar::Parts::increment_arrow},
     {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {},

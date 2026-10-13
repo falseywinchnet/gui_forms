@@ -134,7 +134,7 @@ ScrollBarPart ScrollBar::part_at(Point local_point) const noexcept {
 namespace {
 
 constexpr ControlAnatomy scroll_bar_anatomy{
-    .control_id = "scroll-bar",
+    .control_id = "scroll_bar",
     .parts = scroll_bar_detail::parts,
     .states = scroll_bar_detail::states,
     .custom_states = {},

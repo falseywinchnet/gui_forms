@@ -550,15 +550,15 @@ namespace {
 
 // The events BindingSource adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 9> binding_source_interactions{{
-    {.name = "list-changed", .payload = "BindingListChange", .mutable_payload = false},
-    {.name = "current-changed", .payload = "", .mutable_payload = false},
-    {.name = "current-item-changed", .payload = "", .mutable_payload = false},
-    {.name = "position-changed", .payload = "std::ptrdiff_t", .mutable_payload = false},
-    {.name = "data-error", .payload = "std::string", .mutable_payload = false},
-    {.name = "data-source-changed", .payload = "", .mutable_payload = false},
-    {.name = "data-member-changed", .payload = "std::string", .mutable_payload = false},
-    {.name = "binding-complete", .payload = "BindingCompleteEvent", .mutable_payload = true},
-    {.name = "disposed-event", .payload = "", .mutable_payload = false},
+    {.name = "list_changed", .payload = "BindingListChange", .mutable_payload = false},
+    {.name = "current_changed", .payload = "", .mutable_payload = false},
+    {.name = "current_item_changed", .payload = "", .mutable_payload = false},
+    {.name = "position_changed", .payload = "std::ptrdiff_t", .mutable_payload = false},
+    {.name = "data_error", .payload = "std::string", .mutable_payload = false},
+    {.name = "data_source_changed", .payload = "", .mutable_payload = false},
+    {.name = "data_member_changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "binding_complete", .payload = "BindingCompleteEvent", .mutable_payload = true},
+    {.name = "disposed_event", .payload = "", .mutable_payload = false},
 }};
 
 } // namespace

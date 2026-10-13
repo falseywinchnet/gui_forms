@@ -139,7 +139,7 @@ constexpr std::array<AnatomyState, 10> radio_button_states =
     state_declarations(radio_button_state_fields);
 
 constexpr ControlAnatomy radio_button_anatomy{
-    .control_id = "radio-button",
+    .control_id = "radio_button",
     .parts = radio_button_parts,
     .states = radio_button_states,
     .custom_states = {},
@@ -306,7 +306,7 @@ namespace {
 
 // The events RadioButton adds to those of ButtonBase, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> radio_button_interactions{{
-    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

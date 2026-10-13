@@ -772,8 +772,8 @@ namespace {
 
 // The events ContextMenu adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> context_menu_interactions{{
-    {.name = "item-invoked", .payload = "MenuItemInvocation", .mutable_payload = false},
-    {.name = "open-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "item_invoked", .payload = "MenuItemInvocation", .mutable_payload = false},
+    {.name = "open_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

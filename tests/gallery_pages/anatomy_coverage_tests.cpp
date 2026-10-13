@@ -22,17 +22,17 @@ constexpr std::array<std::string_view, 0> anatomy_pending{
 // something (a context menu, a tool tip) does so through an internal control.
 constexpr std::array<std::string_view, 12> nonvisual_entries{
     "command",
-    "context-menu",
-    "tool-tip",
+    "context_menu",
+    "tool_tip",
     "timer",
-    "image-list",
-    "error-provider",
-    "help-provider",
-    "semantic-feedback",
+    "image_list",
+    "error_provider",
+    "help_provider",
+    "semantic_feedback",
     "binding",
-    "binding-source",
-    "binding-context",
-    "live-surface",
+    "binding_source",
+    "binding_context",
+    "live_surface",
 };
 
 // True when every state a part publishes is one its declaration lists.
@@ -154,7 +154,7 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
         throw std::runtime_error(std::string(anatomy.control_id) + " interactions are malformed: " +
                                  std::string(interaction_defect_name(interaction_validation.defect)));
     }
-    if (find_interaction(interactions, "visible-changed") == interactions.size()) {
+    if (find_interaction(interactions, "visible_changed") == interactions.size()) {
         throw std::runtime_error(std::string(anatomy.control_id) +
                                  " does not inherit Control's interactions");
     }

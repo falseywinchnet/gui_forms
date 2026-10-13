@@ -307,7 +307,7 @@ namespace {
 
 // Its panes and members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy master_detail_view_anatomy{
-    .control_id = "master-detail-view",
+    .control_id = "master_detail_view",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -323,7 +323,7 @@ namespace {
 
 // The events MasterDetailView adds to those of ContainerControl, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> master_detail_view_interactions{{
-    {.name = "presentation-changed", .payload = "MasterDetailPresentationChange", .mutable_payload = false},
+    {.name = "presentation_changed", .payload = "MasterDetailPresentationChange", .mutable_payload = false},
 }};
 
 } // namespace

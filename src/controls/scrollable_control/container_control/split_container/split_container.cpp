@@ -813,7 +813,7 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
                                          part_declarations(split_container_extra_part_fields));
 
 constexpr ControlAnatomy split_container_anatomy{
-    .control_id = "split-container",
+    .control_id = "split_container",
     .parts = split_container_parts,
     .states = split_container_states,
     .custom_states = {},
@@ -893,7 +893,7 @@ namespace {
 
 // The events SplitContainer adds to those of ContainerControl, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> split_container_interactions{{
-    {.name = "splitter-changed", .payload = "SplitChangeEvent", .mutable_payload = false},
+    {.name = "splitter_changed", .payload = "SplitChangeEvent", .mutable_payload = false},
 }};
 
 } // namespace

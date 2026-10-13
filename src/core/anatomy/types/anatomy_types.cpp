@@ -48,17 +48,17 @@ constexpr std::array<std::string_view, anatomy_state_count> anatomy_state_names{
     "pressed",
     "captured",
     "focused",
-    "focus-visible",
+    "focus_visible",
     "preselect",
     "selected",
     "checked",
     "indeterminate",
     "current",
-    "active-tool",
+    "active_tool",
     "enabled",
     "disabled",
     "unavailable",
-    "read-only",
+    "read_only",
     "invalid",
     "pending",
     "open",
@@ -66,59 +66,51 @@ constexpr std::array<std::string_view, anatomy_state_count> anatomy_state_names{
     "expanding",
     "collapsing",
     "interrupted",
-    "drop-accepted",
-    "drop-rejected",
+    "drop_accepted",
+    "drop_rejected",
     "key",
-    "secondary-participating",
-    "drag-proximate",
+    "secondary_participating",
+    "drag_proximate",
     "deactivated",
-    "high-contrast",
-    "reduced-motion",
+    "high_contrast",
+    "reduced_motion",
 };
 static_assert(anatomy_state_names.size() == anatomy_state_count);
 
 constexpr std::array<std::string_view, 30> anatomy_defect_names{
     "none",
-    "control-id-not-kebab-case",
-    "no-parts",
-    "too-many-parts",
-    "part-name-not-kebab-case",
-    "duplicate-part-name",
-    "part-role-out-of-range",
-    "composed-from-not-kebab-case",
-    "state-out-of-range",
-    "duplicate-state",
-    "too-many-custom-states",
-    "custom-state-not-kebab-case",
-    "custom-state-shadows-standard-state",
-    "duplicate-custom-state",
-    "too-many-item-parts",
-    "item-part-name-not-kebab-case",
-    "duplicate-item-part-name",
-    "item-part-role-out-of-range",
-    "item-state-out-of-range",
-    "duplicate-item-state",
-    "too-many-item-custom-states",
-    "item-custom-state-not-kebab-case",
-    "item-custom-state-shadows-standard-state",
-    "duplicate-item-custom-state",
-    "too-many-item-systems",
-    "item-system-name-not-kebab-case",
-    "duplicate-item-system-name",
-    "item-system-without-parts",
-    "part-state-out-of-range",
-    "duplicate-part-state",
+    "control_id_not_snake_case",
+    "no_parts",
+    "too_many_parts",
+    "part_name_not_snake_case",
+    "duplicate_part_name",
+    "part_role_out_of_range",
+    "composed_from_not_snake_case",
+    "state_out_of_range",
+    "duplicate_state",
+    "too_many_custom_states",
+    "custom_state_not_snake_case",
+    "custom_state_shadows_standard_state",
+    "duplicate_custom_state",
+    "too_many_item_parts",
+    "item_part_name_not_snake_case",
+    "duplicate_item_part_name",
+    "item_part_role_out_of_range",
+    "item_state_out_of_range",
+    "duplicate_item_state",
+    "too_many_item_custom_states",
+    "item_custom_state_not_snake_case",
+    "item_custom_state_shadows_standard_state",
+    "duplicate_item_custom_state",
+    "too_many_item_systems",
+    "item_system_name_not_snake_case",
+    "duplicate_item_system_name",
+    "item_system_without_parts",
+    "part_state_out_of_range",
+    "duplicate_part_state",
 };
 static_assert(anatomy_defect_names.size() ==
               static_cast<std::size_t>(AnatomyDefect::duplicate_part_state) + 1U);
-
-[[nodiscard]] bool is_lowercase_letter(char character) noexcept {
-    return character >= 'a' && character <= 'z';
-}
-
-[[nodiscard]] bool is_digit(char character) noexcept {
-    return character >= '0' && character <= '9';
-}
 
 [[nodiscard]] AnatomyValidation defect_at(AnatomyDefect defect,
                                           std::size_t index) noexcept {
@@ -173,8 +165,8 @@ static_assert(anatomy_defect_names.size() ==
 [[nodiscard]] AnatomyValidation validate_item_system(const ControlAnatomy& anatomy,
                                                      std::size_t system_index) noexcept {
     const ItemSystemDeclaration& system = anatomy.item_systems[system_index];
-    if (!is_kebab_case_name(system.name)) {
-        return item_defect_at(AnatomyDefect::item_system_name_not_kebab_case, system_index, 0U);
+    if (!is_registered_name(system.name)) {
+        return item_defect_at(AnatomyDefect::item_system_name_not_snake_case, system_index, 0U);
     }
     for (std::size_t earlier = 0; earlier < system_index; ++earlier) {
         if (anatomy.item_systems[earlier].name == system.name) {
@@ -189,14 +181,14 @@ static_assert(anatomy_defect_names.size() ==
     }
     for (std::size_t index = 0; index < system.parts.size(); ++index) {
         const PartDeclaration& part = system.parts[index];
-        if (!is_kebab_case_name(part.name)) {
-            return item_defect_at(AnatomyDefect::item_part_name_not_kebab_case, system_index, index);
+        if (!is_registered_name(part.name)) {
+            return item_defect_at(AnatomyDefect::item_part_name_not_snake_case, system_index, index);
         }
         if (static_cast<std::size_t>(part.role) >= part_role_count) {
             return item_defect_at(AnatomyDefect::item_part_role_out_of_range, system_index, index);
         }
-        if (!part.composed_from.empty() && !is_kebab_case_name(part.composed_from)) {
-            return item_defect_at(AnatomyDefect::composed_from_not_kebab_case, system_index, index);
+        if (!part.composed_from.empty() && !is_registered_name(part.composed_from)) {
+            return item_defect_at(AnatomyDefect::composed_from_not_snake_case, system_index, index);
         }
         const AnatomyDefect states_defect = part_states_defect(part);
         if (states_defect != AnatomyDefect::none) {
@@ -229,8 +221,8 @@ static_assert(anatomy_defect_names.size() ==
     }
     for (std::size_t index = 0; index < system.custom_states.size(); ++index) {
         const std::string_view name = system.custom_states[index].name;
-        if (!is_kebab_case_name(name)) {
-            return item_defect_at(AnatomyDefect::item_custom_state_not_kebab_case, system_index, index);
+        if (!is_registered_name(name)) {
+            return item_defect_at(AnatomyDefect::item_custom_state_not_snake_case, system_index, index);
         }
         const std::optional<AnatomyState> standard = anatomy_state_from_name(name);
         if (standard.has_value()) {
@@ -281,29 +273,6 @@ std::optional<AnatomyState> anatomy_state_from_name(std::string_view name) noexc
         }
     }
     return std::nullopt;
-}
-
-bool is_kebab_case_name(std::string_view name) noexcept {
-    if (name.empty() || !is_lowercase_letter(name.front())) {
-        return false;
-    }
-    if (name.back() == '-') {
-        return false;
-    }
-    char previous = '\0';
-    for (std::size_t index = 0; index < name.size(); ++index) {
-        const char character = name[index];
-        const bool word_character = is_lowercase_letter(character) || is_digit(character);
-        if (character == '-') {
-            if (previous == '-') {
-                return false;
-            }
-        } else if (!word_character) {
-            return false;
-        }
-        previous = character;
-    }
-    return true;
 }
 
 std::optional<PartIndex> find_declared_part(std::span<const PartDeclaration> declared,
@@ -402,8 +371,8 @@ std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept {
 }
 
 AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexcept {
-    if (!is_kebab_case_name(anatomy.control_id)) {
-        return defect_at(AnatomyDefect::control_id_not_kebab_case, 0U);
+    if (!is_registered_name(anatomy.control_id)) {
+        return defect_at(AnatomyDefect::control_id_not_snake_case, 0U);
     }
     if (anatomy.parts.empty()) {
         return defect_at(AnatomyDefect::no_parts, 0U);
@@ -413,14 +382,14 @@ AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexce
     }
     for (std::size_t index = 0; index < anatomy.parts.size(); ++index) {
         const PartDeclaration& part = anatomy.parts[index];
-        if (!is_kebab_case_name(part.name)) {
-            return defect_at(AnatomyDefect::part_name_not_kebab_case, index);
+        if (!is_registered_name(part.name)) {
+            return defect_at(AnatomyDefect::part_name_not_snake_case, index);
         }
         if (static_cast<std::size_t>(part.role) >= part_role_count) {
             return defect_at(AnatomyDefect::part_role_out_of_range, index);
         }
-        if (!part.composed_from.empty() && !is_kebab_case_name(part.composed_from)) {
-            return defect_at(AnatomyDefect::composed_from_not_kebab_case, index);
+        if (!part.composed_from.empty() && !is_registered_name(part.composed_from)) {
+            return defect_at(AnatomyDefect::composed_from_not_snake_case, index);
         }
         const AnatomyDefect states_defect = part_states_defect(part);
         if (states_defect != AnatomyDefect::none) {
@@ -448,8 +417,8 @@ AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexce
     }
     for (std::size_t index = 0; index < anatomy.custom_states.size(); ++index) {
         const std::string_view name = anatomy.custom_states[index].name;
-        if (!is_kebab_case_name(name)) {
-            return defect_at(AnatomyDefect::custom_state_not_kebab_case, index);
+        if (!is_registered_name(name)) {
+            return defect_at(AnatomyDefect::custom_state_not_snake_case, index);
         }
         const std::optional<AnatomyState> standard = anatomy_state_from_name(name);
         if (standard.has_value()) {

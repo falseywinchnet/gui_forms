@@ -161,7 +161,7 @@ constexpr std::array<AnatomyState, 11> check_box_states =
     state_declarations(check_box_state_fields);
 
 constexpr ControlAnatomy check_box_anatomy{
-    .control_id = "check-box",
+    .control_id = "check_box",
     .parts = check_box_parts,
     .states = check_box_states,
     .custom_states = {},
@@ -377,8 +377,8 @@ namespace {
 
 // The events CheckBox adds to those of ButtonBase, in declaration order.
 constexpr std::array<InteractionDeclaration, 2> check_box_interactions{{
-    {.name = "check-state-changed", .payload = "CheckState", .mutable_payload = false},
-    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "check_state_changed", .payload = "CheckState", .mutable_payload = false},
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
 }};
 
 } // namespace

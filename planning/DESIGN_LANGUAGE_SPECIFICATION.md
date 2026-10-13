@@ -1262,7 +1262,8 @@ These supersede the conflicting sources and options of the first draft.
   XP-style (Luna-like) theme and a Windows 7 (Aero-like) theme, both
   recreated, never Microsoft's bitmaps.
 - **Part and state names** are kebab-case in theme and form documents
-  (`::part(scroll-thumb)`); they are a versioned public contract.
+  (`::part(scroll-thumb)`) and stored in snake_case everywhere else (T1
+  owner decision 8); they are a versioned public contract.
 - **Application-defined states.** A custom control may declare its own finite
   states in the schema; themes may select them and still cannot invent
   states (§8.4 rule 3).

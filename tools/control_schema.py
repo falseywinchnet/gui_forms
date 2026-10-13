@@ -6,8 +6,8 @@ registry type's parts, states, item systems, properties and interactions.
 when the committed copy is stale. This module has two jobs:
 
 - ``check``: prove the manifest names exactly the types of
-  ``manifests/controls.json`` in the same order, that every property name
-  is kebab-case, and that every type's
+  ``manifests/controls.json`` in the same order, that every property and
+  part name is snake_case, and that every type's
   interactions are exactly the public events its header declares, base types
   first (so a new event cannot be left out of the schema);
 - ``render``: write ``docs/controls/generated/schema.md`` from the manifest,
@@ -36,7 +36,7 @@ PAGE_PATH: Path = ROOT / "docs" / "controls" / "generated" / "schema.md"
 _CLASS_HEAD: re.Pattern[str] = re.compile(r"^(class|struct)\s+(\w+)(\s+final)?\s*(:[^{;]*)?\{", re.M)
 _ACCESS: re.Pattern[str] = re.compile(r"(public|protected|private)\s*:")
 _ACCESSOR_TAIL: re.Pattern[str] = re.compile(r"\s*&\s*(\w+)\s*\(\s*\)")
-_KEBAB: re.Pattern[str] = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
+_SNAKE: re.Pattern[str] = re.compile(r"[a-z][a-z0-9]*(_[a-z0-9]+)*")
 
 
 class SchemaError(Exception):
@@ -95,7 +95,7 @@ def _split_arguments(text: str) -> list[str]:
 def interaction_from_accessor(accessor: str, arguments: str) -> Interaction:
     """The schema record of ``Event<arguments>& accessor()``.
 
-    The name is the accessor in kebab-case; the payload lists the argument
+    The name is the accessor's name; the payload lists the argument
     types without ``const`` or reference marks; the payload is mutable when an
     argument is a non-const reference.
     """
@@ -109,7 +109,7 @@ def interaction_from_accessor(accessor: str, arguments: str) -> Interaction:
         if reference and not constant:
             mutable = True
         spelled.append(bare)
-    return Interaction(accessor.replace("_", "-"), ", ".join(spelled), mutable)
+    return Interaction(accessor, ", ".join(spelled), mutable)
 
 
 def _public_events(body: str, public_by_default: bool) -> list[Interaction]:
@@ -212,8 +212,11 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
         if kind == "control" and not record.get("parts"):
             findings.append(f"{identity}: a control declares no parts")
         for item in record.get("properties", []):  # type: ignore[union-attr]
-            if not _KEBAB.fullmatch(str(item.get("name"))):
-                findings.append(f"{identity}: property {item.get('name')!r} is not kebab-case")
+            if not _SNAKE.fullmatch(str(item.get("name"))):
+                findings.append(f"{identity}: property {item.get('name')!r} is not snake_case")
+        for part in record.get("parts", []):  # type: ignore[union-attr]
+            if not _SNAKE.fullmatch(str(part.get("name"))):
+                findings.append(f"{identity}: part {part.get('name')!r} is not snake_case")
         expected: list[Interaction] = expected_interactions(str(record.get("type")), classes)
         exported: list[Interaction] = _interactions_of(record)
         if exported != expected:
@@ -271,13 +274,13 @@ def render_page(schema: Mapping[str, object]) -> str:
         "do not edit. The manifest is written by `gui_forms_gallery_pages_tests` from the run-time",
         "registry (stage T1), so this page lists what the library publishes.",
         "",
-        "Part, state, item-system and interaction names are kebab-case identities that theme and",
-        "form documents address (`::part(thumb):state(pressed)`). C++ reads the same anatomy as",
+        "Every name here is a registered name, stored in snake_case (owner decision 8). Theme",
+        "and form documents, which are CSS-family, write the same words in kebab-case",
+        "(`scroll_thumb` is `::part(scroll-thumb)`, `auto_size_mode` is `auto-size-mode`);",
+        "PropertyGrid and C# show them in PascalCase (`AutoSizeMode`). C++ reads the anatomy as",
         "typed records (`(*bar).parts().thumb`) and registers handlers through each type's events",
-        "(`(*button).clicked()`). Property names are registered in kebab-case too; PropertyGrid",
-        "and C# show the derived display name (`auto-size-mode` is `AutoSizeMode`). An",
-        "interaction's payload is the handler's argument types; *by reference* marks a payload",
-        "the handler receives by mutable reference.",
+        "(`(*button).clicked()`). An interaction's payload is the handler's argument types; *by",
+        "reference* marks a payload the handler receives by mutable reference.",
         "",
         "Every control also has these properties: "
         + ", ".join(_code(name) for name in common_properties) + ".",

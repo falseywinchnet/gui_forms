@@ -54,9 +54,10 @@ against that window's UI thread; using it after the window shuts down throws.
 the list, a map of field names to `BindingValue`s (null, Boolean, integers,
 numbers, text, geometry, colour, font, image, enumeration, object or
 collection), an `editable` flag and per-field or record-wide error texts.
-Field names are case-insensitive. A property has one registered name in
-kebab-case (`text`, `auto-size-mode`); its display name (`AutoSizeMode`, as
-PropertyGrid shows it) also finds it. Replacing the records keeps the
+Field names are case-insensitive. A property has one registered name,
+stored in snake_case (`text`, `auto_size_mode`); its CSS spelling
+(`auto-size-mode`) and display spelling (`AutoSizeMode`, as PropertyGrid
+shows it) also find it. Replacing the records keeps the
 current record when its stable ID is still present.
 
 `position()` and `current()` give the current record; `set_position`,

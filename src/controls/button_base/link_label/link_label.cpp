@@ -64,7 +64,7 @@ constexpr std::array<CustomStateDeclaration, 1> link_label_custom_states{{
 constexpr CustomStateIndex visited_state{0U};
 
 constexpr ControlAnatomy link_label_anatomy{
-    .control_id = "link-label",
+    .control_id = "link_label",
     .parts = link_label_parts,
     .states = link_label_states,
     .custom_states = link_label_custom_states,

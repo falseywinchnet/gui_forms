@@ -132,7 +132,7 @@ namespace {
 
 // The events BindingContext adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 1> binding_context_interactions{{
-    {.name = "collection-changed", .payload = "BindingContextChange", .mutable_payload = false},
+    {.name = "collection_changed", .payload = "BindingContextChange", .mutable_payload = false},
 }};
 
 } // namespace

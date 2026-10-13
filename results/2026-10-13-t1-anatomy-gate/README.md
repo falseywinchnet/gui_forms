@@ -55,7 +55,8 @@ python3 tools/generate_library_docs.py --check
 ## What the schema now is
 
 - Part roles from design language §8.1 and the §8.4 state set, with
-  kebab-case names as identities (owner decisions 1, 3 and 4).
+  names as identities (owner decisions 1, 3 and 4), stored in snake_case and
+  written in kebab-case by theme and form documents (decision 8).
 - Typed records for C++: `parts()` and `states()` with dot members; names
   never used to read or set state from C++ (owner decision 4).
 - Application-defined finite states for controls and for items (owner

@@ -677,10 +677,10 @@ namespace {
 
 // The events ErrorProvider adds to those of Component, in declaration order.
 constexpr std::array<InteractionDeclaration, 4> error_provider_interactions{{
-    {.name = "right-to-left-changed", .payload = "bool", .mutable_payload = false},
-    {.name = "data-source-changed", .payload = "", .mutable_payload = false},
-    {.name = "data-member-changed", .payload = "std::string", .mutable_payload = false},
-    {.name = "error-changed", .payload = "ErrorProviderChange", .mutable_payload = false},
+    {.name = "right_to_left_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "data_source_changed", .payload = "", .mutable_payload = false},
+    {.name = "data_member_changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "error_changed", .payload = "ErrorProviderChange", .mutable_payload = false},
 }};
 
 } // namespace
