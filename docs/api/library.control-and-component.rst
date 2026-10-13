@@ -5,7 +5,7 @@
 Control and component
 =====================
 
-The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states.
+The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states, and the interactions each type raises.
 
 .. list-table::
    :class: autosummary longtable
@@ -52,6 +52,14 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`InteractionDeclaration <gui_forms::InteractionDeclaration>`
+     - One interaction.
+   * - :cpp:class:`InteractionValidation <gui_forms::InteractionValidation>`
+     - The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
+   * - :cpp:class:`ItemSystemDeclaration <gui_forms::ItemSystemDeclaration>`
+     - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
+   * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
+     - Position of an item system in its control type's declaration list.
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
@@ -63,7 +71,7 @@ Related types
    * - :cpp:class:`PartField <gui_forms::PartField>`
      - One member of a parts record and the part it publishes.
    * - :cpp:class:`PartGeometry <gui_forms::PartGeometry>`
-     - Geometry of one declared part in the control's local coordinate space after layout.
+     - One declared part as published: its geometry in the control's local coordinate space after layout, and its own active states.
    * - :cpp:class:`PartGeometryBuffer <gui_forms::PartGeometryBuffer>`
      - Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
    * - :cpp:class:`PartIndex <gui_forms::PartIndex>`
@@ -117,7 +125,11 @@ Related types
 
    .. cpp:member:: std::size_t index
 
-      Index into the list the defect concerns (parts, states, custom states, item parts or item states); zero when the defect concerns the anatomy as a whole.
+      Index into the list the defect concerns (parts, states, custom states, item systems, or one item system's parts or states); zero when the defect concerns the anatomy as a whole.
+
+   .. cpp:member:: std::size_t item_system
+
+      The item system an item defect concerns; zero otherwise.
 
 .. cpp:namespace:: gui_forms
 
@@ -210,15 +222,9 @@ Related types
 
    .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
 
-   .. cpp:member:: std::span<const PartDeclaration> item_parts
+   .. cpp:member:: std::span<const ItemSystemDeclaration> item_systems
 
-      The anatomy of one repeated item (a list row, a tree node), empty for a control without items. Item part names never repeat the control's own part names, so a document addresses either by name alone.
-
-   .. cpp:member:: std::span<const AnatomyState> item_states
-
-   .. cpp:member:: std::span<const CustomStateDeclaration> item_custom_states
-
-      Application-defined finite states of one item, as for a control.
+      The kinds of repeated item the control paints, empty for a control without items. Most controls with items have one system; the details view adds its column headers as a second.
 
 .. cpp:namespace:: gui_forms
 
@@ -270,6 +276,62 @@ Related types
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
    Position of an application-defined state in its control type's declaration list.
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: InteractionDeclaration final
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   One interaction. ``payload`` spells the handler's argument types as the event accessor declares them, without ``const`` or reference marks and separated by ", " ("ButtonBase", "std::size_t, CheckState"); it is empty for an interaction without arguments. ``mutable_payload`` is true when some argument reaches the handler by mutable reference, as a validation the handler may cancel does.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: std::string_view payload
+
+   .. cpp:member:: bool mutable_payload
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: InteractionValidation final
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
+
+   .. cpp:member:: InteractionDefect defect
+
+      Default: ``{InteractionDefect::none}``.
+
+   .. cpp:member:: std::size_t index
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemSystemDeclaration final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header. ``name`` is the system's registered name in the schema ("item", "column"). Item part names are unique within the control, across its own parts and every item system, so a document addresses an item part by its name alone.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: std::span<const PartDeclaration> parts
+
+   .. cpp:member:: std::span<const AnatomyState> states
+
+   .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
+
+      Application-defined finite states of one item, as for a control.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemSystemIndex final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Position of an item system in its control type's declaration list.
 
    .. cpp:member:: std::uint8_t value
 
@@ -331,7 +393,7 @@ Related types
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
-   One declared part. ``name`` is the part's stable kebab-case identity within its control type, as written in ``::part(name)``. ``composed_from`` names the control id of a simpler system the part reuses (a scroll arrow is a "button"), or is empty.
+   One declared part. ``name`` is the part's stable registered name within its control type; documents write it in ``::part(name)``. ``composed_from`` names the control id of a simpler system the part reuses (a scroll arrow is a "button"), or is empty.
 
    .. cpp:member:: std::string_view name
 
@@ -340,6 +402,10 @@ Related types
       Default: ``{PartRole::region}``.
 
    .. cpp:member:: std::string_view composed_from
+
+   .. cpp:member:: std::span<const AnatomyState> states
+
+      The states the part takes on its own, as written in ``::part(name):state(state)``: a scroll bar's thumb is pressed while its arrows are not. Empty for a part that only shares its control's (or item's) states.
 
 .. cpp:namespace:: gui_forms
 
@@ -357,7 +423,7 @@ Related types
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
-   Geometry of one declared part in the control's local coordinate space after layout. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused.
+   One declared part as published: its geometry in the control's local coordinate space after layout, and its own active states. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused. ``states`` holds only states the part's declaration lists, and no custom states.
 
 
    .. rubric:: Methods
@@ -369,6 +435,8 @@ Related types
    .. cpp:member:: Rect bounds
 
    .. cpp:member:: bool present
+
+   .. cpp:member:: AnatomyStateSet states
 
 .. cpp:namespace:: gui_forms
 
@@ -446,19 +514,19 @@ Enumerations
 
    .. cpp:enumerator:: none
 
-   .. cpp:enumerator:: control_id_not_kebab_case
+   .. cpp:enumerator:: control_id_not_snake_case
 
    .. cpp:enumerator:: no_parts
 
    .. cpp:enumerator:: too_many_parts
 
-   .. cpp:enumerator:: part_name_not_kebab_case
+   .. cpp:enumerator:: part_name_not_snake_case
 
    .. cpp:enumerator:: duplicate_part_name
 
    .. cpp:enumerator:: part_role_out_of_range
 
-   .. cpp:enumerator:: composed_from_not_kebab_case
+   .. cpp:enumerator:: composed_from_not_snake_case
 
    .. cpp:enumerator:: state_out_of_range
 
@@ -466,7 +534,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_custom_states
 
-   .. cpp:enumerator:: custom_state_not_kebab_case
+   .. cpp:enumerator:: custom_state_not_snake_case
 
    .. cpp:enumerator:: custom_state_shadows_standard_state
 
@@ -474,7 +542,7 @@ Enumerations
 
    .. cpp:enumerator:: too_many_item_parts
 
-   .. cpp:enumerator:: item_part_name_not_kebab_case
+   .. cpp:enumerator:: item_part_name_not_snake_case
 
    .. cpp:enumerator:: duplicate_item_part_name
 
@@ -486,11 +554,23 @@ Enumerations
 
    .. cpp:enumerator:: too_many_item_custom_states
 
-   .. cpp:enumerator:: item_custom_state_not_kebab_case
+   .. cpp:enumerator:: item_custom_state_not_snake_case
 
    .. cpp:enumerator:: item_custom_state_shadows_standard_state
 
    .. cpp:enumerator:: duplicate_item_custom_state
+
+   .. cpp:enumerator:: too_many_item_systems
+
+   .. cpp:enumerator:: item_system_name_not_snake_case
+
+   .. cpp:enumerator:: duplicate_item_system_name
+
+   .. cpp:enumerator:: item_system_without_parts
+
+   .. cpp:enumerator:: part_state_out_of_range
+
+   .. cpp:enumerator:: duplicate_part_state
 
 .. cpp:namespace:: gui_forms
 
@@ -738,6 +818,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: InteractionDefect
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: too_many_interactions
+
+   .. cpp:enumerator:: name_not_snake_case
+
+   .. cpp:enumerator:: duplicate_name
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: OwnerDecorationLayer
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -843,7 +937,7 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view part_role_name(PartRole role) noexcept
 
-   Kebab-case public names.
+   Registered (snake_case) public names.
 
 .. cpp:function:: std::string_view anatomy_state_name(AnatomyState state) noexcept
 
@@ -851,23 +945,25 @@ Functions, constants and aliases
 
 .. cpp:function:: std::optional<AnatomyState> anatomy_state_from_name(std::string_view name) noexcept
 
-.. cpp:function:: bool is_kebab_case_name(std::string_view name) noexcept
-
-   True when ``name`` is non-empty lowercase ASCII words joined by single hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
-
 .. cpp:function:: std::optional<PartIndex> find_declared_part(std::span<const PartDeclaration> declared, std::string_view part_name) noexcept
 
-   Lookup by declared name within one declaration list, within a control type's own parts, or within its item parts.
+   Lookup by declared name within one declaration list, within a control type's own parts, or within one of its item systems.
 
 .. cpp:function:: std::optional<PartIndex> find_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
 
-.. cpp:function:: std::optional<PartIndex> find_item_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
+.. cpp:function:: std::optional<ItemSystemIndex> find_item_system(const ControlAnatomy& anatomy, std::string_view system_name) noexcept
+
+.. cpp:function:: std::optional<PartIndex> find_item_part(const ItemSystemDeclaration& system, std::string_view part_name) noexcept
 
 .. cpp:function:: std::optional<CustomStateIndex> find_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
 
-.. cpp:function:: std::optional<CustomStateIndex> find_item_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
+.. cpp:function:: std::optional<CustomStateIndex> find_item_custom_state(const ItemSystemDeclaration& system, std::string_view state_name) noexcept
 
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
+
+.. cpp:function:: bool declares_item_state(const ItemSystemDeclaration& system, AnatomyState state) noexcept
+
+.. cpp:function:: bool declares_part_state(const PartDeclaration& part, AnatomyState state) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<PartDeclaration, Count> part_declarations(const std::array<PartField<Record>, Count>& fields)
 
@@ -887,11 +983,11 @@ Functions, constants and aliases
 
 .. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
-.. cpp:function:: template <typename Record, std::size_t Count> void write_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void write_item_parts(const ItemSystemDeclaration& system, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
 
-   The same mapping over one realized item's geometry and the anatomy's item parts.
+   The same mapping over one realized item's geometry and the parts of its item system.
 
-.. cpp:function:: template <typename Record, std::size_t Count> void read_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void read_item_parts(const ItemSystemDeclaration& system, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> void read_states(const std::array<StateField<Record>, Count>& fields, const AnatomyStateSet& active, Record& record) noexcept
 
@@ -919,6 +1015,10 @@ Functions, constants and aliases
 
    Value: ``16``.
 
+.. cpp:var:: constexpr std::size_t maximum_item_systems
+
+   Value: ``4``.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/control/control/control.hpp>``
@@ -942,3 +1042,39 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/schema/types/schema_types.hpp>``
+
+.. cpp:function:: bool is_registered_name(std::string_view name) noexcept
+
+   True when ``name`` is lowercase ASCII words joined by single underscores: [a-z][a-z0-9]*(_[a-z0-9]+)*.
+
+.. cpp:function:: std::string registered_name(std::string_view spelling)
+
+   The stored spelling of a name written in any of the three spellings. Hyphens become underscores; a word boundary inside PascalCase or camelCase becomes an underscore ("HScrollBar" is "h_scroll_bar"); ASCII letters are lowercased. Dots and brackets pass through, so a path converts segment by segment ("Bounds.Width" is "bounds.width"), and other characters are kept. Leading and trailing whitespace is ignored. Throws std::invalid_argument for an empty name.
+
+.. cpp:function:: std::string css_spelling(std::string_view registered)
+
+   The kebab-case spelling CSS-family documents write: "auto-size-mode".
+
+.. cpp:function:: std::string display_spelling(std::string_view registered)
+
+   The PascalCase display spelling: "AutoSizeMode", "Bounds.Width".
+
+.. cpp:function:: std::string display_label(std::string_view text)
+
+   How a display shows a name that may not be registered: the display spelling of a registered name, and any other text (an application's own label) unchanged. A flags value ("top, left") is shown name by name ("Top, Left").
+
+.. cpp:function:: std::string_view interaction_defect_name(InteractionDefect defect) noexcept
+
+.. cpp:function:: InteractionValidation validate_interactions(std::span<const InteractionDeclaration> interactions) noexcept
+
+.. cpp:function:: std::size_t find_interaction(std::span<const InteractionDeclaration> interactions, std::string_view name) noexcept
+
+   The position of the interaction named ``name``, or ``interactions.size()``.
+
+.. cpp:var:: constexpr std::size_t maximum_interactions
+
+   Upper bound on one type's interactions, its inherited ones included. Value: ``64``.

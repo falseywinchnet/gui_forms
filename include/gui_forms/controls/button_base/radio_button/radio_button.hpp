@@ -55,6 +55,7 @@ public:
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:

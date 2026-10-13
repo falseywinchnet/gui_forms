@@ -134,7 +134,7 @@ ScrollBarPart ScrollBar::part_at(Point local_point) const noexcept {
 namespace {
 
 constexpr ControlAnatomy scroll_bar_anatomy{
-    .control_id = "scroll-bar",
+    .control_id = "scroll_bar",
     .parts = scroll_bar_detail::parts,
     .states = scroll_bar_detail::states,
     .custom_states = {},
@@ -156,6 +156,21 @@ void ScrollBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.thumb = PartGeometry::from_bounds(thumb);
     // The scroll bar shows focus on its thumb.
     record.focus = PartGeometry::from_bounds(thumb);
+    // The pressed part carries the pressed state; the page regions either
+    // side of the thumb are the track.
+    if (pressed_part_ == ScrollBarPart::decrement_button) {
+        record.decrement_arrow.states.insert(AnatomyState::pressed);
+    } else if (pressed_part_ == ScrollBarPart::increment_button) {
+        record.increment_arrow.states.insert(AnatomyState::pressed);
+    } else if (pressed_part_ == ScrollBarPart::decrement_track ||
+               pressed_part_ == ScrollBarPart::increment_track) {
+        record.track.states.insert(AnatomyState::pressed);
+    } else if (pressed_part_ == ScrollBarPart::thumb) {
+        record.thumb.states.insert(AnatomyState::pressed);
+    }
+    if (tracking_thumb_) {
+        record.thumb.states.insert(AnatomyState::captured);
+    }
     write_parts(anatomy(), scroll_bar_detail::part_fields, record, geometry);
 }
 

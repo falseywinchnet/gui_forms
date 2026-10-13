@@ -7,18 +7,28 @@
 
 namespace gui_forms::scroll_bar_detail {
 
+// The states a scroll bar's arrows and track take on their own, and those
+// of its thumb, which captures the pointer while dragged.
+inline constexpr std::array<AnatomyState, 1> pressable_part_states{{AnatomyState::pressed}};
+inline constexpr std::array<AnatomyState, 2> thumb_part_states{{
+    AnatomyState::pressed, AnatomyState::captured}};
+
 // Parts and states ScrollBar, HScrollBar and VScrollBar share. Each type
 // publishes them under its own registry id.
 inline constexpr std::array<PartField<ScrollBar::Parts>, 6> part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &ScrollBar::Parts::region},
-    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = pressable_part_states},
      .member = &ScrollBar::Parts::decrement_arrow},
-    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = pressable_part_states},
      .member = &ScrollBar::Parts::increment_arrow},
-    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {}},
+    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {},
+                     .states = pressable_part_states},
      .member = &ScrollBar::Parts::track},
-    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
+    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {},
+                     .states = thumb_part_states},
      .member = &ScrollBar::Parts::thumb},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ScrollBar::Parts::focus},

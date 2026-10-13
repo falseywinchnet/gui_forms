@@ -12,7 +12,7 @@ VScrollBar::VScrollBar(StableId stable_id)
 namespace {
 
 constexpr ControlAnatomy v_scroll_bar_anatomy{
-    .control_id = "v-scroll-bar",
+    .control_id = "v_scroll_bar",
     .parts = scroll_bar_detail::parts,
     .states = scroll_bar_detail::states,
     .custom_states = {},

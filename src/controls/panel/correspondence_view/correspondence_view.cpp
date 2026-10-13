@@ -983,7 +983,7 @@ constexpr std::array<PartField<CorrespondenceView::Parts>, 2> correspondence_vie
 constexpr std::array<PartField<CorrespondenceView::ItemParts>, 8> correspondence_view_item_part_fields{{
     {.declaration = {.name = "card", .role = PartRole::face, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::card},
-    {.declaration = {.name = "status-rail", .role = PartRole::keyline, .composed_from = {}},
+    {.declaration = {.name = "status_rail", .role = PartRole::keyline, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::status_rail},
     {.declaration = {.name = "glyph", .role = PartRole::icon, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::glyph},
@@ -995,7 +995,7 @@ constexpr std::array<PartField<CorrespondenceView::ItemParts>, 8> correspondence
      .member = &CorrespondenceView::ItemParts::metric},
     {.declaration = {.name = "evidence", .role = PartRole::well, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::evidence},
-    {.declaration = {.name = "card-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "card_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &CorrespondenceView::ItemParts::card_focus},
 }};
 
@@ -1023,14 +1023,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
     correspondence_view_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(correspondence_view_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> correspondence_view_item_systems{{
+    {.name = "item", .parts = correspondence_view_item_parts, .states = correspondence_view_item_states,
+     .custom_states = correspondence_view_item_custom_states},
+}};
+
 constexpr ControlAnatomy correspondence_view_anatomy{
-    .control_id = "correspondence-view",
+    .control_id = "correspondence_view",
     .parts = correspondence_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = correspondence_view_item_parts,
-    .item_states = correspondence_view_item_states,
-    .item_custom_states = correspondence_view_item_custom_states,
+    .item_systems = correspondence_view_item_systems,
 };
 
 } // namespace
@@ -1106,7 +1109,7 @@ void CorrespondenceView::publish_realized_item_geometry(std::size_t item,
         record.evidence = PartGeometry::from_bounds(Rect::intersection(excerpt, clip));
     }
     record.card_focus = record.card;
-    write_item_parts(anatomy(), correspondence_view_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), correspondence_view_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet CorrespondenceView::realized_item_anatomy_states(std::size_t item) const {
@@ -1133,7 +1136,7 @@ std::vector<CorrespondenceView::Item> CorrespondenceView::realized_items() const
         Item record;
         record.index = realized_range().first + item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), correspondence_view_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), correspondence_view_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(correspondence_view_item_state_fields, item_states, record.states);
         record.states.pinned = item_states.contains(pinned_item_state);
@@ -1141,6 +1144,24 @@ std::vector<CorrespondenceView::Item> CorrespondenceView::realized_items() const
         records.push_back(record);
     }
     return records;
+}
+
+namespace {
+
+// The events CorrespondenceView adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> correspondence_view_interactions{{
+    {.name = "selection_changed", .payload = "CorrespondenceSelectionChange", .mutable_payload = false},
+    {.name = "pin_changed", .payload = "CorrespondencePinChange", .mutable_payload = false},
+    {.name = "expansion_changed", .payload = "CorrespondenceExpansionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context_requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CorrespondenceView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), correspondence_view_interactions.begin(), correspondence_view_interactions.end());
 }
 
 } // namespace gui_forms

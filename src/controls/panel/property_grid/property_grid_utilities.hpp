@@ -28,34 +28,34 @@ struct CompoundFieldSpec final {
 inline std::vector<CompoundFieldSpec> compound_fields(BindingValueKind kind) {
     switch (kind) {
     case BindingValueKind::point:
-        return {{"X", BindingValueKind::number},
-                {"Y", BindingValueKind::number}};
+        return {{"x", BindingValueKind::number},
+                {"y", BindingValueKind::number}};
     case BindingValueKind::size:
-        return {{"Width", BindingValueKind::number},
-                {"Height", BindingValueKind::number}};
+        return {{"width", BindingValueKind::number},
+                {"height", BindingValueKind::number}};
     case BindingValueKind::rectangle:
-        return {{"X", BindingValueKind::number},
-                {"Y", BindingValueKind::number},
-                {"Width", BindingValueKind::number},
-                {"Height", BindingValueKind::number}};
+        return {{"x", BindingValueKind::number},
+                {"y", BindingValueKind::number},
+                {"width", BindingValueKind::number},
+                {"height", BindingValueKind::number}};
     case BindingValueKind::insets:
-        return {{"Left", BindingValueKind::number},
-                {"Top", BindingValueKind::number},
-                {"Right", BindingValueKind::number},
-                {"Bottom", BindingValueKind::number}};
+        return {{"left", BindingValueKind::number},
+                {"top", BindingValueKind::number},
+                {"right", BindingValueKind::number},
+                {"bottom", BindingValueKind::number}};
     case BindingValueKind::color:
-        return {{"Red", BindingValueKind::unsigned_integer},
-                {"Green", BindingValueKind::unsigned_integer},
-                {"Blue", BindingValueKind::unsigned_integer},
-                {"Alpha", BindingValueKind::unsigned_integer}};
+        return {{"red", BindingValueKind::unsigned_integer},
+                {"green", BindingValueKind::unsigned_integer},
+                {"blue", BindingValueKind::unsigned_integer},
+                {"alpha", BindingValueKind::unsigned_integer}};
     case BindingValueKind::font:
-        return {{"Role", BindingValueKind::text, PropertyEditorKind::choice,
-                 {"Control", "Content", "Monospace"}},
-                {"Size", BindingValueKind::number},
-                {"Weight", BindingValueKind::unsigned_integer},
-                {"Italic", BindingValueKind::boolean,
+        return {{"role", BindingValueKind::text, PropertyEditorKind::choice,
+                 {"control", "content", "monospace"}},
+                {"size", BindingValueKind::number},
+                {"weight", BindingValueKind::unsigned_integer},
+                {"italic", BindingValueKind::boolean,
                  PropertyEditorKind::boolean},
-                {"LetterSpacing", BindingValueKind::number}};
+                {"letter_spacing", BindingValueKind::number}};
     default:
         return {};
     }
@@ -63,7 +63,7 @@ inline std::vector<CompoundFieldSpec> compound_fields(BindingValueKind kind) {
 
 inline std::optional<BindingValue> compound_field_value(
     const BindingValue& value, std::string_view field_name) {
-    const std::string field = canonical_binding_name(field_name);
+    const std::string field = registered_name(field_name);
     if (const gui_forms::Point* item = std::get_if<Point>(&value)) {
         if (field == "x") return BindingValue{(*item).x};
         if (field == "y") return BindingValue{(*item).y};
@@ -88,9 +88,9 @@ inline std::optional<BindingValue> compound_field_value(
     } else if (const gui_forms::FontSpec* item = std::get_if<FontSpec>(&value)) {
         if (field == "role") {
             switch ((*item).role) {
-            case FontRole::control: return BindingValue{std::string("Control")};
-            case FontRole::content: return BindingValue{std::string("Content")};
-            case FontRole::monospace: return BindingValue{std::string("Monospace")};
+            case FontRole::control: return BindingValue{std::string("control")};
+            case FontRole::content: return BindingValue{std::string("content")};
+            case FontRole::monospace: return BindingValue{std::string("monospace")};
             }
         }
         if (field == "size") return BindingValue{(*item).size};
@@ -98,7 +98,7 @@ inline std::optional<BindingValue> compound_field_value(
             return BindingValue{static_cast<std::uint64_t>((*item).weight)};
         }
         if (field == "italic") return BindingValue{(*item).italic};
-        if (field == "letterspacing") return BindingValue{(*item).letter_spacing};
+        if (field == "letter_spacing") return BindingValue{(*item).letter_spacing};
     }
     return {};
 }
@@ -106,7 +106,7 @@ inline std::optional<BindingValue> compound_field_value(
 inline std::optional<BindingValue> replace_compound_field(
     BindingValue value, std::string_view field_name,
     const BindingValue& replacement) {
-    const std::string field = canonical_binding_name(field_name);
+    const std::string field = registered_name(field_name);
     if (gui_forms::Point* item = std::get_if<Point>(&value)) {
         const std::optional<BindingValue> converted = convert_binding_value(
             replacement, BindingValueKind::number);
@@ -152,13 +152,13 @@ inline std::optional<BindingValue> replace_compound_field(
         else return {};
     } else if (gui_forms::FontSpec* item = std::get_if<FontSpec>(&value)) {
         if (field == "role") {
-            const std::string role = canonical_binding_name(
+            const std::string role = registered_name(
                 binding_value_to_string(replacement));
             if (role == "control") (*item).role = FontRole::control;
             else if (role == "content") (*item).role = FontRole::content;
             else if (role == "monospace") (*item).role = FontRole::monospace;
             else return {};
-        } else if (field == "size" || field == "letterspacing") {
+        } else if (field == "size" || field == "letter_spacing") {
             const std::optional<BindingValue> converted = convert_binding_value(
                 replacement, BindingValueKind::number);
             if (!converted) return {};

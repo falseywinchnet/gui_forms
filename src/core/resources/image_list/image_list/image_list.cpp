@@ -458,4 +458,18 @@ void ImageList::on_dispose() noexcept {
     window_lifetime_.reset();
 }
 
+namespace {
+
+// The events ImageList adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> image_list_interactions{{
+    {.name = "changed", .payload = "ImageListChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ImageList::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), image_list_interactions.begin(), image_list_interactions.end());
+}
+
 } // namespace gui_forms

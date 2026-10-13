@@ -137,6 +137,7 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
     src/core/anatomy/types/anatomy_types.cpp
+    src/core/schema/types/schema_types.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -2630,6 +2631,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/typography-and-inspection_tests.cpp
             tests/gallery_pages/semantic-feedback_tests.cpp
             tests/gallery_pages/anatomy_coverage_tests.cpp
+            tests/gallery_pages/schema_export_tests.cpp
         )
         target_include_directories(gui_forms_gallery_pages_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
@@ -2640,6 +2642,10 @@ if(GUI_FORMS_BUILD_TESTS)
         )
         add_test(NAME gui_forms_gallery_pages_tests
                  COMMAND gui_forms_gallery_pages_tests)
+        # The test compares its control-schema export with the committed
+        # manifest (stage T1).
+        set_tests_properties(gui_forms_gallery_pages_tests PROPERTIES ENVIRONMENT
+            "GUI_FORMS_CONTROL_SCHEMA=${CMAKE_CURRENT_SOURCE_DIR}/manifests/control-schema.json")
         # The policy script takes one comma-separated argument; a CMake list
         # would be split into separate COMMAND arguments.
         set(gui_forms_gallery_policy_files

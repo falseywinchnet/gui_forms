@@ -19,7 +19,7 @@ RadioButton::RadioButton(StableId stable_id, std::string text)
     set_text_alignment(ContentAlignment::middle_left);
     set_image_alignment(ContentAlignment::middle_left);
     define_bindable_property({
-        {"Checked", BindingValueKind::boolean, "Behavior",
+        {"checked", BindingValueKind::boolean, "Behavior",
          "Whether the radio button is selected within its group.",
          BindingValue{false}, Dirty::paint | Dirty::semantics},
         detail::BindingMemberGetter<RadioButton, bool>(
@@ -139,7 +139,7 @@ constexpr std::array<AnatomyState, 10> radio_button_states =
     state_declarations(radio_button_state_fields);
 
 constexpr ControlAnatomy radio_button_anatomy{
-    .control_id = "radio-button",
+    .control_id = "radio_button",
     .parts = radio_button_parts,
     .states = radio_button_states,
     .custom_states = {},
@@ -300,6 +300,20 @@ SemanticDescriptor RadioButton::semantic_descriptor() const {
         descriptor.states |= SemanticState::selected;
     }
     return descriptor;
+}
+
+namespace {
+
+// The events RadioButton adds to those of ButtonBase, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> radio_button_interactions{{
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void RadioButton::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ButtonBase::append_interactions(interactions);
+    interactions.insert(interactions.end(), radio_button_interactions.begin(), radio_button_interactions.end());
 }
 
 } // namespace gui_forms

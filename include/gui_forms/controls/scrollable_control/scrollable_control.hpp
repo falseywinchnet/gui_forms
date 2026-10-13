@@ -121,6 +121,7 @@ public:
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     // Called after the retained position changes, including silent API writes
     // and layout clamping. This does not publish a public Scroll event.
     virtual void on_scroll_position_changed() {}

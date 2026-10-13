@@ -83,6 +83,7 @@ public:
     [[nodiscard]] Rect drop_down_bounds() const noexcept;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_activate() override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 

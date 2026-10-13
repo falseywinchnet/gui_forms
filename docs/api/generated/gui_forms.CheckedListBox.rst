@@ -306,6 +306,10 @@ gui_forms::CheckedListBox
 
    .. cpp:function:: AnatomyStateSet realized_item_anatomy_states(std::size_t item) const override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: double row_text_left() const noexcept override
 
       *Protected.*

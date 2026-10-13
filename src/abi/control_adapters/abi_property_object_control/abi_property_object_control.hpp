@@ -253,7 +253,7 @@ public:
             throw std::invalid_argument(
                 "foreign property editor identities require an edit callback");
         }
-        const std::string canonical = gui_forms::canonical_binding_name(
+        const std::string canonical = gui_forms::registered_name(
             (*state).descriptor.name);
         if (properties_.contains(canonical)) {
             throw std::invalid_argument(
@@ -288,7 +288,7 @@ public:
         require_mutable();
         const std::map<std::string, std::shared_ptr<PropertyState>>::iterator
             found = properties_.find(
-            gui_forms::canonical_binding_name(name));
+            gui_forms::registered_name(name));
         if (found == properties_.end()) {
             throw std::invalid_argument(
                 "foreign property change names must identify a definition");

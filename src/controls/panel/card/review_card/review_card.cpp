@@ -3,6 +3,7 @@
 #include "gui_forms/text.hpp"
 #include "../card_anatomy.hpp"
 
+#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -114,7 +115,7 @@ SemanticDescriptor ReviewCard::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy review_card_anatomy{
-    .control_id = "review-card",
+    .control_id = "review_card",
     .parts = panel_detail::parts,
     .states = card_detail::states,
     .custom_states = {},
@@ -124,6 +125,20 @@ constexpr ControlAnatomy review_card_anatomy{
 
 const ControlAnatomy& ReviewCard::anatomy() const noexcept {
     return review_card_anatomy;
+}
+
+namespace {
+
+// The events ReviewCard adds to those of Card, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> review_card_interactions{{
+    {.name = "record_changed", .payload = "ReviewRecord", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ReviewCard::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Card::append_interactions(interactions);
+    interactions.insert(interactions.end(), review_card_interactions.begin(), review_card_interactions.end());
 }
 
 } // namespace gui_forms

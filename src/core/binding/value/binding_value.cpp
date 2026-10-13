@@ -156,15 +156,27 @@ std::string_view trimmed(std::string_view value) noexcept {
     return value.substr(first, last - first + 1U);
 }
 
+// The position of the next byte of `name` at or after `index` that is not a
+// word separator ('_' or '-').
+std::size_t next_spelled_byte(std::string_view name, std::size_t index) noexcept {
+    while (index < name.size() && (name[index] == '_' || name[index] == '-')) ++index;
+    return index;
+}
+
+// True when two enumeration choice names spell the same words: ASCII case
+// and the word separators '_' and '-' are ignored, so "StretchImage",
+// "stretch-image" and "stretch_image" are equal (owner decision 8). Choice
+// validation uses the same rule, so no two choices of one type collide.
 bool ascii_name_equal(std::string_view left, std::string_view right) noexcept {
     left = trimmed(left);
     right = trimmed(right);
-    if (left.size() != right.size()) return false;
-    for (std::size_t index = 0; index < left.size(); ++index) {
+    std::size_t left_index = next_spelled_byte(left, 0U);
+    std::size_t right_index = next_spelled_byte(right, 0U);
+    while (left_index < left.size() && right_index < right.size()) {
         const unsigned char left_byte =
-            static_cast<unsigned char>(left[index]);
+            static_cast<unsigned char>(left[left_index]);
         const unsigned char right_byte =
-            static_cast<unsigned char>(right[index]);
+            static_cast<unsigned char>(right[right_index]);
         const unsigned char folded_left =
             left_byte >= 'A' && left_byte <= 'Z' ?
                 static_cast<unsigned char>(left_byte + ('a' - 'A')) :
@@ -174,8 +186,10 @@ bool ascii_name_equal(std::string_view left, std::string_view right) noexcept {
                 static_cast<unsigned char>(right_byte + ('a' - 'A')) :
                 right_byte;
         if (folded_left != folded_right) return false;
+        left_index = next_spelled_byte(left, left_index + 1U);
+        right_index = next_spelled_byte(right, right_index + 1U);
     }
-    return true;
+    return left_index == left.size() && right_index == right.size();
 }
 
 const PropertyEnumChoice* enum_choice_by_name(
@@ -799,6 +813,14 @@ PropertyObjectValue make_property_object(
     std::string type_name, std::vector<PropertyObjectMember> members) {
     std::shared_ptr<gui_forms::PropertyObjectData> data = std::make_shared<PropertyObjectData>();
     (*data).type_name = std::move(type_name);
+    // Member names are registered names, stored in snake_case whichever
+    // spelling the application wrote (owner decision 8). An empty name is
+    // left for the tree validation below to reject.
+    for (PropertyObjectMember& member : members) {
+        if (member.name.find_first_not_of(" \t\r\n") != std::string::npos) {
+            member.name = registered_name(member.name);
+        }
+    }
     (*data).members = std::move(members);
     PropertyObjectValue result = PropertyValueFactoryAccess::object(
         std::move(data));

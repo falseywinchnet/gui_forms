@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <stdexcept>
 
 namespace gui_forms {
@@ -102,6 +103,20 @@ void Timer::on_dispose() noexcept {
     request_.disconnect();
     if (callback_state_) (*callback_state_).owner = nullptr;
     window_lifetime_.reset();
+}
+
+namespace {
+
+// The events Timer adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> timer_interactions{{
+    {.name = "tick", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void Timer::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), timer_interactions.begin(), timer_interactions.end());
 }
 
 } // namespace gui_forms

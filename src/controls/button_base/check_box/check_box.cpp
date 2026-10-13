@@ -38,7 +38,7 @@ CheckBox::CheckBox(StableId stable_id, std::string text)
     set_text_alignment(ContentAlignment::middle_left);
     set_image_alignment(ContentAlignment::middle_left);
     define_bindable_property({
-        {"Checked", BindingValueKind::boolean, "Behavior",
+        {"checked", BindingValueKind::boolean, "Behavior",
          "Whether the check box is in a checked state.", BindingValue{false},
          Dirty::paint | Dirty::semantics},
         detail::BindingNoexceptMethodGetter<CheckBox, bool>(
@@ -161,7 +161,7 @@ constexpr std::array<AnatomyState, 11> check_box_states =
     state_declarations(check_box_state_fields);
 
 constexpr ControlAnatomy check_box_anatomy{
-    .control_id = "check-box",
+    .control_id = "check_box",
     .parts = check_box_parts,
     .states = check_box_states,
     .custom_states = {},
@@ -371,6 +371,21 @@ SemanticDescriptor CheckBox::semantic_descriptor() const {
     if (check_state_ == CheckState::checked) descriptor.states |= SemanticState::checked;
     if (check_state_ == CheckState::indeterminate) descriptor.states |= SemanticState::mixed;
     return descriptor;
+}
+
+namespace {
+
+// The events CheckBox adds to those of ButtonBase, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> check_box_interactions{{
+    {.name = "check_state_changed", .payload = "CheckState", .mutable_payload = false},
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CheckBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ButtonBase::append_interactions(interactions);
+    interactions.insert(interactions.end(), check_box_interactions.begin(), check_box_interactions.end());
 }
 
 } // namespace gui_forms

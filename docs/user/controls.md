@@ -34,6 +34,8 @@ lab
 - **By function** answers "which control lets the user set a value / pick
   from a list / see progress?". It is the page to read first.
 - **Alphabetical** is the lookup table when you know the name.
+- **Control schema** lists each control's parts, states, item systems,
+  properties and interactions: the names theme and form documents address.
 - The [API reference](../api/index) lists every public type, member and
   enumeration, with one page per function category for the controls.
 
@@ -42,6 +44,7 @@ lab
 
 ../controls/generated/by-function
 ../controls/generated/alphabetical
+../controls/generated/schema
 ```
 
 ## Conventions shared by every control

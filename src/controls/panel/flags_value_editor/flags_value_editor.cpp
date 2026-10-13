@@ -50,7 +50,7 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
     std::optional<PropertyEnumValue> normalized_value;
     if (!value_.type_name.empty()) {
         PropertyDescriptor property;
-        property.name = "Value";
+        property.name = "value";
         property.kind = BindingValueKind::enumeration;
         property.enumeration =
             std::make_shared<const PropertyEnumDescriptor>(descriptor);
@@ -74,7 +74,7 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
 void FlagsValueEditor::set_value(PropertyEnumValue value) {
     require_mutable();
     PropertyDescriptor property;
-    property.name = "Value";
+    property.name = "value";
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);
@@ -126,7 +126,7 @@ void FlagsValueEditor::open_drop_down() {
         if (choice == 0 || (choice > 0 &&
             std::has_single_bit(static_cast<std::uint64_t>(choice)))) {
             popup_choice_indices_.push_back(index);
-            items.push_back(descriptor_.choices[index].name);
+            items.push_back(display_label(descriptor_.choices[index].name));
         }
     }
     if (items.empty()) return;
@@ -251,7 +251,7 @@ void FlagsValueEditor::apply_popup_choice(std::size_t popup_index,
         bits &= ~static_cast<std::uint64_t>(choice.value);
     }
     PropertyDescriptor property;
-    property.name = "Value";
+    property.name = "value";
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);
@@ -297,7 +297,7 @@ void FlagsValueEditor::on_paint(Painter& painter, Rect damage) {
                        std::max(0.0, bounds.height - 4.0)});
     painter.draw_text_utf8({7.0, std::max(font.size,
                             (bounds.height + font.size) * 0.5 - 1.0)},
-                           value_.name, font,
+                           display_label(value_.name), font,
                            enabled() ? colors.text : colors.disabled_text);
     painter.restore();
     if (focused_ || dropped_down_) {
@@ -342,7 +342,7 @@ SemanticDescriptor FlagsValueEditor::semantic_descriptor() const {
     SemanticDescriptor result;
     result.role = SemanticRole::combo_box;
     result.name = accessible_name();
-    result.value = value_.name;
+    result.value = display_label(value_.name);
     result.description = accessible_description();
     if (dropped_down_) result.states |= SemanticState::expanded;
     result.actions = {SemanticAction::focus,
@@ -389,7 +389,7 @@ constexpr std::array<PartField<FlagsValueEditor::Parts>, 6> flags_value_editor_e
      .member = &FlagsValueEditor::Parts::content},
     {.declaration = {.name = "divider", .role = PartRole::divider, .composed_from = {}},
      .member = &FlagsValueEditor::Parts::divider},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = "button"},
      .member = &FlagsValueEditor::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &FlagsValueEditor::Parts::disclosure},
@@ -416,7 +416,7 @@ constexpr std::array<AnatomyState, 11> flags_value_editor_states =
     state_declarations(flags_value_editor_state_fields);
 
 constexpr ControlAnatomy flags_value_editor_anatomy{
-    .control_id = "flags-value-editor",
+    .control_id = "flags_value_editor",
     .parts = flags_value_editor_parts,
     .states = flags_value_editor_states,
     .custom_states = {},
@@ -483,6 +483,21 @@ FlagsValueEditor::States FlagsValueEditor::states() const {
     States record;
     read_states(flags_value_editor_state_fields, anatomy_states(), record);
     return record;
+}
+
+namespace {
+
+// The events FlagsValueEditor adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> flags_value_editor_interactions{{
+    {.name = "value_changed", .payload = "PropertyEnumValue", .mutable_payload = false},
+    {.name = "drop_down_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void FlagsValueEditor::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), flags_value_editor_interactions.begin(), flags_value_editor_interactions.end());
 }
 
 } // namespace gui_forms

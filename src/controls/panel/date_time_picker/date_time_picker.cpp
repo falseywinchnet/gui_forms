@@ -456,6 +456,8 @@ void DateTimePicker::on_detached_from_window() noexcept {
 
 namespace {
 
+constexpr std::array<AnatomyState, 1> date_time_picker_pressable_states{{AnatomyState::pressed}};
+
 constexpr std::array<PartField<DateTimePicker::Parts>, 9> date_time_picker_extra_part_fields{{
     {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
      .member = &DateTimePicker::Parts::face},
@@ -463,15 +465,18 @@ constexpr std::array<PartField<DateTimePicker::Parts>, 9> date_time_picker_extra
      .member = &DateTimePicker::Parts::edge},
     {.declaration = {.name = "content", .role = PartRole::content, .composed_from = {}},
      .member = &DateTimePicker::Parts::content},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = "button"},
      .member = &DateTimePicker::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &DateTimePicker::Parts::disclosure},
-    {.declaration = {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = date_time_picker_pressable_states},
      .member = &DateTimePicker::Parts::increment_arrow},
-    {.declaration = {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = date_time_picker_pressable_states},
      .member = &DateTimePicker::Parts::decrement_arrow},
-    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {},
+                     .states = date_time_picker_pressable_states},
      .member = &DateTimePicker::Parts::well},
     {.declaration = {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
      .member = &DateTimePicker::Parts::indicator},
@@ -497,7 +502,7 @@ constexpr std::array<AnatomyState, 10> date_time_picker_states =
     state_declarations(date_time_picker_state_fields);
 
 constexpr ControlAnatomy date_time_picker_anatomy{
-    .control_id = "date-time-picker",
+    .control_id = "date_time_picker",
     .parts = date_time_picker_parts,
     .states = date_time_picker_states,
     .custom_states = {},
@@ -545,6 +550,11 @@ void DateTimePicker::publish_part_geometry(std::span<PartGeometry> geometry) con
                          std::max(0.0, button.bottom() - middle)};
         record.increment_arrow = PartGeometry::from_bounds(upper);
         record.decrement_arrow = PartGeometry::from_bounds(lower);
+        if (pressed_part_ == HitPart::arrow_up) {
+            record.increment_arrow.states.insert(AnatomyState::pressed);
+        } else if (pressed_part_ == HitPart::arrow_down) {
+            record.decrement_arrow.states.insert(AnatomyState::pressed);
+        }
     } else {
         // The chevron's two one-unit strokes span 8 x 4 about its centre.
         const double center_y = bounds.height * 0.5 + (dropped_down_ ? 2.0 : -1.0);
@@ -557,6 +567,9 @@ void DateTimePicker::publish_part_geometry(std::span<PartGeometry> geometry) con
         const double check_y = std::max(3.0, (bounds.height - 14.0) * 0.5);
         const Rect box{5.0, check_y, 14.0, 14.0};
         record.well = PartGeometry::from_bounds(box);
+        if (pressed_part_ == HitPart::check) {
+            record.well.states.insert(AnatomyState::pressed);
+        }
         if (checked_) {
             // Two-unit strokes through (8, 7), (11, 10) and (17, 3.5) from the box top.
             const Rect mark{7.0, check_y + 2.5, 11.0, 8.5};
@@ -582,6 +595,22 @@ AnatomyStateSet DateTimePicker::anatomy_states() const {
         states.insert(AnatomyState::checked);
     }
     return states;
+}
+
+namespace {
+
+// The events DateTimePicker adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> date_time_picker_interactions{{
+    {.name = "value_changed", .payload = "DateTimeValue", .mutable_payload = false},
+    {.name = "checked_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "drop_down_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void DateTimePicker::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), date_time_picker_interactions.begin(), date_time_picker_interactions.end());
 }
 
 } // namespace gui_forms

@@ -89,7 +89,7 @@ SemanticDescriptor GroupBox::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy group_box_anatomy{
-    .control_id = "group-box",
+    .control_id = "group_box",
     .parts = group_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

@@ -402,7 +402,7 @@ constexpr std::array<AnatomyState, 5> raster_canvas_states =
     state_declarations(raster_canvas_state_fields);
 
 constexpr ControlAnatomy raster_canvas_anatomy{
-    .control_id = "raster-canvas",
+    .control_id = "raster_canvas",
     .parts = raster_canvas_parts,
     .states = raster_canvas_states,
     .custom_states = {},

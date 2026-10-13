@@ -106,6 +106,7 @@ public:
     [[nodiscard]] Parts parts() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     // The lines of a label's text placed in its arranged bounds (stage T1):
     // each line's drawing origin (left edge, snapped baseline) and width, and
     // the block the lines fill. Paint and published geometry share it.

@@ -73,7 +73,7 @@ private:
         inspector_ = make_control<PropertyGrid>(StableId("gallery.values.property-grid"));
         (*inspector_).set_accessible_name("Decimal control property grid");
         (*inspector_).set_selected_object(numerics_[1]);
-        static_cast<void>((*inspector_).set_property_expanded("Bounds", true));
+        static_cast<void>((*inspector_).set_property_expanded("bounds", true));
         items_target_ = make_control<ComboBox>(StableId("gallery.values.items-target"));
         (*items_target_).set_accessible_name("Inspectable mode collection");
         (*items_target_).set_items({"AM", "FM", "WFM"});
@@ -145,20 +145,20 @@ private:
 
     void inspect_numeric() {
         (*inspector_).set_selected_object(numerics_[1]);
-        static_cast<void>((*inspector_).set_property_expanded("Bounds", true));
+        static_cast<void>((*inspector_).set_property_expanded("bounds", true));
         (*status_).set_text("PropertyGrid · retained NumericUpDown factory and typed commit");
     }
 
     void inspect_items() {
         (*inspector_).set_selected_object(items_target_);
-        static_cast<void>((*inspector_).set_property_expanded("Items", true));
+        static_cast<void>((*inspector_).set_property_expanded("items", true));
         focus_editor("Items[0]");
         (*status_).set_text("PropertyGrid · ComboBox.Items immutable collection expanded");
     }
 
     void inspect_style() {
         (*inspector_).set_selected_object(status_);
-        static_cast<void>((*inspector_).set_property_expanded("ForeColor", true));
+        static_cast<void>((*inspector_).set_property_expanded("fore-color", true));
         (*status_).set_text("PropertyGrid · flags popup and canonical color editor services");
     }
 
@@ -166,9 +166,9 @@ private:
         if ((*inspector_).selected_object() != items_target_) {
             (*inspector_).set_selected_object(items_target_);
         }
-        static_cast<void>((*inspector_).set_property_expanded("Items", true));
+        static_cast<void>((*inspector_).set_property_expanded("items", true));
         const bool added = (*inspector_).insert_collection_item(
-            "Items", (*items_target_).items().size(), BindingValue{std::string("CW")});
+            "items", (*items_target_).items().size(), BindingValue{std::string("CW")});
         if (added) {
             focus_editor("Items[" + std::to_string((*items_target_).items().size() - 1U) + "]");
         }

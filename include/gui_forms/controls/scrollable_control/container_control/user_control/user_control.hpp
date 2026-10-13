@@ -19,6 +19,7 @@ public:
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
     void on_attachment_committed() noexcept override;
     void on_detached_from_window() noexcept override;

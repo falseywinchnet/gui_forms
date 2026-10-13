@@ -12,7 +12,7 @@ HScrollBar::HScrollBar(StableId stable_id)
 namespace {
 
 constexpr ControlAnatomy h_scroll_bar_anatomy{
-    .control_id = "h-scroll-bar",
+    .control_id = "h_scroll_bar",
     .parts = scroll_bar_detail::parts,
     .states = scroll_bar_detail::states,
     .custom_states = {},

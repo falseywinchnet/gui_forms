@@ -205,8 +205,8 @@ gui_forms::PropertyGrid
       std::shared_ptr<gf::PropertyGrid> inspector =
           gf::make_control<gf::PropertyGrid>(gf::StableId("options.inspector"));
       (*inspector).set_selected_object(wrap);
-      (*inspector).try_set_property_text("Text", "Wrap long lines");
-      (*inspector).try_set_property_value("Checked", gf::BindingValue{true});
+      (*inspector).try_set_property_text("text", "Wrap long lines");
+      (*inspector).try_set_property_value("checked", gf::BindingValue{true});
       // the check box now reads "Wrap long lines" and is checked
 
    Follow successful edits and rejected ones from an owner:
@@ -236,8 +236,8 @@ gui_forms::PropertyGrid
 
       void example() {
           Inspector inspector;
-          (*inspector.grid).try_set_property_value("Checked", gf::BindingValue{true});
-          // changed is "Checked"
+          (*inspector.grid).try_set_property_value("checked", gf::BindingValue{true});
+          // changed is "checked"
           (*inspector.grid).try_set_property_value(
               "TabIndex", gf::BindingValue{std::string("-1")});
           // rejected is "TabIndex"; the tab index is unchanged
@@ -444,6 +444,10 @@ gui_forms::PropertyGrid
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
 
    .. cpp:function:: void on_dispose() noexcept override
 

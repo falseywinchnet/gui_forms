@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <sstream>
@@ -120,6 +121,20 @@ const char* semantic_feedback_kind_name(SemanticFeedbackKind kind) noexcept {
     case SemanticFeedbackKind::conflict: return "conflict";
     }
     return "unknown";
+}
+
+namespace {
+
+// The events SemanticFeedback adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> semantic_feedback_interactions{{
+    {.name = "emitted", .payload = "SemanticFeedbackRecord", .mutable_payload = false},
+}};
+
+} // namespace
+
+void SemanticFeedback::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), semantic_feedback_interactions.begin(), semantic_feedback_interactions.end());
 }
 
 } // namespace gui_forms

@@ -172,6 +172,7 @@ public:
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     // Text and image placement inside a button face (stage T1). Paint and
     // published geometry share it. Rectangles are at rest: the pressed
     // content offset and a theme's visual offset are presentation and are

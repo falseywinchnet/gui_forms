@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 #include "../scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -112,7 +113,7 @@ SemanticDescriptor ContainerControl::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy container_control_anatomy{
-    .control_id = "container-control",
+    .control_id = "container_control",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -122,6 +123,20 @@ constexpr ControlAnatomy container_control_anatomy{
 
 const ControlAnatomy& ContainerControl::anatomy() const noexcept {
     return container_control_anatomy;
+}
+
+namespace {
+
+// The events ContainerControl adds to those of ScrollableControl, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> container_control_interactions{{
+    {.name = "auto_validate_changed", .payload = "AutoValidate", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ContainerControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ScrollableControl::append_interactions(interactions);
+    interactions.insert(interactions.end(), container_control_interactions.begin(), container_control_interactions.end());
 }
 
 } // namespace gui_forms

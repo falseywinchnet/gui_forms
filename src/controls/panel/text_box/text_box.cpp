@@ -41,7 +41,7 @@ TextBox::TextBox(StableId stable_id, std::string text)
     set_cursor(CursorKind::text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
     define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
+        {"text", BindingValueKind::text, "Appearance",
          "Editable UTF-8 text content.", BindingValue{std::string{}},
          invalidation::text_content},
         detail::BoundMemberFunction<BindingValue (TextBox::*)() const>(
@@ -1300,7 +1300,7 @@ constexpr std::array<AnatomyState, 10> text_box_states =
     state_declarations(text_box_state_fields);
 
 constexpr ControlAnatomy text_box_anatomy{
-    .control_id = "text-box",
+    .control_id = "text_box",
     .parts = text_box_parts,
     .states = text_box_states,
     .custom_states = {},
@@ -1412,6 +1412,23 @@ AnatomyStateSet TextBox::anatomy_states() const {
         states.insert(AnatomyState::pending);
     }
     return states;
+}
+
+namespace {
+
+// The events TextBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 4> text_box_interactions{{
+    {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "TextSelection", .mutable_payload = false},
+    {.name = "committed", .payload = "std::string", .mutable_payload = false},
+    {.name = "cancelled", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void TextBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), text_box_interactions.begin(), text_box_interactions.end());
 }
 
 } // namespace gui_forms

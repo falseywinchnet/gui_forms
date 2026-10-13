@@ -426,15 +426,15 @@ void initialize_gallery_runtime(Window& window) {
     validated_binding.data_source_update_mode =
         DataSourceUpdateMode::on_validation;
     const std::shared_ptr<Binding> name_binding = (*(*context).binding_editor).data_bindings().add(
-        "Text", (*context).binding_source, "name", validated_binding);
+        "text", (*context).binding_source, "name", validated_binding);
     on((*name_binding).parse(), *actions, &RuntimeActions::validate_profile_name);
     BindingOptions immediate_binding;
     immediate_binding.data_source_update_mode =
         DataSourceUpdateMode::on_property_changed;
     static_cast<void>((*(*context).binding_enabled).data_bindings().add(
-        "Checked", (*context).binding_source, "enabled", immediate_binding));
+        "checked", (*context).binding_source, "enabled", immediate_binding));
     static_cast<void>((*(*context).binding_gain).data_bindings().add(
-        "Value", (*context).binding_source, "gain", immediate_binding));
+        "value", (*context).binding_source, "gain", immediate_binding));
     (*(*context).tooltips).set_initial_delay(420ms);
     (*(*context).tooltips).set_reshow_delay(90ms);
     (*(*context).tooltips).set_auto_pop_delay(4s);

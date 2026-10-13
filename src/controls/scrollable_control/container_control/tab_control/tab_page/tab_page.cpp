@@ -41,7 +41,7 @@ SemanticDescriptor TabPage::semantic_descriptor() const {
 namespace {
 
 constexpr ControlAnatomy tab_page_anatomy{
-    .control_id = "tab-page",
+    .control_id = "tab_page",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

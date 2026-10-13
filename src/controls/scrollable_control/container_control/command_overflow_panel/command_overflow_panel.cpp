@@ -349,7 +349,7 @@ namespace {
 
 // Its panes and members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy command_overflow_panel_anatomy{
-    .control_id = "command-overflow-panel",
+    .control_id = "command_overflow_panel",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

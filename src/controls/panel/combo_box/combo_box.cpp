@@ -23,7 +23,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_focusable(true);
     set_cursor(CursorKind::hand);
     PropertyDescriptor items_descriptor;
-    items_descriptor.name = "Items";
+    items_descriptor.name = "items";
     items_descriptor.kind = BindingValueKind::collection;
     items_descriptor.category = "Data";
     items_descriptor.description =
@@ -54,7 +54,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
 
     gui_forms::PropertyRegistration index_registration;
     index_registration.descriptor = {
-        "SelectedIndex", BindingValueKind::signed_integer, "Behavior",
+        "selected_index", BindingValueKind::signed_integer, "Behavior",
         "Zero-based selected item index, or -1 when no item is selected.",
         BindingValue{std::int64_t{-1}}, Dirty::paint | Dirty::semantics};
     index_registration.get = detail::BoundMemberFunction<
@@ -70,7 +70,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
 
     gui_forms::PropertyRegistration text_registration;
     text_registration.descriptor = {
-        "Text", BindingValueKind::text, "Appearance",
+        "text", BindingValueKind::text, "Appearance",
         "Text of the selected item, or empty when no item is selected.",
         BindingValue{std::string{}}, Dirty::paint | Dirty::semantics};
     text_registration.get = detail::BoundMemberFunction<
@@ -552,7 +552,7 @@ constexpr std::array<PartField<ComboBox::Parts>, 7> combo_box_extra_part_fields{
      .member = &ComboBox::Parts::content},
     {.declaration = {.name = "divider", .role = PartRole::divider, .composed_from = {}},
      .member = &ComboBox::Parts::divider},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = "button"},
      .member = &ComboBox::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &ComboBox::Parts::disclosure},
@@ -577,7 +577,7 @@ constexpr std::array<AnatomyState, 9> combo_box_states =
     state_declarations(combo_box_state_fields);
 
 constexpr ControlAnatomy combo_box_anatomy{
-    .control_id = "combo-box",
+    .control_id = "combo_box",
     .parts = combo_box_parts,
     .states = combo_box_states,
     .custom_states = {},
@@ -646,6 +646,22 @@ AnatomyStateSet ComboBox::anatomy_states() const {
         states.insert(AnatomyState::closed);
     }
     return states;
+}
+
+namespace {
+
+// The events ComboBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> combo_box_interactions{{
+    {.name = "selected_index_changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+    {.name = "drop_down_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "items_changed", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ComboBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), combo_box_interactions.begin(), combo_box_interactions.end());
 }
 
 } // namespace gui_forms

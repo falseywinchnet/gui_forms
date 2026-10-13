@@ -286,7 +286,7 @@ constexpr std::array<AnatomyState, 5> easing_preview_states =
     state_declarations(easing_preview_state_fields);
 
 constexpr ControlAnatomy easing_preview_anatomy{
-    .control_id = "easing-preview",
+    .control_id = "easing_preview",
     .parts = easing_preview_parts,
     .states = easing_preview_states,
     .custom_states = {},

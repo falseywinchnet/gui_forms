@@ -1729,7 +1729,7 @@ constexpr std::array<PartField<ObjectView::ItemParts>, 5> object_view_item_part_
      .member = &ObjectView::ItemParts::name},
     {.declaration = {.name = "secondary", .role = PartRole::content, .composed_from = {}},
      .member = &ObjectView::ItemParts::secondary},
-    {.declaration = {.name = "cell-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "cell_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ObjectView::ItemParts::cell_focus},
 }};
 
@@ -1745,17 +1745,57 @@ constexpr std::array<PartDeclaration, 5> object_view_item_parts =
 constexpr std::array<AnatomyState, 4> object_view_item_states =
     state_declarations(object_view_item_state_fields);
 
+constexpr std::array<PartField<ObjectView::ColumnParts>, 6> object_view_column_part_fields{{
+    {.declaration = {.name = "column_header", .role = PartRole::region, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::column_header},
+    {.declaration = {.name = "column_label", .role = PartRole::label, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::column_label},
+    {.declaration = {.name = "sort_glyph", .role = PartRole::glyph, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::sort_glyph},
+    {.declaration = {.name = "column_divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::column_divider},
+    {.declaration = {.name = "column_grip", .role = PartRole::grip, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::column_grip},
+    {.declaration = {.name = "column_focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &ObjectView::ColumnParts::column_focus},
+}};
+
+constexpr std::array<StateField<ObjectView::ColumnStates>, 3> object_view_column_state_fields{{
+    {.state = AnatomyState::pressed, .member = &ObjectView::ColumnStates::pressed},
+    {.state = AnatomyState::captured, .member = &ObjectView::ColumnStates::captured},
+    {.state = AnatomyState::current, .member = &ObjectView::ColumnStates::current},
+}};
+
+constexpr std::array<CustomStateDeclaration, 2> object_view_column_custom_states{{
+    {.name = "sorted_ascending"},
+    {.name = "sorted_descending"},
+}};
+constexpr CustomStateIndex sorted_ascending_state{0U};
+constexpr CustomStateIndex sorted_descending_state{1U};
+
+constexpr std::array<PartDeclaration, 6> object_view_column_parts =
+    part_declarations(object_view_column_part_fields);
+constexpr std::array<AnatomyState, 3> object_view_column_states =
+    state_declarations(object_view_column_state_fields);
+constexpr ItemSystemIndex object_view_column_system{1U};
+
 constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
     object_view_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(object_view_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 2> object_view_item_systems{{
+    {.name = "item", .parts = object_view_item_parts, .states = object_view_item_states,
+     .custom_states = {}},
+    {.name = "column", .parts = object_view_column_parts, .states = object_view_column_states,
+     .custom_states = object_view_column_custom_states},
+}};
+
 constexpr ControlAnatomy object_view_anatomy{
-    .control_id = "object-view",
+    .control_id = "object_view",
     .parts = object_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = object_view_item_parts,
-    .item_states = object_view_item_states,
+    .item_systems = object_view_item_systems,
 };
 
 } // namespace
@@ -1771,8 +1811,8 @@ void ObjectView::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Panel::Parts panel = panel_parts();
     record.face = panel.face;
     record.edge = panel.edge;
-    // The column header band of the details view. Columns are not yet
-    // published one by one.
+    // The column header band of the details view; each visible column is
+    // also published as an item of the column system.
     if (has_details_columns()) {
         const Rect bounds = local_bounds();
         const double viewport_right = std::max(4.0, bounds.width - 4.0);
@@ -1792,7 +1832,7 @@ ObjectView::Parts ObjectView::parts() const {
     return record;
 }
 
-std::size_t ObjectView::realized_item_count() const {
+std::size_t ObjectView::realized_row_count() const noexcept {
     const std::size_t first = top_row_ * columns();
     if (first >= items_.size()) return 0U;
     const std::size_t end = std::min(items_.size(),
@@ -1800,12 +1840,102 @@ std::size_t ObjectView::realized_item_count() const {
     return end - first;
 }
 
+std::size_t ObjectView::realized_column_count() const noexcept {
+    if (!has_details_columns()) return 0U;
+    const double viewport_right = std::max(4.0, local_bounds().width - 4.0);
+    std::size_t count = 0U;
+    for (std::size_t index = 0U; index < details_columns_.size(); ++index) {
+        const Rect cell = column_bounds(index);
+        if (cell.x < viewport_right && cell.x + cell.width > 4.0) ++count;
+    }
+    return count;
+}
+
+std::size_t ObjectView::realized_column_index(std::size_t position) const noexcept {
+    const double viewport_right = std::max(4.0, local_bounds().width - 4.0);
+    std::size_t seen = 0U;
+    for (std::size_t index = 0U; index < details_columns_.size(); ++index) {
+        const Rect cell = column_bounds(index);
+        if (cell.x >= viewport_right || cell.x + cell.width <= 4.0) continue;
+        if (seen == position) return index;
+        ++seen;
+    }
+    return details_columns_.size();
+}
+
+std::size_t ObjectView::realized_item_count() const {
+    return realized_row_count() + realized_column_count();
+}
+
 std::string ObjectView::realized_item_stable_id(std::size_t item) const {
-    return items_[top_row_ * columns() + item].stable_id;
+    const std::size_t rows = realized_row_count();
+    if (item < rows) return items_[top_row_ * columns() + item].stable_id;
+    const std::size_t column = realized_column_index(item - rows);
+    return std::string(stable_id().value()) + ".column." + details_columns_[column].id.value;
+}
+
+ItemSystemIndex ObjectView::publish_realized_item_system(std::size_t item) const {
+    if (item < realized_row_count()) {
+        const ItemSystemIndex rows;
+        return rows;
+    }
+    return object_view_column_system;
+}
+
+// The header cell as paint_details lays it out: the label inset by six
+// units and short of the sort glyph, the divider stroked one unit inside the
+// right edge, and the resize grip four units either side of that edge.
+ObjectView::ColumnParts ObjectView::column_parts(std::size_t column) const {
+    const Rect bounds = local_bounds();
+    const double viewport_right = std::max(4.0, bounds.width - 4.0);
+    const Rect clip{4.0, 2.0, std::max(0.0, viewport_right - 4.0), header_height()};
+    const Rect cell = column_bounds(column);
+    const bool sorted = details_columns_[column].id == details_sort_.column;
+    const double reserved = sorted ? 22.0 : 12.0;
+    const Rect label{cell.x + 6.0, cell.y, std::max(0.0, cell.width - reserved), cell.height};
+    const double edge = cell.x + cell.width;
+    const Rect divider{edge - 1.5, cell.y + 3.0, 1.0, std::max(0.0, cell.height - 6.0)};
+    const Rect grip{edge - 4.0, cell.y, 8.0, cell.height};
+    Rect glyph{};
+    if (sorted) {
+        const double center = edge - 10.0;
+        glyph = {center - 3.0, cell.y + cell.height * .5 - 3.0, 6.0, 6.0};
+    }
+    ColumnParts record;
+    const Rect visible_cell = Rect::intersection(cell, clip);
+    record.column_header = PartGeometry::from_bounds(visible_cell);
+    record.column_label = PartGeometry::from_bounds(Rect::intersection(label, visible_cell));
+    record.sort_glyph = PartGeometry::from_bounds(Rect::intersection(glyph, visible_cell));
+    record.column_divider = PartGeometry::from_bounds(Rect::intersection(divider, visible_cell));
+    record.column_grip = PartGeometry::from_bounds(Rect::intersection(grip, clip));
+    record.column_focus = record.column_header;
+    return record;
+}
+
+AnatomyStateSet ObjectView::column_states(std::size_t column) const {
+    AnatomyStateSet states;
+    if (pressed_column_ == column) states.insert(AnatomyState::pressed);
+    if (resizing_column_ == column) states.insert(AnatomyState::captured);
+    if (header_focused_ && focused_column_ == column) states.insert(AnatomyState::current);
+    if (details_columns_[column].id == details_sort_.column) {
+        if (details_sort_.direction == ObjectSortDirection::ascending) {
+            states.insert(sorted_ascending_state);
+        } else {
+            states.insert(sorted_descending_state);
+        }
+    }
+    return states;
 }
 
 void ObjectView::publish_realized_item_geometry(std::size_t item,
                                           std::span<PartGeometry> geometry) const {
+    const std::size_t rows = realized_row_count();
+    if (item >= rows) {
+        const ColumnParts column = column_parts(realized_column_index(item - rows));
+        write_item_parts(anatomy().item_systems[object_view_column_system.value],
+                         object_view_column_part_fields, column, geometry);
+        return;
+    }
     ItemParts record;
 
     // Name and secondary text are published as the slots on_paint lays them
@@ -1857,10 +1987,12 @@ void ObjectView::publish_realized_item_geometry(std::size_t item,
     record.name = PartGeometry::from_bounds(Rect::intersection(name, visible_cell));
     record.secondary = PartGeometry::from_bounds(Rect::intersection(secondary, visible_cell));
     record.cell_focus = record.cell;
-    write_item_parts(anatomy(), object_view_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), object_view_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet ObjectView::realized_item_anatomy_states(std::size_t item) const {
+    const std::size_t rows = realized_row_count();
+    if (item >= rows) return column_states(realized_column_index(item - rows));
     AnatomyStateSet states;
     const std::size_t index = top_row_ * columns() + item;
     const ObjectViewItem& entry = items_[index];
@@ -1872,7 +2004,7 @@ AnatomyStateSet ObjectView::realized_item_anatomy_states(std::size_t item) const
 }
 
 std::vector<ObjectView::Item> ObjectView::realized_items() const {
-    const std::size_t count = realized_item_count();
+    const std::size_t count = realized_row_count();
     std::vector<Item> records;
     records.reserve(count);
     for (std::size_t item = 0; item < count; ++item) {
@@ -1880,12 +2012,49 @@ std::vector<ObjectView::Item> ObjectView::realized_items() const {
         Item record;
         record.index = top_row_ * columns() + item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), object_view_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), object_view_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(object_view_item_state_fields, item_states, record.states);
         records.push_back(record);
     }
     return records;
+}
+
+std::vector<ObjectView::Column> ObjectView::realized_columns() const {
+    const std::size_t count = realized_column_count();
+    std::vector<Column> records;
+    records.reserve(count);
+    for (std::size_t position = 0; position < count; ++position) {
+        const std::size_t index = realized_column_index(position);
+        Column record;
+        record.index = index;
+        record.stable_id = std::string(stable_id().value()) + ".column." +
+                           details_columns_[index].id.value;
+        record.parts = column_parts(index);
+        const AnatomyStateSet states = column_states(index);
+        read_states(object_view_column_state_fields, states, record.states);
+        record.states.sorted_ascending = states.contains(sorted_ascending_state);
+        record.states.sorted_descending = states.contains(sorted_descending_state);
+        records.push_back(record);
+    }
+    return records;
+}
+
+namespace {
+
+// The events ObjectView adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 4> object_view_interactions{{
+    {.name = "sort_requested", .payload = "ObjectDetailsSort", .mutable_payload = false},
+    {.name = "selection_changed", .payload = "ObjectSelectionChange", .mutable_payload = false},
+    {.name = "item_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context_requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ObjectView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), object_view_interactions.begin(), object_view_interactions.end());
 }
 
 } // namespace gui_forms

@@ -197,4 +197,11 @@ gui_forms::SemanticFeedback
       ``operation_completed`` plays ``operation_complete``, ``operation_failed``
       plays ``error``, and ``conflict`` plays ``warning``.
 
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:type:: Clock = std::function<std::uint64_t()>

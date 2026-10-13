@@ -66,6 +66,7 @@ public:
     [[nodiscard]] States states() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:

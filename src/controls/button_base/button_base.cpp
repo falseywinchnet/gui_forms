@@ -132,7 +132,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     set_focusable(true);
     set_cursor(CursorKind::hand);
     define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
+        {"text", BindingValueKind::text, "Appearance",
          "Text displayed by the button.", BindingValue{std::string{}},
          invalidation::text_content},
         detail::BindingMemberGetter<ButtonBase, std::string>(
@@ -143,7 +143,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
         detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 
     PropertyDescriptor font;
-    font.name = "Font";
+    font.name = "font";
     font.kind = BindingValueKind::font;
     font.category = "Appearance";
     font.description = "Font used for button measurement and painting.";
@@ -159,7 +159,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
             *this, &ButtonBase::set_font), {}, {}, {}});
 
     PropertyDescriptor image;
-    image.name = "Image";
+    image.name = "image";
     image.kind = BindingValueKind::image;
     image.category = "Appearance";
     image.description = "Direct generational image resource for button content.";
@@ -178,7 +178,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
             *this, &ButtonBase::should_serialize_image)});
 
     PropertyDescriptor content_padding;
-    content_padding.name = "ContentPadding";
+    content_padding.name = "content_padding";
     content_padding.kind = BindingValueKind::insets;
     content_padding.category = "Layout";
     content_padding.description =
@@ -773,7 +773,7 @@ constexpr std::array<AnatomyState, 9> button_base_states =
     state_declarations(button_base_state_fields);
 
 constexpr ControlAnatomy button_base_anatomy{
-    .control_id = "button-base",
+    .control_id = "button_base",
     .parts = button_base_parts,
     .states = button_base_states,
     .custom_states = {},
@@ -1032,6 +1032,22 @@ bool ButtonBase::on_semantic_action(SemanticAction action, std::string_view valu
         return true;
     }
     return Control::on_semantic_action(action, value);
+}
+
+namespace {
+
+// The events ButtonBase adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> button_base_interactions{{
+    {.name = "expanded_changed", .payload = "std::optional<bool>", .mutable_payload = false},
+    {.name = "clicked", .payload = "ButtonBase", .mutable_payload = true},
+    {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ButtonBase::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), button_base_interactions.begin(), button_base_interactions.end());
 }
 
 } // namespace gui_forms

@@ -706,11 +706,11 @@ constexpr std::array<PartField<BreadcrumbTrail::Parts>, 2> breadcrumb_trail_extr
 constexpr std::array<PartField<BreadcrumbTrail::ItemParts>, 4> breadcrumb_trail_item_part_fields{{
     {.declaration = {.name = "segment", .role = PartRole::face, .composed_from = "button"},
      .member = &BreadcrumbTrail::ItemParts::segment},
-    {.declaration = {.name = "segment-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "segment_label", .role = PartRole::label, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_label},
-    {.declaration = {.name = "segment-cap", .role = PartRole::cap, .composed_from = {}},
+    {.declaration = {.name = "segment_cap", .role = PartRole::cap, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_cap},
-    {.declaration = {.name = "segment-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "segment_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &BreadcrumbTrail::ItemParts::segment_focus},
 }};
 
@@ -729,13 +729,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
     breadcrumb_trail_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(breadcrumb_trail_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> breadcrumb_trail_item_systems{{
+    {.name = "item", .parts = breadcrumb_trail_item_parts, .states = breadcrumb_trail_item_states,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy breadcrumb_trail_anatomy{
-    .control_id = "breadcrumb-trail",
+    .control_id = "breadcrumb_trail",
     .parts = breadcrumb_trail_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = breadcrumb_trail_item_parts,
-    .item_states = breadcrumb_trail_item_states,
+    .item_systems = breadcrumb_trail_item_systems,
 };
 
 } // namespace
@@ -809,7 +813,7 @@ void BreadcrumbTrail::publish_realized_item_geometry(std::size_t item,
         record.segment_cap = PartGeometry::from_bounds(cap);
     }
     record.segment_focus = PartGeometry::from_bounds(bounds);
-    write_item_parts(anatomy(), breadcrumb_trail_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), breadcrumb_trail_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet BreadcrumbTrail::realized_item_anatomy_states(std::size_t item) const {
@@ -836,11 +840,30 @@ std::vector<BreadcrumbTrail::Item> BreadcrumbTrail::realized_items() const {
         Item record;
         record.index = item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), breadcrumb_trail_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), breadcrumb_trail_item_part_fields, published.parts(), record.parts);
         read_states(breadcrumb_trail_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }
     return records;
+}
+
+namespace {
+
+// The events BreadcrumbTrail adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 6> breadcrumb_trail_interactions{{
+    {.name = "segment_activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "overflow_activated", .payload = "", .mutable_payload = false},
+    {.name = "edit_committed", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit_started", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit_cancelled", .payload = "", .mutable_payload = false},
+    {.name = "edit_completion_requested", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void BreadcrumbTrail::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), breadcrumb_trail_interactions.begin(), breadcrumb_trail_interactions.end());
 }
 
 } // namespace gui_forms

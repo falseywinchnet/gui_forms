@@ -6,6 +6,15 @@
 #include <utility>
 
 namespace gui_forms {
+std::vector<InteractionDeclaration> Component::interactions() const {
+    std::vector<InteractionDeclaration> declared;
+    append_interactions(declared);
+    return declared;
+}
+
+// Component itself raises no events.
+void Component::append_interactions(std::vector<InteractionDeclaration>&) const {}
+
 Component::~Component() {
     // Natural C++ destruction ends subscriptions just as explicit disposal
     // does. Do not call virtual disposal hooks after derived members are gone.

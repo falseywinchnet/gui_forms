@@ -41,6 +41,9 @@ public:
     [[nodiscard]] static HostSoundCue cue_for(
         SemanticFeedbackKind kind) noexcept;
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     Window* window_{};
     Clock clock_;

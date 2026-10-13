@@ -380,6 +380,10 @@ gui_forms::Card
 
    .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

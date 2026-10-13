@@ -290,3 +290,10 @@ gui_forms::Command
 
       Marks the command as destructive, such as Delete; menus draw its item in
       red.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*

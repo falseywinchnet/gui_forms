@@ -6,6 +6,7 @@
 
 #include "../support/binding_support.hpp"
 
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <charconv>
@@ -24,7 +25,7 @@ Binding::Binding(Control& target, std::string property_name,
                  std::shared_ptr<BindingSource> source,
                  std::string data_member, BindingOptions options)
     : target_(&target), source_(source),
-      property_name_(canonical_binding_name(property_name)),
+      property_name_(registered_name(property_name)),
       data_member_(canonical_binding_name(data_member)),
       options_(std::move(options)) {
     detail::validate_binding_options(options_);
@@ -319,6 +320,22 @@ void Binding::on_dispose() noexcept {
     binding_complete_.disconnect_all();
     source_.reset();
     target_ = nullptr;
+}
+
+namespace {
+
+// The events Binding adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> binding_interactions{{
+    {.name = "format", .payload = "BindingConvertEvent", .mutable_payload = true},
+    {.name = "parse", .payload = "BindingConvertEvent", .mutable_payload = true},
+    {.name = "binding_complete", .payload = "BindingCompleteEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void Binding::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), binding_interactions.begin(), binding_interactions.end());
 }
 
 } // namespace gui_forms

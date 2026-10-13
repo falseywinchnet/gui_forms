@@ -411,6 +411,10 @@ gui_forms::DateTimePicker
 
    .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: void on_detached_from_window() noexcept override
 
       *Protected.*

@@ -793,7 +793,7 @@ bool ScrollableControl::on_semantic_child_action(
 namespace {
 
 constexpr ControlAnatomy scrollable_control_anatomy{
-    .control_id = "scrollable-control",
+    .control_id = "scrollable_control",
     .parts = scrollable_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -820,6 +820,13 @@ ScrollableControl::Parts ScrollableControl::scrollable_parts() const {
     record.vertical_track = PartGeometry::from_bounds(vertical.track);
     record.vertical_thumb = PartGeometry::from_bounds(vertical.thumb);
     record.vertical_increment_arrow = PartGeometry::from_bounds(vertical.last_button);
+    if (dragging_orientation_ == ScrollOrientation::horizontal) {
+        record.horizontal_thumb.states.insert(AnatomyState::pressed);
+        record.horizontal_thumb.states.insert(AnatomyState::captured);
+    } else if (dragging_orientation_ == ScrollOrientation::vertical) {
+        record.vertical_thumb.states.insert(AnatomyState::pressed);
+        record.vertical_thumb.states.insert(AnatomyState::captured);
+    }
     if (hscroll() && vscroll()) {
         const Rect corner{viewport_rectangle_.width, viewport_rectangle_.height,
                           scrollbar_thickness_, scrollbar_thickness_};
@@ -855,6 +862,20 @@ ScrollableControl::States ScrollableControl::states() const {
     States record;
     read_states(scrollable_detail::state_fields, anatomy_states(), record);
     return record;
+}
+
+namespace {
+
+// The events ScrollableControl adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> scrollable_control_interactions{{
+    {.name = "scroll", .payload = "ScrollEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void ScrollableControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), scrollable_control_interactions.begin(), scrollable_control_interactions.end());
 }
 
 } // namespace gui_forms

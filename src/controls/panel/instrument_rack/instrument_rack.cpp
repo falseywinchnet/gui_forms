@@ -6,6 +6,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -1074,7 +1075,7 @@ namespace {
 
 // Its rows, modules and toolbars are child controls with their own anatomies.
 constexpr ControlAnatomy instrument_rack_anatomy{
-    .control_id = "instrument-rack",
+    .control_id = "instrument_rack",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -1084,6 +1085,24 @@ constexpr ControlAnatomy instrument_rack_anatomy{
 
 const ControlAnatomy& InstrumentRack::anatomy() const noexcept {
     return instrument_rack_anatomy;
+}
+
+namespace {
+
+// The events InstrumentRack adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> instrument_rack_interactions{{
+    {.name = "field_changed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "field_committed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "module_toggled", .payload = "InstrumentModuleToggle", .mutable_payload = false},
+    {.name = "remove_requested", .payload = "InstrumentModuleRequest", .mutable_payload = false},
+    {.name = "move_requested", .payload = "InstrumentModuleMoveRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void InstrumentRack::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), instrument_rack_interactions.begin(), instrument_rack_interactions.end());
 }
 
 } // namespace gui_forms

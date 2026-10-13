@@ -2,6 +2,7 @@
 #include "gui_forms/text.hpp"
 #include "../panel/panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -259,7 +260,7 @@ namespace {
 
 // Its members are child controls, which publish their own anatomies.
 constexpr ControlAnatomy command_bar_anatomy{
-    .control_id = "command-bar",
+    .control_id = "command_bar",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -269,6 +270,20 @@ constexpr ControlAnatomy command_bar_anatomy{
 
 const ControlAnatomy& CommandBar::anatomy() const noexcept {
     return command_bar_anatomy;
+}
+
+namespace {
+
+// The events CommandBar adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> command_bar_interactions{{
+    {.name = "invoked", .payload = "CommandItem", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CommandBar::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), command_bar_interactions.begin(), command_bar_interactions.end());
 }
 
 } // namespace gui_forms

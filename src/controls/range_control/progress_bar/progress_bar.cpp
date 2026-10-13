@@ -243,7 +243,7 @@ constexpr std::array<AnatomyState, 5> progress_bar_states =
     state_declarations(progress_bar_state_fields);
 
 constexpr ControlAnatomy progress_bar_anatomy{
-    .control_id = "progress-bar",
+    .control_id = "progress_bar",
     .parts = progress_bar_parts,
     .states = progress_bar_states,
     .custom_states = {},

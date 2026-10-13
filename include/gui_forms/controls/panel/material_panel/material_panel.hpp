@@ -25,6 +25,7 @@ public:
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 

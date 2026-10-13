@@ -113,6 +113,7 @@ public:
     }
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void verify_dispose_thread() override;
     void on_dispose() noexcept override;
 

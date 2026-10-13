@@ -79,6 +79,8 @@ bool DropDownButton::perform_drop_down() {
 
 namespace {
 
+constexpr std::array<AnatomyState, 1> drop_down_segment_states{{AnatomyState::pressed}};
+
 constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &DropDownButton::Parts::region},
@@ -88,7 +90,8 @@ constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_
      .member = &DropDownButton::Parts::icon},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &DropDownButton::Parts::label},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = {}},
+    {.declaration = {.name = "drop_down", .role = PartRole::actuator, .composed_from = {},
+                     .states = drop_down_segment_states},
      .member = &DropDownButton::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &DropDownButton::Parts::disclosure},
@@ -118,7 +121,7 @@ constexpr std::array<AnatomyState, 11> drop_down_button_states =
     state_declarations(drop_down_button_state_fields);
 
 constexpr ControlAnatomy drop_down_button_anatomy{
-    .control_id = "drop-down-button",
+    .control_id = "drop_down_button",
     .parts = drop_down_button_parts,
     .states = drop_down_button_states,
     .custom_states = {},
@@ -163,6 +166,10 @@ void DropDownButton::publish_part_geometry(std::span<PartGeometry> geometry) con
         const Rect arrow{std::floor(center_x) - 3.0, std::floor(center_y) - 1.0, 7.0, 4.0};
         record.drop_down = PartGeometry::from_bounds(segment);
         record.disclosure = PartGeometry::from_bounds(arrow);
+        // A press that began on the drop-down segment presses that part.
+        if (pressed_visual() && pointer_drop_down_) {
+            record.drop_down.states.insert(AnatomyState::pressed);
+        }
     }
     write_parts(anatomy(), drop_down_button_part_fields, record, geometry);
 }
@@ -290,6 +297,21 @@ void DropDownButton::on_activate() {
     }
     pointer_drop_down_ = false;
     ButtonBase::on_activate();
+}
+
+namespace {
+
+// The events DropDownButton adds to those of Button, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> drop_down_button_interactions{{
+    {.name = "drop_down_requested", .payload = "DropDownButton", .mutable_payload = true},
+    {.name = "drop_down_close_requested", .payload = "DropDownButton", .mutable_payload = true},
+}};
+
+} // namespace
+
+void DropDownButton::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Button::append_interactions(interactions);
+    interactions.insert(interactions.end(), drop_down_button_interactions.begin(), drop_down_button_interactions.end());
 }
 
 } // namespace gui_forms

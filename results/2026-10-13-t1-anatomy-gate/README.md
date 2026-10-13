@@ -55,7 +55,8 @@ python3 tools/generate_library_docs.py --check
 ## What the schema now is
 
 - Part roles from design language §8.1 and the §8.4 state set, with
-  kebab-case names as identities (owner decisions 1, 3 and 4).
+  names as identities (owner decisions 1, 3 and 4), stored in snake_case and
+  written in kebab-case by theme and form documents (decision 8).
 - Typed records for C++: `parts()` and `states()` with dot members; names
   never used to read or set state from C++ (owner decision 4).
 - Application-defined finite states for controls and for items (owner
@@ -64,15 +65,39 @@ python3 tools/generate_library_docs.py --check
   tree nodes and cards, identified by their semantic virtual child's stable
   ID (owner decision 5).
 
-## Open within T1
+## Close-out (owner decision 6, 2026-10-13)
 
-These are part of the stage's deliverables but outside the gate as worded:
+The owner chose what closes T1: the schema export, interactions in the
+schema, per-part states and details-view column headers as items. All four
+are built on stacked branches after the gate:
 
-- The registry as one exportable schema: generating `manifests/controls.json`
-  and the docs from the anatomy and property registry, and interactions.
-- Hit regions derived from part geometry (design language §7.4 rule 1).
-- Per-part states (`::part(thumb):state(pressed)` naming one part).
-- Column headers of the details view as items; ObjectView, CorrespondenceView
-  and PropertyList publish text as layout slots rather than measured extents.
-- Cue geometry (where focus and preselect rings are stroked) moves to the
-  engine in T2.
+| Item | Branch | Evidence |
+|---|---|---|
+| Column headers as items | `claude/t1-item-systems` | Item systems in the schema; ObjectView's `column` system. `gui_forms_anatomy_tests` (`test_object_view_columns_are_items`, `test_item_systems_are_distinct`); the Gallery coverage test checks every realized item against its own system. |
+| Per-part states | `claude/t1-part-states` | ScrollBar, TrackBar, scrollable thumbs, DateTimePicker, DropDownButton and SplitContainer publish states on the part that has them. `gui_forms_anatomy_tests` checks a dragged thumb and a pressed arrow; the coverage test fails on any undeclared part state. |
+| Interactions | `claude/t1-interactions` | 49 types declare 134 interactions; `Component::interactions()` lists them base types first. `gui_forms_anatomy_tests` checks order, payload spelling and a component. |
+| Schema export | `claude/t1-schema-export` | `manifests/control-schema.json`, written by `gui_forms_gallery_pages_tests` (which fails when it is stale); `tools/control_schema.py check` (every type's interactions equal its headers' public events) and `render --check` (`docs/controls/generated/schema.md`) in CI. |
+
+Measured on the same machine and configuration as the gate, on
+`claude/t1-schema-export`:
+
+- `ctest`: 122 of 122 tests passed. `gui_forms_gallery_pages_tests`
+  reports "anatomy
+  coverage: 60 of 60 registry controls (12 nonvisual entries excluded); 28830
+  control instances inspected" and "control schema: 72 types match the
+  committed manifest".
+- `python3 tools/control_schema.py check`: "72 types OK". The export has 60
+  controls, 11 components and the LiveSurface service, 1,244 property rows
+  and 971 interaction rows.
+- House style, control registry, library docs and the tool unit tests pass.
+
+The coverage table was regenerated on this branch; it now shows each part's
+own states and every item system.
+
+## Not required to close T1
+
+- Hit regions derived from part geometry (design language §7.4 rule 1):
+  proposed for T2, beside cue geometry (where focus and preselect rings are
+  stroked), which already moves there.
+- ObjectView, CorrespondenceView and PropertyList publish text as layout
+  slots rather than measured extents: proposed for T2's text work.

@@ -3,6 +3,7 @@
 #include "gui_forms/component/revocable/revocable.hpp"
 #include "gui_forms/component/types/component_types.hpp"
 #include "gui_forms/event/subscription_token/subscription_token.hpp"
+#include "gui_forms/schema/types/schema_types.hpp"
 
 #include <memory>
 #include <vector>
@@ -39,7 +40,14 @@ public:
     void own_subscription(SubscriptionToken subscription);
     [[nodiscard]] std::size_t owned_subscription_count() const noexcept;
 
+    // The interactions the dynamic type raises (stage T1): one record per
+    // public event, its base types' first.
+    [[nodiscard]] std::vector<InteractionDeclaration> interactions() const;
+
 protected:
+    // Appends the type's own interactions to `interactions`. A type with
+    // events of its own overrides this and calls its base type's first.
+    virtual void append_interactions(std::vector<InteractionDeclaration>& interactions) const;
     virtual void verify_dispose_thread();
     virtual void on_dispose() noexcept;
     void revoke_owned_work() noexcept;

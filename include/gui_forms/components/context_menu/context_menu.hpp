@@ -92,6 +92,7 @@ public:
     [[nodiscard]] Event<bool>& open_changed() noexcept { return open_changed_; }
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_dispose() noexcept override;
 
 private:

@@ -32,7 +32,7 @@ every Forms type to its GUI.Forms counterpart.
 | `System.Windows.Forms.Timer` | `Timer(Window&)` with `tick()` | Bound to one window and fires on its UI thread. |
 | `Dock`, `Anchor` | `set_dock(DockStyle)`, `set_anchor(AnchorStyles)` | Same values. The default anchor is top and left. Dock places children backmost first. |
 | Integer pixels, `AutoScaleMode` | Logical pixels as `double`; the window's `scale` | `Rect{x, y, width, height}` is in the parent's client space. `set_bounds` takes `BoundsSpecified` with the Forms flag values. See [Layout](layout). |
-| `DataBindings.Add("Text", source, "Name")` | `data_bindings().add("Text", source, "name", options)` | `BindingSource` holds `BindingRecord` rows with named fields, not reflected objects. `Value<T>` holds scalar application state shared between controls. |
+| `DataBindings.Add("Text", source, "Name")` | `data_bindings().add("text", source, "name", options)` | `BindingSource` holds `BindingRecord` rows with named fields, not reflected objects. `Value<T>` holds scalar application state shared between controls. |
 | `CausesValidation`, `Validating`, `Validated`, `AutoValidate` | `causes_validation`, `validating()`, `validated()`, `AutoValidate` | Under the default `AutoValidate` policy, cancelling `validating` keeps focus where it is. See [Input and focus](input-and-focus). |
 | `TabIndex`, `TabStop`, `Focus()` | `set_tab_index`, `set_tab_stop`, `Window::request_focus(control)` | Mnemonics use the same `&File` convention; `&&` shows one ampersand. |
 | `Tag` | `set_tag(std::any)` | The value is released when the control is disposed. |

@@ -949,6 +949,8 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string canonical_binding_name(std::string_view name)
 
+   Data members, service names and categories compare ignoring case.
+
 .. cpp:type:: BindingValue = std::variant<std::monostate, bool, std::int64_t, std::uint64_t, double, std::string, Point, Size, Rect, Insets, Color, FontSpec, ImageId, PropertyEnumValue, PropertyObjectValue, PropertyCollectionValue>
 
 .. cpp:var:: constexpr std::size_t maximum_property_value_depth

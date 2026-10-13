@@ -99,7 +99,7 @@ constexpr std::array<PartField<MetricsView::Parts>, 4> metrics_view_part_fields{
      .member = &MetricsView::Parts::region},
     {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
      .member = &MetricsView::Parts::face},
-    {.declaration = {.name = "accent-strip", .role = PartRole::keyline, .composed_from = {}},
+    {.declaration = {.name = "accent_strip", .role = PartRole::keyline, .composed_from = {}},
      .member = &MetricsView::Parts::accent_strip},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &MetricsView::Parts::focus},
@@ -119,7 +119,7 @@ constexpr std::array<AnatomyState, 5> metrics_view_states =
     state_declarations(metrics_view_state_fields);
 
 constexpr ControlAnatomy metrics_view_anatomy{
-    .control_id = "metrics-view",
+    .control_id = "metrics_view",
     .parts = metrics_view_parts,
     .states = metrics_view_states,
     .custom_states = {},

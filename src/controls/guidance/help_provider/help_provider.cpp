@@ -5,6 +5,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -312,5 +313,18 @@ void HelpProvider::on_dispose() noexcept {
     window_lifetime_.reset();
 }
 
+namespace {
+
+// The events HelpProvider adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> help_provider_interactions{{
+    {.name = "help_requested", .payload = "HelpRequestEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void HelpProvider::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), help_provider_interactions.begin(), help_provider_interactions.end());
+}
 
 } // namespace gui_forms

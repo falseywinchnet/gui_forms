@@ -73,6 +73,7 @@ public:
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_dispose() noexcept override;
 
 private:

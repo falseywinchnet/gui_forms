@@ -647,19 +647,19 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require(window.dispatch_text({"Edited through metadata"}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 (*target).text() == "Edited through metadata" &&
-                !changes.empty() && changes.back().property_name == "Text" &&
+                !changes.empty() && changes.back().property_name == "text" &&
                 changes.back().origin == PropertyValueOrigin::local,
             "committing a PropertyGrid text editor must use the target's registered setter and event");
 
     (*checked).set_checked(true);
-    require((*target).checked() && changes.back().property_name == "Checked" &&
+    require((*target).checked() && changes.back().property_name == "checked" &&
                 std::get<bool>(changes.back().current_value),
             "Boolean PropertyGrid edits must use a retained CheckBox and commit immediately");
 
     (*target).set_text("Programmatic update");
     text = std::dynamic_pointer_cast<TextBox>((*grid).editor("Text"));
     require(text && (*text).text() == "Programmatic update" &&
-                changes.back().property_name == "Text",
+                changes.back().property_name == "text",
             "truthful target change notifications must refresh the live editor without rebuilding the grid");
 
     const std::uint32_t tab_index_before = (*target).tab_index();
@@ -667,7 +667,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
                 "TabIndex", BindingValue{std::string("-1")}) &&
                 (*target).tab_index() == tab_index_before &&
                 (*grid).last_error().has_value() && !failures.empty() &&
-                failures.back().property_name == "TabIndex",
+                failures.back().property_name == "tab_index",
             "invalid scalar edits must preserve the target and publish inline diagnostic state");
 
     require((*grid).reset_property("Text") && (*target).text().empty() &&
@@ -686,7 +686,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require((*grid).try_set_property_value(
                 "Bounds.X", BindingValue{std::string("31.5")}) &&
                 (*target).requested_bounds().x == 31.5 &&
-                changes.back().property_name == "Bounds.X" &&
+                changes.back().property_name == "bounds.x" &&
                 std::get<double>(changes.back().current_value) == 31.5 &&
                 (*(*grid).selected_descriptor("Bounds.X")).kind ==
                     BindingValueKind::number,
@@ -695,7 +695,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require(!(*grid).try_set_property_value(
                 "Bounds.Width", BindingValue{std::string("-1")}) &&
                 (*target).requested_bounds().width == width_before &&
-                failures.back().property_name == "Bounds.Width",
+                failures.back().property_name == "bounds.width",
             "invalid compound field edits must preserve the complete owning value and identify the precise field path");
 
     require((*grid).set_property_expanded("Padding", true) &&
@@ -707,7 +707,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require(padding_reset && (*padding_reset).enabled() &&
                 (*padding_reset).perform_click() &&
                 (*target).padding() == Insets{} && !(*padding_reset).enabled() &&
-                changes.back().property_name == "Padding" &&
+                changes.back().property_name == "padding" &&
                 changes.back().reset,
             "the visible Reset control must invoke the owning property's actual reset contract and disable at default");
     const SemanticSnapshot expanded_semantics = window.semantic_snapshot();
@@ -956,7 +956,7 @@ void test_default_flags_and_color_property_editors() {
 
     std::shared_ptr<gui_forms::FlagsValueEditor> flags = std::dynamic_pointer_cast<FlagsValueEditor>(
         (*grid).editor("Anchor"));
-    require(flags && (*flags).value().name == "Top, Left" &&
+    require(flags && (*flags).value().name == "top, left" &&
                 (*flags).semantic_descriptor().role == SemanticRole::combo_box,
             "the default enum editor service must project flags through a retained multi-choice editor");
     (*flags).set_popup_width(286.0);
@@ -970,7 +970,7 @@ void test_default_flags_and_color_property_editors() {
             "the flags popup must expose zero and each independent bit with synchronized checks");
     (*choices).set_item_checked(4U, true);
     require(has_anchor((*target).anchor(), AnchorStyles::right) &&
-                (*flags).value().name == "Top, Left, Right",
+                (*flags).value().name == "top, left, right",
             "checking a flags row must immediately commit the typed enum through PropertyGrid");
     (*flags).set_dropped_down(false);
     require(!window.find(std::string((*flags).stable_id().value()) +
@@ -1004,7 +1004,7 @@ void test_default_flags_and_color_property_editors() {
     require(window.dispatch_text({"not-a-color"}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 (*target).foreground() == retained && !failures.empty() &&
-                failures.back().property_name == "ForeColor" &&
+                failures.back().property_name == "fore_color" &&
                 failures.back().attempted_value == "not-a-color" &&
                 (*color).visual_status() == ControlVisualStatus::invalid,
             "invalid color input must preserve retained state and publish exact inline failure feedback");
@@ -1054,12 +1054,12 @@ void test_recursive_object_and_collection_projection_and_mutation() {
                 (*std::dynamic_pointer_cast<TextBox>(
                     (*grid).editor("Settings.Endpoint.Port"))).text() == "6000" &&
                 changed_paths == std::vector<std::string>{
-                    "Settings.Endpoint.Host", "Settings.Endpoint.Port",
-                    "Settings.Modes[1]"},
-            "recursive edits must reconstruct every immutable ancestor, preserve scalar kinds, and publish the precise authored path");
+                    "settings.endpoint.host", "settings.endpoint.port",
+                    "settings.modes[1]"},
+            "recursive edits must reconstruct every immutable ancestor, preserve scalar kinds, and publish the precise registered path");
     require(!(*grid).try_set_property_value(
                 "Settings.Endpoint.Protocol", BindingValue{std::string("UDP")}) &&
-                (*(*grid).last_error()).property_name == "Settings.Endpoint.Protocol",
+                (*(*grid).last_error()).property_name == "settings.endpoint.protocol",
             "a read-only nested member must reject edits without weakening its writable ancestor");
 
     require((*grid).insert_collection_item(

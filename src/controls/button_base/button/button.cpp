@@ -269,4 +269,19 @@ Insets Button::visual_outsets() const noexcept {
     return resolved_visual_outsets(role, context);
 }
 
+namespace {
+
+// The events Button adds to those of ButtonBase, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> button_interactions{{
+    {.name = "dialog_result_changed", .payload = "DialogResult", .mutable_payload = false},
+    {.name = "selected_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void Button::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ButtonBase::append_interactions(interactions);
+    interactions.insert(interactions.end(), button_interactions.begin(), button_interactions.end());
+}
+
 } // namespace gui_forms

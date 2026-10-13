@@ -55,6 +55,9 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     void validate_anchor(const Control::Ptr& anchor) const;
 

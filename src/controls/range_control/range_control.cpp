@@ -35,7 +35,7 @@ void RangeControl::unbind() noexcept { value_binding_.reset(); }
 RangeControl::RangeControl(StableId stable_id)
     : Control(std::move(stable_id)) {
     define_bindable_property({
-        {"Value", BindingValueKind::number, "Behavior",
+        {"value", BindingValueKind::number, "Behavior",
          "Current value within the retained range.", BindingValue{0.0},
          Dirty::paint | Dirty::semantics},
         detail::BindingMemberGetter<RangeControl, double>(
@@ -199,7 +199,7 @@ constexpr std::array<AnatomyState, 5> range_control_states =
     state_declarations(range_control_state_fields);
 
 constexpr ControlAnatomy range_control_anatomy{
-    .control_id = "range-control",
+    .control_id = "range_control",
     .parts = range_control_parts,
     .states = range_control_states,
     .custom_states = {},
@@ -230,6 +230,22 @@ RangeControl::States RangeControl::states() const {
     States record;
     read_states(range_control_state_fields, anatomy_states(), record);
     return record;
+}
+
+namespace {
+
+// The events RangeControl adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> range_control_interactions{{
+    {.name = "range_changed", .payload = "double, double", .mutable_payload = false},
+    {.name = "value_changed", .payload = "double", .mutable_payload = false},
+    {.name = "scroll", .payload = "RangeScrollEvent", .mutable_payload = false},
+}};
+
+} // namespace
+
+void RangeControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), range_control_interactions.begin(), range_control_interactions.end());
 }
 
 } // namespace gui_forms

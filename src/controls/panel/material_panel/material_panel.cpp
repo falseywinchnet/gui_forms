@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
 
+#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -61,7 +62,7 @@ Insets MaterialPanel::visual_outsets() const noexcept {
 namespace {
 
 constexpr ControlAnatomy material_panel_anatomy{
-    .control_id = "material-panel",
+    .control_id = "material_panel",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
@@ -80,6 +81,20 @@ void MaterialPanel::publish_part_geometry(std::span<PartGeometry> geometry) cons
     record.face = PartGeometry::from_bounds(client_rectangle());
     write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
     write_parts(anatomy(), panel_detail::extra_fields, record, geometry);
+}
+
+namespace {
+
+// The events MaterialPanel adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> material_panel_interactions{{
+    {.name = "material_changed", .payload = "SurfaceMaterial", .mutable_payload = false},
+}};
+
+} // namespace
+
+void MaterialPanel::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), material_panel_interactions.begin(), material_panel_interactions.end());
 }
 
 } // namespace gui_forms

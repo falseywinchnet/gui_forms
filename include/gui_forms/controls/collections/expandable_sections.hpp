@@ -32,6 +32,9 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     struct Entry;
     struct Revision;

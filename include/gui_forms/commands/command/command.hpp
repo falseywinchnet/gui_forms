@@ -46,6 +46,9 @@ public:
         return invoked_;
     }
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     void publish_state();
     void on_dispose() noexcept override;

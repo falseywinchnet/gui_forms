@@ -271,6 +271,11 @@ struct PropertyRegistration final {
 // Control inspection API.
 using BindableProperty = PropertyRegistration;
 
+// Data members, service names and categories compare ignoring case.
 [[nodiscard]] std::string canonical_binding_name(std::string_view name);
+
+// Property names are registered names (gui_forms/schema): one stored
+// snake_case spelling, found by any of its three spellings through
+// registered_name().
 
 } // namespace gui_forms

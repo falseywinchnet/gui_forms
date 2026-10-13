@@ -42,7 +42,7 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
         scrollable_detail::parts, part_declarations(splitter_panel_extra_fields));
 
 constexpr ControlAnatomy splitter_panel_anatomy{
-    .control_id = "splitter-panel",
+    .control_id = "splitter_panel",
     .parts = splitter_panel_parts,
     .states = scrollable_detail::states,
     .custom_states = {},

@@ -74,7 +74,7 @@ void ScaledPanel::arrange(Rect final_bounds) {
 namespace {
 
 constexpr ControlAnatomy scaled_panel_anatomy{
-    .control_id = "scaled-panel",
+    .control_id = "scaled_panel",
     .parts = panel_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},

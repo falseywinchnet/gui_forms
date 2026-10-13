@@ -316,6 +316,10 @@ gui_forms::Label
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: virtual std::string display_text() const
 
       *Protected.*

@@ -22,18 +22,39 @@ constexpr std::array<std::string_view, 0> anatomy_pending{
 // something (a context menu, a tool tip) does so through an internal control.
 constexpr std::array<std::string_view, 12> nonvisual_entries{
     "command",
-    "context-menu",
-    "tool-tip",
+    "context_menu",
+    "tool_tip",
     "timer",
-    "image-list",
-    "error-provider",
-    "help-provider",
-    "semantic-feedback",
+    "image_list",
+    "error_provider",
+    "help_provider",
+    "semantic_feedback",
     "binding",
-    "binding-source",
-    "binding-context",
-    "live-surface",
+    "binding_source",
+    "binding_context",
+    "live_surface",
 };
+
+// True when every state a part publishes is one its declaration lists.
+bool part_states_declared(const PartDeclaration& part, const PartGeometry& published) {
+    if (published.states.custom_bits() != 0U) return false;
+    for (std::size_t index = 0; index < anatomy_state_count; ++index) {
+        const AnatomyState state = static_cast<AnatomyState>(index);
+        if (published.states.contains(state) && !declares_part_state(part, state)) return false;
+    }
+    return true;
+}
+
+// A part's name and role, followed by the states it takes on its own.
+std::string describe_part(const PartDeclaration& part) {
+    std::string text = std::string(part.name) + " (" + std::string(part_role_name(part.role));
+    for (std::size_t index = 0; index < part.states.size(); ++index) {
+        text += index == 0U ? "; " : ", ";
+        text += std::string(anatomy_state_name(part.states[index]));
+    }
+    text += ")";
+    return text;
+}
 
 // Prints one control type's declared anatomy as a table row: id, parts
 // with roles, states, and the item anatomy when there is one.
@@ -41,8 +62,7 @@ void print_anatomy_row(const ControlAnatomy& anatomy) {
     std::string parts;
     for (std::size_t index = 0; index < anatomy.parts.size(); ++index) {
         if (index > 0U) parts += ", ";
-        parts += std::string(anatomy.parts[index].name) + " (" +
-                 std::string(part_role_name(anatomy.parts[index].role)) + ")";
+        parts += describe_part(anatomy.parts[index]);
     }
     std::string states;
     for (std::size_t index = 0; index < anatomy.states.size(); ++index) {
@@ -52,19 +72,26 @@ void print_anatomy_row(const ControlAnatomy& anatomy) {
     for (std::size_t index = 0; index < anatomy.custom_states.size(); ++index) {
         states += ", " + std::string(anatomy.custom_states[index].name) + " (custom)";
     }
+    // Each item system after the first is introduced by its name.
     std::string items;
-    for (std::size_t index = 0; index < anatomy.item_parts.size(); ++index) {
-        if (index > 0U) items += ", ";
-        items += std::string(anatomy.item_parts[index].name) + " (" +
-                 std::string(part_role_name(anatomy.item_parts[index].role)) + ")";
-    }
     std::string item_states;
-    for (std::size_t index = 0; index < anatomy.item_states.size(); ++index) {
-        if (index > 0U) item_states += ", ";
-        item_states += std::string(anatomy_state_name(anatomy.item_states[index]));
-    }
-    for (std::size_t index = 0; index < anatomy.item_custom_states.size(); ++index) {
-        item_states += ", " + std::string(anatomy.item_custom_states[index].name) + " (custom)";
+    for (std::size_t system_index = 0; system_index < anatomy.item_systems.size(); ++system_index) {
+        const ItemSystemDeclaration& system = anatomy.item_systems[system_index];
+        if (system_index > 0U) {
+            items += "; " + std::string(system.name) + ": ";
+            item_states += "; " + std::string(system.name) + ": ";
+        }
+        for (std::size_t index = 0; index < system.parts.size(); ++index) {
+            if (index > 0U) items += ", ";
+            items += describe_part(system.parts[index]);
+        }
+        for (std::size_t index = 0; index < system.states.size(); ++index) {
+            if (index > 0U) item_states += ", ";
+            item_states += std::string(anatomy_state_name(system.states[index]));
+        }
+        for (std::size_t index = 0; index < system.custom_states.size(); ++index) {
+            item_states += ", " + std::string(system.custom_states[index].name) + " (custom)";
+        }
     }
     std::cout << "| " << anatomy.control_id << " | " << parts << " | " << states << " | "
               << items << " | " << item_states << " |\n";
@@ -114,6 +141,22 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
                                      std::string(anatomy.parts[index].name) +
                                      " publishes invalid geometry");
         }
+        if (!part_states_declared(anatomy.parts[index], part)) {
+            throw std::runtime_error(std::string(anatomy.control_id) + " part " +
+                                     std::string(anatomy.parts[index].name) +
+                                     " publishes an undeclared part state");
+        }
+    }
+    // Every control raises Control's events and validates its own list.
+    const std::vector<InteractionDeclaration> interactions = control.interactions();
+    const InteractionValidation interaction_validation = validate_interactions(interactions);
+    if (interaction_validation.defect != InteractionDefect::none) {
+        throw std::runtime_error(std::string(anatomy.control_id) + " interactions are malformed: " +
+                                 std::string(interaction_defect_name(interaction_validation.defect)));
+    }
+    if (find_interaction(interactions, "visible_changed") == interactions.size()) {
+        throw std::runtime_error(std::string(anatomy.control_id) +
+                                 " does not inherit Control's interactions");
     }
     const AnatomyStateSet active = control.anatomy_states();
     for (std::size_t index = 0; index < anatomy_state_count; ++index) {
@@ -124,37 +167,45 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
                                      std::string(anatomy_state_name(state)));
         }
     }
-    // Every realized item: identity, geometry and states.
+    // Every realized item: its system, identity, geometry and states.
     const std::size_t items = control.realized_item_count();
-    std::vector<PartGeometry> item_geometry(anatomy.item_parts.size());
+    std::vector<PartGeometry> item_geometry;
     for (std::size_t item = 0; item < items; ++item) {
         if (control.realized_item_stable_id(item).empty()) {
             throw std::runtime_error(std::string(anatomy.control_id) +
                                      " publishes an item without a stable ID");
         }
+        const ItemSystemIndex system_index = control.realized_item_system(item);
+        if (system_index.value >= anatomy.item_systems.size()) {
+            throw std::runtime_error(std::string(anatomy.control_id) +
+                                     " publishes an item of an undeclared item system");
+        }
+        const ItemSystemDeclaration& system = anatomy.item_systems[system_index.value];
+        item_geometry.assign(system.parts.size(), PartGeometry{});
         control.fill_realized_item_geometry(item, item_geometry);
         for (std::size_t index = 0; index < item_geometry.size(); ++index) {
             const PartGeometry& part = item_geometry[index];
             if (!finite_rect(part.bounds) || (!part.present && !part.bounds.empty())) {
                 throw std::runtime_error(std::string(anatomy.control_id) + " item part " +
-                                         std::string(anatomy.item_parts[index].name) +
+                                         std::string(system.parts[index].name) +
                                          " publishes invalid geometry");
+            }
+            if (!part_states_declared(system.parts[index], part)) {
+                throw std::runtime_error(std::string(anatomy.control_id) + " item part " +
+                                         std::string(system.parts[index].name) +
+                                         " publishes an undeclared part state");
             }
         }
         const AnatomyStateSet item_states = control.realized_item_anatomy_states(item);
         const unsigned int declared_custom =
-            (1U << static_cast<unsigned int>(anatomy.item_custom_states.size())) - 1U;
+            (1U << static_cast<unsigned int>(system.custom_states.size())) - 1U;
         if ((static_cast<unsigned int>(item_states.custom_bits()) & ~declared_custom) != 0U) {
             throw std::runtime_error(std::string(anatomy.control_id) +
                                      " publishes an undeclared item custom state");
         }
         for (std::size_t index = 0; index < anatomy_state_count; ++index) {
             const AnatomyState state = static_cast<AnatomyState>(index);
-            bool declared = false;
-            for (std::size_t position = 0; position < anatomy.item_states.size(); ++position) {
-                if (anatomy.item_states[position] == state) declared = true;
-            }
-            if (item_states.contains(state) && !declared) {
+            if (item_states.contains(state) && !declares_item_state(system, state)) {
                 throw std::runtime_error(std::string(anatomy.control_id) +
                                          " publishes undeclared item state " +
                                          std::string(anatomy_state_name(state)));

@@ -397,4 +397,19 @@ Card::States Card::states() const {
     return record;
 }
 
+namespace {
+
+// The events Card adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> card_interactions{{
+    {.name = "activated", .payload = "Card", .mutable_payload = true},
+    {.name = "selected_changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void Card::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), card_interactions.begin(), card_interactions.end());
+}
+
 } // namespace gui_forms

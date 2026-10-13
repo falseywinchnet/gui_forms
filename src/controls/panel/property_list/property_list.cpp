@@ -1178,23 +1178,23 @@ constexpr std::array<PartField<PropertyList::Parts>, 1> property_list_extra_part
 }};
 
 constexpr std::array<PartField<PropertyList::ItemParts>, 9> property_list_item_part_fields{{
-    {.declaration = {.name = "group-header", .role = PartRole::face, .composed_from = {}},
+    {.declaration = {.name = "group_header", .role = PartRole::face, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_header},
-    {.declaration = {.name = "group-expander", .role = PartRole::disclosure, .composed_from = {}},
+    {.declaration = {.name = "group_expander", .role = PartRole::disclosure, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_expander},
-    {.declaration = {.name = "group-title", .role = PartRole::caption, .composed_from = {}},
+    {.declaration = {.name = "group_title", .role = PartRole::caption, .composed_from = {}},
      .member = &PropertyList::ItemParts::group_title},
-    {.declaration = {.name = "property-row", .role = PartRole::region, .composed_from = {}},
+    {.declaration = {.name = "property_row", .role = PartRole::region, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_row},
-    {.declaration = {.name = "property-name", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "property_name", .role = PartRole::label, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_name},
-    {.declaration = {.name = "property-value", .role = PartRole::content, .composed_from = {}},
+    {.declaration = {.name = "property_value", .role = PartRole::content, .composed_from = {}},
      .member = &PropertyList::ItemParts::property_value},
-    {.declaration = {.name = "row-expander", .role = PartRole::disclosure, .composed_from = {}},
+    {.declaration = {.name = "row_expander", .role = PartRole::disclosure, .composed_from = {}},
      .member = &PropertyList::ItemParts::row_expander},
     {.declaration = {.name = "validation", .role = PartRole::validation, .composed_from = {}},
      .member = &PropertyList::ItemParts::validation},
-    {.declaration = {.name = "row-divider", .role = PartRole::divider, .composed_from = {}},
+    {.declaration = {.name = "row_divider", .role = PartRole::divider, .composed_from = {}},
      .member = &PropertyList::ItemParts::row_divider},
 }};
 
@@ -1211,7 +1211,7 @@ constexpr std::array<PartDeclaration, 9> property_list_item_parts =
 constexpr std::array<AnatomyState, 5> property_list_item_states =
     state_declarations(property_list_item_state_fields);
 constexpr std::array<CustomStateDeclaration, 1> property_list_item_custom_states{{
-    {.name = "group-header"},
+    {.name = "group_header"},
 }};
 constexpr CustomStateIndex group_header_item_state{0U};
 
@@ -1219,14 +1219,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
     property_list_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(property_list_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> property_list_item_systems{{
+    {.name = "item", .parts = property_list_item_parts, .states = property_list_item_states,
+     .custom_states = property_list_item_custom_states},
+}};
+
 constexpr ControlAnatomy property_list_anatomy{
-    .control_id = "property-list",
+    .control_id = "property_list",
     .parts = property_list_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = property_list_item_parts,
-    .item_states = property_list_item_states,
-    .item_custom_states = property_list_item_custom_states,
+    .item_systems = property_list_item_systems,
 };
 
 } // namespace
@@ -1310,7 +1313,7 @@ void PropertyList::publish_realized_item_geometry(std::size_t item,
                            std::max(0.0, bounds.width - padding * 2.0), 1.0};
         record.row_divider = PartGeometry::from_bounds(Rect::intersection(divider, bounds));
     }
-    write_item_parts(anatomy(), property_list_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), property_list_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet PropertyList::realized_item_anatomy_states(std::size_t item) const {
@@ -1341,7 +1344,7 @@ std::vector<PropertyList::Item> PropertyList::realized_items() const {
         Item record;
         record.index = item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), property_list_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), property_list_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(property_list_item_state_fields, item_states, record.states);
         record.states.group_header = item_states.contains(group_header_item_state);
@@ -1374,6 +1377,24 @@ std::vector<PropertyList::ItemEntry> PropertyList::item_entries() const {
         }
     }
     return entries;
+}
+
+namespace {
+
+// The events PropertyList adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> property_list_interactions{{
+    {.name = "value_changed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "value_committed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "group_changed", .payload = "PropertyGroupChange", .mutable_payload = false},
+    {.name = "row_expansion_changed", .payload = "PropertyRowExpansionChange", .mutable_payload = false},
+    {.name = "reset_requested", .payload = "PropertyResetRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void PropertyList::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), property_list_interactions.begin(), property_list_interactions.end());
 }
 
 } // namespace gui_forms

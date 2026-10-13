@@ -547,11 +547,11 @@ constexpr std::array<PartField<MenuStrip::Parts>, 4> menu_strip_part_fields{{
 }};
 
 constexpr std::array<PartField<MenuStrip::ItemParts>, 3> menu_strip_item_part_fields{{
-    {.declaration = {.name = "menu-item", .role = PartRole::face, .composed_from = {}},
+    {.declaration = {.name = "menu_item", .role = PartRole::face, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_item},
-    {.declaration = {.name = "menu-label", .role = PartRole::label, .composed_from = {}},
+    {.declaration = {.name = "menu_label", .role = PartRole::label, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_label},
-    {.declaration = {.name = "menu-focus", .role = PartRole::focus, .composed_from = {}},
+    {.declaration = {.name = "menu_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &MenuStrip::ItemParts::menu_focus},
 }};
 
@@ -577,13 +577,17 @@ constexpr std::array<AnatomyState, 5> menu_strip_states{
     AnatomyState::focus_visible,
 };
 
+constexpr std::array<ItemSystemDeclaration, 1> menu_strip_item_systems{{
+    {.name = "item", .parts = menu_strip_item_parts, .states = menu_strip_item_states,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy menu_strip_anatomy{
-    .control_id = "menu-strip",
+    .control_id = "menu_strip",
     .parts = menu_strip_parts,
     .states = menu_strip_states,
     .custom_states = {},
-    .item_parts = menu_strip_item_parts,
-    .item_states = menu_strip_item_states,
+    .item_systems = menu_strip_item_systems,
 };
 
 } // namespace
@@ -657,7 +661,7 @@ void MenuStrip::publish_realized_item_geometry(std::size_t item,
     record.menu_item = PartGeometry::from_bounds(face);
     record.menu_label = PartGeometry::from_bounds(Rect::intersection(label, bounds));
     record.menu_focus = PartGeometry::from_bounds(bounds);
-    write_item_parts(anatomy(), menu_strip_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), menu_strip_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet MenuStrip::realized_item_anatomy_states(std::size_t item) const {
@@ -687,11 +691,26 @@ std::vector<MenuStrip::Item> MenuStrip::realized_items() const {
         Item record;
         record.index = realized_item_index(item);
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), menu_strip_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), menu_strip_item_part_fields, published.parts(), record.parts);
         read_states(menu_strip_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }
     return records;
+}
+
+namespace {
+
+// The events MenuStrip adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> menu_strip_interactions{{
+    {.name = "item_invoked", .payload = "MenuStripInvocation", .mutable_payload = false},
+    {.name = "open_changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+}};
+
+} // namespace
+
+void MenuStrip::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), menu_strip_interactions.begin(), menu_strip_interactions.end());
 }
 
 } // namespace gui_forms

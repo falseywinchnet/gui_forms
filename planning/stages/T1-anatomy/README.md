@@ -2,10 +2,10 @@
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
 through them, almost everything else. Status 2026-10-13: gate measured
-(`results/2026-10-13-t1-anatomy-gate`), owner review pending; built on branch
-`claude/t1-anatomy`, with stacked `claude/t1-*` branches (schema types; range
-controls; the button family; containers and labels; a Gallery coverage
-test).
+(`results/2026-10-13-t1-anatomy-gate`); the close-out the owner chose
+(decision 6) is built on stacked branches `claude/t1-item-systems`,
+`claude/t1-part-states`, `claude/t1-interactions` and
+`claude/t1-schema-export`; owner sign-off pending.
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.
@@ -137,8 +137,8 @@ no longer needed. Record the coverage table and test run under `results/`.
 4. **Names are identities; state is dot members** (owner, 2026-10-13:
    "names and ids: kebab operators. strictly objective ontological
    participatory state items: dot operators"). Part, state and control
-   names and ids are kebab-case declarations that documents and tools
-   address. C++ never reads or sets a part, state or property by such a
+   names and ids are declarations that documents and tools address
+   (spelled as decision 8 rules). C++ never reads or sets a part, state or property by such a
    name: it uses typed records with dot members
    (`(*track).parts().thumb.bounds`, `(*button).states().preselect`).
 5. **Repeated items are item systems, not controls** (owner, 2026-10-13).
@@ -150,6 +150,66 @@ no longer needed. Record the coverage table and test run under `results/`.
    interactive controls keeps them as real child controls; the item record
    covers what the list itself paints. Theme documents address items like
    parts: `::part(row):state(selected)`.
+
+6. **What closes T1** (owner, 2026-10-13). Before T1 closes: the schema
+   export (a generated manifest and docs, checked in CI), interactions in
+   the schema, per-part states, and details-view column headers as items.
+   Hit regions derived from part geometry (design language §7.4 rule 1)
+   were not required; they are proposed for T2 beside cue geometry, which
+   already moves there. Text published as layout slots rather than measured
+   extents is also left open, proposed for T2's text work.
+
+7. **A property has one registered name** (owner, 2026-10-13: "css is
+   registeredspelling inside"). As in CSS, the name a document writes is the
+   name the property is registered under; other spellings are derived from
+   it and never stored. Decision 8 sets the stored spelling.
+8. **One name, three spellings** (owner, 2026-10-13: "using a dash is not
+   kosher except in css"). Every name GUI.Forms registers (control ids,
+   parts, states, item systems, interactions, properties, compound fields,
+   enumeration types and values, members of application-built nested
+   values) is a sequence of words with one stored spelling, snake_case
+   (`auto_size_mode`, `scroll_thumb`, `track_bar`), used by C++ string APIs,
+   the C ABI, the schema and every name the library reports. CSS-family
+   documents (themes, form documents) write the same words in kebab-case
+   (`auto-size-mode`); PropertyGrid and C# show them in PascalCase
+   (`AutoSizeMode`). Lookup accepts any of the three; output is always the
+   stored spelling. A path joins names with `.` and indexes with `[n]`
+   (`bounds.width`, `items[0]`). A control id is the words of its C++ type
+   name, stored and checked in CI so that renaming a type cannot move its id
+   silently. Enumeration type names are GUI.Forms names (`dock_style`), not
+   .NET names. Names GUI.Forms does not own keep their own spelling and
+   case-insensitive matching: binding-source field names, editor and
+   converter service names, categories, accessible names, an application's
+   own enumeration choices, and stable IDs.
+
+## Close-out, 2026-10-13
+
+- **Item systems.** `ControlAnatomy::item_systems` lists named item kinds;
+  each realized item names its system. ObjectView's details columns are the
+  `column` system (header, label, sort glyph, divider, resize grip, focus;
+  pressed, captured, current; `sorted_ascending`, `sorted_descending`).
+- **Per-part states.** `PartDeclaration::states` lists a part's own states
+  and each published part carries its active set:
+  `(*bar).parts().thumb.states.contains(AnatomyState::pressed)`.
+- **Interactions.** `Component::interactions()`: one record per public
+  event, base types first, named by its accessor, with its payload. 49
+  types declare 134.
+- **Schema export.** `gui_forms_gallery_pages_tests` writes
+  `manifests/control-schema.json` (72 types: parts, states, item systems,
+  properties, interactions) and fails when the committed copy is stale;
+  `tools/control_schema.py check` proves every type's interactions equal its
+  headers' public events, and `render` writes
+  `docs/controls/generated/schema.md`. Both run in CI's house-style job.
+- **Names** (decisions 7 and 8): `gui_forms/schema` holds
+  `registered_name`, `css_spelling`, `display_spelling` and `display_label`.
+  Every declared name, property, compound field (`letter_spacing`),
+  enumeration (`dock_style`: `none`, `fill`, …) and registry id
+  (`track_bar`) is stored in snake_case; PropertyGrid shows display
+  spellings and reports registered paths in its events and errors.
+  `tools/control_registry.py check` fails when an id is not the words of its
+  type name; `tools/control_schema.py check` fails on a property or part
+  name that is not snake_case. The schema lists each enumeration's
+  choices.
 
 ## Read first
 
