@@ -40,7 +40,7 @@ The top bar has NumPy's five sections. Each is a directory with an index page.
 | `building/` | Building from source | hand |
 | `dev/` | Development: contributing, decisions (`dev/adr/` includes `../../decisions/`), roadmap, evidence | hand |
 | `release/` | Release notes; `0.1.md` includes `packaging/RELEASE_NOTES.md` | hand |
-| `controls/generated/` | Alphabetical and by-function control indexes from `tools/control_registry.py render` | generated; do not edit |
+| `controls/generated/` | Alphabetical and by-function control indexes from `tools/control_registry.py render`; the control schema page from `tools/control_schema.py render` | generated; do not edit |
 | `_static/` | `gui_forms.css` (adapted from NumPy's `numpy.css`), the logo mark and the card icons | hand |
 | `library/` | API reference inputs: docstrings, `manual.json`, archived captures; see `library/README.md` | hand; excluded |
 | `reference/` | Inputs of `tools/api_reference.py` (clang inventory, reviewed contracts) | generated or reviewed JSON; excluded |
@@ -83,6 +83,7 @@ Regenerate before building when headers, the registry or a docstring changed:
 ```sh
 python3 tools/control_registry.py check          # validates manifests/controls.json
 python3 tools/control_registry.py render         # writes controls/generated/
+python3 tools/control_schema.py render           # writes controls/generated/schema.md
 python3 tools/generate_library_docs.py           # writes api/ and tests/doc_examples_tests.cpp
 ```
 

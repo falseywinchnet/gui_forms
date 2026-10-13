@@ -2,10 +2,10 @@
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
 through them, almost everything else. Status 2026-10-13: gate measured
-(`results/2026-10-13-t1-anatomy-gate`), owner review pending; built on branch
-`claude/t1-anatomy`, with stacked `claude/t1-*` branches (schema types; range
-controls; the button family; containers and labels; a Gallery coverage
-test).
+(`results/2026-10-13-t1-anatomy-gate`); the close-out the owner chose
+(decision 6) is built on stacked branches `claude/t1-item-systems`,
+`claude/t1-part-states`, `claude/t1-interactions` and
+`claude/t1-schema-export`; owner sign-off pending.
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.
@@ -150,6 +150,36 @@ no longer needed. Record the coverage table and test run under `results/`.
    interactive controls keeps them as real child controls; the item record
    covers what the list itself paints. Theme documents address items like
    parts: `::part(row):state(selected)`.
+
+6. **What closes T1** (owner, 2026-10-13). Before T1 closes: the schema
+   export (a generated manifest and docs, checked in CI), interactions in
+   the schema, per-part states, and details-view column headers as items.
+   Hit regions derived from part geometry (design language §7.4 rule 1)
+   were not required; they are proposed for T2 beside cue geometry, which
+   already moves there. Text published as layout slots rather than measured
+   extents is also left open, proposed for T2's text work.
+
+## Close-out, 2026-10-13
+
+- **Item systems.** `ControlAnatomy::item_systems` lists named item kinds;
+  each realized item names its system. ObjectView's details columns are the
+  `column` system (header, label, sort glyph, divider, resize grip, focus;
+  pressed, captured, current; `sorted-ascending`, `sorted-descending`).
+- **Per-part states.** `PartDeclaration::states` lists a part's own states
+  and each published part carries its active set:
+  `(*bar).parts().thumb.states.contains(AnatomyState::pressed)`.
+- **Interactions.** `Component::interactions()`: one record per public
+  event, base types first, named in kebab-case from the accessor, with its
+  payload. 49 types declare 134.
+- **Schema export.** `gui_forms_gallery_pages_tests` writes
+  `manifests/control-schema.json` (72 types: parts, states, item systems,
+  properties, interactions) and fails when the committed copy is stale;
+  `tools/control_schema.py check` proves every type's interactions equal its
+  headers' public events, and `render` writes
+  `docs/controls/generated/schema.md`. Both run in CI's house-style job.
+- Property names in the export are the registered names (`Text`,
+  `Checked`). Whether form documents spell them in kebab-case is FD's
+  decision.
 
 ## Read first
 

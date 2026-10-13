@@ -11,6 +11,7 @@ void test_catalog_pages_resolve_and_headers_describe_pages();
 void test_page_contract_and_rendering();
 void test_gallery_semantic_surface();
 void test_anatomy_coverage();
+void test_schema_export();
 
 void test_ranges_and_progress(gui_forms::Window& window);
 void test_containers_and_focus(gui_forms::Window& window);
