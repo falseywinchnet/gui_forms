@@ -34,7 +34,7 @@ constexpr std::array<PartDeclaration, 4> link_label_parts{{
     {.name = "focus", .role = PartRole::focus, .composed_from = {}},
 }};
 
-constexpr std::array<AnatomyState, 7> link_label_states{
+constexpr std::array<AnatomyState, 9> link_label_states{
     AnatomyState::normal,
     AnatomyState::hot,
     AnatomyState::pressed,
@@ -42,6 +42,8 @@ constexpr std::array<AnatomyState, 7> link_label_states{
     AnatomyState::disabled,
     AnatomyState::focused,
     AnatomyState::focus_visible,
+    AnatomyState::open,
+    AnatomyState::closed,
 };
 
 // "visited" has no counterpart in the design language's state set, so the

@@ -134,7 +134,7 @@ constexpr std::array<PartDeclaration, 7> check_box_parts{{
     {.name = "focus", .role = PartRole::focus, .composed_from = {}},
 }};
 
-constexpr std::array<AnatomyState, 9> check_box_states{
+constexpr std::array<AnatomyState, 11> check_box_states{
     AnatomyState::normal,
     AnatomyState::hot,
     AnatomyState::pressed,
@@ -144,6 +144,8 @@ constexpr std::array<AnatomyState, 9> check_box_states{
     AnatomyState::disabled,
     AnatomyState::focused,
     AnatomyState::focus_visible,
+    AnatomyState::open,
+    AnatomyState::closed,
 };
 
 constexpr ControlAnatomy check_box_anatomy{

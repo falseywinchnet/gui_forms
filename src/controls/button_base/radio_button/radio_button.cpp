@@ -114,7 +114,7 @@ constexpr std::array<PartDeclaration, 6> radio_button_parts{{
     {.name = "focus", .role = PartRole::focus, .composed_from = {}},
 }};
 
-constexpr std::array<AnatomyState, 8> radio_button_states{
+constexpr std::array<AnatomyState, 10> radio_button_states{
     AnatomyState::normal,
     AnatomyState::hot,
     AnatomyState::pressed,
@@ -123,6 +123,8 @@ constexpr std::array<AnatomyState, 8> radio_button_states{
     AnatomyState::disabled,
     AnatomyState::focused,
     AnatomyState::focus_visible,
+    AnatomyState::open,
+    AnatomyState::closed,
 };
 
 constexpr ControlAnatomy radio_button_anatomy{
