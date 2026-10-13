@@ -545,13 +545,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
     tree_view_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(tree_view_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> tree_view_item_systems{{
+    {.name = "item", .parts = tree_view_item_parts, .states = tree_view_item_states,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy tree_view_anatomy{
     .control_id = "tree-view",
     .parts = tree_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = tree_view_item_parts,
-    .item_states = tree_view_item_states,
+    .item_systems = tree_view_item_systems,
 };
 
 } // namespace
@@ -634,7 +638,7 @@ void TreeView::publish_realized_item_geometry(std::size_t item,
     record.row = PartGeometry::from_bounds(Rect::intersection(row, content));
     record.label = PartGeometry::from_bounds(Rect::intersection(Rect::intersection(label, row), content));
     record.row_focus = record.row;
-    write_item_parts(anatomy(), tree_view_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), tree_view_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet TreeView::realized_item_anatomy_states(std::size_t item) const {
@@ -660,7 +664,7 @@ std::vector<TreeView::Item> TreeView::realized_items() const {
         Item record;
         record.index = visible_[top_row_ + item];
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), tree_view_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), tree_view_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(tree_view_item_state_fields, item_states, record.states);
         records.push_back(record);

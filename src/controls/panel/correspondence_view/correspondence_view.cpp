@@ -1023,14 +1023,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
     correspondence_view_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(correspondence_view_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> correspondence_view_item_systems{{
+    {.name = "item", .parts = correspondence_view_item_parts, .states = correspondence_view_item_states,
+     .custom_states = correspondence_view_item_custom_states},
+}};
+
 constexpr ControlAnatomy correspondence_view_anatomy{
     .control_id = "correspondence-view",
     .parts = correspondence_view_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = correspondence_view_item_parts,
-    .item_states = correspondence_view_item_states,
-    .item_custom_states = correspondence_view_item_custom_states,
+    .item_systems = correspondence_view_item_systems,
 };
 
 } // namespace
@@ -1106,7 +1109,7 @@ void CorrespondenceView::publish_realized_item_geometry(std::size_t item,
         record.evidence = PartGeometry::from_bounds(Rect::intersection(excerpt, clip));
     }
     record.card_focus = record.card;
-    write_item_parts(anatomy(), correspondence_view_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), correspondence_view_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet CorrespondenceView::realized_item_anatomy_states(std::size_t item) const {
@@ -1133,7 +1136,7 @@ std::vector<CorrespondenceView::Item> CorrespondenceView::realized_items() const
         Item record;
         record.index = realized_range().first + item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), correspondence_view_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), correspondence_view_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(correspondence_view_item_state_fields, item_states, record.states);
         record.states.pinned = item_states.contains(pinned_item_state);

@@ -231,10 +231,39 @@ public:
     };
     // The items currently realized, in paint order (owner decision 5).
     [[nodiscard]] std::vector<Item> realized_items() const;
+    // The details view's column headers are a second item system,
+    // "column". Realized columns are those the viewport shows; in the
+    // generic realized-item path they follow the realized items. A column's
+    // identity is the view's stable ID, ".column.", and the column's id.
+    struct ColumnParts final {
+        PartGeometry column_header;
+        PartGeometry column_label;
+        PartGeometry sort_glyph;
+        PartGeometry column_divider;
+        PartGeometry column_grip;
+        PartGeometry column_focus;
+    };
+    struct ColumnStates final {
+        bool pressed{};
+        bool captured{};
+        bool current{};
+        // Application-defined column states.
+        bool sorted_ascending{};
+        bool sorted_descending{};
+    };
+    struct Column final {
+        // The column's position in the details model.
+        std::size_t index{};
+        std::string stable_id;
+        ColumnParts parts;
+        ColumnStates states;
+    };
+    [[nodiscard]] std::vector<Column> realized_columns() const;
 
 protected:
     void on_attached_to_window() override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    [[nodiscard]] ItemSystemIndex publish_realized_item_system(std::size_t item) const override;
     void publish_realized_item_geometry(std::size_t item,
                                         std::span<PartGeometry> geometry) const override;
 
@@ -265,6 +294,13 @@ private:
     [[nodiscard]] double total_column_width() const noexcept;
     [[nodiscard]] std::optional<std::size_t> column_index(const ObjectColumnId& id) const noexcept;
     [[nodiscard]] Rect column_bounds(std::size_t column) const noexcept;
+    // Realized rows and realized (visible) details columns. `position`
+    // counts visible columns; the result is the column's model index.
+    [[nodiscard]] std::size_t realized_row_count() const noexcept;
+    [[nodiscard]] std::size_t realized_column_count() const noexcept;
+    [[nodiscard]] std::size_t realized_column_index(std::size_t position) const noexcept;
+    [[nodiscard]] ColumnParts column_parts(std::size_t column) const;
+    [[nodiscard]] AnatomyStateSet column_states(std::size_t column) const;
     void clamp_horizontal_offset() noexcept;
     void reveal_header();
     void cancel_header_interaction();

@@ -729,13 +729,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
     breadcrumb_trail_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(breadcrumb_trail_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> breadcrumb_trail_item_systems{{
+    {.name = "item", .parts = breadcrumb_trail_item_parts, .states = breadcrumb_trail_item_states,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy breadcrumb_trail_anatomy{
     .control_id = "breadcrumb-trail",
     .parts = breadcrumb_trail_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = breadcrumb_trail_item_parts,
-    .item_states = breadcrumb_trail_item_states,
+    .item_systems = breadcrumb_trail_item_systems,
 };
 
 } // namespace
@@ -809,7 +813,7 @@ void BreadcrumbTrail::publish_realized_item_geometry(std::size_t item,
         record.segment_cap = PartGeometry::from_bounds(cap);
     }
     record.segment_focus = PartGeometry::from_bounds(bounds);
-    write_item_parts(anatomy(), breadcrumb_trail_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), breadcrumb_trail_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet BreadcrumbTrail::realized_item_anatomy_states(std::size_t item) const {
@@ -836,7 +840,7 @@ std::vector<BreadcrumbTrail::Item> BreadcrumbTrail::realized_items() const {
         Item record;
         record.index = item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), breadcrumb_trail_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), breadcrumb_trail_item_part_fields, published.parts(), record.parts);
         read_states(breadcrumb_trail_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }

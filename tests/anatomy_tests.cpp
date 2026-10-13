@@ -857,7 +857,7 @@ void test_list_rows_are_item_records() {
     }
     require(rejected, "item geometry storage of the wrong size must be rejected");
     rejected = false;
-    std::vector<PartGeometry> sized((*list).anatomy().item_parts.size());
+    std::vector<PartGeometry> sized((*list).anatomy().item_systems.front().parts.size());
     try {
         (*list).fill_realized_item_geometry(rows.size(), sized);
     } catch (const std::out_of_range&) {
@@ -869,13 +869,70 @@ void test_list_rows_are_item_records() {
 constexpr std::array<PartDeclaration, 1> clashing_item_parts{{
     {.name = "region", .role = PartRole::region, .composed_from = {}},
 }};
+constexpr std::array<ItemSystemDeclaration, 1> clashing_item_systems{{
+    {.name = "item", .parts = clashing_item_parts, .states = {}, .custom_states = {}},
+}};
+
+constexpr std::array<PartDeclaration, 1> row_item_parts{{
+    {.name = "row", .role = PartRole::region, .composed_from = {}},
+}};
+constexpr std::array<PartDeclaration, 1> column_item_parts{{
+    {.name = "column-header", .role = PartRole::region, .composed_from = {}},
+}};
+constexpr std::array<ItemSystemDeclaration, 2> row_and_column_systems{{
+    {.name = "item", .parts = row_item_parts, .states = {}, .custom_states = {}},
+    {.name = "column", .parts = column_item_parts, .states = {}, .custom_states = {}},
+}};
+// The second system repeats the first system's part name.
+constexpr std::array<ItemSystemDeclaration, 2> repeated_part_systems{{
+    {.name = "item", .parts = row_item_parts, .states = {}, .custom_states = {}},
+    {.name = "column", .parts = row_item_parts, .states = {}, .custom_states = {}},
+}};
+constexpr std::array<ItemSystemDeclaration, 2> repeated_name_systems{{
+    {.name = "item", .parts = row_item_parts, .states = {}, .custom_states = {}},
+    {.name = "item", .parts = column_item_parts, .states = {}, .custom_states = {}},
+}};
+constexpr std::array<ItemSystemDeclaration, 1> empty_item_system{{
+    {.name = "item", .parts = {}, .states = {}, .custom_states = {}},
+}};
 
 void test_item_names_never_repeat_control_parts() {
     const ControlAnatomy clashing{
         .control_id = "grid", .parts = single_region, .states = {},
-        .custom_states = {}, .item_parts = clashing_item_parts, .item_states = {}};
+        .custom_states = {}, .item_systems = clashing_item_systems};
     require(validate_control_anatomy(clashing).defect == AnatomyDefect::duplicate_item_part_name,
             "an item part may not reuse a control part's name");
+}
+
+void test_item_systems_are_distinct() {
+    const ControlAnatomy two{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_systems = row_and_column_systems};
+    require(validate_control_anatomy(two).defect == AnatomyDefect::none,
+            "a control may declare a second item system");
+    const std::optional<ItemSystemIndex> column = find_item_system(two, "column");
+    require(column.has_value() && (*column).value == 1U &&
+                find_item_part(two.item_systems[1], "column-header").has_value() &&
+                !find_item_part(two.item_systems[1], "row").has_value(),
+            "item parts are found within their own system");
+    const ControlAnatomy repeated_part{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_systems = repeated_part_systems};
+    const AnatomyValidation repeated = validate_control_anatomy(repeated_part);
+    require(repeated.defect == AnatomyDefect::duplicate_item_part_name &&
+                repeated.item_system == 1U,
+            "an item part name is unique across item systems");
+    const ControlAnatomy repeated_name{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_systems = repeated_name_systems};
+    require(validate_control_anatomy(repeated_name).defect ==
+                AnatomyDefect::duplicate_item_system_name,
+            "item system names are unique");
+    const ControlAnatomy empty{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_systems = empty_item_system};
+    require(validate_control_anatomy(empty).defect == AnatomyDefect::item_system_without_parts,
+            "an item system declares at least one part");
 }
 
 // FlagsValueEditor needs an enum descriptor; the Gallery coverage test
@@ -1034,8 +1091,8 @@ void test_tree_and_correspondence_items() {
 
     const ControlAnatomy& anatomy = (*view).anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none &&
-                find_item_custom_state(anatomy, "pinned").has_value() &&
-                find_item_custom_state(anatomy, "stale").has_value(),
+                find_item_custom_state(anatomy.item_systems.front(), "pinned").has_value() &&
+                find_item_custom_state(anatomy.item_systems.front(), "stale").has_value(),
             "correspondence rows declare their own pinned and stale states");
     const std::vector<CorrespondenceView::Item> cards = (*view).realized_items();
     require(cards.size() == 2U && cards[0].states.stale && !cards[1].states.stale &&
@@ -1046,15 +1103,91 @@ void test_tree_and_correspondence_items() {
             "each card publishes its rail and glyph inside the card");
 }
 
+// The details view's column headers are items of a second system, after
+// the rows in the generic path and as typed records through
+// realized_columns().
+void test_object_view_columns_are_items() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.objects.root"));
+    std::shared_ptr<ObjectView> view = make_control<ObjectView>(StableId("anatomy.objects"));
+    (*view).set_bounds({0.0, 0.0, 400.0, 200.0});
+    (*view).set_view_mode(ObjectViewMode::details);
+    std::vector<ObjectDetailsColumn> columns;
+    columns.push_back({.id = {"name"}, .label = "Name", .width = 150.0});
+    columns.push_back({.id = {"size"}, .label = "Size", .width = 120.0});
+    columns.push_back({.id = {"kind"}, .label = "Kind", .width = 100.0, .sortable = false});
+    std::vector<ObjectViewItem> items;
+    for (std::size_t index = 0; index < 2U; ++index) {
+        ObjectViewItem item;
+        item.stable_id = "anatomy.objects.item." + std::to_string(index);
+        item.name = "Object " + std::to_string(index);
+        item.cells.push_back({{"name"}, item.name});
+        item.cells.push_back({{"size"}, std::to_string(index)});
+        item.cells.push_back({{"kind"}, "File"});
+        items.push_back(item);
+    }
+    ObjectDetailsSort sort;
+    sort.column = ObjectColumnId{"name"};
+    (*view).set_details_model(std::move(columns), std::move(items), sort);
+    (*root).add_child(view);
+    Window window(root, Size{400.0, 200.0});
+    window.perform_layout();
+
+    const ControlAnatomy& anatomy = (*view).anatomy();
+    require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none &&
+                anatomy.item_systems.size() == 2U &&
+                find_item_system(anatomy, "column").has_value(),
+            "the object view declares rows and columns as item systems");
+    const std::vector<ObjectView::Column> realized = (*view).realized_columns();
+    require(realized.size() == 3U && realized[0].stable_id == "anatomy.objects.column.name" &&
+                realized[0].index == 0U && realized[2].index == 2U,
+            "every visible column is a realized column with a stable identity");
+    require(realized[0].states.sorted_ascending && !realized[0].states.sorted_descending &&
+                !realized[1].states.sorted_ascending,
+            "the sorted column publishes its sort direction as an item state");
+    require(realized[0].parts.sort_glyph.present && !realized[1].parts.sort_glyph.present,
+            "only the sorted column has a sort glyph");
+    require(realized[0].parts.column_header.bounds.contains(realized[0].parts.column_label.bounds) &&
+                realized[1].parts.column_header.bounds.x >=
+                    realized[0].parts.column_header.bounds.right() - 0.5,
+            "column labels sit inside their headers, which run left to right");
+    const ObjectView::Parts parts = (*view).parts();
+    require(parts.header.bounds.contains(realized[1].parts.column_header.bounds),
+            "column headers lie in the header band");
+
+    // The generic path: the rows first, then the columns.
+    const std::vector<ObjectView::Item> rows = (*view).realized_items();
+    const std::size_t total = (*view).realized_item_count();
+    require(total == rows.size() + realized.size(), "rows and columns are realized together");
+    require((*view).realized_item_system(0U).value == 0U &&
+                (*view).realized_item_system(total - 1U).value == 1U,
+            "each realized item names its item system");
+    std::vector<PartGeometry> column_geometry(anatomy.item_systems[1].parts.size());
+    (*view).fill_realized_item_geometry(rows.size(), column_geometry);
+    require(column_geometry[0] == realized[0].parts.column_header &&
+                (*view).realized_item_stable_id(rows.size()) == realized[0].stable_id,
+            "the generic path publishes the same column geometry and identity");
+    bool rejected = false;
+    std::vector<PartGeometry> row_sized(anatomy.item_systems[0].parts.size());
+    try {
+        (*view).fill_realized_item_geometry(rows.size(), row_sized);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    require(rejected, "a column's geometry needs storage for the column system's parts");
+}
+
 constexpr std::array<CustomStateDeclaration, 1> shadowing_item_custom_state{{
     {.name = "selected"},
+}};
+constexpr std::array<ItemSystemDeclaration, 1> shadowing_item_system{{
+    {.name = "item", .parts = row_item_parts, .states = {},
+     .custom_states = shadowing_item_custom_state},
 }};
 
 void test_item_custom_states_never_shadow_standard_states() {
     const ControlAnatomy shadowing{
         .control_id = "grid", .parts = single_region, .states = {},
-        .custom_states = {}, .item_parts = {}, .item_states = {},
-        .item_custom_states = shadowing_item_custom_state};
+        .custom_states = {}, .item_systems = shadowing_item_system};
     require(validate_control_anatomy(shadowing).defect ==
                 AnatomyDefect::item_custom_state_shadows_standard_state,
             "an item custom state may not reuse a standard state's name");
@@ -1086,6 +1219,8 @@ int main() {
         test_tabs_menus_and_breadcrumbs_are_items();
         test_tree_and_correspondence_items();
         test_item_custom_states_never_shadow_standard_states();
+        test_item_systems_are_distinct();
+        test_object_view_columns_are_items();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

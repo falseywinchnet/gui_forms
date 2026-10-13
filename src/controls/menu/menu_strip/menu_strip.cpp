@@ -577,13 +577,17 @@ constexpr std::array<AnatomyState, 5> menu_strip_states{
     AnatomyState::focus_visible,
 };
 
+constexpr std::array<ItemSystemDeclaration, 1> menu_strip_item_systems{{
+    {.name = "item", .parts = menu_strip_item_parts, .states = menu_strip_item_states,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy menu_strip_anatomy{
     .control_id = "menu-strip",
     .parts = menu_strip_parts,
     .states = menu_strip_states,
     .custom_states = {},
-    .item_parts = menu_strip_item_parts,
-    .item_states = menu_strip_item_states,
+    .item_systems = menu_strip_item_systems,
 };
 
 } // namespace
@@ -657,7 +661,7 @@ void MenuStrip::publish_realized_item_geometry(std::size_t item,
     record.menu_item = PartGeometry::from_bounds(face);
     record.menu_label = PartGeometry::from_bounds(Rect::intersection(label, bounds));
     record.menu_focus = PartGeometry::from_bounds(bounds);
-    write_item_parts(anatomy(), menu_strip_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), menu_strip_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet MenuStrip::realized_item_anatomy_states(std::size_t item) const {
@@ -687,7 +691,7 @@ std::vector<MenuStrip::Item> MenuStrip::realized_items() const {
         Item record;
         record.index = realized_item_index(item);
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), menu_strip_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), menu_strip_item_part_fields, published.parts(), record.parts);
         read_states(menu_strip_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }

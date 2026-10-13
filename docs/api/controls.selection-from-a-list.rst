@@ -109,6 +109,12 @@ Related types
      -  
    * - :cpp:class:`ObjectSelectionChange <gui_forms::ObjectSelectionChange>`
      - ObjectSelectionChange reports previous/current optional identities and interaction source.
+   * - :cpp:class:`ObjectView::Column <gui_forms::ObjectView::Column>`
+     -  
+   * - :cpp:class:`ObjectView::ColumnParts <gui_forms::ObjectView::ColumnParts>`
+     - The details view's column headers are a second item system, "column".
+   * - :cpp:class:`ObjectView::ColumnStates <gui_forms::ObjectView::ColumnStates>`
+     -  
    * - :cpp:class:`ObjectView::Item <gui_forms::ObjectView::Item>`
      -  
    * - :cpp:class:`ObjectView::ItemParts <gui_forms::ObjectView::ItemParts>`
@@ -649,6 +655,60 @@ Related types
    .. cpp:member:: std::vector<std::string> previous_ids
 
    .. cpp:member:: std::vector<std::string> current_ids
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ObjectView::Column final
+
+   ``#include <gui_forms/controls/panel/object_view/object_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+      The column's position in the details model.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ColumnParts parts
+
+   .. cpp:member:: ColumnStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ObjectView::ColumnParts final
+
+   ``#include <gui_forms/controls/panel/object_view/object_view.hpp>``
+
+   The details view's column headers are a second item system, "column". Realized columns are those the viewport shows; in the generic realized-item path they follow the realized items. A column's identity is the view's stable ID, ".column.", and the column's id.
+
+   .. cpp:member:: PartGeometry column_header
+
+   .. cpp:member:: PartGeometry column_label
+
+   .. cpp:member:: PartGeometry sort_glyph
+
+   .. cpp:member:: PartGeometry column_divider
+
+   .. cpp:member:: PartGeometry column_grip
+
+   .. cpp:member:: PartGeometry column_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ObjectView::ColumnStates final
+
+   ``#include <gui_forms/controls/panel/object_view/object_view.hpp>``
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool sorted_ascending
+
+      Application-defined column states.
+
+   .. cpp:member:: bool sorted_descending
 
 .. cpp:namespace:: gui_forms
 

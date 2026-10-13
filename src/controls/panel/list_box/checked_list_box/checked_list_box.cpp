@@ -268,13 +268,17 @@ constexpr std::array<PartDeclaration, 5> checked_item_parts_declared =
 constexpr std::array<AnatomyState, 5> checked_item_states_declared =
     state_declarations(checked_item_state_fields);
 
+constexpr std::array<ItemSystemDeclaration, 1> checked_list_box_item_systems{{
+    {.name = "item", .parts = checked_item_parts_declared, .states = checked_item_states_declared,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy checked_list_box_anatomy{
     .control_id = "checked-list-box",
     .parts = list_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = checked_item_parts_declared,
-    .item_states = checked_item_states_declared,
+    .item_systems = checked_list_box_item_systems,
 };
 
 } // namespace
@@ -308,7 +312,7 @@ void CheckedListBox::publish_realized_item_geometry(std::size_t item,
             record.check = PartGeometry::from_bounds(bar);
         }
     }
-    write_item_parts(anatomy(), checked_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), checked_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet CheckedListBox::realized_item_anatomy_states(std::size_t item) const {
@@ -333,7 +337,7 @@ std::vector<CheckedListBox::Item> CheckedListBox::realized_items() const {
         Item record;
         record.index = realized_item_index(item);
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), checked_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), checked_item_part_fields, published.parts(), record.parts);
         read_states(checked_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }

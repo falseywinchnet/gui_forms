@@ -516,13 +516,17 @@ constexpr std::array<PartDeclaration, 3> list_item_parts_declared =
 constexpr std::array<AnatomyState, 3> list_item_states_declared =
     state_declarations(list_item_state_fields);
 
+constexpr std::array<ItemSystemDeclaration, 1> list_box_item_systems{{
+    {.name = "item", .parts = list_item_parts_declared, .states = list_item_states_declared,
+     .custom_states = {}},
+}};
+
 constexpr ControlAnatomy list_box_anatomy{
     .control_id = "list-box",
     .parts = list_box_detail::parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = list_item_parts_declared,
-    .item_states = list_item_states_declared,
+    .item_systems = list_box_item_systems,
 };
 
 } // namespace
@@ -601,7 +605,7 @@ ListBox::ItemParts ListBox::list_item_parts(std::size_t item) const {
 void ListBox::publish_realized_item_geometry(std::size_t item,
                                              std::span<PartGeometry> geometry) const {
     const ItemParts record = list_item_parts(item);
-    write_item_parts(anatomy(), list_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), list_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet ListBox::list_item_states(std::size_t index) const {
@@ -632,7 +636,7 @@ std::vector<ListBox::Item> ListBox::realized_items() const {
         Item record;
         record.index = realized_item_index(item);
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), list_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), list_item_part_fields, published.parts(), record.parts);
         read_states(list_item_state_fields, realized_item_anatomy_states(item), record.states);
         records.push_back(record);
     }

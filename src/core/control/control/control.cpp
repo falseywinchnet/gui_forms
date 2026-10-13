@@ -2577,12 +2577,26 @@ std::string Control::realized_item_stable_id(std::size_t) const {
     return {};
 }
 
-void Control::fill_realized_item_geometry(std::size_t item,
-                                          std::span<PartGeometry> geometry) const {
+ItemSystemIndex Control::realized_item_system(std::size_t item) const {
     if (item >= realized_item_count()) {
         throw std::out_of_range("realized item index is past the realized items");
     }
-    if (geometry.size() != anatomy().item_parts.size()) {
+    const ItemSystemIndex system = publish_realized_item_system(item);
+    return system;
+}
+
+ItemSystemIndex Control::publish_realized_item_system(std::size_t) const {
+    const ItemSystemIndex first;
+    return first;
+}
+
+void Control::fill_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    const ItemSystemIndex system = realized_item_system(item);
+    const std::span<const ItemSystemDeclaration> systems = anatomy().item_systems;
+    const std::size_t declared_parts =
+        system.value < systems.size() ? systems[system.value].parts.size() : 0U;
+    if (geometry.size() != declared_parts) {
         throw std::invalid_argument(
             "item geometry storage must hold one record per declared item part");
     }
@@ -2600,8 +2614,11 @@ void Control::publish_realized_item_geometry(std::size_t, std::span<PartGeometry
 
 PartGeometryBuffer Control::published_realized_item_geometry(std::size_t item) const {
     PartGeometryBuffer buffer;
-    const ControlAnatomy& declared = anatomy();
-    buffer.count = std::min(declared.item_parts.size(), maximum_control_parts);
+    const ItemSystemIndex system = publish_realized_item_system(item);
+    const std::span<const ItemSystemDeclaration> systems = anatomy().item_systems;
+    const std::size_t declared_parts =
+        system.value < systems.size() ? systems[system.value].parts.size() : 0U;
+    buffer.count = std::min(declared_parts, maximum_control_parts);
     const std::span<PartGeometry> parts(buffer.geometry.data(), buffer.count);
     publish_realized_item_geometry(item, parts);
     return buffer;

@@ -1219,14 +1219,17 @@ constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
     property_list_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(property_list_extra_part_fields));
 
+constexpr std::array<ItemSystemDeclaration, 1> property_list_item_systems{{
+    {.name = "item", .parts = property_list_item_parts, .states = property_list_item_states,
+     .custom_states = property_list_item_custom_states},
+}};
+
 constexpr ControlAnatomy property_list_anatomy{
     .control_id = "property-list",
     .parts = property_list_parts,
     .states = scrollable_detail::states,
     .custom_states = {},
-    .item_parts = property_list_item_parts,
-    .item_states = property_list_item_states,
-    .item_custom_states = property_list_item_custom_states,
+    .item_systems = property_list_item_systems,
 };
 
 } // namespace
@@ -1310,7 +1313,7 @@ void PropertyList::publish_realized_item_geometry(std::size_t item,
                            std::max(0.0, bounds.width - padding * 2.0), 1.0};
         record.row_divider = PartGeometry::from_bounds(Rect::intersection(divider, bounds));
     }
-    write_item_parts(anatomy(), property_list_item_part_fields, record, geometry);
+    write_item_parts(anatomy().item_systems.front(), property_list_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet PropertyList::realized_item_anatomy_states(std::size_t item) const {
@@ -1341,7 +1344,7 @@ std::vector<PropertyList::Item> PropertyList::realized_items() const {
         Item record;
         record.index = item;
         record.stable_id = realized_item_stable_id(item);
-        read_item_parts(anatomy(), property_list_item_part_fields, published.parts(), record.parts);
+        read_item_parts(anatomy().item_systems.front(), property_list_item_part_fields, published.parts(), record.parts);
         const AnatomyStateSet item_states = realized_item_anatomy_states(item);
         read_states(property_list_item_state_fields, item_states, record.states);
         record.states.group_header = item_states.contains(group_header_item_state);

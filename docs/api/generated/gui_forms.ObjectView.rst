@@ -137,6 +137,8 @@ gui_forms::ObjectView
       **realized_items** : ``std::vector<Item>``, read-only
          The items currently realized, in paint order (owner decision 5).
 
+      **realized_columns** : ``std::vector<Column>``, read-only
+
    :Events:
 
       **sort_requested** : ``Event<const ObjectDetailsSort&>``
@@ -488,6 +490,8 @@ gui_forms::ObjectView
 
       The items currently realized, in paint order (owner decision 5).
 
+   .. cpp:function:: std::vector<Column> realized_columns() const
+
 
    .. rubric:: Events
 
@@ -630,6 +634,10 @@ gui_forms::ObjectView
       *Protected.*
 
    .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: ItemSystemIndex publish_realized_item_system(std::size_t item) const override
 
       *Protected.*
 

@@ -52,6 +52,10 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`ItemSystemDeclaration <gui_forms::ItemSystemDeclaration>`
+     - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
+   * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
+     - Position of an item system in its control type's declaration list.
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
@@ -117,7 +121,11 @@ Related types
 
    .. cpp:member:: std::size_t index
 
-      Index into the list the defect concerns (parts, states, custom states, item parts or item states); zero when the defect concerns the anatomy as a whole.
+      Index into the list the defect concerns (parts, states, custom states, item systems, or one item system's parts or states); zero when the defect concerns the anatomy as a whole.
+
+   .. cpp:member:: std::size_t item_system
+
+      The item system an item defect concerns; zero otherwise.
 
 .. cpp:namespace:: gui_forms
 
@@ -210,15 +218,9 @@ Related types
 
    .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
 
-   .. cpp:member:: std::span<const PartDeclaration> item_parts
+   .. cpp:member:: std::span<const ItemSystemDeclaration> item_systems
 
-      The anatomy of one repeated item (a list row, a tree node), empty for a control without items. Item part names never repeat the control's own part names, so a document addresses either by name alone.
-
-   .. cpp:member:: std::span<const AnatomyState> item_states
-
-   .. cpp:member:: std::span<const CustomStateDeclaration> item_custom_states
-
-      Application-defined finite states of one item, as for a control.
+      The kinds of repeated item the control paints, empty for a control without items. Most controls with items have one system; the details view adds its column headers as a second.
 
 .. cpp:namespace:: gui_forms
 
@@ -270,6 +272,34 @@ Related types
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
    Position of an application-defined state in its control type's declaration list.
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemSystemDeclaration final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header. ``name`` is the system's kebab-case identity in the schema ("item", "column"). Item part names are unique within the control, across its own parts and every item system, so a document addresses an item part by its name alone.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: std::span<const PartDeclaration> parts
+
+   .. cpp:member:: std::span<const AnatomyState> states
+
+   .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
+
+      Application-defined finite states of one item, as for a control.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ItemSystemIndex final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Position of an item system in its control type's declaration list.
 
    .. cpp:member:: std::uint8_t value
 
@@ -491,6 +521,14 @@ Enumerations
    .. cpp:enumerator:: item_custom_state_shadows_standard_state
 
    .. cpp:enumerator:: duplicate_item_custom_state
+
+   .. cpp:enumerator:: too_many_item_systems
+
+   .. cpp:enumerator:: item_system_name_not_kebab_case
+
+   .. cpp:enumerator:: duplicate_item_system_name
+
+   .. cpp:enumerator:: item_system_without_parts
 
 .. cpp:namespace:: gui_forms
 
@@ -857,17 +895,21 @@ Functions, constants and aliases
 
 .. cpp:function:: std::optional<PartIndex> find_declared_part(std::span<const PartDeclaration> declared, std::string_view part_name) noexcept
 
-   Lookup by declared name within one declaration list, within a control type's own parts, or within its item parts.
+   Lookup by declared name within one declaration list, within a control type's own parts, or within one of its item systems.
 
 .. cpp:function:: std::optional<PartIndex> find_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
 
-.. cpp:function:: std::optional<PartIndex> find_item_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
+.. cpp:function:: std::optional<ItemSystemIndex> find_item_system(const ControlAnatomy& anatomy, std::string_view system_name) noexcept
+
+.. cpp:function:: std::optional<PartIndex> find_item_part(const ItemSystemDeclaration& system, std::string_view part_name) noexcept
 
 .. cpp:function:: std::optional<CustomStateIndex> find_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
 
-.. cpp:function:: std::optional<CustomStateIndex> find_item_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
+.. cpp:function:: std::optional<CustomStateIndex> find_item_custom_state(const ItemSystemDeclaration& system, std::string_view state_name) noexcept
 
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
+
+.. cpp:function:: bool declares_item_state(const ItemSystemDeclaration& system, AnatomyState state) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<PartDeclaration, Count> part_declarations(const std::array<PartField<Record>, Count>& fields)
 
@@ -887,11 +929,11 @@ Functions, constants and aliases
 
 .. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
-.. cpp:function:: template <typename Record, std::size_t Count> void write_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void write_item_parts(const ItemSystemDeclaration& system, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
 
-   The same mapping over one realized item's geometry and the anatomy's item parts.
+   The same mapping over one realized item's geometry and the parts of its item system.
 
-.. cpp:function:: template <typename Record, std::size_t Count> void read_item_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+.. cpp:function:: template <typename Record, std::size_t Count> void read_item_parts(const ItemSystemDeclaration& system, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> void read_states(const std::array<StateField<Record>, Count>& fields, const AnatomyStateSet& active, Record& record) noexcept
 
@@ -918,6 +960,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_custom_states
 
    Value: ``16``.
+
+.. cpp:var:: constexpr std::size_t maximum_item_systems
+
+   Value: ``4``.
 
 .. cpp:namespace:: gui_forms
 

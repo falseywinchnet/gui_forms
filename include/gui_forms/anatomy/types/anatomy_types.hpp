@@ -110,6 +110,7 @@ inline constexpr std::size_t anatomy_state_count =
 // declaring more is rejected by validate_control_anatomy.
 inline constexpr std::size_t maximum_control_parts = 32;
 inline constexpr std::size_t maximum_custom_states = 16;
+inline constexpr std::size_t maximum_item_systems = 4;
 static_assert(anatomy_state_count <= 64,
               "AnatomyStateSet stores standard states in 64 bits");
 
@@ -134,6 +135,15 @@ struct CustomStateIndex final {
     }
 };
 
+// Position of an item system in its control type's declaration list.
+struct ItemSystemIndex final {
+    std::uint8_t value{};
+
+    friend constexpr bool operator==(ItemSystemIndex left, ItemSystemIndex right) noexcept {
+        return left.value == right.value;
+    }
+};
+
 // One declared part. `name` is the part's stable kebab-case identity within
 // its control type, as written in `::part(name)`. `composed_from` names the
 // control id of a simpler system the part reuses (a scroll arrow is a
@@ -149,6 +159,19 @@ struct CustomStateDeclaration final {
     std::string_view name;
 };
 
+// One kind of repeated item a control paints (owner decision 5): a list
+// row, a tree node, a details-view column header. `name` is the system's
+// kebab-case identity in the schema ("item", "column"). Item part names are
+// unique within the control, across its own parts and every item system, so
+// a document addresses an item part by its name alone.
+struct ItemSystemDeclaration final {
+    std::string_view name;
+    std::span<const PartDeclaration> parts;
+    std::span<const AnatomyState> states;
+    // Application-defined finite states of one item, as for a control.
+    std::span<const CustomStateDeclaration> custom_states;
+};
+
 // The anatomy of one control type. Every span refers to static storage
 // owned by the control type's translation unit, so a ControlAnatomy may be
 // copied and retained for the life of the program.
@@ -159,13 +182,10 @@ struct ControlAnatomy final {
     std::span<const PartDeclaration> parts;
     std::span<const AnatomyState> states;
     std::span<const CustomStateDeclaration> custom_states;
-    // The anatomy of one repeated item (a list row, a tree node), empty for
-    // a control without items. Item part names never repeat the control's
-    // own part names, so a document addresses either by name alone.
-    std::span<const PartDeclaration> item_parts;
-    std::span<const AnatomyState> item_states;
-    // Application-defined finite states of one item, as for a control.
-    std::span<const CustomStateDeclaration> item_custom_states;
+    // The kinds of repeated item the control paints, empty for a control
+    // without items. Most controls with items have one system; the details
+    // view adds its column headers as a second.
+    std::span<const ItemSystemDeclaration> item_systems;
 };
 
 // Geometry of one declared part in the control's local coordinate space
@@ -264,19 +284,23 @@ private:
 [[nodiscard]] bool is_kebab_case_name(std::string_view name) noexcept;
 
 // Lookup by declared name within one declaration list, within a control
-// type's own parts, or within its item parts.
+// type's own parts, or within one of its item systems.
 [[nodiscard]] std::optional<PartIndex> find_declared_part(
     std::span<const PartDeclaration> declared, std::string_view part_name) noexcept;
 [[nodiscard]] std::optional<PartIndex> find_part(
     const ControlAnatomy& anatomy, std::string_view part_name) noexcept;
+[[nodiscard]] std::optional<ItemSystemIndex> find_item_system(
+    const ControlAnatomy& anatomy, std::string_view system_name) noexcept;
 [[nodiscard]] std::optional<PartIndex> find_item_part(
-    const ControlAnatomy& anatomy, std::string_view part_name) noexcept;
+    const ItemSystemDeclaration& system, std::string_view part_name) noexcept;
 [[nodiscard]] std::optional<CustomStateIndex> find_custom_state(
     const ControlAnatomy& anatomy, std::string_view state_name) noexcept;
 [[nodiscard]] std::optional<CustomStateIndex> find_item_custom_state(
-    const ControlAnatomy& anatomy, std::string_view state_name) noexcept;
+    const ItemSystemDeclaration& system, std::string_view state_name) noexcept;
 [[nodiscard]] bool declares_state(const ControlAnatomy& anatomy,
                                   AnatomyState state) noexcept;
+[[nodiscard]] bool declares_item_state(const ItemSystemDeclaration& system,
+                                       AnatomyState state) noexcept;
 
 // Typed records (stage T1). C++ reads a control's parts and states as dot
 // members of a record (`parts.thumb.bounds`, `states.pressed`); kebab-case
@@ -382,20 +406,20 @@ void read_parts(const ControlAnatomy& anatomy,
     read_declared_parts(anatomy.parts, fields, geometry, record);
 }
 
-// The same mapping over one realized item's geometry and the anatomy's
-// item parts.
+// The same mapping over one realized item's geometry and the parts of
+// its item system.
 template <typename Record, std::size_t Count>
-void write_item_parts(const ControlAnatomy& anatomy,
+void write_item_parts(const ItemSystemDeclaration& system,
                       const std::array<PartField<Record>, Count>& fields,
                       const Record& record, std::span<PartGeometry> geometry) noexcept {
-    write_declared_parts(anatomy.item_parts, fields, record, geometry);
+    write_declared_parts(system.parts, fields, record, geometry);
 }
 
 template <typename Record, std::size_t Count>
-void read_item_parts(const ControlAnatomy& anatomy,
+void read_item_parts(const ItemSystemDeclaration& system,
                      const std::array<PartField<Record>, Count>& fields,
                      std::span<const PartGeometry> geometry, Record& record) noexcept {
-    read_declared_parts(anatomy.item_parts, fields, geometry, record);
+    read_declared_parts(system.parts, fields, geometry, record);
 }
 
 template <typename Record, std::size_t Count>
@@ -432,15 +456,21 @@ enum class AnatomyDefect : std::uint8_t {
     item_custom_state_not_kebab_case,
     item_custom_state_shadows_standard_state,
     duplicate_item_custom_state,
+    too_many_item_systems,
+    item_system_name_not_kebab_case,
+    duplicate_item_system_name,
+    item_system_without_parts,
 };
 
 // The result of validate_control_anatomy: the first defect found, or none.
 struct AnatomyValidation final {
     AnatomyDefect defect{AnatomyDefect::none};
     // Index into the list the defect concerns (parts, states, custom states,
-    // item parts or item states); zero when the defect concerns the anatomy
-    // as a whole.
+    // item systems, or one item system's parts or states); zero when the
+    // defect concerns the anatomy as a whole.
     std::size_t index{};
+    // The item system an item defect concerns; zero otherwise.
+    std::size_t item_system{};
 };
 
 [[nodiscard]] std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept;
