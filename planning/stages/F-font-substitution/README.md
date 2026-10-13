@@ -56,7 +56,7 @@ Candidates to evaluate, not decisions:
 | Times New Roman | Tinos | metric-compatible |
 | Segoe UI | Selawik | Microsoft's open Segoe UI fallback; check how close its metrics are |
 | Tahoma, Microsoft Sans Serif | nearest OFL/MIT/Apache face | Wine's LGPL replacements are excluded (decision 1) |
-| Consolas | Portsmouth Mono | the owner's face (decision 3); measure its differential |
+| Consolas | Portsmouth Mono | the owner's face, bundled (decision 3); measure its differential |
 
 ## How
 
@@ -89,18 +89,13 @@ corpus, sizes, tolerance and results under `results/`.
    unmapped family falls back to the host's bytes (CoreText, GDI), so drawing
    code keeps working.
 3. **Consolas** maps to **Portsmouth Mono**, the owner's own monospace face
-   ("Portsmouth Mono exists"). Licence: MIT, like Portsmouth Rapids (owner,
-   2026-10-13). Version 1.0, `PortsmouthMono.ttf`, SHA-256
-   `6129c819de5046e4ec97c7ee8d915bf195d106b98680d9b17901741a1d7314ad`. It is
-   not yet in `assets/fonts/`. The owner expected it in the original
-   `falseywinchnet/file_manager` repository, but no branch or commit there has
-   ever contained it (only Portsmouth Rapids, under the old `gui_forms/`
-   subtree). The copy found in the owner's repositories is in
-   `falseywinchnet/paymenottowork` at
-   `public/instruments/portsmouth/assets/downloads/Portsmouth-Mono-1.0.zip`
-   (the face plus its `PROJECT.md`; commit `3dbc684`). Ask the owner which
-   repository is the canonical source before bundling, then add it with its
-   licence text and provenance recorded as for Portsmouth Rapids.
+   (MIT, version 1.0, fixed pitch). The owner asked for every Portsmouth face
+   to be included; all of them are now in `assets/fonts/` with hashes and
+   provenance in `assets/fonts/ATTRIBUTION.md` (from the owner's published
+   1.0 downloads in `falseywinchnet/paymenottowork`). The hosts do not
+   register Mono yet; wiring it into the substitution table is this stage's
+   work, with its metric differential against Consolas recorded like any
+   other mapping.
 
 ## Read first
 

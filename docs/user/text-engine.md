@@ -63,6 +63,7 @@ pixel on one platform fails that test.
 | Face | Role | Licence |
 |---|---|---|
 | Portsmouth Rapids (regular, bold) | `FontRole::control`: titles, buttons, labels, menus | Owner's MIT grant (`assets/fonts/LICENSE-PortsmouthRapids.txt`) |
+| Portsmouth Rapids (light, italic, bold italic), Portsmouth (five styles), Portsmouth Mono | Installed with the SDK; not registered by the hosts | Owner's MIT grant |
 | Carlito (four styles) | `FontRole::content`: editable text, lists, fields; metric-compatible with Calibri | SIL OFL |
 | Cousine (four styles) | `FontRole::monospace` | SIL OFL |
 | Noto Sans CJK JP | Fallback: Han, kana, Hangul | SIL OFL |

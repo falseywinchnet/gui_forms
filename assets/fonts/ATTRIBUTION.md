@@ -19,6 +19,38 @@ requested by GUI.Forms while retaining the previous 330 cmap entries, glyph
 IDs, advances, and outlines exactly. The editable construction and acceptance
 reports live in the cited Portsmouth source project.
 
+## The rest of the Portsmouth 1.0 family
+
+On 2026-10-13 the owner asked for every Portsmouth face to be included and
+confirmed that the MIT grant in `LICENSE-PortsmouthRapids.txt` covers them
+all. They come from the owner's published 1.0 downloads
+(`Portsmouth-Family-1.0.zip`, `Portsmouth-Rapids-Family-1.0.zip` and
+`Portsmouth-Mono-1.0.zip` in `falseywinchnet/paymenottowork` at `3dbc684`,
+`public/instruments/portsmouth/assets/downloads/`), built on 2026-08-06 in the
+same run as the two faces above, which are byte-identical to that release.
+Every face embeds version 1.0 and the same 349-entry cmap.
+
+| File | Family / style | SHA-256 |
+|---|---|---|
+| `PortsmouthRapids-Light.ttf` | Portsmouth Rapids Light | `1afe07a8d89be75a5a9fb5befca4938009422e6719a0d6d7b117d95d8345e61a` |
+| `PortsmouthRapids-Italic.ttf` | Portsmouth Rapids Italic | `cd806b808e80df27b16694295ad06066c7479c6f0699e22b3c1e3cf04ec9e375` |
+| `PortsmouthRapids-BoldItalic.ttf` | Portsmouth Rapids Bold Italic | `00ab54b1cc0c46c0706bb51653d8a96c3c5a56e23c2030826b0918ff78a387d1` |
+| `Portsmouth.ttf` | Portsmouth Regular | `c3dcc717d26c7f42c83d87550a1b2f4b4c3b51d0d776d780bdd883018ead0f81` |
+| `Portsmouth-Light.ttf` | Portsmouth Light | `8e78f093987c736dc32376dd9b112408855b31701ac878bf21650c1d72aa63dc` |
+| `Portsmouth-Italic.ttf` | Portsmouth Italic | `0781e11d005c75b6942653b07ad65c2e05d50ab901ee2919b5038cb176a17682` |
+| `Portsmouth-Bold.ttf` | Portsmouth Bold | `e709c37667842e2aae50af7e6a000ed4eabee378fc543c35140e49af176d6800` |
+| `Portsmouth-BoldItalic.ttf` | Portsmouth Bold Italic | `7cdfaea4929b298ed01e40ac64e34c440436026195939b7897ec3828726c3ea9` |
+| `PortsmouthMono.ttf` | Portsmouth Mono Regular (fixed pitch, 575 units) | `6129c819de5046e4ec97c7ee8d915bf195d106b98680d9b17901741a1d7314ad` |
+
+The release's `Portsmouth-Regular-1.0.ttf` (an earlier build under the
+separate family name "Portsmouth Regular") and its `.ttc` collections are not
+copied; the individual faces above carry the same styles.
+
+These faces are installed with the SDK's font directory. The hosts register
+only the two faces above for `FontRole::control`; the others are available to
+applications and to font substitution (Portsmouth Mono is the planned
+substitute for Consolas, `planning/stages/F-font-substitution/`).
+
 The font-pack specimen also contains Carlito and Cousine at upstream commit
 and byte identity:
 
