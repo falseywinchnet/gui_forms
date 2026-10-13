@@ -35,14 +35,74 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`ScrollableControl::Parts <gui_forms::ScrollableControl::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`ScrollableControl::States <gui_forms::ScrollableControl::States>`
+     -  
    * - :cpp:class:`ScrollAxisSnapshot <gui_forms::ScrollAxisSnapshot>`
      - ScrollAxisSnapshot exposes minimum, maximum, viewport, small/large change, value, effective maximum, and visibility for one axis.
+   * - :cpp:class:`ScrollBar::Parts <gui_forms::ScrollBar::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`ScrollBar::States <gui_forms::ScrollBar::States>`
+     -  
    * - :cpp:class:`ScrollEvent <gui_forms::ScrollEvent>`
      - ScrollEvent reports axis, mutation kind, old/new values, and logical orientation for one admitted scroll transition.
    * - :cpp:class:`ScrollProperties <gui_forms::ScrollProperties>`
      - ScrollProperties is the owner-bound, per-axis state model for enabled/visible state, authored or automatic range increments, clamped position, orientation, and inspectable snapshot projection.
    * - :cpp:class:`ScrollSnapshot <gui_forms::ScrollSnapshot>`
      - ScrollSnapshot combines horizontal/vertical axis snapshots with auto-scroll policy, margin, minimum size, offset, and logical position.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ScrollableControl::Parts final
+
+   ``#include <gui_forms/controls/scrollable_control/scrollable_control.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry viewport
+
+   .. cpp:member:: PartGeometry horizontal_decrement_arrow
+
+   .. cpp:member:: PartGeometry horizontal_track
+
+   .. cpp:member:: PartGeometry horizontal_thumb
+
+   .. cpp:member:: PartGeometry horizontal_increment_arrow
+
+   .. cpp:member:: PartGeometry vertical_decrement_arrow
+
+   .. cpp:member:: PartGeometry vertical_track
+
+   .. cpp:member:: PartGeometry vertical_thumb
+
+   .. cpp:member:: PartGeometry vertical_increment_arrow
+
+   .. cpp:member:: PartGeometry scroll_corner
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ScrollableControl::States final
+
+   ``#include <gui_forms/controls/scrollable_control/scrollable_control.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 
@@ -73,6 +133,46 @@ Related types
       Default: ``{1.0}``.
 
    .. cpp:member:: double value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ScrollBar::Parts final
+
+   ``#include <gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry decrement_arrow
+
+   .. cpp:member:: PartGeometry increment_arrow
+
+   .. cpp:member:: PartGeometry track
+
+   .. cpp:member:: PartGeometry thumb
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ScrollBar::States final
+
+   ``#include <gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 

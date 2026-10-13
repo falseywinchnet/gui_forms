@@ -48,6 +48,23 @@ gui_forms::TrackBar
          colour up to the thumb. :cpp:enumerator:`TrackBarVisualStyle::compact <gui_forms::TrackBarVisualStyle::compact>` draws the filled
          track with a smaller thumb and no tick marks.
 
+      **value_span_bounds** : ``Rect``, read-only
+         Public part geometry in local coordinates (stage T1). The value maps linearly across value_span_bounds(): minimum at its left (horizontal) or bottom (vertical) edge. track_bounds() is the painted groove, which shares the value span's extent along the axis.
+
+      **track_bounds** : ``Rect``, read-only
+
+      **fill_bounds** : ``Rect``, read-only
+         The value portion of the groove; empty in the classic style.
+
+      **thumb_bounds** : ``Rect``, read-only
+
+      **ticks_bounds** : ``Rect``, read-only
+         The band the tick marks occupy; empty when ticks are not drawn.
+
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       From :cpp:class:`RangeControl <gui_forms::RangeControl>`: properties :cpp:func:`minimum <gui_forms::RangeControl::minimum>`, :cpp:func:`maximum <gui_forms::RangeControl::maximum>`, :cpp:func:`value <gui_forms::RangeControl::value>`, :cpp:func:`small_change <gui_forms::RangeControl::small_change>`, :cpp:func:`large_change <gui_forms::RangeControl::large_change>`, :cpp:func:`orientation <gui_forms::RangeControl::orientation>`, :cpp:func:`normalized_value <gui_forms::RangeControl::normalized_value>`, :cpp:func:`style <gui_forms::RangeControl::style>`; events :cpp:func:`range_changed <gui_forms::RangeControl::range_changed>`, :cpp:func:`value_changed <gui_forms::RangeControl::value_changed>`, :cpp:func:`scroll <gui_forms::RangeControl::scroll>`; methods :cpp:func:`bind <gui_forms::RangeControl::bind>`, :cpp:func:`increment <gui_forms::RangeControl::increment>`, :cpp:func:`set_range <gui_forms::RangeControl::set_range>`, :cpp:func:`unbind <gui_forms::RangeControl::unbind>`.
@@ -190,8 +207,32 @@ gui_forms::TrackBar
 
       Sets :cpp:func:`visual_style <gui_forms::TrackBar::visual_style>`; see the property's description above.
 
+   .. cpp:function:: Rect value_span_bounds() const noexcept
+
+      Public part geometry in local coordinates (stage T1). The value maps linearly across value_span_bounds(): minimum at its left (horizontal) or bottom (vertical) edge. track_bounds() is the painted groove, which shares the value span's extent along the axis.
+
+   .. cpp:function:: Rect track_bounds() const noexcept
+
+   .. cpp:function:: Rect fill_bounds() const noexcept
+
+      The value portion of the groove; empty in the classic style.
+
+   .. cpp:function:: Rect thumb_bounds() const noexcept
+
+   .. cpp:function:: Rect ticks_bounds() const noexcept
+
+      The band the tick marks occupy; empty when ticks are not drawn.
+
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Extension points
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
    .. cpp:function:: Size measure(Size available) override
 
@@ -206,3 +247,7 @@ gui_forms::TrackBar
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

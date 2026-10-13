@@ -1,5 +1,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.hpp"
+#include "../../../scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -25,6 +27,51 @@ void SplitterPanel::on_paint(Painter& painter, Rect) {
     if (background_.alpha == 0U) return;
     const Rect bounds = committed_arranged_bounds();
     painter.fill_rect({0.0, 0.0, bounds.width, bounds.height}, background_);
+}
+
+
+namespace {
+
+constexpr std::array<PartField<SplitterPanel::Parts>, 1> splitter_panel_extra_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &SplitterPanel::Parts::face},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
+    splitter_panel_parts = joined_declarations(
+        scrollable_detail::parts, part_declarations(splitter_panel_extra_fields));
+
+constexpr ControlAnatomy splitter_panel_anatomy{
+    .control_id = "splitter-panel",
+    .parts = splitter_panel_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& SplitterPanel::anatomy() const noexcept {
+    return splitter_panel_anatomy;
+}
+
+void SplitterPanel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+    // The face exists only while the panel has an opaque background.
+    if (background_.alpha != 0U) {
+        record.face = PartGeometry::from_bounds(client_rectangle());
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), splitter_panel_extra_fields, record, geometry);
+}
+
+SplitterPanel::Parts SplitterPanel::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), splitter_panel_extra_fields, published.parts(), record);
+    return record;
 }
 
 } // namespace gui_forms

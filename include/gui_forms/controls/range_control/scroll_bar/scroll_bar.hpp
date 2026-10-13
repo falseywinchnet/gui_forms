@@ -3,6 +3,7 @@
 #include "gui_forms/controls/range_control/range_control.hpp"
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace gui_forms {
@@ -42,6 +43,29 @@ public:
     [[nodiscard]] Rect thumb_bounds() const noexcept;
     [[nodiscard]] ScrollBarPart part_at(Point local_point) const noexcept;
 
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry decrement_arrow;
+        PartGeometry increment_arrow;
+        PartGeometry track;
+        PartGeometry thumb;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+
     [[nodiscard]] Size measure(Size available) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
@@ -54,6 +78,7 @@ public:
 
 protected:
     void on_detached_from_window() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     void paint_button(Painter& painter, Rect button, ScrollBarPart part,

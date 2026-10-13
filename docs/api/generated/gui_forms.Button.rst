@@ -65,6 +65,10 @@ gui_forms::Button
          Border width for the ``flat`` style after ``set_style``; zero draws no
          border. A negative or non-finite width throws ``std::invalid_argument``.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **dialog_result_changed** : ``Event<DialogResult>``
@@ -227,6 +231,10 @@ gui_forms::Button
 
       Sets :cpp:func:`flat_border_width <gui_forms::Button::flat_border_width>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -249,3 +257,17 @@ gui_forms::Button
    .. cpp:function:: Insets visual_outsets() const noexcept override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: Parts button_parts() const
+
+      *Protected.*
+
+      The button's parts computed for its current style.

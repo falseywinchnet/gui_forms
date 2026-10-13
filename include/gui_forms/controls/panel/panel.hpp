@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace gui_forms {
 
@@ -41,10 +42,21 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+    };
+    [[nodiscard]] Parts parts() const;
 
 protected:
     [[nodiscard]] Rect local_bounds() const noexcept;
     void paint_panel(Painter& painter, Rect bounds) const;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    // The scrollable parts, the face, and the edge when a border style is set.
+    [[nodiscard]] Parts panel_parts() const;
 
 private:
     std::optional<BasicControlStyle> style_override_;

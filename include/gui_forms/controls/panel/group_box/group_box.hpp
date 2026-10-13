@@ -2,6 +2,7 @@
 
 #include "gui_forms/controls/panel/panel.hpp"
 
+#include <span>
 #include <string>
 
 namespace gui_forms {
@@ -19,6 +20,22 @@ public:
 
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: a face, the frame and the caption.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry caption;
+    };
+    [[nodiscard]] Parts parts() const;
+
+protected:
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    [[nodiscard]] std::string caption_text() const;
+    // The background block behind the caption; its width follows the
+    // estimated caption width, as paint has always used.
+    [[nodiscard]] Rect caption_bounds() const;
 
 private:
     [[nodiscard]] bool mnemonic_matches(

@@ -136,6 +136,7 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/wake_connection/live_surface_wake_connection.cpp
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
+    src/core/anatomy/types/anatomy_types.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -2338,6 +2339,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
 
+    add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
+    target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_anatomy_tests COMMAND gui_forms_anatomy_tests)
+
     add_executable(gui_forms_material_tests tests/material_tests.cpp)
     target_link_libraries(gui_forms_material_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_material_tests COMMAND gui_forms_material_tests)
@@ -2613,6 +2618,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/live-surfaces_tests.cpp
             tests/gallery_pages/typography-and-inspection_tests.cpp
             tests/gallery_pages/semantic-feedback_tests.cpp
+            tests/gallery_pages/anatomy_coverage_tests.cpp
         )
         target_include_directories(gui_forms_gallery_pages_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}

@@ -10,6 +10,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -584,29 +585,31 @@ ImageListResolution ButtonBase::resolved_button_image(bool selected) const noexc
     return result;
 }
 
-void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
-                                      std::string_view text, Color foreground,
-                                      Point offset, bool selected,
-                                      bool command_alignment) const {
+Rect ButtonBase::content_box(Rect face, bool command_alignment) const noexcept {
     const double command_leading = command_alignment ? 6.0 : 0.0;
-    Rect content{
-        bounds.x + content_padding_.left + command_leading,
-        bounds.y + content_padding_.top,
-        std::max(0.0, bounds.width - content_padding_.left -
+    const Rect content{
+        face.x + content_padding_.left + command_leading,
+        face.y + content_padding_.top,
+        std::max(0.0, face.width - content_padding_.left -
                           content_padding_.right - command_leading),
-        std::max(0.0, bounds.height - content_padding_.top -
+        std::max(0.0, face.height - content_padding_.top -
                           content_padding_.bottom)};
-    if (content.empty()) return;
-    const FontSpec font = effective_font(font_);
-    const std::vector<std::string_view> lines = button_text_lines(text);
+    return content;
+}
+
+ButtonBase::ContentLayout ButtonBase::layout_content(
+    Rect content, std::span<const Size> line_sizes, FontSpec font,
+    bool selected, bool command_alignment) const {
+    ContentLayout layout;
     double text_width = 0.0;
     double line_height = font.size * text_line_spacing_;
-    for (const std::string_view line : lines) {
-        const Size measured = painter.measure_text_utf8(line, font);
-        text_width = std::max(text_width, measured.width);
-        line_height = std::max(line_height, measured.height);
+    for (std::size_t index = 0; index < line_sizes.size(); ++index) {
+        text_width = std::max(text_width, line_sizes[index].width);
+        line_height = std::max(line_height, line_sizes[index].height);
     }
-    const Size text_size{text_width, static_cast<double>(lines.size()) * line_height};
+    layout.line_height = line_height;
+    const Size text_size{text_width,
+                         static_cast<double>(line_sizes.size()) * line_height};
     const ImageListResolution image = resolved_button_image(selected);
     Size image_size{};
     if (image) {
@@ -616,8 +619,8 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
     const bool has_text = text_size.width > 0.0 && text_size.height > 0.0;
     const bool has_image = image && image_size.width > 0.0 &&
                            image_size.height > 0.0;
-    Rect text_rect{};
-    Rect image_rect{};
+    layout.has_text = has_text;
+    layout.has_image = has_image;
     const ContentAlignment group_alignment = command_alignment
         ? ContentAlignment::middle_left : text_alignment_;
     const double gap = has_text && has_image ? image_gap_ : 0.0;
@@ -639,12 +642,12 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                                                : group.x + text_size.width + gap;
             const double text_x = image_first ? group.x + image_size.width + gap
                                               : group.x;
-            image_rect = {image_x,
-                          group.y + (group.height - image_size.height) * 0.5,
-                          image_size.width, image_size.height};
-            text_rect = {text_x,
-                         group.y + (group.height - text_size.height) * 0.5,
-                         text_size.width, text_size.height};
+            layout.image = {image_x,
+                            group.y + (group.height - image_size.height) * 0.5,
+                            image_size.width, image_size.height};
+            layout.text = {text_x,
+                           group.y + (group.height - text_size.height) * 0.5,
+                           text_size.width, text_size.height};
         } else {
             const bool image_first =
                 text_image_relation_ == TextImageRelation::image_above_text;
@@ -652,17 +655,62 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                                                : group.y + text_size.height + gap;
             const double text_y = image_first ? group.y + image_size.height + gap
                                               : group.y;
-            image_rect = {group.x + (group.width - image_size.width) * 0.5,
-                          image_y, image_size.width, image_size.height};
-            text_rect = {group.x + (group.width - text_size.width) * 0.5,
-                         text_y, text_size.width, text_size.height};
+            layout.image = {group.x + (group.width - image_size.width) * 0.5,
+                            image_y, image_size.width, image_size.height};
+            layout.text = {group.x + (group.width - text_size.width) * 0.5,
+                           text_y, text_size.width, text_size.height};
         }
     } else {
-        if (has_image) image_rect = aligned_rect(content, image_size, image_alignment_);
-        if (has_text) text_rect = aligned_rect(content, text_size, group_alignment);
+        if (has_image) layout.image = aligned_rect(content, image_size, image_alignment_);
+        if (has_text) layout.text = aligned_rect(content, text_size, group_alignment);
     }
+    return layout;
+}
 
-    if (has_image && !image_rect.empty()) {
+ButtonBase::ContentLayout ButtonBase::published_content_layout(
+    Rect face, bool selected, bool command_alignment) const {
+    const Rect content = content_box(face, command_alignment);
+    if (content.empty()) {
+        ContentLayout empty;
+        return empty;
+    }
+    const FontSpec font = effective_font(font_);
+    const std::string display = display_text();
+    const std::vector<std::string_view> lines = button_text_lines(display);
+    std::vector<Size> line_sizes(lines.size());
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        // The host installs its raster painter as the window's text metrics,
+        // so this matches what paint measures; a detached control estimates.
+        const ResolvedTextLayout measured = window() != nullptr
+            ? (*window()).resolve_text_layout_utf8(lines[index], font)
+            : estimate_text_layout_utf8(lines[index], font);
+        line_sizes[index] = measured.logical_size;
+    }
+    const ContentLayout layout =
+        layout_content(content, line_sizes, font, selected, command_alignment);
+    return layout;
+}
+
+void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
+                                      std::string_view text, Color foreground,
+                                      Point offset, bool selected,
+                                      bool command_alignment) const {
+    const Rect content = content_box(bounds, command_alignment);
+    if (content.empty()) return;
+    const FontSpec font = effective_font(font_);
+    const std::vector<std::string_view> lines = button_text_lines(text);
+    std::vector<Size> line_sizes(lines.size());
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        line_sizes[index] = painter.measure_text_utf8(lines[index], font);
+    }
+    const ContentLayout layout =
+        layout_content(content, line_sizes, font, selected, command_alignment);
+    const Rect image_rect = layout.image;
+    const Rect text_rect = layout.text;
+    const double line_height = layout.line_height;
+
+    if (layout.has_image && !image_rect.empty()) {
+        const ImageListResolution image = resolved_button_image(selected);
         const double opacity = !effectively_enabled() &&
                 image.resolved_state != ImageVisualState::disabled
             ? 0.45 : 1.0;
@@ -671,9 +719,9 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                             image_rect.width, image_rect.height},
                            opacity);
     }
-    if (has_text && !text_rect.empty()) {
+    if (layout.has_text && !text_rect.empty()) {
         for (std::size_t index = 0; index < lines.size(); ++index) {
-            const Size measured = painter.measure_text_utf8(lines[index], font);
+            const Size measured = line_sizes[index];
             double x = text_rect.x;
             if (text_alignment_ == ContentAlignment::top_center ||
                 text_alignment_ == ContentAlignment::middle_center ||
@@ -690,6 +738,116 @@ void ButtonBase::paint_button_content(Painter& painter, Rect bounds,
                 lines[index], font, foreground);
         }
     }
+}
+
+namespace {
+
+constexpr std::array<PartField<ButtonBase::Parts>, 5> button_base_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &ButtonBase::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &ButtonBase::Parts::face},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &ButtonBase::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &ButtonBase::Parts::label},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &ButtonBase::Parts::focus},
+}};
+
+constexpr std::array<StateField<ButtonBase::States>, 9> button_base_state_fields{{
+    {.state = AnatomyState::normal, .member = &ButtonBase::States::normal},
+    {.state = AnatomyState::hot, .member = &ButtonBase::States::hot},
+    {.state = AnatomyState::pressed, .member = &ButtonBase::States::pressed},
+    {.state = AnatomyState::enabled, .member = &ButtonBase::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ButtonBase::States::disabled},
+    {.state = AnatomyState::focused, .member = &ButtonBase::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &ButtonBase::States::focus_visible},
+    {.state = AnatomyState::open, .member = &ButtonBase::States::open},
+    {.state = AnatomyState::closed, .member = &ButtonBase::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 5> button_base_parts =
+    part_declarations(button_base_part_fields);
+constexpr std::array<AnatomyState, 9> button_base_states =
+    state_declarations(button_base_state_fields);
+
+constexpr ControlAnatomy button_base_anatomy{
+    .control_id = "button-base",
+    .parts = button_base_parts,
+    .states = button_base_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ButtonBase::anatomy() const noexcept {
+    return button_base_anatomy;
+}
+
+void ButtonBase::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Parts record = push_button_parts(false, false);
+    write_parts(anatomy(), button_base_part_fields, record, geometry);
+}
+
+ButtonBase::Parts ButtonBase::push_button_parts(bool selected,
+                                                bool command_alignment) const {
+    const Rect bounds = local_bounds();
+    const ContentLayout layout =
+        published_content_layout(bounds, selected, command_alignment);
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    if (layout.has_image) {
+        record.icon = PartGeometry::from_bounds(layout.image);
+    }
+    if (layout.has_text) {
+        record.label = PartGeometry::from_bounds(layout.text);
+    }
+    // A cue part publishes the face it marks. Where the ring is stroked
+    // relative to it is a theme recipe parameter until the engine (T2)
+    // owns cue geometry.
+    record.focus = PartGeometry::from_bounds(bounds);
+    return record;
+}
+
+AnatomyStateSet ButtonBase::button_anatomy_states() const {
+    AnatomyStateSet states = base_anatomy_states();
+    // Hot and pressed are independent; the theme applies the surface
+    // precedence of design language §8.4 rule 1.
+    if (pressed_visual()) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+    }
+    if (hovered_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::hot);
+    }
+    if (expanded_state_.has_value()) {
+        if (*expanded_state_) {
+            states.insert(AnatomyState::open);
+        } else {
+            states.insert(AnatomyState::closed);
+        }
+    }
+    return states;
+}
+
+AnatomyStateSet ButtonBase::anatomy_states() const {
+    return button_anatomy_states();
+}
+
+ButtonBase::Parts ButtonBase::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), button_base_part_fields, published.parts(), record);
+    return record;
+}
+
+ButtonBase::States ButtonBase::states() const {
+    States record;
+    read_states(button_base_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void ButtonBase::paint_themed_button(Painter& painter, Rect bounds,

@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -24,17 +25,119 @@ void LinkLabel::set_visited(bool visited_value) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+namespace {
+
+constexpr std::array<PartField<LinkLabel::Parts>, 4> link_label_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &LinkLabel::Parts::region},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &LinkLabel::Parts::label},
+    {.declaration = {.name = "underline", .role = PartRole::glyph, .composed_from = {}},
+     .member = &LinkLabel::Parts::underline},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &LinkLabel::Parts::focus},
+}};
+
+constexpr std::array<StateField<LinkLabel::States>, 9> link_label_state_fields{{
+    {.state = AnatomyState::normal, .member = &LinkLabel::States::normal},
+    {.state = AnatomyState::hot, .member = &LinkLabel::States::hot},
+    {.state = AnatomyState::pressed, .member = &LinkLabel::States::pressed},
+    {.state = AnatomyState::enabled, .member = &LinkLabel::States::enabled},
+    {.state = AnatomyState::disabled, .member = &LinkLabel::States::disabled},
+    {.state = AnatomyState::focused, .member = &LinkLabel::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &LinkLabel::States::focus_visible},
+    {.state = AnatomyState::open, .member = &LinkLabel::States::open},
+    {.state = AnatomyState::closed, .member = &LinkLabel::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 4> link_label_parts =
+    part_declarations(link_label_part_fields);
+constexpr std::array<AnatomyState, 9> link_label_states =
+    state_declarations(link_label_state_fields);
+
+// "visited" has no counterpart in the design language's state set, so the
+// link declares it as its own finite state.
+constexpr std::array<CustomStateDeclaration, 1> link_label_custom_states{{
+    {.name = "visited"},
+}};
+
+constexpr CustomStateIndex visited_state{0U};
+
+constexpr ControlAnatomy link_label_anatomy{
+    .control_id = "link-label",
+    .parts = link_label_parts,
+    .states = link_label_states,
+    .custom_states = link_label_custom_states,
+};
+
+} // namespace
+
+const ControlAnatomy& LinkLabel::anatomy() const noexcept {
+    return link_label_anatomy;
+}
+
+double LinkLabel::text_baseline() const noexcept {
+    const Rect bounds = local_bounds();
+    const double baseline = std::max(font().size,
+        (bounds.height + font().size) * 0.5 - 1.0);
+    return baseline;
+}
+
+double LinkLabel::underline_width() const {
+    const Rect bounds = local_bounds();
+    const double width = std::min(bounds.width - 4.0,
+                                  estimated_text_width(display_text(), font()));
+    return std::max(0.0, width);
+}
+
+void LinkLabel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = local_bounds();
+    const double baseline = text_baseline();
+    const double width = underline_width();
+    // The label spans one font size above the baseline; the underline is the
+    // one-unit stroke two units below it.
+    const Rect label{2.0, baseline - font().size, width, font().size};
+    const Rect underline{2.0, baseline + 1.5, width, 1.0};
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.label = PartGeometry::from_bounds(label);
+    record.underline = PartGeometry::from_bounds(underline);
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), link_label_part_fields, record, geometry);
+}
+
+AnatomyStateSet LinkLabel::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (visited_) {
+        states.insert(visited_state);
+    }
+    return states;
+}
+
+LinkLabel::Parts LinkLabel::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), link_label_part_fields, published.parts(), record);
+    return record;
+}
+
+LinkLabel::States LinkLabel::states() const {
+    States record;
+    const AnatomyStateSet active = anatomy_states();
+    read_states(link_label_state_fields, active, record);
+    record.visited = active.contains(visited_state);
+    return record;
+}
+
 void LinkLabel::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
     const BasicControlStyle& colors = style();
     const Color foreground = enabled()
         ? (visited_ ? colors.visited_link : colors.link) : colors.disabled_text;
-    const double baseline = std::max(font().size,
-        (bounds.height + font().size) * 0.5 - 1.0);
-    const double width = std::min(bounds.width - 4.0,
-                                  estimated_text_width(display_text(), font()));
+    const double baseline = text_baseline();
+    const double width = underline_width();
     painter.draw_text_utf8({2.0, baseline}, display_text(), font(), foreground);
-    painter.draw_line({2.0, baseline + 2.0}, {2.0 + std::max(0.0, width), baseline + 2.0},
+    painter.draw_line({2.0, baseline + 2.0}, {2.0 + width, baseline + 2.0},
                       foreground, 1.0);
     if (focus_cue_visible()) {
         paint_focus(painter, bounds, foreground);

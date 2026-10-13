@@ -1,5 +1,7 @@
 #include "gui_forms/controls/panel/card/card.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -344,5 +346,70 @@ bool Card::on_semantic_action(SemanticAction action, std::string_view value) {
     return Panel::on_semantic_action(action, value);
 }
 
+
+
+namespace {
+
+constexpr std::array<StateField<Card::States>, 9> card_state_fields{{
+    {.state = AnatomyState::normal, .member = &Card::States::normal},
+    {.state = AnatomyState::hot, .member = &Card::States::hot},
+    {.state = AnatomyState::pressed, .member = &Card::States::pressed},
+    {.state = AnatomyState::captured, .member = &Card::States::captured},
+    {.state = AnatomyState::selected, .member = &Card::States::selected},
+    {.state = AnatomyState::enabled, .member = &Card::States::enabled},
+    {.state = AnatomyState::disabled, .member = &Card::States::disabled},
+    {.state = AnatomyState::focused, .member = &Card::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &Card::States::focus_visible},
+}};
+
+constexpr std::array<AnatomyState, 9> card_states =
+    state_declarations(card_state_fields);
+
+constexpr ControlAnatomy card_anatomy{
+    .control_id = "card",
+    .parts = panel_detail::parts,
+    .states = card_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Card::anatomy() const noexcept {
+    return card_anatomy;
+}
+
+void Card::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    if (has_background_override() || has_style_override()) {
+        Panel::publish_part_geometry(geometry);
+        return;
+    }
+    Parts record;
+    record.scrollable = scrollable_parts();
+    record.face = PartGeometry::from_bounds(client_rectangle());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), panel_detail::extra_fields, record, geometry);
+}
+
+AnatomyStateSet Card::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (pressed_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+    }
+    if (hovered_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::hot);
+    }
+    if (selected_) {
+        states.insert(AnatomyState::selected);
+    }
+    return states;
+}
+
+Card::States Card::states() const {
+    States record;
+    read_states(card_state_fields, anatomy_states(), record);
+    return record;
+}
 
 } // namespace gui_forms

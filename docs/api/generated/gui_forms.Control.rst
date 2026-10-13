@@ -278,6 +278,10 @@ gui_forms::Control
 
       **property_descriptors** : ``std::vector<PropertyDescriptor>``, read-only
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **name_changed** : ``Event<const std::string&>``
@@ -422,6 +426,8 @@ gui_forms::Control
         -  
       * - :cpp:func:`apply_provider_semantics <gui_forms::Control::apply_provider_semantics>`
         - Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor.
+      * - :cpp:func:`fill_part_geometry <gui_forms::Control::fill_part_geometry>`
+        - Fills one record per declared part, in declaration order, in local coordinates after layout.
       * - :cpp:func:`set_child_index <gui_forms::Control::set_child_index>`
         - Moves a child to a z-order index, where 0 is frontmost.
       * - :cpp:func:`set_bounds <gui_forms::Control::set_bounds>`
@@ -962,6 +968,10 @@ gui_forms::Control
 
    .. cpp:function:: std::vector<PropertyDescriptor> property_descriptors() const
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -1214,6 +1224,10 @@ gui_forms::Control
 
       Extender providers enrich the final semantic projection after a stock or custom control has authored its own descriptor. This keeps validation and help metadata from depending on every subclass remembering to call a particular base implementation.
 
+   .. cpp:function:: void fill_part_geometry(std::span<PartGeometry> geometry) const
+
+      Fills one record per declared part, in declaration order, in local coordinates after layout. ``geometry`` must hold exactly anatomy().parts.size() records; otherwise this throws std::invalid_argument and leaves ``geometry`` unchanged. This is the generic path for the engine, inspection and tools; C++ callers read parts() instead.
+
    .. cpp:function:: bool set_child_index(RuntimeId child, std::size_t index)
 
       Moves a child to a z-order index, where 0 is frontmost. An index past
@@ -1352,6 +1366,32 @@ gui_forms::Control
 
       Called by the window when the primary button is pressed and released
       over the control. Buttons raise ``clicked`` from here.
+
+   .. cpp:function:: virtual const ControlAnatomy& anatomy() const noexcept
+
+      Anatomy (stage T1). A control type opts in by overriding anatomy(), publish_part_geometry() and anatomy_states() together; the defaults publish base_control_anatomy(). The anatomy describes the type, never the instance: it is the same record for every object of the type.
+
+   .. cpp:function:: virtual AnatomyStateSet anatomy_states() const
+
+      The active states. Every standard state in the result is one anatomy().states declares, and every custom index is in range.
+
+   .. cpp:function:: virtual void publish_part_geometry(std::span<PartGeometry> geometry) const
+
+      *Protected.*
+
+      Called by fill_part_geometry with ``geometry`` already sized to anatomy().parts.size() and every record reset to absent.
+
+   .. cpp:function:: PartGeometryBuffer published_part_geometry() const
+
+      *Protected.*
+
+      The geometry publish_part_geometry produces for the dynamic type.
+
+   .. cpp:function:: AnatomyStateSet base_anatomy_states() const
+
+      *Protected.*
+
+      The base states every control shares: normal, enabled or disabled, focused and focus-visible. Overrides start from this and add their own.
 
    .. cpp:function:: Window* window() const noexcept
 

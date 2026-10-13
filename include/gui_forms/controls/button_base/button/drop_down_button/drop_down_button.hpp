@@ -51,9 +51,40 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry face;
+        PartGeometry icon;
+        PartGeometry label;
+        PartGeometry drop_down;
+        PartGeometry disclosure;
+        PartGeometry preselect;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool hot{};
+        bool pressed{};
+        bool preselect{};
+        bool selected{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool open{};
+        bool closed{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+    // The disclosure segment at the selected edge, in local coordinates.
+    [[nodiscard]] Rect drop_down_bounds() const noexcept;
 
 protected:
     void on_activate() override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     [[nodiscard]] bool point_in_drop_down(Point window_point) const noexcept;

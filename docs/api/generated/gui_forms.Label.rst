@@ -87,6 +87,8 @@ gui_forms::Label
          Whether ``&`` in :cpp:func:`text <gui_forms::Label::text>` marks a mnemonic. When false the ampersand is drawn
          and Alt shortcuts are ignored.
 
+      **parts** : ``Parts``, read-only
+
    :Events:
 
       **text_changed** : ``Event<const std::string&>``
@@ -280,6 +282,8 @@ gui_forms::Label
 
       Sets :cpp:func:`use_mnemonic <gui_forms::Label::use_mnemonic>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
 
    .. rubric:: Events
 
@@ -310,10 +314,22 @@ gui_forms::Label
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: virtual std::string display_text() const
 
       *Protected.*
 
    .. cpp:function:: void paint_label_text(Painter& painter, std::string_view text) const
+
+      *Protected.*
+
+   .. cpp:function:: TextLayout layout_label_text(std::string_view text, Painter* painter) const
+
+      *Protected.*
+
+      Measures with ``painter`` when one is given, otherwise with the window's text metrics, which the host's raster painter provides.
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

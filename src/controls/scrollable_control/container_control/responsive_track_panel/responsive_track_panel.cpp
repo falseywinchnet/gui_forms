@@ -2,6 +2,7 @@
 #include "gui_forms/window.hpp"
 
 #include "../container_layout_utilities.hpp"
+#include "../../scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -689,6 +690,22 @@ SemanticDescriptor ResponsiveTrackPanel::semantic_descriptor() const {
     descriptor.exposed = !descriptor.name.empty() ||
                          !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy responsive_track_panel_anatomy{
+    .control_id = "responsive-track-panel",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ResponsiveTrackPanel::anatomy() const noexcept {
+    return responsive_track_panel_anatomy;
 }
 
 } // namespace gui_forms

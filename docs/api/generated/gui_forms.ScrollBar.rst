@@ -68,6 +68,10 @@ gui_forms::ScrollBar
          the range plus the large change, at least :cpp:func:`minimum_thumb_extent <gui_forms::ScrollBar::minimum_thumb_extent>`, and
          its position along the track follows the value.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       From :cpp:class:`RangeControl <gui_forms::RangeControl>`: properties :cpp:func:`minimum <gui_forms::RangeControl::minimum>`, :cpp:func:`maximum <gui_forms::RangeControl::maximum>`, :cpp:func:`value <gui_forms::RangeControl::value>`, :cpp:func:`small_change <gui_forms::RangeControl::small_change>`, :cpp:func:`large_change <gui_forms::RangeControl::large_change>`, :cpp:func:`orientation <gui_forms::RangeControl::orientation>`, :cpp:func:`normalized_value <gui_forms::RangeControl::normalized_value>`, :cpp:func:`style <gui_forms::RangeControl::style>`; events :cpp:func:`range_changed <gui_forms::RangeControl::range_changed>`, :cpp:func:`value_changed <gui_forms::RangeControl::value_changed>`, :cpp:func:`scroll <gui_forms::RangeControl::scroll>`; methods :cpp:func:`bind <gui_forms::RangeControl::bind>`, :cpp:func:`increment <gui_forms::RangeControl::increment>`, :cpp:func:`set_range <gui_forms::RangeControl::set_range>`, :cpp:func:`unbind <gui_forms::RangeControl::unbind>`.
@@ -234,6 +238,10 @@ gui_forms::ScrollBar
       the range plus the large change, at least :cpp:func:`minimum_thumb_extent <gui_forms::ScrollBar::minimum_thumb_extent>`, and
       its position along the track follows the value.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Methods
 
@@ -245,6 +253,10 @@ gui_forms::ScrollBar
 
 
    .. rubric:: Extension points
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
    .. cpp:function:: Size measure(Size available) override
 
@@ -267,5 +279,9 @@ gui_forms::ScrollBar
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
    .. cpp:function:: void on_detached_from_window() noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -90,6 +91,34 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry viewport;
+        PartGeometry horizontal_decrement_arrow;
+        PartGeometry horizontal_track;
+        PartGeometry horizontal_thumb;
+        PartGeometry horizontal_increment_arrow;
+        PartGeometry vertical_decrement_arrow;
+        PartGeometry vertical_track;
+        PartGeometry vertical_thumb;
+        PartGeometry vertical_increment_arrow;
+        PartGeometry scroll_corner;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
     // Called after the retained position changes, including silent API writes
@@ -105,6 +134,9 @@ protected:
     [[nodiscard]] Rect child_viewport_rectangle() const noexcept override {
         return effective_viewport_rectangle();
     }
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    // The region, viewport, scroll axes and focus as currently laid out.
+    [[nodiscard]] Parts scrollable_parts() const;
 
 private:
     friend class ScrollProperties;

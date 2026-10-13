@@ -24,6 +24,7 @@ public:
     bool validate_children(
         ValidationConstraints constraints = ValidationConstraints::selectable);
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     [[nodiscard]] AutoValidate authored_auto_validate() const noexcept override {

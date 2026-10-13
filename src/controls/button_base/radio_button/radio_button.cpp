@@ -5,6 +5,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -100,6 +101,108 @@ void RadioButton::set_indicator_style(ChoiceIndicatorStyle style_value) {
     }
     indicator_style_ = style_value;
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+namespace {
+
+constexpr std::array<PartField<RadioButton::Parts>, 6> radio_button_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &RadioButton::Parts::region},
+    {.declaration = {.name = "well", .role = PartRole::well, .composed_from = {}},
+     .member = &RadioButton::Parts::well},
+    {.declaration = {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
+     .member = &RadioButton::Parts::indicator},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &RadioButton::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &RadioButton::Parts::label},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &RadioButton::Parts::focus},
+}};
+
+constexpr std::array<StateField<RadioButton::States>, 10> radio_button_state_fields{{
+    {.state = AnatomyState::normal, .member = &RadioButton::States::normal},
+    {.state = AnatomyState::hot, .member = &RadioButton::States::hot},
+    {.state = AnatomyState::pressed, .member = &RadioButton::States::pressed},
+    {.state = AnatomyState::checked, .member = &RadioButton::States::checked},
+    {.state = AnatomyState::enabled, .member = &RadioButton::States::enabled},
+    {.state = AnatomyState::disabled, .member = &RadioButton::States::disabled},
+    {.state = AnatomyState::focused, .member = &RadioButton::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &RadioButton::States::focus_visible},
+    {.state = AnatomyState::open, .member = &RadioButton::States::open},
+    {.state = AnatomyState::closed, .member = &RadioButton::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 6> radio_button_parts =
+    part_declarations(radio_button_part_fields);
+constexpr std::array<AnatomyState, 10> radio_button_states =
+    state_declarations(radio_button_state_fields);
+
+constexpr ControlAnatomy radio_button_anatomy{
+    .control_id = "radio-button",
+    .parts = radio_button_parts,
+    .states = radio_button_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& RadioButton::anatomy() const noexcept {
+    return radio_button_anatomy;
+}
+
+void RadioButton::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = local_bounds();
+    const double indicator_width =
+        indicator_style_ == ChoiceIndicatorStyle::toggle ? 30.0 : 15.0;
+    const double top = std::max(1.0, (bounds.height - 15.0) * 0.5);
+    const Rect well{1.0, top, indicator_width, 15.0};
+    // The toggle's knob, or the round dot drawn inside the 15-unit disc.
+    Rect mark{};
+    if (indicator_style_ == ChoiceIndicatorStyle::toggle) {
+        const double knob_x = checked_ ? well.x + well.width - 13.0 : well.x + 2.0;
+        mark = {knob_x, well.y + 2.0, 11.0, 11.0};
+    } else if (checked_) {
+        mark = {well.x + 4.0, well.y + 4.0, 7.0, 7.0};
+    }
+    const Rect content_face{well.x + well.width + 1.0, 0.0,
+                            std::max(0.0, bounds.width - well.x - well.width - 1.0),
+                            bounds.height};
+    const ContentLayout layout =
+        published_content_layout(content_face, checked_, false);
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.well = PartGeometry::from_bounds(well);
+    record.indicator = PartGeometry::from_bounds(mark);
+    if (layout.has_image) {
+        record.icon = PartGeometry::from_bounds(layout.image);
+    }
+    if (layout.has_text) {
+        record.label = PartGeometry::from_bounds(layout.text);
+    }
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), radio_button_part_fields, record, geometry);
+}
+
+AnatomyStateSet RadioButton::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (checked_) {
+        states.insert(AnatomyState::checked);
+    }
+    return states;
+}
+
+RadioButton::Parts RadioButton::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), radio_button_part_fields, published.parts(), record);
+    return record;
+}
+
+RadioButton::States RadioButton::states() const {
+    States record;
+    read_states(radio_button_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void RadioButton::on_paint(Painter& painter, Rect) {

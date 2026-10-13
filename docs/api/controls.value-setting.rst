@@ -53,6 +53,10 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`CheckBox::Parts <gui_forms::CheckBox::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`CheckBox::States <gui_forms::CheckBox::States>`
+     -  
    * - :cpp:class:`InstrumentFieldChange <gui_forms::InstrumentFieldChange>`
      - InstrumentFieldChange carries stable module and field identities, previous/current text, and whether the transition is a committed edit.
    * - :cpp:class:`InstrumentFieldSpec <gui_forms::InstrumentFieldSpec>`
@@ -95,8 +99,66 @@ Related types
      - PropertyValueConverter is a renderer-neutral pair of formatting/parsing callbacks with optional context-aware variants.
    * - :cpp:class:`PropertyValueConverterRegistry <gui_forms::PropertyValueConverterRegistry>`
      - PropertyValueConverterRegistry is an instance-owned deterministic service map from canonical names and BindingValueKind defaults to validated format/parse pairs.
+   * - :cpp:class:`RadioButton::Parts <gui_forms::RadioButton::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`RadioButton::States <gui_forms::RadioButton::States>`
+     -  
    * - :cpp:class:`RangeScrollEvent <gui_forms::RangeScrollEvent>`
      - RangeScrollEvent is the typed transition payload shared by interactive range controls.
+   * - :cpp:class:`TrackBar::Parts <gui_forms::TrackBar::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`TrackBar::States <gui_forms::TrackBar::States>`
+     -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CheckBox::Parts final
+
+   ``#include <gui_forms/controls/button_base/check_box/check_box.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry indicator
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CheckBox::States final
+
+   ``#include <gui_forms/controls/button_base/check_box/check_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool indeterminate
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
 
 .. cpp:namespace:: gui_forms
 
@@ -558,6 +620,52 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RadioButton::Parts final
+
+   ``#include <gui_forms/controls/button_base/radio_button/radio_button.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry indicator
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry label
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RadioButton::States final
+
+   ``#include <gui_forms/controls/button_base/radio_button/radio_button.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RangeScrollEvent final
 
    ``#include <gui_forms/controls/range_control/range_control.hpp>``
@@ -571,6 +679,46 @@ Related types
    .. cpp:member:: RangeAction action
 
       Default: ``{RangeAction::thumb_position}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TrackBar::Parts final
+
+   ``#include <gui_forms/controls/range_control/track_bar/track_bar.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry track
+
+   .. cpp:member:: PartGeometry fill
+
+   .. cpp:member:: PartGeometry ticks
+
+   .. cpp:member:: PartGeometry thumb
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TrackBar::States final
+
+   ``#include <gui_forms/controls/range_control/track_bar/track_bar.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 Enumerations
 ------------

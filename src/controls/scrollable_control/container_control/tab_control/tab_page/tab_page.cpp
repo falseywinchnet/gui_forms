@@ -1,4 +1,5 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
+#include "../../../../panel/panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -34,6 +35,22 @@ SemanticDescriptor TabPage::semantic_descriptor() const {
     descriptor.description = accessible_description();
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy tab_page_anatomy{
+    .control_id = "tab-page",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& TabPage::anatomy() const noexcept {
+    return tab_page_anatomy;
 }
 
 } // namespace gui_forms

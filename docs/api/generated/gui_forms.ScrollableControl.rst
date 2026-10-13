@@ -98,6 +98,10 @@ gui_forms::ScrollableControl
          A copy of the whole scrolling state: mode, position, margin, minimum
          size, display and viewport rectangles, and both axes.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **scroll** : ``Event<ScrollEvent&>``
@@ -352,6 +356,10 @@ gui_forms::ScrollableControl
       A copy of the whole scrolling state: mode, position, margin, minimum
       size, display and viewport rectangles, and both axes.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -432,6 +440,10 @@ gui_forms::ScrollableControl
 
    .. cpp:function:: bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: virtual void on_scroll_position_changed()
 
       *Protected.*
@@ -466,6 +478,16 @@ gui_forms::ScrollableControl
    .. cpp:function:: Rect child_viewport_rectangle() const noexcept override
 
       *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: Parts scrollable_parts() const
+
+      *Protected.*
+
+      The region, viewport, scroll axes and focus as currently laid out.
 
    .. cpp:member:: constexpr std::uint32_t scroll_state_auto_scrolling
 

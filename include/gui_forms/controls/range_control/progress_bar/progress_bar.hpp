@@ -3,6 +3,7 @@
 #include "gui_forms/controls/range_control/range_control.hpp"
 
 #include <cstdint>
+#include <span>
 
 namespace gui_forms {
 
@@ -96,15 +97,36 @@ public:
     void on_frame(FrameTime now) override;
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry track;
+        PartGeometry fill;
+        PartGeometry activity;
+    };
+    struct States final {
+        bool normal{};
+        bool indeterminate{};
+        bool enabled{};
+        bool disabled{};
+        bool reduced_motion{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
     void on_attached_to_window() override;
     void on_detached_from_window() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     void update_animation_registration();
     void on_presentation_changed(const PresentationSettings& settings);
     [[nodiscard]] bool animated_style() const noexcept;
+    // The fill (determinate styles) or the moving activity band (marquee).
+    [[nodiscard]] Rect indicator_bounds() const noexcept;
 
     ProgressBarVisualStyle visual_style_{ProgressBarVisualStyle::continuous};
     ProgressBarOverlayStyle overlay_style_{ProgressBarOverlayStyle::none};

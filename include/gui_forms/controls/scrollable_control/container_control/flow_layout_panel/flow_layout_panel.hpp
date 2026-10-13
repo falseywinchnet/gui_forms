@@ -62,6 +62,7 @@ public:
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     using FlowBreakMap = std::unordered_map<std::uint64_t, bool>;

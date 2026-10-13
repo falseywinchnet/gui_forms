@@ -16,6 +16,7 @@ public:
     [[nodiscard]] std::uint64_t attachment_count() const noexcept {
         return attachment_count_;
     }
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
     void on_attached_to_window() override;

@@ -1,5 +1,6 @@
 #include "gui_forms/controls/panel/scaled_panel/scaled_panel.hpp"
 #include "../../scrollable_control/container_control/scaled_layout_utilities.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -67,6 +68,22 @@ void ScaledPanel::arrange(Rect final_bounds) {
                          scaled_layout_detail::child_bounds(design_size_, (*slot).second,
                                              final_bounds));
     }
+}
+
+
+namespace {
+
+constexpr ControlAnatomy scaled_panel_anatomy{
+    .control_id = "scaled-panel",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ScaledPanel::anatomy() const noexcept {
+    return scaled_panel_anatomy;
 }
 
 } // namespace gui_forms

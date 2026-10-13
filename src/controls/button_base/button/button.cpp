@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -91,6 +92,99 @@ void Button::set_flat_border_width(double width) {
     if (flat_border_width_ == width) return;
     flat_border_width_ = width;
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+namespace {
+
+constexpr std::array<PartField<Button::Parts>, 6> button_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &Button::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &Button::Parts::face},
+    {.declaration = {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+     .member = &Button::Parts::icon},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &Button::Parts::label},
+    {.declaration = {.name = "preselect", .role = PartRole::preselect, .composed_from = {}},
+     .member = &Button::Parts::preselect},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &Button::Parts::focus},
+}};
+
+constexpr std::array<StateField<Button::States>, 11> button_state_fields{{
+    {.state = AnatomyState::normal, .member = &Button::States::normal},
+    {.state = AnatomyState::hot, .member = &Button::States::hot},
+    {.state = AnatomyState::pressed, .member = &Button::States::pressed},
+    {.state = AnatomyState::preselect, .member = &Button::States::preselect},
+    {.state = AnatomyState::selected, .member = &Button::States::selected},
+    {.state = AnatomyState::enabled, .member = &Button::States::enabled},
+    {.state = AnatomyState::disabled, .member = &Button::States::disabled},
+    {.state = AnatomyState::focused, .member = &Button::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &Button::States::focus_visible},
+    {.state = AnatomyState::open, .member = &Button::States::open},
+    {.state = AnatomyState::closed, .member = &Button::States::closed},
+}};
+
+constexpr std::array<PartDeclaration, 6> button_parts =
+    part_declarations(button_part_fields);
+constexpr std::array<AnatomyState, 11> button_states =
+    state_declarations(button_state_fields);
+
+constexpr ControlAnatomy button_anatomy{
+    .control_id = "button",
+    .parts = button_parts,
+    .states = button_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Button::anatomy() const noexcept {
+    return button_anatomy;
+}
+
+Button::Parts Button::button_parts() const {
+    // Paint passes the selection to the image lookup only on the themed path.
+    const bool layout_selected = !has_style_override() && selected_;
+    const bool command_alignment = visual_style_ == ButtonVisualStyle::command;
+    const ButtonBase::Parts base = push_button_parts(layout_selected, command_alignment);
+    Parts record;
+    record.region = base.region;
+    record.face = base.face;
+    record.icon = base.icon;
+    record.label = base.label;
+    record.preselect = base.face;
+    record.focus = base.focus;
+    return record;
+}
+
+void Button::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Parts record = button_parts();
+    write_parts(anatomy(), button_part_fields, record, geometry);
+}
+
+AnatomyStateSet Button::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (default_button_) {
+        states.insert(AnatomyState::preselect);
+    }
+    if (selected_) {
+        states.insert(AnatomyState::selected);
+    }
+    return states;
+}
+
+Button::Parts Button::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), button_part_fields, published.parts(), record);
+    return record;
+}
+
+Button::States Button::states() const {
+    States record;
+    read_states(button_state_fields, anatomy_states(), record);
+    return record;
 }
 
 void Button::on_paint(Painter& painter, Rect) {

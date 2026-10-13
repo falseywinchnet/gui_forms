@@ -216,42 +216,131 @@ Size ProgressBar::measure(Size available) {
             std::min(available.height, preferred.height)};
 }
 
+namespace {
+
+constexpr std::array<PartField<ProgressBar::Parts>, 4> progress_bar_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &ProgressBar::Parts::region},
+    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {}},
+     .member = &ProgressBar::Parts::track},
+    {.declaration = {.name = "fill", .role = PartRole::fill, .composed_from = {}},
+     .member = &ProgressBar::Parts::fill},
+    {.declaration = {.name = "activity", .role = PartRole::activity, .composed_from = {}},
+     .member = &ProgressBar::Parts::activity},
+}};
+
+constexpr std::array<StateField<ProgressBar::States>, 5> progress_bar_state_fields{{
+    {.state = AnatomyState::normal, .member = &ProgressBar::States::normal},
+    {.state = AnatomyState::indeterminate, .member = &ProgressBar::States::indeterminate},
+    {.state = AnatomyState::enabled, .member = &ProgressBar::States::enabled},
+    {.state = AnatomyState::disabled, .member = &ProgressBar::States::disabled},
+    {.state = AnatomyState::reduced_motion, .member = &ProgressBar::States::reduced_motion},
+}};
+
+constexpr std::array<PartDeclaration, 4> progress_bar_parts =
+    part_declarations(progress_bar_part_fields);
+constexpr std::array<AnatomyState, 5> progress_bar_states =
+    state_declarations(progress_bar_state_fields);
+
+constexpr ControlAnatomy progress_bar_anatomy{
+    .control_id = "progress-bar",
+    .parts = progress_bar_parts,
+    .states = progress_bar_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+Rect ProgressBar::indicator_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const Rect interior{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                        std::max(0.0, bounds.height - 4.0)};
+    Rect fill = interior;
+    if (visual_style_ == ProgressBarVisualStyle::marquee) {
+        const MotionPolicy policy = effective_motion_policy();
+        const double presented_phase = policy.presentation_phase(animation_phase_);
+        if (orientation() == Orientation::horizontal) {
+            const double band = std::max(18.0, fill.width * 0.28);
+            fill.x += (fill.width + band) * presented_phase - band;
+            fill.width = band;
+        } else {
+            const double band = std::max(18.0, fill.height * 0.28);
+            fill.y += (fill.height + band) * (1.0 - presented_phase) - band;
+            fill.height = band;
+        }
+        fill = Rect::intersection(fill, interior);
+        return fill;
+    }
+    const double ratio = normalized_value();
+    if (orientation() == Orientation::horizontal) {
+        fill.width *= ratio;
+    } else {
+        const double filled_height = fill.height * ratio;
+        fill.y += fill.height - filled_height;
+        fill.height = filled_height;
+    }
+    return fill;
+}
+
+const ControlAnatomy& ProgressBar::anatomy() const noexcept {
+    return progress_bar_anatomy;
+}
+
+void ProgressBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = local_bounds();
+    const Rect indicator = indicator_bounds();
+    Parts record;
+    record.region.bounds = bounds;
+    record.region.present = true;
+    record.track.bounds = bounds;
+    record.track.present = true;
+    // The fill exists for every determinate style even at zero value, so its
+    // presence follows the style, not the value.
+    if (visual_style_ == ProgressBarVisualStyle::marquee) {
+        record.activity.bounds = indicator;
+        record.activity.present = true;
+    } else {
+        record.fill.bounds = indicator;
+        record.fill.present = true;
+    }
+    write_parts(anatomy(), progress_bar_part_fields, record, geometry);
+}
+
+AnatomyStateSet ProgressBar::anatomy_states() const {
+    AnatomyStateSet states = base_anatomy_states();
+    if (visual_style_ == ProgressBarVisualStyle::marquee) {
+        states.insert(AnatomyState::indeterminate);
+    }
+    const MotionPolicy policy = effective_motion_policy();
+    if (policy.reduced) {
+        states.insert(AnatomyState::reduced_motion);
+    }
+    return states;
+}
+
+ProgressBar::Parts ProgressBar::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), progress_bar_part_fields, published.parts(), record);
+    return record;
+}
+
+ProgressBar::States ProgressBar::states() const {
+    States record;
+    read_states(progress_bar_state_fields, anatomy_states(), record);
+    return record;
+}
+
 void ProgressBar::on_paint(Painter& painter, Rect) {
     const Rect bounds = local_bounds();
     const ControlVisualRecipe& track_recipe = effective_theme().resolve(
         ControlVisualRole::progress, visual_context());
     paint_surface_material(painter, bounds, track_recipe.material);
-    const double ratio = normalized_value();
-    Rect fill{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
-              std::max(0.0, bounds.height - 4.0)};
-    const Rect interior = fill;
+    const Rect interior{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                        std::max(0.0, bounds.height - 4.0)};
     const MotionPolicy policy = effective_motion_policy();
     const double presented_phase = policy.presentation_phase(animation_phase_);
-    if (visual_style_ == ProgressBarVisualStyle::marquee) {
-        if (orientation() == Orientation::horizontal) {
-            const double band = std::max(18.0, fill.width * 0.28);
-            fill.x += (fill.width + band) * presented_phase - band;
-            fill.width = band;
-            fill = Rect::intersection(fill, {2.0, 2.0,
-                                             std::max(0.0, bounds.width - 4.0),
-                                             std::max(0.0, bounds.height - 4.0)});
-        } else {
-            const double band = std::max(18.0, fill.height * 0.28);
-            fill.y += (fill.height + band) * (1.0 - presented_phase) - band;
-            fill.height = band;
-            fill = Rect::intersection(fill, {2.0, 2.0,
-                                             std::max(0.0, bounds.width - 4.0),
-                                             std::max(0.0, bounds.height - 4.0)});
-        }
-    } else {
-        if (orientation() == Orientation::horizontal) {
-            fill.width *= ratio;
-        } else {
-            const double filled_height = fill.height * ratio;
-            fill.y += fill.height - filled_height;
-            fill.height = filled_height;
-        }
-    }
+    const Rect fill = indicator_bounds();
 
     const ControlVisualRecipe& fill_recipe = effective_theme().resolve(
         ControlVisualRole::progress,

@@ -60,6 +60,10 @@ gui_forms::CheckBox
          The indicator drawn for :cpp:func:`appearance <gui_forms::CheckBox::appearance>` ``normal``: a classic box, a modern
          box or a toggle switch.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **check_state_changed** : ``Event<CheckState>``
@@ -202,6 +206,10 @@ gui_forms::CheckBox
 
       Sets :cpp:func:`indicator_style <gui_forms::CheckBox::indicator_style>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -249,3 +257,11 @@ gui_forms::CheckBox
    .. cpp:function:: void on_activate() override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

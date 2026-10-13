@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
@@ -60,35 +61,181 @@ Size TrackBar::measure(Size available) {
             std::min(available.height, preferred.height)};
 }
 
-void TrackBar::on_paint(Painter& painter, Rect) {
+namespace {
+
+constexpr std::array<PartField<TrackBar::Parts>, 6> track_bar_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &TrackBar::Parts::region},
+    {.declaration = {.name = "track", .role = PartRole::track, .composed_from = {}},
+     .member = &TrackBar::Parts::track},
+    {.declaration = {.name = "fill", .role = PartRole::fill, .composed_from = {}},
+     .member = &TrackBar::Parts::fill},
+    {.declaration = {.name = "ticks", .role = PartRole::glyph, .composed_from = {}},
+     .member = &TrackBar::Parts::ticks},
+    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
+     .member = &TrackBar::Parts::thumb},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &TrackBar::Parts::focus},
+}};
+
+constexpr std::array<StateField<TrackBar::States>, 7> track_bar_state_fields{{
+    {.state = AnatomyState::normal, .member = &TrackBar::States::normal},
+    {.state = AnatomyState::pressed, .member = &TrackBar::States::pressed},
+    {.state = AnatomyState::captured, .member = &TrackBar::States::captured},
+    {.state = AnatomyState::enabled, .member = &TrackBar::States::enabled},
+    {.state = AnatomyState::disabled, .member = &TrackBar::States::disabled},
+    {.state = AnatomyState::focused, .member = &TrackBar::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &TrackBar::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 6> track_bar_parts =
+    part_declarations(track_bar_part_fields);
+constexpr std::array<AnatomyState, 7> track_bar_states =
+    state_declarations(track_bar_state_fields);
+
+constexpr ControlAnatomy track_bar_anatomy{
+    .control_id = "track-bar",
+    .parts = track_bar_parts,
+    .states = track_bar_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+Rect TrackBar::value_span_bounds() const noexcept {
     const Rect bounds = local_bounds();
-    const bool horizontal = orientation() == Orientation::horizontal;
-    const Rect track = horizontal
-        ? Rect{track_inset, bounds.height * 0.5 - 2.5,
-               std::max(0.0, bounds.width - track_inset * 2.0), 5.0}
-        : Rect{bounds.width * 0.5 - 2.5, track_inset, 5.0,
-               std::max(0.0, bounds.height - track_inset * 2.0)};
+    if (orientation() == Orientation::horizontal) {
+        const Rect span{track_inset, bounds.height * 0.5 - 2.5,
+                        std::max(0.0, bounds.width - track_inset * 2.0), 5.0};
+        return span;
+    }
+    const Rect span{bounds.width * 0.5 - 2.5, track_inset, 5.0,
+                    std::max(0.0, bounds.height - track_inset * 2.0)};
+    return span;
+}
+
+Rect TrackBar::track_bounds() const noexcept {
+    const Rect span = value_span_bounds();
     if (visual_style_ == TrackBarVisualStyle::classic) {
-        paint_sunken(painter, track, style(), style().face_light);
+        return span;
+    }
+    if (orientation() == Orientation::horizontal) {
+        const Rect groove{span.x, span.y + 1.5, span.width, 2.0};
+        return groove;
+    }
+    const Rect groove{span.x + 1.5, span.y, 2.0, span.height};
+    return groove;
+}
+
+Rect TrackBar::fill_bounds() const noexcept {
+    if (visual_style_ == TrackBarVisualStyle::classic) {
+        return {};
+    }
+    Rect filled = track_bounds();
+    if (orientation() == Orientation::horizontal) {
+        filled.width *= normalized_value();
     } else {
-        const Rect modern_track = horizontal
-            ? Rect{track.x, track.y + 1.5, track.width, 2.0}
-            : Rect{track.x + 1.5, track.y, 2.0, track.height};
-        painter.fill_rect(modern_track, style().border);
-        Rect filled = modern_track;
-        if (horizontal) {
-            filled.width *= normalized_value();
-        } else {
-            const double height = filled.height * normalized_value();
-            filled.y += filled.height - height;
-            filled.height = height;
-        }
-        painter.fill_rect(filled, style().accent);
+        const double height = filled.height * normalized_value();
+        filled.y += filled.height - height;
+        filled.height = height;
+    }
+    return filled;
+}
+
+Rect TrackBar::thumb_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const Rect span = value_span_bounds();
+    const double ratio = normalized_value();
+    double thumb_extent = 14.0;
+    if (visual_style_ == TrackBarVisualStyle::compact) {
+        thumb_extent = 8.0;
+    } else if (visual_style_ == TrackBarVisualStyle::filled) {
+        thumb_extent = 12.0;
+    }
+    if (orientation() == Orientation::horizontal) {
+        const Rect thumb{span.x + ratio * span.width - thumb_extent * 0.5,
+                         std::max(2.0, (bounds.height - thumb_extent) * 0.5),
+                         thumb_extent, thumb_extent};
+        return thumb;
+    }
+    const Rect thumb{std::max(2.0, (bounds.width - thumb_extent) * 0.5),
+                     span.y + (1.0 - ratio) * span.height - thumb_extent * 0.5,
+                     thumb_extent, thumb_extent};
+    return thumb;
+}
+
+bool TrackBar::ticks_drawn() const noexcept {
+    return show_ticks_ && visual_style_ != TrackBarVisualStyle::compact;
+}
+
+Rect TrackBar::ticks_bounds() const noexcept {
+    if (!ticks_drawn()) {
+        return {};
+    }
+    // Tick lines are one unit wide and centred on their positions, so the
+    // band reaches half a unit past each end of the value span.
+    const Rect span = value_span_bounds();
+    if (orientation() == Orientation::horizontal) {
+        const Rect band{span.x - 0.5, span.bottom() + 2.0, span.width + 1.0, 3.0};
+        return band;
+    }
+    const Rect band{span.right() + 2.0, span.y - 0.5, 3.0, span.height + 1.0};
+    return band;
+}
+
+const ControlAnatomy& TrackBar::anatomy() const noexcept {
+    return track_bar_anatomy;
+}
+
+void TrackBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect thumb = thumb_bounds();
+    Parts record;
+    record.region = PartGeometry::from_bounds(local_bounds());
+    record.track = PartGeometry::from_bounds(track_bounds());
+    record.fill = PartGeometry::from_bounds(fill_bounds());
+    record.ticks = PartGeometry::from_bounds(ticks_bounds());
+    record.thumb = PartGeometry::from_bounds(thumb);
+    // The track bar shows focus on its thumb.
+    record.focus = PartGeometry::from_bounds(thumb);
+    write_parts(anatomy(), track_bar_part_fields, record, geometry);
+}
+
+AnatomyStateSet TrackBar::anatomy_states() const {
+    AnatomyStateSet states = base_anatomy_states();
+    if (tracking_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+        states.insert(AnatomyState::captured);
+    }
+    return states;
+}
+
+TrackBar::Parts TrackBar::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), track_bar_part_fields, published.parts(), record);
+    return record;
+}
+
+TrackBar::States TrackBar::states() const {
+    States record;
+    read_states(track_bar_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void TrackBar::on_paint(Painter& painter, Rect) {
+    const bool horizontal = orientation() == Orientation::horizontal;
+    const Rect span = value_span_bounds();
+    if (visual_style_ == TrackBarVisualStyle::classic) {
+        paint_sunken(painter, span, style(), style().face_light);
+    } else {
+        painter.fill_rect(track_bounds(), style().border);
+        painter.fill_rect(fill_bounds(), style().accent);
     }
 
-    if (show_ticks_ && visual_style_ != TrackBarVisualStyle::compact) {
-        const double span = maximum() - minimum();
-        const double requested_count = std::floor(span / tick_frequency_);
+    if (ticks_drawn()) {
+        const double value_range = maximum() - minimum();
+        const double requested_count = std::floor(value_range / tick_frequency_);
         const std::size_t bounded_count = static_cast<std::size_t>(
             std::min(requested_count, 256.0));
         for (std::size_t index = 0; index <= bounded_count; ++index) {
@@ -96,29 +243,20 @@ void TrackBar::on_paint(Painter& painter, Rect) {
                 ? 0.0 : static_cast<double>(index) /
                     static_cast<double>(bounded_count);
             if (horizontal) {
-                const double x = track.x + ratio * track.width;
-                painter.draw_line({x, track.y + track.height + 2.0},
-                                  {x, track.y + track.height + 5.0},
+                const double x = span.x + ratio * span.width;
+                painter.draw_line({x, span.y + span.height + 2.0},
+                                  {x, span.y + span.height + 5.0},
                                   style().dark_border, 1.0);
             } else {
-                const double y = track.y + (1.0 - ratio) * track.height;
-                painter.draw_line({track.x + track.width + 2.0, y},
-                                  {track.x + track.width + 5.0, y},
+                const double y = span.y + (1.0 - ratio) * span.height;
+                painter.draw_line({span.x + span.width + 2.0, y},
+                                  {span.x + span.width + 5.0, y},
                                   style().dark_border, 1.0);
             }
         }
     }
 
-    const double ratio = normalized_value();
-    const double thumb_extent = visual_style_ == TrackBarVisualStyle::compact
-        ? 8.0 : visual_style_ == TrackBarVisualStyle::filled ? 12.0 : 14.0;
-    const Rect thumb = horizontal
-        ? Rect{track.x + ratio * track.width - thumb_extent * 0.5,
-               std::max(2.0, (bounds.height - thumb_extent) * 0.5),
-               thumb_extent, thumb_extent}
-        : Rect{std::max(2.0, (bounds.width - thumb_extent) * 0.5),
-               track.y + (1.0 - ratio) * track.height - thumb_extent * 0.5,
-               thumb_extent, thumb_extent};
+    const Rect thumb = thumb_bounds();
     if (visual_style_ == TrackBarVisualStyle::classic) {
         paint_thumb(painter, thumb, style(), focused_);
     } else {

@@ -6,6 +6,7 @@
 #include "../../display/chunk/display_chunk.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -2489,6 +2490,111 @@ void Control::on_drag_bubble(DragEvent&) {}
 void Control::on_focus_changed(bool) {}
 void Control::on_focus_cue_changed(bool) {}
 void Control::on_activate() {}
+
+namespace {
+
+constexpr std::array<PartField<Control::Parts>, 2> control_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &Control::Parts::region},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &Control::Parts::focus},
+}};
+
+constexpr std::array<StateField<Control::States>, 5> control_state_fields{{
+    {.state = AnatomyState::normal, .member = &Control::States::normal},
+    {.state = AnatomyState::enabled, .member = &Control::States::enabled},
+    {.state = AnatomyState::disabled, .member = &Control::States::disabled},
+    {.state = AnatomyState::focused, .member = &Control::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &Control::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 2> control_parts = part_declarations(control_part_fields);
+constexpr std::array<AnatomyState, 5> control_states = state_declarations(control_state_fields);
+
+constexpr ControlAnatomy base_anatomy{
+    .control_id = "control",
+    .parts = control_parts,
+    .states = control_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& base_control_anatomy() noexcept {
+    return base_anatomy;
+}
+
+const ControlAnatomy& Control::anatomy() const noexcept {
+    return base_control_anatomy();
+}
+
+void Control::fill_part_geometry(std::span<PartGeometry> geometry) const {
+    const ControlAnatomy& declared = anatomy();
+    if (geometry.size() != declared.parts.size()) {
+        throw std::invalid_argument(
+            "part geometry storage must hold one record per declared part");
+    }
+    const PartGeometryBuffer published = published_part_geometry();
+    const std::span<const PartGeometry> parts = published.parts();
+    std::copy(parts.begin(), parts.end(), geometry.begin());
+}
+
+PartGeometryBuffer Control::published_part_geometry() const {
+    PartGeometryBuffer buffer;
+    const ControlAnatomy& declared = anatomy();
+    buffer.count = std::min(declared.parts.size(), maximum_control_parts);
+    const std::span<PartGeometry> parts(buffer.geometry.data(), buffer.count);
+    publish_part_geometry(parts);
+    return buffer;
+}
+
+AnatomyStateSet Control::anatomy_states() const {
+    return base_anatomy_states();
+}
+
+void Control::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    // The region and the focus cue cover the client rectangle; any other
+    // declared part stays absent until its type publishes it.
+    const Rect client = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(client);
+    record.focus = PartGeometry::from_bounds(client);
+    write_parts(anatomy(), control_part_fields, record, geometry);
+}
+
+Control::Parts Control::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), control_part_fields, published.parts(), record);
+    return record;
+}
+
+Control::States Control::states() const {
+    States record;
+    read_states(control_state_fields, anatomy_states(), record);
+    return record;
+}
+
+AnatomyStateSet Control::base_anatomy_states() const {
+    AnatomyStateSet states;
+    states.insert(AnatomyState::normal);
+    if (effectively_enabled()) {
+        states.insert(AnatomyState::enabled);
+    } else {
+        states.insert(AnatomyState::disabled);
+    }
+    if (window_ != nullptr) {
+        const Ptr focused = (*window_).focused_control();
+        if (focused.get() == this) {
+            states.insert(AnatomyState::focused);
+            if ((*window_).focus_cue_visible()) {
+                states.insert(AnatomyState::focus_visible);
+            }
+        }
+    }
+    return states;
+}
+
 void Control::on_attached_to_window() {}
 void Control::on_attachment_committed() noexcept {}
 void Control::on_detaching_from_window(Window&) noexcept {}

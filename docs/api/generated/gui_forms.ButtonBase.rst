@@ -130,6 +130,10 @@ gui_forms::ButtonBase
          to the accessibility tree. Setting a different value raises
          :cpp:func:`expanded_changed <gui_forms::ButtonBase::expanded_changed>`.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Events:
 
       **expanded_changed** : ``Event<std::optional<bool>>``
@@ -438,6 +442,10 @@ gui_forms::ButtonBase
 
       Sets :cpp:func:`expanded_state <gui_forms::ButtonBase::expanded_state>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Events
 
@@ -523,9 +531,47 @@ gui_forms::ButtonBase
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: Rect local_bounds() const noexcept
 
       *Protected.*
+
+   .. cpp:function:: Rect content_box(Rect face, bool command_alignment) const noexcept
+
+      *Protected.*
+
+      The face less its content padding, and the command leading when ``command_alignment`` is set.
+
+   .. cpp:function:: ContentLayout layout_content(Rect content, std::span<const Size> line_sizes, FontSpec font, bool selected, bool command_alignment) const
+
+      *Protected.*
+
+      Places the text block, one entry of ``line_sizes`` per display line, and the resolved image inside ``content``.
+
+   .. cpp:function:: ContentLayout published_content_layout(Rect face, bool selected, bool command_alignment) const
+
+      *Protected.*
+
+      layout_content for ``face``, measuring the display text with the window's text metrics.
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: Parts push_button_parts(bool selected, bool command_alignment) const
+
+      *Protected.*
+
+      The parts of a push-style button whose face is the whole control.
+
+   .. cpp:function:: AnatomyStateSet button_anatomy_states() const
+
+      *Protected.*
+
+      The interaction, availability, focus and disclosure states every button shares.
 
    .. cpp:function:: std::string display_text() const
 

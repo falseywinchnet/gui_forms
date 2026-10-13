@@ -109,6 +109,16 @@ public:
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members: the scrollable parts and the cell grid.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry cell_grid;
+    };
+    [[nodiscard]] Parts parts() const;
+
+protected:
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     struct CellMetadata final {

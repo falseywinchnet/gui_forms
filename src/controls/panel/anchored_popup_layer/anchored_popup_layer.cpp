@@ -2,6 +2,7 @@
 
 #include "anchored_popup_placement_utilities.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -140,5 +141,21 @@ SemanticDescriptor AnchoredPopupLayer::semantic_descriptor() const {
     return descriptor;
 }
 
+
+
+namespace {
+
+constexpr ControlAnatomy anchored_popup_layer_anatomy{
+    .control_id = "anchored-popup-layer",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& AnchoredPopupLayer::anatomy() const noexcept {
+    return anchored_popup_layer_anatomy;
+}
 
 } // namespace gui_forms

@@ -785,7 +785,7 @@ owner direction; §12.1 item 1).
 | face | main material surface | button, tab, thumb, capsule |
 | edge | outer boundary stroke and silhouette | every bounded part |
 | keyline | inner highlight or lowlight on one edge | the lower specular line of the identity band |
-| perimeter | second outer ring | default action (M105) |
+| perimeter | second outer ring | preselect, the default-action cue (M105) |
 | sheen | specular or reflective layer over a face | gloss band, cursor sheen |
 | seam | parent-owned shared boundary | splitter, breadcrumb or tab join |
 | divider, caption | etched group line; group label beneath | command-plane groups |
@@ -801,7 +801,7 @@ owner direction; §12.1 item 1).
 | disclosure | open/close affordance | menu arrow, tree expander |
 | grip | seam or panel actuator | collapse grip, resize grip |
 | chip | small flat tinted status cell | size, zoom (Plan Paint status strip) |
-| focus, default, selection, validation, drop | state cues | §8.4 |
+| focus, preselect, selection, validation, drop | state cues | §8.4 |
 
 Sources: CONTROL_DNA §3.3–3.5; MICROFEATURE §6.3; theme types (`text`,
 `muted_text`, `glyph`, `focus_ring`, `default_ring`); PlaySuite
@@ -855,7 +855,7 @@ activation behaviour stays platform-owned (DDV-007-01).
 | Group | States | Source |
 |---|---|---|
 | interaction | normal, hot/proximate, pressed, captured | CONTROL_DNA §3.7; VISUAL §10 |
-| focus, default | focused, focus-visible; default action | CONTROL_DNA §3.7; M105 |
+| focus, preselect | focused, focus-visible; preselect (the default action, the Enter target) | CONTROL_DNA §3.7; M105 |
 | value | selected, checked, indeterminate, current, active tool | CONTROL_DNA §3.7; Plan Paint |
 | availability | enabled, disabled, unavailable, read-only | CONTROL_DNA §3.7; DNA-C11; M104 |
 | validity | invalid, pending/staged | theme types; VISUAL §10 |

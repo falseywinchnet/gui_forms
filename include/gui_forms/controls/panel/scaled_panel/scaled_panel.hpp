@@ -17,6 +17,7 @@ public:
     void set_design_bounds(const Control& child, Rect design_bounds);
     [[nodiscard]] std::optional<Rect> design_bounds(const Control& child) const;
     void arrange(Rect final_bounds) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     using SlotMap = std::unordered_map<std::uint64_t, Rect>;

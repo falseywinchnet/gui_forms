@@ -53,6 +53,7 @@ public:
     void on_pointer(PointerEvent& event) override;
     void on_key_preview(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     void validate_anchor(const Control::Ptr& anchor) const;

@@ -5,7 +5,7 @@
 Control and component
 =====================
 
-The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies.
+The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states.
 
 .. list-table::
    :class: autosummary longtable
@@ -32,22 +32,92 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`AnatomyStateSet <gui_forms::AnatomyStateSet>`
+     - A bounded set of active standard and custom states.
+   * - :cpp:class:`AnatomyValidation <gui_forms::AnatomyValidation>`
+     - The result of validate_control_anatomy: the first defect found, or none.
    * - :cpp:class:`ComponentContainer <gui_forms::ComponentContainer>`
      - ComponentContainer owns a unique ordered set of shared components and disposes the captured ownership sequence exactly once.
+   * - :cpp:class:`Control::Parts <gui_forms::Control::Parts>`
+     - The parts and states every control publishes, as dot members.
+   * - :cpp:class:`Control::States <gui_forms::Control::States>`
+     -  
+   * - :cpp:class:`ControlAnatomy <gui_forms::ControlAnatomy>`
+     - The anatomy of one control type.
    * - :cpp:class:`ControlFactory <gui_forms::ControlFactory>`
      - ControlFactory maps explicit type names to construction callbacks, rejects duplicates/unknown types, and recursively creates retained trees without a bundled scripting runtime.
    * - :cpp:class:`ControlValidationEvent <gui_forms::ControlValidationEvent>`
      - ControlValidationEvent carries source, destination, bulk-validation intent, and mutable cancellation through one validation turn.
+   * - :cpp:class:`CustomStateDeclaration <gui_forms::CustomStateDeclaration>`
+     - One application-defined finite state, as written in ``:state(name)``.
+   * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
+     - Position of an application-defined state in its control type's declaration list.
    * - :cpp:class:`LayoutTransactionState <gui_forms::LayoutTransactionState>`
      - LayoutTransactionState exposes suspension depth, deferred work, and requested-versus-committed revisions without leaking a host layout engine.
    * - :cpp:class:`MnemonicText <gui_forms::MnemonicText>`
      - MnemonicText separates rendered UTF-8 from the optional activation scalar parsed from Forms-compatible ampersand notation.
    * - :cpp:class:`OwnerDecorationRecipe <gui_forms::OwnerDecorationRecipe>`
      -  
+   * - :cpp:class:`PartDeclaration <gui_forms::PartDeclaration>`
+     - One declared part.
+   * - :cpp:class:`PartField <gui_forms::PartField>`
+     - One member of a parts record and the part it publishes.
+   * - :cpp:class:`PartGeometry <gui_forms::PartGeometry>`
+     - Geometry of one declared part in the control's local coordinate space after layout.
+   * - :cpp:class:`PartGeometryBuffer <gui_forms::PartGeometryBuffer>`
+     - Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
+   * - :cpp:class:`PartIndex <gui_forms::PartIndex>`
+     - Position of a part in its control type's declaration list.
    * - :cpp:class:`RuntimeId <gui_forms::RuntimeId>`
      - RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
+   * - :cpp:class:`StateField <gui_forms::StateField>`
+     - One member of a states record and the standard state it reports.
    * - :cpp:class:`StaticNode <gui_forms::StaticNode>`
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: AnatomyStateSet final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   A bounded set of active standard and custom states.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr std::uint64_t standard_bits() const noexcept
+
+   .. cpp:function:: constexpr std::uint16_t custom_bits() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: constexpr void insert(AnatomyState state) noexcept
+
+   .. cpp:function:: constexpr void erase(AnatomyState state) noexcept
+
+   .. cpp:function:: constexpr bool contains(AnatomyState state) const noexcept
+
+   .. cpp:function:: constexpr void insert(CustomStateIndex state) noexcept
+
+   .. cpp:function:: constexpr bool contains(CustomStateIndex state) const noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AnatomyValidation final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   The result of validate_control_anatomy: the first defect found, or none.
+
+   .. cpp:member:: AnatomyDefect defect
+
+      Default: ``{AnatomyDefect::none}``.
+
+   .. cpp:member:: std::size_t index
+
+      Index into the list the defect concerns (parts, states or custom states); zero when the defect concerns the anatomy as a whole.
 
 .. cpp:namespace:: gui_forms
 
@@ -96,6 +166,52 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: Control::Parts final
+
+   ``#include <gui_forms/control/control/control.hpp>``
+
+   The parts and states every control publishes, as dot members. A type that declares its own anatomy hides these with records of its own. Every record reads the control's published geometry and states, so a record read through a base type agrees with the dynamic type.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Control::States final
+
+   ``#include <gui_forms/control/control/control.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ControlAnatomy final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   The anatomy of one control type. Every span refers to static storage owned by the control type's translation unit, so a ControlAnatomy may be copied and retained for the life of the program.
+
+   .. cpp:member:: std::string_view control_id
+
+      The control's id in manifests/controls.json, or "control" for the anatomy every control inherits.
+
+   .. cpp:member:: std::span<const PartDeclaration> parts
+
+   .. cpp:member:: std::span<const AnatomyState> states
+
+   .. cpp:member:: std::span<const CustomStateDeclaration> custom_states
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: ControlFactory
 
    ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
@@ -126,6 +242,26 @@ Related types
    .. cpp:member:: bool bulk
 
    .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CustomStateDeclaration final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One application-defined finite state, as written in ``:state(name)``.
+
+   .. cpp:member:: std::string_view name
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CustomStateIndex final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Position of an application-defined state in its control type's declaration list.
+
+   .. cpp:member:: std::uint8_t value
 
 .. cpp:namespace:: gui_forms
 
@@ -181,6 +317,78 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartDeclaration final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One declared part. ``name`` is the part's stable kebab-case identity within its control type, as written in ``::part(name)``. ``composed_from`` names the control id of a simpler system the part reuses (a scroll arrow is a "button"), or is empty.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: PartRole role
+
+      Default: ``{PartRole::region}``.
+
+   .. cpp:member:: std::string_view composed_from
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: template <typename Record> PartField final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One member of a parts record and the part it publishes.
+
+   .. cpp:member:: PartDeclaration declaration
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartGeometry final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Geometry of one declared part in the control's local coordinate space after layout. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static constexpr PartGeometry from_bounds(Rect bounds) noexcept
+
+      A part that is present exactly when ``bounds`` is not empty.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: bool present
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartGeometryBuffer final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const PartGeometry> parts() const noexcept
+
+   .. cpp:member:: std::array<PartGeometry, maximum_control_parts> geometry
+
+   .. cpp:member:: std::size_t count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartIndex final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   Position of a part in its control type's declaration list. Distinct from the part's role (shared vocabulary) and from its name (public identity).
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RuntimeId
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -188,6 +396,18 @@ Related types
    RuntimeId is the monotonic process-local identity used for exact retained instances and child operations.
 
    .. cpp:member:: std::uint64_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: template <typename Record> StateField final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   One member of a states record and the standard state it reports.
+
+   .. cpp:member:: AnatomyState state
+
+      Default: ``{AnatomyState::normal}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -207,6 +427,110 @@ Related types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: AnatomyDefect
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: control_id_not_kebab_case
+
+   .. cpp:enumerator:: no_parts
+
+   .. cpp:enumerator:: too_many_parts
+
+   .. cpp:enumerator:: part_name_not_kebab_case
+
+   .. cpp:enumerator:: duplicate_part_name
+
+   .. cpp:enumerator:: part_role_out_of_range
+
+   .. cpp:enumerator:: composed_from_not_kebab_case
+
+   .. cpp:enumerator:: state_out_of_range
+
+   .. cpp:enumerator:: duplicate_state
+
+   .. cpp:enumerator:: too_many_custom_states
+
+   .. cpp:enumerator:: custom_state_not_kebab_case
+
+   .. cpp:enumerator:: custom_state_shadows_standard_state
+
+   .. cpp:enumerator:: duplicate_custom_state
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: AnatomyState
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: hot
+
+   .. cpp:enumerator:: pressed
+
+   .. cpp:enumerator:: captured
+
+   .. cpp:enumerator:: focused
+
+   .. cpp:enumerator:: focus_visible
+
+   .. cpp:enumerator:: preselect
+
+   .. cpp:enumerator:: selected
+
+   .. cpp:enumerator:: checked
+
+   .. cpp:enumerator:: indeterminate
+
+   .. cpp:enumerator:: current
+
+   .. cpp:enumerator:: active_tool
+
+   .. cpp:enumerator:: enabled
+
+   .. cpp:enumerator:: disabled
+
+   .. cpp:enumerator:: unavailable
+
+   .. cpp:enumerator:: read_only
+
+   .. cpp:enumerator:: invalid
+
+   .. cpp:enumerator:: pending
+
+   .. cpp:enumerator:: open
+
+   .. cpp:enumerator:: closed
+
+   .. cpp:enumerator:: expanding
+
+   .. cpp:enumerator:: collapsing
+
+   .. cpp:enumerator:: interrupted
+
+   .. cpp:enumerator:: drop_accepted
+
+   .. cpp:enumerator:: drop_rejected
+
+   .. cpp:enumerator:: key
+
+   .. cpp:enumerator:: secondary_participating
+
+   .. cpp:enumerator:: drag_proximate
+
+   .. cpp:enumerator:: deactivated
+
+   .. cpp:enumerator:: high_contrast
+
+   .. cpp:enumerator:: reduced_motion
+
+   .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
 
@@ -394,6 +718,76 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PartRole
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   .. cpp:enumerator:: region
+
+   .. cpp:enumerator:: shadow
+
+   .. cpp:enumerator:: face
+
+   .. cpp:enumerator:: edge
+
+   .. cpp:enumerator:: keyline
+
+   .. cpp:enumerator:: perimeter
+
+   .. cpp:enumerator:: sheen
+
+   .. cpp:enumerator:: seam
+
+   .. cpp:enumerator:: divider
+
+   .. cpp:enumerator:: caption
+
+   .. cpp:enumerator:: cap
+
+   .. cpp:enumerator:: well
+
+   .. cpp:enumerator:: track
+
+   .. cpp:enumerator:: fill
+
+   .. cpp:enumerator:: thumb
+
+   .. cpp:enumerator:: actuator
+
+   .. cpp:enumerator:: indicator
+
+   .. cpp:enumerator:: activity
+
+   .. cpp:enumerator:: glyph
+
+   .. cpp:enumerator:: icon
+
+   .. cpp:enumerator:: label
+
+   .. cpp:enumerator:: content
+
+   .. cpp:enumerator:: caret
+
+   .. cpp:enumerator:: disclosure
+
+   .. cpp:enumerator:: grip
+
+   .. cpp:enumerator:: chip
+
+   .. cpp:enumerator:: focus
+
+   .. cpp:enumerator:: preselect
+
+   .. cpp:enumerator:: selection
+
+   .. cpp:enumerator:: validation
+
+   .. cpp:enumerator:: drop
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ValidationConstraints
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -412,6 +806,72 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+.. cpp:function:: std::string_view part_role_name(PartRole role) noexcept
+
+   Kebab-case public names.
+
+.. cpp:function:: std::string_view anatomy_state_name(AnatomyState state) noexcept
+
+.. cpp:function:: std::optional<PartRole> part_role_from_name(std::string_view name) noexcept
+
+.. cpp:function:: std::optional<AnatomyState> anatomy_state_from_name(std::string_view name) noexcept
+
+.. cpp:function:: bool is_kebab_case_name(std::string_view name) noexcept
+
+   True when ``name`` is non-empty lowercase ASCII words joined by single hyphens: [a-z][a-z0-9]*(-[a-z0-9]+)*.
+
+.. cpp:function:: std::optional<PartIndex> find_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
+
+   Lookup by declared name within one control type's anatomy.
+
+.. cpp:function:: std::optional<CustomStateIndex> find_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
+
+.. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
+
+.. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<PartDeclaration, Count> part_declarations(const std::array<PartField<Record>, Count>& fields)
+
+.. cpp:function:: template <std::size_t First, std::size_t Second> constexpr std::array<PartDeclaration, First + Second> joined_declarations(const std::array<PartDeclaration, First>& first, const std::array<PartDeclaration, Second>& second)
+
+.. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<AnatomyState, Count> state_declarations(const std::array<StateField<Record>, Count>& fields)
+
+.. cpp:function:: template <typename Record, std::size_t Count> void write_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, const Record& record, std::span<PartGeometry> geometry) noexcept
+
+   Publishes every member of ``record`` into the part ``anatomy`` declares with that member's name. A part the anatomy does not declare is skipped, so a base type's record publishes into a subclass's longer declaration list. ``geometry`` holds one record per declared part.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_parts(const ControlAnatomy& anatomy, const std::array<PartField<Record>, Count>& fields, std::span<const PartGeometry> geometry, Record& record) noexcept
+
+   Reads the published geometry back into ``record``; a member whose part the anatomy does not declare is left absent.
+
+.. cpp:function:: template <typename Record, std::size_t Count> void read_states(const std::array<StateField<Record>, Count>& fields, const AnatomyStateSet& active, Record& record) noexcept
+
+.. cpp:function:: std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept
+
+.. cpp:function:: AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexcept
+
+.. cpp:function:: const ControlAnatomy& base_control_anatomy() noexcept
+
+   The anatomy every control inherits until its type declares its own: the granted region and the focus part.
+
+.. cpp:var:: constexpr std::size_t part_role_count
+
+   Value: ``static_cast<std::size_t>(PartRole::count)``.
+
+.. cpp:var:: constexpr std::size_t anatomy_state_count
+
+   Value: ``static_cast<std::size_t>(AnatomyState::count)``.
+
+.. cpp:var:: constexpr std::size_t maximum_control_parts
+
+   Upper bounds that size the fixed tables and bit sets below. A control type declaring more is rejected by validate_control_anatomy. Value: ``32``.
+
+.. cpp:var:: constexpr std::size_t maximum_custom_states
+
+   Value: ``16``.
 
 .. cpp:namespace:: gui_forms
 
