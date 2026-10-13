@@ -1,7 +1,8 @@
 # Stage T1: anatomy — articulated controls and one schema
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
-through them, almost everything else. Status 2026-10-12: not started.
+through them, almost everything else. Status 2026-10-13: started on branch
+`claude/t1-anatomy` (schema types; TrackBar, ScrollBar and ProgressBar).
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.
@@ -127,6 +128,9 @@ no longer needed. Record the coverage table and test run under `results/`.
 2. **Application-defined states are in T1.** A custom control may declare its
    own finite states in the schema: typed, bounded, visible to themes and
    inspection. Themes still cannot invent states.
+3. **The default-action cue is named `preselect`** (owner, 2026-10-13),
+   as both the part role and the state: no part or state name reuses a C++
+   keyword, and `default` is one.
 
 ## Read first
 

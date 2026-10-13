@@ -6,6 +6,7 @@
 #include "../../display/chunk/display_chunk.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -2489,6 +2490,76 @@ void Control::on_drag_bubble(DragEvent&) {}
 void Control::on_focus_changed(bool) {}
 void Control::on_focus_cue_changed(bool) {}
 void Control::on_activate() {}
+
+const ControlAnatomy& Control::anatomy() const noexcept {
+    return base_control_anatomy();
+}
+
+void Control::fill_part_geometry(std::span<PartGeometry> geometry) const {
+    const ControlAnatomy& declared = anatomy();
+    if (geometry.size() != declared.parts.size()) {
+        throw std::invalid_argument(
+            "part geometry storage must hold one record per declared part");
+    }
+    std::array<PartGeometry, maximum_control_parts> published{};
+    const std::span<PartGeometry> published_parts(published.data(),
+                                                  declared.parts.size());
+    publish_part_geometry(published_parts);
+    std::copy(published_parts.begin(), published_parts.end(), geometry.begin());
+}
+
+std::optional<PartGeometry> Control::part_geometry(std::string_view part_name) const {
+    const ControlAnatomy& declared = anatomy();
+    const std::optional<PartIndex> index = find_part(declared, part_name);
+    if (!index.has_value()) {
+        return std::nullopt;
+    }
+    std::array<PartGeometry, maximum_control_parts> published{};
+    const std::span<PartGeometry> published_parts(published.data(),
+                                                  declared.parts.size());
+    fill_part_geometry(published_parts);
+    const PartGeometry found = published_parts[(*index).value];
+    return found;
+}
+
+AnatomyStateSet Control::anatomy_states() const {
+    return base_anatomy_states();
+}
+
+void Control::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    // Region and focus parts cover the client rectangle; any other declared
+    // part stays absent until its type publishes it.
+    const ControlAnatomy& declared = anatomy();
+    const Rect client = client_rectangle();
+    for (std::size_t index = 0; index < declared.parts.size(); ++index) {
+        const PartRole role = declared.parts[index].role;
+        if (role == PartRole::region || role == PartRole::focus) {
+            geometry[index].bounds = client;
+            geometry[index].present = true;
+        }
+    }
+}
+
+AnatomyStateSet Control::base_anatomy_states() const {
+    AnatomyStateSet states;
+    states.insert(AnatomyState::normal);
+    if (effectively_enabled()) {
+        states.insert(AnatomyState::enabled);
+    } else {
+        states.insert(AnatomyState::disabled);
+    }
+    if (window_ != nullptr) {
+        const Ptr focused = (*window_).focused_control();
+        if (focused.get() == this) {
+            states.insert(AnatomyState::focused);
+            if ((*window_).focus_cue_visible()) {
+                states.insert(AnatomyState::focus_visible);
+            }
+        }
+    }
+    return states;
+}
+
 void Control::on_attached_to_window() {}
 void Control::on_attachment_committed() noexcept {}
 void Control::on_detaching_from_window(Window&) noexcept {}

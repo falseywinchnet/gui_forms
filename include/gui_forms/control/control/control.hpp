@@ -1,6 +1,7 @@
 #pragma once
 #include "gui_forms/types/cursor_image/cursor_image.hpp"
 
+#include "gui_forms/anatomy.hpp"
 #include "gui_forms/component.hpp"
 #include "gui_forms/control/stable_id/stable_id.hpp"
 #include "gui_forms/binding_types.hpp"
@@ -668,7 +669,31 @@ public:
     virtual void on_focus_cue_changed(bool visible);
     virtual void on_activate();
 
+    // Anatomy (stage T1). A control type opts in by overriding anatomy(),
+    // publish_part_geometry() and anatomy_states() together; the defaults
+    // publish base_control_anatomy(). The anatomy describes the type, never
+    // the instance: it is the same record for every object of the type.
+    [[nodiscard]] virtual const ControlAnatomy& anatomy() const noexcept;
+    // Fills one record per declared part, in declaration order, in local
+    // coordinates after layout. `geometry` must hold exactly
+    // anatomy().parts.size() records; otherwise this throws
+    // std::invalid_argument and leaves `geometry` unchanged.
+    void fill_part_geometry(std::span<PartGeometry> geometry) const;
+    // Geometry of one declared part, or nullopt when the type declares no
+    // part with that name.
+    [[nodiscard]] std::optional<PartGeometry> part_geometry(
+        std::string_view part_name) const;
+    // The active states. Every standard state in the result is one
+    // anatomy().states declares, and every custom index is in range.
+    [[nodiscard]] virtual AnatomyStateSet anatomy_states() const;
+
 protected:
+    // Called by fill_part_geometry with `geometry` already sized to
+    // anatomy().parts.size() and every record reset to absent.
+    virtual void publish_part_geometry(std::span<PartGeometry> geometry) const;
+    // The base states every control shares: normal, enabled or disabled,
+    // focused and focus-visible. Overrides start from this and add their own.
+    [[nodiscard]] AnatomyStateSet base_anatomy_states() const;
     [[nodiscard]] Window* window() const noexcept { return window_; }
     void require_mutable() const;
     // Layout is allowed to invoke application-overridable measurement. Such a

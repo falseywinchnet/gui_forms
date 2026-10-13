@@ -261,10 +261,18 @@ gui_forms::ProgressBar
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*
 
    .. cpp:function:: void on_detached_from_window() noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

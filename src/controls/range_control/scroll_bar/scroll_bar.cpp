@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <sstream>
 #include <stdexcept>
@@ -127,6 +128,68 @@ ScrollBarPart ScrollBar::part_at(Point local_point) const noexcept {
         ? thumb.x : thumb.y;
     return coordinate < thumb_start ? ScrollBarPart::decrement_track
                                     : ScrollBarPart::increment_track;
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 6> scroll_bar_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.name = "track", .role = PartRole::track, .composed_from = {}},
+    {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
+    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 7> scroll_bar_states{
+    AnatomyState::normal,
+    AnatomyState::pressed,
+    AnatomyState::captured,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy scroll_bar_anatomy{
+    .control_id = "scroll-bar",
+    .parts = scroll_bar_parts,
+    .states = scroll_bar_states,
+    .custom_states = {},
+};
+
+void publish_part(std::span<PartGeometry> geometry, std::size_t index, Rect bounds) {
+    geometry[index].bounds = bounds;
+    geometry[index].present = !bounds.empty();
+}
+
+} // namespace
+
+const ControlAnatomy& ScrollBar::anatomy() const noexcept {
+    return scroll_bar_anatomy;
+}
+
+void ScrollBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect thumb = thumb_bounds();
+    publish_part(geometry, 0U, local_bounds());
+    publish_part(geometry, 1U, decrement_button_bounds());
+    publish_part(geometry, 2U, increment_button_bounds());
+    publish_part(geometry, 3U, track_bounds());
+    publish_part(geometry, 4U, thumb);
+    // The scroll bar shows focus on its thumb.
+    publish_part(geometry, 5U, thumb);
+}
+
+AnatomyStateSet ScrollBar::anatomy_states() const {
+    AnatomyStateSet states = base_anatomy_states();
+    if (pressed_part_ != ScrollBarPart::none) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+    }
+    if (tracking_thumb_) {
+        states.insert(AnatomyState::captured);
+    }
+    return states;
 }
 
 double ScrollBar::value_from_thumb_coordinate(double coordinate) const noexcept {

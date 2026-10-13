@@ -246,6 +246,10 @@ gui_forms::ScrollBar
 
    .. rubric:: Extension points
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: Size measure(Size available) override
 
       Uses the requested width and height where they are set; otherwise a
@@ -267,5 +271,9 @@ gui_forms::ScrollBar
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
    .. cpp:function:: void on_detached_from_window() noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*
