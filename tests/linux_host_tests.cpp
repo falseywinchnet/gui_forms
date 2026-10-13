@@ -469,6 +469,7 @@ void live_frame_sequence(Runtime &runtime) {
           "Overlay lost its pixels over a changed frame");
   (*window).close(HostCloseReason::application, true);
   runtime.step(0);
+}
 struct KeepClientSize final {
   std::function<HostServiceStatus(Size)> *retained{};
   void operator()(std::function<HostServiceStatus(Size)> request) const { *retained = std::move(request); }
