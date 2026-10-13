@@ -438,14 +438,15 @@ void live_frame_sequence(Runtime &runtime) {
           "First frame and overlay not composed");
 
   // A change away from the overlay: a live-only tick copies the changed
-  // region and paints nothing retained.
+  // region, widened by one surface pixel on each side (live_damage_in_window),
+  // so 7 x 7 for a 5 x 5 change, and paints nothing retained.
   const MetricsSnapshot before = model.metrics_snapshot();
   publish_color(*surface, {50.0, 50.0, 5.0, 5.0}, white);
   runtime.step(0);
   const MetricsSnapshot moved = model.metrics_snapshot();
   require(moved.live_frames_presented == before.live_frames_presented + 1U,
           "Live-only tick did not present one frame");
-  require(moved.live_pixels_presented == before.live_pixels_presented + 25U,
+  require(moved.live_pixels_presented == before.live_pixels_presented + 49U,
           "Live-only tick copied more than the changed region");
   require(moved.paint_passes == before.paint_passes &&
               moved.retained_pixels_presented == before.retained_pixels_presented,
