@@ -569,6 +569,11 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
       .metrics()
       .set_renderer("Skia CPU / HarfBuzz / FreeType / X11", true);
   services = std::make_unique<Services>(*this);
+  // The availability record (stage DP): the X11 host copies the damage
+  // bounding box, so partial present is not offered.
+  PresentationDeclaration presentation;
+  presentation.contract_version = paint_contract_version;
+  (*entry.model).declare_presentation(presentation);
   session = std::make_unique<HostSession>(*entry.model, linux_capabilities(),
                                           services.get());
   closing_token = (*session).closing().subscribe(Closing{this});

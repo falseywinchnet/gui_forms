@@ -145,6 +145,11 @@ DibFrameStatus DibFrameStore::present_surface(const Surface& source, HDC target,
 }
 
 DibFrameStatus DibFrameStore::commit(HDC target, const RECT& damage, DibFrameKey key) {
+    const std::span<const RECT> single(&damage, 1U);
+    return commit(target, single, key);
+}
+
+DibFrameStatus DibFrameStore::commit(HDC target, std::span<const RECT> damage, DibFrameKey key) {
     if (!on_executor()) { return DibFrameStatus::wrong_executor; }
     if (!active_ || key.revision == 0 || key.epoch == 0 || !std::isfinite(key.scale) || key.scale <= 0) {
         return DibFrameStatus::invalid;
@@ -154,13 +159,26 @@ DibFrameStatus DibFrameStore::commit(HDC target, const RECT& damage, DibFrameKey
         active_ = false;
         return DibFrameStatus::flush_failed;
     }
-    DibFrameStatus presented = DibFrameStatus::present_failed;
-    if (!take_failure(DibFrameFault::present)) { presented = present_surface(candidate_, target, damage); }
+    DibFrameStatus presented = DibFrameStatus::success;
+    std::size_t copied = 0;
+    if (take_failure(DibFrameFault::present)) {
+        presented = DibFrameStatus::present_failed;
+    } else if (target == nullptr) {
+        presented = DibFrameStatus::present_failed;
+    }
+    while (presented == DibFrameStatus::success && copied < damage.size()) {
+        presented = present_surface(candidate_, target, damage[copied]);
+        ++copied;
+    }
     active_ = false;
     if (presented != DibFrameStatus::success) {
-        // Best-effort recovery of visible pixels; never claim OS presentation
-        // failure left the screen untouched. The committed backing stays exact.
-        static_cast<void>(present_surface(front_, target, damage));
+        // Best-effort recovery of visible pixels over every rectangle this
+        // commit touched; never claim OS presentation failure left the screen
+        // untouched. The committed backing stays exact.
+        const std::size_t touched = copied == 0 ? damage.size() : copied;
+        for (std::size_t index = 0; index < touched; ++index) {
+            static_cast<void>(present_surface(front_, target, damage[index]));
+        }
         return presented;
     }
     front_.swap(candidate_);

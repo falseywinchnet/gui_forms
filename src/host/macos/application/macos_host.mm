@@ -1188,6 +1188,12 @@ private:
     self = [super initWithFrame:NSMakeRect(0.0, 0.0, 980.0, 680.0)];
     if (self != nil) {
         _model = std::move(model);
+        // The availability record (stage DP): AppKit clips each copy to the
+        // rectangles being drawn, so the host presents a rectangle set.
+        gui_forms::PresentationDeclaration presentation;
+        presentation.contract_version = gui_forms::paint_contract_version;
+        presentation.extensions.partial_present = true;
+        (*_model).declare_presentation(presentation);
         _hostServices = gui_forms::host::make_macos_host_services();
         _hostSession = std::make_unique<HostSession>(
             *_model, gui_forms::host::macos_capabilities(), _hostServices.get());

@@ -794,6 +794,12 @@ public:
         return matches;
     }
     [[nodiscard]] bool commit_frame(HDC target, const RECT& damage, PaintReceipt receipt) {
+        const std::span<const RECT> single(&damage, 1U);
+        return commit_frame(target, single, receipt);
+    }
+    // Commits the candidate and presents exactly `damage` (stage DP partial
+    // present); the swap stays all-or-nothing.
+    [[nodiscard]] bool commit_frame(HDC target, std::span<const RECT> damage, PaintReceipt receipt) {
 #if defined(GUI_FORMS_WINDOWS_PREPARED_TEXT)
         if (prepared_frame_failed_) { abort_frame(); return false; }
         // Retain owners before acquiring guards. abort_frame clears the member
@@ -2245,6 +2251,12 @@ public:
     WindowsHostState(std::unique_ptr<Window> model, WindowsHostOptions options)
         : model_(std::move(model)), options_(std::move(options)),
           services_(), session_(*model_, windows_capabilities(), &services_) {
+        // The availability record (stage DP). Both the default host and the
+        // transactional store present each damage rectangle.
+        PresentationDeclaration presentation;
+        presentation.contract_version = paint_contract_version;
+        presentation.extensions.partial_present = true;
+        (*model_).declare_presentation(presentation);
         live_frame_clock_ = CreateWaitableTimerExW(
             nullptr, nullptr, 0, TIMER_ALL_ACCESS);
         if (live_frame_clock_ == nullptr) {
@@ -2598,6 +2610,7 @@ public:
     std::string host_json() const {
         return "{\"session\":" + session_.snapshot().to_json() +
                ",\"services\":" + services_.snapshot().to_json() +
+               ",\"presentation\":" + (*model_).presentation_availability().to_json() +
                ",\"compatibility_surfaces\":" +
                detail::compatibility_paint_metrics_json() +
                ",\"live_presentations\":{" +
@@ -3171,6 +3184,15 @@ private:
         // region even when logical damage exists, so all drawing operations
         // restore the same pixel edges and native exposures are not omitted.
         if (!update_region_read) pending_damage_.add(logical_rect(paint_state.rcPaint));
+        // Present exactly the rectangles painted (stage DP partial present):
+        // the candidate carries the front's pixels everywhere else.
+        const std::span<const Rect> painted_rectangles = pending_damage_.rectangles();
+        std::vector<RECT> present_rectangles;
+        present_rectangles.reserve(painted_rectangles.size());
+        for (std::size_t index = 0; index < painted_rectangles.size(); ++index) {
+            const RECT device = device_rect(painted_rectangles[index]);
+            if (device_pixels(device) != 0U) present_rectangles.push_back(device);
+        }
         std::optional<PaintReceipt> receipt{};
         bool presented = false;
         try {
@@ -3179,7 +3201,7 @@ private:
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
                 if (images_ready) {
                     receipt = (*model_).paint(raster_, pending_damage_.rectangles());
-                    if (receipt) presented = raster_.commit_frame(dc, paint_state.rcPaint, *receipt);
+                    if (receipt) presented = raster_.commit_frame(dc, present_rectangles, *receipt);
                 }
             }
         } catch (...) {
@@ -3199,10 +3221,11 @@ private:
             bool acknowledged = current.surface_epoch == (*receipt).surface_epoch &&
                 current.presented_revision == (*receipt).rendered_revision;
             if (!acknowledged) {
-                // The transactional store commits the whole update box.
                 PresentedArea copied;
-                copied.device_pixels = device_pixels(paint_state.rcPaint);
-                copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
+                for (std::size_t index = 0; index < present_rectangles.size(); ++index) {
+                    copied.device_pixels += device_pixels(present_rectangles[index]);
+                    ++copied.rectangles;
+                }
                 acknowledged = (*model_).notify_presented(*receipt,
                     static_cast<std::uint64_t>(elapsed.count()), copied);
             }

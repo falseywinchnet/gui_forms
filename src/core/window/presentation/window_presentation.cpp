@@ -452,6 +452,42 @@ void Window::notify_presented(std::uint64_t duration_nanoseconds) {
         PaintReceipt{rendered_revision_, surface_epoch_}, duration_nanoseconds));
 }
 
+void Window::declare_presentation(PresentationDeclaration declaration) {
+    if (declaration.contract_version < paint_contract_version) {
+        throw std::invalid_argument(
+            "GUI.Forms host does not meet the paint contract and cannot attach");
+    }
+    presentation_declaration_ = declaration;
+}
+
+PresentationAvailability Window::presentation_availability() const noexcept {
+    PresentationAvailability availability;
+    availability.contract_version = presentation_declaration_.contract_version;
+    availability.extensions = presentation_declaration_.extensions;
+    availability.lease = paint_lease_snapshot();
+    return availability;
+}
+
+std::string PresentationAvailability::to_json() const {
+    const char* const flag_true = "true";
+    const char* const flag_false = "false";
+    std::string json = "{\"contract_version\":" + std::to_string(contract_version) +
+        ",\"extensions\":{\"partial_present\":" +
+        (extensions.partial_present ? flag_true : flag_false) +
+        ",\"zero_copy_import\":" + (extensions.zero_copy_import ? flag_true : flag_false) +
+        ",\"presentation_fence\":" + (extensions.presentation_fence ? flag_true : flag_false) +
+        ",\"native_surface_lease\":" + (extensions.native_surface_lease ? flag_true : flag_false) +
+        "},\"lease\":{\"content_revision\":" + std::to_string(lease.content_revision) +
+        ",\"rendered_revision\":" + std::to_string(lease.rendered_revision) +
+        ",\"presented_revision\":" + std::to_string(lease.presented_revision) +
+        ",\"surface_epoch\":" + std::to_string(lease.surface_epoch) +
+        ",\"presentation_receipts_accepted\":" +
+        std::to_string(lease.presentation_receipts_accepted) +
+        ",\"presentation_receipts_rejected\":" +
+        std::to_string(lease.presentation_receipts_rejected) + "}}";
+    return json;
+}
+
 PaintLeaseSnapshot Window::paint_lease_snapshot() const noexcept {
     return {paint_lease_state_, content_revision_, rendered_revision_,
             presented_revision_, surface_epoch_, paint_leases_started_,

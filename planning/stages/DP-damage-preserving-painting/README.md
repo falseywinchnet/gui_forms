@@ -2,10 +2,13 @@
 
 Release: 0.4 Flexible. Depends on: nothing; it can start now. It matters
 more once the engine (T2) animates small parts such as a cursor sheen or an
-ambient progress fill. Status 2026-10-13: rectangle-set paint merged on every
-host (#59, #60); presentation counters on `claude/dp-presentation-counters`;
-next the availability record, transactional partial present, and the single
-frame sequence (decisions 2 to 5). Authority: the "Damage-preserving painting" and
+ambient progress fill. Status 2026-10-13: rectangle-set paint on every host
+(#59, #60) and presentation counters (#71) merged; the Windows live frame
+sequence (#72) confirmed on screen by the owner; the availability record and
+transactional partial present on Windows on `claude/dp-availability-record`.
+Partial present is now offered by both Windows profiles and by macOS; X11
+still copies the bounding box, so decision 3's amendment of
+`PAINT_PIPELINE_AVAILABILITY.md` waits for X11. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage
