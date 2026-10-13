@@ -1,9 +1,10 @@
 # T1 gate measurement: anatomy for every registry control
 
 Date: 2026-10-13. Stage: T1, anatomy — articulated controls and one schema
-(`planning/stages/T1-anatomy/README.md`). Status: measured on Windows x64;
-CI runs the same tests on macOS, Linux and Windows for each pull request.
-Owner review pending.
+(`planning/stages/T1-anatomy/README.md`). Status: **closed 2026-10-13**,
+owner signed off. Measured on Windows x64; CI ran the same tests on macOS,
+Linux and Windows for each pull request (PRs #46 to #57 for the gate,
+#62 to #67 for the close-out).
 
 ## The gate
 
@@ -93,6 +94,14 @@ Measured on the same machine and configuration as the gate, on
 
 The coverage table was regenerated on this branch; it now shows each part's
 own states and every item system.
+
+## Cross-host evidence
+
+PR #67, the last of the close-out, passed all twelve CI checks before it
+merged: the native and programs jobs on macOS arm64, Linux x64, Linux arm64
+and Windows x64, house style and the docs build. The Gallery page tests in
+those jobs compare their schema export with the committed
+`manifests/control-schema.json`, so the schema is identical on every host.
 
 ## Not required to close T1
 

@@ -1,11 +1,11 @@
 # Stage T1: anatomy — articulated controls and one schema
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
-through them, almost everything else. Status 2026-10-13: gate measured
-(`results/2026-10-13-t1-anatomy-gate`); the close-out the owner chose
-(decision 6) is built on stacked branches `claude/t1-item-systems`,
-`claude/t1-part-states`, `claude/t1-interactions` and
-`claude/t1-schema-export`; owner sign-off pending.
+through them, almost everything else. Status: **closed 2026-10-13**. The
+gate is recorded in `results/2026-10-13-t1-anatomy-gate`; the close-out the
+owner chose (decision 6) and the naming rulings (decisions 7 and 8) merged
+through PRs #62 to #67, and the owner signed off. Items not required to close
+T1 are proposed for T2 (decision 6).
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.
