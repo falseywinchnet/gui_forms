@@ -869,7 +869,8 @@ activation behaviour stays platform-owned (DDV-007-01).
 2. Hot, pressed, focused, disabled and default are mutually distinguishable in
    grayscale and keyboard-only use (DNA-C08; M104, M105).
 3. A theme selects published states; it cannot invent a state visible to code or
-   accessibility (CONTROL_DNA §3.7).
+   accessibility (CONTROL_DNA §3.7). Custom controls may publish their own
+   declared states (§12.6).
 4. The code addresses seven surface states (normal, hot, pressed, pending,
    invalid, disabled, deactivated) plus selected, focused, defaulted and
    high-contrast flags (theme types); the rest is not yet reachable.
@@ -1096,8 +1097,8 @@ bit tweaked to look nicer" than its references (owner direction).
    the ribbon cloth (§3.5 Bulge), and the command plane deepens from near-white
    to royale blue toward its foot.
 9. **Beside it.** Windows-familiar themes ship too: Classic and a modern flat
-   look first, a few more later (§12.3). Literal Windows rendering lives only
-   there (owner revision 3).
+   look first, then XP-style and Windows 7-style themes (§12.3, §12.6).
+   Literal Windows rendering lives only there (owner revision 3).
 
 ## 12. Conflicts and open questions
 
@@ -1117,8 +1118,8 @@ bit tweaked to look nicer" than its references (owner direction).
    it hand-authors high-contrast arrays per role (theme types); the owner wants
    GUI.Forms' own default and derived variants. Plan Paint builds its look as
    overrides of `windows-professional` (Plan Paint `ribbon.cpp`).
-3. **Location.** The `planning/interview/` records exist on branch
-   `claude/style-summary-and-interview-ledger`, not yet on `main`.
+3. **Location.** Resolved: the `planning/interview/` records are on `main`
+   (merged 2026-10-12).
 4. **Work-pane depth (owner revision 2 over the depth map).** The depth map
    gives content a "calm plane" and the first draft made paper flush. The work
    pane is now a recessed inset plane and, with entry fields, the deepest locus;
@@ -1248,10 +1249,25 @@ These supersede the conflicting sources and options of the first draft.
   replaced with dithering: the same bulge subsampled as a lattice of dots
   (§3.5 Dithered bulge), which the published studies now draw. Flat, smooth
   bulge and dithered bulge are engine-level renderings of one part role; which
-  one the default theme ships is the owner's call.
+  one the default theme ships was decided in §12.6.
 - **Ivory.** By "neutral Windows ivory" the owner means a near-white in the
   manner of Windows' `#F0F0F0`, not a cream. The owner chose `#F4F4F5`; side
   planes and dialog stock use it.
+
+### 12.6 Owner decisions, fourth round, 2026-10-13
+
+- **Ribbon buttons.** The default theme ships the dithered bulge (§3.5).
+  Flat and the smooth bulge remain engine renderings other themes may choose.
+- **Windows-familiar themes.** After Classic and the modern flat look come an
+  XP-style (Luna-like) theme and a Windows 7 (Aero-like) theme, both
+  recreated, never Microsoft's bitmaps.
+- **Part and state names** are kebab-case in theme and form documents
+  (`::part(scroll-thumb)`); they are a versioned public contract.
+- **Application-defined states.** A custom control may declare its own finite
+  states in the schema; themes may select them and still cannot invent
+  states (§8.4 rule 3).
+- **Live theme switching** is allowed; external theme packs need a content
+  hash, not a signature.
 
 ## Appendix A. Anti-models
 

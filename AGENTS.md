@@ -79,7 +79,10 @@ visual tools) is defined in `planning/FORWARD_PROGRAMME.md`, with the visual
 rules in `planning/DESIGN_LANGUAGE_SPECIFICATION.md`. Find your stage there,
 start it only once its dependencies' gates are recorded, and record your own
 gate's measurement. Open owner decisions are listed in both files; do not
-assume them. A readable stage board for sibling threads is published at
+assume them. Each stage has a working brief in `planning/stages/` (why, what,
+how, current code, house-style points, open decisions and lessons from the
+owner's discussions); read `planning/stages/README.md` and your stage's
+brief before starting. A readable stage board for sibling threads is published at
 https://claude.ai/artifact/D9d2SUvkiKQETiVnmwnEt4 (read it with the Artifact
 tool); the planning files are authoritative where they differ.
 
@@ -130,12 +133,9 @@ mandatory for work in that directory.
 - Win32, COM, WIC, MSAA, and UIA types remain inside `src/host/windows/`.
 - The core is retained; do not introduce an immediate-mode control API or a
   perpetual redraw loop.
-- ADR-013 reserves persistent side-panel composition to File Manager and its
-  embedded picker/browser. GUI.Forms may implement reusable panel controls, but
-  Paint, Text Editor, Games, and other consumers require owned popup dialogs
-  instead. Future capability routing is recorded in
-  `planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md`; it does not alter the
-  currently opened implementation milestone by itself.
+- ADR-013's reservation of persistent side panels to File Manager was retired
+  by the owner on 2026-10-13: any consumer may compose panels from the
+  reusable panel controls, and owned dialogs remain first-class capabilities.
 - Authored accessibility/help metadata is optional secondary hook data and is
   not required to instantiate a control. Supported stock controls still supply
   default semantic adapters; File Manager requires native accessibility

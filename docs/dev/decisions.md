@@ -13,7 +13,7 @@ truth and are edited there.
 | [ADR-003](adr/ADR-003) | Use one deterministic event order and preserve DML assignment order | accepted | 2026-08-04 |
 | [ADR-004](adr/ADR-004) | One text rasterization engine with identical output on every platform | accepted; implemented | 2026-10-11 |
 | [ADR-006](adr/ADR-006) | GUI.Forms and Orchestrator are independent predecessors; consumption is negotiated through a published manifest | accepted (recorded retroactively) | 2026-10-11 |
-| [ADR-013](adr/ADR-013) | Persistent side-panel composition is reserved to File Manager; demonstrations may compose panels | accepted (recorded retroactively) | 2026-10-11 |
+| [ADR-013](adr/ADR-013) | Persistent side-panel composition is reserved to File Manager; demonstrations may compose panels | retired | 2026-10-13 |
 | [ADR-014](adr/ADR-014) | One portable lifecycle contract with separate retained, session, native and lease identities | accepted (recorded retroactively) | 2026-10-11 |
 
 Numbers 005 and 007 through 012 are not assigned in this repository; the

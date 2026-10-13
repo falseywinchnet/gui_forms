@@ -50,6 +50,7 @@ STAGES = [
         "Flex and grid layout",
         "Form documents that round-trip hand edits",
         "Damage-preserving painting",
+        "More Windows Forms controls",
     ]),
     ("0.5", "ABI candidate", "stage", [
         "Installed, versioned C ABI",
@@ -58,6 +59,7 @@ STAGES = [
     ]),
     ("0.6", "Bindings", "stage", [
         "C# bindings with a Windows Forms shape",
+        "The rest of the .NET 8+ Windows Forms controls",
     ]),
     ("0.7", "Designers", "stage", [
         "Interface builder",

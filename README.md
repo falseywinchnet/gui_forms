@@ -283,5 +283,5 @@ Boundary violations fail `ctest` before review.
 
 [MIT](LICENSE). Bundled fonts carry their own notices in
 [`assets/fonts/ATTRIBUTION.md`](assets/fonts/ATTRIBUTION.md): Portsmouth
-Rapids (MIT, the owner's typeface), Carlito, Cousine and the Noto fallback
-faces (SIL OFL 1.1).
+Rapids and the rest of the Portsmouth family (MIT, the owner's typefaces),
+Carlito, Cousine and the Noto fallback faces (SIL OFL 1.1).

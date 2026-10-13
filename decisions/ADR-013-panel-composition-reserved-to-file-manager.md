@@ -1,7 +1,7 @@
 # ADR-013: Persistent side-panel composition is reserved to File Manager; demonstrations may compose panels
 
-Status: accepted (recorded retroactively); classification of demonstration
-programs added 2026-10-11
+Status: retired 2026-10-13 by the owner (was accepted, recorded
+retroactively; classification of demonstration programs added 2026-10-11)
 
 Date: 2026-10-11 (topology rule in force since 2026-08-06; first written down
 on this date)
@@ -71,3 +71,13 @@ polish-stage plan before this file existed.
 - **Treat the mail mockup as a consumer product and refuse its layout.**
   Rejected on 2026-10-11: it demonstrates reusable controls and claims no
   product topology.
+
+## Retirement, 2026-10-13
+
+The owner retired this decision while settling the forward programme's
+designer tools (the interface builder, the HTML layout designer and the
+theme designer), which need a toolbox, a canvas and an inspector. The
+reservation is dropped for every consumer: any application may compose
+persistent panels from the reusable panel controls. Owned dialogs remain
+first-class GUI.Forms capabilities, and plugins and providers still never
+instantiate GUI.Forms objects or native windows.

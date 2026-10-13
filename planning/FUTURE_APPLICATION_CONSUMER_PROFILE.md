@@ -3,7 +3,9 @@
 Date: 2026-08-06.
 
 Status: **GIVEN consumer topology under ADR-013 plus CANDIDATE capability
-planning; not an implementation authorization or ABI freeze**.
+planning; not an implementation authorization or ABI freeze**. ADR-013 was
+retired on 2026-10-13; its panel reservation no longer binds these
+consumers, and the owned-dialog capabilities below remain useful.
 
 This profile complements `FILE_MANAGER_CONSUMER_CAPABILITY_PROFILE.md`. It does
 not change the active GUI.Forms milestone plan. It records capability classes

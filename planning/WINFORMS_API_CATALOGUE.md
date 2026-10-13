@@ -53,6 +53,14 @@ A `partial_native` row means only that a corresponding retained GUI.Forms/GUI.Dr
 
 ## Policy boundary
 
+**Scope rule, owner 2026-10-13:** only types and members supported by Windows
+Forms on .NET 8.0 or later are in scope; .NET Framework-only items (2.0
+through 4.x) and the types removed in .NET Core 3.1 are out. The rows above
+come from a fork's shipped API list and predate this rule; stage W
+(`planning/stages/W-winforms-controls/`) regenerates them from the official
+.NET 8+ reference surface.
+
+
 The base excludes ActiveX/browser hosting, printing, MDI, design-time services, classic `DataGrid`, obsolete menu/toolbar/status families, metafile playback, and arbitrary desktop capture. Raw HWND/HDC members are platform-extension work behind opaque leases, never portable public types. PNG is the renderer-core codec; other codec/metadata families remain package review.
 
 Everything else is an admitted oversight row, not an implementation promise. Promotion to `native` requires a named test or runtime trace for the exact behavioral center; generated identity resolution alone is facade evidence.

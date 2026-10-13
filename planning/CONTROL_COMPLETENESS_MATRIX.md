@@ -73,6 +73,11 @@ A family is `supported` only when it has all applicable items:
 
 ## 3. Dependency-ordered matrix
 
+Scope rule, owner 2026-10-13: only Windows Forms types and members supported on
+.NET 8.0 or later count toward completeness; .NET Framework-only items and the
+types removed in .NET Core 3.1 are out of scope. Stage W
+(`planning/stages/W-winforms-controls/`) implements the remaining rows.
+
 Evidence locators abbreviate:
 
 - `WF` — `planning/interview/WINFORMS_CONTROL_INVENTORY.md`;

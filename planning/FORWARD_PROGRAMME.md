@@ -68,16 +68,24 @@ T3 Theme language front end ─────────────────�
 T4 Default theme + Windows-familiar themes ────┤       │              │
 T5 Compositor cooperation ─────────────────────┤ (parallel after T2)  │
 L  Real dynamic layout (flex, grid, flow) ─────┤ (parallel after T1)  │
+FD Form documents ─────────────────────────────┤ needs T1, T3         │
+DP Damage-preserving painting (no dependencies)│                      │
 R  SDRSharp reflection, current technique ─────┴── needs T4, F        │
+W  Windows Forms controls, .NET 8+ only ── needs T4                   │
 C  Stable installed C ABI ─────────────── needs T1, T2 ───────────────┤
 S  C# sibling: Windows Forms swap-in ──── needs R, C                  │
-D  Interface builder (dogfooded) ──────── needs T3, L, form documents │
+D  Interface builder (dogfooded) ──────── needs T3, L, FD             │
 H  HTML import + WYSIWYG layout designer ─ needs L, T3                │
 V  WYSIWYG theme designer ─────────────── needs T4, D core ───────────┘
 ```
 
-A, F and T1 can start now; A and F run beside everything else. T1 to T4 are
-the spine.
+A, F, T1 and DP can start now; A and F run beside everything else. T1 to T4
+are the spine. FD and DP were added on 2026-10-12 to match the public
+roadmap's 0.4 release; the owner accepted their gates on 2026-10-13.
+
+Each stage has a working brief in `planning/stages/<stage>/README.md` with
+the owner's reasons, the current code, the agreed approach, house-style
+points and open decisions. Read `planning/stages/README.md` first.
 
 ## 3. Foundations
 
@@ -186,7 +194,51 @@ Gate: a corpus of layout fixtures matches Chromium's boxes within a recorded
 tolerance at several window sizes, using the fidelity oracle approach of the
 earlier Web.Forms experiments (`file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md`).
 
+### FD. Form documents
+
+A compact form-document format that serializes the T1 schema: objects with
+stable IDs, z-order, layers, properties, layout containers, presentational
+state machines and references to named handlers. Hand edits are legal and
+round-trip; generated C++ and C# are disposable (interview GF014). The syntax
+is the CSS family shared with T3 (one parser, one round-trip machinery), and
+the provisional `demo/gallery.dml` migrates to it (owner, 2026-10-13).
+
+Gate: untouched documents round-trip byte for byte; a scripted
+one-property edit changes only that property's bytes; every Gallery page can
+be expressed as a document whose generated C++ compiles against the installed
+SDK and passes its tests.
+
+### DP. Damage-preserving painting
+
+Paint and present each damage rectangle of the bounded set instead of their
+bounding box, report partial present as an optional host extension, and
+publish the presentation availability record
+(`PAINT_PIPELINE_AVAILABILITY.md`).
+
+Gate: with two distant damaged rectangles, the painted area equals
+their sum on every host and pixels outside them are untouched; the
+paint-pipeline acceptance tests still pass.
+
 ## 5. Reflection and the C# sibling
+
+### W. Windows Forms control coverage
+
+Added 2026-10-13 at the owner's request. Scope: only types and members
+supported by Windows Forms on .NET 8.0 or later. Nothing that exists only in
+.NET Framework (2.0 through 4.x), nothing removed in .NET Core 3.1 (`DataGrid`,
+`ToolBar`, `StatusBar`, `MainMenu`, `ContextMenu`, `MenuItem`), nothing marked
+obsolete; the existing GUI.Forms exclusions still apply. Rebuild the API
+catalogue from the official .NET 8+ reference assemblies, then implement the
+missing controls (`DataGridView`, `ListView`, the `ToolStrip` and
+`StatusStrip` family first; then `MaskedTextBox`, `DomainUpDown`,
+`MonthCalendar`, `NotifyIcon` and member depth), each articulated and
+engine-painted from birth.
+
+Gate (accepted 2026-10-13; W starts after T4): the catalogue is regenerated from the official .NET 8+
+surface; every in-scope row of `CONTROL_COMPLETENESS_MATRIX.md` is implemented
+and tested on every platform, or excluded or deferred with a reason; the
+manifest records every in-scope type and member and the docs are generated
+from it.
 
 ### R. SDRSharp reflection, current technique
 
@@ -267,6 +319,7 @@ propagated; the saved theme passes T3 conformance and T4's reference images.
 
 ## 7. Working rules for siblings
 
+- Read `planning/stages/README.md` and your stage's brief before starting.
 - Follow `AGENTS.md`, the house style, and the build method in
   `docs/building/fast-builds.md`; do not improvise CI, caching or toolchains.
 - Record each gate's measurement with workload, machine and commands.
@@ -303,6 +356,24 @@ two authorities (the host palette under host high contrast, GUI.Forms' own
 near-colourless rebuild otherwise); the proposed tokens are the starting
 tokens, revisited after a native specimen sheet.
 
-Default theme candidates for T4 are sketched in the published theme studies
-(Sapphire Dusk, Pearl Works, Chrome and Gold, Graphite Studio); the owner has
-not chosen one yet.
+Decided in later rounds (`DESIGN_LANGUAGE_SPECIFICATION.md` §12.4, §12.5):
+the default follows the Pearl Ribbon study moved toward Plan Paint's royale
+blue, with Plan Paint's tab stack, ribbon buttons as a cloth bulge with no
+edge, push buttons as Plan Paint's action plate, near-white `#F4F4F5` stock
+and no fresco band; the derived dark variant drawn in the studies is accepted
+and reaches whole windows; every theme keeps high-colour icons.
+
+Decided 2026-10-13: the default's ribbon buttons ship as the dithered
+bulge; no interim default before T4; XP-style and Windows 7-style themes
+follow Classic and modern flat; part names are kebab-case and custom controls
+may declare states; live theme switching, with hash-only pack integrity; form
+documents use the CSS-family syntax shared with themes and the Gallery DML
+migrates; the FD and DP gates are accepted; ADR-013 is retired; the 1.0
+consumers are PlaySuite and Plan Paint, then the interface builder and the
+demoboard program; the C# layer lives in its own repository with an
+open-source corpus proposed for approval; fonts are OFL, MIT or Apache only,
+the substitution table precedes host fonts in GUI.Drawing, and Consolas maps
+to the owner's Portsmouth Mono; the Web.Forms fidelity oracle moves into
+`tools/` and Chromium stays a test oracle; the SDRSharp spectrum and
+waterfall route is deferred to careful later work. Each stage brief records
+its decisions.
