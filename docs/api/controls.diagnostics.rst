@@ -283,6 +283,10 @@ Related types
 
       Counts presentation, total duration, and worst duration.
 
+   .. cpp:function:: void record_screen_copy(std::uint64_t nanoseconds) noexcept
+
+      Time spent only copying pixels to the screen.
+
    .. cpp:function:: void record_live_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels, std::uint64_t rectangles) noexcept
 
       One live-surface frame copied to the screen.
@@ -471,6 +475,10 @@ Related types
    .. cpp:member:: std::uint64_t live_rectangles_presented
 
    .. cpp:member:: std::uint64_t live_present_duration_nanoseconds
+
+   .. cpp:member:: std::uint64_t screen_copy_nanoseconds
+
+      The time hosts spent only copying pixels to the screen (conversion and the native copy), retained and live together. The present durations above also cover painting and composing; this one compares the copy itself across hosts.
 
    .. cpp:member:: std::string renderer_name
 

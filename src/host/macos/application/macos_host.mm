@@ -2228,6 +2228,7 @@ private:
     }
 #endif
     bool presented = false;
+    std::uint64_t copyNanoseconds = 0U;
     const void* pixels = _raster.pixels();
     // Native exposure/snapshot callbacks can precede unocclusion. The model
     // intentionally declines painting then; the last complete raster is still
@@ -2268,6 +2269,8 @@ private:
             const std::chrono::steady_clock::time_point drawEnded =
                 std::chrono::steady_clock::now();
             _cgDrawPhase.record(drawStarted, drawEnded);
+            copyNanoseconds = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(drawEnded - drawStarted).count());
             presented = true;
         }
         const std::chrono::steady_clock::time_point releaseStarted =
@@ -2330,7 +2333,11 @@ private:
             static_cast<std::uint64_t>(std::llround(retainedArea * devicePixelsPerPoint));
         retainedCopied.rectangles =
             drawnCount > 0 ? static_cast<std::uint64_t>(drawnCount) : 1U;
+        // The window records the copy time with the retained report; a
+        // live-only flush reports it with its first live frame.
+        if (receipt) retainedCopied.copy_nanoseconds = copyNanoseconds;
     }
+    std::uint64_t unreportedCopy = receipt ? 0U : copyNanoseconds;
     const std::uint64_t elapsedNanoseconds = static_cast<std::uint64_t>(elapsed.count());
     const double copiedArea = std::max(drawnArea, liveArea);
     const std::uint64_t liveElapsed = copiedArea <= 0.0 ? 0U :
@@ -2357,6 +2364,8 @@ private:
                 ++liveCopied.rectangles;
             }
             if (liveCopied.rectangles == 0U) continue;
+            liveCopied.copy_nanoseconds = unreportedCopy;
+            unreportedCopy = 0U;
             (*_model).notify_live_presented(liveDuration, liveCopied);
         }
     }

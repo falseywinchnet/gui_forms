@@ -330,8 +330,9 @@ public:
     [[nodiscard]] PaintLeaseSnapshot paint_lease_snapshot() const noexcept;
     // Called by a host when it attaches this window (stage DP). Throws
     // std::invalid_argument when the declared contract version is older than
-    // paint_contract_version: such a host fails attachment rather than
-    // presenting in a degraded mode.
+    // paint_contract_version, or claims version 2 or later without partial
+    // present: such a host fails attachment rather than presenting in a
+    // degraded mode.
     void declare_presentation(PresentationDeclaration declaration);
     // The availability record: the host's declaration and the live lease.
     [[nodiscard]] PresentationAvailability presentation_availability() const noexcept;

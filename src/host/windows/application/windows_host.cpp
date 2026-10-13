@@ -3109,6 +3109,8 @@ private:
         }
         bool presented = true;
         PresentedArea copied;
+        const std::chrono::steady_clock::time_point copy_started =
+            std::chrono::steady_clock::now();
         const std::span<const Rect> presented_rectangles = screen.rectangles();
         for (std::size_t index = 0; index < presented_rectangles.size(); ++index) {
             const RECT device = device_rect(presented_rectangles[index]);
@@ -3123,6 +3125,9 @@ private:
             }
         }
         ReleaseDC(hwnd_, target);
+        copied.copy_nanoseconds = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - copy_started).count());
         const std::uint64_t elapsed = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started).count());
@@ -3136,6 +3141,10 @@ private:
         retained.device_pixels = copied.device_pixels > live_pixels ?
             copied.device_pixels - live_pixels : 0U;
         retained.rectangles = copied.rectangles;
+        // A tick with a receipt reports the copy time with the retained
+        // present; a live-only tick with its first live frame.
+        if (receipt) retained.copy_nanoseconds = copied.copy_nanoseconds;
+        std::uint64_t unreported_copy = receipt ? 0U : copied.copy_nanoseconds;
         const std::uint64_t all_pixels = retained.device_pixels + live_pixels;
         const std::uint64_t live_elapsed = all_pixels == 0U ? 0U :
             static_cast<std::uint64_t>(static_cast<double>(elapsed) *
@@ -3164,6 +3173,8 @@ private:
             PresentedArea live;
             live.device_pixels = composed_live_pixels_[index];
             live.rectangles = composed_live_rectangles_[index];
+            live.copy_nanoseconds = unreported_copy;
+            unreported_copy = 0U;
             (*model_).notify_live_presented(live_duration, live);
         }
     }
@@ -3253,13 +3264,21 @@ private:
         }
         std::optional<PaintReceipt> receipt{};
         bool presented = false;
+        std::uint64_t transactional_copy_nanoseconds = 0U;
         try {
             const bool begun = raster_.begin_frame();
             if (begun) {
                 const bool images_ready = raster_.synchronize_images((*model_).image_resources());
                 if (images_ready) {
                     receipt = (*model_).paint(raster_, pending_damage_.rectangles());
-                    if (receipt) presented = raster_.commit_frame(dc, present_rectangles, *receipt);
+                    if (receipt) {
+                        const std::chrono::steady_clock::time_point copy_started =
+                            std::chrono::steady_clock::now();
+                        presented = raster_.commit_frame(dc, present_rectangles, *receipt);
+                        transactional_copy_nanoseconds = static_cast<std::uint64_t>(
+                            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                std::chrono::steady_clock::now() - copy_started).count());
+                    }
                 }
             }
         } catch (...) {
@@ -3280,6 +3299,7 @@ private:
                 current.presented_revision == (*receipt).rendered_revision;
             if (!acknowledged) {
                 PresentedArea copied;
+                copied.copy_nanoseconds = transactional_copy_nanoseconds;
                 for (std::size_t index = 0; index < present_rectangles.size(); ++index) {
                     copied.device_pixels += device_pixels(present_rectangles[index]);
                     ++copied.rectangles;
@@ -3322,14 +3342,20 @@ private:
         const std::optional<PaintReceipt> receipt =
             (*model_).paint(raster_, pending_damage_.rectangles());
         bool presented = receipt.has_value();
+        const std::chrono::steady_clock::time_point copy_started =
+            std::chrono::steady_clock::now();
         for (std::size_t index = 0; presented && index < present_rectangles.size(); ++index) {
             presented = raster_.present(dc, present_rectangles[index]);
         }
+        const std::uint64_t copy_nanoseconds = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - copy_started).count());
         EndPaint(hwnd_, &paint_state);
         const std::chrono::nanoseconds elapsed =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started);
         PresentedArea copied;
+        copied.copy_nanoseconds = copy_nanoseconds;
         for (std::size_t index = 0; index < present_rectangles.size(); ++index) {
             const std::uint64_t pixels = device_pixels(present_rectangles[index]);
             copied.device_pixels += pixels;

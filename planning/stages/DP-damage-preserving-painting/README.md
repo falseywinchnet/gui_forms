@@ -6,9 +6,11 @@ ambient progress fill. Status 2026-10-13: rectangle-set paint on every host
 (#59, #60) and presentation counters (#71) merged; the Windows live frame
 sequence (#72) confirmed on screen by the owner; the availability record and
 transactional partial present on Windows on `claude/dp-availability-record`.
-Partial present is now offered by both Windows profiles and by macOS; X11
-still copies the bounding box, so decision 3's amendment of
-`PAINT_PIPELINE_AVAILABILITY.md` waits for X11. Authority: the "Damage-preserving painting" and
+Partial present is offered by both Windows profiles and by macOS; the X11
+frame sequence (live frames as damage, rectangle-set present, a 16 ms live
+clock) is on `claude/dp-x11-frame-sequence`, awaiting CI and PlaySuite's Lima
+runs. Decision 3's amendment of `PAINT_PIPELINE_AVAILABILITY.md` follows once
+X11 is verified. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage
@@ -103,7 +105,10 @@ of `PAINT_PIPELINE_AVAILABILITY.md` "Acceptance" still pass. Record under
    profile presents rectangle sets correctly (unchanged pixels carried into
    the candidate, only the rectangles presented, the all-or-nothing swap
    kept). Until then it stays an optional extension, and
-   `PAINT_PIPELINE_AVAILABILITY.md` is amended when it changes.
+   `PAINT_PIPELINE_AVAILABILITY.md` is amended when it changes. Done
+   2026-10-13: the transactional profile (#73) and X11 (#76) present
+   rectangle sets, the document is amended, and `paint_contract_version` is 2;
+   a host that claims it without partial present cannot attach.
 4. **Measure before settling the copy cost.** The cost in question is a
    second copy of live frames, which scales with each frame's changed area.
    PlaySuite measures Stillwater, Mowing and Maze 95 before and after with

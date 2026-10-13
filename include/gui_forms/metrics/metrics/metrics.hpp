@@ -70,6 +70,8 @@ public:
     // A retained present that copied `device_pixels` in `rectangles`.
     void record_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels,
                         std::uint64_t rectangles) noexcept;
+    // Time spent only copying pixels to the screen.
+    void record_screen_copy(std::uint64_t nanoseconds) noexcept;
     // One live-surface frame copied to the screen.
     void record_live_present(std::uint64_t duration_nanoseconds, std::uint64_t device_pixels,
                              std::uint64_t rectangles) noexcept;

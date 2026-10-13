@@ -146,18 +146,23 @@ in today's rasters). `retained_pixels_presented` and
 `live_rectangles_presented` and `live_present_duration_nanoseconds` count
 live-surface frames: one per surface per new frame, with the fragments its
 clip is cut into around overlays as its rectangles. When one present copies
-both, the duration is split by the pixels each copied. Divide by `frames_presented` or `live_frames_presented`
+both, the duration is split by the pixels each copied. The present durations
+cover painting and composing as well as the copy; `screen_copy_nanoseconds`
+counts only the copy to the screen (pixel conversion and the native copy),
+retained and live together, so the copy itself compares across hosts. Divide by `frames_presented` or `live_frames_presented`
 for the copy per frame. A host that presents its rectangles separately shows
 `retained_rectangles_presented` above `frames_presented`; one that copies a
 bounding box shows them equal. Both Windows profiles copy each damage
 rectangle (the transactional one still swaps its whole candidate only after
-every rectangle is copied); the X11 host copies the bounding box; the macOS
-host copies the rectangles AppKit draws, with live frames counted inside the
-same copy.
+every rectangle is copied); the X11 host copies each damage rectangle; the
+macOS host copies the rectangles AppKit draws, with live frames counted inside
+the same copy. On X11 a new live frame becomes damage and retained painting
+composes it, with any overlay above it, in the same frame.
 
 `Window::presentation_availability()` reports what the attached host offers:
-the paint-contract version it meets (`paint_contract_version`; a host that
-cannot meet it fails to attach), whether it presents rectangle sets
-(`partial_present`) and the other optional extensions, and the live paint
-lease. `to_json()` serializes it, and the Windows host includes it in its
+the paint-contract version it meets (`paint_contract_version`, now 2; a host
+that cannot meet it fails to attach), the optional extensions, and the live
+paint lease. Since version 2 every host presents the rectangle set it paints,
+never their union; `partial_present` is reported true for readers of
+version 1. `to_json()` serializes it, and the Windows host includes it in its
 host diagnostics.

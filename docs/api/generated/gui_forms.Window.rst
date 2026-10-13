@@ -743,7 +743,7 @@ gui_forms::Window
 
    .. cpp:function:: void declare_presentation(PresentationDeclaration declaration)
 
-      Called by a host when it attaches this window (stage DP). Throws std::invalid_argument when the declared contract version is older than paint_contract_version: such a host fails attachment rather than presenting in a degraded mode.
+      Called by a host when it attaches this window (stage DP). Throws std::invalid_argument when the declared contract version is older than paint_contract_version, or claims version 2 or later without partial present: such a host fails attachment rather than presenting in a degraded mode.
 
    .. cpp:function:: bool queue_live_surface_presentation(const Control::Ptr& control, std::shared_ptr<LiveSurface> surface)
 

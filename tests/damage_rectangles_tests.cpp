@@ -215,7 +215,13 @@ void presentation_counters_record_copied_area() {
     PresentedArea retained;
     retained.device_pixels = 2400U;
     retained.rectangles = 2U;
+    retained.copy_nanoseconds = 300U;
     expect(window.notify_presented(*receipt, 1000U, retained), "the receipt is accepted");
+    // A repeated receipt (a tick that only presented live frames) is refused,
+    // but its copy still happened and still counts.
+    PresentedArea repeated;
+    repeated.copy_nanoseconds = 100U;
+    expect(!window.notify_presented(*receipt, 1000U, repeated), "a repeated receipt is refused");
     PresentedArea live;
     live.device_pixels = 10000U;
     live.rectangles = 1U;
@@ -229,6 +235,8 @@ void presentation_counters_record_copied_area() {
                metrics.live_rectangles_presented == 2U &&
                metrics.live_present_duration_nanoseconds == 1000U,
            "live frames are counted apart from retained presents");
+    expect(metrics.screen_copy_nanoseconds == 400U,
+           "copy time counts every copy, accepted receipt or not");
     const std::string json = metrics.to_json();
     expect(json.find("\"live_pixels_presented\":20000") != std::string::npos &&
                json.find("\"retained_pixels_presented\":2400") != std::string::npos,
@@ -250,6 +258,15 @@ void availability_record_reports_the_declaration() {
         rejected = true;
     }
     expect(rejected, "a host below the paint contract fails attachment");
+    PresentationDeclaration without_rectangles;
+    without_rectangles.contract_version = paint_contract_version;
+    rejected = false;
+    try {
+        window.declare_presentation(without_rectangles);
+    } catch (const std::invalid_argument&) {
+        rejected = true;
+    }
+    expect(rejected, "contract version 2 requires presenting rectangle sets");
     PresentationDeclaration declared;
     declared.contract_version = paint_contract_version;
     declared.extensions.partial_present = true;
@@ -262,7 +279,7 @@ void availability_record_reports_the_declaration() {
            "the record carries the declaration and the live lease");
     const std::string json = availability.to_json();
     expect(json.find("\"partial_present\":true") != std::string::npos &&
-               json.find("\"contract_version\":1") != std::string::npos,
+               json.find("\"contract_version\":2") != std::string::npos,
            "the record serializes for diagnostics");
 }
 

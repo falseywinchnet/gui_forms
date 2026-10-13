@@ -422,6 +422,7 @@ bool Window::notify_presented(PaintReceipt receipt,
 void Window::notify_live_presented(std::uint64_t duration_nanoseconds,
                                    PresentedArea presented) {
     require_ui_thread("live surface presentation report");
+    metrics_.record_screen_copy(presented.copy_nanoseconds);
     metrics_.record_live_present(duration_nanoseconds, presented.device_pixels,
                                  presented.rectangles);
 }
@@ -430,6 +431,9 @@ bool Window::notify_presented(PaintReceipt receipt,
                               std::uint64_t duration_nanoseconds,
                               PresentedArea presented) {
     require_ui_thread("paint presentation release");
+    // The copy happened whether or not the receipt is newer (a tick that only
+    // presents live frames repeats the presented revision).
+    metrics_.record_screen_copy(presented.copy_nanoseconds);
     const bool current_epoch = receipt.surface_epoch == surface_epoch_;
     const bool complete_revision = receipt.rendered_revision != 0U &&
         receipt.rendered_revision <= rendered_revision_;
@@ -456,6 +460,11 @@ void Window::declare_presentation(PresentationDeclaration declaration) {
     if (declaration.contract_version < paint_contract_version) {
         throw std::invalid_argument(
             "GUI.Forms host does not meet the paint contract and cannot attach");
+    }
+    // Contract version 2 includes damage-preserving partial present.
+    if (declaration.contract_version >= 2U && !declaration.extensions.partial_present) {
+        throw std::invalid_argument(
+            "GUI.Forms paint contract 2 requires presenting rectangle sets");
     }
     presentation_declaration_ = declaration;
 }

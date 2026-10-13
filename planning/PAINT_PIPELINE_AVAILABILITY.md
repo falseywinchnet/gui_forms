@@ -1,6 +1,9 @@
 # GUI.Forms paint-pipeline contract and availability
 
 Status: **GIVEN / MEASURED PARTIAL / REQUIRED CLOSURE**. Date: 2026-08-06.
+Amended 2026-10-13 (contract version 2): damage-preserving partial present
+moves from the optional extensions into the required contract (stage DP,
+owner decision 3).
 
 ## Required invariant
 
@@ -11,8 +14,27 @@ unbounded queue or incomplete pixels becoming visible.
 This is a baseline GUI.Forms correctness contract. It is not a platform feature
 that an adapter may report as unavailable. A conforming host must provide the
 behavior itself or use the portable fallback. Optional host capabilities may
-describe faster partial presentation, zero-copy import, or external native
-surface leases; they may not disable coherent latest-state presentation.
+describe zero-copy import, presentation fences or external native surface
+leases; they may not disable coherent latest-state presentation.
+
+**GIVEN (contract version 2, 2026-10-13):** a host presents the bounded
+rectangle set it paints, not the union of those rectangles. Pixels outside the
+set are neither repainted nor copied to the screen, so two distant changes
+cost the sum of their areas. A candidate raster that swaps atomically (M12-P2)
+carries the presented front forward and copies only the rectangle set, and the
+swap stays all-or-nothing. Hosts compose and present in one frame sequence
+(gather, compose, present; `planning/stages/DP-damage-preserving-painting/`
+decision 2), so the screen is always a copy of the raster and a frame capture
+is evidence of what users see.
+
+This was an optional availability item until every host met it:
+
+| Host | Rectangle-set present | Evidence |
+|---|---|---|
+| Windows, default profile | each rectangle copied separately; live frames through the frame sequence | #59, #72, #74; `results/2026-10-13-dp-gate-windows` |
+| Windows, transactional DIB profile | `DibFrameStore::commit` copies each rectangle, swaps only when all succeed | #73; `test_rectangle_set_commit` |
+| macOS | AppKit clips each copy to the rectangles being drawn | #60, #74 |
+| X11 | each rectangle converted and copied with `XPutImage` | #76, #77; PlaySuite's Lima `x11_screen_check.py` runs (changes stay inside the damaged rectangles) |
 
 The three commits have distinct authorities:
 
@@ -36,7 +58,7 @@ the coalesced-wake counters/bit, and the exact diagnostic states `clean`,
 | One active paint lease | **MEASURED** | UI-thread-exclusive `Window::paint`; nested paint becomes `rendering_dirty` and returns |
 | One deferred follow-up while rendering | **MEASURED** | `dirty_after_render`, later damage, and revision comparison preserve one latest-state pass; no revision jobs are stored |
 | Separate ready and presented stages | **MEASURED** | a complete current-epoch replay returns a receipt and becomes `ready`; only an accepted exact host release advances `presented_revision`; duplicate/backward/replaced receipts are counted and rejected |
-| Spatial dirty coalescing | **MEASURED PARTIAL** | bounded multi-rectangle `DamageRegion`, per-plane damage, dirty-subtree traversal, and retained chunk reuse are real; useful rectangles are still collapsed by some native presenters |
+| Spatial dirty coalescing | **MEASURED** | bounded multi-rectangle `DamageRegion`, per-plane damage, dirty-subtree traversal, and retained chunk reuse are real; `Window::paint` paints each rectangle of the set under its own clip, and every host presents the set rather than its union (contract version 2; table above) |
 | Temporal coalescing | **MEASURED** | a queued wake is boolean and revisions are sampled at lease start; intermediate revisions are never replayed as jobs |
 | Last completed surface survives stalls | **MEASURED PARTIAL** | host CPU rasters persist across unrelated paints and callback failure never replays a partial command list; backend replay can still alter the live raster before throwing |
 | Callback failure cannot expose partial owner paint | **MEASURED** | candidate display commands are complete before replay and retained chunks/damage restore on callback failure |
@@ -80,8 +102,9 @@ the combined M11h-P1/M12-P3 boundary is closed.
 - Publish it as latest-ready only after every backend command succeeds.
 - Keep the last presented raster usable across allocation, renderer, upload,
   device-loss, and callback faults.
-- Preserve useful multi-rectangle damage through host copying where supported;
-  a bounded portable copy fallback remains conforming.
+- Preserve multi-rectangle damage through host copying: carry the presented
+  front into the candidate and copy only the rectangle set (contract version 2).
+  Copying the union of the rectangles is no longer conforming.
 
 ### M12-P3 — pressure, input, and stall conformance
 
@@ -106,14 +129,19 @@ extensions:
 | Availability item | Required meaning |
 |---|---|
 | native compatibility-surface lease | opaque platform lease exists; no HWND/HDC enters portable control API |
-| damage-preserving partial present | host consumes a bounded rectangle set instead of its union |
 | zero-copy surface import | completed private pixels can be imported without a CPU copy |
 | explicit presentation receipt/fence | host can distinguish submission from compositor acknowledgement |
 
-The availability record must also publish the mandatory contract version and
-the live diagnostic snapshot. If a host cannot meet coherent latest-state
-presentation, attachment fails; it must not silently advertise a degraded
-mode.
+Damage-preserving partial present (the host consumes a bounded rectangle set
+instead of its union) left this table with contract version 2: it is part of
+the contract. `PresentationExtensions::partial_present` stays in the record
+for readers of version 1, and is true for every host that declares version 2;
+`Window::declare_presentation` refuses a version-2 declaration without it.
+
+The availability record (`Window::presentation_availability()`) publishes the
+mandatory contract version, the extensions and the live diagnostic snapshot.
+If a host cannot meet the contract, attachment fails; it must not silently
+advertise a degraded mode. No host offers the three extensions above yet.
 
 ## Acceptance
 

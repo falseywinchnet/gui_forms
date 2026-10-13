@@ -82,7 +82,7 @@ Related types
    * - :cpp:class:`PresentationSettings <gui_forms::PresentationSettings>`
      - PresentationSettings keeps logical text scaling, contrast, motion, and sound preferences independent from device scale and native host mechanics.
    * - :cpp:class:`PresentedArea <gui_forms::PresentedArea>`
-     - The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
+     - The screen area one presentation copied (stage DP): device pixels, the rectangles they were copied in, and the time spent only copying them (pixel conversion and the native copy, not painting).
    * - :cpp:class:`ValidationSnapshot <gui_forms::ValidationSnapshot>`
      - ValidationSnapshot reports attempts, outcomes, focus blocks, reentrancy rejection, bulk visits, and active transaction state.
 
@@ -648,7 +648,7 @@ Related types
 
    .. cpp:member:: bool partial_present
 
-      The host copies a bounded rectangle set to the screen, not its union.
+      The host copies a bounded rectangle set to the screen, not its union. Required since contract version 2, and reported for readers of version 1.
 
    .. cpp:member:: bool zero_copy_import
 
@@ -688,11 +688,13 @@ Related types
 
    ``#include <gui_forms/window/presentation/presentation_types.hpp>``
 
-   The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
+   The screen area one presentation copied (stage DP): device pixels, the rectangles they were copied in, and the time spent only copying them (pixel conversion and the native copy, not painting).
 
    .. cpp:member:: std::uint64_t device_pixels
 
    .. cpp:member:: std::uint64_t rectangles
+
+   .. cpp:member:: std::uint64_t copy_nanoseconds
 
 .. cpp:namespace:: gui_forms
 
@@ -924,7 +926,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::uint32_t paint_contract_version
 
-   The presentation availability record (stage DP; planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Value: ``1U``.
+   The presentation availability record (stage DP; planning/ PAINT_PIPELINE_AVAILABILITY.md, M11h-P4 / M12-P4). The baseline contract (coherent latest-state presentation: mutation may outpace rendering and rendering may outpace presentation, with no unbounded queue and no incomplete frame visible) is reported as a version, never as a capability: a host that cannot meet it fails attachment. Only optional extensions are reported as available or not, and only truthfully. Version 2 (2026-10-13) adds damage-preserving partial present to the contract: the host presents the bounded rectangle set it paints, not their union. Value: ``2U``.
 
 .. cpp:namespace:: gui_forms
 

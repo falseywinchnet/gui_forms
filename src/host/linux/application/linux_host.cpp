@@ -1,5 +1,7 @@
 #include "linux_host_internal.hpp"
 #include "../../../core/host/frame_capture/frame_capture.hpp"
+#include "../../../core/damage/device_damage/device_damage.hpp"
+#include "gui_forms/live_surface.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 #include <thread>
 #include <X11/XKBlib.h>
@@ -18,6 +20,7 @@
 #include <iostream>
 #include <limits>
 #include <poll.h>
+#include <span>
 #include <stdexcept>
 #include <unistd.h>
 
@@ -45,27 +48,26 @@ struct WindowTitle final {
     } catch (...) { return {HostServiceError::backend_failure}; }
   }
 };
-#if defined(GUI_FORMS_PREPARED_TEXT)
-struct PreparedPresentationImage final {
+struct PresentationImage final {
   XImage* value{};
-  PreparedPresentationImage() = default;
-  ~PreparedPresentationImage() {
+  PresentationImage() = default;
+  ~PresentationImage() {
     if (value != nullptr) {
       // Pixel storage is borrowed from NativeWindow::presentation, not Xlib.
       (*value).data = nullptr;
       XDestroyImage(value);
     }
   }
-  PreparedPresentationImage(const PreparedPresentationImage&) = delete;
-  PreparedPresentationImage& operator=(const PreparedPresentationImage&) = delete;
+  PresentationImage(const PresentationImage&) = delete;
+  PresentationImage& operator=(const PresentationImage&) = delete;
 };
 
-struct PreparedNativeChannel final {
+struct NativeChannel final {
   unsigned long mask{0};
   unsigned long maximum{0};
   unsigned shift{0};
 };
-struct PreparedNativePixels final {
+struct NativePixels final {
   const unsigned char* source{};
   std::size_t source_stride{0};
   std::size_t destination_stride{0};
@@ -73,14 +75,14 @@ struct PreparedNativePixels final {
   int top{0};
   int right{0};
   int bottom{0};
-  std::array<PreparedNativeChannel, 3> channels{};
+  std::array<NativeChannel, 3> channels{};
 };
 
-unsigned long pack_prepared_pixel(const unsigned char* const pixel,
-                                 const std::array<PreparedNativeChannel, 3>& channels) {
+unsigned long pack_native_pixel(const unsigned char* const pixel,
+                                 const std::array<NativeChannel, 3>& channels) {
   unsigned long value = 0;
   for (std::size_t channel = 0; channel < channels.size(); ++channel) {
-    const PreparedNativeChannel component = channels[channel];
+    const NativeChannel component = channels[channel];
     const std::uint64_t intensity = static_cast<std::uint64_t>(pixel[channel]);
     const std::uint64_t scaled_value = (intensity * static_cast<std::uint64_t>(component.maximum) + 127U) / 255U;
     const unsigned long scaled = static_cast<unsigned long>(scaled_value);
@@ -88,72 +90,75 @@ unsigned long pack_prepared_pixel(const unsigned char* const pixel,
   }
   return value;
 }
-void convert_prepared_pixels32(XImage& image, const PreparedNativePixels& pixels) {
+void convert_native_pixels32(XImage& image, const NativePixels& pixels) {
   for (int row = pixels.top; row < pixels.bottom; ++row) {
     const std::size_t source_row = static_cast<std::size_t>(row) * pixels.source_stride;
     const std::size_t destination_row = static_cast<std::size_t>(row) * pixels.destination_stride;
     for (int column = pixels.left; column < pixels.right; ++column) {
       const std::size_t offset = static_cast<std::size_t>(column) * 4U;
-      const unsigned long value = pack_prepared_pixel(pixels.source + source_row + offset, pixels.channels);
+      const unsigned long value = pack_native_pixel(pixels.source + source_row + offset, pixels.channels);
       const std::uint32_t packed = static_cast<std::uint32_t>(value);
       std::memcpy(image.data + destination_row + offset, &packed, sizeof(packed));
     }
   }
 }
-void convert_prepared_pixels_generic(XImage& image, const PreparedNativePixels& pixels) {
+// The common visual: 32-bit pixels in native byte order with 8-bit channels
+// (Xvfb and most TrueColor servers). Each channel is a byte moved into place;
+// no scaling.
+void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
+  const unsigned red = pixels.channels[0].shift;
+  const unsigned green = pixels.channels[1].shift;
+  const unsigned blue = pixels.channels[2].shift;
+  for (int row = pixels.top; row < pixels.bottom; ++row) {
+    const unsigned char* source = pixels.source + static_cast<std::size_t>(row) * pixels.source_stride +
+                                  static_cast<std::size_t>(pixels.left) * 4U;
+    unsigned char* destination = reinterpret_cast<unsigned char*>(image.data) +
+                                 static_cast<std::size_t>(row) * pixels.destination_stride +
+                                 static_cast<std::size_t>(pixels.left) * 4U;
+    for (int column = pixels.left; column < pixels.right; ++column) {
+      const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << red) |
+                                   (static_cast<std::uint32_t>(source[1]) << green) |
+                                   (static_cast<std::uint32_t>(source[2]) << blue);
+      std::memcpy(destination, &packed, sizeof(packed));
+      source += 4;
+      destination += 4;
+    }
+  }
+}
+void convert_native_pixels_generic(XImage& image, const NativePixels& pixels) {
   for (int row = pixels.top; row < pixels.bottom; ++row) {
     const std::size_t source_row = static_cast<std::size_t>(row) * pixels.source_stride;
     for (int column = pixels.left; column < pixels.right; ++column) {
       const std::size_t offset = static_cast<std::size_t>(column) * 4U;
-      const unsigned long value = pack_prepared_pixel(pixels.source + source_row + offset, pixels.channels);
+      const unsigned long value = pack_native_pixel(pixels.source + source_row + offset, pixels.channels);
       XPutPixel(&image, column, row, value);
     }
   }
 }
 
-// Submits only coherent front pixels. Source and native conversion storage are
-// disjoint; both borrows end before the renderer can begin another transaction.
-// The device pixels the X11 host copies for a damage bounding box at scale 1:
-// the box widened to whole pixels and clipped to the window (stage DP).
-PresentedArea presented_box(const Rect bounds, const Size window_size) {
-  PresentedArea copied;
-  const Rect extent{0.0, 0.0, window_size.width, window_size.height};
-  const Rect clipped = Rect::intersection(bounds, extent);
-  if (clipped.empty()) return copied;
-  const double left = std::floor(clipped.x);
-  const double top = std::floor(clipped.y);
-  const double right = std::ceil(clipped.right());
-  const double bottom = std::ceil(clipped.bottom());
-  copied.device_pixels = static_cast<std::uint64_t>(right - left) *
-                         static_cast<std::uint64_t>(bottom - top);
-  copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
-  return copied;
-}
-
-bool present_prepared_front(NativeWindow& window, const Rect requested) {
+// Copies each rectangle of the raster's pixels to the window (stage DP partial
+// present): one native image for the raster, converted and submitted rectangle
+// by rectangle. Rectangles are clipped to the window and widened to whole
+// pixels. Returns false, copying nothing, when the raster or the native image
+// cannot be used; `copied` then stays empty. Source and native conversion
+// storage are disjoint, and both borrows end before the renderer can begin
+// another frame.
+bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect> requested,
+                               PresentedArea& copied) {
   render::SkiaRaster& raster = window.raster;
   const std::uint32_t width = raster.pixel_width();
   const std::uint32_t height = raster.pixel_height();
   const unsigned char* const source = static_cast<const unsigned char*>(raster.pixels());
-  if (source == nullptr || width == 0 || height == 0 || width > 16384 || height > 16384 ||
-      raster.prepared_front_scale() != 1.0) return false;
+  if (source == nullptr || width == 0 || height == 0 || width > 16384 || height > 16384) return false;
   if (!std::isfinite(window.size.width) || !std::isfinite(window.size.height) ||
       window.size.width <= 0.0 || window.size.height <= 0.0) return false;
-  if (!std::isfinite(requested.x) || !std::isfinite(requested.y) || !std::isfinite(requested.width) ||
-      !std::isfinite(requested.height) || !std::isfinite(requested.right()) || !std::isfinite(requested.bottom())) return false;
   const double visible_width = std::min(static_cast<double>(width), window.size.width);
   const double visible_height = std::min(static_cast<double>(height), window.size.height);
   const Rect extent{0.0, 0.0, visible_width, visible_height};
-  const Rect clipped = Rect::intersection(requested, extent);
-  if (clipped.empty()) return false;
-  PreparedNativePixels pixels{};
+  NativePixels pixels{};
   pixels.source = source;
   pixels.source_stride = raster.row_bytes();
-  pixels.left = static_cast<int>(std::floor(clipped.x));
-  pixels.top = static_cast<int>(std::floor(clipped.y));
-  pixels.right = static_cast<int>(std::ceil(clipped.right()));
-  pixels.bottom = static_cast<int>(std::ceil(clipped.bottom()));
-  PreparedPresentationImage owner{};
+  PresentationImage owner{};
   Display* const display = window.runtime.display;
   const int screen = DefaultScreen(display);
   owner.value = XCreateImage(display, DefaultVisual(display, screen),
@@ -179,17 +184,41 @@ bool present_prepared_front(NativeWindow& window, const Rect requested) {
   }
   const bool native32 = image.bits_per_pixel == 32 &&
       (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
-  if (native32) convert_prepared_pixels32(image, pixels);
-  else convert_prepared_pixels_generic(image, pixels);
-  const unsigned columns = static_cast<unsigned>(pixels.right - pixels.left);
-  const unsigned rows = static_cast<unsigned>(pixels.bottom - pixels.top);
-  XPutImage(display, window.xid, window.gc, &image, pixels.left, pixels.top,
-            pixels.left, pixels.top, columns, rows);
+  bool byte_channels = native32;
+  for (std::size_t channel = 0; channel < pixels.channels.size(); ++channel) {
+    if (pixels.channels[channel].maximum != 255U || pixels.channels[channel].shift % 8U != 0U ||
+        pixels.channels[channel].shift > 24U) byte_channels = false;
+  }
+  // The copy alone is timed: conversion, XPutImage and the flush.
+  const std::chrono::steady_clock::time_point copy_started = std::chrono::steady_clock::now();
+  for (std::size_t index = 0; index < requested.size(); ++index) {
+    const Rect rectangle = requested[index];
+    if (!rectangle.finite()) continue;
+    const Rect clipped = Rect::intersection(rectangle, extent);
+    if (clipped.empty()) continue;
+    pixels.left = static_cast<int>(std::floor(clipped.x));
+    pixels.top = static_cast<int>(std::floor(clipped.y));
+    pixels.right = static_cast<int>(std::ceil(clipped.right()));
+    pixels.bottom = static_cast<int>(std::ceil(clipped.bottom()));
+    if (byte_channels) convert_native_pixels32_bytes(image, pixels);
+    else if (native32) convert_native_pixels32(image, pixels);
+    else convert_native_pixels_generic(image, pixels);
+    const unsigned columns = static_cast<unsigned>(pixels.right - pixels.left);
+    const unsigned rows = static_cast<unsigned>(pixels.bottom - pixels.top);
+    XPutImage(display, window.xid, window.gc, &image, pixels.left, pixels.top,
+              pixels.left, pixels.top, columns, rows);
+    copied.device_pixels += static_cast<std::uint64_t>(columns) * static_cast<std::uint64_t>(rows);
+    ++copied.rectangles;
+  }
   XFlush(display);
+  copied.copy_nanoseconds += static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now() - copy_started).count());
   // Xlib submission is not a server-error/physical-display atomicity guarantee.
   return true;
 }
 
+#if defined(GUI_FORMS_PREPARED_TEXT)
 // Returns true when a frame was presented and its damage acknowledged.
 bool update_prepared_window(NativeWindow& window) {
   render::SkiaRaster& raster = window.raster;
@@ -215,16 +244,16 @@ bool update_prepared_window(NativeWindow& window) {
     // replay cannot terminate the event loop or claim a presentation receipt.
   }
   const PaintReceipt front = raster.prepared_front_receipt();
-  if (!front) return false;
+  if (!front || raster.prepared_front_scale() != 1.0) return false;
   bool presented = false;
-  try { presented = present_prepared_front(window, window.damage.bounds()); }
+  PresentedArea copied;
+  try { presented = present_raster_rectangles(window, window.damage.rectangles(), copied); }
   catch (...) { return false; }
   if (!presented || !committed) return false;
   const std::chrono::steady_clock::time_point finished = std::chrono::steady_clock::now();
   const std::chrono::nanoseconds duration = std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started);
   const std::uint64_t elapsed = static_cast<std::uint64_t>(duration.count());
-  const PresentedArea copied = presented_box(window.damage.bounds(), window.size);
-  const bool acknowledged = (*window.entry.model).notify_presented(*committed, elapsed, copied);
+  const bool acknowledged = window.report_presented(*committed, elapsed, copied);
   if (acknowledged) window.damage.clear();
   else {
     // An exposure can repaint an already acknowledged revision. Clear only if
@@ -569,10 +598,11 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
       .metrics()
       .set_renderer("Skia CPU / HarfBuzz / FreeType / X11", true);
   services = std::make_unique<Services>(*this);
-  // The availability record (stage DP): the X11 host copies the damage
-  // bounding box, so partial present is not offered.
+  // The availability record (stage DP): the X11 host copies each damage
+  // rectangle.
   PresentationDeclaration presentation;
   presentation.contract_version = paint_contract_version;
+  presentation.extensions.partial_present = true;
   (*entry.model).declare_presentation(presentation);
   session = std::make_unique<HostSession>(*entry.model, linux_capabilities(),
                                           services.get());
@@ -894,9 +924,12 @@ void NativeWindow::update() {
   static_cast<void>(
       (*entry.model).poll_frame_schedule(std::chrono::steady_clock::now()));
   if (accessibility && !closed) { (*accessibility).update(); }
+  const bool regions_taken = gather_live_damage();
   const DamageRegion fresh = (*entry.model).take_damage();
   for (std::size_t i = 0; i < fresh.rectangles().size(); ++i)
     damage.add(fresh.rectangles()[i]);
+  // A taken region stays valid only if this tick presents it.
+  if (regions_taken) live_region_lost = true;
   if (!visible || damage.empty())
     return;
   const Rect frame_bounds = damage.bounds();
@@ -906,6 +939,7 @@ void NativeWindow::update() {
       frame_bounds.y + frame_bounds.height >= size.height;
 #if defined(GUI_FORMS_PREPARED_TEXT)
   const bool prepared_presented = update_prepared_window(*this);
+  if (prepared_presented && regions_taken) live_region_lost = false;
   frame_capture_if_due(covers_window && prepared_presented);
   return;
 #else
@@ -920,78 +954,119 @@ void NativeWindow::update() {
   raster.end_frame();
   if (!receipt)
     return;
-  XImage *image = XCreateImage(
-      runtime.display,
-      DefaultVisual(runtime.display, DefaultScreen(runtime.display)),
-      static_cast<unsigned>(
-          DefaultDepth(runtime.display, DefaultScreen(runtime.display))),
-      ZPixmap, 0, nullptr, raster.pixel_width(), raster.pixel_height(), 32, 0);
-  if (image == nullptr)
-    throw std::runtime_error("Cannot create X11 presentation image");
-  presentation.resize(static_cast<std::size_t>((*image).bytes_per_line) *
-                      raster.pixel_height());
-  (*image).data = presentation.data();
-  const unsigned char *source =
-      static_cast<const unsigned char *>(raster.pixels());
-  const Rect bounds = damage.bounds();
-  const int x = std::clamp(static_cast<int>(std::floor(bounds.x)), 0,
-                           static_cast<int>(raster.pixel_width())),
-            y = std::clamp(static_cast<int>(std::floor(bounds.y)), 0,
-                           static_cast<int>(raster.pixel_height()));
-  const unsigned width = static_cast<unsigned>(std::max(
-      0.0, std::min(size.width, std::ceil(bounds.x + bounds.width)) - x));
-  const unsigned height = static_cast<unsigned>(std::max(
-      0.0, std::min(size.height, std::ceil(bounds.y + bounds.height)) - y));
-  const unsigned long masks[] = {(*image).red_mask, (*image).green_mask,
-                                 (*image).blue_mask};
-  for (unsigned row = static_cast<unsigned>(y);
-       row < static_cast<unsigned>(y) + height; ++row) {
-    for (unsigned column = static_cast<unsigned>(x);
-         column < static_cast<unsigned>(x) + width; ++column) {
-      const unsigned char *pixel =
-          source + static_cast<std::size_t>(row) * raster.row_bytes() +
-          column * 4U;
-      unsigned long value = 0;
-      for (unsigned channel = 0; channel < 3; ++channel) {
-        if (masks[channel] == 0)
-          continue;
-        const unsigned shift = std::countr_zero(masks[channel]);
-        const unsigned long maximum = masks[channel] >> shift;
-        value |=
-            ((static_cast<unsigned long>(pixel[channel]) * maximum + 127) / 255
-             << shift) &
-            masks[channel];
-      }
-      if ((*image).bits_per_pixel == 32 &&
-          ((*image).byte_order == LSBFirst) ==
-              (std::endian::native == std::endian::little)) {
-        const std::uint32_t packed = static_cast<std::uint32_t>(value);
-        std::memcpy((*image).data +
-                        static_cast<std::size_t>(row) *
-                            (*image).bytes_per_line +
-                        column * 4U,
-                    &packed, sizeof(packed));
-      } else
-        XPutPixel(image, static_cast<int>(column), static_cast<int>(row),
-                  value);
-    }
-  }
-  XPutImage(runtime.display, xid, gc, image, x, y, x, y, width, height);
-  (*image).data = nullptr;
-  XDestroyImage(image);
+  PresentedArea copied;
+  if (!present_raster_rectangles(*this, damage.rectangles(), copied))
+    return;
   const std::uint64_t elapsed = static_cast<std::uint64_t>(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           std::chrono::steady_clock::now() - started)
           .count());
-  PresentedArea copied;
-  copied.device_pixels = static_cast<std::uint64_t>(width) * static_cast<std::uint64_t>(height);
-  copied.rectangles = copied.device_pixels != 0U ? 1U : 0U;
-  if ((*entry.model).notify_presented(*receipt, elapsed, copied)) {
+  // The copy reached the window. A tick that only presents live frames paints
+  // the revision already presented: the window refuses that receipt as not
+  // newer, but the frame is on screen, so the damage is done (as the
+  // prepared-text path checks).
+  const bool acknowledged = report_presented(*receipt, elapsed, copied);
+  const PaintLeaseSnapshot lease = (*entry.model).paint_lease_snapshot();
+  const bool shown = acknowledged ||
+      (lease.surface_epoch == (*receipt).surface_epoch &&
+       lease.presented_revision == (*receipt).rendered_revision);
+  if (shown) {
     damage.clear();
+    if (regions_taken) live_region_lost = false;
     frame_capture_if_due(covers_window);
   }
 #endif
 }
+// Frame sequence, gather (stage DP decision 2). Each surface's new frame is
+// taken once with the region it changed since this host last drew it; the
+// core splits its clip around overlays, and each fragment adds the changed
+// part (or, after a change of placement or a lost region, all of it) to the
+// window's damage. Retained painting then composes the frame and whatever
+// lies above it, so overlays are drawn over the new frame in the same pass.
+bool NativeWindow::gather_live_damage() {
+  live_surfaces.clear();
+  live_frame_pixels.clear();
+  live_frame_rectangles.clear();
+  if (!(*entry.model).has_live_surface_presentations()) return false;
+  const std::vector<LiveSurfacePresentation> updates =
+      (*entry.model).take_live_surface_presentations();
+  const bool regions_usable = !live_region_lost;
+  bool regions_taken = false;
+  std::vector<Rect> changed_regions;
+  changed_regions.reserve(updates.size());
+  for (std::size_t index = 0; index < updates.size(); ++index) {
+    const LiveSurfacePresentation& update = updates[index];
+    if (!update.surface) continue;
+    std::size_t frame = live_surfaces.size();
+    for (std::size_t earlier = 0; earlier < live_surfaces.size(); ++earlier) {
+      if (live_surfaces[earlier] == update.surface.get()) {
+        frame = earlier;
+        break;
+      }
+    }
+    if (frame == live_surfaces.size()) {
+      const LiveSurfaceFrame taken = (*update.surface).acquire_for_presentation(this);
+      if (taken) regions_taken = true;
+      Rect changed = update.clip;
+      if (!taken) {
+        changed = {};
+      } else if (update.damage_limited && regions_usable) {
+        changed = gui_forms::detail::live_damage_in_window(
+            taken.damage(), update.destination, taken.width(), taken.height(), 1.0);
+      }
+      live_surfaces.push_back(update.surface.get());
+      changed_regions.push_back(changed);
+      live_frame_pixels.push_back(0U);
+      live_frame_rectangles.push_back(0U);
+    }
+    const Rect changed = changed_regions[frame];
+    const Rect region = update.damage_limited && regions_usable
+        ? Rect::intersection(update.clip, changed) : (changed.empty() ? Rect{} : update.clip);
+    if (region.empty()) continue;
+    damage.add(region);
+    const Rect device = gui_forms::detail::align_damage_outward(region, 1.0);
+    live_frame_pixels[frame] += static_cast<std::uint64_t>(device.width) *
+                                static_cast<std::uint64_t>(device.height);
+    ++live_frame_rectangles[frame];
+  }
+  return regions_taken;
+}
+
+// Frame sequence, report (stage DP). One present copied `copied`; the live
+// frames gathered this tick are its live share, the rest retained, and the
+// duration is split between them by the pixels each copied.
+bool NativeWindow::report_presented(const PaintReceipt receipt, const std::uint64_t elapsed,
+                                    const PresentedArea copied) {
+  std::uint64_t live_pixels = 0U;
+  std::uint64_t live_frames = 0U;
+  for (std::size_t index = 0; index < live_frame_rectangles.size(); ++index) {
+    if (live_frame_rectangles[index] == 0U) continue;
+    live_pixels += live_frame_pixels[index];
+    ++live_frames;
+  }
+  if (live_pixels > copied.device_pixels) live_pixels = copied.device_pixels;
+  PresentedArea retained;
+  retained.device_pixels = copied.device_pixels - live_pixels;
+  retained.rectangles = copied.rectangles;
+  // The window records the copy time with this report, accepted or not.
+  retained.copy_nanoseconds = copied.copy_nanoseconds;
+  const std::uint64_t live_elapsed = copied.device_pixels == 0U ? 0U :
+      static_cast<std::uint64_t>(static_cast<double>(elapsed) *
+          static_cast<double>(live_pixels) / static_cast<double>(copied.device_pixels));
+  const bool acknowledged =
+      (*entry.model).notify_presented(receipt, elapsed - live_elapsed, retained);
+  const std::uint64_t live_duration = live_frames == 0U ? 0U : live_elapsed / live_frames;
+  for (std::size_t index = 0; index < live_frame_rectangles.size(); ++index) {
+    if (live_frame_rectangles[index] == 0U) continue;
+    PresentedArea live;
+    live.device_pixels = live_frame_pixels[index];
+    live.rectangles = live_frame_rectangles[index];
+    (*entry.model).notify_live_presented(live_duration, live);
+  }
+  live_frame_rectangles.clear();
+  return acknowledged;
+}
+
 void NativeWindow::frame_capture_if_due(bool covers_window) {
   if (closed || frame_capture_completed || !covers_window ||
       entry.options.capture_path.empty())
@@ -1074,6 +1149,10 @@ void Runtime::step(int maximum_wait) {
     window.update();
     if (window.closed)
       continue;
+    // The live clock (stage DP): a registered live surface is sampled at
+    // least every 16 ms, as the Windows host's waitable timer does.
+    if ((*window.entry.model).has_live_surface_presentations())
+      wait = wait < 0 ? 16 : std::min(wait, 16);
     const std::optional<FrameTime> deadline = (*window.entry.model).next_wake();
     if (deadline) {
       const long long delay =
