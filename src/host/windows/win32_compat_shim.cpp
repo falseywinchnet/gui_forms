@@ -21,8 +21,11 @@ std::unordered_set<HBITMAP> top_down_bitmaps;
 // DC classifications are keyed by handle value, and GDI recycles DC values.
 // A DC destroyed outside the shim leaves its classification behind, so a
 // recycled value may be recorded as ordinary although it is now an endpoint
-// DC. Consumers receive endpoint DCs only through GetDC or BeginPaint, which
-// reclassify the value before it is used.
+// DC. GetDC and BeginPaint, the consumer's route to an endpoint DC,
+// reclassify the value; CreateCompatibleBitmap, whose orientation choice
+// lasts for the bitmap's lifetime, asks the ABI instead of trusting an
+// ordinary record. Drawing calls trust the record: re-asking the ABI there
+// would construct an error message per call for every ordinary DC.
 std::mutex endpoint_dc_mutex;
 std::unordered_set<HDC> endpoint_dcs;
 std::unordered_set<HDC> ordinary_dcs;
@@ -120,17 +123,30 @@ void publish_endpoint_dc(HDC dc) noexcept {
     }
 }
 
+bool request_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
+    static const BeginEndpointWrite entry = forms_entry<BeginEndpointWrite>(
+        "gf_windows_paint_endpoint_begin_write_v1");
+    return entry != nullptr && lease != nullptr &&
+        entry(reinterpret_cast<std::uintptr_t>(dc), lease) == 0 &&
+        *lease != 0U;
+}
+
 bool begin_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
     const DcKind kind = cached_dc_kind(dc);
     if (kind == DcKind::ordinary) return false;
-    static const BeginEndpointWrite entry = forms_entry<BeginEndpointWrite>(
-        "gf_windows_paint_endpoint_begin_write_v1");
-    const bool acquired = entry != nullptr && lease != nullptr &&
-        entry(reinterpret_cast<std::uintptr_t>(dc), lease) == 0 &&
-        *lease != 0U;
+    const bool acquired = request_endpoint_write(dc, lease);
     if (kind == DcKind::unknown) {
         remember_dc(dc, acquired ? DcKind::endpoint : DcKind::ordinary);
     }
+    return acquired;
+}
+
+// Asks the ABI even when the cache records dc as ordinary, then records the
+// answer. Used where a stale record would have a lasting effect.
+bool begin_endpoint_write_revalidated(HDC dc, std::uint64_t* lease) noexcept {
+    if (dc == nullptr) return false;
+    const bool acquired = request_endpoint_write(dc, lease);
+    remember_dc(dc, acquired ? DcKind::endpoint : DcKind::ordinary);
     return acquired;
 }
 
@@ -425,7 +441,11 @@ extern "C" HBITMAP WINAPI gf_compat_CreateCompatibleBitmap(
     std::uint64_t endpoint_lease{};
     const HBITMAP selected = dc == nullptr ? nullptr :
         reinterpret_cast<HBITMAP>(GetCurrentObject(dc, OBJ_BITMAP));
-    const bool top_down = begin_endpoint_write(dc, &endpoint_lease) ||
+    // GDI's own compatible bitmap for a DC holding a top-down DIB section is
+    // bottom-up, so misclassifying an endpoint DC here would give the
+    // producer the opposite orientation for the bitmap's whole lifetime.
+    const bool top_down =
+        begin_endpoint_write_revalidated(dc, &endpoint_lease) ||
         tracked_top_down(selected);
     HBITMAP result{};
     if (top_down && width > 0 && height > 0) {

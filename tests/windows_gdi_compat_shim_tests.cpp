@@ -374,8 +374,8 @@ bool run_concurrent_resize_gate(const gf_api_v0& api, HMODULE shim) {
 // value. A module that does not import the shim may hand it a DC (classified
 // ordinary after the ABI declines it) and later destroy that DC with gdi32.
 // Repeat that cycle across the handle table so the endpoint DC acquired next
-// is likely to reuse a value the shim still records as ordinary. The shim's
-// GetDC must reclassify the endpoint DC regardless.
+// is likely to reuse a value the shim still records as ordinary. The shim
+// must still give that endpoint DC a top-down compatible bitmap.
 bool seed_recycled_dc_classifications(HMODULE shim) {
     const ShimBitBlt bit_blt = entry<ShimBitBlt>(shim, "BitBlt");
     if (bit_blt == nullptr) return false;
@@ -390,13 +390,26 @@ bool seed_recycled_dc_classifications(HMODULE shim) {
     return true;
 }
 
+// The bitmap a dib-overlap case scrolls, and for the top-down cases the route
+// by which the endpoint DC reaches the test.
+enum class DibOverlapSource : std::uint8_t {
+    // Operating-system bottom-up DIB section.
+    bottom_up_section,
+    // Endpoint DC from the shim's GetDC, the consumer route.
+    top_down_shim_get_dc,
+    // Endpoint DC from the internal ABI bridge, which the shim never sees
+    // until CreateCompatibleBitmap receives it.
+    top_down_abi_bridge,
+};
+
 // Scrolls a 32-bit DIB down one row onto itself through the shim's BitBlt.
-// The bottom-up case uses an operating-system DIB section; the top-down case
-// uses the shim's compatible bitmap for a GUI.Forms endpoint DC, which the
+// The bottom-up case uses an operating-system DIB section; the top-down cases
+// use the shim's compatible bitmap for a GUI.Forms endpoint DC, which the
 // shim creates as a tracked top-down DIB section. Windows reports a positive
 // biHeight for both orientations, so the case verifies the orientation it
 // fills before checking the overlapping copy.
-bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
+bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim,
+                          DibOverlapSource source) {
     const ShimGetDC get_dc = entry<ShimGetDC>(shim, "GetDC");
     const ShimReleaseDC release_dc =
         entry<ShimReleaseDC>(shim, "ReleaseDC");
@@ -427,7 +440,13 @@ bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
     info.bmiHeader.biPlanes = 1;
     info.bmiHeader.biBitCount = 32;
     info.bmiHeader.biCompression = BI_RGB;
-    const char* orientation = top_down ? "top-down" : "bottom-up";
+    const bool top_down = source != DibOverlapSource::bottom_up_section;
+    const char* orientation = "bottom-up";
+    if (source == DibOverlapSource::top_down_shim_get_dc) {
+        orientation = "top-down";
+    } else if (source == DibOverlapSource::top_down_abi_bridge) {
+        orientation = "top-down-abi-bridge";
+    }
     gf_handle endpoint_control{};
     std::uint64_t endpoint{};
     std::uintptr_t endpoint_window{};
@@ -457,11 +476,18 @@ bool run_dib_overlap_case(const gf_api_v0& api, HMODULE shim, bool top_down) {
                          "shim-gate=failure|stage:dib-overlap-acquire\n");
             goto cleanup;
         }
-        // A consumer receives an endpoint DC only through the shim's GetDC
-        // or BeginPaint, which classify it as an endpoint. The ABI's own DC
-        // lookup would leave a recycled value's ordinary classification in
-        // place, and the shim would then create a bottom-up compatible bitmap.
-        endpoint_dc = get_dc(reinterpret_cast<HWND>(endpoint_window));
+        // The seeded value may still be recorded as ordinary. GetDC
+        // reclassifies it; on the bridge route only CreateCompatibleBitmap's
+        // own ABI query keeps the shim from creating a bottom-up bitmap.
+        if (source == DibOverlapSource::top_down_shim_get_dc) {
+            endpoint_dc = get_dc(reinterpret_cast<HWND>(endpoint_window));
+        } else {
+            std::uintptr_t bridge_dc{};
+            if (gf_windows_paint_endpoint_get_dc_v1(
+                    endpoint_window, &bridge_dc) == GF_OK) {
+                endpoint_dc = reinterpret_cast<HDC>(bridge_dc);
+            }
+        }
         if (endpoint_dc == nullptr) {
             std::fprintf(stderr,
                          "shim-gate=failure|stage:dib-overlap-get-dc\n");
@@ -546,8 +572,12 @@ cleanup:
     if (previous != nullptr) select_object(dc, previous);
     if (bitmap != nullptr) delete_object(bitmap);
     if (dc != nullptr) delete_dc(dc);
-    if (endpoint_dc != nullptr) {
+    if (endpoint_dc != nullptr &&
+        source == DibOverlapSource::top_down_shim_get_dc) {
         release_dc(reinterpret_cast<HWND>(endpoint_window), endpoint_dc);
+    } else if (endpoint_dc != nullptr) {
+        gf_windows_paint_endpoint_release_dc_v1(
+            endpoint_window, reinterpret_cast<std::uintptr_t>(endpoint_dc));
     }
     if (endpoint != 0U) gf_windows_paint_endpoint_release_v1(endpoint);
     if (endpoint_control.slot != 0U || endpoint_control.generation != 0U) {
@@ -557,8 +587,12 @@ cleanup:
 }
 
 bool run_dib_overlap_gate(const gf_api_v0& api, HMODULE shim) {
-    return run_dib_overlap_case(api, shim, false) &&
-        run_dib_overlap_case(api, shim, true);
+    return run_dib_overlap_case(
+               api, shim, DibOverlapSource::bottom_up_section) &&
+        run_dib_overlap_case(
+            api, shim, DibOverlapSource::top_down_shim_get_dc) &&
+        run_dib_overlap_case(
+            api, shim, DibOverlapSource::top_down_abi_bridge);
 }
 
 bool run_concurrent_release_gate(const gf_api_v0& api) {
