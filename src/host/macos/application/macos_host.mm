@@ -1790,6 +1790,17 @@ private:
             [self setNeedsDisplayInRect:
                 NSMakeRect(aligned.x, aligned.y, aligned.width, aligned.height)];
         }
+        // Where a new frame changed pixels beneath an overlay, the model now
+        // holds that share as damage (take_live_surface_presentations). Take
+        // it into this flush so the overlay is retained-painted over the new
+        // frame together with the live copy, not one wake later.
+        const DamageRegion beneathOverlays = (*_model).take_damage();
+        for (GFRect rect : beneathOverlays.rectangles()) {
+            rect = gui_forms::detail::align_damage_outward(rect, scale);
+            _pendingDamage.add(rect);
+            [self setNeedsDisplayInRect:
+                NSMakeRect(rect.x, rect.y, rect.width, rect.height)];
+        }
         // AppKit calls on the main run loop, following this view's screen. Keep
         // its default variable refresh policy; sample only the newest frame.
         [self displayIfNeeded];

@@ -250,6 +250,50 @@ void overlay_presentations() {
     require(shown.size() == 1U && all_damage_limited(shown, false), "a re-shown surface copies completely");
 }
 
+// The live lane never draws beneath an overlay, so each new frame must leave
+// the share of the overlay it changed as retained damage, and nothing more.
+void overlay_share_of_new_frames() {
+    const std::shared_ptr<Control> root = make_control<Control>(StableId("tank.root"));
+    const std::shared_ptr<Control> scene = make_control<Control>(StableId("tank"));
+    const std::shared_ptr<Control> capsule = make_control<Control>(StableId("tank.capsule"));
+    (*scene).set_requested_bounds({0.0, 0.0, 100.0, 80.0});
+    (*capsule).set_requested_bounds({10.0, 10.0, 20.0, 10.0});
+    (*capsule).set_paint_plane(PaintPlane::overlay);
+    (*root).add_child(scene);
+    (*root).add_child(capsule);
+    Window window(root, {100.0, 80.0});
+    window.perform_layout();
+    static_cast<void>(window.take_damage());
+    // One surface pixel per window point.
+    const std::shared_ptr<LiveSurface> surface = LiveSurface::create(
+        {.width = 100U, .height = 80U, .opaque = true});
+    require(static_cast<bool>(surface), "tank surface created");
+    publish_damage(*surface, {});
+    require(window.queue_live_surface_presentation(scene, surface), "tank registered");
+
+    require(!window.take_live_surface_presentations().empty(), "first frame presented");
+    require(window.take_damage().bounds() == Rect(10.0, 10.0, 20.0, 10.0),
+            "a first frame damages the whole share beneath the overlay");
+
+    publish_damage(*surface, {50.0, 50.0, 5.0, 5.0});
+    require(!window.take_live_surface_presentations().empty(), "distant change presented");
+    require(window.take_damage().empty(), "a change away from the overlay leaves it retained");
+
+    publish_damage(*surface, {12.0, 12.0, 4.0, 3.0});
+    require(!window.take_live_surface_presentations().empty(), "change beneath presented");
+    require(window.take_damage().bounds() == Rect(11.0, 11.0, 6.0, 5.0),
+            "a change beneath the overlay damages that share, widened one pixel");
+
+    publish_damage(*surface, {50.0, 50.0, 5.0, 5.0});
+    publish_damage(*surface, {60.0, 60.0, 5.0, 5.0});
+    require(!window.take_live_surface_presentations().empty(), "skipped generation presented");
+    require(window.take_damage().bounds() == Rect(10.0, 10.0, 20.0, 10.0),
+            "a skipped generation's unknown damage covers the whole share");
+
+    require(window.take_live_surface_presentations().empty(), "an unchanged frame is not presented");
+    require(window.take_damage().empty(), "an unchanged frame damages nothing");
+}
+
 void host_region_helpers() {
     // 1:1 at scale 2: a 400-pixel surface in a 200-point destination.
     const Rect destination{10.0, 20.0, 200.0, 100.0};
@@ -286,6 +330,7 @@ int main() {
     description_and_frame_lifetime();
     presentation_region();
     overlay_presentations();
+    overlay_share_of_new_frames();
     host_region_helpers();
     format_and_frame_lifetime();
     damage_coverage();
