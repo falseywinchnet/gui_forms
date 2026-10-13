@@ -17,7 +17,7 @@ about features.
 | Condition (from `docs/dev/roadmap.md`) | Satisfied by |
 |---|---|
 | The C function tables and error model pass a breaking-change audit, and the C++ wrappers are RAII conveniences over them rather than a second contract | C |
-| Two independent native consumers pass the ownership, thread and callback conformance tests against the installed SDK | C |
+| Two independent native consumers pass the ownership, thread and callback conformance tests against the installed SDK | C: PlaySuite and Plan Paint, then the interface builder and the demoboard program (owner decision, 2026-10-13) |
 | A machine-readable manifest lists every control and member as supported, deferred or excluded, and the documentation is generated from it | T1 (schema), plus the docs generators (`tools/control_registry.py`, `tools/generate_library_docs.py`) extended to members |
 | Windows, macOS and the X11 host pass the same normative traces, including lifecycle, input order, focus and paint receipts | the host work across all stages; ADR-003, ADR-014 |
 | Native accessibility publication of the semantic tree exists on every host and is exercised by a test, not only the deterministic snapshot | A |

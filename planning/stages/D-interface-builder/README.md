@@ -58,11 +58,10 @@ Prior art to study, for what to take from each:
 
 - Dogfood: the builder is a GUI.Forms program on the default theme (T4). Do
   not hand-style it; problems with its look are toolkit problems.
-- ADR-013 reserves persistent side-panel composition to File Manager and its
-  embedded picker. A builder with a toolbox, a canvas and an inspector needs
-  panels. Raise this with the owner before designing the window
-  (`planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md` routes other consumers
-  to owned popup dialogs).
+- The builder may compose persistent panels; the owner retired ADR-013 on
+  2026-10-13.
+- The builder is also one of the native consumers for the 1.0 ABI
+  conformance condition (stage C): build it against the installed SDK.
 - Generated code passes the house-style check and follows the generated-code
   profile of house style §10.
 - Hand-written handlers stay outside generated regions; a regex rewrite of
@@ -75,10 +74,13 @@ Hand edits and builder edits round-trip: a document edited by hand, then in
 the builder, keeps every untouched byte; the builder can author a Gallery
 page that compiles and passes its tests. Record under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **ADR-013 and the builder's own panels** (see How).
-2. **Where the Visual Studio extension lives** and how it is distributed.
+1. **ADR-013 is retired.** The builder may use persistent panels (toolbox,
+   canvas, inspector).
+
+Still open, minor: where the Visual Studio extension lives and how it is
+distributed.
 
 ## Read first
 
@@ -86,5 +88,4 @@ page that compiles and passes its tests. Record under `results/`.
   [T3](../T3-theme-language/README.md) briefs
 - `planning/interview/GUI_FORMS_INTERVIEW_LEDGER.md` GF014–GF016
 - `planning/CONCISE_AUTHORING_AVAILABILITY.md` deliveries C and E
-- `decisions/ADR-013-panel-composition-reserved-to-file-manager.md`,
-  `planning/FUTURE_APPLICATION_CONSUMER_PROFILE.md`
+- `decisions/ADR-013-panel-composition-reserved-to-file-manager.md` (retired)

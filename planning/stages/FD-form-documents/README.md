@@ -2,8 +2,7 @@
 
 Release: 0.4 Flexible ("form documents that round-trip"). Depends on: T1
 (the schema they serialize) and T3 (shared syntax and round-trip machinery).
-Unblocks D, and through it V. Status 2026-10-12: not started; the format is
-an open owner decision. Authority: `planning/FORWARD_PROGRAMME.md` (stage D
+Unblocks D, and through it V. Status 2026-10-13: not started; format decided. Authority: `planning/FORWARD_PROGRAMME.md` (stage D
 names "form documents" as a dependency, and §1 states the no-clobber rule).
 The forward programme has no separate section for this stage; this brief and
 the stage index added it on 2026-10-12 to match the public roadmap.
@@ -82,20 +81,20 @@ the document, so the familiar file still appears.
 
 ## Gate
 
-Proposed, for owner review: a corpus of documents round-trips byte for byte
+Accepted by the owner on 2026-10-13: a corpus of documents round-trips byte for byte
 when untouched; a scripted edit of one property changes only that
 property's bytes; every Gallery page can be expressed as a document whose
 generated C++ compiles against the installed SDK and passes its tests. D's
 gate then adds the builder.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Syntax.** (a) Evolve the provisional DML block syntax, which is already
-   compact and CSS-like; (b) a CSS-family syntax unified with T3 so forms and
-   themes share one parser; (c) another format. GF014's HTML/CSS profile
-   belonged to Web.Forms; whether any of it carries over is the owner's call.
-2. **Retiring the Gallery DML.** Should it migrate to the new format?
-3. **This stage's gate** above is a proposal.
+1. **Syntax: the CSS family, shared with themes.** One parser and one
+   round-trip machinery serve form and theme documents. The provisional
+   Gallery DML's block style already looks like this and evolves into it.
+2. **The Gallery DML migrates** in this stage; the Gallery becomes the first
+   real form-document corpus and test.
+3. **The gate above is accepted.**
 
 ## Read first
 

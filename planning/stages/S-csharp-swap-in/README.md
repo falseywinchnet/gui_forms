@@ -64,8 +64,9 @@ by swapping one package reference.
    runs on macOS, Linux and Windows. (A binary swap also works because .NET 5
    and later do not verify strong-name signatures; the loader lab showed the
    mechanism. The source swap is the product.)
-3. A corpus of real applications, with SDRSharp first and a few more, chosen
-   and measured with the capture tool. Coverage is what they use.
+3. A corpus of real applications: SDRSharp first, then open-source Windows
+   Forms applications you propose and the owner approves, measured with the
+   capture tool. Coverage is what they use.
 4. A native C# demonstration program built on Shadow Windows in Visual
    Studio.
 5. Generated `InitializeComponent` from form documents (FD), so C# users
@@ -74,8 +75,7 @@ by swapping one package reference.
 ## How
 
 - GUI.Forms itself never depends on .NET (`AGENTS.md`; interview GF014–GF016).
-  The C# layer is a consumer on the installed SDK, built outside the native
-  core build.
+  The C# layer is a consumer on the installed SDK, in its own repository.
 - Look the same: visual differentials against the same application on real
   Windows Forms on Shadow Windows, using the Windows-familiar themes of T4 and
   the fonts of F.
@@ -91,13 +91,15 @@ all three platforms; a visual differential against the same application on
 real Windows Forms is within tolerance. Record per application and platform
 under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Where the C# layer lives**: its own repository, or a separate top-level
-   project in this one that the native build never sees. Proposed on
-   2026-10-12, not answered.
-2. **The corpus** beyond SDRSharp.
-3. **Package identity and naming** on NuGet.
+1. **The C# layer lives in its own repository**, consuming the installed
+   SDK; the native build and CI never see .NET.
+2. **Corpus.** Propose a few open-source Windows Forms applications to join
+   SDRSharp, measured with the capture tool, and get the owner's approval of
+   the list.
+
+Still open, minor: package identity and naming on NuGet.
 
 ## Read first
 

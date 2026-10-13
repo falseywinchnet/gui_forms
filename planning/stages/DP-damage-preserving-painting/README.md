@@ -68,16 +68,16 @@ meaningless if presentation always takes the union.
 
 ## Gate
 
-Proposed, for owner review: with two distant damaged rectangles, the painted
+Accepted by the owner on 2026-10-13: with two distant damaged rectangles, the painted
 area equals their sum (not their bounding box) on every host, and pixels
 outside them are untouched; hosts that support partial present receive the
 rectangle set; the focused model tests, renderer fault tests and host probes
 of `PAINT_PIPELINE_AVAILABILITY.md` "Acceptance" still pass. Record under
 `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. This stage's gate above is a proposal.
+1. The gate above is accepted.
 
 ## Read first
 

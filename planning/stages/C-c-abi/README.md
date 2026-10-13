@@ -91,11 +91,13 @@ two independent native consumers pass the ownership, thread and callback
 conformance tests against the installed SDK. Record the audit and the
 conformance runs under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **What counts as an independent consumer.** PlaySuite and Plan Paint are
-   the owner's own programs on GUI.Forms; whether they qualify, or the
-   consumers must be new, is the owner's call.
+1. **Consumers.** PlaySuite and Plan Paint both count, plus new ones: first
+   the interface builder (D), second the File Manager demoboard program
+   (`file_manager_demoboard/`). PlaySuite and Plan Paint can carry this
+   stage's gate at 0.5; the builder and the demoboard follow as they move to
+   the installed SDK and the stable ABI.
 
 ## Read first
 

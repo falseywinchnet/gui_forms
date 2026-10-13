@@ -80,7 +80,8 @@ cue set on one role reaches every control (the owner's "paint-fill").
    parent-owned overlap (§8.1; CONTROL_DNA §3.6, §4).
 3. Every control publishes its states from the set of §8.4 that it actually
    has. A theme can select only published states and can never invent one
-   visible to code or accessibility (§8.4 rule 3).
+   visible to code or accessibility (§8.4 rule 3). Custom controls may declare
+   their own finite states in the schema (owner decision 2 below).
 4. The property registry grows into the one schema: parts, states,
    properties and interactions per control type, readable at run time and
    exportable (the manifest and the docs are generated from it, which is also
@@ -118,14 +119,14 @@ schema; a test reads each part's geometry from a laid-out Gallery; the
 PlaySuite workarounds that copied private geometry (the track bar inset) are
 no longer needed. Record the coverage table and test run under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Part naming spelling.** Kebab-case CSS-style names (`::part(thumb)`) are
-   what T3 will read; the C++ enumerators follow house naming. Confirm the
-   public spelling before freezing it, since it becomes a contract.
-2. **Application-authored states.** CONTROL_DNA §3.7 allows "application-
-   authored finite states declared in the source contract". Whether custom
-   controls can publish their own states in this stage, or later, is open.
+1. **Part and state names are kebab-case** in theme and form documents
+   (`::part(scroll-thumb)`, `:state(drop-accepted)`); C++ enumerators stay
+   snake_case and map one to one. The names are a versioned public contract.
+2. **Application-defined states are in T1.** A custom control may declare its
+   own finite states in the schema: typed, bounded, visible to themes and
+   inspection. Themes still cannot invent states.
 
 ## Read first
 

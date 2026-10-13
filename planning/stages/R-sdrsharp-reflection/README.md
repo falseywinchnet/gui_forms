@@ -97,11 +97,12 @@ Windows run, within a recorded tolerance, for the listed controls. Record
 under `results/` (screenshots of SDRSharp itself may be kept only as the
 existing harness does: visual records with no extracted application data).
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **The direct HWND route** for the spectrum and waterfall: keep it as the
-   bounded lease ADR-001 allows, or port those controls to portable drawing
-   first.
+1. **The direct HWND route** for the spectrum and waterfall is deferred:
+   "when the time comes, this will require fine-tuned work. May be possible
+   with our accelerated canvas." Plan the port of those two controls as its
+   own careful step; do not decide it inside the rerun.
 
 ## Read first
 

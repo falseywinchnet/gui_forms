@@ -80,7 +80,7 @@ V  WYSIWYG theme designer ─────────────── needs T4
 
 A, F, T1 and DP can start now; A and F run beside everything else. T1 to T4
 are the spine. FD and DP were added on 2026-10-12 to match the public
-roadmap's 0.4 release; their scopes and gates are proposals for owner review.
+roadmap's 0.4 release; the owner accepted their gates on 2026-10-13.
 
 Each stage has a working brief in `planning/stages/<stage>/README.md` with
 the owner's reasons, the current code, the agreed approach, house-style
@@ -199,10 +199,10 @@ A compact form-document format that serializes the T1 schema: objects with
 stable IDs, z-order, layers, properties, layout containers, presentational
 state machines and references to named handlers. Hand edits are legal and
 round-trip; generated C++ and C# are disposable (interview GF014). The syntax
-is an open owner decision (the provisional `demo/gallery.dml` block syntax, a
-CSS-family syntax shared with T3, or another).
+is the CSS family shared with T3 (one parser, one round-trip machinery), and
+the provisional `demo/gallery.dml` migrates to it (owner, 2026-10-13).
 
-Gate (proposed): untouched documents round-trip byte for byte; a scripted
+Gate: untouched documents round-trip byte for byte; a scripted
 one-property edit changes only that property's bytes; every Gallery page can
 be expressed as a document whose generated C++ compiles against the installed
 SDK and passes its tests.
@@ -214,7 +214,7 @@ bounding box, report partial present as an optional host extension, and
 publish the presentation availability record
 (`PAINT_PIPELINE_AVAILABILITY.md`).
 
-Gate (proposed): with two distant damaged rectangles, the painted area equals
+Gate: with two distant damaged rectangles, the painted area equals
 their sum on every host and pixels outside them are untouched; the
 paint-pipeline acceptance tests still pass.
 
@@ -341,8 +341,19 @@ the default follows the Pearl Ribbon study moved toward Plan Paint's royale
 blue, with Plan Paint's tab stack, ribbon buttons as a cloth bulge with no
 edge, push buttons as Plan Paint's action plate, near-white `#F4F4F5` stock
 and no fresco band; the derived dark variant drawn in the studies is accepted
-and reaches whole windows; every theme keeps high-colour icons. Still open:
-whether the default's ribbon buttons ship flat, as the smooth bulge or as the
-dithered bulge (§12.5); whether to create an interim `gui-forms` default on
-today's recipe system before T4; how independent the two 1.0 consumers must
-be; the form-document syntax (FD); where the C# layer lives (S).
+and reaches whole windows; every theme keeps high-colour icons.
+
+Decided 2026-10-13: the default's ribbon buttons ship as the dithered
+bulge; no interim default before T4; XP-style and Windows 7-style themes
+follow Classic and modern flat; part names are kebab-case and custom controls
+may declare states; live theme switching, with hash-only pack integrity; form
+documents use the CSS-family syntax shared with themes and the Gallery DML
+migrates; the FD and DP gates are accepted; ADR-013 is retired; the 1.0
+consumers are PlaySuite and Plan Paint, then the interface builder and the
+demoboard program; the C# layer lives in its own repository with an
+open-source corpus proposed for approval; fonts are OFL, MIT or Apache only,
+the substitution table precedes host fonts in GUI.Drawing, and Consolas maps
+to the owner's Portsmouth Mono; the Web.Forms fidelity oracle moves into
+`tools/` and Chromium stays a test oracle; the SDRSharp spectrum and
+waterfall route is deferred to careful later work. Each stage brief records
+its decisions.

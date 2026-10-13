@@ -55,8 +55,8 @@ Candidates to evaluate, not decisions:
 | Arial, Helvetica | Arimo (Liberation Sans lineage) | metric-compatible with Arial |
 | Times New Roman | Tinos | metric-compatible |
 | Segoe UI | Selawik | Microsoft's open Segoe UI fallback; check how close its metrics are |
-| Tahoma, Microsoft Sans Serif | Wine's replacement faces | check metrics and licence (Wine's fonts are not OFL) |
-| Consolas | none known | record as a gap if nothing metric-compatible exists |
+| Tahoma, Microsoft Sans Serif | nearest OFL/MIT/Apache face | Wine's LGPL replacements are excluded (decision 1) |
+| Consolas | Portsmouth Mono | the owner's face (decision 3); measure its differential |
 
 ## How
 
@@ -80,18 +80,22 @@ line breaks on a fixed corpus) against the reference face, within a recorded
 tolerance; licences recorded in `assets/fonts/ATTRIBUTION.md`. Record the
 corpus, sizes, tolerance and results under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Licences beyond OFL and MIT.** If Wine's Tahoma or Microsoft Sans Serif
-   replacements are the only close match, may GUI.Forms bundle faces under
-   their licence?
-2. **The GUI.Drawing host-font exception.** Should a requested family go
-   through the substitution table first and only then (or never) fall back to
-   CoreText and GDI? Removing the exception makes output identical on every
-   host; keeping it helps unmapped families.
-3. **Families with no metric-compatible face** (Consolas is the likely
-   case): map to the nearest bundled face and accept the differential, or
-   leave unmapped?
+1. **Licences.** Bundle only OFL, MIT or Apache-licensed faces. Wine's
+   LGPL Tahoma and Microsoft Sans Serif replacements are out; those families
+   map to the nearest open face and the differential is recorded.
+2. **GUI.Drawing host fonts.** The substitution table comes first; only an
+   unmapped family falls back to the host's bytes (CoreText, GDI), so drawing
+   code keeps working.
+3. **Consolas** maps to **Portsmouth Mono**, the owner's own monospace face
+   ("Portsmouth Mono exists"). Version 1.0, `PortsmouthMono.ttf`, SHA-256
+   `6129c819de5046e4ec97c7ee8d915bf195d106b98680d9b17901741a1d7314ad`; the
+   owner's copies are in their Portsmouth project downloads
+   (`Portsmouth-Mono-1.0.zip`, with its `PROJECT.md`). It is not yet in
+   `assets/fonts/`; bundle it with its licence and provenance recorded as for
+   Portsmouth Rapids, and confirm the licence text with the owner when adding
+   it.
 
 ## Read first
 

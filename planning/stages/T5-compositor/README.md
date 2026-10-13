@@ -77,7 +77,8 @@ Record per host, including X11 with and without a compositor, under
 
 ## Open decisions (ask, do not decide)
 
-None recorded.
+None recorded. The Windows 7 (Aero-like) Windows-familiar theme (T4) will be
+the first theme to request behind-window glass.
 
 ## Read first
 

@@ -61,8 +61,8 @@ Throw out the rest of the conversion.
 
 ## How
 
-- Chromium (headless) is a test oracle and, if the owner agrees, an import-
-  time measuring tool. It is never a runtime dependency; no browser engine
+- Chromium (headless) is a test oracle only (owner decision): the importer
+  never calls it. It is never a runtime dependency; no browser engine
   enters GUI.Forms (`AGENTS.md`). A layout captured from Chromium at one
   size freezes it, and resizing then breaks. That is why L implements real
   layout instead.
@@ -81,12 +81,12 @@ imports without re-authoring and matches Chromium per node (geometry,
 typography, raster) within tolerance. Record the oracle report under
 `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **What to take from Web.Forms** into this repository: the oracle tooling,
-   anything else.
-2. **Chromium at import time.** May the importer call headless Chromium to
-   measure computed styles while importing, or only tests?
+1. **From Web.Forms, take the fidelity oracle** into `tools/`; leave the
+   compiler and HTML profile behind.
+2. **Chromium in tests only.** The importer computes layout with L's
+   containers; Chromium only checks it.
 
 ## Read first
 

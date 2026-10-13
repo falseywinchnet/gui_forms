@@ -120,14 +120,20 @@ Conformance fixtures for every selector and property form; malformed and
 hostile input tests; a byte-preserving round trip of an untouched document.
 Record the fixture coverage and fuzz run under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **RC003, live switching.** May theme collections change while the program
-   runs, or only at the next launch? The core already has atomic theme
-   replacement.
-2. **RC004, trust.** Do external theme packs need a signature, only a content
-   hash, or a conspicuous untrusted state?
-3. **The file extension and media type** for theme documents.
+1. **Live switching (RC003).** Theme collections may change while a program
+   runs, using the core's atomic theme replacement; focus, capture,
+   selection, semantic bounds and active edits survive a swap. The theme
+   designer's live stage depends on it.
+2. **Trust (RC004).** External packs need a content hash for integrity, no
+   signature. Themes are data-only and bounded; invalid data falls back.
+3. **Names are kebab-case** (see T1).
+4. **Forms share this syntax.** Form documents (FD) use the same CSS-family
+   syntax and the same parser and round-trip machinery.
+
+Still open, minor: the file extension and media type for theme documents.
+Propose one to the owner when the parser lands.
 
 ## Read first
 

@@ -110,8 +110,8 @@ logical lattice position. The studies did this; the engine must state its
 own rule and keep the lattice at 2 logical px.
 
 Flat, smooth bulge and dithered bulge are three engine renderings of one part
-role. **Which one the default ships is the owner's call** (§12.5); the studies
-show the dithered form.
+role. **The default ships the dithered bulge** (owner decision, 2026-10-13;
+design language §12.6).
 
 ## 4. Tabs: Plan Paint's tab stack, exactly
 

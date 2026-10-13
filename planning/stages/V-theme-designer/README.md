@@ -63,9 +63,11 @@ The default theme's button cues are authored in the designer and propagated;
 the saved theme passes T3 conformance and T4's reference images. Record under
 `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **ADR-013 and the designer's panels**, as for D.
+1. **ADR-013 is retired**; the designer may use persistent panels.
+2. **Live theme switching** is allowed (T3), so the stage shows edits
+   immediately.
 
 ## Read first
 

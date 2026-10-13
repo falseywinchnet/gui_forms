@@ -39,8 +39,8 @@ geometry forces a bounded layout pass, nested update scopes defer it, and
 passes are bounded. The docs page says it plainly: no constraint or
 grid-template layout, no CSS.
 
-The earlier experiments left one excellent tool: the browser/native fidelity
-oracle (`file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md` in the
+The earlier experiments left one excellent tool, which the owner decided to
+copy into `tools/`: the browser/native fidelity oracle (`file_manager/web_forms/experiments/FIDELITY_ORACLE_001.md` in the
 `falseywinchnet/file_manager` repository). It compares a real Chromium
 layout against the GUI.Forms retained tree node by node, keeping structure,
 state, geometry, typography, material and raster differences separate. On
@@ -89,12 +89,12 @@ tolerance at several window sizes, using the fidelity oracle approach of the
 earlier Web.Forms experiments. Record the corpus, sizes, tolerance and
 per-node report under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Where the oracle tooling lives.** Nobody maintains the Web.Forms project
-   any more, and the owner said its work is "free to capture". Copy the
-   oracle into this repository (for example under `tools/`), or keep using it
-   in place.
+1. **The fidelity oracle moves into this repository** under `tools/`. The
+   Web.Forms compiler and HTML profile stay behind.
+2. **Chromium is a test oracle only**, never called by GUI.Forms code at
+   import or run time.
 
 ## Read first
 

@@ -46,10 +46,9 @@ rendering reference has the numbers.
   raised?"). Nothing is lifted by a Windows bevel.
 - **Push buttons.** Plan Paint's action plate, the slight pill with inner
   light-over-dark lines and a one-pixel contact shadow.
-- **Ribbon buttons.** A bulge in the ribbon cloth with no edge. Its
-  dithered form, a multi-tone lattice, is what the studies show. Flat, smooth
-  and dithered are engine renderings of one part role; which ships is the
-  owner's call.
+- **Ribbon buttons.** A bulge in the ribbon cloth with no edge, shipped in
+  its dithered form, a multi-tone lattice (owner decision, 2026-10-13). Flat
+  and smooth are other engine renderings of the same part role.
 - **Tabs.** Plan Paint's tab stack and shadowing exactly.
 - **Command strips.** Members may be flat at rest because dividers and strip
   shading carry the structure ("we account for this with dividers in Plan
@@ -86,13 +85,12 @@ rendering reference has the numbers.
 ## Windows-familiar themes
 
 Classic (the Windows 2000 look: pure procedural bevels, the cheapest proof
-that the engine works) and a modern flat look first; "we could add a few"
-later. Literal Windows rendering, raised buttons and sunken cells live only
+that the engine works) and a modern flat look first, then XP-style (Luna-like)
+and Windows 7 (Aero-like) themes. Literal Windows rendering, raised buttons and sunken cells live only
 here. The modern flat theme still keeps boundaries, hover, focus and input
 unequivocal (M076) and still uses high-colour icons. `windows-professional`
 becomes one of these themes rather than the default. XP- and Aero-style looks
-are artwork-heavy. If they come later, they are recreated, never Microsoft's
-bitmaps.
+are artwork-heavy; they are recreated, never Microsoft's bitmaps.
 
 SDRSharp's visual demands are acceptance fixtures here (see R): owner-drawn
 lists and combos, `ToolStripProfessionalRenderer` gradients, GDI+ linear,
@@ -130,15 +128,16 @@ the contrast checks of the specification pass automatically for every
 shipped theme; the owner approves the reference image set. Record the
 specimen sheet, contrast report and approval under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Ribbon-button rendering in the default**: flat, smooth bulge or
-   dithered bulge (§12.5).
-2. **An interim default.** Asked on 2026-10-12 and not yet answered: create a
-   `gui-forms` default now with today's recipe system, following the
-   specification as far as recipes allow, and demote `windows-professional`
-   to a named alternative; or wait for T4 on the engine.
-3. **Which further Windows-familiar themes** follow Classic and modern flat.
+1. **Ribbon buttons ship as the dithered bulge** in the default. Flat and
+   smooth bulge remain engine renderings other themes may choose.
+2. **No interim default.** `windows-professional` stays until the default is
+   built on the engine in this stage.
+3. **Windows-familiar themes**: Classic and modern flat first, then an
+   XP-style (Luna-like) theme and a Windows 7 (Aero-like) theme, both
+   recreated, never Microsoft's bitmaps. The Aero-like theme exercises glass
+   and compositor cooperation (T5).
 
 ## Read first
 
