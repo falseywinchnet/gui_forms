@@ -6,8 +6,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace gui_forms {
 
@@ -95,10 +97,26 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
+    // The lines of a label's text placed in its arranged bounds (stage T1):
+    // each line's drawing origin (left edge, snapped baseline) and width, and
+    // the block the lines fill. Paint and published geometry share it.
+    struct TextLayout final {
+        std::vector<std::string> lines;
+        std::vector<Point> origins;
+        std::vector<double> widths;
+        Rect block{};
+    };
+
     [[nodiscard]] virtual std::string display_text() const;
     void paint_label_text(Painter& painter, std::string_view text) const;
+    // Measures with `painter` when one is given, otherwise with the window's
+    // text metrics, which the host's raster painter provides.
+    [[nodiscard]] TextLayout layout_label_text(std::string_view text,
+                                               Painter* painter) const;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     [[nodiscard]] PropertyValueOrigin font_property_origin() const noexcept;

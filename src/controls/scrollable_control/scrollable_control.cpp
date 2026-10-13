@@ -1,6 +1,8 @@
 #include "gui_forms/controls/scrollable_control/scrollable_control.hpp"
 #include "scrolling_utilities.hpp"
+#include "scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -785,6 +787,55 @@ bool ScrollableControl::on_semantic_child_action(
     }
     static_cast<void>(apply_axis_value(*orientation, next, type, true));
     return true;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy scrollable_control_anatomy{
+    .control_id = "scrollable-control",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ScrollableControl::anatomy() const noexcept {
+    return scrollable_control_anatomy;
+}
+
+void ScrollableControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const ControlAnatomy& declared = anatomy();
+    const Rect region = client_rectangle();
+    const AxisGeometry horizontal = axis_geometry(ScrollOrientation::horizontal);
+    const AxisGeometry vertical = axis_geometry(ScrollOrientation::vertical);
+    set_part_geometry(declared, geometry, "region", region);
+    set_part_geometry(declared, geometry, "viewport", viewport_rectangle_);
+    set_part_geometry(declared, geometry, "horizontal-decrement-arrow", horizontal.first_button);
+    set_part_geometry(declared, geometry, "horizontal-track", horizontal.track);
+    set_part_geometry(declared, geometry, "horizontal-thumb", horizontal.thumb);
+    set_part_geometry(declared, geometry, "horizontal-increment-arrow", horizontal.last_button);
+    set_part_geometry(declared, geometry, "vertical-decrement-arrow", vertical.first_button);
+    set_part_geometry(declared, geometry, "vertical-track", vertical.track);
+    set_part_geometry(declared, geometry, "vertical-thumb", vertical.thumb);
+    set_part_geometry(declared, geometry, "vertical-increment-arrow", vertical.last_button);
+    if (hscroll() && vscroll()) {
+        const Rect corner{viewport_rectangle_.width, viewport_rectangle_.height,
+                          scrollbar_thickness_, scrollbar_thickness_};
+        set_part_geometry(declared, geometry, "scroll-corner", corner);
+    }
+    set_part_geometry(declared, geometry, "focus", region);
+}
+
+AnatomyStateSet ScrollableControl::anatomy_states() const {
+    AnatomyStateSet states = base_anatomy_states();
+    if (dragging_orientation_.has_value()) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+        states.insert(AnatomyState::captured);
+    }
+    return states;
 }
 
 } // namespace gui_forms

@@ -13,11 +13,9 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 50> anatomy_pending{
+constexpr std::array<std::string_view, 33> anatomy_pending{
     "command-bar",
     "text-box",
-    "label",
-    "picture-box",
     "review-card",
     "list-box",
     "checked-list-box",
@@ -35,28 +33,13 @@ constexpr std::array<std::string_view, 50> anatomy_pending{
     "property-list",
     "instrument-rack",
     "date-time-picker",
-    "panel",
-    "group-box",
-    "scaled-group-box",
-    "material-panel",
-    "card",
     "expandable-sections",
-    "container-control",
-    "user-control",
     "tab-control",
-    "tab-page",
-    "flow-layout-panel",
-    "table-layout-panel",
-    "responsive-track-panel",
-    "scaled-panel",
     "split-container",
-    "splitter-panel",
     "command-overflow-panel",
     "master-detail-view",
-    "scrollable-control",
     "menu-strip",
     "context-menu",
-    "anchored-popup-layer",
     "drawing-surface",
     "raster-canvas",
     "easing-preview",
@@ -172,14 +155,20 @@ void test_anatomy_coverage() {
         window.perform_layout();
         inspect_tree(window.root(), seen_ids, inspected);
     }
-    // Registry base types the Gallery reaches only through subclasses.
+    // Registry types the Gallery does not attach to its root tree: base
+    // types reached only through subclasses, and popups.
     const std::shared_ptr<ButtonBase> button_base =
         make_control<ButtonBase>(StableId("anatomy.coverage.button-base"), "Base");
     const std::shared_ptr<ScrollBar> scroll_bar =
         make_control<ScrollBar>(StableId("anatomy.coverage.scroll-bar"));
+    // Popups open only on demand and live outside the root tree.
+    const std::shared_ptr<AnchoredPopupLayer> popup_layer = make_control<AnchoredPopupLayer>(
+        StableId("anatomy.coverage.anchored-popup-layer"), button_base,
+        AnchoredPopupPlacement{});
     inspect_control(*button_base, seen_ids);
     inspect_control(*scroll_bar, seen_ids);
-    inspected += 2U;
+    inspect_control(*popup_layer, seen_ids);
+    inspected += 3U;
 
     std::string unexpected_gaps;
     std::string stale_pending;

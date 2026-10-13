@@ -1,5 +1,6 @@
 #include "gui_forms/controls/scrollable_control/container_control/flow_layout_panel/flow_layout_panel.hpp"
 #include "../container_layout_utilities.hpp"
+#include "../../scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -379,6 +380,22 @@ SemanticDescriptor FlowLayoutPanel::semantic_descriptor() const {
     descriptor.description = accessible_description();
     descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy flow_layout_panel_anatomy{
+    .control_id = "flow-layout-panel",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& FlowLayoutPanel::anatomy() const noexcept {
+    return flow_layout_panel_anatomy;
 }
 
 } // namespace gui_forms

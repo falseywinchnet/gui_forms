@@ -1,5 +1,7 @@
 #include "gui_forms/controls/panel/card/card.hpp"
+#include "../../scrollable_control/scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -344,5 +346,58 @@ bool Card::on_semantic_action(SemanticAction action, std::string_view value) {
     return Panel::on_semantic_action(action, value);
 }
 
+
+
+namespace {
+
+constexpr std::array<AnatomyState, 9> card_states{
+    AnatomyState::normal,
+    AnatomyState::hot,
+    AnatomyState::pressed,
+    AnatomyState::captured,
+    AnatomyState::selected,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy card_anatomy{
+    .control_id = "card",
+    .parts = scrollable_detail::panel_parts,
+    .states = card_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Card::anatomy() const noexcept {
+    return card_anatomy;
+}
+
+void Card::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    if (has_background_override() || has_style_override()) {
+        Panel::publish_part_geometry(geometry);
+        return;
+    }
+    ScrollableControl::publish_part_geometry(geometry);
+    set_part_geometry(anatomy(), geometry, "face", client_rectangle());
+}
+
+AnatomyStateSet Card::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (pressed_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+    }
+    if (hovered_) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::hot);
+    }
+    if (selected_) {
+        states.insert(AnatomyState::selected);
+    }
+    return states;
+}
 
 } // namespace gui_forms

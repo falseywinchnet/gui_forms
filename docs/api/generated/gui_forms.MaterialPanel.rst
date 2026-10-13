@@ -143,6 +143,8 @@ gui_forms::MaterialPanel
       How far the material's shadows reach beyond the panel. The panel paints
       into that area without changing its layout or hit testing.
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*
@@ -150,3 +152,7 @@ gui_forms::MaterialPanel
       Checks the image fills against the window's images when the panel is
       attached. A missing or resized image throws ``std::invalid_argument``, and
       the attachment is rolled back.
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

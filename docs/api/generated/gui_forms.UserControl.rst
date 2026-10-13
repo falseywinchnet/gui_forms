@@ -195,6 +195,8 @@ gui_forms::UserControl
 
    .. rubric:: Extension points
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*

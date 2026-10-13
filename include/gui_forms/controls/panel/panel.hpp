@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 
 namespace gui_forms {
 
@@ -41,10 +42,12 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
     [[nodiscard]] Rect local_bounds() const noexcept;
     void paint_panel(Painter& painter, Rect bounds) const;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     std::optional<BasicControlStyle> style_override_;

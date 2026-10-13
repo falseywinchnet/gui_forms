@@ -107,3 +107,5 @@ gui_forms::TabPage
    .. rubric:: Extension points
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

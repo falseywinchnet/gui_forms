@@ -155,3 +155,5 @@ gui_forms::ScaledGroupBox
       Scales each slot by the box's arranged width over the design width and
       its arranged height over the design height, and gives the result to the
       child.
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

@@ -295,3 +295,5 @@ gui_forms::ResponsiveTrackPanel
    .. cpp:function:: void arrange(Rect final_bounds) override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

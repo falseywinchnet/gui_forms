@@ -101,3 +101,9 @@ gui_forms::SplitterPanel
    .. rubric:: Extension points
 
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

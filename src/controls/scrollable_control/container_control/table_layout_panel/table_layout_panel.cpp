@@ -1,6 +1,8 @@
 #include "gui_forms/controls/scrollable_control/container_control/table_layout_panel/table_layout_panel.hpp"
 #include "../container_layout_utilities.hpp"
+#include "../../scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -705,6 +707,47 @@ SemanticDescriptor TableLayoutPanel::semantic_descriptor() const {
     descriptor.description = accessible_description();
     descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartDeclaration, 1> table_layout_panel_extra{{
+    {.name = "cell-grid", .role = PartRole::divider, .composed_from = {}},
+}};
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
+    table_layout_panel_parts = scrollable_detail::with_parts(table_layout_panel_extra);
+
+constexpr ControlAnatomy table_layout_panel_anatomy{
+    .control_id = "table-layout-panel",
+    .parts = table_layout_panel_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& TableLayoutPanel::anatomy() const noexcept {
+    return table_layout_panel_anatomy;
+}
+
+void TableLayoutPanel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    ContainerControl::publish_part_geometry(geometry);
+    if (cell_border_style_ == TableCellBorderStyle::none ||
+        column_widths_.empty() || row_heights_.empty()) {
+        return;
+    }
+    // The extent on_paint rules: every track and the spacing between them,
+    // from the padding origin.
+    const Insets inset = padding();
+    const double width = std::accumulate(column_widths_.begin(),
+                                         column_widths_.end(), 0.0) +
+        track_spacing_.width * static_cast<double>(column_widths_.size() - 1U);
+    const double height = std::accumulate(row_heights_.begin(),
+                                          row_heights_.end(), 0.0) +
+        track_spacing_.height * static_cast<double>(row_heights_.size() - 1U);
+    const Rect grid{inset.left, inset.top, width, height};
+    set_part_geometry(anatomy(), geometry, "cell-grid", grid);
 }
 
 } // namespace gui_forms

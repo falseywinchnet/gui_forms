@@ -13,6 +13,7 @@ public:
     [[nodiscard]] const std::string& text() const noexcept { return text_; }
     void set_text(std::string text);
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     std::string text_;

@@ -153,3 +153,5 @@ gui_forms::ScaledPanel
    .. rubric:: Extension points
 
    .. cpp:function:: void arrange(Rect final_bounds) override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

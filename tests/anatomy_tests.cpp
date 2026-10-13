@@ -13,6 +13,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -362,19 +363,26 @@ void test_progress_bar_geometry_and_states() {
     require_declared_states(*progress);
 }
 
+// A control type that declares no anatomy of its own.
+class UndeclaredControl final : public Control {
+public:
+    explicit UndeclaredControl(StableId stable_id) : Control(std::move(stable_id)) {}
+};
+
 void test_base_anatomy_for_undeclared_controls() {
-    std::shared_ptr<Panel> panel = make_control<Panel>(StableId("anatomy.panel"));
-    (*panel).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
-    Window window(panel, {80.0, 40.0});
+    std::shared_ptr<UndeclaredControl> plain =
+        make_control<UndeclaredControl>(StableId("anatomy.plain"));
+    (*plain).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+    Window window(plain, {80.0, 40.0});
     window.perform_layout();
-    require(&(*panel).anatomy() == &base_control_anatomy(),
+    require(&(*plain).anatomy() == &base_control_anatomy(),
             "a type that declares nothing inherits the base anatomy");
-    const PartGeometry region = required_part(*panel, "region");
-    require(region.present && region.bounds == (*panel).client_rectangle(),
+    const PartGeometry region = required_part(*plain, "region");
+    require(region.present && region.bounds == (*plain).client_rectangle(),
             "the base region is the client rectangle");
-    require(!(*panel).part_geometry("thumb").has_value(),
+    require(!(*plain).part_geometry("thumb").has_value(),
             "an undeclared part name must not resolve");
-    require_declared_states(*panel);
+    require_declared_states(*plain);
 }
 
 // Records where text is drawn, in window coordinates, and measures text with
@@ -590,6 +598,84 @@ void test_drop_down_button_disclosure() {
     require_parts_within_region(*button);
 }
 
+void test_panel_and_scrollable_parts() {
+    std::shared_ptr<Panel> panel = make_control<Panel>(StableId("anatomy.panel"));
+    (*panel).set_requested_bounds({0.0, 0.0, 200.0, 120.0});
+    std::shared_ptr<Label> tall = make_control<Label>(StableId("anatomy.panel.tall"), "Tall");
+    (*tall).set_requested_bounds({0.0, 0.0, 120.0, 400.0});
+    (*panel).add_child(tall);
+    Window window(panel, {200.0, 120.0});
+    window.perform_layout();
+    require(validate_control_anatomy((*panel).anatomy()).defect == AnatomyDefect::none &&
+                (*panel).anatomy().control_id == "panel",
+            "Panel must publish its own valid anatomy");
+    require(required_part(*panel, "face").present && !required_part(*panel, "edge").present,
+            "a borderless panel publishes a face and no edge");
+    (*panel).set_border_style(BorderStyle::line);
+    require(required_part(*panel, "edge").present,
+            "a bordered panel publishes its edge");
+    require(!required_part(*panel, "vertical-thumb").present,
+            "without auto-scroll no scroll axis is published");
+
+    (*panel).set_auto_scroll(true);
+    window.perform_layout();
+    const PartGeometry track = required_part(*panel, "vertical-track");
+    const PartGeometry thumb = required_part(*panel, "vertical-thumb");
+    const PartGeometry viewport = required_part(*panel, "viewport");
+    require(track.present && thumb.present && track.bounds.contains(thumb.bounds),
+            "an overflowing auto-scroll panel publishes its vertical thumb inside its track");
+    require(viewport.present && viewport.bounds.right() <= track.bounds.x,
+            "the viewport ends where the vertical scroll axis begins");
+    const ControlAnatomy& anatomy = (*panel).anatomy();
+    const std::optional<PartIndex> thumb_index = find_part(anatomy, "vertical-thumb");
+    require(thumb_index.has_value() &&
+                anatomy.parts[(*thumb_index).value].role == PartRole::thumb,
+            "a container's scroll thumb shares the thumb role with ScrollBar");
+    require_declared_states(*panel);
+    require_parts_within_region(*panel);
+}
+
+void test_group_box_and_label_parts() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.groups.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 320.0, 200.0});
+    std::shared_ptr<GroupBox> group = make_control<GroupBox>(StableId("anatomy.group"), "Output");
+    (*group).set_requested_bounds({10.0, 10.0, 200.0, 100.0});
+    std::shared_ptr<Label> label = make_control<Label>(StableId("anatomy.label"), "Ready");
+    (*label).set_requested_bounds({10.0, 130.0, 160.0, 24.0});
+    (*root).add_child(group);
+    (*root).add_child(label);
+    Window window(root, {320.0, 200.0});
+    TextOriginPainter painter;
+    window.set_text_metrics_provider(&painter);
+    window.perform_layout();
+
+    const PartGeometry caption = required_part(*group, "caption");
+    const PartGeometry edge = required_part(*group, "edge");
+    require(caption.present && edge.present && caption.bounds.y < edge.bounds.y &&
+                caption.bounds.bottom() > edge.bounds.y,
+            "the group caption sits across the top of its frame");
+    require((*group).anatomy().control_id == "group-box", "GroupBox publishes its own id");
+
+    const PartGeometry text = required_part(*label, "label");
+    require(text.present && text.bounds.width > 0.0 && near(text.bounds.x, 2.0),
+            "a near-aligned label publishes its text block from the left inset");
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 320.0, 200.0}));
+    const Rect absolute = (*label).absolute_bounds();
+    bool found = false;
+    for (std::size_t index = 0; index < painter.text_origins.size(); ++index) {
+        const Point origin = painter.text_origins[index];
+        if (near(origin.x, absolute.x + text.bounds.x) &&
+            origin.y > absolute.y + text.bounds.y &&
+            origin.y <= absolute.y + text.bounds.bottom()) {
+            found = true;
+        }
+    }
+    window.set_text_metrics_provider(nullptr);
+    require(found, "the label's published block must contain where paint draws its text");
+    require_parts_within_region(*group);
+    require_parts_within_region(*label);
+}
+
 } // namespace
 
 int main() {
@@ -605,6 +691,8 @@ int main() {
         test_check_box_and_radio_button_parts();
         test_link_label_custom_visited_state();
         test_drop_down_button_disclosure();
+        test_panel_and_scrollable_parts();
+        test_group_box_and_label_parts();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

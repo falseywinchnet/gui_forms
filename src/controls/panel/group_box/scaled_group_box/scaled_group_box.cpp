@@ -1,5 +1,6 @@
 #include "gui_forms/controls/panel/group_box/scaled_group_box/scaled_group_box.hpp"
 #include "../../../scrollable_control/container_control/scaled_layout_utilities.hpp"
+#include "../group_box_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -69,6 +70,22 @@ void ScaledGroupBox::arrange(Rect final_bounds) {
                          scaled_layout_detail::child_bounds(design_size_, (*slot).second,
                                              final_bounds));
     }
+}
+
+
+namespace {
+
+constexpr ControlAnatomy scaled_group_box_anatomy{
+    .control_id = "scaled-group-box",
+    .parts = group_box_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ScaledGroupBox::anatomy() const noexcept {
+    return scaled_group_box_anatomy;
 }
 
 } // namespace gui_forms

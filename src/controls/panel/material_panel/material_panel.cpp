@@ -1,5 +1,6 @@
 #include "gui_forms/controls/panel/material_panel/material_panel.hpp"
 #include "gui_forms/window.hpp"
+#include "../../scrollable_control/scrollable_anatomy.hpp"
 
 #include <stdexcept>
 #include <utility>
@@ -54,6 +55,28 @@ void MaterialPanel::on_paint(Painter& painter, Rect) {
 
 Insets MaterialPanel::visual_outsets() const noexcept {
     return surface_material_visual_outsets(material_);
+}
+
+
+namespace {
+
+constexpr ControlAnatomy material_panel_anatomy{
+    .control_id = "material-panel",
+    .parts = scrollable_detail::panel_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& MaterialPanel::anatomy() const noexcept {
+    return material_panel_anatomy;
+}
+
+void MaterialPanel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    // The material is the whole face; Panel's border style is not painted.
+    ScrollableControl::publish_part_geometry(geometry);
+    set_part_geometry(anatomy(), geometry, "face", client_rectangle());
 }
 
 } // namespace gui_forms

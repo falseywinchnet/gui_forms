@@ -171,3 +171,19 @@ gui_forms::GroupBox
       when the box or one of its parents is disabled.
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: std::string caption_text() const
+
+      *Protected.*
+
+   .. cpp:function:: Rect caption_bounds() const
+
+      *Protected.*
+
+      The background block behind the caption; its width follows the estimated caption width, as paint has always used.

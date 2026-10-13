@@ -432,6 +432,10 @@ gui_forms::ScrollableControl
 
    .. cpp:function:: bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: virtual void on_scroll_position_changed()
 
       *Protected.*
@@ -464,6 +468,10 @@ gui_forms::ScrollableControl
       *Protected.*
 
    .. cpp:function:: Rect child_viewport_rectangle() const noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*
 

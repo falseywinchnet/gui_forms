@@ -285,3 +285,5 @@ gui_forms::AnchoredPopupLayer
    .. cpp:function:: void on_key_preview(KeyEvent& event) override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

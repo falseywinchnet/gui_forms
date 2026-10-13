@@ -231,6 +231,8 @@ gui_forms::Panel
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: Rect local_bounds() const noexcept
 
       *Protected.*
@@ -242,3 +244,7 @@ gui_forms::Panel
       For subclasses. Paints the panel's background and border into a
       rectangle, so an ``on_paint`` override can draw the standard surface
       first.
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

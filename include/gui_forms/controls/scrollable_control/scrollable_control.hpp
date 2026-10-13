@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
@@ -90,6 +91,8 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
     // Called after the retained position changes, including silent API writes
@@ -105,6 +108,7 @@ protected:
     [[nodiscard]] Rect child_viewport_rectangle() const noexcept override {
         return effective_viewport_rectangle();
     }
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     friend class ScrollProperties;

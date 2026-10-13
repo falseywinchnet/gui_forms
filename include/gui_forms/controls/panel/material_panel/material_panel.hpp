@@ -3,6 +3,8 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/surface_material.hpp"
 
+#include <span>
+
 namespace gui_forms {
 
 // General retained material container. It is deliberately content-agnostic.
@@ -20,9 +22,11 @@ public:
 
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] Insets visual_outsets() const noexcept override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 protected:
     void on_attached_to_window() override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     void validate_window_images(const SurfaceMaterial& material) const;

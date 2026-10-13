@@ -4,6 +4,7 @@
 #include "gui_forms/event.hpp"
 
 #include <cstdint>
+#include <span>
 
 namespace gui_forms {
 
@@ -40,6 +41,10 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+
+protected:
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     [[nodiscard]] Rect content_bounds() const noexcept;

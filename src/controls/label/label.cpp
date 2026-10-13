@@ -6,6 +6,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -371,32 +372,43 @@ std::string Label::display_text() const {
     return display;
 }
 
-void Label::paint_label_text(Painter& painter, const std::string_view text) const {
+Label::TextLayout Label::layout_label_text(const std::string_view text,
+                                           Painter* painter) const {
     const Rect arranged = committed_arranged_bounds();
     const FontSpec font = effective_font((*this).font());
-    const TextWidthResolver resolve{PainterLabelWidth{painter, font}};
-    std::vector<std::string> lines = label_lines(
+    const TextWidthResolver resolve = painter != nullptr
+        ? TextWidthResolver{PainterLabelWidth{*painter, font}}
+        : TextWidthResolver{LabelWidth{*this, font}};
+    TextLayout layout;
+    layout.lines = label_lines(
         text, font, std::max(0.0, arranged.width - 4.0), text_wrapping_, resolve, maximum_lines_);
     std::vector<ResolvedTextLayout> metrics{};
-    metrics.reserve(lines.size());
+    metrics.reserve(layout.lines.size());
     double line_height{};
-    for (const std::string& line : lines) {
-        metrics.push_back(painter.resolve_text_layout_utf8(line, font));
+    for (const std::string& line : layout.lines) {
+        if (painter != nullptr) {
+            metrics.push_back((*painter).resolve_text_layout_utf8(line, font));
+        } else {
+            metrics.push_back(resolve_text_layout_utf8(line, font));
+        }
         line_height = std::max(
             line_height,
             std::max(font.size, metrics.back().logical_size.height) *
                 line_spacing_);
     }
     if (line_height <= 0.0) line_height = font.size * line_spacing_;
-    const double block_height = static_cast<double>(lines.size()) * line_height;
+    const double block_height = static_cast<double>(layout.lines.size()) * line_height;
     double top = 1.0;
     if (vertical_alignment_ == VerticalAlignment::center) {
         top = std::max(1.0, (arranged.height - block_height) * 0.5);
     } else if (vertical_alignment_ == VerticalAlignment::far) {
         top = std::max(1.0, arranged.height - block_height - 1.0);
     }
-    const Color color = foreground();
-    for (std::size_t index = 0; index < lines.size(); ++index) {
+    layout.origins.reserve(layout.lines.size());
+    layout.widths.reserve(layout.lines.size());
+    double block_left = arranged.width;
+    double block_right = 0.0;
+    for (std::size_t index = 0; index < layout.lines.size(); ++index) {
         const double text_width = metrics[index].logical_size.width;
         double x = 2.0;
         if (alignment_ == HorizontalAlignment::center) {
@@ -409,8 +421,59 @@ void Label::paint_label_text(Painter& painter, const std::string_view text) cons
         const double baseline = snap_text_baseline(
             top + leading * 0.5 + metrics[index].ascent +
                 static_cast<double>(index) * line_height);
-        painter.draw_text_utf8({x, baseline}, lines[index], font, color);
+        layout.origins.push_back({x, baseline});
+        layout.widths.push_back(text_width);
+        block_left = std::min(block_left, x);
+        block_right = std::max(block_right, x + text_width);
     }
+    if (!layout.lines.empty() && block_right > block_left) {
+        layout.block = {block_left, top, block_right - block_left, block_height};
+    }
+    return layout;
+}
+
+void Label::paint_label_text(Painter& painter, const std::string_view text) const {
+    const FontSpec font = effective_font((*this).font());
+    const TextLayout layout = layout_label_text(text, &painter);
+    const Color color = foreground();
+    for (std::size_t index = 0; index < layout.lines.size(); ++index) {
+        painter.draw_text_utf8(layout.origins[index], layout.lines[index], font, color);
+    }
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 2> label_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "label", .role = PartRole::label, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 5> label_states{
+    AnatomyState::normal,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy label_anatomy{
+    .control_id = "label",
+    .parts = label_parts,
+    .states = label_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Label::anatomy() const noexcept {
+    return label_anatomy;
+}
+
+void Label::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const ControlAnatomy& declared = anatomy();
+    const TextLayout layout = layout_label_text(display_text(), nullptr);
+    set_part_geometry(declared, geometry, "region", client_rectangle());
+    set_part_geometry(declared, geometry, "label", layout.block);
 }
 
 void Label::on_paint(Painter& painter, Rect) {

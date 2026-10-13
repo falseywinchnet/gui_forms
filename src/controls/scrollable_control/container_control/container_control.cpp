@@ -1,5 +1,6 @@
 #include "gui_forms/controls/scrollable_control/container_control/container_control.hpp"
 #include "gui_forms/window.hpp"
+#include "../scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -105,6 +106,22 @@ SemanticDescriptor ContainerControl::semantic_descriptor() const {
     descriptor.exposed = !descriptor.name.empty() ||
                          !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy container_control_anatomy{
+    .control_id = "container-control",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ContainerControl::anatomy() const noexcept {
+    return container_control_anatomy;
 }
 
 } // namespace gui_forms

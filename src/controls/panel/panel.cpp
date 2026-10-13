@@ -2,6 +2,7 @@
 #include "../basic/basic_control_rendering.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../scrollable_control/scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -147,6 +148,32 @@ SemanticDescriptor Panel::semantic_descriptor() const {
     descriptor.exposed = !descriptor.name.empty() ||
                          !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr ControlAnatomy panel_anatomy{
+    .control_id = "panel",
+    .parts = scrollable_detail::panel_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Panel::anatomy() const noexcept {
+    return panel_anatomy;
+}
+
+void Panel::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    ScrollableControl::publish_part_geometry(geometry);
+    const ControlAnatomy& declared = anatomy();
+    const Rect bounds = local_bounds();
+    set_part_geometry(declared, geometry, "face", bounds);
+    if (border_style_ != BorderStyle::none) {
+        set_part_geometry(declared, geometry, "edge", bounds);
+    }
 }
 
 } // namespace gui_forms

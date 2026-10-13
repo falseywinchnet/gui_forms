@@ -4,7 +4,9 @@
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../../scrollable_control/scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -217,6 +219,37 @@ SemanticDescriptor PictureBox::semantic_descriptor() const {
     descriptor.exposed = has_valid_image() || !descriptor.name.empty() ||
                          !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartDeclaration, 3> picture_box_extra{{
+    {.name = "face", .role = PartRole::face, .composed_from = {}},
+    {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+    {.name = "image", .role = PartRole::icon, .composed_from = {}},
+}};
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
+    picture_box_parts = scrollable_detail::with_parts(picture_box_extra);
+
+constexpr ControlAnatomy picture_box_anatomy{
+    .control_id = "picture-box",
+    .parts = picture_box_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& PictureBox::anatomy() const noexcept {
+    return picture_box_anatomy;
+}
+
+void PictureBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Panel::publish_part_geometry(geometry);
+    if (has_valid_image() && image_opacity_ > 0.0) {
+        set_part_geometry(anatomy(), geometry, "image", image_bounds());
+    }
 }
 
 } // namespace gui_forms
