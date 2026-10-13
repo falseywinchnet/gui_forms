@@ -260,11 +260,18 @@ void test_track_bar_geometry_matches_pointer_mapping() {
     require(dragging.pressed && dragging.captured && !dragging.normal,
             "dragging must publish pressed and captured");
     require_declared_states(*slider);
+    const TrackBar::Parts dragged = (*slider).parts();
+    require(dragged.thumb.states.contains(AnatomyState::pressed) &&
+                dragged.thumb.states.contains(AnatomyState::captured) &&
+                !dragged.track.states.contains(AnatomyState::pressed),
+            "the dragged thumb, not the track, is pressed and captured");
     PointerEvent up = down;
     up.action = PointerAction::up;
     require(window.dispatch_pointer(up), "pointer up must be handled");
     require((*slider).states().normal,
             "release must return to normal");
+    require(!(*slider).parts().thumb.states.contains(AnatomyState::pressed),
+            "release clears the thumb's own states");
 
     (*slider).set_visual_style(TrackBarVisualStyle::filled);
     const PartGeometry filled = (*slider).parts().fill;
@@ -322,9 +329,27 @@ void test_scroll_bar_geometry_and_states() {
     const ScrollBar::States dragging = (*horizontal).states();
     require(dragging.pressed && dragging.captured,
             "thumb drag must publish pressed and captured");
+    const ScrollBar::Parts dragged = (*horizontal).parts();
+    require(dragged.thumb.states.contains(AnatomyState::pressed) &&
+                dragged.thumb.states.contains(AnatomyState::captured) &&
+                !dragged.decrement_arrow.states.contains(AnatomyState::pressed),
+            "the dragged thumb carries pressed and captured; the arrows do not");
     PointerEvent up = down;
     up.action = PointerAction::up;
     require(window.dispatch_pointer(up), "thumb release must be handled");
+
+    const Rect arrow_bounds = (*horizontal).decrement_button_bounds();
+    PointerEvent arrow_down = down;
+    arrow_down.position = {absolute.x + arrow_bounds.x + arrow_bounds.width * 0.5,
+                           absolute.y + arrow_bounds.y + arrow_bounds.height * 0.5};
+    require(window.dispatch_pointer(arrow_down), "arrow press must be handled");
+    const ScrollBar::Parts arrow_pressed = (*horizontal).parts();
+    require(arrow_pressed.decrement_arrow.states.contains(AnatomyState::pressed) &&
+                !arrow_pressed.thumb.states.contains(AnatomyState::pressed),
+            "a pressed arrow carries the pressed state on its own");
+    PointerEvent arrow_up = arrow_down;
+    arrow_up.action = PointerAction::up;
+    require(window.dispatch_pointer(arrow_up), "arrow release must be handled");
 
     (*horizontal).set_enabled(false);
     const ScrollBar::States disabled = (*horizontal).states();
@@ -904,6 +929,23 @@ void test_item_names_never_repeat_control_parts() {
             "an item part may not reuse a control part's name");
 }
 
+constexpr std::array<AnatomyState, 2> repeated_part_state{{
+    AnatomyState::pressed, AnatomyState::pressed}};
+constexpr std::array<PartDeclaration, 1> repeated_state_part{{
+    {.name = "thumb", .role = PartRole::thumb, .composed_from = {}, .states = repeated_part_state},
+}};
+
+void test_part_states_are_validated() {
+    const ControlAnatomy repeated{
+        .control_id = "slider", .parts = repeated_state_part, .states = {},
+        .custom_states = {}, .item_systems = {}};
+    require(validate_control_anatomy(repeated).defect == AnatomyDefect::duplicate_part_state,
+            "a part lists each of its own states once");
+    require(declares_part_state(repeated_state_part[0], AnatomyState::pressed) &&
+                !declares_part_state(repeated_state_part[0], AnatomyState::hot),
+            "a part's declaration lists the states it takes on its own");
+}
+
 void test_item_systems_are_distinct() {
     const ControlAnatomy two{
         .control_id = "grid", .parts = single_region, .states = {},
@@ -1220,6 +1262,7 @@ int main() {
         test_tree_and_correspondence_items();
         test_item_custom_states_never_shadow_standard_states();
         test_item_systems_are_distinct();
+        test_part_states_are_validated();
         test_object_view_columns_are_items();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;

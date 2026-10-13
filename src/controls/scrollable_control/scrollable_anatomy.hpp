@@ -8,6 +8,10 @@
 
 namespace gui_forms::scrollable_detail {
 
+// A thumb is pressed and captures the pointer while dragged.
+inline constexpr std::array<AnatomyState, 2> thumb_part_states{{
+    AnatomyState::pressed, AnatomyState::captured}};
+
 // Parts every ScrollableControl publishes: its region, the viewport granted
 // to children, and the two scroll axes it paints itself. The axes reuse the
 // scroll bar's roles, so a cue on the thumb role reaches these thumbs too.
@@ -20,7 +24,8 @@ inline constexpr std::array<PartField<ScrollableControl::Parts>, 12> part_fields
      .member = &ScrollableControl::Parts::horizontal_decrement_arrow},
     {.declaration = {.name = "horizontal-track", .role = PartRole::track, .composed_from = {}},
      .member = &ScrollableControl::Parts::horizontal_track},
-    {.declaration = {.name = "horizontal-thumb", .role = PartRole::thumb, .composed_from = {}},
+    {.declaration = {.name = "horizontal-thumb", .role = PartRole::thumb, .composed_from = {},
+                     .states = thumb_part_states},
      .member = &ScrollableControl::Parts::horizontal_thumb},
     {.declaration = {.name = "horizontal-increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
      .member = &ScrollableControl::Parts::horizontal_increment_arrow},
@@ -28,7 +33,8 @@ inline constexpr std::array<PartField<ScrollableControl::Parts>, 12> part_fields
      .member = &ScrollableControl::Parts::vertical_decrement_arrow},
     {.declaration = {.name = "vertical-track", .role = PartRole::track, .composed_from = {}},
      .member = &ScrollableControl::Parts::vertical_track},
-    {.declaration = {.name = "vertical-thumb", .role = PartRole::thumb, .composed_from = {}},
+    {.declaration = {.name = "vertical-thumb", .role = PartRole::thumb, .composed_from = {},
+                     .states = thumb_part_states},
      .member = &ScrollableControl::Parts::vertical_thumb},
     {.declaration = {.name = "vertical-increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
      .member = &ScrollableControl::Parts::vertical_increment_arrow},

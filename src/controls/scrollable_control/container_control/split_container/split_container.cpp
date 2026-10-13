@@ -778,10 +778,17 @@ void SplitContainer::update_splitter_cursor() {
 
 namespace {
 
+constexpr std::array<AnatomyState, 3> split_seam_states{{
+    AnatomyState::hot, AnatomyState::pressed, AnatomyState::captured}};
+constexpr std::array<AnatomyState, 2> split_grip_states{{
+    AnatomyState::open, AnatomyState::closed}};
+
 constexpr std::array<PartField<SplitContainer::Parts>, 2> split_container_extra_part_fields{{
-    {.declaration = {.name = "seam", .role = PartRole::seam, .composed_from = {}},
+    {.declaration = {.name = "seam", .role = PartRole::seam, .composed_from = {},
+                     .states = split_seam_states},
      .member = &SplitContainer::Parts::seam},
-    {.declaration = {.name = "grip", .role = PartRole::grip, .composed_from = {}},
+    {.declaration = {.name = "grip", .role = PartRole::grip, .composed_from = {},
+                     .states = split_grip_states},
      .member = &SplitContainer::Parts::grip},
 }};
 
@@ -824,12 +831,23 @@ void SplitContainer::publish_part_geometry(std::span<PartGeometry> geometry) con
 
     const SplitSeamSnapshot seam = splitter_seam_snapshot();
     record.seam = PartGeometry::from_bounds(seam.visible_bounds);
+    if (seam.state == SplitSeamState::near || seam.state == SplitSeamState::hot) {
+        record.seam.states.insert(AnatomyState::hot);
+    } else if (seam.state == SplitSeamState::dragging) {
+        record.seam.states.insert(AnatomyState::pressed);
+        record.seam.states.insert(AnatomyState::captured);
+    }
     // The collapse actuator, given in the grip's coordinates.
     if (!seam.actuator_bounds.empty()) {
         const Rect actuator{seam.hit_bounds.x + seam.actuator_bounds.x,
                             seam.hit_bounds.y + seam.actuator_bounds.y,
                             seam.actuator_bounds.width, seam.actuator_bounds.height};
         record.grip = PartGeometry::from_bounds(actuator);
+        if (seam.state == SplitSeamState::collapsed) {
+            record.grip.states.insert(AnatomyState::closed);
+        } else {
+            record.grip.states.insert(AnatomyState::open);
+        }
     }
     write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
     write_parts(anatomy(), split_container_extra_part_fields, record, geometry);

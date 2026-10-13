@@ -820,6 +820,13 @@ ScrollableControl::Parts ScrollableControl::scrollable_parts() const {
     record.vertical_track = PartGeometry::from_bounds(vertical.track);
     record.vertical_thumb = PartGeometry::from_bounds(vertical.thumb);
     record.vertical_increment_arrow = PartGeometry::from_bounds(vertical.last_button);
+    if (dragging_orientation_ == ScrollOrientation::horizontal) {
+        record.horizontal_thumb.states.insert(AnatomyState::pressed);
+        record.horizontal_thumb.states.insert(AnatomyState::captured);
+    } else if (dragging_orientation_ == ScrollOrientation::vertical) {
+        record.vertical_thumb.states.insert(AnatomyState::pressed);
+        record.vertical_thumb.states.insert(AnatomyState::captured);
+    }
     if (hscroll() && vscroll()) {
         const Rect corner{viewport_rectangle_.width, viewport_rectangle_.height,
                           scrollbar_thickness_, scrollbar_thickness_};

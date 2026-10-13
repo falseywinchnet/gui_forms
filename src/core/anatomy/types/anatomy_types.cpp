@@ -77,7 +77,7 @@ constexpr std::array<std::string_view, anatomy_state_count> anatomy_state_names{
 };
 static_assert(anatomy_state_names.size() == anatomy_state_count);
 
-constexpr std::array<std::string_view, 28> anatomy_defect_names{
+constexpr std::array<std::string_view, 30> anatomy_defect_names{
     "none",
     "control-id-not-kebab-case",
     "no-parts",
@@ -106,9 +106,11 @@ constexpr std::array<std::string_view, 28> anatomy_defect_names{
     "item-system-name-not-kebab-case",
     "duplicate-item-system-name",
     "item-system-without-parts",
+    "part-state-out-of-range",
+    "duplicate-part-state",
 };
 static_assert(anatomy_defect_names.size() ==
-              static_cast<std::size_t>(AnatomyDefect::item_system_without_parts) + 1U);
+              static_cast<std::size_t>(AnatomyDefect::duplicate_part_state) + 1U);
 
 [[nodiscard]] bool is_lowercase_letter(char character) noexcept {
     return character >= 'a' && character <= 'z';
@@ -133,6 +135,23 @@ static_assert(anatomy_defect_names.size() ==
     result.index = index;
     result.item_system = system;
     return result;
+}
+
+// The part-state check of validate_control_anatomy for one part: the
+// defect, or none.
+[[nodiscard]] AnatomyDefect part_states_defect(const PartDeclaration& part) noexcept {
+    for (std::size_t index = 0; index < part.states.size(); ++index) {
+        const AnatomyState state = part.states[index];
+        if (static_cast<std::size_t>(state) >= anatomy_state_count) {
+            return AnatomyDefect::part_state_out_of_range;
+        }
+        for (std::size_t earlier = 0; earlier < index; ++earlier) {
+            if (part.states[earlier] == state) {
+                return AnatomyDefect::duplicate_part_state;
+            }
+        }
+    }
+    return AnatomyDefect::none;
 }
 
 // True when `name` is one of the control's own parts or a part of an item
@@ -178,6 +197,10 @@ static_assert(anatomy_defect_names.size() ==
         }
         if (!part.composed_from.empty() && !is_kebab_case_name(part.composed_from)) {
             return item_defect_at(AnatomyDefect::composed_from_not_kebab_case, system_index, index);
+        }
+        const AnatomyDefect states_defect = part_states_defect(part);
+        if (states_defect != AnatomyDefect::none) {
+            return item_defect_at(states_defect, system_index, index);
         }
         // An item part may repeat neither another item part nor one of the
         // control's own parts.
@@ -361,6 +384,15 @@ bool declares_item_state(const ItemSystemDeclaration& system, AnatomyState state
     return false;
 }
 
+bool declares_part_state(const PartDeclaration& part, AnatomyState state) noexcept {
+    for (std::size_t index = 0; index < part.states.size(); ++index) {
+        if (part.states[index] == state) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept {
     const std::size_t index = static_cast<std::size_t>(defect);
     if (index >= anatomy_defect_names.size()) {
@@ -389,6 +421,10 @@ AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexce
         }
         if (!part.composed_from.empty() && !is_kebab_case_name(part.composed_from)) {
             return defect_at(AnatomyDefect::composed_from_not_kebab_case, index);
+        }
+        const AnatomyDefect states_defect = part_states_defect(part);
+        if (states_defect != AnatomyDefect::none) {
+            return defect_at(states_defect, index);
         }
         for (std::size_t earlier = 0; earlier < index; ++earlier) {
             if (anatomy.parts[earlier].name == part.name) {

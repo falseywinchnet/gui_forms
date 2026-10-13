@@ -67,7 +67,7 @@ Related types
    * - :cpp:class:`PartField <gui_forms::PartField>`
      - One member of a parts record and the part it publishes.
    * - :cpp:class:`PartGeometry <gui_forms::PartGeometry>`
-     - Geometry of one declared part in the control's local coordinate space after layout.
+     - One declared part as published: its geometry in the control's local coordinate space after layout, and its own active states.
    * - :cpp:class:`PartGeometryBuffer <gui_forms::PartGeometryBuffer>`
      - Storage for one control's published part geometry: ``count`` live records, one per declared part, in declaration order.
    * - :cpp:class:`PartIndex <gui_forms::PartIndex>`
@@ -371,6 +371,10 @@ Related types
 
    .. cpp:member:: std::string_view composed_from
 
+   .. cpp:member:: std::span<const AnatomyState> states
+
+      The states the part takes on its own, as written in ``::part(name):state(state)``: a scroll bar's thumb is pressed while its arrows are not. Empty for a part that only shares its control's (or item's) states.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: template <typename Record> PartField final
@@ -387,7 +391,7 @@ Related types
 
    ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
 
-   Geometry of one declared part in the control's local coordinate space after layout. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused.
+   One declared part as published: its geometry in the control's local coordinate space after layout, and its own active states. ``present`` is false when the part does not exist in the control's current configuration (a track bar's fill in the classic style); ``bounds`` is then empty. Presence does not depend on transient state: a focus part is present while the control is unfocused. ``states`` holds only states the part's declaration lists, and no custom states.
 
 
    .. rubric:: Methods
@@ -399,6 +403,8 @@ Related types
    .. cpp:member:: Rect bounds
 
    .. cpp:member:: bool present
+
+   .. cpp:member:: AnatomyStateSet states
 
 .. cpp:namespace:: gui_forms
 
@@ -529,6 +535,10 @@ Enumerations
    .. cpp:enumerator:: duplicate_item_system_name
 
    .. cpp:enumerator:: item_system_without_parts
+
+   .. cpp:enumerator:: part_state_out_of_range
+
+   .. cpp:enumerator:: duplicate_part_state
 
 .. cpp:namespace:: gui_forms
 
@@ -910,6 +920,8 @@ Functions, constants and aliases
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
 
 .. cpp:function:: bool declares_item_state(const ItemSystemDeclaration& system, AnatomyState state) noexcept
+
+.. cpp:function:: bool declares_part_state(const PartDeclaration& part, AnatomyState state) noexcept
 
 .. cpp:function:: template <typename Record, std::size_t Count> constexpr std::array<PartDeclaration, Count> part_declarations(const std::array<PartField<Record>, Count>& fields)
 

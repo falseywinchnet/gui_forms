@@ -79,6 +79,8 @@ bool DropDownButton::perform_drop_down() {
 
 namespace {
 
+constexpr std::array<AnatomyState, 1> drop_down_segment_states{{AnatomyState::pressed}};
+
 constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &DropDownButton::Parts::region},
@@ -88,7 +90,8 @@ constexpr std::array<PartField<DropDownButton::Parts>, 8> drop_down_button_part_
      .member = &DropDownButton::Parts::icon},
     {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
      .member = &DropDownButton::Parts::label},
-    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = {}},
+    {.declaration = {.name = "drop-down", .role = PartRole::actuator, .composed_from = {},
+                     .states = drop_down_segment_states},
      .member = &DropDownButton::Parts::drop_down},
     {.declaration = {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
      .member = &DropDownButton::Parts::disclosure},
@@ -163,6 +166,10 @@ void DropDownButton::publish_part_geometry(std::span<PartGeometry> geometry) con
         const Rect arrow{std::floor(center_x) - 3.0, std::floor(center_y) - 1.0, 7.0, 4.0};
         record.drop_down = PartGeometry::from_bounds(segment);
         record.disclosure = PartGeometry::from_bounds(arrow);
+        // A press that began on the drop-down segment presses that part.
+        if (pressed_visual() && pointer_drop_down_) {
+            record.drop_down.states.insert(AnatomyState::pressed);
+        }
     }
     write_parts(anatomy(), drop_down_button_part_fields, record, geometry);
 }

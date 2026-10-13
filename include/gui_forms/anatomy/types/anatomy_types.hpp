@@ -144,85 +144,6 @@ struct ItemSystemIndex final {
     }
 };
 
-// One declared part. `name` is the part's stable kebab-case identity within
-// its control type, as written in `::part(name)`. `composed_from` names the
-// control id of a simpler system the part reuses (a scroll arrow is a
-// "button"), or is empty.
-struct PartDeclaration final {
-    std::string_view name;
-    PartRole role{PartRole::region};
-    std::string_view composed_from;
-};
-
-// One application-defined finite state, as written in `:state(name)`.
-struct CustomStateDeclaration final {
-    std::string_view name;
-};
-
-// One kind of repeated item a control paints (owner decision 5): a list
-// row, a tree node, a details-view column header. `name` is the system's
-// kebab-case identity in the schema ("item", "column"). Item part names are
-// unique within the control, across its own parts and every item system, so
-// a document addresses an item part by its name alone.
-struct ItemSystemDeclaration final {
-    std::string_view name;
-    std::span<const PartDeclaration> parts;
-    std::span<const AnatomyState> states;
-    // Application-defined finite states of one item, as for a control.
-    std::span<const CustomStateDeclaration> custom_states;
-};
-
-// The anatomy of one control type. Every span refers to static storage
-// owned by the control type's translation unit, so a ControlAnatomy may be
-// copied and retained for the life of the program.
-struct ControlAnatomy final {
-    // The control's id in manifests/controls.json, or "control" for the
-    // anatomy every control inherits.
-    std::string_view control_id;
-    std::span<const PartDeclaration> parts;
-    std::span<const AnatomyState> states;
-    std::span<const CustomStateDeclaration> custom_states;
-    // The kinds of repeated item the control paints, empty for a control
-    // without items. Most controls with items have one system; the details
-    // view adds its column headers as a second.
-    std::span<const ItemSystemDeclaration> item_systems;
-};
-
-// Geometry of one declared part in the control's local coordinate space
-// after layout. `present` is false when the part does not exist in the
-// control's current configuration (a track bar's fill in the classic style);
-// `bounds` is then empty. Presence does not depend on transient state: a
-// focus part is present while the control is unfocused.
-struct PartGeometry final {
-    Rect bounds{};
-    bool present{};
-
-    // A part that is present exactly when `bounds` is not empty.
-    [[nodiscard]] static constexpr PartGeometry from_bounds(Rect bounds) noexcept {
-        PartGeometry geometry;
-        geometry.bounds = bounds;
-        geometry.present = !bounds.empty();
-        return geometry;
-    }
-
-    friend constexpr bool operator==(const PartGeometry& left,
-                                     const PartGeometry& right) noexcept {
-        return left.bounds == right.bounds && left.present == right.present;
-    }
-};
-
-// Storage for one control's published part geometry: `count` live records,
-// one per declared part, in declaration order.
-struct PartGeometryBuffer final {
-    std::array<PartGeometry, maximum_control_parts> geometry{};
-    std::size_t count{};
-
-    [[nodiscard]] std::span<const PartGeometry> parts() const noexcept {
-        const std::span<const PartGeometry> live(geometry.data(), count);
-        return live;
-    }
-};
-
 // A bounded set of active standard and custom states.
 class AnatomyStateSet final {
 public:
@@ -271,6 +192,94 @@ private:
     std::uint16_t custom_bits_{};
 };
 
+// One declared part. `name` is the part's stable kebab-case identity within
+// its control type, as written in `::part(name)`. `composed_from` names the
+// control id of a simpler system the part reuses (a scroll arrow is a
+// "button"), or is empty.
+struct PartDeclaration final {
+    std::string_view name;
+    PartRole role{PartRole::region};
+    std::string_view composed_from;
+    // The states the part takes on its own, as written in
+    // `::part(name):state(state)`: a scroll bar's thumb is pressed while
+    // its arrows are not. Empty for a part that only shares its control's
+    // (or item's) states.
+    std::span<const AnatomyState> states;
+};
+
+// One application-defined finite state, as written in `:state(name)`.
+struct CustomStateDeclaration final {
+    std::string_view name;
+};
+
+// One kind of repeated item a control paints (owner decision 5): a list
+// row, a tree node, a details-view column header. `name` is the system's
+// kebab-case identity in the schema ("item", "column"). Item part names are
+// unique within the control, across its own parts and every item system, so
+// a document addresses an item part by its name alone.
+struct ItemSystemDeclaration final {
+    std::string_view name;
+    std::span<const PartDeclaration> parts;
+    std::span<const AnatomyState> states;
+    // Application-defined finite states of one item, as for a control.
+    std::span<const CustomStateDeclaration> custom_states;
+};
+
+// The anatomy of one control type. Every span refers to static storage
+// owned by the control type's translation unit, so a ControlAnatomy may be
+// copied and retained for the life of the program.
+struct ControlAnatomy final {
+    // The control's id in manifests/controls.json, or "control" for the
+    // anatomy every control inherits.
+    std::string_view control_id;
+    std::span<const PartDeclaration> parts;
+    std::span<const AnatomyState> states;
+    std::span<const CustomStateDeclaration> custom_states;
+    // The kinds of repeated item the control paints, empty for a control
+    // without items. Most controls with items have one system; the details
+    // view adds its column headers as a second.
+    std::span<const ItemSystemDeclaration> item_systems;
+};
+
+// One declared part as published: its geometry in the control's local
+// coordinate space after layout, and its own active states. `present` is
+// false when the part does not exist in the control's current configuration
+// (a track bar's fill in the classic style); `bounds` is then empty.
+// Presence does not depend on transient state: a focus part is present while
+// the control is unfocused. `states` holds only states the part's
+// declaration lists, and no custom states.
+struct PartGeometry final {
+    Rect bounds{};
+    bool present{};
+    AnatomyStateSet states{};
+
+    // A part that is present exactly when `bounds` is not empty.
+    [[nodiscard]] static constexpr PartGeometry from_bounds(Rect bounds) noexcept {
+        PartGeometry geometry;
+        geometry.bounds = bounds;
+        geometry.present = !bounds.empty();
+        return geometry;
+    }
+
+    friend constexpr bool operator==(const PartGeometry& left,
+                                     const PartGeometry& right) noexcept {
+        return left.bounds == right.bounds && left.present == right.present &&
+               left.states == right.states;
+    }
+};
+
+// Storage for one control's published part geometry: `count` live records,
+// one per declared part, in declaration order.
+struct PartGeometryBuffer final {
+    std::array<PartGeometry, maximum_control_parts> geometry{};
+    std::size_t count{};
+
+    [[nodiscard]] std::span<const PartGeometry> parts() const noexcept {
+        const std::span<const PartGeometry> live(geometry.data(), count);
+        return live;
+    }
+};
+
 // Kebab-case public names.
 [[nodiscard]] std::string_view part_role_name(PartRole role) noexcept;
 [[nodiscard]] std::string_view anatomy_state_name(AnatomyState state) noexcept;
@@ -300,6 +309,8 @@ private:
 [[nodiscard]] bool declares_state(const ControlAnatomy& anatomy,
                                   AnatomyState state) noexcept;
 [[nodiscard]] bool declares_item_state(const ItemSystemDeclaration& system,
+                                       AnatomyState state) noexcept;
+[[nodiscard]] bool declares_part_state(const PartDeclaration& part,
                                        AnatomyState state) noexcept;
 
 // Typed records (stage T1). C++ reads a control's parts and states as dot
@@ -460,6 +471,8 @@ enum class AnatomyDefect : std::uint8_t {
     item_system_name_not_kebab_case,
     duplicate_item_system_name,
     item_system_without_parts,
+    part_state_out_of_range,
+    duplicate_part_state,
 };
 
 // The result of validate_control_anatomy: the first defect found, or none.

@@ -63,6 +63,10 @@ Size TrackBar::measure(Size available) {
 
 namespace {
 
+// The thumb is pressed and captures the pointer while dragged.
+constexpr std::array<AnatomyState, 2> track_bar_thumb_states{{
+    AnatomyState::pressed, AnatomyState::captured}};
+
 constexpr std::array<PartField<TrackBar::Parts>, 6> track_bar_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &TrackBar::Parts::region},
@@ -72,7 +76,8 @@ constexpr std::array<PartField<TrackBar::Parts>, 6> track_bar_part_fields{{
      .member = &TrackBar::Parts::fill},
     {.declaration = {.name = "ticks", .role = PartRole::glyph, .composed_from = {}},
      .member = &TrackBar::Parts::ticks},
-    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
+    {.declaration = {.name = "thumb", .role = PartRole::thumb, .composed_from = {},
+                     .states = track_bar_thumb_states},
      .member = &TrackBar::Parts::thumb},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &TrackBar::Parts::focus},
@@ -195,6 +200,10 @@ void TrackBar::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.fill = PartGeometry::from_bounds(fill_bounds());
     record.ticks = PartGeometry::from_bounds(ticks_bounds());
     record.thumb = PartGeometry::from_bounds(thumb);
+    if (tracking_) {
+        record.thumb.states.insert(AnatomyState::pressed);
+        record.thumb.states.insert(AnatomyState::captured);
+    }
     // The track bar shows focus on its thumb.
     record.focus = PartGeometry::from_bounds(thumb);
     write_parts(anatomy(), track_bar_part_fields, record, geometry);
