@@ -904,6 +904,24 @@ public:
 #endif
     }
 
+#if !defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    // Draws one live frame into the raster under its clip without presenting
+    // it; the frame sequence presents afterwards (stage DP decision 2). The
+    // clip returns to the whole surface so retained painting can follow in
+    // the same frame.
+    [[nodiscard]] bool compose_live_surface(const LiveSurfacePresentation& presentation) {
+        if (!presentation.surface || presentation.destination.empty() ||
+            presentation.clip.empty() || states_.empty()) {
+            return false;
+        }
+        const Rect whole = states_.back().clip;
+        states_.back().clip = presentation.clip;
+        draw_live_surface(presentation.surface, presentation.destination, 1.0);
+        states_.back().clip = whole;
+        return true;
+    }
+#endif
+
     [[nodiscard]] bool present_live_surface(
         HDC target, const LiveSurfacePresentation& presentation) {
         if (target == nullptr || !presentation.surface ||
@@ -2595,6 +2613,10 @@ public:
                    std::to_string(live_present_duration_nanoseconds_) +
                ",\"worst_duration_nanoseconds\":" +
                    std::to_string(live_worst_present_duration_nanoseconds_) +
+               ",\"retained_with_frames\":" +
+                   std::to_string(live_sequence_retained_presented_) +
+               ",\"retained_deferred\":" +
+                   std::to_string(live_sequence_retained_deferred_) +
                "}}";
     }
 
@@ -2972,6 +2994,110 @@ private:
         }
     }
 
+#if !defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
+    // The frame sequence for new live frames (stage DP decision 2), in one
+    // tick: gather the frames and the retained damage they caused (an
+    // overlay's share above a changed frame, #69) with any damage still
+    // pending; compose the frames, then the retained painting over them, into
+    // the raster; present the combined rectangles once. An overlay is never a
+    // wake behind the frame beneath it, and the screen stays a copy of the
+    // raster.
+    void present_live_frame_sequence(const std::vector<LiveSurfacePresentation>& updates) {
+        const std::chrono::steady_clock::time_point started =
+            std::chrono::steady_clock::now();
+        const DamageRegion taken = (*model_).take_damage();
+        const std::span<const Rect> taken_rectangles = taken.rectangles();
+        for (std::size_t index = 0; index < taken_rectangles.size(); ++index) {
+            pending_damage_.add(taken_rectangles[index]);
+        }
+        // Gather and compose.
+        raster_.begin_frame();
+        static_cast<void>(raster_.synchronize_images((*model_).image_resources()));
+        DamageRegion screen;
+        std::uint64_t live_pixels = 0U;
+        std::uint64_t live_composed = 0U;
+        composed_live_pixels_.clear();
+        for (const gui_forms::LiveSurfacePresentation& update : updates) {
+            if (!raster_.compose_live_surface(update)) {
+                ++live_updates_failed_;
+                continue;
+            }
+            screen.add(update.clip);
+            const std::uint64_t pixels = device_pixels(device_rect(update.clip));
+            composed_live_pixels_.push_back(pixels);
+            live_pixels += pixels;
+            ++live_composed;
+        }
+        std::optional<PaintReceipt> receipt;
+        if (!pending_damage_.empty()) {
+            receipt = (*model_).paint(raster_, pending_damage_.rectangles());
+            if (receipt) {
+                const std::span<const Rect> painted = pending_damage_.rectangles();
+                for (std::size_t index = 0; index < painted.size(); ++index) {
+                    screen.add(painted[index]);
+                }
+            }
+        }
+        // Present: each rectangle once, and none left for WM_PAINT to repeat.
+        HDC target = GetDC(hwnd_);
+        if (target == nullptr) {
+            live_updates_failed_ += live_composed;
+            return;
+        }
+        bool presented = true;
+        PresentedArea copied;
+        const std::span<const Rect> presented_rectangles = screen.rectangles();
+        for (std::size_t index = 0; index < presented_rectangles.size(); ++index) {
+            const RECT device = device_rect(presented_rectangles[index]);
+            const std::uint64_t pixels = device_pixels(device);
+            if (pixels == 0U) continue;
+            if (raster_.present(target, device)) {
+                ValidateRect(hwnd_, &device);
+                copied.device_pixels += pixels;
+                ++copied.rectangles;
+            } else {
+                presented = false;
+            }
+        }
+        ReleaseDC(hwnd_, target);
+        const std::uint64_t elapsed = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started).count());
+        // Live frames are copied inside this one present: their clips are
+        // reported as live and the rest as retained. A tick with a receipt
+        // carries the duration; a live-only tick divides it among its frames.
+        PresentedArea retained;
+        retained.device_pixels = copied.device_pixels > live_pixels ?
+            copied.device_pixels - live_pixels : 0U;
+        retained.rectangles = copied.rectangles;
+        if (presented && receipt &&
+            (*model_).notify_presented(*receipt, elapsed, retained)) {
+            pending_damage_.clear();
+        }
+        // Retained damage the sequence painted with the frames, or left for a
+        // later WM_PAINT (a declined paint or a failed copy).
+        if (!pending_damage_.empty()) {
+            ++live_sequence_retained_deferred_;
+        } else if (receipt) {
+            ++live_sequence_retained_presented_;
+        }
+        if (!presented) {
+            live_updates_failed_ += live_composed;
+            return;
+        }
+        live_updates_presented_ += live_composed;
+        const std::uint64_t live_duration =
+            receipt || live_composed == 0U ? 0U : elapsed / live_composed;
+        for (std::size_t index = 0; index < composed_live_pixels_.size(); ++index) {
+            PresentedArea live;
+            live.device_pixels = composed_live_pixels_[index];
+            if (live.device_pixels == 0U) continue;
+            live.rectangles = 1U;
+            (*model_).notify_live_presented(live_duration, live);
+        }
+    }
+#endif
+
     void present_live_surface_updates() {
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         // Placements are model-current. Never consume their generations while
@@ -2990,6 +3116,7 @@ private:
             live_clock_armed_ = false;
         }
         if (updates.empty() || hwnd_ == nullptr) return;
+#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
         HDC target = GetDC(hwnd_);
         if (target == nullptr) {
             live_updates_failed_ += updates.size();
@@ -3009,14 +3136,15 @@ private:
                 (*model_).notify_live_presented(update_duration, copied);
             } else {
                 ++live_updates_failed_;
-#if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
                 pending_damage_.add(update.clip);
                 recovery_expose_pending_ = true;
                 InvalidateRect(hwnd_, nullptr, FALSE);
-#endif
             }
         }
         ReleaseDC(hwnd_, target);
+#else
+        present_live_frame_sequence(updates);
+#endif
         const std::uint64_t duration = static_cast<std::uint64_t>(
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started).count());
@@ -3572,6 +3700,9 @@ private:
     WINDOWPLACEMENT restore_placement_{};
     DibPainter raster_;
     DamageRegion pending_damage_;
+    // The device pixels of each live frame the current frame sequence composed;
+    // reused across ticks.
+    std::vector<std::uint64_t> composed_live_pixels_;
 #if defined(GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB)
     bool recovery_expose_pending_{};
 #endif
@@ -3587,6 +3718,10 @@ private:
     std::uint64_t live_clock_signals_{};
     std::uint64_t live_presentation_drains_{};
     std::uint64_t live_updates_sampled_{};
+    // Frame-sequence ticks whose retained damage went out with the live frames,
+    // and ticks that left it for a later WM_PAINT (stage DP).
+    std::uint64_t live_sequence_retained_presented_{};
+    std::uint64_t live_sequence_retained_deferred_{};
     std::uint64_t live_updates_presented_{};
     std::uint64_t live_updates_failed_{};
     std::uint64_t live_present_duration_nanoseconds_{};
