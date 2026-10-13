@@ -14,7 +14,7 @@ Running windows on a native host, host options per platform, and the portable ho
    * - :cpp:class:`Application <gui_forms::Application>`
      - The entry point that presents windows on the platform's native host.
    * - :cpp:class:`ApplicationWindowHandle <gui_forms::ApplicationWindowHandle>`
-     - A weak handle for asking the host to show, hide, retitle or close a running window.
+     - A weak handle for asking the host to show, hide, retitle, resize or close a running window.
    * - :cpp:class:`ApplicationWindowOptions <gui_forms::ApplicationWindowOptions>`
      - The title, sizes, behaviour and callbacks of one native application window.
 
@@ -1272,6 +1272,10 @@ Related types
 
       Published on the host UI thread during initialization. The returned title operation borrows its UTF-8 input only through the call; empty is allowed, NUL/malformed UTF-8/>65536 bytes are invalid_argument. Invoke on the host UI thread; wrong-thread calls are refused before native mutable access. Copies do not own the host/window and may be discarded after run returns. Calls on the UI thread after native lifetime ends return after_shutdown. Adapter/conversion exceptions become backend_failure; accepted means the native request was submitted, not that title pixels were presented.
 
+   .. cpp:member:: std::function<void(std::function<HostServiceStatus(Size)>)> client_size_ready
+
+      Published on the host UI thread during initialization, like title_ready. The operation asks for a native client size in logical units; see ApplicationWindowHandle::request_client_size. Sizes below minimum_size are invalid_argument; full screen, maximized and minimized windows are unsupported. The new size arrives through the host's resize event.
+
    .. cpp:member:: std::function<void(HostCloseRequest &)> close_request
 
    .. cpp:member:: std::function<void(std::function<void()> wake, std::function<void()> request_close, std::function<HostDialogResult(const HostDialogRequest &)> show_dialog, std::function<HostServiceStatus(const HostTooltipRequest &)> show_tooltip, std::function<void()> hide_tooltip, std::function<HostClipboardTextResult()> read_clipboard_text, std::function<HostServiceStatus(std::string_view)> write_clipboard_text)> host_ready
@@ -1355,6 +1359,10 @@ Related types
    .. cpp:member:: std::function<void(std::function<HostServiceStatus(std::string_view)>)> title_ready
 
       Published on the host UI thread during initialization. The returned title operation borrows its UTF-8 input only through the call; empty is allowed, NUL/malformed UTF-8/>65536 bytes are invalid_argument. Invoke on the host UI thread; wrong-thread calls are refused before native mutable access. Copies do not own the host/window and may be discarded after run returns. Calls on the UI thread after native lifetime ends return after_shutdown. Adapter/conversion exceptions become backend_failure; accepted means the native request was submitted, not that title pixels were presented.
+
+   .. cpp:member:: std::function<void(std::function<HostServiceStatus(Size)>)> client_size_ready
+
+      Published on the host UI thread during initialization, like title_ready. The operation asks for a native client size in logical units; see ApplicationWindowHandle::request_client_size. Sizes below minimum_size are invalid_argument; full screen, maximized and minimized windows are unsupported. The new size arrives through the host's resize event.
 
    .. cpp:member:: bool print_metrics_on_close
 
@@ -1543,6 +1551,10 @@ Related types
    .. cpp:member:: std::function<void(std::function<HostServiceStatus(std::string_view)>)> title_ready
 
       Published on the host UI thread during initialization. The returned title operation borrows its UTF-8 input only through the call; empty is allowed, NUL/malformed UTF-8/>65536 bytes are invalid_argument. Invoke on the host UI thread; wrong-thread calls are refused before native mutable access. Copies do not own the host/window and may be discarded after run returns. Calls on the UI thread after native lifetime ends return after_shutdown. Adapter/conversion exceptions become backend_failure; accepted means the native request was submitted, not that title pixels were presented.
+
+   .. cpp:member:: std::function<void(std::function<HostServiceStatus(Size)>)> client_size_ready
+
+      Published on the host UI thread during initialization, like title_ready. The operation asks for a native client size in logical units; see ApplicationWindowHandle::request_client_size. Sizes below minimum_size are invalid_argument; full screen, maximized and minimized windows are unsupported. The new size arrives through the host's resize event.
 
    .. cpp:member:: Point initial_position
 

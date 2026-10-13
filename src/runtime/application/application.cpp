@@ -122,6 +122,12 @@ struct TitleReady final {
         (*(*bridge).state).set_title = std::move(update);
     }
 };
+struct ClientSizeReady final {
+    std::shared_ptr<WindowBridge> bridge{};
+    void operator()(std::function<HostServiceStatus(Size)> request) const noexcept {
+        (*(*bridge).state).request_client_size = std::move(request);
+    }
+};
 struct Closing final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()(HostCloseRequest& request) const noexcept {
@@ -145,6 +151,7 @@ struct Closed final {
         (*(*bridge).state).hide = {};
         (*(*bridge).state).toggle_full_screen = {};
         (*(*bridge).state).set_title = {};
+        (*(*bridge).state).request_client_size = {};
         try {
             if ((*bridge).options.closed) (*bridge).options.closed();
         } catch (...) { (*(*bridge).failure).capture(); }
@@ -165,6 +172,7 @@ public:
             state.hide = {};
             state.toggle_full_screen = {};
             state.set_title = {};
+            state.request_client_size = {};
         }
     }
     std::vector<std::shared_ptr<WindowBridge>> windows{};
@@ -207,6 +215,7 @@ void prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
         entry.options.visibility_ready = VisibilityReady{bridge};
         entry.options.full_screen_ready = FullScreenReady{bridge};
         entry.options.title_ready = TitleReady{bridge};
+        entry.options.client_size_ready = ClientSizeReady{bridge};
         entry.options.close_request = Closing{bridge};
         entry.options.closed = Closed{bridge};
         native.push_back(std::move(entry));

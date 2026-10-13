@@ -86,6 +86,57 @@ void titles() {
     require(handle.set_title("closed").error == HostServiceError::after_shutdown && calls == 3, "closed title reached adapter");
     require(ApplicationWindowHandle{}.set_title("expired").error == HostServiceError::after_shutdown, "empty title handle callable");
 }
+struct SizeRequest final {
+    Size* observed{};
+    unsigned* calls{};
+    HostServiceStatus operator()(const Size value) const {
+        *observed = value;
+        ++*calls;
+        return {};
+    }
+};
+struct SizeOnWorker final {
+    ApplicationWindowHandle handle{};
+    HostServiceStatus* result{};
+    void operator()() const { *result = handle.request_client_size({400.0, 300.0}); }
+};
+struct ThrowSize final {
+    HostServiceStatus operator()(Size) const { throw std::runtime_error("size adapter failure"); }
+};
+void client_sizes() {
+    const std::shared_ptr<detail::ApplicationWindowState> state = std::make_shared<detail::ApplicationWindowState>();
+    const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(state);
+    require(handle.request_client_size({400.0, 300.0}).error == HostServiceError::backend_failure,
+        "unready size request accepted");
+    (*state).ready = true;
+    require(handle.request_client_size({400.0, 300.0}).error == HostServiceError::unsupported,
+        "missing size adapter accepted");
+    Size observed{};
+    unsigned calls = 0;
+    (*state).request_client_size = SizeRequest{&observed, &calls};
+    require(handle.request_client_size({400.0, 300.0}).accepted() && observed == Size{400.0, 300.0},
+        "size request changed in transit");
+    const double infinity = std::numeric_limits<double>::infinity();
+    require(handle.request_client_size({0.5, 300.0}).error == HostServiceError::invalid_argument,
+        "sub-unit width accepted");
+    require(handle.request_client_size({400.0, 32769.0}).error == HostServiceError::invalid_argument,
+        "oversized height accepted");
+    require(handle.request_client_size({infinity, 300.0}).error == HostServiceError::invalid_argument,
+        "infinite width accepted");
+    require(calls == 1, "invalid size reached native adapter");
+    HostServiceStatus worker{};
+    std::thread thread(SizeOnWorker{handle, &worker});
+    thread.join();
+    require(worker.error == HostServiceError::wrong_thread && calls == 1, "foreign-thread size reached adapter");
+    (*state).request_client_size = ThrowSize{};
+    require(handle.request_client_size({400.0, 300.0}).error == HostServiceError::backend_failure,
+        "native size exception escaped");
+    (*state).closed = true;
+    require(handle.request_client_size({400.0, 300.0}).error == HostServiceError::after_shutdown,
+        "closed size request reached adapter");
+    require(ApplicationWindowHandle{}.request_client_size({400.0, 300.0}).error == HostServiceError::after_shutdown,
+        "empty size handle callable");
+}
 struct ChangeHidePolicy final {
     void operator()(HostCloseRequest& request) const { request.hide_on_accept = false; }
 };
@@ -223,6 +274,7 @@ void reusable_hide() {
 }
 int main() {
     titles();
+    client_sizes();
     validation();
     handles();
     reusable_hide();

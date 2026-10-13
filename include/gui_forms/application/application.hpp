@@ -54,6 +54,16 @@ public:
     // malformed UTF-8, embedded NUL and more than 65536 bytes are refused.
     // Acceptance is a native update request, not a compositor presentation receipt.
     [[nodiscard]] HostServiceStatus set_title(const std::string_view title) const;
+    // UI-thread request that the native window's client area become
+    // `client_size` logical units (1 to 32768 each way, at least the window's
+    // minimum_size). Acceptance means the native request was submitted. The
+    // new size reaches the model only through the host's resize event, as any
+    // user resize does: never assume it has arrived when this returns (inside
+    // a host callback the event waits until the callback returns, and X11
+    // answers on a later event). The platform or window manager may constrain
+    // it. Refused as unsupported while the window is full screen, maximized or
+    // minimized.
+    [[nodiscard]] HostServiceStatus request_client_size(Size client_size) const;
 
 private:
     friend struct detail::ApplicationHandleAccess;

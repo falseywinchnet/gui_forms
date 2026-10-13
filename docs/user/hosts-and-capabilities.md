@@ -125,8 +125,12 @@ of the renderer-neutral core; a boundary test enforces that.
 in one host run, each with its own `Window` model, stable ID, options and an
 optional owner ID for tool windows. The `ready` callback hands you an
 `ApplicationWindowHandle`, a weak, thread-affine handle for `show`, `hide`,
-`toggle_full_screen`, `set_title` and `request_close`; requests after close
-return `after_shutdown`. One window's handlers may mutate another window's
+`toggle_full_screen`, `set_title`, `request_client_size` and `request_close`;
+requests after close return `after_shutdown`. `request_client_size` asks the
+native window for a client size; the model follows when the host's resize
+event arrives, as for a user resize. `Window::resize` only reports a size the
+host already has, so calling it from application code leaves the model and
+the screen disagreeing. One window's handlers may mutate another window's
 model and have it present on the next wake.
 
 ## Choosing a host at build time

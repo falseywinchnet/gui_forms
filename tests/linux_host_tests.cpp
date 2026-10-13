@@ -6,11 +6,13 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
+#include <functional>
 #include <fstream>
 #include <iostream>
 #include <poll.h>
 #include <stdexcept>
 #include <sys/wait.h>
+#include <thread>
 #include <unistd.h>
 
 namespace {
@@ -467,6 +469,46 @@ void live_frame_sequence(Runtime &runtime) {
           "Overlay lost its pixels over a changed frame");
   (*window).close(HostCloseReason::application, true);
   runtime.step(0);
+struct KeepClientSize final {
+  std::function<HostServiceStatus(Size)> *retained{};
+  void operator()(std::function<HostServiceStatus(Size)> request) const { *retained = std::move(request); }
+};
+struct SizeOnWorker final {
+  const std::function<HostServiceStatus(Size)> *request{};
+  HostServiceStatus *result{};
+  void operator()() const { *result = (*request)({300.0, 200.0}); }
+};
+// A size request reaches the native window, and the model follows only
+// through ConfigureNotify, as a user resize does.
+void client_size_request(Runtime &runtime) {
+  std::function<HostServiceStatus(Size)> request{};
+  host::LinuxApplicationWindow entry;
+  entry.stable_id = "sized";
+  entry.options.title = "GUI.Forms X11 client size check";
+  entry.options.initial_size = {320, 240};
+  entry.options.minimum_size = {160, 120};
+  entry.options.client_size_ready = KeepClientSize{&request};
+  entry.model = std::make_unique<gui_forms::Window>(
+      make_control<Control>(StableId("sized.root")), entry.options.initial_size);
+  const std::shared_ptr<NativeWindow> window = runtime.add(std::move(entry));
+  (*window).ready();
+  require(static_cast<bool>(request), "Client size request not published");
+  gui_forms::Window &model = *(*window).entry.model;
+  for (int tick = 0; tick < 4; ++tick) runtime.step(10);
+  require(request({100.0, 100.0}).error == HostServiceError::invalid_argument,
+          "Size below the window minimum accepted");
+  HostServiceStatus worker{};
+  std::thread thread(SizeOnWorker{&request, &worker});
+  thread.join();
+  require(worker.error == HostServiceError::wrong_thread, "Foreign-thread size request accepted");
+  require(request({300.0, 200.0}).accepted(), "Client size request refused");
+  require(model.client_size() == Size{320.0, 240.0}, "Model resized before the native window");
+  for (int tick = 0; tick < 50 && model.client_size() != Size{300.0, 200.0}; ++tick) runtime.step(10);
+  require(model.client_size() == Size{300.0, 200.0}, "Native resize did not reach the model");
+  (*window).close(HostCloseReason::application, true);
+  runtime.step(0);
+  require(request({300.0, 200.0}).error == HostServiceError::after_shutdown,
+          "Size request outlived the window");
 }
 int main() {
   try {
@@ -612,9 +654,10 @@ int main() {
     dialog(runtime, *window, directory, true);
     std::filesystem::remove_all(directory);
     live_frame_sequence(runtime);
+    client_size_request(runtime);
     (*window).close(HostCloseReason::application, true);
     std::cout << "X11 services: cross-process text and PNG INCR, preserved "
-                 "input, local file drops, open/save dialogs, live frame sequence passed\n";
+                 "input, local file drops, open/save dialogs, live frame sequence, client size request passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';

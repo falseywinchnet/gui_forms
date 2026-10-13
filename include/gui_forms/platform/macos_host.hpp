@@ -67,6 +67,12 @@ struct MacHostOptions {
     // Adapter/conversion exceptions become backend_failure; accepted means the
     // native request was submitted, not that title pixels were presented.
     std::function<void(std::function<HostServiceStatus(std::string_view)>)> title_ready;
+    // Published on the host UI thread during initialization, like title_ready.
+    // The operation asks for a native client size in logical units; see
+    // ApplicationWindowHandle::request_client_size. Sizes below minimum_size
+    // are invalid_argument; full screen, maximized and minimized windows are
+    // unsupported. The new size arrives through the host's resize event.
+    std::function<void(std::function<HostServiceStatus(Size)>)> client_size_ready;
     bool print_metrics_on_close{true};
     bool close_after_launch_for_testing{};
     std::uint32_t close_attempts_for_testing{1};

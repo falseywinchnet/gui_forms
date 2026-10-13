@@ -11,7 +11,7 @@ gui_forms::ApplicationWindowHandle
 
    ``#include <gui_forms/application/application.hpp>``
 
-   A weak handle for asking the host to show, hide, retitle or close a running window.
+   A weak handle for asking the host to show, hide, retitle, resize or close a running window.
 
    The ``ready`` callback in :cpp:class:`ApplicationWindowOptions <gui_forms::ApplicationWindowOptions>` hands you a handle for its
    window; keep a copy wherever you need to act on the native window later, for
@@ -41,6 +41,8 @@ gui_forms::ApplicationWindowHandle
         - Asks the host to hide the window without closing it.
       * - :cpp:func:`toggle_full_screen <gui_forms::ApplicationWindowHandle::toggle_full_screen>`
         - Asks the host to enter or leave full-screen presentation.
+      * - :cpp:func:`request_client_size <gui_forms::ApplicationWindowHandle::request_client_size>`
+        - Asks the host to make the window's client area a given size in logical units, as if the user had dragged its edge.
       * - :cpp:func:`set_title <gui_forms::ApplicationWindowHandle::set_title>`
         - Changes the native title bar text.
 
@@ -68,7 +70,7 @@ gui_forms::ApplicationWindowHandle
 
    An accepted request means the host received it. The native window may carry
    it out later in the same event loop, so do not expect the window to be
-   hidden or closed when the call returns.
+   hidden, resized or closed when the call returns.
 
    Handles are cheap to copy. After the window closes, or after
    ``Application::run`` returns, every request returns
@@ -152,6 +154,19 @@ gui_forms::ApplicationWindowHandle
 
       Asks the host to enter or leave full-screen presentation. A host without
       full-screen support returns :cpp:enumerator:`HostServiceError::unsupported <gui_forms::HostServiceError::unsupported>`.
+
+   .. cpp:function:: HostServiceStatus request_client_size(Size client_size) const
+
+      Asks the host to make the window's client area a given size in logical
+      units, as if the user had dragged its edge. Each side must be from 1 to
+      32768 and at least the window's ``minimum_size``, or the request returns
+      :cpp:enumerator:`HostServiceError::invalid_argument <gui_forms::HostServiceError::invalid_argument>`. A window that is full screen,
+      maximized or minimized returns :cpp:enumerator:`HostServiceError::unsupported <gui_forms::HostServiceError::unsupported>`. The model
+      takes the new size only when the host's resize event arrives, and the
+      platform or window manager may give a different size; read
+      ``Window::client_size`` afterwards rather than assuming the request's size.
+      ``Window::resize`` is the host's side of this and does not resize the native
+      window.
 
    .. cpp:function:: HostServiceStatus set_title(const std::string_view title) const
 

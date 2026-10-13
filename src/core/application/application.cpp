@@ -119,4 +119,20 @@ HostServiceStatus ApplicationWindowHandle::set_title(const std::string_view titl
         return result;
     } catch (...) { return {HostServiceError::backend_failure}; }
 }
+HostServiceStatus ApplicationWindowHandle::request_client_size(const Size client_size) const {
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    if (!state) return {HostServiceError::after_shutdown};
+    if ((*state).thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
+    if ((*state).closed) return {HostServiceError::after_shutdown};
+    if (!(*state).ready) return {HostServiceError::backend_failure};
+    if (!valid_size(client_size)) return {HostServiceError::invalid_argument};
+    if (!(*state).request_client_size) return {HostServiceError::unsupported};
+    try {
+        // The native request may resize the model synchronously; keep the
+        // callable alive until it returns.
+        const std::function<HostServiceStatus(Size)> action = (*state).request_client_size;
+        const HostServiceStatus result = action(client_size);
+        return result;
+    } catch (...) { return {HostServiceError::backend_failure}; }
+}
 } // namespace gui_forms

@@ -46,6 +46,12 @@ struct LinuxHostOptions final {
   // Adapter/conversion exceptions become backend_failure; accepted means the
   // native request was submitted, not that title pixels were presented.
   std::function<void(std::function<HostServiceStatus(std::string_view)>)> title_ready;
+  // Published on the host UI thread during initialization, like title_ready.
+  // The operation asks for a native client size in logical units; see
+  // ApplicationWindowHandle::request_client_size. Sizes below minimum_size
+  // are invalid_argument; full screen, maximized and minimized windows are
+  // unsupported. The new size arrives through the host's resize event.
+  std::function<void(std::function<HostServiceStatus(Size)>)> client_size_ready;
   std::function<void(HostCloseRequest &)> close_request;
   std::function<void(
       std::function<void()> wake, std::function<void()> request_close,

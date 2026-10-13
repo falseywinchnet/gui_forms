@@ -48,6 +48,57 @@ struct WindowTitle final {
     } catch (...) { return {HostServiceError::backend_failure}; }
   }
 };
+// True when the window manager holds the window full screen or maximized
+// (_NET_WM_STATE); a size request would fight it.
+bool window_state_fixed(NativeWindow& window) {
+  Atom type{};
+  int format{};
+  unsigned long count{}, remaining{};
+  unsigned char* data = nullptr;
+  bool fixed = false;
+  if (XGetWindowProperty(window.runtime.display, window.xid, window.runtime.atom("_NET_WM_STATE"),
+                         0, 64, False, XA_ATOM, &type, &format, &count, &remaining,
+                         &data) == Success && type == XA_ATOM && format == 32) {
+    const Atom fullscreen = window.runtime.atom("_NET_WM_STATE_FULLSCREEN");
+    const Atom maximized_vertical = window.runtime.atom("_NET_WM_STATE_MAXIMIZED_VERT");
+    const Atom maximized_horizontal = window.runtime.atom("_NET_WM_STATE_MAXIMIZED_HORZ");
+    const Atom hidden = window.runtime.atom("_NET_WM_STATE_HIDDEN");
+    const Atom* atoms = reinterpret_cast<const Atom*>(data);
+    for (unsigned long index = 0; index < count; ++index) {
+      if (atoms[index] == fullscreen || atoms[index] == maximized_vertical ||
+          atoms[index] == maximized_horizontal || atoms[index] == hidden) fixed = true;
+    }
+  }
+  if (data != nullptr) XFree(data);
+  return fixed;
+}
+// Asks for a client area of `client_size` logical units (device pixels; the
+// X11 host runs at scale 1). The server or window manager answers with
+// ConfigureNotify, which resizes the model on a later event.
+struct WindowClientSize final {
+  std::weak_ptr<NativeWindow> owner{};
+  const std::thread::id thread{std::this_thread::get_id()};
+  HostServiceStatus operator()(const Size client_size) const {
+    if (thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
+    const std::shared_ptr<NativeWindow> window = owner.lock();
+    if (!window || (*window).closed) return {HostServiceError::after_shutdown};
+    try {
+      NativeWindow& native = *window;
+      if (!std::isfinite(client_size.width) || !std::isfinite(client_size.height) ||
+          client_size.width > 32768.0 || client_size.height > 32768.0 ||
+          client_size.width < std::max(1.0, native.entry.options.minimum_size.width) ||
+          client_size.height < std::max(1.0, native.entry.options.minimum_size.height))
+        return {HostServiceError::invalid_argument};
+      if (native.fallback_fullscreen || window_state_fixed(native))
+        return {HostServiceError::unsupported};
+      XResizeWindow(native.runtime.display, native.xid,
+                    static_cast<unsigned>(std::lround(client_size.width)),
+                    static_cast<unsigned>(std::lround(client_size.height)));
+      XFlush(native.runtime.display);
+      return {};
+    } catch (...) { return {HostServiceError::backend_failure}; }
+  }
+};
 struct PresentationImage final {
   XImage* value{};
   PresentationImage() = default;
@@ -648,6 +699,8 @@ void NativeWindow::ready() {
         weak_from_this(), runtime.actions, ActionKind::fullscreen});
   if (entry.options.title_ready)
     entry.options.title_ready(WindowTitle{weak_from_this()});
+  if (entry.options.client_size_ready)
+    entry.options.client_size_ready(WindowClientSize{weak_from_this()});
   if (entry.options.visibility_ready)
     entry.options.visibility_ready(show, hide);
 }

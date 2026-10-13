@@ -2214,6 +2214,17 @@ struct RequestWindowTitle final {
         } catch (...) { return {HostServiceError::backend_failure}; }
     }
 };
+class WindowsHostState;
+// As TitleCallbackState: only the UI thread reads or revokes host. The
+// operation owns no host; it reaches the host only while the window lives.
+struct ClientSizeCallbackState final {
+    const DWORD thread{GetCurrentThreadId()};
+    WindowsHostState* host{};
+};
+struct RequestClientSize final {
+    std::weak_ptr<ClientSizeCallbackState> owner{};
+    HostServiceStatus operator()(Size client_size) const;
+};
 // An independent DIB uses the same font selection, gradients, shadows and image
 // sampling as the window, without repainting the retained control tree.
 class DibFramebuffer final : public PaintFramebuffer {
@@ -2247,6 +2258,8 @@ std::unique_ptr<PaintFramebuffer> DibPainter::create_framebuffer(Size logical_si
 }
 
 class WindowsHostState final {
+    // Reaches request_client_size through its revocable callback state.
+    friend struct RequestClientSize;
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
     friend struct DibHostFixture;
 #endif
@@ -2275,6 +2288,7 @@ public:
 
     ~WindowsHostState() {
         (*title_state_).window = nullptr;
+        (*size_state_).host = nullptr;
         accessibility_.detach();
         // Initialization can unwind before WM_DESTROY. Detach the callback
         // address before releasing the native window so no later message can
@@ -2303,6 +2317,7 @@ public:
         if (native_phase_ != NativePhase::creating) return;
         hwnd_ = window;
         (*title_state_).window = window;
+        (*size_state_).host = this;
         services_.bind_owner(window, *model_);
         native_phase_ = NativePhase::bound;
     }
@@ -2378,6 +2393,9 @@ public:
         }
         if (options_.title_ready) {
             options_.title_ready(RequestWindowTitle{title_state_});
+        }
+        if (options_.client_size_ready) {
+            options_.client_size_ready(RequestClientSize{size_state_});
         }
         if (options_.visibility_ready) {
             options_.visibility_ready(
@@ -2592,6 +2610,7 @@ public:
         case WM_CLOSE: return close();
         case WM_DESTROY:
             (*title_state_).window = nullptr;
+            (*size_state_).host = nullptr;
             services_.revoke_cursor_interaction(CursorError::closing);
             accessibility_.detach();
             if (!closed_) {
@@ -2691,6 +2710,30 @@ private:
 
     void hide_window() noexcept {
         if (hwnd_ != nullptr && !closed_) ShowWindow(hwnd_, SW_HIDE);
+    }
+
+    // Asks for a client area of `client_size` logical units. SetWindowPos
+    // sends WM_SIZE before it returns, and the model is resized through the
+    // ordinary resize event (deferred while a host callback is running).
+    HostServiceStatus request_client_size(const Size client_size) {
+        if (hwnd_ == nullptr || closed_) return {HostServiceError::after_shutdown};
+        if (client_size.width < options_.minimum_size.width ||
+            client_size.height < options_.minimum_size.height) {
+            return {HostServiceError::invalid_argument};
+        }
+        if (full_screen_ || IsZoomed(hwnd_) || IsIconic(hwnd_)) {
+            return {HostServiceError::unsupported};
+        }
+        RECT frame{0, 0,
+                   static_cast<LONG>(std::lround(client_size.width * scale_)),
+                   static_cast<LONG>(std::lround(client_size.height * scale_))};
+        adjust_client_frame(frame, static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_STYLE)),
+            static_cast<DWORD>(GetWindowLongPtrW(hwnd_, GWL_EXSTYLE)), scale_);
+        const BOOL moved = SetWindowPos(hwnd_, nullptr, 0, 0,
+            frame.right - frame.left, frame.bottom - frame.top,
+            SWP_NOMOVE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE);
+        if (moved == FALSE) return {HostServiceError::backend_failure};
+        return {};
     }
 
     template <class Payload>
@@ -3842,12 +3885,29 @@ private:
     std::uint64_t live_worst_present_duration_nanoseconds_{};
     bool in_size_move_{};
     std::shared_ptr<TitleCallbackState> title_state_{std::make_shared<TitleCallbackState>()};
+    std::shared_ptr<ClientSizeCallbackState> size_state_{std::make_shared<ClientSizeCallbackState>()};
     bool closed_{};
     bool frame_capture_completed_{};
     bool frame_capture_saved_{};
     NativePhase native_phase_{NativePhase::creating};
     TooltipPopup tooltip_;
 };
+
+HostServiceStatus RequestClientSize::operator()(const Size client_size) const {
+    const std::shared_ptr<ClientSizeCallbackState> state = owner.lock();
+    if (!state) return {HostServiceError::after_shutdown};
+    if ((*state).thread != GetCurrentThreadId()) return {HostServiceError::wrong_thread};
+    if ((*state).host == nullptr) return {HostServiceError::after_shutdown};
+    if (!std::isfinite(client_size.width) || !std::isfinite(client_size.height) ||
+        client_size.width < 1.0 || client_size.height < 1.0 ||
+        client_size.width > 32768.0 || client_size.height > 32768.0) {
+        return {HostServiceError::invalid_argument};
+    }
+    try {
+        const HostServiceStatus result = (*(*state).host).request_client_size(client_size);
+        return result;
+    } catch (...) { return {HostServiceError::backend_failure}; }
+}
 
 LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     WindowsHostState* state = reinterpret_cast<WindowsHostState*>(
