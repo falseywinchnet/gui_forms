@@ -76,6 +76,14 @@ public:
   // Portable frame capture (capture_path host option): runs once after the
   // first presented frame whose damage covered the whole window, then closes.
   void frame_capture_if_due(bool covers_window);
+  // The frame sequence (stage DP decision 2). Gathers each live surface's new
+  // frame as damage, so retained painting composes it with everything above
+  // it (overlays) into the raster; returns true when a presentation region
+  // was taken from a surface.
+  bool gather_live_damage();
+  // Reports one present that copied `copied`: the live frames' share as live
+  // frames, the rest as the retained present, the duration split by pixels.
+  bool report_presented(PaintReceipt receipt, std::uint64_t elapsed, PresentedArea copied);
   HostDispatchResult dispatch(HostEventPayload payload);
   HostDialogResult dialog(const HostDialogRequest &request);
   Runtime &runtime;
@@ -106,6 +114,14 @@ public:
   unsigned last_click_button{};
   unsigned click_count{};
   std::vector<char> presentation;
+  // Per tick: the device pixels and rectangles gathered for each live
+  // surface's frame, reused across ticks.
+  std::vector<const LiveSurface*> live_surfaces;
+  std::vector<std::uint64_t> live_frame_pixels;
+  std::vector<std::uint64_t> live_frame_rectangles;
+  // A taken presentation region that was never presented: the next tick
+  // repaints whole clips.
+  bool live_region_lost{};
   ::Window drag_source{};
   Atom drag_type{};
   DragEvent drag;

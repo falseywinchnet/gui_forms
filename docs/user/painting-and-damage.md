@@ -151,9 +151,10 @@ for the copy per frame. A host that presents its rectangles separately shows
 `retained_rectangles_presented` above `frames_presented`; one that copies a
 bounding box shows them equal. Both Windows profiles copy each damage
 rectangle (the transactional one still swaps its whole candidate only after
-every rectangle is copied); the X11 host copies the bounding box; the macOS
-host copies the rectangles AppKit draws, with live frames counted inside the
-same copy.
+every rectangle is copied); the X11 host copies each damage rectangle; the
+macOS host copies the rectangles AppKit draws, with live frames counted inside
+the same copy. On X11 a new live frame becomes damage and retained painting
+composes it, with any overlay above it, in the same frame.
 
 `Window::presentation_availability()` reports what the attached host offers:
 the paint-contract version it meets (`paint_contract_version`; a host that
