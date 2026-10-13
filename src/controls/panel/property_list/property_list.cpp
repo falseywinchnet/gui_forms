@@ -3,7 +3,11 @@
 #include "property_list_utilities.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <vector>
+#include <string>
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -1163,6 +1167,213 @@ void PropertyList::on_dispose() noexcept {
     (*impl_).rows.clear();
     (*impl_).header.reset();
     Control::on_dispose();
+}
+
+
+namespace {
+
+constexpr std::array<PartField<PropertyList::Parts>, 1> property_list_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &PropertyList::Parts::face},
+}};
+
+constexpr std::array<PartField<PropertyList::ItemParts>, 9> property_list_item_part_fields{{
+    {.declaration = {.name = "group-header", .role = PartRole::face, .composed_from = {}},
+     .member = &PropertyList::ItemParts::group_header},
+    {.declaration = {.name = "group-expander", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &PropertyList::ItemParts::group_expander},
+    {.declaration = {.name = "group-title", .role = PartRole::caption, .composed_from = {}},
+     .member = &PropertyList::ItemParts::group_title},
+    {.declaration = {.name = "property-row", .role = PartRole::region, .composed_from = {}},
+     .member = &PropertyList::ItemParts::property_row},
+    {.declaration = {.name = "property-name", .role = PartRole::label, .composed_from = {}},
+     .member = &PropertyList::ItemParts::property_name},
+    {.declaration = {.name = "property-value", .role = PartRole::content, .composed_from = {}},
+     .member = &PropertyList::ItemParts::property_value},
+    {.declaration = {.name = "row-expander", .role = PartRole::disclosure, .composed_from = {}},
+     .member = &PropertyList::ItemParts::row_expander},
+    {.declaration = {.name = "validation", .role = PartRole::validation, .composed_from = {}},
+     .member = &PropertyList::ItemParts::validation},
+    {.declaration = {.name = "row-divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &PropertyList::ItemParts::row_divider},
+}};
+
+constexpr std::array<StateField<PropertyList::ItemStates>, 5> property_list_item_state_fields{{
+    {.state = AnatomyState::open, .member = &PropertyList::ItemStates::open},
+    {.state = AnatomyState::closed, .member = &PropertyList::ItemStates::closed},
+    {.state = AnatomyState::invalid, .member = &PropertyList::ItemStates::invalid},
+    {.state = AnatomyState::read_only, .member = &PropertyList::ItemStates::read_only},
+    {.state = AnatomyState::disabled, .member = &PropertyList::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 9> property_list_item_parts =
+    part_declarations(property_list_item_part_fields);
+constexpr std::array<AnatomyState, 5> property_list_item_states =
+    state_declarations(property_list_item_state_fields);
+constexpr std::array<CustomStateDeclaration, 1> property_list_item_custom_states{{
+    {.name = "group-header"},
+}};
+constexpr CustomStateIndex group_header_item_state{0U};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 1>
+    property_list_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(property_list_extra_part_fields));
+
+constexpr ControlAnatomy property_list_anatomy{
+    .control_id = "property-list",
+    .parts = property_list_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = property_list_item_parts,
+    .item_states = property_list_item_states,
+    .item_custom_states = property_list_item_custom_states,
+};
+
+} // namespace
+
+const ControlAnatomy& PropertyList::anatomy() const noexcept {
+    return property_list_anatomy;
+}
+
+void PropertyList::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    record.face = PartGeometry::from_bounds(local_bounds());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), property_list_extra_part_fields, record, geometry);
+}
+
+PropertyList::Parts PropertyList::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), property_list_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t PropertyList::realized_item_count() const {
+    return item_entries().size();
+}
+
+std::string PropertyList::realized_item_stable_id(std::size_t item) const {
+    const ItemEntry entry = item_entries()[item];
+    if (entry.group) return (*impl_).groups[entry.group_index].stable_id;
+    return (*impl_).spec((*impl_).rows[entry.row_index]).stable_id;
+}
+
+void PropertyList::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    // Group headers and property rows share one item anatomy; the parts of
+    // the other kind are absent. Text is published as the slots on_paint
+    // draws into; value editors are child controls.
+    const ItemEntry entry = item_entries()[item];
+    const Rect bounds = local_bounds();
+    const double s = effective_text_scale();
+    if (entry.group) {
+        const double group_height = (*impl_).group_extent();
+        const Rect band{0.0, entry.group_y, bounds.width, group_height};
+        record.group_header = PartGeometry::from_bounds(Rect::intersection(band, bounds));
+        record.group_expander = PartGeometry::from_bounds(Rect::intersection(
+            {7.0 * s, entry.group_y, 13.0 * s, group_height}, bounds));
+        record.group_title = PartGeometry::from_bounds(Rect::intersection(
+            {22.0 * s, entry.group_y, std::max(0.0, bounds.width - 26.0 * s), group_height},
+            bounds));
+    } else {
+        const Impl::RowState& state = (*impl_).rows[entry.row_index];
+        const PropertyRowSpec& row = (*impl_).spec(state);
+        const double offset = (*impl_).scroll_offset;
+        const Rect band{state.row_bounds.x, state.row_bounds.y - offset,
+                        state.row_bounds.width, state.row_bounds.height};
+        const Rect name{state.name_bounds.x, state.name_bounds.y - offset,
+                        state.name_bounds.width, state.name_bounds.height};
+        const Rect value{state.value_bounds.x, state.value_bounds.y - offset,
+                         state.value_bounds.width, state.value_bounds.height};
+        record.property_row = PartGeometry::from_bounds(Rect::intersection(band, bounds));
+        record.property_name = PartGeometry::from_bounds(Rect::intersection(name, bounds));
+        record.property_value = PartGeometry::from_bounds(Rect::intersection(value, bounds));
+        if (row.expandable) {
+            record.row_expander = PartGeometry::from_bounds(Rect::intersection(
+                {std::max(2.0 * s, name.x - 13.0 * s), name.y, 11.0 * s, name.height}, bounds));
+        }
+        if (!row.validation_message.empty()) {
+            const Rect validation{state.validation_bounds.x, state.validation_bounds.y - offset,
+                                  state.validation_bounds.width, state.validation_bounds.height};
+            record.validation = PartGeometry::from_bounds(Rect::intersection(validation, bounds));
+        }
+        // The one-unit rule along the row's bottom, inset by the padding.
+        const double padding = property_padding * s;
+        const Rect divider{padding, band.bottom() - 1.5,
+                           std::max(0.0, bounds.width - padding * 2.0), 1.0};
+        record.row_divider = PartGeometry::from_bounds(Rect::intersection(divider, bounds));
+    }
+    write_item_parts(anatomy(), property_list_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet PropertyList::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const ItemEntry entry = item_entries()[item];
+    if (entry.group) {
+        states.insert(group_header_item_state);
+        const bool expanded = (*impl_).groups[entry.group_index].expanded;
+        states.insert(expanded ? AnatomyState::open : AnatomyState::closed);
+    } else {
+        const PropertyRowSpec& row = (*impl_).spec((*impl_).rows[entry.row_index]);
+        if (row.expandable) {
+            states.insert(row.expanded ? AnatomyState::open : AnatomyState::closed);
+        }
+        if (!row.validation_message.empty()) states.insert(AnatomyState::invalid);
+        if (row.editor == PropertyEditorKind::read_only) states.insert(AnatomyState::read_only);
+        if (!row.enabled) states.insert(AnatomyState::disabled);
+    }
+    return states;
+}
+
+std::vector<PropertyList::Item> PropertyList::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = item;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), property_list_item_part_fields, published.parts(), record.parts);
+        const AnatomyStateSet item_states = realized_item_anatomy_states(item);
+        read_states(property_list_item_state_fields, item_states, record.states);
+        record.states.group_header = item_states.contains(group_header_item_state);
+        records.push_back(record);
+    }
+    return records;
+}
+
+
+std::vector<PropertyList::ItemEntry> PropertyList::item_entries() const {
+    // The walk on_paint makes: each group header, then its visible rows
+    // while the group is expanded.
+    std::vector<ItemEntry> entries;
+    double y = (*impl_).header_height - (*impl_).scroll_offset;
+    for (std::size_t group_index = 0; group_index < (*impl_).groups.size(); ++group_index) {
+        ItemEntry header;
+        header.group = true;
+        header.group_index = group_index;
+        header.group_y = y;
+        entries.push_back(header);
+        y += (*impl_).group_extent();
+        if (!(*impl_).groups[group_index].expanded) continue;
+        for (std::size_t row_index = 0; row_index < (*impl_).rows.size(); ++row_index) {
+            const Impl::RowState& state = (*impl_).rows[row_index];
+            if (state.group_index != group_index || !(*impl_).row_visible(state)) continue;
+            ItemEntry row;
+            row.group_index = group_index;
+            row.row_index = row_index;
+            entries.push_back(row);
+        }
+    }
+    return entries;
 }
 
 } // namespace gui_forms

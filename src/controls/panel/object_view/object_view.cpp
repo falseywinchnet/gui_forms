@@ -3,7 +3,10 @@
 #include "../collection_control_utilities.hpp"
 #include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <vector>
+#include <string>
 #include <algorithm>
 #include <array>
 #include <charconv>
@@ -1703,6 +1706,186 @@ void ObjectView::paint_details(Painter& painter) {
         }
     }
     painter.restore();
+}
+
+
+namespace {
+
+constexpr std::array<PartField<ObjectView::Parts>, 3> object_view_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &ObjectView::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &ObjectView::Parts::edge},
+    {.declaration = {.name = "header", .role = PartRole::face, .composed_from = {}},
+     .member = &ObjectView::Parts::header},
+}};
+
+constexpr std::array<PartField<ObjectView::ItemParts>, 5> object_view_item_part_fields{{
+    {.declaration = {.name = "cell", .role = PartRole::region, .composed_from = {}},
+     .member = &ObjectView::ItemParts::cell},
+    {.declaration = {.name = "glyph", .role = PartRole::icon, .composed_from = {}},
+     .member = &ObjectView::ItemParts::glyph},
+    {.declaration = {.name = "name", .role = PartRole::label, .composed_from = {}},
+     .member = &ObjectView::ItemParts::name},
+    {.declaration = {.name = "secondary", .role = PartRole::content, .composed_from = {}},
+     .member = &ObjectView::ItemParts::secondary},
+    {.declaration = {.name = "cell-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &ObjectView::ItemParts::cell_focus},
+}};
+
+constexpr std::array<StateField<ObjectView::ItemStates>, 4> object_view_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &ObjectView::ItemStates::selected},
+    {.state = AnatomyState::hot, .member = &ObjectView::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &ObjectView::ItemStates::current},
+    {.state = AnatomyState::disabled, .member = &ObjectView::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 5> object_view_item_parts =
+    part_declarations(object_view_item_part_fields);
+constexpr std::array<AnatomyState, 4> object_view_item_states =
+    state_declarations(object_view_item_state_fields);
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 3>
+    object_view_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(object_view_extra_part_fields));
+
+constexpr ControlAnatomy object_view_anatomy{
+    .control_id = "object-view",
+    .parts = object_view_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = object_view_item_parts,
+    .item_states = object_view_item_states,
+};
+
+} // namespace
+
+const ControlAnatomy& ObjectView::anatomy() const noexcept {
+    return object_view_anatomy;
+}
+
+void ObjectView::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const Panel::Parts panel = panel_parts();
+    record.face = panel.face;
+    record.edge = panel.edge;
+    // The column header band of the details view. Columns are not yet
+    // published one by one.
+    if (has_details_columns()) {
+        const Rect bounds = local_bounds();
+        const double viewport_right = std::max(4.0, bounds.width - 4.0);
+        record.header = PartGeometry::from_bounds(
+            {4.0, 2.0, std::max(0.0, viewport_right - 4.0), header_height()});
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), object_view_extra_part_fields, record, geometry);
+}
+
+ObjectView::Parts ObjectView::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), object_view_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t ObjectView::realized_item_count() const {
+    const std::size_t first = top_row_ * columns();
+    if (first >= items_.size()) return 0U;
+    const std::size_t end = std::min(items_.size(),
+        (top_row_ + visible_row_count() + 1U) * columns());
+    return end - first;
+}
+
+std::string ObjectView::realized_item_stable_id(std::size_t item) const {
+    return items_[top_row_ * columns() + item].stable_id;
+}
+
+void ObjectView::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    // Name and secondary text are published as the slots on_paint lays them
+    // in; the painted text is elided to fit.
+    const std::size_t index = top_row_ * columns() + item;
+    const ObjectViewItem& entry = items_[index];
+    const Rect bounds = local_bounds();
+    const Rect cell = item_bounds(index);
+    Rect clip{2.0, 2.0, std::max(0.0, bounds.width - 4.0), std::max(0.0, bounds.height - 4.0)};
+    Rect glyph{};
+    Rect name{};
+    Rect secondary{};
+    if (has_details_columns()) {
+        const double viewport_right = std::max(4.0, bounds.width - 4.0);
+        clip = {4.0, 2.0 + header_height(), std::max(0.0, viewport_right - 4.0),
+                std::max(0.0, bounds.height - header_height() - 4.0)};
+        const double column_x = 4.0 - horizontal_offset_ * effective_text_scale();
+        const double column_width = details_columns_.front().width * effective_text_scale();
+        glyph = {column_x + 4.0, cell.y + 3.0, 24.0, std::max(18.0, cell.height - 6.0)};
+        name = {column_x + 34.0, cell.y, std::max(0.0, column_width - 40.0), cell.height};
+    } else if (view_mode_ == ObjectViewMode::icons) {
+        const double glyph_width = std::min(46.0, cell.width - 18.0);
+        glyph = {cell.x + (cell.width - glyph_width) * 0.5, cell.y + 4.0, glyph_width, 43.0};
+        name = {cell.x + 4.0, cell.y + 47.0, std::max(0.0, cell.width - 8.0),
+                std::max(0.0, cell.height - 49.0)};
+        if (show_secondary_text_ && !entry.secondary_text.empty() && cell.height >= 90.0) {
+            const double size = std::max(8.0, font_.size - 1.5);
+            secondary = {cell.x + 5.0, cell.bottom() - 5.0 - size,
+                         std::max(0.0, cell.width - 10.0), size};
+        }
+    } else {
+        glyph = {cell.x + 6.0, cell.y + 3.0, 24.0, std::max(18.0, cell.height - 6.0)};
+        const bool shows_secondary = show_secondary_text_ &&
+            !entry.secondary_text.empty() && cell.width >= 112.0;
+        const double secondary_x = shows_secondary
+            ? std::max(cell.x + 92.0, cell.x + cell.width * 0.68)
+            : cell.x + cell.width - 6.0;
+        const double name_width = std::max(
+            0.0, secondary_x - (cell.x + 38.0) - (shows_secondary ? 8.0 : 0.0));
+        name = {cell.x + 38.0, cell.y, name_width, cell.height};
+        if (shows_secondary) {
+            secondary = {secondary_x, cell.y, std::max(0.0, cell.right() - 6.0 - secondary_x),
+                         cell.height};
+        }
+    }
+    const Rect visible_cell = Rect::intersection(cell, clip);
+    record.cell = PartGeometry::from_bounds(visible_cell);
+    record.glyph = PartGeometry::from_bounds(Rect::intersection(glyph, visible_cell));
+    record.name = PartGeometry::from_bounds(Rect::intersection(name, visible_cell));
+    record.secondary = PartGeometry::from_bounds(Rect::intersection(secondary, visible_cell));
+    record.cell_focus = record.cell;
+    write_item_parts(anatomy(), object_view_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet ObjectView::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const std::size_t index = top_row_ * columns() + item;
+    const ObjectViewItem& entry = items_[index];
+    if (is_selected(entry.stable_id)) states.insert(AnatomyState::selected);
+    if (hovered_index_ == index) states.insert(AnatomyState::hot);
+    if (entry.stable_id == focused_id_) states.insert(AnatomyState::current);
+    if (!entry.enabled) states.insert(AnatomyState::disabled);
+    return states;
+}
+
+std::vector<ObjectView::Item> ObjectView::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = top_row_ * columns() + item;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), object_view_item_part_fields, published.parts(), record.parts);
+        const AnatomyStateSet item_states = realized_item_anatomy_states(item);
+        read_states(object_view_item_state_fields, item_states, record.states);
+        records.push_back(record);
+    }
+    return records;
 }
 
 } // namespace gui_forms

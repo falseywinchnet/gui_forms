@@ -991,6 +991,75 @@ void test_tabs_menus_and_breadcrumbs_are_items() {
     }
 }
 
+void test_tree_and_correspondence_items() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.trees.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 700.0, 400.0});
+    std::shared_ptr<TreeView> tree = make_control<TreeView>(StableId("anatomy.tree"));
+    (*tree).set_requested_bounds({10.0, 10.0, 220.0, 160.0});
+    TreeViewItem parent;
+    parent.stable_id = "anatomy.tree.parent";
+    parent.text = "Parent";
+    parent.expandable = true;
+    parent.expanded = true;
+    TreeViewItem child;
+    child.stable_id = "anatomy.tree.child";
+    child.text = "Child";
+    child.depth = 1U;
+    child.enabled = false;
+    (*tree).set_items({parent, child});
+    std::shared_ptr<CorrespondenceView> view =
+        make_control<CorrespondenceView>(StableId("anatomy.correspondence"));
+    (*view).set_requested_bounds({250.0, 10.0, 420.0, 300.0});
+    CorrespondenceItem first;
+    first.stable_id = "anatomy.correspondence.first";
+    first.title = "First";
+    first.stale = true;
+    CorrespondenceItem second;
+    second.stable_id = "anatomy.correspondence.second";
+    second.title = "Second";
+    second.unavailable = true;
+    (*view).set_items({first, second});
+    (*root).add_child(tree);
+    (*root).add_child(view);
+    Window window(root, {700.0, 400.0});
+    window.perform_layout();
+
+    const std::vector<TreeView::Item> nodes = (*tree).realized_items();
+    require(nodes.size() == 2U && nodes[0].stable_id == "anatomy.tree.parent" &&
+                nodes[0].states.open && nodes[0].parts.expander.present &&
+                !nodes[1].parts.expander.present && nodes[1].states.disabled,
+            "tree nodes publish their expander, open state and availability per node");
+    require(nodes[1].parts.label.bounds.x > nodes[0].parts.label.bounds.x,
+            "a deeper node's label is indented");
+
+    const ControlAnatomy& anatomy = (*view).anatomy();
+    require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none &&
+                find_item_custom_state(anatomy, "pinned").has_value() &&
+                find_item_custom_state(anatomy, "stale").has_value(),
+            "correspondence rows declare their own pinned and stale states");
+    const std::vector<CorrespondenceView::Item> cards = (*view).realized_items();
+    require(cards.size() == 2U && cards[0].states.stale && !cards[1].states.stale &&
+                cards[1].states.unavailable && !cards[0].states.pinned,
+            "custom and standard item states are published per card");
+    require(cards[0].parts.card.bounds.contains(cards[0].parts.glyph.bounds) &&
+                cards[0].parts.status_rail.present,
+            "each card publishes its rail and glyph inside the card");
+}
+
+constexpr std::array<CustomStateDeclaration, 1> shadowing_item_custom_state{{
+    {.name = "selected"},
+}};
+
+void test_item_custom_states_never_shadow_standard_states() {
+    const ControlAnatomy shadowing{
+        .control_id = "grid", .parts = single_region, .states = {},
+        .custom_states = {}, .item_parts = {}, .item_states = {},
+        .item_custom_states = shadowing_item_custom_state};
+    require(validate_control_anatomy(shadowing).defect ==
+                AnatomyDefect::item_custom_state_shadows_standard_state,
+            "an item custom state may not reuse a standard state's name");
+}
+
 } // namespace
 
 int main() {
@@ -1015,6 +1084,8 @@ int main() {
         test_item_names_never_repeat_control_parts();
         test_value_editors_and_diagnostic_views();
         test_tabs_menus_and_breadcrumbs_are_items();
+        test_tree_and_correspondence_items();
+        test_item_custom_states_never_shadow_standard_states();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

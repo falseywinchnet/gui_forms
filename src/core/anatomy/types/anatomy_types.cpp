@@ -77,7 +77,7 @@ constexpr std::array<std::string_view, anatomy_state_count> anatomy_state_names{
 };
 static_assert(anatomy_state_names.size() == anatomy_state_count);
 
-constexpr std::array<std::string_view, 20> anatomy_defect_names{
+constexpr std::array<std::string_view, 24> anatomy_defect_names{
     "none",
     "control-id-not-kebab-case",
     "no-parts",
@@ -98,9 +98,13 @@ constexpr std::array<std::string_view, 20> anatomy_defect_names{
     "item-part-role-out-of-range",
     "item-state-out-of-range",
     "duplicate-item-state",
+    "too-many-item-custom-states",
+    "item-custom-state-not-kebab-case",
+    "item-custom-state-shadows-standard-state",
+    "duplicate-item-custom-state",
 };
 static_assert(anatomy_defect_names.size() ==
-              static_cast<std::size_t>(AnatomyDefect::duplicate_item_state) + 1U);
+              static_cast<std::size_t>(AnatomyDefect::duplicate_item_custom_state) + 1U);
 
 [[nodiscard]] bool is_lowercase_letter(char character) noexcept {
     return character >= 'a' && character <= 'z';
@@ -206,6 +210,18 @@ std::optional<CustomStateIndex> find_custom_state(
     const ControlAnatomy& anatomy, std::string_view state_name) noexcept {
     for (std::size_t index = 0; index < anatomy.custom_states.size(); ++index) {
         if (anatomy.custom_states[index].name == state_name) {
+            CustomStateIndex found;
+            found.value = static_cast<std::uint8_t>(index);
+            return found;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<CustomStateIndex> find_item_custom_state(
+    const ControlAnatomy& anatomy, std::string_view state_name) noexcept {
+    for (std::size_t index = 0; index < anatomy.item_custom_states.size(); ++index) {
+        if (anatomy.item_custom_states[index].name == state_name) {
             CustomStateIndex found;
             found.value = static_cast<std::uint8_t>(index);
             return found;
@@ -321,6 +337,24 @@ AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexce
         for (std::size_t earlier = 0; earlier < index; ++earlier) {
             if (anatomy.item_states[earlier] == state) {
                 return defect_at(AnatomyDefect::duplicate_item_state, index);
+            }
+        }
+    }
+    if (anatomy.item_custom_states.size() > maximum_custom_states) {
+        return defect_at(AnatomyDefect::too_many_item_custom_states, 0U);
+    }
+    for (std::size_t index = 0; index < anatomy.item_custom_states.size(); ++index) {
+        const std::string_view name = anatomy.item_custom_states[index].name;
+        if (!is_kebab_case_name(name)) {
+            return defect_at(AnatomyDefect::item_custom_state_not_kebab_case, index);
+        }
+        const std::optional<AnatomyState> standard = anatomy_state_from_name(name);
+        if (standard.has_value()) {
+            return defect_at(AnatomyDefect::item_custom_state_shadows_standard_state, index);
+        }
+        for (std::size_t earlier = 0; earlier < index; ++earlier) {
+            if (anatomy.item_custom_states[earlier].name == name) {
+                return defect_at(AnatomyDefect::duplicate_item_custom_state, index);
             }
         }
     }

@@ -216,6 +216,10 @@ Related types
 
    .. cpp:member:: std::span<const AnatomyState> item_states
 
+   .. cpp:member:: std::span<const CustomStateDeclaration> item_custom_states
+
+      Application-defined finite states of one item, as for a control.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:class:: ControlFactory
@@ -479,6 +483,14 @@ Enumerations
    .. cpp:enumerator:: item_state_out_of_range
 
    .. cpp:enumerator:: duplicate_item_state
+
+   .. cpp:enumerator:: too_many_item_custom_states
+
+   .. cpp:enumerator:: item_custom_state_not_kebab_case
+
+   .. cpp:enumerator:: item_custom_state_shadows_standard_state
+
+   .. cpp:enumerator:: duplicate_item_custom_state
 
 .. cpp:namespace:: gui_forms
 
@@ -852,6 +864,8 @@ Functions, constants and aliases
 .. cpp:function:: std::optional<PartIndex> find_item_part(const ControlAnatomy& anatomy, std::string_view part_name) noexcept
 
 .. cpp:function:: std::optional<CustomStateIndex> find_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
+
+.. cpp:function:: std::optional<CustomStateIndex> find_item_custom_state(const ControlAnatomy& anatomy, std::string_view state_name) noexcept
 
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
 

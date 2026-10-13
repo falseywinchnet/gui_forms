@@ -3,7 +3,11 @@
 #include "../collection_control_utilities.hpp"
 #include "gui_forms/detail/algorithm/sort.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <vector>
+#include <string>
+#include <array>
 #include <algorithm>
 #include <charconv>
 #include <cmath>
@@ -965,5 +969,178 @@ void CorrespondenceView::on_detached_from_window() noexcept {
     Panel::on_detached_from_window();
 }
 
+
+
+namespace {
+
+constexpr std::array<PartField<CorrespondenceView::Parts>, 2> correspondence_view_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &CorrespondenceView::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &CorrespondenceView::Parts::edge},
+}};
+
+constexpr std::array<PartField<CorrespondenceView::ItemParts>, 8> correspondence_view_item_part_fields{{
+    {.declaration = {.name = "card", .role = PartRole::face, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::card},
+    {.declaration = {.name = "status-rail", .role = PartRole::keyline, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::status_rail},
+    {.declaration = {.name = "glyph", .role = PartRole::icon, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::glyph},
+    {.declaration = {.name = "title", .role = PartRole::label, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::title},
+    {.declaration = {.name = "secondary", .role = PartRole::content, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::secondary},
+    {.declaration = {.name = "metric", .role = PartRole::content, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::metric},
+    {.declaration = {.name = "evidence", .role = PartRole::well, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::evidence},
+    {.declaration = {.name = "card-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &CorrespondenceView::ItemParts::card_focus},
+}};
+
+constexpr std::array<StateField<CorrespondenceView::ItemStates>, 6> correspondence_view_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &CorrespondenceView::ItemStates::selected},
+    {.state = AnatomyState::hot, .member = &CorrespondenceView::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &CorrespondenceView::ItemStates::current},
+    {.state = AnatomyState::open, .member = &CorrespondenceView::ItemStates::open},
+    {.state = AnatomyState::unavailable, .member = &CorrespondenceView::ItemStates::unavailable},
+    {.state = AnatomyState::disabled, .member = &CorrespondenceView::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 8> correspondence_view_item_parts =
+    part_declarations(correspondence_view_item_part_fields);
+constexpr std::array<AnatomyState, 6> correspondence_view_item_states =
+    state_declarations(correspondence_view_item_state_fields);
+constexpr std::array<CustomStateDeclaration, 2> correspondence_view_item_custom_states{{
+    {.name = "pinned"},
+    {.name = "stale"},
+}};
+constexpr CustomStateIndex pinned_item_state{0U};
+constexpr CustomStateIndex stale_item_state{1U};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
+    correspondence_view_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(correspondence_view_extra_part_fields));
+
+constexpr ControlAnatomy correspondence_view_anatomy{
+    .control_id = "correspondence-view",
+    .parts = correspondence_view_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = correspondence_view_item_parts,
+    .item_states = correspondence_view_item_states,
+    .item_custom_states = correspondence_view_item_custom_states,
+};
+
+} // namespace
+
+const ControlAnatomy& CorrespondenceView::anatomy() const noexcept {
+    return correspondence_view_anatomy;
+}
+
+void CorrespondenceView::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const Panel::Parts panel = panel_parts();
+    record.face = panel.face;
+    record.edge = panel.edge;
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), correspondence_view_extra_part_fields, record, geometry);
+}
+
+CorrespondenceView::Parts CorrespondenceView::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), correspondence_view_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t CorrespondenceView::realized_item_count() const {
+    const std::pair<std::size_t, std::size_t> range = realized_range();
+    return range.second - range.first;
+}
+
+std::string CorrespondenceView::realized_item_stable_id(std::size_t item) const {
+    return items_[realized_range().first + item].stable_id;
+}
+
+void CorrespondenceView::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    // Text is published as the slots on_paint draws into.
+    const std::size_t index = realized_range().first + item;
+    const Rect bounds = local_bounds();
+    const Rect clip{2.0, 2.0, std::max(0.0, bounds.width - 4.0),
+                    std::max(0.0, bounds.height - 4.0)};
+    const Rect row = item_bounds(index);
+    const double visible_height = std::max(0.0, row.height - 5.0);
+    const Rect card{row.x, row.y, row.width, visible_height};
+    const double metric_x = row.x + std::max(48.0, row.width - 64.0);
+    record.card = PartGeometry::from_bounds(Rect::intersection(card, clip));
+    record.status_rail = PartGeometry::from_bounds(Rect::intersection(
+        {row.x + 1.0, row.y + 1.0, status_rail_width_, std::max(0.0, visible_height - 2.0)}, clip));
+    record.glyph = PartGeometry::from_bounds(
+        Rect::intersection({row.x + 10.0, row.y + 7.0, 30.0, 30.0}, clip));
+    record.title = PartGeometry::from_bounds(Rect::intersection(
+        {row.x + 48.0, row.y + 4.0, std::max(0.0, metric_x - row.x - 56.0), 17.0}, clip));
+    record.secondary = PartGeometry::from_bounds(Rect::intersection(
+        {row.x + 48.0, row.y + 22.0, std::max(0.0, metric_x - row.x - 56.0), 15.0}, clip));
+    record.metric = PartGeometry::from_bounds(Rect::intersection(
+        {metric_x, row.y + 12.0, std::max(0.0, row.right() - metric_x - 4.0), 20.0}, clip));
+    if (expanded_index(index)) {
+        // The excerpt box of the expanded evidence body.
+        const double scale = effective_text_scale();
+        const double body_top = row.y + scaled_compact_height() - 5.0 * scale;
+        const bool wide = row.width >= 650.0 * scale;
+        const double lane_width = wide
+            ? std::min(190.0 * scale, std::max(150.0 * scale, row.width * 0.25)) : 0.0;
+        const double evidence_x = row.x + 52.0 * scale;
+        const double evidence_width = std::max(40.0, row.width - 62.0 * scale - lane_width);
+        const Rect excerpt{evidence_x, body_top + 22.0 * scale, evidence_width,
+                           std::max(20.0, 43.0 * scale)};
+        record.evidence = PartGeometry::from_bounds(Rect::intersection(excerpt, clip));
+    }
+    record.card_focus = record.card;
+    write_item_parts(anatomy(), correspondence_view_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet CorrespondenceView::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const std::size_t index = realized_range().first + item;
+    const CorrespondenceItem& entry = items_[index];
+    if (entry.stable_id == selected_id_) states.insert(AnatomyState::selected);
+    if (entry.stable_id == hovered_id_) states.insert(AnatomyState::hot);
+    if (entry.stable_id == focused_id_) states.insert(AnatomyState::current);
+    if (expanded_index(index)) states.insert(AnatomyState::open);
+    if (entry.unavailable) states.insert(AnatomyState::unavailable);
+    if (!entry.enabled) states.insert(AnatomyState::disabled);
+    if (entry.stable_id == pinned_id_) states.insert(pinned_item_state);
+    if (entry.stale) states.insert(stale_item_state);
+    return states;
+}
+
+std::vector<CorrespondenceView::Item> CorrespondenceView::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = realized_range().first + item;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), correspondence_view_item_part_fields, published.parts(), record.parts);
+        const AnatomyStateSet item_states = realized_item_anatomy_states(item);
+        read_states(correspondence_view_item_state_fields, item_states, record.states);
+        record.states.pinned = item_states.contains(pinned_item_state);
+        record.states.stale = item_states.contains(stale_item_state);
+        records.push_back(record);
+    }
+    return records;
+}
 
 } // namespace gui_forms

@@ -1,7 +1,8 @@
 # Stage T1: anatomy — articulated controls and one schema
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
-through them, almost everything else. Status 2026-10-13: started on branch
+through them, almost everything else. Status 2026-10-13: gate measured
+(`results/2026-10-13-t1-anatomy-gate`), owner review pending; built on branch
 `claude/t1-anatomy`, with stacked `claude/t1-*` branches (schema types; range
 controls; the button family; containers and labels; a Gallery coverage
 test).

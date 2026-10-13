@@ -419,6 +419,8 @@ gui_forms::InstrumentRack
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_dispose() noexcept override
 
       *Protected.*

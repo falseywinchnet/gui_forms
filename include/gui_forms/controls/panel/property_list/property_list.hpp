@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -73,12 +74,62 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] std::size_t realized_item_count() const override;
+    [[nodiscard]] std::string realized_item_stable_id(std::size_t item) const override;
+    [[nodiscard]] AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const override;
+    // Stage T1 anatomy, as dot members.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+    };
+    [[nodiscard]] Parts parts() const;
+    struct ItemParts final {
+        PartGeometry group_header;
+        PartGeometry group_expander;
+        PartGeometry group_title;
+        PartGeometry property_row;
+        PartGeometry property_name;
+        PartGeometry property_value;
+        PartGeometry row_expander;
+        PartGeometry validation;
+        PartGeometry row_divider;
+    };
+    struct ItemStates final {
+        bool open{};
+        bool closed{};
+        bool invalid{};
+        bool read_only{};
+        bool disabled{};
+        bool group_header{};
+    };
+    struct Item final {
+        std::size_t index{};
+        std::string stable_id;
+        ItemParts parts;
+        ItemStates states;
+    };
+    // The items currently realized, in paint order (owner decision 5).
+    [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
     void on_dispose() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    void publish_realized_item_geometry(std::size_t item,
+                                        std::span<PartGeometry> geometry) const override;
 
 private:
     struct Impl;
+    // One drawn row: a group header, or a visible property row of an
+    // expanded group. `group_y` is a group header's top in local coordinates.
+    struct ItemEntry final {
+        bool group{};
+        std::size_t group_index{};
+        std::size_t row_index{};
+        double group_y{};
+    };
+    [[nodiscard]] std::vector<ItemEntry> item_entries() const;
     std::unique_ptr<Impl> impl_;
     Event<const PropertyValueChange&> value_changed_;
     Event<const PropertyValueChange&> value_committed_;

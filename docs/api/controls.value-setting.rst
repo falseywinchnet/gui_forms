@@ -99,6 +99,14 @@ Related types
      - PropertyGroupChange carries stable group identity and committed disclosure state.
    * - :cpp:class:`PropertyGroupSpec <gui_forms::PropertyGroupSpec>`
      - PropertyGroupSpec is a stable titled collection of PropertyRowSpec records plus retained expanded state.
+   * - :cpp:class:`PropertyList::Item <gui_forms::PropertyList::Item>`
+     -  
+   * - :cpp:class:`PropertyList::ItemParts <gui_forms::PropertyList::ItemParts>`
+     -  
+   * - :cpp:class:`PropertyList::ItemStates <gui_forms::PropertyList::ItemStates>`
+     -  
+   * - :cpp:class:`PropertyList::Parts <gui_forms::PropertyList::Parts>`
+     - Stage T1 anatomy, as dot members.
    * - :cpp:class:`PropertyResetRequest <gui_forms::PropertyResetRequest>`
      - PropertyResetRequest identifies the stable authored row whose reset action the consumer must authorize.
    * - :cpp:class:`PropertyRowExpansionChange <gui_forms::PropertyRowExpansionChange>`
@@ -592,6 +600,74 @@ Related types
    .. cpp:member:: bool expanded
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::Item final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::ItemParts final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: PartGeometry group_header
+
+   .. cpp:member:: PartGeometry group_expander
+
+   .. cpp:member:: PartGeometry group_title
+
+   .. cpp:member:: PartGeometry property_row
+
+   .. cpp:member:: PartGeometry property_name
+
+   .. cpp:member:: PartGeometry property_value
+
+   .. cpp:member:: PartGeometry row_expander
+
+   .. cpp:member:: PartGeometry validation
+
+   .. cpp:member:: PartGeometry row_divider
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::ItemStates final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool group_header
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyList::Parts final
+
+   ``#include <gui_forms/controls/panel/property_list/property_list.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
 
 .. cpp:namespace:: gui_forms
 

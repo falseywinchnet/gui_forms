@@ -164,6 +164,8 @@ struct ControlAnatomy final {
     // own part names, so a document addresses either by name alone.
     std::span<const PartDeclaration> item_parts;
     std::span<const AnatomyState> item_states;
+    // Application-defined finite states of one item, as for a control.
+    std::span<const CustomStateDeclaration> item_custom_states;
 };
 
 // Geometry of one declared part in the control's local coordinate space
@@ -270,6 +272,8 @@ private:
 [[nodiscard]] std::optional<PartIndex> find_item_part(
     const ControlAnatomy& anatomy, std::string_view part_name) noexcept;
 [[nodiscard]] std::optional<CustomStateIndex> find_custom_state(
+    const ControlAnatomy& anatomy, std::string_view state_name) noexcept;
+[[nodiscard]] std::optional<CustomStateIndex> find_item_custom_state(
     const ControlAnatomy& anatomy, std::string_view state_name) noexcept;
 [[nodiscard]] bool declares_state(const ControlAnatomy& anatomy,
                                   AnatomyState state) noexcept;
@@ -424,6 +428,10 @@ enum class AnatomyDefect : std::uint8_t {
     item_part_role_out_of_range,
     item_state_out_of_range,
     duplicate_item_state,
+    too_many_item_custom_states,
+    item_custom_state_not_kebab_case,
+    item_custom_state_shadows_standard_state,
+    duplicate_item_custom_state,
 };
 
 // The result of validate_control_anatomy: the first defect found, or none.

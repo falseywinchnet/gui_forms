@@ -143,9 +143,52 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] std::size_t realized_item_count() const override;
+    [[nodiscard]] std::string realized_item_stable_id(std::size_t item) const override;
+    [[nodiscard]] AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const override;
+    // Stage T1 anatomy, as dot members.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry face;
+        PartGeometry edge;
+    };
+    [[nodiscard]] Parts parts() const;
+    struct ItemParts final {
+        PartGeometry card;
+        PartGeometry status_rail;
+        PartGeometry glyph;
+        PartGeometry title;
+        PartGeometry secondary;
+        PartGeometry metric;
+        PartGeometry evidence;
+        PartGeometry card_focus;
+    };
+    struct ItemStates final {
+        bool selected{};
+        bool hot{};
+        bool current{};
+        bool open{};
+        bool unavailable{};
+        bool disabled{};
+        bool pinned{};
+        bool stale{};
+    };
+    struct Item final {
+        std::size_t index{};
+        std::string stable_id;
+        ItemParts parts;
+        ItemStates states;
+    };
+    // The items currently realized, in paint order (owner decision 5).
+    [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
     void on_detached_from_window() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    void publish_realized_item_geometry(std::size_t item,
+                                        std::span<PartGeometry> geometry) const override;
 
 private:
     struct HoverIntentCallback;

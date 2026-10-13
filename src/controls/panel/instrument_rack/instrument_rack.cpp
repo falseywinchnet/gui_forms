@@ -4,6 +4,7 @@
 
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -1066,6 +1067,23 @@ void InstrumentRack::on_dispose() noexcept {
     (*impl_).states.clear();
     (*impl_).public_modules.clear();
     (*impl_).action_content.reset();
+}
+
+
+namespace {
+
+// Its rows, modules and toolbars are child controls with their own anatomies.
+constexpr ControlAnatomy instrument_rack_anatomy{
+    .control_id = "instrument-rack",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& InstrumentRack::anatomy() const noexcept {
+    return instrument_rack_anatomy;
 }
 
 } // namespace gui_forms
