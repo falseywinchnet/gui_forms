@@ -242,3 +242,5 @@ gui_forms::ExpandableSections
       the full width and the height of its requested bounds.
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

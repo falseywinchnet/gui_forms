@@ -2,6 +2,7 @@
 
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
@@ -284,6 +285,148 @@ SemanticDescriptor VisualInspectorOverlay::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.exposed = false;
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<VisualInspectorView::Parts>, 5> visual_inspector_view_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &VisualInspectorView::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &VisualInspectorView::Parts::face},
+    {.declaration = {.name = "header", .role = PartRole::face, .composed_from = {}},
+     .member = &VisualInspectorView::Parts::header},
+    {.declaration = {.name = "accent-strip", .role = PartRole::keyline, .composed_from = {}},
+     .member = &VisualInspectorView::Parts::accent_strip},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &VisualInspectorView::Parts::focus},
+}};
+
+constexpr std::array<StateField<VisualInspectorView::States>, 5> visual_inspector_view_state_fields{{
+    {.state = AnatomyState::normal, .member = &VisualInspectorView::States::normal},
+    {.state = AnatomyState::enabled, .member = &VisualInspectorView::States::enabled},
+    {.state = AnatomyState::disabled, .member = &VisualInspectorView::States::disabled},
+    {.state = AnatomyState::focused, .member = &VisualInspectorView::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &VisualInspectorView::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 5> visual_inspector_view_parts =
+    part_declarations(visual_inspector_view_part_fields);
+constexpr std::array<AnatomyState, 5> visual_inspector_view_states =
+    state_declarations(visual_inspector_view_state_fields);
+
+constexpr ControlAnatomy visual_inspector_view_anatomy{
+    .control_id = "visual-inspector-view",
+    .parts = visual_inspector_view_parts,
+    .states = visual_inspector_view_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& VisualInspectorView::anatomy() const noexcept {
+    return visual_inspector_view_anatomy;
+}
+
+void VisualInspectorView::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    // The lighter title band and the blue strip on_paint lays across the face.
+    record.header = PartGeometry::from_bounds(
+        Rect::intersection({0.0, 0.0, bounds.width, 44.0}, bounds));
+    record.accent_strip = PartGeometry::from_bounds(
+        Rect::intersection({0.0, 0.0, 5.0, bounds.height}, bounds));
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), visual_inspector_view_part_fields, record, geometry);
+}
+
+VisualInspectorView::Parts VisualInspectorView::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), visual_inspector_view_part_fields, published.parts(), record);
+    return record;
+}
+
+VisualInspectorView::States VisualInspectorView::states() const {
+    States record;
+    read_states(visual_inspector_view_state_fields, anatomy_states(), record);
+    return record;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<VisualInspectorOverlay::Parts>, 3> visual_inspector_overlay_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &VisualInspectorOverlay::Parts::region},
+    {.declaration = {.name = "highlight", .role = PartRole::selection, .composed_from = {}},
+     .member = &VisualInspectorOverlay::Parts::highlight},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &VisualInspectorOverlay::Parts::focus},
+}};
+
+constexpr std::array<StateField<VisualInspectorOverlay::States>, 5> visual_inspector_overlay_state_fields{{
+    {.state = AnatomyState::normal, .member = &VisualInspectorOverlay::States::normal},
+    {.state = AnatomyState::enabled, .member = &VisualInspectorOverlay::States::enabled},
+    {.state = AnatomyState::disabled, .member = &VisualInspectorOverlay::States::disabled},
+    {.state = AnatomyState::focused, .member = &VisualInspectorOverlay::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &VisualInspectorOverlay::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 3> visual_inspector_overlay_parts =
+    part_declarations(visual_inspector_overlay_part_fields);
+constexpr std::array<AnatomyState, 5> visual_inspector_overlay_states =
+    state_declarations(visual_inspector_overlay_state_fields);
+
+constexpr ControlAnatomy visual_inspector_overlay_anatomy{
+    .control_id = "visual-inspector-overlay",
+    .parts = visual_inspector_overlay_parts,
+    .states = visual_inspector_overlay_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& VisualInspectorOverlay::anatomy() const noexcept {
+    return visual_inspector_overlay_anatomy;
+}
+
+void VisualInspectorOverlay::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    // The target's arranged and visual bounds that on_paint outlines.
+    Window* owner = window();
+    if (owner != nullptr && !target_stable_id_.empty()) {
+        const VisualInspectionSnapshot snapshot =
+            (*owner).visual_inspection_snapshot(overlay_options());
+        const VisualControlInspection* target = snapshot.find(target_stable_id_);
+        if (target != nullptr && (*target).runtime_id != runtime_id()) {
+            const Rect arranged = rectangle_from_window((*target).layout.absolute_bounds);
+            const Rect visual = rectangle_from_window((*target).layout.visual_bounds);
+            record.highlight = PartGeometry::from_bounds(Rect::united(arranged, visual));
+        }
+    }
+    write_parts(anatomy(), visual_inspector_overlay_part_fields, record, geometry);
+}
+
+VisualInspectorOverlay::Parts VisualInspectorOverlay::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), visual_inspector_overlay_part_fields, published.parts(), record);
+    return record;
+}
+
+VisualInspectorOverlay::States VisualInspectorOverlay::states() const {
+    States record;
+    read_states(visual_inspector_overlay_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

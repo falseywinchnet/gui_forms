@@ -2,6 +2,8 @@
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
 #include "gui_forms/date_time_picker.hpp"
+#include "gui_forms/diagnostic_controls.hpp"
+#include "gui_forms/inspection_controls.hpp"
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/material.hpp"
 #include "gui_forms/range_controls.hpp"
@@ -874,6 +876,39 @@ void test_item_names_never_repeat_control_parts() {
             "an item part may not reuse a control part's name");
 }
 
+// FlagsValueEditor needs an enum descriptor; the Gallery coverage test
+// checks it with the Gallery's own.
+void test_value_editors_and_diagnostic_views() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.editors.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 360.0, 200.0});
+    std::shared_ptr<ColorValueEditor> color = make_control<ColorValueEditor>(StableId("anatomy.color"));
+    (*color).set_requested_bounds({10.0, 10.0, 200.0, 28.0});
+    std::shared_ptr<MetricsView> metrics = make_control<MetricsView>(StableId("anatomy.metrics"));
+    (*metrics).set_requested_bounds({10.0, 90.0, 300.0, 90.0});
+    (*root).add_child(color);
+    (*root).add_child(metrics);
+    Window window(root, {360.0, 200.0});
+    window.perform_layout();
+
+    const ColorValueEditor::Parts color_parts = (*color).parts();
+    require(color_parts.swatch.present && color_parts.field.present &&
+                color_parts.swatch.bounds.right() <= color_parts.field.bounds.x,
+            "the colour editor's swatch sits before its text field");
+    const MetricsView::Parts metric_parts = (*metrics).parts();
+    require(metric_parts.accent_strip.present &&
+                near(metric_parts.accent_strip.bounds.width, (*metrics).accent_width()) &&
+                near(metric_parts.accent_strip.bounds.x, 0.0),
+            "the metrics view publishes its accent strip on the leading edge");
+    const std::array<const Control*, 2> controls{color.get(), metrics.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "every editor and view anatomy must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -896,6 +931,7 @@ int main() {
         test_spin_combo_and_picker_parts();
         test_list_rows_are_item_records();
         test_item_names_never_repeat_control_parts();
+        test_value_editors_and_diagnostic_views();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

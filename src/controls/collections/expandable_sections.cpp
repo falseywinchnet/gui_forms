@@ -1,5 +1,6 @@
 #include "gui_forms/controls/collections/expandable_sections.hpp"
 #include "gui_forms/text.hpp"
+#include "../panel/panel_anatomy.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -225,6 +226,23 @@ SemanticDescriptor ExpandableSections::semantic_descriptor() const {
     descriptor.role = SemanticRole::group;
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+// Its members are child controls, which publish their own anatomies.
+constexpr ControlAnatomy expandable_sections_anatomy{
+    .control_id = "expandable-sections",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ExpandableSections::anatomy() const noexcept {
+    return expandable_sections_anatomy;
 }
 
 } // namespace gui_forms

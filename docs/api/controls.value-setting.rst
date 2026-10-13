@@ -57,6 +57,14 @@ Related types
      - Stage T1 anatomy, as dot members (see Control::Parts).
    * - :cpp:class:`CheckBox::States <gui_forms::CheckBox::States>`
      -  
+   * - :cpp:class:`ColorValueEditor::Parts <gui_forms::ColorValueEditor::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`ColorValueEditor::States <gui_forms::ColorValueEditor::States>`
+     -  
+   * - :cpp:class:`FlagsValueEditor::Parts <gui_forms::FlagsValueEditor::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`FlagsValueEditor::States <gui_forms::FlagsValueEditor::States>`
+     -  
    * - :cpp:class:`InstrumentFieldChange <gui_forms::InstrumentFieldChange>`
      - InstrumentFieldChange carries stable module and field identities, previous/current text, and whether the transition is a committed edit.
    * - :cpp:class:`InstrumentFieldSpec <gui_forms::InstrumentFieldSpec>`
@@ -106,6 +114,10 @@ Related types
    * - :cpp:class:`RadioButton::Parts <gui_forms::RadioButton::Parts>`
      - Stage T1 anatomy, as dot members (see Control::Parts).
    * - :cpp:class:`RadioButton::States <gui_forms::RadioButton::States>`
+     -  
+   * - :cpp:class:`RangeControl::Parts <gui_forms::RangeControl::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`RangeControl::States <gui_forms::RangeControl::States>`
      -  
    * - :cpp:class:`RangeScrollEvent <gui_forms::RangeScrollEvent>`
      - RangeScrollEvent is the typed transition payload shared by interactive range controls.
@@ -163,6 +175,94 @@ Related types
    .. cpp:member:: bool open
 
    .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ColorValueEditor::Parts final
+
+   ``#include <gui_forms/controls/panel/color_value_editor/color_value_editor.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry swatch
+
+   .. cpp:member:: PartGeometry field
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ColorValueEditor::States final
+
+   ``#include <gui_forms/controls/panel/color_value_editor/color_value_editor.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlagsValueEditor::Parts final
+
+   ``#include <gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry divider
+
+   .. cpp:member:: PartGeometry drop_down
+
+   .. cpp:member:: PartGeometry disclosure
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FlagsValueEditor::States final
+
+   ``#include <gui_forms/controls/panel/flags_value_editor/flags_value_editor.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
 
 .. cpp:namespace:: gui_forms
 
@@ -711,6 +811,34 @@ Related types
    .. cpp:member:: bool open
 
    .. cpp:member:: bool closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RangeControl::Parts final
+
+   ``#include <gui_forms/controls/range_control/range_control.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RangeControl::States final
+
+   ``#include <gui_forms/controls/range_control/range_control.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 

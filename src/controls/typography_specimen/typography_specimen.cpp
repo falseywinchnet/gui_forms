@@ -3,6 +3,7 @@
 #include "gui_forms/visual_inspection.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cctype>
 #include <iomanip>
@@ -215,6 +216,69 @@ SemanticDescriptor TypographySpecimen::semantic_descriptor() const {
                                                   : resolved.primary_family);
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<TypographySpecimen::Parts>, 4> typography_specimen_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &TypographySpecimen::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &TypographySpecimen::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &TypographySpecimen::Parts::edge},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &TypographySpecimen::Parts::focus},
+}};
+
+constexpr std::array<StateField<TypographySpecimen::States>, 5> typography_specimen_state_fields{{
+    {.state = AnatomyState::normal, .member = &TypographySpecimen::States::normal},
+    {.state = AnatomyState::enabled, .member = &TypographySpecimen::States::enabled},
+    {.state = AnatomyState::disabled, .member = &TypographySpecimen::States::disabled},
+    {.state = AnatomyState::focused, .member = &TypographySpecimen::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &TypographySpecimen::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 4> typography_specimen_parts =
+    part_declarations(typography_specimen_part_fields);
+constexpr std::array<AnatomyState, 5> typography_specimen_states =
+    state_declarations(typography_specimen_state_fields);
+
+constexpr ControlAnatomy typography_specimen_anatomy{
+    .control_id = "typography-specimen",
+    .parts = typography_specimen_parts,
+    .states = typography_specimen_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& TypographySpecimen::anatomy() const noexcept {
+    return typography_specimen_anatomy;
+}
+
+void TypographySpecimen::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.face = PartGeometry::from_bounds(bounds);
+    record.edge = PartGeometry::from_bounds(bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), typography_specimen_part_fields, record, geometry);
+}
+
+TypographySpecimen::Parts TypographySpecimen::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), typography_specimen_part_fields, published.parts(), record);
+    return record;
+}
+
+TypographySpecimen::States TypographySpecimen::states() const {
+    States record;
+    read_states(typography_specimen_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

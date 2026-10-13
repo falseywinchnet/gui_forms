@@ -13,41 +13,27 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 27> anatomy_pending{
-    "command-bar",
-    "review-card",
+constexpr std::array<std::string_view, 12> anatomy_pending{
     "tree-view",
     "object-view",
     "correspondence-view",
-    "choice-group",
     "breadcrumb-trail",
-    "range-control",
-    "color-value-editor",
-    "flags-value-editor",
     "property-grid",
     "property-list",
     "instrument-rack",
-    "expandable-sections",
     "tab-control",
     "split-container",
     "command-overflow-panel",
     "master-detail-view",
     "menu-strip",
-    "context-menu",
-    "drawing-surface",
-    "raster-canvas",
-    "easing-preview",
-    "metrics-view",
-    "typography-specimen",
-    "visual-inspector-view",
-    "visual-inspector-overlay",
 };
 
 // Registry entries that are not controls: nonvisual components and the
 // LiveSurface service type. They have no parts; a component that shows
-// something does so through an internal control.
-constexpr std::array<std::string_view, 11> nonvisual_entries{
+// something (a context menu, a tool tip) does so through an internal control.
+constexpr std::array<std::string_view, 12> nonvisual_entries{
     "command",
+    "context-menu",
     "tool-tip",
     "timer",
     "image-list",
@@ -190,10 +176,13 @@ void test_anatomy_coverage() {
     const std::shared_ptr<AnchoredPopupLayer> popup_layer = make_control<AnchoredPopupLayer>(
         StableId("anatomy.coverage.anchored-popup-layer"), button_base,
         AnchoredPopupPlacement{});
+    const std::shared_ptr<RangeControl> range_control =
+        make_control<RangeControl>(StableId("anatomy.coverage.range-control"));
     inspect_control(*button_base, seen_ids);
     inspect_control(*scroll_bar, seen_ids);
     inspect_control(*popup_layer, seen_ids);
-    inspected += 3U;
+    inspect_control(*range_control, seen_ids);
+    inspected += 4U;
 
     std::string unexpected_gaps;
     std::string stale_pending;

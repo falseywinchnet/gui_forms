@@ -276,3 +276,5 @@ gui_forms::ChoiceGroup
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
       Publishes the role ``radio_group``.
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

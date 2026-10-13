@@ -6,6 +6,7 @@
 #include "gui_forms/basic_controls.hpp"
 
 #include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace gui_forms {
@@ -66,10 +67,26 @@ public:
     [[nodiscard]] Event<const RangeScrollEvent&>& scroll() noexcept {
         return scroll_;
     }
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
 
 protected:
     [[nodiscard]] Rect local_bounds() const noexcept;
     bool set_value_from_input(double value, RangeAction action);
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     void validate_bound_value(double value) const;

@@ -24,3 +24,81 @@ Owner-drawn, live and raster surfaces.
    generated/gui_forms.DrawingSurface
    generated/gui_forms.RasterCanvas
    generated/gui_forms.LiveSurface
+
+Related types
+-------------
+
+.. list-table::
+   :class: autosummary longtable
+   :widths: 35 65
+
+   * - :cpp:class:`DrawingSurface::Parts <gui_forms::DrawingSurface::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`DrawingSurface::States <gui_forms::DrawingSurface::States>`
+     -  
+   * - :cpp:class:`RasterCanvas::Parts <gui_forms::RasterCanvas::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`RasterCanvas::States <gui_forms::RasterCanvas::States>`
+     -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DrawingSurface::Parts final
+
+   ``#include <gui_forms/controls/drawing_surface/drawing_surface.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DrawingSurface::States final
+
+   ``#include <gui_forms/controls/drawing_surface/drawing_surface.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RasterCanvas::Parts final
+
+   ``#include <gui_forms/controls/raster_canvas/raster_canvas.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry image
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RasterCanvas::States final
+
+   ``#include <gui_forms/controls/raster_canvas/raster_canvas.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible

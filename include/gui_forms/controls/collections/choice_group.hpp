@@ -42,6 +42,7 @@ public:
     void on_key(KeyEvent& event) override;
     void on_key_bubble(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
 private:
     struct Entry;

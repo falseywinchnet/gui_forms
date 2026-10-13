@@ -60,6 +60,10 @@ gui_forms::TypographySpecimen
          engine, and the status is :cpp:enumerator:`TextResolutionStatus::estimated <gui_forms::TextResolutionStatus::estimated>` with no
          face.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -167,6 +171,10 @@ gui_forms::TypographySpecimen
       engine, and the status is :cpp:enumerator:`TextResolutionStatus::estimated <gui_forms::TextResolutionStatus::estimated>` with no
       face.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Extension points
 
@@ -177,3 +185,9 @@ gui_forms::TypographySpecimen
    .. cpp:function:: bool hit_test_local(Point local_point) const override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

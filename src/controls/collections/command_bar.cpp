@@ -1,5 +1,6 @@
 #include "gui_forms/controls/collections/command_bar.hpp"
 #include "gui_forms/text.hpp"
+#include "../panel/panel_anatomy.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -251,6 +252,23 @@ void CommandBar::on_attached_to_window() {
 void CommandBar::on_detaching_from_window(Window& former_window) noexcept {
     clear_shortcuts();
     Panel::on_detaching_from_window(former_window);
+}
+
+
+namespace {
+
+// Its members are child controls, which publish their own anatomies.
+constexpr ControlAnatomy command_bar_anatomy{
+    .control_id = "command-bar",
+    .parts = panel_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& CommandBar::anatomy() const noexcept {
+    return command_bar_anatomy;
 }
 
 } // namespace gui_forms

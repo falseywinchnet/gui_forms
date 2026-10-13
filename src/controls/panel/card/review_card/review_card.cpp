@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/card/review_card/review_card.hpp"
 
 #include "gui_forms/text.hpp"
+#include "../card_anatomy.hpp"
 
 #include <stdexcept>
 #include <utility>
@@ -108,5 +109,21 @@ SemanticDescriptor ReviewCard::semantic_descriptor() const {
     return descriptor;
 }
 
+
+
+namespace {
+
+constexpr ControlAnatomy review_card_anatomy{
+    .control_id = "review-card",
+    .parts = panel_detail::parts,
+    .states = card_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& ReviewCard::anatomy() const noexcept {
+    return review_card_anatomy;
+}
 
 } // namespace gui_forms

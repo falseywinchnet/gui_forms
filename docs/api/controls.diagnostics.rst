@@ -38,12 +38,24 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`EasingPreview::Parts <gui_forms::EasingPreview::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`EasingPreview::States <gui_forms::EasingPreview::States>`
+     -  
    * - :cpp:class:`EasingPreviewTrack <gui_forms::EasingPreviewTrack>`
      - EasingPreviewTrack is one caller-authored easing comparison row: exact curve, label, and marker color.
    * - :cpp:class:`Metrics <gui_forms::Metrics>`
      - Metrics is the structured counter accumulator used by Window and retained controls; only wrong-thread rejection is atomic because that rejection may originate off-thread.
    * - :cpp:class:`MetricsSnapshot <gui_forms::MetricsSnapshot>`
      - MetricsSnapshot is the renderer-neutral population, traversal, damage, input, lifetime, scheduler, presentation, and renderer telemetry record.
+   * - :cpp:class:`MetricsView::Parts <gui_forms::MetricsView::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`MetricsView::States <gui_forms::MetricsView::States>`
+     -  
+   * - :cpp:class:`TypographySpecimen::Parts <gui_forms::TypographySpecimen::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`TypographySpecimen::States <gui_forms::TypographySpecimen::States>`
+     -  
    * - :cpp:class:`VisualControlInspection <gui_forms::VisualControlInspection>`
      -  
    * - :cpp:class:`VisualControlLayoutSnapshot <gui_forms::VisualControlLayoutSnapshot>`
@@ -54,8 +66,48 @@ Related types
      -  
    * - :cpp:class:`VisualInspectionSnapshot <gui_forms::VisualInspectionSnapshot>`
      -  
+   * - :cpp:class:`VisualInspectorOverlay::Parts <gui_forms::VisualInspectorOverlay::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`VisualInspectorOverlay::States <gui_forms::VisualInspectorOverlay::States>`
+     -  
+   * - :cpp:class:`VisualInspectorView::Parts <gui_forms::VisualInspectorView::Parts>`
+     - Stage T1 anatomy, as dot members (see Control::Parts).
+   * - :cpp:class:`VisualInspectorView::States <gui_forms::VisualInspectorView::States>`
+     -  
    * - :cpp:class:`VisualPaintOperationSnapshot <gui_forms::VisualPaintOperationSnapshot>`
      - One immutable, backend-neutral record from the last committed display chunk.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: EasingPreview::Parts final
+
+   ``#include <gui_forms/controls/easing_preview/easing_preview.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: EasingPreview::States final
+
+   ``#include <gui_forms/controls/easing_preview/easing_preview.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 
@@ -402,6 +454,70 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: MetricsView::Parts final
+
+   ``#include <gui_forms/controls/metrics_view/metrics_view.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry accent_strip
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MetricsView::States final
+
+   ``#include <gui_forms/controls/metrics_view/metrics_view.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TypographySpecimen::Parts final
+
+   ``#include <gui_forms/controls/typography_specimen/typography_specimen.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TypographySpecimen::States final
+
+   ``#include <gui_forms/controls/typography_specimen/typography_specimen.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: VisualControlInspection final
 
    ``#include <gui_forms/visual_inspection/types/visual_inspection_types.hpp>``
@@ -625,6 +741,70 @@ Related types
    .. cpp:member:: bool controls_truncated
 
    .. cpp:member:: std::vector<VisualControlInspection> controls
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: VisualInspectorOverlay::Parts final
+
+   ``#include <gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry highlight
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: VisualInspectorOverlay::States final
+
+   ``#include <gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: VisualInspectorView::Parts final
+
+   ``#include <gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp>``
+
+   Stage T1 anatomy, as dot members (see Control::Parts).
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry accent_strip
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: VisualInspectorView::States final
+
+   ``#include <gui_forms/controls/visual_inspector_view/visual_inspector_view.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
 
 .. cpp:namespace:: gui_forms
 

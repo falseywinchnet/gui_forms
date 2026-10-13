@@ -2,6 +2,7 @@
 
 #include "gui_forms/control.hpp"
 
+#include <span>
 #include <string>
 
 namespace gui_forms {
@@ -31,6 +32,26 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] bool hit_test_local(Point local_point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    // Stage T1 anatomy, as dot members (see Control::Parts).
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry face;
+        PartGeometry edge;
+        PartGeometry focus;
+    };
+    struct States final {
+        bool normal{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
+
+protected:
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     std::string text_;

@@ -47,6 +47,10 @@ gui_forms::DrawingSurface
          Fill drawn over the whole surface before the paint callback runs. The
          default is fully transparent.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -184,6 +188,10 @@ gui_forms::DrawingSurface
 
       Sets :cpp:func:`background <gui_forms::DrawingSurface::background>`; see the property's description above.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Methods
 
@@ -203,5 +211,11 @@ gui_forms::DrawingSurface
    .. cpp:function:: bool hit_test_local(Point local_point) const override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
 
    .. cpp:type:: PaintCallback = std::function<void(Painter&, Rect, Rect)>

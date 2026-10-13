@@ -67,6 +67,10 @@ gui_forms::EasingPreview
          Progress through the current iteration of the timeline, from 0 to 1. The
          markers travel out during the first half and back during the second.
 
+      **parts** : ``Parts``, read-only
+
+      **states** : ``States``, read-only
+
    :Inherited:
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
@@ -200,6 +204,10 @@ gui_forms::EasingPreview
       Progress through the current iteration of the timeline, from 0 to 1. The
       markers travel out during the first half and back during the second.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: States states() const
+
 
    .. rubric:: Extension points
 
@@ -214,10 +222,16 @@ gui_forms::EasingPreview
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*
 
    .. cpp:function:: void on_detached_from_window() noexcept override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

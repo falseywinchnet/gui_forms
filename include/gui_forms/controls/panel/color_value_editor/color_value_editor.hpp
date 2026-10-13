@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -35,9 +36,31 @@ public:
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+    // Stage T1 anatomy, as dot members.
+    struct Parts final {
+        ScrollableControl::Parts scrollable;
+        PartGeometry swatch;
+        PartGeometry field;
+    };
+    struct States final {
+        bool normal{};
+        bool pressed{};
+        bool captured{};
+        bool enabled{};
+        bool disabled{};
+        bool focused{};
+        bool focus_visible{};
+        bool invalid{};
+        bool pending{};
+    };
+    [[nodiscard]] Parts parts() const;
+    [[nodiscard]] States states() const;
 
 protected:
     void on_dispose() noexcept override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     static std::optional<std::uint8_t> parse_nibble(char value) noexcept;

@@ -215,6 +215,8 @@ gui_forms::CommandBar
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:function:: void on_attached_to_window() override
 
       *Protected.*

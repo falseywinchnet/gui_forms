@@ -3,6 +3,7 @@
 
 #include "range_control_rendering.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -172,6 +173,63 @@ bool RangeControl::set_value_from_input(double value, RangeAction action) {
         publish_change(value_changed_, value_);
     }
     return true;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<RangeControl::Parts>, 2> range_control_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &RangeControl::Parts::region},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &RangeControl::Parts::focus},
+}};
+
+constexpr std::array<StateField<RangeControl::States>, 5> range_control_state_fields{{
+    {.state = AnatomyState::normal, .member = &RangeControl::States::normal},
+    {.state = AnatomyState::enabled, .member = &RangeControl::States::enabled},
+    {.state = AnatomyState::disabled, .member = &RangeControl::States::disabled},
+    {.state = AnatomyState::focused, .member = &RangeControl::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &RangeControl::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 2> range_control_parts =
+    part_declarations(range_control_part_fields);
+constexpr std::array<AnatomyState, 5> range_control_states =
+    state_declarations(range_control_state_fields);
+
+constexpr ControlAnatomy range_control_anatomy{
+    .control_id = "range-control",
+    .parts = range_control_parts,
+    .states = range_control_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& RangeControl::anatomy() const noexcept {
+    return range_control_anatomy;
+}
+
+void RangeControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), range_control_part_fields, record, geometry);
+}
+
+RangeControl::Parts RangeControl::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), range_control_part_fields, published.parts(), record);
+    return record;
+}
+
+RangeControl::States RangeControl::states() const {
+    States record;
+    read_states(range_control_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

@@ -1,5 +1,6 @@
 #include "gui_forms/controls/drawing_surface/drawing_surface.hpp"
 
+#include <array>
 #include <utility>
 
 namespace gui_forms {
@@ -52,6 +53,70 @@ SemanticDescriptor DrawingSurface::semantic_descriptor() const {
     descriptor.description = accessible_description();
     descriptor.exposed = !descriptor.name.empty() || !descriptor.description.empty();
     return descriptor;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<DrawingSurface::Parts>, 3> drawing_surface_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &DrawingSurface::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &DrawingSurface::Parts::face},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &DrawingSurface::Parts::focus},
+}};
+
+constexpr std::array<StateField<DrawingSurface::States>, 5> drawing_surface_state_fields{{
+    {.state = AnatomyState::normal, .member = &DrawingSurface::States::normal},
+    {.state = AnatomyState::enabled, .member = &DrawingSurface::States::enabled},
+    {.state = AnatomyState::disabled, .member = &DrawingSurface::States::disabled},
+    {.state = AnatomyState::focused, .member = &DrawingSurface::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &DrawingSurface::States::focus_visible},
+}};
+
+constexpr std::array<PartDeclaration, 3> drawing_surface_parts =
+    part_declarations(drawing_surface_part_fields);
+constexpr std::array<AnatomyState, 5> drawing_surface_states =
+    state_declarations(drawing_surface_state_fields);
+
+constexpr ControlAnatomy drawing_surface_anatomy{
+    .control_id = "drawing-surface",
+    .parts = drawing_surface_parts,
+    .states = drawing_surface_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& DrawingSurface::anatomy() const noexcept {
+    return drawing_surface_anatomy;
+}
+
+void DrawingSurface::publish_part_geometry(std::span<PartGeometry> geometry) const {
+
+    const Rect bounds = client_rectangle();
+    Parts record;
+    record.region = PartGeometry::from_bounds(bounds);
+    // The background fill; the application's drawing lies over it.
+    if (background_.alpha != 0U) {
+        record.face = PartGeometry::from_bounds(bounds);
+    }
+    record.focus = PartGeometry::from_bounds(bounds);
+    write_parts(anatomy(), drawing_surface_part_fields, record, geometry);
+}
+
+DrawingSurface::Parts DrawingSurface::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), drawing_surface_part_fields, published.parts(), record);
+    return record;
+}
+
+DrawingSurface::States DrawingSurface::states() const {
+    States record;
+    read_states(drawing_surface_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms
