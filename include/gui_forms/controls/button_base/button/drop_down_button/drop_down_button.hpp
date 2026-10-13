@@ -51,9 +51,14 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+    // The disclosure segment at the selected edge, in local coordinates.
+    [[nodiscard]] Rect drop_down_bounds() const noexcept;
 
 protected:
     void on_activate() override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     [[nodiscard]] bool point_in_drop_down(Point window_point) const noexcept;

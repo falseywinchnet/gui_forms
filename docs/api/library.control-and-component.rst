@@ -749,6 +749,10 @@ Functions, constants and aliases
 
 .. cpp:function:: bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept
 
+.. cpp:function:: void set_part_geometry(const ControlAnatomy& anatomy, std::span<PartGeometry> geometry, std::string_view part_name, Rect bounds) noexcept
+
+   Publishes ``bounds`` for the declared part named ``part_name``; the part is present when ``bounds`` is not empty. A name the anatomy does not declare is ignored, so a shared publisher can serve types that declare a subset. ``geometry`` must hold one record per declared part.
+
 .. cpp:function:: std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept
 
 .. cpp:function:: AnatomyValidation validate_control_anatomy(const ControlAnatomy& anatomy) noexcept

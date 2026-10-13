@@ -122,3 +122,11 @@ gui_forms::LinkLabel
    .. cpp:function:: void on_activate() override
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*

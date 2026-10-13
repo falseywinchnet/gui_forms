@@ -243,6 +243,14 @@ private:
 [[nodiscard]] bool declares_state(const ControlAnatomy& anatomy,
                                   AnatomyState state) noexcept;
 
+// Publishes `bounds` for the declared part named `part_name`; the part is
+// present when `bounds` is not empty. A name the anatomy does not declare is
+// ignored, so a shared publisher can serve types that declare a subset.
+// `geometry` must hold one record per declared part.
+void set_part_geometry(const ControlAnatomy& anatomy,
+                       std::span<PartGeometry> geometry,
+                       std::string_view part_name, Rect bounds) noexcept;
+
 // Reasons a declared anatomy is malformed.
 enum class AnatomyDefect : std::uint8_t {
     none,

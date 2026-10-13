@@ -224,6 +224,18 @@ bool declares_state(const ControlAnatomy& anatomy, AnatomyState state) noexcept 
     return false;
 }
 
+void set_part_geometry(const ControlAnatomy& anatomy,
+                       std::span<PartGeometry> geometry,
+                       std::string_view part_name, Rect bounds) noexcept {
+    const std::optional<PartIndex> index = find_part(anatomy, part_name);
+    if (!index.has_value() || (*index).value >= geometry.size()) {
+        return;
+    }
+    PartGeometry& part = geometry[(*index).value];
+    part.bounds = bounds;
+    part.present = !bounds.empty();
+}
+
 std::string_view anatomy_defect_name(AnatomyDefect defect) noexcept {
     const std::size_t index = static_cast<std::size_t>(defect);
     if (index >= anatomy_defect_names.size()) {

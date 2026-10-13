@@ -1,6 +1,7 @@
 #include "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <stdexcept>
 #include <utility>
@@ -74,6 +75,87 @@ bool DropDownButton::perform_drop_down() {
     if (!prepare_command_activation()) return false;
     drop_down_requested_.emit(*this);
     return true;
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 8> drop_down_button_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "face", .role = PartRole::face, .composed_from = {}},
+    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+    {.name = "label", .role = PartRole::label, .composed_from = {}},
+    {.name = "drop-down", .role = PartRole::actuator, .composed_from = {}},
+    {.name = "disclosure", .role = PartRole::disclosure, .composed_from = {}},
+    {.name = "preselect", .role = PartRole::preselect, .composed_from = {}},
+    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 11> drop_down_button_states{
+    AnatomyState::normal,
+    AnatomyState::hot,
+    AnatomyState::pressed,
+    AnatomyState::preselect,
+    AnatomyState::selected,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+    AnatomyState::open,
+    AnatomyState::closed,
+};
+
+constexpr ControlAnatomy drop_down_button_anatomy{
+    .control_id = "drop-down-button",
+    .parts = drop_down_button_parts,
+    .states = drop_down_button_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& DropDownButton::anatomy() const noexcept {
+    return drop_down_button_anatomy;
+}
+
+Rect DropDownButton::drop_down_bounds() const noexcept {
+    const Rect bounds = local_bounds();
+    const bool bottom = edge_ == DropDownButtonEdge::bottom;
+    const double extent = std::min(drop_down_width_, bottom ? bounds.height : bounds.width);
+    const double start = (bottom ? bounds.height : bounds.width) - extent;
+    if (bottom) {
+        const Rect segment{0.0, start, bounds.width, extent};
+        return segment;
+    }
+    const Rect segment{start, 0.0, extent, bounds.height};
+    return segment;
+}
+
+void DropDownButton::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Button::publish_part_geometry(geometry);
+    const ControlAnatomy& declared = anatomy();
+    const Rect bounds = local_bounds();
+    if (bounds.width <= 0.0 || bounds.height <= 0.0) return;
+    const Rect segment = drop_down_bounds();
+    const bool bottom = edge_ == DropDownButtonEdge::bottom;
+    // The 7 x 4 arrow at rest, as on_paint draws it before the pressed or
+    // open offset.
+    const double center_x = bottom ? bounds.width * 0.5 : segment.x + segment.width * 0.5;
+    const double center_y = bottom ? segment.y + segment.height * 0.5 : bounds.height * 0.5;
+    const Rect arrow{std::floor(center_x) - 3.0, std::floor(center_y) - 1.0, 7.0, 4.0};
+    set_part_geometry(declared, geometry, "drop-down", segment);
+    set_part_geometry(declared, geometry, "disclosure", arrow);
+}
+
+AnatomyStateSet DropDownButton::anatomy_states() const {
+    AnatomyStateSet states = Button::anatomy_states();
+    states.erase(AnatomyState::open);
+    states.erase(AnatomyState::closed);
+    if (drop_down_open_) {
+        states.insert(AnatomyState::open);
+    } else {
+        states.insert(AnatomyState::closed);
+    }
+    return states;
 }
 
 void DropDownButton::on_paint(Painter& painter, const Rect local_damage) {

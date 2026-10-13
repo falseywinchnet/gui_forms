@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -91,6 +92,62 @@ void Button::set_flat_border_width(double width) {
     if (flat_border_width_ == width) return;
     flat_border_width_ = width;
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 6> button_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "face", .role = PartRole::face, .composed_from = {}},
+    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+    {.name = "label", .role = PartRole::label, .composed_from = {}},
+    {.name = "preselect", .role = PartRole::preselect, .composed_from = {}},
+    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 11> button_states{
+    AnatomyState::normal,
+    AnatomyState::hot,
+    AnatomyState::pressed,
+    AnatomyState::preselect,
+    AnatomyState::selected,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+    AnatomyState::open,
+    AnatomyState::closed,
+};
+
+constexpr ControlAnatomy button_anatomy{
+    .control_id = "button",
+    .parts = button_parts,
+    .states = button_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& Button::anatomy() const noexcept {
+    return button_anatomy;
+}
+
+void Button::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    // Paint passes the selection to the image lookup only on the themed path.
+    const bool layout_selected = !has_style_override() && selected_;
+    const bool command_alignment = visual_style_ == ButtonVisualStyle::command;
+    publish_push_button_parts(geometry, layout_selected, command_alignment);
+}
+
+AnatomyStateSet Button::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (default_button_) {
+        states.insert(AnatomyState::preselect);
+    }
+    if (selected_) {
+        states.insert(AnatomyState::selected);
+    }
+    return states;
 }
 
 void Button::on_paint(Painter& painter, Rect) {

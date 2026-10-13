@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -146,9 +147,44 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action,
                             std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
 
 protected:
+    // Text and image placement inside a button face (stage T1). Paint and
+    // published geometry share it. Rectangles are at rest: the pressed
+    // content offset and a theme's visual offset are presentation and are
+    // applied only when painting.
+    struct ContentLayout final {
+        Rect text{};
+        Rect image{};
+        double line_height{};
+        bool has_text{};
+        bool has_image{};
+    };
+
     [[nodiscard]] Rect local_bounds() const noexcept;
+    // The face less its content padding, and the command leading when
+    // `command_alignment` is set.
+    [[nodiscard]] Rect content_box(Rect face, bool command_alignment) const noexcept;
+    // Places the text block, one entry of `line_sizes` per display line, and
+    // the resolved image inside `content`.
+    [[nodiscard]] ContentLayout layout_content(Rect content,
+                                               std::span<const Size> line_sizes,
+                                               FontSpec font, bool selected,
+                                               bool command_alignment) const;
+    // layout_content for `face`, measuring the display text with the
+    // window's text metrics.
+    [[nodiscard]] ContentLayout published_content_layout(
+        Rect face, bool selected, bool command_alignment) const;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    // Publishes region, face, icon, label, focus and, where the type declares
+    // it, preselect for a push-style button whose face is the whole control.
+    void publish_push_button_parts(std::span<PartGeometry> geometry,
+                                   bool selected, bool command_alignment) const;
+    // The interaction, availability, focus and disclosure states every
+    // button shares.
+    [[nodiscard]] AnatomyStateSet button_anatomy_states() const;
     [[nodiscard]] std::string display_text() const;
     void paint_button_frame(Painter& painter, Rect bounds, bool default_cue) const;
     void paint_button_text(Painter& painter, Rect bounds,

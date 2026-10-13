@@ -5,6 +5,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -119,6 +120,97 @@ void CheckBox::set_indicator_style(ChoiceIndicatorStyle style_value) {
     }
     indicator_style_ = style_value;
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 7> check_box_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "face", .role = PartRole::face, .composed_from = {}},
+    {.name = "well", .role = PartRole::well, .composed_from = {}},
+    {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
+    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+    {.name = "label", .role = PartRole::label, .composed_from = {}},
+    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 9> check_box_states{
+    AnatomyState::normal,
+    AnatomyState::hot,
+    AnatomyState::pressed,
+    AnatomyState::checked,
+    AnatomyState::indeterminate,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy check_box_anatomy{
+    .control_id = "check-box",
+    .parts = check_box_parts,
+    .states = check_box_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& CheckBox::anatomy() const noexcept {
+    return check_box_anatomy;
+}
+
+void CheckBox::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    if (appearance_ == CheckBoxAppearance::button) {
+        // The button appearance is a push button whose selection is the
+        // check state; it has a face and no well or indicator.
+        const bool layout_selected = !has_style_override() && checked();
+        publish_push_button_parts(geometry, layout_selected, false);
+        return;
+    }
+    const ControlAnatomy& declared = anatomy();
+    const Rect bounds = local_bounds();
+    const double indicator_width =
+        indicator_style_ == ChoiceIndicatorStyle::toggle ? 30.0 : 15.0;
+    const Rect box{1.0, std::max(1.0, (bounds.height - 15.0) * 0.5),
+                   indicator_width, 15.0};
+    // The mark inside the well: the toggle's knob, the check stroke's extent
+    // or the indeterminate bar, as on_paint draws them.
+    Rect mark{};
+    if (indicator_style_ == ChoiceIndicatorStyle::toggle) {
+        const double knob_x = checked() ? box.x + box.width - 13.0 : box.x + 2.0;
+        mark = {knob_x, box.y + 2.0, 11.0, 11.0};
+    } else if (check_state_ == CheckState::checked) {
+        // Two-unit strokes through (3, 7), (6, 10) and (13, 3) from the box.
+        mark = {box.x + 2.0, box.y + 2.0, 12.0, 9.0};
+    } else if (check_state_ == CheckState::indeterminate) {
+        mark = has_style_override() ? Rect{box.x + 3.0, box.y + 6.0, 9.0, 4.0}
+                                    : Rect{box.x + 4.0, box.y + 6.0, 8.0, 3.0};
+    }
+    const Rect content_face{box.x + box.width + 1.0, 0.0,
+                            std::max(0.0, bounds.width - box.x - box.width - 1.0),
+                            bounds.height};
+    const ContentLayout layout =
+        published_content_layout(content_face, checked(), false);
+    set_part_geometry(declared, geometry, "region", bounds);
+    set_part_geometry(declared, geometry, "well", box);
+    set_part_geometry(declared, geometry, "indicator", mark);
+    if (layout.has_image) {
+        set_part_geometry(declared, geometry, "icon", layout.image);
+    }
+    if (layout.has_text) {
+        set_part_geometry(declared, geometry, "label", layout.text);
+    }
+    set_part_geometry(declared, geometry, "focus", bounds);
+}
+
+AnatomyStateSet CheckBox::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (check_state_ == CheckState::checked) {
+        states.insert(AnatomyState::checked);
+    } else if (check_state_ == CheckState::indeterminate) {
+        states.insert(AnatomyState::indeterminate);
+    }
+    return states;
 }
 
 void CheckBox::on_paint(Painter& painter, Rect) {

@@ -60,6 +60,9 @@ gui_forms::DropDownButton
          edge, and reports itself to accessibility as expanded. The button never
          changes it; the application sets it while its menu is shown.
 
+      **drop_down_bounds** : ``Rect``, read-only
+         The disclosure segment at the selected edge, in local coordinates.
+
    :Events:
 
       **drop_down_requested** : ``Event<DropDownButton&>``
@@ -231,6 +234,10 @@ gui_forms::DropDownButton
 
       Sets :cpp:func:`drop_down_open <gui_forms::DropDownButton::drop_down_open>`; see the property's description above.
 
+   .. cpp:function:: Rect drop_down_bounds() const noexcept
+
+      The disclosure segment at the selected edge, in local coordinates.
+
 
    .. rubric:: Events
 
@@ -270,6 +277,14 @@ gui_forms::DropDownButton
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet anatomy_states() const override
+
    .. cpp:function:: void on_activate() override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
 
       *Protected.*

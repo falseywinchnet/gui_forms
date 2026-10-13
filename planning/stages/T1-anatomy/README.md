@@ -2,7 +2,8 @@
 
 Release: 0.2 Verified. Depends on: nothing. Unblocks T2, T3, L, C and,
 through them, almost everything else. Status 2026-10-13: started on branch
-`claude/t1-anatomy` (schema types; TrackBar, ScrollBar and ProgressBar).
+`claude/t1-anatomy`, with stacked `claude/t1-*` branches (schema types; range
+controls; the button family).
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.

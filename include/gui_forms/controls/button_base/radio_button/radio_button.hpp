@@ -28,6 +28,11 @@ public:
     [[nodiscard]] Insets visual_outsets() const noexcept override;
     void on_activate() override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] AnatomyStateSet anatomy_states() const override;
+
+protected:
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
     void set_checked_without_exclusion(bool checked);

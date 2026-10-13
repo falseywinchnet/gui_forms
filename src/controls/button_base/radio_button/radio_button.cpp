@@ -5,6 +5,7 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <iterator>
 #include <stdexcept>
@@ -100,6 +101,81 @@ void RadioButton::set_indicator_style(ChoiceIndicatorStyle style_value) {
     }
     indicator_style_ = style_value;
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+namespace {
+
+constexpr std::array<PartDeclaration, 6> radio_button_parts{{
+    {.name = "region", .role = PartRole::region, .composed_from = {}},
+    {.name = "well", .role = PartRole::well, .composed_from = {}},
+    {.name = "indicator", .role = PartRole::indicator, .composed_from = {}},
+    {.name = "icon", .role = PartRole::icon, .composed_from = {}},
+    {.name = "label", .role = PartRole::label, .composed_from = {}},
+    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+}};
+
+constexpr std::array<AnatomyState, 8> radio_button_states{
+    AnatomyState::normal,
+    AnatomyState::hot,
+    AnatomyState::pressed,
+    AnatomyState::checked,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy radio_button_anatomy{
+    .control_id = "radio-button",
+    .parts = radio_button_parts,
+    .states = radio_button_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& RadioButton::anatomy() const noexcept {
+    return radio_button_anatomy;
+}
+
+void RadioButton::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const ControlAnatomy& declared = anatomy();
+    const Rect bounds = local_bounds();
+    const double indicator_width =
+        indicator_style_ == ChoiceIndicatorStyle::toggle ? 30.0 : 15.0;
+    const double top = std::max(1.0, (bounds.height - 15.0) * 0.5);
+    const Rect well{1.0, top, indicator_width, 15.0};
+    // The toggle's knob, or the round dot drawn inside the 15-unit disc.
+    Rect mark{};
+    if (indicator_style_ == ChoiceIndicatorStyle::toggle) {
+        const double knob_x = checked_ ? well.x + well.width - 13.0 : well.x + 2.0;
+        mark = {knob_x, well.y + 2.0, 11.0, 11.0};
+    } else if (checked_) {
+        mark = {well.x + 4.0, well.y + 4.0, 7.0, 7.0};
+    }
+    const Rect content_face{well.x + well.width + 1.0, 0.0,
+                            std::max(0.0, bounds.width - well.x - well.width - 1.0),
+                            bounds.height};
+    const ContentLayout layout =
+        published_content_layout(content_face, checked_, false);
+    set_part_geometry(declared, geometry, "region", bounds);
+    set_part_geometry(declared, geometry, "well", well);
+    set_part_geometry(declared, geometry, "indicator", mark);
+    if (layout.has_image) {
+        set_part_geometry(declared, geometry, "icon", layout.image);
+    }
+    if (layout.has_text) {
+        set_part_geometry(declared, geometry, "label", layout.text);
+    }
+    set_part_geometry(declared, geometry, "focus", bounds);
+}
+
+AnatomyStateSet RadioButton::anatomy_states() const {
+    AnatomyStateSet states = button_anatomy_states();
+    if (checked_) {
+        states.insert(AnatomyState::checked);
+    }
+    return states;
 }
 
 void RadioButton::on_paint(Painter& painter, Rect) {
