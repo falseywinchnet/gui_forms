@@ -47,6 +47,8 @@ gui_forms::CheckedListBox
          starts after it. Values outside 8 to 32, or not finite, throw
          ``std::out_of_range``.
 
+      **realized_items** : ``std::vector<Item>``, read-only
+
    :Events:
 
       **item_checking** : ``Event<ItemCheckEvent&>``
@@ -65,9 +67,9 @@ gui_forms::CheckedListBox
 
    :Inherited:
 
-      From :cpp:class:`ListBox <gui_forms::ListBox>`: properties :cpp:func:`items <gui_forms::ListBox::items>`, :cpp:func:`selection_mode <gui_forms::ListBox::selection_mode>`, :cpp:func:`selected_indices <gui_forms::ListBox::selected_indices>`, :cpp:func:`selected_index <gui_forms::ListBox::selected_index>`, :cpp:func:`top_index <gui_forms::ListBox::top_index>`, :cpp:func:`item_height <gui_forms::ListBox::item_height>`, :cpp:func:`font <gui_forms::ListBox::font>`; events :cpp:func:`selection_changed <gui_forms::ListBox::selection_changed>`, :cpp:func:`item_activated <gui_forms::ListBox::item_activated>`; methods :cpp:func:`clear_selection <gui_forms::ListBox::clear_selection>`, :cpp:func:`item_stable_id <gui_forms::ListBox::item_stable_id>`, :cpp:func:`select_index <gui_forms::ListBox::select_index>`, :cpp:func:`set_item_stable_ids <gui_forms::ListBox::set_item_stable_ids>`.
+      From :cpp:class:`ListBox <gui_forms::ListBox>`: properties :cpp:func:`items <gui_forms::ListBox::items>`, :cpp:func:`selection_mode <gui_forms::ListBox::selection_mode>`, :cpp:func:`selected_indices <gui_forms::ListBox::selected_indices>`, :cpp:func:`selected_index <gui_forms::ListBox::selected_index>`, :cpp:func:`top_index <gui_forms::ListBox::top_index>`, :cpp:func:`item_height <gui_forms::ListBox::item_height>`, :cpp:func:`font <gui_forms::ListBox::font>`, :cpp:func:`parts <gui_forms::ListBox::parts>`; events :cpp:func:`selection_changed <gui_forms::ListBox::selection_changed>`, :cpp:func:`item_activated <gui_forms::ListBox::item_activated>`; methods :cpp:func:`clear_selection <gui_forms::ListBox::clear_selection>`, :cpp:func:`item_stable_id <gui_forms::ListBox::item_stable_id>`, :cpp:func:`select_index <gui_forms::ListBox::select_index>`, :cpp:func:`set_item_stable_ids <gui_forms::ListBox::set_item_stable_ids>`.
 
-      From :cpp:class:`Panel <gui_forms::Panel>`: properties :cpp:func:`border_style <gui_forms::Panel::border_style>`, :cpp:func:`background <gui_forms::Panel::background>`, :cpp:func:`has_background_override <gui_forms::Panel::has_background_override>`, :cpp:func:`style <gui_forms::Panel::style>`, :cpp:func:`has_style_override <gui_forms::Panel::has_style_override>`, :cpp:func:`visual_role <gui_forms::Panel::visual_role>`, :cpp:func:`parts <gui_forms::Panel::parts>`; methods :cpp:func:`clear_background <gui_forms::Panel::clear_background>`, :cpp:func:`clear_style <gui_forms::Panel::clear_style>`.
+      From :cpp:class:`Panel <gui_forms::Panel>`: properties :cpp:func:`border_style <gui_forms::Panel::border_style>`, :cpp:func:`background <gui_forms::Panel::background>`, :cpp:func:`has_background_override <gui_forms::Panel::has_background_override>`, :cpp:func:`style <gui_forms::Panel::style>`, :cpp:func:`has_style_override <gui_forms::Panel::has_style_override>`, :cpp:func:`visual_role <gui_forms::Panel::visual_role>`; methods :cpp:func:`clear_background <gui_forms::Panel::clear_background>`, :cpp:func:`clear_style <gui_forms::Panel::clear_style>`.
 
       From :cpp:class:`ScrollableControl <gui_forms::ScrollableControl>`: properties :cpp:func:`auto_scroll <gui_forms::ScrollableControl::auto_scroll>`, :cpp:func:`auto_scroll_margin <gui_forms::ScrollableControl::auto_scroll_margin>`, :cpp:func:`auto_scroll_min_size <gui_forms::ScrollableControl::auto_scroll_min_size>`, :cpp:func:`auto_scroll_position <gui_forms::ScrollableControl::auto_scroll_position>`, :cpp:func:`scroll_position <gui_forms::ScrollableControl::scroll_position>`, :cpp:func:`viewport_rectangle <gui_forms::ScrollableControl::viewport_rectangle>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`, :cpp:func:`hscroll <gui_forms::ScrollableControl::hscroll>`, :cpp:func:`vscroll <gui_forms::ScrollableControl::vscroll>`, :cpp:func:`last_scroll_event <gui_forms::ScrollableControl::last_scroll_event>`, :cpp:func:`scroll_event_revision <gui_forms::ScrollableControl::scroll_event_revision>`, :cpp:func:`scroll_snapshot <gui_forms::ScrollableControl::scroll_snapshot>`, :cpp:func:`states <gui_forms::ScrollableControl::states>`; events :cpp:func:`scroll <gui_forms::ScrollableControl::scroll>`; methods :cpp:func:`get_scroll_state <gui_forms::ScrollableControl::get_scroll_state>`, :cpp:func:`horizontal_scroll <gui_forms::ScrollableControl::horizontal_scroll>`, :cpp:func:`scroll_by <gui_forms::ScrollableControl::scroll_by>`, :cpp:func:`scroll_control_into_view <gui_forms::ScrollableControl::scroll_control_into_view>`, :cpp:func:`scroll_to <gui_forms::ScrollableControl::scroll_to>`, :cpp:func:`set_scroll_state <gui_forms::ScrollableControl::set_scroll_state>`, :cpp:func:`vertical_scroll <gui_forms::ScrollableControl::vertical_scroll>`.
 
@@ -200,6 +202,8 @@ gui_forms::CheckedListBox
 
       Sets :cpp:func:`indicator_size <gui_forms::CheckedListBox::indicator_size>`; see the property's description above.
 
+   .. cpp:function:: std::vector<Item> realized_items() const
+
 
    .. rubric:: Events
 
@@ -298,10 +302,18 @@ gui_forms::CheckedListBox
       its check, without raising ``item_activated``. Other actions behave as in
       :cpp:class:`ListBox <gui_forms::ListBox>`.
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: AnatomyStateSet realized_item_anatomy_states(std::size_t item) const override
+
    .. cpp:function:: double row_text_left() const noexcept override
 
       *Protected.*
 
    .. cpp:function:: void paint_row_adornment(Painter& painter, std::size_t index, Rect row_bounds, bool selected, bool focused) const override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const override
 
       *Protected.*
