@@ -10,9 +10,13 @@ timer (#77) and paint contract version 2 (#78) are merged. PlaySuite's Lima
 runs after #77 showed X11 spending most of a live frame outside the copy: X11
 composed live frames by retained painting of their regions (everything under
 and over them), while Windows and macOS draw them directly. On
-`claude/dp-x11-direct-live`, X11 draws opaque frames directly as well, so all
-three hosts compose live frames one way; Untangle in the Lima guest is the
-check. Authority: the "Damage-preserving painting" and
+`claude/dp-x11-direct-live` (#80), X11 draws opaque frames directly as well,
+so all three hosts compose live frames one way; Untangle in the Lima guest is
+the check. Remaining for the gate: the macOS and X11 records under
+`results/`. PlaySuite's screen checks already pass the "no pixel outside the
+damaged rectangles changes" condition on both (macOS through screencapture,
+X11 through xwd in the Lima guest, against #77); the records wait for their
+re-runs against #80. Authority: the "Damage-preserving painting" and
 "Presentation availability record" rows of the milestone table in
 `docs/dev/roadmap.md`, and `planning/PAINT_PIPELINE_AVAILABILITY.md`. The
 forward programme has no section for this stage; this brief and the stage

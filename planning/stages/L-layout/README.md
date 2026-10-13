@@ -1,7 +1,8 @@
 # Stage L: real dynamic layout (flex, grid, flow)
 
 Release: 0.4 Flexible. Depends on: T1. Unblocks FD, D and H. Status
-2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
+2026-10-13: not started; ready, since T1's gate is recorded
+(`results/2026-10-13-t1-anatomy-gate`). Authority: `planning/FORWARD_PROGRAMME.md` §4 L.
 
 Read [the shared brief](../README.md) first.
 

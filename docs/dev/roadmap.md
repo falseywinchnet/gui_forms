@@ -127,8 +127,8 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Coherent latest-state presentation | Separate content, rendered and presented revisions; one paint lease, one coalesced wake and one deferred follow-up per window; exact presentation receipts; owner-callback failure restores the previous chunks | done |
 | Pressure, input and stall conformance | Under 100 mutations per frame, nested paints, resize during replay, occlusion, backend faults and owner retirement: one queued drain, latest-state rendering and a return to idle; input deferred outside the paint lease with a fixed bound | in progress: the deterministic gates pass; a native wall-clock soak remains |
 | Atomic candidate raster | Replay into a private candidate raster and publish it only after every backend command succeeds, keeping the last presented raster across allocation, renderer and upload faults | in progress: an opt-in Windows transactional frame store exists; default hosts replay into the live raster |
-| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | planned |
-| Presentation availability record | Publishing the mandatory paint-contract version and optional host extensions (partial present, zero-copy import, presentation fences) | planned |
+| Damage-preserving painting | Painting and presenting each damage rectangle instead of their bounding box | in progress: every host paints and presents the rectangle set (paint contract version 2), and live frames follow one frame sequence; the gate is recorded on Windows, macOS and X11 records remain |
+| Presentation availability record | Publishing the mandatory paint-contract version and optional host extensions (partial present, zero-copy import, presentation fences) | done: `Window::presentation_availability()` reports contract version 2 (partial present is now part of the contract), the extensions and the live paint lease; no host offers zero-copy import or fences yet |
 | API stability (1.0) | The conditions listed under "Before 1.0" below | planned |
 
 ## Done and tested
