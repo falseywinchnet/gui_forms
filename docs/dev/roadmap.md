@@ -55,6 +55,8 @@ details are under [Done and tested](#done-and-tested).
   overwrite each other.
 - **Damage-preserving painting:** each damaged region is painted and presented
   on its own, not as one bounding box.
+- **More Windows Forms controls:** a data grid, a list view, and complete tool
+  and status strips, built on the theme engine.
 
 ## 0.5 ABI candidate
 
@@ -68,6 +70,9 @@ details are under [Done and tested](#done-and-tested).
 
 - **C# bindings** over the C ABI with a Windows Forms-shaped API, so a Windows
   Forms project can switch to GUI.Forms and run on macOS and Linux.
+- **The rest of the Windows Forms controls** that .NET 8 and later support.
+  Controls that exist only in .NET Framework, or that .NET removed, are out
+  of scope.
 
 ## 0.7 Designers
 

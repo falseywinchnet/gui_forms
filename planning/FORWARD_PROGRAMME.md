@@ -71,6 +71,7 @@ L  Real dynamic layout (flex, grid, flow) ─────┤ (parallel after T1)
 FD Form documents ─────────────────────────────┤ needs T1, T3         │
 DP Damage-preserving painting (no dependencies)│                      │
 R  SDRSharp reflection, current technique ─────┴── needs T4, F        │
+W  Windows Forms controls, .NET 8+ only ── needs T4                   │
 C  Stable installed C ABI ─────────────── needs T1, T2 ───────────────┤
 S  C# sibling: Windows Forms swap-in ──── needs R, C                  │
 D  Interface builder (dogfooded) ──────── needs T3, L, FD             │
@@ -219,6 +220,25 @@ their sum on every host and pixels outside them are untouched; the
 paint-pipeline acceptance tests still pass.
 
 ## 5. Reflection and the C# sibling
+
+### W. Windows Forms control coverage
+
+Added 2026-10-13 at the owner's request. Scope: only types and members
+supported by Windows Forms on .NET 8.0 or later. Nothing that exists only in
+.NET Framework (2.0 through 4.x), nothing removed in .NET Core 3.1 (`DataGrid`,
+`ToolBar`, `StatusBar`, `MainMenu`, `ContextMenu`, `MenuItem`), nothing marked
+obsolete; the existing GUI.Forms exclusions still apply. Rebuild the API
+catalogue from the official .NET 8+ reference assemblies, then implement the
+missing controls (`DataGridView`, `ListView`, the `ToolStrip` and
+`StatusStrip` family first; then `MaskedTextBox`, `DomainUpDown`,
+`MonthCalendar`, `NotifyIcon` and member depth), each articulated and
+engine-painted from birth.
+
+Gate (proposed): the catalogue is regenerated from the official .NET 8+
+surface; every in-scope row of `CONTROL_COMPLETENESS_MATRIX.md` is implemented
+and tested on every platform, or excluded or deferred with a reason; the
+manifest records every in-scope type and member and the docs are generated
+from it.
 
 ### R. SDRSharp reflection, current technique
 

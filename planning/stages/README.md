@@ -41,6 +41,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | planned in the paint-pipeline records |
+| W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4 | not started |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
