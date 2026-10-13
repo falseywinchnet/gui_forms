@@ -2153,7 +2153,7 @@ private:
         // opposite corners cost their own areas, not the strip between them.
         _raster.save();
         _raster.clip_damage(_pendingDamage);
-        receipt = (*_model).paint(_raster, _pendingDamage.bounds());
+        receipt = (*_model).paint(_raster, _pendingDamage.rectangles());
         _raster.restore();
         const std::chrono::steady_clock::time_point paintEnded =
             std::chrono::steady_clock::now();

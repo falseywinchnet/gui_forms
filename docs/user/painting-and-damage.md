@@ -32,8 +32,8 @@ paints the accumulated damage rectangles. Given one rectangle, or none, it
 paints that rectangle or the bounding rectangle of accumulated damage, as
 before. The Windows host invalidates each damage rectangle separately, reads
 the update region rectangle by rectangle, paints that set and copies each
-rectangle to the window. The macOS and X11 hosts still paint the bounding
-rectangle.
+rectangle to the window. The macOS and X11 hosts paint their pending damage
+rectangles the same way; macOS also clips its raster to them.
 
 ## Display chunks
 

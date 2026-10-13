@@ -183,7 +183,7 @@ bool update_prepared_window(NativeWindow& window) {
     if (images_ready) {
       const PreparedTextStatus begun = raster.begin_prepared_frame(window.size, 1.0, window.damage);
       if (begun == PreparedTextStatus::success) {
-        const std::optional<PaintReceipt> receipt = (*window.entry.model).paint(raster, window.damage.bounds());
+        const std::optional<PaintReceipt> receipt = (*window.entry.model).paint(raster, window.damage.rectangles());
         raster.end_frame();
         if (receipt) {
           const PreparedTextStatus status = raster.commit_prepared_frame(*receipt);
@@ -893,7 +893,7 @@ void NativeWindow::update() {
       std::chrono::steady_clock::now();
   raster.begin_frame(damage);
   const std::optional<PaintReceipt> receipt =
-      (*entry.model).paint(raster, damage.bounds());
+      (*entry.model).paint(raster, damage.rectangles());
   raster.end_frame();
   if (!receipt)
     return;
