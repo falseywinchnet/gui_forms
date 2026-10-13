@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 
 #include "../container_layout_utilities.hpp"
+#include "../../scrollable_anatomy.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -341,6 +342,23 @@ SemanticDescriptor CommandOverflowPanel::semantic_descriptor() const {
     descriptor.description = accessible_description();
     descriptor.exposed = true;
     return descriptor;
+}
+
+
+namespace {
+
+// Its panes and members are child controls, which publish their own anatomies.
+constexpr ControlAnatomy command_overflow_panel_anatomy{
+    .control_id = "command-overflow-panel",
+    .parts = scrollable_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& CommandOverflowPanel::anatomy() const noexcept {
+    return command_overflow_panel_anatomy;
 }
 
 } // namespace gui_forms

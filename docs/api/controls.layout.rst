@@ -67,6 +67,10 @@ Related types
      - A zero maximum is unbounded, matching Control::maximum_size.
    * - :cpp:class:`SplitChangeEvent <gui_forms::SplitChangeEvent>`
      - SplitChangeEvent reports old/new splitter distance and whether the change originated from pointer interaction.
+   * - :cpp:class:`SplitContainer::Parts <gui_forms::SplitContainer::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`SplitContainer::States <gui_forms::SplitContainer::States>`
+     -  
    * - :cpp:class:`SplitSeamGeometry <gui_forms::SplitSeamGeometry>`
      -  
    * - :cpp:class:`SplitSeamSnapshot <gui_forms::SplitSeamSnapshot>`
@@ -306,6 +310,46 @@ Related types
    .. cpp:member:: SplitCollapseOrigin collapse_origin
 
       Default: ``{SplitCollapseOrigin::none}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SplitContainer::Parts final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry seam
+
+   .. cpp:member:: PartGeometry grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SplitContainer::States final
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
 
 .. cpp:namespace:: gui_forms
 

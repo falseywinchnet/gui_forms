@@ -312,6 +312,8 @@ gui_forms::MasterDetailView
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
    .. cpp:member:: constexpr bool initialize_tree_after_construction
 
       Default: ``true``.

@@ -68,6 +68,11 @@ gui_forms::MenuStrip
       **is_open** : ``bool``, default ``false``, read-only
          Whether one of the strip's menus is open.
 
+      **parts** : ``Parts``, read-only
+
+      **realized_items** : ``std::vector<Item>``, read-only
+         The items currently realized, in paint order (owner decision 5).
+
    :Events:
 
       **item_invoked** : ``Event<const MenuStripInvocation&>``
@@ -261,6 +266,12 @@ gui_forms::MenuStrip
 
       Whether one of the strip's menus is open.
 
+   .. cpp:function:: Parts parts() const
+
+   .. cpp:function:: std::vector<Item> realized_items() const
+
+      The items currently realized, in paint order (owner decision 5).
+
 
    .. rubric:: Events
 
@@ -313,6 +324,14 @@ gui_forms::MenuStrip
 
    .. cpp:function:: bool on_semantic_child_action(std::string_view stable_id, SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: std::size_t realized_item_count() const override
+
+   .. cpp:function:: std::string realized_item_stable_id(std::size_t item) const override
+
+   .. cpp:function:: AnatomyStateSet realized_item_anatomy_states(std::size_t item) const override
+
    .. cpp:function:: void on_dispose() noexcept override
 
       *Protected.*
@@ -324,3 +343,17 @@ gui_forms::MenuStrip
    .. cpp:function:: bool process_mnemonic_self(char32_t character) override
 
       *Protected.*
+
+   .. cpp:function:: void publish_part_geometry(std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: void publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const override
+
+      *Protected.*
+
+   .. cpp:function:: std::size_t realized_item_index(std::size_t item) const noexcept
+
+      *Protected.*
+
+      The model position of a realized (visible) top-level item.

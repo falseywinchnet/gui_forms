@@ -1,6 +1,8 @@
 #include "gui_forms/anatomy.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/container_controls.hpp"
+#include "gui_forms/menu_controls.hpp"
+#include "gui_forms/collection_controls.hpp"
 #include "gui_forms/date_time_picker.hpp"
 #include "gui_forms/diagnostic_controls.hpp"
 #include "gui_forms/inspection_controls.hpp"
@@ -909,6 +911,86 @@ void test_value_editors_and_diagnostic_views() {
     }
 }
 
+void test_tabs_menus_and_breadcrumbs_are_items() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.nav.root"));
+    (*root).set_requested_bounds({0.0, 0.0, 640.0, 360.0});
+    std::shared_ptr<TabControl> tabs = make_control<TabControl>(StableId("anatomy.tabs"));
+    (*tabs).set_requested_bounds({10.0, 10.0, 400.0, 160.0});
+    (*tabs).add_page(make_control<TabPage>(StableId("anatomy.tabs.general"), "General"));
+    (*tabs).add_page(make_control<TabPage>(StableId("anatomy.tabs.advanced"), "Advanced"));
+    std::shared_ptr<MenuStrip> menu = make_control<MenuStrip>(StableId("anatomy.menu"));
+    (*menu).set_requested_bounds({10.0, 180.0, 400.0, 28.0});
+    // Every top-level item needs a menu of its own.
+    const std::shared_ptr<Command> open = std::make_shared<Command>("anatomy.open", "Open");
+    MenuStripItemSpec file;
+    file.stable_id = "anatomy.menu.file";
+    file.text = "&File";
+    file.items = {{"anatomy.menu.file.open", MenuItemKind::command, open}};
+    MenuStripItemSpec hidden;
+    hidden.stable_id = "anatomy.menu.hidden";
+    hidden.text = "Hidden";
+    hidden.items = {{"anatomy.menu.hidden.open", MenuItemKind::command, open}};
+    hidden.visible = false;
+    MenuStripItemSpec edit;
+    edit.stable_id = "anatomy.menu.edit";
+    edit.text = "&Edit";
+    edit.items = {{"anatomy.menu.edit.open", MenuItemKind::command, open}};
+    edit.enabled = false;
+    (*menu).set_items({file, hidden, edit});
+    std::shared_ptr<BreadcrumbTrail> trail = make_control<BreadcrumbTrail>(StableId("anatomy.trail"));
+    (*trail).set_requested_bounds({10.0, 220.0, 420.0, 30.0});
+    BreadcrumbSegment home;
+    home.stable_id = "anatomy.trail.home";
+    home.text = "Home";
+    BreadcrumbSegment docs;
+    docs.stable_id = "anatomy.trail.docs";
+    docs.text = "Documents";
+    (*trail).set_segments({home, docs});
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("anatomy.split"));
+    (*split).set_requested_bounds({10.0, 260.0, 400.0, 90.0});
+    (*root).add_child(tabs);
+    (*root).add_child(menu);
+    (*root).add_child(trail);
+    (*root).add_child(split);
+    Window window(root, {640.0, 360.0});
+    window.perform_layout();
+
+    const std::vector<TabControl::Item> tab_items = (*tabs).realized_items();
+    require(tab_items.size() == 2U && tab_items[0].stable_id == "anatomy.tabs.general.tab" &&
+                tab_items[0].states.selected && !tab_items[1].states.selected,
+            "each tab is an item with the semantic tree's id and its own selected state");
+    require(tab_items[0].parts.tab_seam.present && !tab_items[1].parts.tab_seam.present &&
+                tab_items[0].parts.tab.bounds.contains(tab_items[0].parts.tab_label.bounds),
+            "only the selected tab publishes its seam with the display");
+    require((*tabs).parts().display.present, "the tab control publishes its display");
+
+    const std::vector<MenuStrip::Item> menu_items = (*menu).realized_items();
+    require(menu_items.size() == 2U && menu_items[0].index == 0U && menu_items[1].index == 2U &&
+                menu_items[1].states.disabled && !menu_items[0].states.disabled,
+            "hidden menu items are not realized; indices stay model positions");
+    require(menu_items[0].parts.menu_label.present &&
+                menu_items[0].parts.menu_item.bounds.right() <= menu_items[1].parts.menu_item.bounds.x,
+            "menu items publish their labels and run left to right");
+    require((*menu).parts().divider.present, "the menu strip publishes its bottom rule");
+
+    const std::vector<BreadcrumbTrail::Item> segments = (*trail).realized_items();
+    require(segments.size() >= 2U, "the breadcrumb realizes its visible segments");
+    require(segments.front().parts.segment_cap.present && !segments.back().parts.segment_cap.present,
+            "every segment but the last ends in a chevron cap");
+
+    const SplitContainer::Parts split_parts = (*split).parts();
+    require(split_parts.seam.present && split_parts.seam.bounds.height > 0.0,
+            "the split container publishes its seam");
+    const std::array<const Control*, 4> controls{tabs.get(), menu.get(), trail.get(), split.get()};
+    for (std::size_t index = 0; index < controls.size(); ++index) {
+        require(validate_control_anatomy((*controls[index]).anatomy()).defect ==
+                    AnatomyDefect::none,
+                "navigation anatomies must validate");
+        require_declared_states(*controls[index]);
+        require_parts_within_region(*controls[index]);
+    }
+}
+
 } // namespace
 
 int main() {
@@ -932,6 +1014,7 @@ int main() {
         test_list_rows_are_item_records();
         test_item_names_never_repeat_control_parts();
         test_value_editors_and_diagnostic_views();
+        test_tabs_menus_and_breadcrumbs_are_items();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

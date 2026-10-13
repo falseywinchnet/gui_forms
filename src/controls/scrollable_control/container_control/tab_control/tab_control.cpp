@@ -1,6 +1,9 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp"
 #include "gui_forms/window.hpp"
+#include "../../scrollable_anatomy.hpp"
 
+#include <vector>
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -502,6 +505,150 @@ bool TabControl::on_semantic_child_action(std::string_view child_stable_id,
         return true;
     }
     return false;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<TabControl::Parts>, 2> tab_control_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &TabControl::Parts::face},
+    {.declaration = {.name = "display", .role = PartRole::face, .composed_from = {}},
+     .member = &TabControl::Parts::display},
+}};
+
+constexpr std::array<PartField<TabControl::ItemParts>, 4> tab_control_item_part_fields{{
+    {.declaration = {.name = "tab", .role = PartRole::face, .composed_from = {}},
+     .member = &TabControl::ItemParts::tab},
+    {.declaration = {.name = "tab-label", .role = PartRole::label, .composed_from = {}},
+     .member = &TabControl::ItemParts::tab_label},
+    {.declaration = {.name = "tab-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &TabControl::ItemParts::tab_focus},
+    {.declaration = {.name = "tab-seam", .role = PartRole::seam, .composed_from = {}},
+     .member = &TabControl::ItemParts::tab_seam},
+}};
+
+constexpr std::array<StateField<TabControl::ItemStates>, 1> tab_control_item_state_fields{{
+    {.state = AnatomyState::selected, .member = &TabControl::ItemStates::selected},
+}};
+
+constexpr std::array<PartDeclaration, 4> tab_control_item_parts =
+    part_declarations(tab_control_item_part_fields);
+constexpr std::array<AnatomyState, 1> tab_control_item_states =
+    state_declarations(tab_control_item_state_fields);
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
+    tab_control_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(tab_control_extra_part_fields));
+
+constexpr ControlAnatomy tab_control_anatomy{
+    .control_id = "tab-control",
+    .parts = tab_control_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = tab_control_item_parts,
+    .item_states = tab_control_item_states,
+};
+
+} // namespace
+
+const ControlAnatomy& TabControl::anatomy() const noexcept {
+    return tab_control_anatomy;
+}
+
+void TabControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
+                      committed_arranged_bounds().height};
+    record.face = PartGeometry::from_bounds(bounds);
+    // The paper area the pages sit on.
+    record.display = PartGeometry::from_bounds(display_bounds());
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), tab_control_extra_part_fields, record, geometry);
+}
+
+TabControl::Parts TabControl::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), tab_control_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t TabControl::realized_item_count() const {
+    return page_count();
+}
+
+std::string TabControl::realized_item_stable_id(std::size_t item) const {
+    const std::shared_ptr<TabPage> page = page_at(item);
+    const std::string stable_id = std::string((*page).stable_id().value()) + ".tab";
+    return stable_id;
+}
+
+void TabControl::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    const std::shared_ptr<TabPage> page = page_at(item);
+    const std::optional<std::size_t> selected = selected_index();
+    const bool active = selected && *selected == item;
+    Rect tab = tab_bounds(item);
+    if (appearance_ == TabAppearance::buttons && !active) {
+        tab = {tab.x + 2.0, tab.y + 2.0, std::max(0.0, tab.width - 4.0),
+               std::max(0.0, tab.height - 4.0)};
+    }
+    // on_paint centres the label by an estimated width.
+    const FontSpec font = effective_font(font_);
+    const double text_width = static_cast<double>((*page).text().size()) * font.size * 0.55;
+    const double text_x = tab.x + std::max(5.0, (tab.width - text_width) * 0.5);
+    const Rect label{text_x, tab.y, std::max(0.0, std::min(text_width, tab.right() - text_x)),
+                     tab.height};
+    record.tab = PartGeometry::from_bounds(tab);
+    record.tab_label = PartGeometry::from_bounds(Rect::intersection(label, tab));
+    record.tab_focus = PartGeometry::from_bounds(tab);
+    // The selected tab's join with the display, which on_paint opens.
+    if (active && appearance_ == TabAppearance::normal) {
+        Rect seam{};
+        if (alignment_ == TabAlignment::top) {
+            seam = {tab.x + 1.0, tab.y + tab.height - 2.0, std::max(0.0, tab.width - 2.0), 3.0};
+        } else if (alignment_ == TabAlignment::bottom) {
+            seam = {tab.x + 1.0, tab.y - 1.0, std::max(0.0, tab.width - 2.0), 3.0};
+        } else if (alignment_ == TabAlignment::left) {
+            seam = {tab.x + tab.width - 2.0, tab.y + 1.0, 3.0, std::max(0.0, tab.height - 2.0)};
+        } else {
+            seam = {tab.x - 1.0, tab.y + 1.0, 3.0, std::max(0.0, tab.height - 2.0)};
+        }
+        record.tab_seam = PartGeometry::from_bounds(seam);
+    }
+    write_item_parts(anatomy(), tab_control_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet TabControl::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const std::optional<std::size_t> selected = selected_index();
+    if (selected && *selected == item) {
+        states.insert(AnatomyState::selected);
+    }
+    return states;
+}
+
+std::vector<TabControl::Item> TabControl::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = item;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), tab_control_item_part_fields, published.parts(), record.parts);
+        read_states(tab_control_item_state_fields, realized_item_anatomy_states(item), record.states);
+        records.push_back(record);
+    }
+    return records;
 }
 
 } // namespace gui_forms

@@ -7,6 +7,9 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <vector>
+#include <string>
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -528,5 +531,167 @@ void MenuStrip::on_dispose() noexcept {
     if (popup_) (*popup_).dispose();
 }
 
+
+
+namespace {
+
+constexpr std::array<PartField<MenuStrip::Parts>, 4> menu_strip_part_fields{{
+    {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
+     .member = &MenuStrip::Parts::region},
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &MenuStrip::Parts::face},
+    {.declaration = {.name = "divider", .role = PartRole::divider, .composed_from = {}},
+     .member = &MenuStrip::Parts::divider},
+    {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &MenuStrip::Parts::focus},
+}};
+
+constexpr std::array<PartField<MenuStrip::ItemParts>, 3> menu_strip_item_part_fields{{
+    {.declaration = {.name = "menu-item", .role = PartRole::face, .composed_from = {}},
+     .member = &MenuStrip::ItemParts::menu_item},
+    {.declaration = {.name = "menu-label", .role = PartRole::label, .composed_from = {}},
+     .member = &MenuStrip::ItemParts::menu_label},
+    {.declaration = {.name = "menu-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &MenuStrip::ItemParts::menu_focus},
+}};
+
+constexpr std::array<StateField<MenuStrip::ItemStates>, 4> menu_strip_item_state_fields{{
+    {.state = AnatomyState::hot, .member = &MenuStrip::ItemStates::hot},
+    {.state = AnatomyState::open, .member = &MenuStrip::ItemStates::open},
+    {.state = AnatomyState::selected, .member = &MenuStrip::ItemStates::selected},
+    {.state = AnatomyState::disabled, .member = &MenuStrip::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 3> menu_strip_item_parts =
+    part_declarations(menu_strip_item_part_fields);
+constexpr std::array<AnatomyState, 4> menu_strip_item_states =
+    state_declarations(menu_strip_item_state_fields);
+
+constexpr std::array<PartDeclaration, 4> menu_strip_parts =
+    part_declarations(menu_strip_part_fields);
+constexpr std::array<AnatomyState, 5> menu_strip_states{
+    AnatomyState::normal,
+    AnatomyState::enabled,
+    AnatomyState::disabled,
+    AnatomyState::focused,
+    AnatomyState::focus_visible,
+};
+
+constexpr ControlAnatomy menu_strip_anatomy{
+    .control_id = "menu-strip",
+    .parts = menu_strip_parts,
+    .states = menu_strip_states,
+    .custom_states = {},
+    .item_parts = menu_strip_item_parts,
+    .item_states = menu_strip_item_states,
+};
+
+} // namespace
+
+const ControlAnatomy& MenuStrip::anatomy() const noexcept {
+    return menu_strip_anatomy;
+}
+
+void MenuStrip::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Rect surface{0.0, 0.0, committed_arranged_bounds().width,
+                       committed_arranged_bounds().height};
+    Parts record;
+    record.region = PartGeometry::from_bounds(surface);
+    record.face = PartGeometry::from_bounds(surface);
+    // The one-unit rule along the strip's bottom.
+    const Rect rule{0.0, std::max(0.0, surface.height - 1.5), surface.width, 1.0};
+    record.divider = PartGeometry::from_bounds(Rect::intersection(rule, surface));
+    record.focus = PartGeometry::from_bounds(surface);
+    write_parts(anatomy(), menu_strip_part_fields, record, geometry);
+}
+
+MenuStrip::Parts MenuStrip::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), menu_strip_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t MenuStrip::realized_item_index(std::size_t item) const noexcept {
+    std::size_t seen = 0U;
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        if (!items_[index].visible) continue;
+        if (seen == item) return index;
+        ++seen;
+    }
+    return items_.size();
+}
+
+std::size_t MenuStrip::realized_item_count() const {
+    std::size_t count = 0U;
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        if (items_[index].visible) ++count;
+    }
+    return count;
+}
+
+std::string MenuStrip::realized_item_stable_id(std::size_t item) const {
+    return items_[realized_item_index(item)].stable_id;
+}
+
+void MenuStrip::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    const std::size_t index = realized_item_index(item);
+    const Rect bounds = item_bounds()[index];
+    const bool emphasised = active_index_ == index ||
+                            selected_item_id_ == items_[index].stable_id;
+    FontSpec font = effective_font(font_);
+    if (emphasised) {
+        font.weight = std::max<std::uint16_t>(font.weight, 700U);
+    }
+    const std::string display = use_mnemonic_
+        ? menu_display_text(items_[index].text) : items_[index].text;
+    const double text_width = resolve_text_layout_utf8(display, font).logical_size.width;
+    const double text_x = bounds.x + item_padding_ * effective_text_scale();
+    const Rect label{text_x, bounds.y, text_width, bounds.height};
+    // The highlight on_paint lays inside the item, one unit in.
+    const Rect face{bounds.x + 1.0, 1.0, std::max(0.0, bounds.width - 2.0),
+                    std::max(0.0, bounds.height - 2.0)};
+    record.menu_item = PartGeometry::from_bounds(face);
+    record.menu_label = PartGeometry::from_bounds(Rect::intersection(label, bounds));
+    record.menu_focus = PartGeometry::from_bounds(bounds);
+    write_item_parts(anatomy(), menu_strip_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet MenuStrip::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const std::size_t index = realized_item_index(item);
+    if (hot_index_ == index) {
+        states.insert(AnatomyState::hot);
+    }
+    if (active_index_ == index) {
+        states.insert(AnatomyState::open);
+    }
+    if (selected_item_id_ == items_[index].stable_id) {
+        states.insert(AnatomyState::selected);
+    }
+    if (!items_[index].enabled) {
+        states.insert(AnatomyState::disabled);
+    }
+    return states;
+}
+
+std::vector<MenuStrip::Item> MenuStrip::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = realized_item_index(item);
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), menu_strip_item_part_fields, published.parts(), record.parts);
+        read_states(menu_strip_item_state_fields, realized_item_anatomy_states(item), record.states);
+        records.push_back(record);
+    }
+    return records;
+}
 
 } // namespace gui_forms

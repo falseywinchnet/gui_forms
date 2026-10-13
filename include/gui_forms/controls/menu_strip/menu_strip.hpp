@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -80,12 +81,49 @@ public:
     bool on_semantic_child_action(std::string_view stable_id,
                                   SemanticAction action,
                                   std::string_view value) override;
+    [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
+    [[nodiscard]] std::size_t realized_item_count() const override;
+    [[nodiscard]] std::string realized_item_stable_id(std::size_t item) const override;
+    [[nodiscard]] AnatomyStateSet realized_item_anatomy_states(
+        std::size_t item) const override;
+    // Stage T1 anatomy, as dot members; its states are Control's.
+    struct Parts final {
+        PartGeometry region;
+        PartGeometry face;
+        PartGeometry divider;
+        PartGeometry focus;
+    };
+    [[nodiscard]] Parts parts() const;
+    struct ItemParts final {
+        PartGeometry menu_item;
+        PartGeometry menu_label;
+        PartGeometry menu_focus;
+    };
+    struct ItemStates final {
+        bool hot{};
+        bool open{};
+        bool selected{};
+        bool disabled{};
+    };
+    struct Item final {
+        std::size_t index{};
+        std::string stable_id;
+        ItemParts parts;
+        ItemStates states;
+    };
+    // The items currently realized, in paint order (owner decision 5).
+    [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
     void on_dispose() noexcept override;
     [[nodiscard]] bool mnemonic_matches(
         char32_t character) const noexcept override;
     bool process_mnemonic_self(char32_t character) override;
+    void publish_part_geometry(std::span<PartGeometry> geometry) const override;
+    void publish_realized_item_geometry(std::size_t item,
+                                        std::span<PartGeometry> geometry) const override;
+    // The model position of a realized (visible) top-level item.
+    [[nodiscard]] std::size_t realized_item_index(std::size_t item) const noexcept;
 
 private:
     [[nodiscard]] std::vector<Rect> item_bounds() const;

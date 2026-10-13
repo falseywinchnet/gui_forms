@@ -49,6 +49,14 @@ Related types
 
    * - :cpp:class:`BreadcrumbSegment <gui_forms::BreadcrumbSegment>`
      -  
+   * - :cpp:class:`BreadcrumbTrail::Item <gui_forms::BreadcrumbTrail::Item>`
+     -  
+   * - :cpp:class:`BreadcrumbTrail::ItemParts <gui_forms::BreadcrumbTrail::ItemParts>`
+     -  
+   * - :cpp:class:`BreadcrumbTrail::ItemStates <gui_forms::BreadcrumbTrail::ItemStates>`
+     -  
+   * - :cpp:class:`BreadcrumbTrail::Parts <gui_forms::BreadcrumbTrail::Parts>`
+     - Stage T1 anatomy, as dot members.
    * - :cpp:class:`CheckedListBox::Item <gui_forms::CheckedListBox::Item>`
      -  
    * - :cpp:class:`CheckedListBox::ItemParts <gui_forms::CheckedListBox::ItemParts>`
@@ -117,6 +125,60 @@ Related types
    .. cpp:member:: bool enabled
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BreadcrumbTrail::Item final
+
+   ``#include <gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BreadcrumbTrail::ItemParts final
+
+   ``#include <gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp>``
+
+   .. cpp:member:: PartGeometry segment
+
+   .. cpp:member:: PartGeometry segment_label
+
+   .. cpp:member:: PartGeometry segment_cap
+
+   .. cpp:member:: PartGeometry segment_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BreadcrumbTrail::ItemStates final
+
+   ``#include <gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BreadcrumbTrail::Parts final
+
+   ``#include <gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
 
 .. cpp:namespace:: gui_forms
 

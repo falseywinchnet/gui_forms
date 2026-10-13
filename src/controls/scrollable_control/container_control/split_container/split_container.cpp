@@ -1,7 +1,10 @@
 #include "gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp"
 #include "splitter_grip.hpp"
 #include "gui_forms/window.hpp"
+#include "../../scrollable_anatomy.hpp"
 
+#include <vector>
+#include <array>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -770,6 +773,102 @@ void SplitContainer::update_splitter_cursor() {
     splitter.set_orientation(orientation_);
     splitter.set_visible_geometry(splitter_geometry_.hit_before,
                                   effective_splitter_width());
+}
+
+
+namespace {
+
+constexpr std::array<PartField<SplitContainer::Parts>, 2> split_container_extra_part_fields{{
+    {.declaration = {.name = "seam", .role = PartRole::seam, .composed_from = {}},
+     .member = &SplitContainer::Parts::seam},
+    {.declaration = {.name = "grip", .role = PartRole::grip, .composed_from = {}},
+     .member = &SplitContainer::Parts::grip},
+}};
+
+constexpr std::array<StateField<SplitContainer::States>, 10> split_container_state_fields{{
+    {.state = AnatomyState::normal, .member = &SplitContainer::States::normal},
+    {.state = AnatomyState::pressed, .member = &SplitContainer::States::pressed},
+    {.state = AnatomyState::captured, .member = &SplitContainer::States::captured},
+    {.state = AnatomyState::enabled, .member = &SplitContainer::States::enabled},
+    {.state = AnatomyState::disabled, .member = &SplitContainer::States::disabled},
+    {.state = AnatomyState::focused, .member = &SplitContainer::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &SplitContainer::States::focus_visible},
+    {.state = AnatomyState::hot, .member = &SplitContainer::States::hot},
+    {.state = AnatomyState::open, .member = &SplitContainer::States::open},
+    {.state = AnatomyState::closed, .member = &SplitContainer::States::closed},
+}};
+
+constexpr std::array<AnatomyState, 10> split_container_states =
+    state_declarations(split_container_state_fields);
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
+    split_container_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(split_container_extra_part_fields));
+
+constexpr ControlAnatomy split_container_anatomy{
+    .control_id = "split-container",
+    .parts = split_container_parts,
+    .states = split_container_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& SplitContainer::anatomy() const noexcept {
+    return split_container_anatomy;
+}
+
+void SplitContainer::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const SplitSeamSnapshot seam = splitter_seam_snapshot();
+    record.seam = PartGeometry::from_bounds(seam.visible_bounds);
+    // The collapse actuator, given in the grip's coordinates.
+    if (!seam.actuator_bounds.empty()) {
+        const Rect actuator{seam.hit_bounds.x + seam.actuator_bounds.x,
+                            seam.hit_bounds.y + seam.actuator_bounds.y,
+                            seam.actuator_bounds.width, seam.actuator_bounds.height};
+        record.grip = PartGeometry::from_bounds(actuator);
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), split_container_extra_part_fields, record, geometry);
+}
+
+SplitContainer::Parts SplitContainer::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), split_container_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+AnatomyStateSet SplitContainer::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    const SplitSeamSnapshot seam = splitter_seam_snapshot();
+    if (seam.state == SplitSeamState::near || seam.state == SplitSeamState::hot) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::hot);
+    } else if (seam.state == SplitSeamState::dragging) {
+        states.erase(AnatomyState::normal);
+        states.insert(AnatomyState::pressed);
+        states.insert(AnatomyState::captured);
+    }
+    if (!seam.actuator_bounds.empty()) {
+        if (seam.state == SplitSeamState::collapsed) {
+            states.insert(AnatomyState::closed);
+        } else {
+            states.insert(AnatomyState::open);
+        }
+    }
+    return states;
+}
+
+SplitContainer::States SplitContainer::states() const {
+    States record;
+    read_states(split_container_state_fields, anatomy_states(), record);
+    return record;
 }
 
 } // namespace gui_forms

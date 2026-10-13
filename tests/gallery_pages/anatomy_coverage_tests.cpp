@@ -13,19 +13,13 @@ namespace {
 // T1). The coverage test fails when this list and the Gallery disagree in
 // either direction, so a control that gains an anatomy must leave the list
 // in the same change. The T1 gate is this list empty.
-constexpr std::array<std::string_view, 12> anatomy_pending{
+constexpr std::array<std::string_view, 6> anatomy_pending{
     "tree-view",
     "object-view",
     "correspondence-view",
-    "breadcrumb-trail",
     "property-grid",
     "property-list",
     "instrument-rack",
-    "tab-control",
-    "split-container",
-    "command-overflow-panel",
-    "master-detail-view",
-    "menu-strip",
 };
 
 // Registry entries that are not controls: nonvisual components and the

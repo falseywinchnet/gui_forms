@@ -2,7 +2,10 @@
 
 #include "../collection_control_utilities.hpp"
 #include "gui_forms/window.hpp"
+#include "../panel_anatomy.hpp"
 
+#include <vector>
+#include <string>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -688,6 +691,156 @@ bool BreadcrumbTrail::on_semantic_child_action(
         invalidate(Dirty::paint | Dirty::semantics | Dirty::accessibility);
     }
     return true;
+}
+
+
+namespace {
+
+constexpr std::array<PartField<BreadcrumbTrail::Parts>, 2> breadcrumb_trail_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &BreadcrumbTrail::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &BreadcrumbTrail::Parts::edge},
+}};
+
+constexpr std::array<PartField<BreadcrumbTrail::ItemParts>, 4> breadcrumb_trail_item_part_fields{{
+    {.declaration = {.name = "segment", .role = PartRole::face, .composed_from = "button"},
+     .member = &BreadcrumbTrail::ItemParts::segment},
+    {.declaration = {.name = "segment-label", .role = PartRole::label, .composed_from = {}},
+     .member = &BreadcrumbTrail::ItemParts::segment_label},
+    {.declaration = {.name = "segment-cap", .role = PartRole::cap, .composed_from = {}},
+     .member = &BreadcrumbTrail::ItemParts::segment_cap},
+    {.declaration = {.name = "segment-focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &BreadcrumbTrail::ItemParts::segment_focus},
+}};
+
+constexpr std::array<StateField<BreadcrumbTrail::ItemStates>, 3> breadcrumb_trail_item_state_fields{{
+    {.state = AnatomyState::hot, .member = &BreadcrumbTrail::ItemStates::hot},
+    {.state = AnatomyState::current, .member = &BreadcrumbTrail::ItemStates::current},
+    {.state = AnatomyState::disabled, .member = &BreadcrumbTrail::ItemStates::disabled},
+}};
+
+constexpr std::array<PartDeclaration, 4> breadcrumb_trail_item_parts =
+    part_declarations(breadcrumb_trail_item_part_fields);
+constexpr std::array<AnatomyState, 3> breadcrumb_trail_item_states =
+    state_declarations(breadcrumb_trail_item_state_fields);
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 2>
+    breadcrumb_trail_parts = joined_declarations(scrollable_detail::parts,
+                                         part_declarations(breadcrumb_trail_extra_part_fields));
+
+constexpr ControlAnatomy breadcrumb_trail_anatomy{
+    .control_id = "breadcrumb-trail",
+    .parts = breadcrumb_trail_parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_parts = breadcrumb_trail_item_parts,
+    .item_states = breadcrumb_trail_item_states,
+};
+
+} // namespace
+
+const ControlAnatomy& BreadcrumbTrail::anatomy() const noexcept {
+    return breadcrumb_trail_anatomy;
+}
+
+void BreadcrumbTrail::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    Parts record;
+    record.scrollable = scrollable_parts();
+
+    const Panel::Parts panel = panel_parts();
+    record.face = panel.face;
+    record.edge = panel.edge;
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), breadcrumb_trail_extra_part_fields, record, geometry);
+}
+
+BreadcrumbTrail::Parts BreadcrumbTrail::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
+               record.scrollable);
+    read_parts(anatomy(), breadcrumb_trail_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+std::size_t BreadcrumbTrail::realized_item_count() const {
+    if (editing_) return 0U;
+    return visible_items_.size();
+}
+
+std::string BreadcrumbTrail::realized_item_stable_id(std::size_t item) const {
+    const std::string stable_id(visible_stable_id(visible_items_[item]));
+    return stable_id;
+}
+
+void BreadcrumbTrail::publish_realized_item_geometry(std::size_t item,
+                                          std::span<PartGeometry> geometry) const {
+    ItemParts record;
+
+    const VisibleItem& visible = visible_items_[item];
+    const Rect bounds = visible.bounds;
+    FontSpec item_font = effective_font(font_);
+    std::string_view text{};
+    if (visible.kind == VisibleKind::edit) {
+        text = "./";
+    } else if (visible.kind == VisibleKind::overflow) {
+        text = "…";
+    } else {
+        text = segments_[visible.segment_index].text;
+    }
+    if (visible.kind == VisibleKind::edit ||
+        (visible.kind == VisibleKind::segment &&
+         visible.segment_index + 1U == segments_.size())) {
+        item_font.weight = 700;
+    }
+    // Labels sit nine units into a segment and centred on the others.
+    const double text_width = resolve_text_layout_utf8(text, item_font).logical_size.width;
+    const double text_x = visible.kind == VisibleKind::segment
+        ? bounds.x + 9.0
+        : bounds.x + std::max(0.0, (bounds.width - text_width) * 0.5);
+    const Rect label{text_x, bounds.y, text_width, bounds.height};
+    record.segment = PartGeometry::from_bounds(bounds);
+    record.segment_label = PartGeometry::from_bounds(Rect::intersection(label, bounds));
+    // Every segment but the last ends in the chevron its successor overlaps.
+    if (item + 1U < visible_items_.size()) {
+        const Rect cap{bounds.x + bounds.width - edge_overlap_, bounds.y + 2.0,
+                       edge_overlap_, std::max(0.0, bounds.height - 4.0)};
+        record.segment_cap = PartGeometry::from_bounds(cap);
+    }
+    record.segment_focus = PartGeometry::from_bounds(bounds);
+    write_item_parts(anatomy(), breadcrumb_trail_item_part_fields, record, geometry);
+}
+
+AnatomyStateSet BreadcrumbTrail::realized_item_anatomy_states(std::size_t item) const {
+    AnatomyStateSet states;
+    const VisibleItem& visible = visible_items_[item];
+    if (hovered_visible_ == item) {
+        states.insert(AnatomyState::hot);
+    }
+    if (visible_stable_id(visible) == active_id_) {
+        states.insert(AnatomyState::current);
+    }
+    if (visible.kind == VisibleKind::segment && !segments_[visible.segment_index].enabled) {
+        states.insert(AnatomyState::disabled);
+    }
+    return states;
+}
+
+std::vector<BreadcrumbTrail::Item> BreadcrumbTrail::realized_items() const {
+    const std::size_t count = realized_item_count();
+    std::vector<Item> records;
+    records.reserve(count);
+    for (std::size_t item = 0; item < count; ++item) {
+        const PartGeometryBuffer published = published_realized_item_geometry(item);
+        Item record;
+        record.index = item;
+        record.stable_id = realized_item_stable_id(item);
+        read_item_parts(anatomy(), breadcrumb_trail_item_part_fields, published.parts(), record.parts);
+        read_states(breadcrumb_trail_item_state_fields, realized_item_anatomy_states(item), record.states);
+        records.push_back(record);
+    }
+    return records;
 }
 
 } // namespace gui_forms
