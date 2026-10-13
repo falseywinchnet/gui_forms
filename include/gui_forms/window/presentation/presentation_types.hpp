@@ -27,11 +27,13 @@ struct PresentationSettings final {
     }
 };
 
-// The screen area one presentation copied (stage DP): device pixels, and the
-// rectangles they were copied in.
+// The screen area one presentation copied (stage DP): device pixels, the
+// rectangles they were copied in, and the time spent only copying them
+// (pixel conversion and the native copy, not painting).
 struct PresentedArea final {
     std::uint64_t device_pixels{};
     std::uint64_t rectangles{};
+    std::uint64_t copy_nanoseconds{};
 };
 
 // Immutable host placement for the newest generation of one live surface.

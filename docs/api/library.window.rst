@@ -82,7 +82,7 @@ Related types
    * - :cpp:class:`PresentationSettings <gui_forms::PresentationSettings>`
      - PresentationSettings keeps logical text scaling, contrast, motion, and sound preferences independent from device scale and native host mechanics.
    * - :cpp:class:`PresentedArea <gui_forms::PresentedArea>`
-     - The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
+     - The screen area one presentation copied (stage DP): device pixels, the rectangles they were copied in, and the time spent only copying them (pixel conversion and the native copy, not painting).
    * - :cpp:class:`ValidationSnapshot <gui_forms::ValidationSnapshot>`
      - ValidationSnapshot reports attempts, outcomes, focus blocks, reentrancy rejection, bulk visits, and active transaction state.
 
@@ -688,11 +688,13 @@ Related types
 
    ``#include <gui_forms/window/presentation/presentation_types.hpp>``
 
-   The screen area one presentation copied (stage DP): device pixels, and the rectangles they were copied in.
+   The screen area one presentation copied (stage DP): device pixels, the rectangles they were copied in, and the time spent only copying them (pixel conversion and the native copy, not painting).
 
    .. cpp:member:: std::uint64_t device_pixels
 
    .. cpp:member:: std::uint64_t rectangles
+
+   .. cpp:member:: std::uint64_t copy_nanoseconds
 
 .. cpp:namespace:: gui_forms
 

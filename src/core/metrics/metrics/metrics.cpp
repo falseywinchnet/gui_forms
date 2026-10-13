@@ -194,6 +194,9 @@ void Metrics::record_present(std::uint64_t duration, std::uint64_t device_pixels
     values_.retained_pixels_presented += device_pixels;
     values_.retained_rectangles_presented += rectangles;
 }
+void Metrics::record_screen_copy(std::uint64_t nanoseconds) noexcept {
+    values_.screen_copy_nanoseconds += nanoseconds;
+}
 void Metrics::record_live_present(std::uint64_t duration, std::uint64_t device_pixels,
                                   std::uint64_t rectangles) noexcept {
     ++values_.live_frames_presented;

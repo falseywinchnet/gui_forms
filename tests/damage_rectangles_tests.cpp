@@ -215,7 +215,13 @@ void presentation_counters_record_copied_area() {
     PresentedArea retained;
     retained.device_pixels = 2400U;
     retained.rectangles = 2U;
+    retained.copy_nanoseconds = 300U;
     expect(window.notify_presented(*receipt, 1000U, retained), "the receipt is accepted");
+    // A repeated receipt (a tick that only presented live frames) is refused,
+    // but its copy still happened and still counts.
+    PresentedArea repeated;
+    repeated.copy_nanoseconds = 100U;
+    expect(!window.notify_presented(*receipt, 1000U, repeated), "a repeated receipt is refused");
     PresentedArea live;
     live.device_pixels = 10000U;
     live.rectangles = 1U;
@@ -229,6 +235,8 @@ void presentation_counters_record_copied_area() {
                metrics.live_rectangles_presented == 2U &&
                metrics.live_present_duration_nanoseconds == 1000U,
            "live frames are counted apart from retained presents");
+    expect(metrics.screen_copy_nanoseconds == 400U,
+           "copy time counts every copy, accepted receipt or not");
     const std::string json = metrics.to_json();
     expect(json.find("\"live_pixels_presented\":20000") != std::string::npos &&
                json.find("\"retained_pixels_presented\":2400") != std::string::npos,

@@ -93,6 +93,11 @@ struct MetricsSnapshot {
     std::uint64_t live_pixels_presented{};
     std::uint64_t live_rectangles_presented{};
     std::uint64_t live_present_duration_nanoseconds{};
+    // The time hosts spent only copying pixels to the screen (conversion and
+    // the native copy), retained and live together. The present durations
+    // above also cover painting and composing; this one compares the copy
+    // itself across hosts.
+    std::uint64_t screen_copy_nanoseconds{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

@@ -102,6 +102,29 @@ void convert_native_pixels32(XImage& image, const NativePixels& pixels) {
     }
   }
 }
+// The common visual: 32-bit pixels in native byte order with 8-bit channels
+// (Xvfb and most TrueColor servers). Each channel is a byte moved into place;
+// no scaling.
+void convert_native_pixels32_bytes(XImage& image, const NativePixels& pixels) {
+  const unsigned red = pixels.channels[0].shift;
+  const unsigned green = pixels.channels[1].shift;
+  const unsigned blue = pixels.channels[2].shift;
+  for (int row = pixels.top; row < pixels.bottom; ++row) {
+    const unsigned char* source = pixels.source + static_cast<std::size_t>(row) * pixels.source_stride +
+                                  static_cast<std::size_t>(pixels.left) * 4U;
+    unsigned char* destination = reinterpret_cast<unsigned char*>(image.data) +
+                                 static_cast<std::size_t>(row) * pixels.destination_stride +
+                                 static_cast<std::size_t>(pixels.left) * 4U;
+    for (int column = pixels.left; column < pixels.right; ++column) {
+      const std::uint32_t packed = (static_cast<std::uint32_t>(source[0]) << red) |
+                                   (static_cast<std::uint32_t>(source[1]) << green) |
+                                   (static_cast<std::uint32_t>(source[2]) << blue);
+      std::memcpy(destination, &packed, sizeof(packed));
+      source += 4;
+      destination += 4;
+    }
+  }
+}
 void convert_native_pixels_generic(XImage& image, const NativePixels& pixels) {
   for (int row = pixels.top; row < pixels.bottom; ++row) {
     const std::size_t source_row = static_cast<std::size_t>(row) * pixels.source_stride;
@@ -161,6 +184,13 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
   }
   const bool native32 = image.bits_per_pixel == 32 &&
       (image.byte_order == LSBFirst) == (std::endian::native == std::endian::little);
+  bool byte_channels = native32;
+  for (std::size_t channel = 0; channel < pixels.channels.size(); ++channel) {
+    if (pixels.channels[channel].maximum != 255U || pixels.channels[channel].shift % 8U != 0U ||
+        pixels.channels[channel].shift > 24U) byte_channels = false;
+  }
+  // The copy alone is timed: conversion, XPutImage and the flush.
+  const std::chrono::steady_clock::time_point copy_started = std::chrono::steady_clock::now();
   for (std::size_t index = 0; index < requested.size(); ++index) {
     const Rect rectangle = requested[index];
     if (!rectangle.finite()) continue;
@@ -170,7 +200,8 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
     pixels.top = static_cast<int>(std::floor(clipped.y));
     pixels.right = static_cast<int>(std::ceil(clipped.right()));
     pixels.bottom = static_cast<int>(std::ceil(clipped.bottom()));
-    if (native32) convert_native_pixels32(image, pixels);
+    if (byte_channels) convert_native_pixels32_bytes(image, pixels);
+    else if (native32) convert_native_pixels32(image, pixels);
     else convert_native_pixels_generic(image, pixels);
     const unsigned columns = static_cast<unsigned>(pixels.right - pixels.left);
     const unsigned rows = static_cast<unsigned>(pixels.bottom - pixels.top);
@@ -180,6 +211,9 @@ bool present_raster_rectangles(NativeWindow& window, const std::span<const Rect>
     ++copied.rectangles;
   }
   XFlush(display);
+  copied.copy_nanoseconds += static_cast<std::uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          std::chrono::steady_clock::now() - copy_started).count());
   // Xlib submission is not a server-error/physical-display atomicity guarantee.
   return true;
 }
@@ -1014,6 +1048,8 @@ bool NativeWindow::report_presented(const PaintReceipt receipt, const std::uint6
   PresentedArea retained;
   retained.device_pixels = copied.device_pixels - live_pixels;
   retained.rectangles = copied.rectangles;
+  // The window records the copy time with this report, accepted or not.
+  retained.copy_nanoseconds = copied.copy_nanoseconds;
   const std::uint64_t live_elapsed = copied.device_pixels == 0U ? 0U :
       static_cast<std::uint64_t>(static_cast<double>(elapsed) *
           static_cast<double>(live_pixels) / static_cast<double>(copied.device_pixels));

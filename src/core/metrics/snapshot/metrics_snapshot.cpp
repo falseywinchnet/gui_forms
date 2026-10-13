@@ -105,6 +105,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"live_pixels_presented\":" << live_pixels_presented << ','
            << "\"live_rectangles_presented\":" << live_rectangles_presented << ','
            << "\"live_present_duration_nanoseconds\":" << live_present_duration_nanoseconds << ','
+           << "\"screen_copy_nanoseconds\":" << screen_copy_nanoseconds << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';
