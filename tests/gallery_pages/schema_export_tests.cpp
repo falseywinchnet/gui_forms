@@ -293,8 +293,8 @@ std::string render_schema(std::span<const TypeRecord> records) {
            "(stage T1): set GUI_FORMS_CONTROL_SCHEMA_WRITE=1 and run that test to rewrite it. "
            "Do not edit.\",\n";
     out += "    \"Controls list their parts, states, item systems, properties and interactions; "
-           "components list their interactions. Names are kebab-case identities except "
-           "property names, which are the registered names.\"\n";
+           "components list their interactions. Every name is the kebab-case registered "
+           "name; a property's display name (AutoSizeMode) is derived from it.\"\n";
     out += "  ],\n";
     out += "  \"types\": [";
     for (std::size_t index = 0; index < records.size(); ++index) {

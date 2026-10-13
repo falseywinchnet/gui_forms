@@ -38,7 +38,7 @@ struct PainterLabelWidth final {
 Label::Label(StableId stable_id, std::string text)
     : Control(std::move(stable_id)), text_(std::move(text)) {
     define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
+        {"text", BindingValueKind::text, "Appearance",
          "Text displayed by the label.", BindingValue{std::string{}},
          invalidation::text_content},
         detail::BindingMemberGetter<Label, std::string>(
@@ -49,7 +49,7 @@ Label::Label(StableId stable_id, std::string text)
         detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 
     PropertyDescriptor font;
-    font.name = "Font";
+    font.name = "font";
     font.kind = BindingValueKind::font;
     font.category = "Appearance";
     font.description =
@@ -71,7 +71,7 @@ Label::Label(StableId stable_id, std::string text)
                 *this, &Label::font_property_origin)});
 
     PropertyDescriptor foreground;
-    foreground.name = "ForeColor";
+    foreground.name = "fore-color";
     foreground.kind = BindingValueKind::color;
     foreground.category = "Appearance";
     foreground.description =
@@ -93,7 +93,7 @@ Label::Label(StableId stable_id, std::string text)
                 *this, &Label::foreground_property_origin)});
 
     PropertyDescriptor maximum_lines;
-    maximum_lines.name = "MaximumLines";
+    maximum_lines.name = "maximum-lines";
     maximum_lines.kind = BindingValueKind::unsigned_integer;
     maximum_lines.category = "Layout";
     maximum_lines.description =

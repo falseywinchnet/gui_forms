@@ -271,6 +271,19 @@ struct PropertyRegistration final {
 // Control inspection API.
 using BindableProperty = PropertyRegistration;
 
+// Data members, service names and categories compare ignoring case.
 [[nodiscard]] std::string canonical_binding_name(std::string_view name);
+
+// Property names (stage T1, owner 2026-10-13). A property has one registered
+// name, in kebab-case ("auto-size-mode"); documents, the schema and the C ABI
+// write it as registered. Its display name ("AutoSizeMode") is derived from
+// it, as PropertyGrid shows it and C# spells the member, and is never stored.
+[[nodiscard]] std::string property_display_name(std::string_view registered_name);
+// The registered name `name` addresses: a registered name is returned
+// unchanged, and a display name is converted (a hyphen before each capital
+// that follows a lowercase letter or digit, then lowercase). Leading and
+// trailing whitespace is ignored; throws std::invalid_argument for an empty
+// name.
+[[nodiscard]] std::string canonical_property_name(std::string_view name);
 
 } // namespace gui_forms

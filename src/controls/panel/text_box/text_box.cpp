@@ -41,7 +41,7 @@ TextBox::TextBox(StableId stable_id, std::string text)
     set_cursor(CursorKind::text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
     define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
+        {"text", BindingValueKind::text, "Appearance",
          "Editable UTF-8 text content.", BindingValue{std::string{}},
          invalidation::text_content},
         detail::BoundMemberFunction<BindingValue (TextBox::*)() const>(

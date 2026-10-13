@@ -122,7 +122,7 @@ struct ContextMenu::Impl final {
         [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
             SemanticDescriptor descriptor;
             descriptor.role = SemanticRole::menu;
-            descriptor.name = "Menu";
+            descriptor.name = "menu";
             descriptor.exposed = true;
             descriptor.include_descendants = true;
             return descriptor;

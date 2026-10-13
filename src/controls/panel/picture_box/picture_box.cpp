@@ -19,7 +19,7 @@ namespace gui_forms {
 PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_background(Color::rgba(255, 255, 255));
     PropertyDescriptor image;
-    image.name = "Image";
+    image.name = "image";
     image.kind = BindingValueKind::image;
     image.category = "Appearance";
     image.description = "Generational image resource displayed by this control.";
@@ -39,7 +39,7 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
                 *this, &PictureBox::should_serialize_image)});
 
     PropertyDescriptor size_mode;
-    size_mode.name = "SizeMode";
+    size_mode.name = "size-mode";
     size_mode.kind = BindingValueKind::enumeration;
     size_mode.category = "Appearance";
     size_mode.description = "Image placement and scaling policy.";
@@ -59,7 +59,7 @@ PictureBox::PictureBox(StableId stable_id) : Panel(std::move(stable_id)) {
         {}, {}, {}});
 
     PropertyDescriptor opacity;
-    opacity.name = "ImageOpacity";
+    opacity.name = "image-opacity";
     opacity.kind = BindingValueKind::number;
     opacity.category = "Appearance";
     opacity.description = "Image opacity from zero through one.";

@@ -16,7 +16,7 @@ Parameters
 target
     The control whose property is bound. It must be alive.
 property_name
-    The bindable property of the control, such as "Text" or "Checked";
+    The bindable property of the control, such as "text" or "checked";
     `bindable_property_names` on the control lists them. The name is trimmed
     and compared ignoring ASCII case. A name the control does not have throws
     `std::invalid_argument`.
@@ -150,7 +150,7 @@ change:
    gf::BindingOptions options;
    options.data_source_update_mode = gf::DataSourceUpdateMode::on_property_changed;
    std::shared_ptr<gf::Binding> binding =
-       (*name).data_bindings().add("Text", people, "name", options);
+       (*name).data_bindings().add("text", people, "name", options);
    // the text box shows "Ada"
    (*name).set_text("Ada Lovelace");
    // the current record's "name" field is now "Ada Lovelace"
@@ -183,7 +183,7 @@ types one:
        options.data_source_update_mode = gf::DataSourceUpdateMode::on_property_changed;
        PriceField field;
        std::shared_ptr<gf::Binding> binding =
-           (*price).data_bindings().add("Text", items, "price", options);
+           (*price).data_bindings().add("text", items, "price", options);
        gf::on((*binding).parse(), field, &PriceField::on_parse);
        // the text box shows "12.50"
        (*price).set_text("$13.25");

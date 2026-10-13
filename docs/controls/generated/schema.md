@@ -7,10 +7,12 @@ registry (stage T1), so this page lists what the library publishes.
 Part, state, item-system and interaction names are kebab-case identities that theme and
 form documents address (`::part(thumb):state(pressed)`). C++ reads the same anatomy as
 typed records (`(*bar).parts().thumb`) and registers handlers through each type's events
-(`(*button).clicked()`). An interaction's payload is the handler's argument types; *by
-reference* marks a payload the handler receives by mutable reference.
+(`(*button).clicked()`). Property names are registered in kebab-case too; PropertyGrid
+and C# show the derived display name (`auto-size-mode` is `AutoSizeMode`). An
+interaction's payload is the handler's argument types; *by reference* marks a payload
+the handler receives by mutable reference.
 
-Every control also has these properties: `AccessibleDescription`, `AccessibleName`, `AllowDrop`, `Anchor`, `AutoScrollOffset`, `AutoSize`, `AutoSizeMode`, `Bounds`, `CausesValidation`, `Dock`, `Enabled`, `HitTestTransparent`, `Margin`, `MaximumSize`, `MinimumSize`, `Name`, `Padding`, `TabIndex`, `TabStop`, `Visible`.
+Every control also has these properties: `accessible-description`, `accessible-name`, `allow-drop`, `anchor`, `auto-scroll-offset`, `auto-size`, `auto-size-mode`, `bounds`, `causes-validation`, `dock`, `enabled`, `hit-test-transparent`, `margin`, `maximum-size`, `minimum-size`, `name`, `padding`, `tab-index`, `tab-stop`, `visible`.
 
 Every control also raises these interactions: `name-changed`, `visible-changed`, `enabled-changed`, `auto-size-changed`, `causes-validation-changed`, `validating`, `validated`, `initialization-completed`, `pointer-observed`, `pointer-preview-observed`, `focus-observed`, `arranged-bounds-changed`, `help-requested`.
 
@@ -26,7 +28,7 @@ Every control also raises these interactions: `name-changed`, `visible-changed`,
 
 States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -47,7 +49,7 @@ Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Im
 
 States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -72,7 +74,7 @@ Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Im
 
 States: `normal`, `hot`, `pressed`, `preselect`, `selected`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -95,7 +97,7 @@ Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Im
 
 States: `normal`, `hot`, `pressed`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`. Application-defined: `visited`.
 
-Properties beyond every control's: `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -156,7 +158,7 @@ Properties beyond every control's: none.
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `read-only`, `invalid`, `pending`.
 
-Properties beyond every control's: `Text` (text).
+Properties beyond every control's: `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -175,7 +177,7 @@ Properties beyond every control's: `Text` (text).
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Font` (font), `ForeColor` (color), `MaximumLines` (unsigned-integer), `Text` (text).
+Properties beyond every control's: `font` (font), `fore-color` (color), `maximum-lines` (unsigned-integer), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -203,7 +205,7 @@ Properties beyond every control's: `Font` (font), `ForeColor` (color), `MaximumL
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Image` (image), `ImageOpacity` (number), `SizeMode` (enumeration).
+Properties beyond every control's: `image` (image), `image-opacity` (number), `size-mode` (enumeration).
 
 | Interaction | Payload |
 |---|---|
@@ -221,7 +223,7 @@ Properties beyond every control's: `Image` (image), `ImageOpacity` (number), `Si
 
 States: `normal`, `indeterminate`, `enabled`, `disabled`, `reduced-motion`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -371,7 +373,7 @@ Properties beyond every control's: none.
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `Items` (collection), `SelectedIndex` (signed-integer), `Text` (text).
+Properties beyond every control's: `items` (collection), `selected-index` (signed-integer), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -614,7 +616,7 @@ Properties beyond every control's: none.
 
 States: `normal`, `hot`, `pressed`, `checked`, `indeterminate`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `Checked` (boolean), `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `checked` (boolean), `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -637,7 +639,7 @@ Properties beyond every control's: `Checked` (boolean), `ContentPadding` (insets
 
 States: `normal`, `hot`, `pressed`, `checked`, `enabled`, `disabled`, `focused`, `focus-visible`, `open`, `closed`.
 
-Properties beyond every control's: `Checked` (boolean), `ContentPadding` (insets), `Font` (font), `Image` (image), `Text` (text).
+Properties beyond every control's: `checked` (boolean), `content-padding` (insets), `font` (font), `image` (image), `text` (text).
 
 | Interaction | Payload |
 |---|---|
@@ -655,7 +657,7 @@ Properties beyond every control's: `Checked` (boolean), `ContentPadding` (insets
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -676,7 +678,7 @@ Properties beyond every control's: `Value` (number).
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -708,7 +710,7 @@ Properties beyond every control's: `Value` (number).
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`, `invalid`, `pending`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -1464,7 +1466,7 @@ Properties beyond every control's: none.
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -1485,7 +1487,7 @@ Properties beyond every control's: `Value` (number).
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|
@@ -1506,7 +1508,7 @@ Properties beyond every control's: `Value` (number).
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus-visible`.
 
-Properties beyond every control's: `Value` (number).
+Properties beyond every control's: `value` (number).
 
 | Interaction | Payload |
 |---|---|

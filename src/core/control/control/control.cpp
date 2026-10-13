@@ -295,14 +295,14 @@ Control::Control(StableId stable_id)
     : runtime_id_{next_runtime_id_.fetch_add(1, std::memory_order_relaxed)},
       stable_id_(std::move(stable_id)), name_(stable_id_.value()) {
     define_bindable_property({
-        {"Name", BindingValueKind::text, "Design",
+        {"name", BindingValueKind::text, "Design",
          "Stable authoring name used by inspection and generated surfaces.",
          BindingValue{name_}, Dirty::semantics | Dirty::accessibility},
         RegisteredPropertyGetter<RegisteredProperty::name>{this},
         RegisteredPropertySetter<RegisteredProperty::name>{this},
         RegisteredPropertyConnector<RegisteredProperty::name>{this}, {}, {}});
     define_bindable_property({
-        {"Visible", BindingValueKind::boolean, "Behavior",
+        {"visible", BindingValueKind::boolean, "Behavior",
          "Whether this control participates in retained presentation and input.",
          BindingValue{true}, invalidation::visibility, true},
         RegisteredPropertyGetter<RegisteredProperty::visible>{this},
@@ -310,7 +310,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertyConnector<RegisteredProperty::visible>{this}, {},
         {}});
     define_bindable_property({
-        {"Enabled", BindingValueKind::boolean, "Behavior",
+        {"enabled", BindingValueKind::boolean, "Behavior",
          "Whether this control can receive ordinary user input.",
          BindingValue{true}, invalidation::enabled},
         RegisteredPropertyGetter<RegisteredProperty::enabled>{this},
@@ -318,7 +318,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertyConnector<RegisteredProperty::enabled>{this}, {},
         {}});
     define_bindable_property({
-        {"AutoSize", BindingValueKind::boolean, "Layout",
+        {"auto-size", BindingValueKind::boolean, "Layout",
          "Whether retained measurement determines this control's size.",
          BindingValue{false}, Dirty::measure | Dirty::arrange |
              Dirty::hit_test | Dirty::semantics | Dirty::accessibility},
@@ -327,7 +327,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertyConnector<RegisteredProperty::auto_size>{this}, {},
         {}});
     define_bindable_property({
-        {"CausesValidation", BindingValueKind::boolean, "Behavior",
+        {"causes-validation", BindingValueKind::boolean, "Behavior",
          "Whether moving focus from this control initiates validation.",
          BindingValue{true}, Dirty::none},
         RegisteredPropertyGetter<RegisteredProperty::causes_validation>{this},
@@ -337,7 +337,7 @@ Control::Control(StableId stable_id)
         {}, {}});
 
     PropertyDescriptor bounds;
-    bounds.name = "Bounds";
+    bounds.name = "bounds";
     bounds.kind = BindingValueKind::rectangle;
     bounds.category = "Layout";
     bounds.description = "Authored logical bounds before parent layout.";
@@ -349,7 +349,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::bounds>{this});
 
     PropertyDescriptor minimum_size;
-    minimum_size.name = "MinimumSize";
+    minimum_size.name = "minimum-size";
     minimum_size.kind = BindingValueKind::size;
     minimum_size.category = "Layout";
     minimum_size.description = "Minimum retained layout size.";
@@ -361,7 +361,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::minimum_size>{this});
 
     PropertyDescriptor maximum_size;
-    maximum_size.name = "MaximumSize";
+    maximum_size.name = "maximum-size";
     maximum_size.kind = BindingValueKind::size;
     maximum_size.category = "Layout";
     maximum_size.description =
@@ -374,7 +374,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::maximum_size>{this});
 
     PropertyDescriptor margin;
-    margin.name = "Margin";
+    margin.name = "margin";
     margin.kind = BindingValueKind::insets;
     margin.category = "Layout";
     margin.description = "External logical spacing requested from a layout owner.";
@@ -387,7 +387,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::margin>{this});
 
     PropertyDescriptor padding;
-    padding.name = "Padding";
+    padding.name = "padding";
     padding.kind = BindingValueKind::insets;
     padding.category = "Layout";
     padding.description = "Internal logical spacing around child content.";
@@ -399,7 +399,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::padding>{this});
 
     PropertyDescriptor auto_scroll_offset;
-    auto_scroll_offset.name = "AutoScrollOffset";
+    auto_scroll_offset.name = "auto-scroll-offset";
     auto_scroll_offset.kind = BindingValueKind::point;
     auto_scroll_offset.category = "Layout";
     auto_scroll_offset.description =
@@ -414,7 +414,7 @@ Control::Control(StableId stable_id)
             this});
 
     PropertyDescriptor dock;
-    dock.name = "Dock";
+    dock.name = "dock";
     dock.kind = BindingValueKind::enumeration;
     dock.category = "Layout";
     dock.description = "Edge or fill participation in parent layout.";
@@ -428,7 +428,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::dock>{this});
 
     PropertyDescriptor anchor;
-    anchor.name = "Anchor";
+    anchor.name = "anchor";
     anchor.kind = BindingValueKind::enumeration;
     anchor.category = "Layout";
     anchor.description = "Flags retaining distances to parent client edges.";
@@ -442,7 +442,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::anchor>{this});
 
     PropertyDescriptor auto_size_mode;
-    auto_size_mode.name = "AutoSizeMode";
+    auto_size_mode.name = "auto-size-mode";
     auto_size_mode.kind = BindingValueKind::enumeration;
     auto_size_mode.category = "Layout";
     auto_size_mode.description = "Whether automatic sizing may shrink.";
@@ -457,7 +457,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::auto_size_mode>{this});
 
     PropertyDescriptor tab_index;
-    tab_index.name = "TabIndex";
+    tab_index.name = "tab-index";
     tab_index.kind = BindingValueKind::unsigned_integer;
     tab_index.category = "Behavior";
     tab_index.description = "Keyboard traversal order within the retained tree.";
@@ -469,7 +469,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::tab_index>{this});
 
     PropertyDescriptor tab_stop;
-    tab_stop.name = "TabStop";
+    tab_stop.name = "tab-stop";
     tab_stop.kind = BindingValueKind::boolean;
     tab_stop.category = "Behavior";
     tab_stop.description = "Whether keyboard traversal may focus this control.";
@@ -481,7 +481,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::tab_stop>{this});
 
     PropertyDescriptor allow_drop;
-    allow_drop.name = "AllowDrop";
+    allow_drop.name = "allow-drop";
     allow_drop.kind = BindingValueKind::boolean;
     allow_drop.category = "Behavior";
     allow_drop.description = "Whether this control may receive drag data.";
@@ -493,7 +493,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::allow_drop>{this});
 
     PropertyDescriptor hit_test_transparent;
-    hit_test_transparent.name = "HitTestTransparent";
+    hit_test_transparent.name = "hit-test-transparent";
     hit_test_transparent.kind = BindingValueKind::boolean;
     hit_test_transparent.category = "Behavior";
     hit_test_transparent.description =
@@ -510,7 +510,7 @@ Control::Control(StableId stable_id)
             this});
 
     PropertyDescriptor accessible_name;
-    accessible_name.name = "AccessibleName";
+    accessible_name.name = "accessible-name";
     accessible_name.kind = BindingValueKind::text;
     accessible_name.category = "Accessibility";
     accessible_name.description = "Authored assistive name override.";
@@ -522,7 +522,7 @@ Control::Control(StableId stable_id)
         RegisteredPropertySetter<RegisteredProperty::accessible_name>{this});
 
     PropertyDescriptor accessible_description;
-    accessible_description.name = "AccessibleDescription";
+    accessible_description.name = "accessible-description";
     accessible_description.kind = BindingValueKind::text;
     accessible_description.category = "Accessibility";
     accessible_description.description = "Authored assistive description.";
@@ -745,12 +745,13 @@ void Control::set_tag(std::any tag) {
 
 void Control::define_bindable_property(BindableProperty property) {
     PropertyDescriptor& descriptor = property.descriptor;
-    const std::string canonical = canonical_binding_name(descriptor.name);
-    const std::string::size_type first =
-        descriptor.name.find_first_not_of(" \t\r\n");
-    const std::string::size_type last =
-        descriptor.name.find_last_not_of(" \t\r\n");
-    descriptor.name = descriptor.name.substr(first, last - first + 1U);
+    // A display name is accepted and registered under its kebab-case name.
+    const std::string canonical = canonical_property_name(descriptor.name);
+    if (!is_kebab_case_name(canonical)) {
+        throw std::invalid_argument(
+            "GUI.Forms property name must be kebab-case or its display form");
+    }
+    descriptor.name = canonical;
     if (!descriptor.readable && !descriptor.writable) {
         throw std::invalid_argument(
             "GUI.Forms property must be readable or writable");
@@ -844,7 +845,7 @@ void Control::clear_bindable_properties() {
 const BindableProperty* Control::find_bindable_property(
     std::string_view name) const {
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_binding_name(name));
+        bindable_properties_.find(canonical_property_name(name));
     return found == bindable_properties_.end() ||
             !(*found).second.descriptor.bindable
         ? nullptr : &(*found).second;
@@ -870,7 +871,7 @@ std::vector<std::string> Control::bindable_property_names() const {
 std::optional<PropertyDescriptor> Control::property_descriptor(
     std::string_view name) const {
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_binding_name(name));
+        bindable_properties_.find(canonical_property_name(name));
     if (found == bindable_properties_.end()) return std::nullopt;
     return (*found).second.descriptor;
 }
@@ -892,7 +893,7 @@ std::optional<BindingValue> Control::property_value(std::string_view name) const
     }
     if (window_) (*window_).require_ui_thread("control property query");
     const BindablePropertyMap::const_iterator found =
-        bindable_properties_.find(canonical_binding_name(name));
+        bindable_properties_.find(canonical_property_name(name));
     if (found == bindable_properties_.end() ||
         !(*found).second.descriptor.readable || !(*found).second.get) {
         return std::nullopt;
@@ -911,7 +912,7 @@ std::optional<BindingValue> Control::property_value(std::string_view name) const
 
 void Control::set_property_value(std::string_view name, BindingValue value) {
     require_mutable();
-    const std::string canonical = canonical_binding_name(name);
+    const std::string canonical = canonical_property_name(name);
     const BindablePropertyMap::iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -936,7 +937,7 @@ void Control::set_property_value(std::string_view name, BindingValue value) {
 SubscriptionToken Control::subscribe_property_changed(
     std::string_view name, Component& owner, std::function<void()> changed) {
     require_mutable();
-    const std::string canonical = canonical_binding_name(name);
+    const std::string canonical = canonical_property_name(name);
     const BindablePropertyMap::iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -952,7 +953,7 @@ SubscriptionToken Control::subscribe_property_changed(
 bool Control::reset_property(std::string_view name) {
     require_mutable();
     const BindablePropertyMap::iterator found =
-        bindable_properties_.find(canonical_binding_name(name));
+        bindable_properties_.find(canonical_property_name(name));
     if (found == bindable_properties_.end()) return false;
     const PropertyRegistration registration = (*found).second;
     if (registration.reset) {
@@ -973,7 +974,7 @@ bool Control::should_serialize_property(std::string_view name) const {
             "GUI.Forms cannot inspect a disposed control property");
     }
     if (window_) (*window_).require_ui_thread("control property inspection");
-    const std::string canonical = canonical_binding_name(name);
+    const std::string canonical = canonical_property_name(name);
     const BindablePropertyMap::const_iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {
@@ -1002,7 +1003,7 @@ PropertyValueOrigin Control::property_value_origin(
     if (window_) {
         (*window_).require_ui_thread("control property origin inspection");
     }
-    const std::string canonical = canonical_binding_name(name);
+    const std::string canonical = canonical_property_name(name);
     const BindablePropertyMap::const_iterator found =
         bindable_properties_.find(canonical);
     if (found == bindable_properties_.end()) {

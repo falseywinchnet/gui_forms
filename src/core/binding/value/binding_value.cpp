@@ -878,6 +878,53 @@ std::optional<BindingValue> convert_property_value(
     return {};
 }
 
+std::string property_display_name(std::string_view registered_name) {
+    std::string display;
+    display.reserve(registered_name.size());
+    bool word_start = true;
+    for (std::size_t index = 0; index < registered_name.size(); ++index) {
+        const char character = registered_name[index];
+        if (character == '-') {
+            word_start = true;
+            continue;
+        }
+        const unsigned char byte = static_cast<unsigned char>(character);
+        if (word_start && byte >= 'a' && byte <= 'z') {
+            display += static_cast<char>(byte - ('a' - 'A'));
+        } else {
+            display += character;
+        }
+        word_start = false;
+    }
+    return display;
+}
+
+std::string canonical_property_name(std::string_view name) {
+    const std::string::size_type first = name.find_first_not_of(" \t\r\n");
+    if (first == std::string_view::npos) {
+        throw std::invalid_argument("GUI.Forms property name may not be empty");
+    }
+    const std::string::size_type last = name.find_last_not_of(" \t\r\n");
+    const std::string_view trimmed = name.substr(first, last - first + 1U);
+    std::string registered;
+    registered.reserve(trimmed.size() + 8U);
+    for (std::size_t index = 0; index < trimmed.size(); ++index) {
+        const unsigned char byte = static_cast<unsigned char>(trimmed[index]);
+        if (byte >= 'A' && byte <= 'Z') {
+            if (index > 0U) {
+                const unsigned char previous = static_cast<unsigned char>(trimmed[index - 1U]);
+                const bool after_word = (previous >= 'a' && previous <= 'z') ||
+                                        (previous >= '0' && previous <= '9');
+                if (after_word) registered += '-';
+            }
+            registered += static_cast<char>(byte + ('a' - 'A'));
+        } else {
+            registered += trimmed[index];
+        }
+    }
+    return registered;
+}
+
 std::string canonical_binding_name(std::string_view name) {
     const std::string::size_type first =
         name.find_first_not_of(" \t\r\n");

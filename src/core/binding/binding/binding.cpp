@@ -25,7 +25,7 @@ Binding::Binding(Control& target, std::string property_name,
                  std::shared_ptr<BindingSource> source,
                  std::string data_member, BindingOptions options)
     : target_(&target), source_(source),
-      property_name_(canonical_binding_name(property_name)),
+      property_name_(canonical_property_name(property_name)),
       data_member_(canonical_binding_name(data_member)),
       options_(std::move(options)) {
     detail::validate_binding_options(options_);

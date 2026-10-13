@@ -19,7 +19,7 @@ RadioButton::RadioButton(StableId stable_id, std::string text)
     set_text_alignment(ContentAlignment::middle_left);
     set_image_alignment(ContentAlignment::middle_left);
     define_bindable_property({
-        {"Checked", BindingValueKind::boolean, "Behavior",
+        {"checked", BindingValueKind::boolean, "Behavior",
          "Whether the radio button is selected within its group.",
          BindingValue{false}, Dirty::paint | Dirty::semantics},
         detail::BindingMemberGetter<RadioButton, bool>(

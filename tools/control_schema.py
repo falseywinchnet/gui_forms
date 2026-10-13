@@ -6,7 +6,8 @@ registry type's parts, states, item systems, properties and interactions.
 when the committed copy is stale. This module has two jobs:
 
 - ``check``: prove the manifest names exactly the types of
-  ``manifests/controls.json`` in the same order, and that every type's
+  ``manifests/controls.json`` in the same order, that every property name
+  is kebab-case, and that every type's
   interactions are exactly the public events its header declares, base types
   first (so a new event cannot be left out of the schema);
 - ``render``: write ``docs/controls/generated/schema.md`` from the manifest,
@@ -35,6 +36,7 @@ PAGE_PATH: Path = ROOT / "docs" / "controls" / "generated" / "schema.md"
 _CLASS_HEAD: re.Pattern[str] = re.compile(r"^(class|struct)\s+(\w+)(\s+final)?\s*(:[^{;]*)?\{", re.M)
 _ACCESS: re.Pattern[str] = re.compile(r"(public|protected|private)\s*:")
 _ACCESSOR_TAIL: re.Pattern[str] = re.compile(r"\s*&\s*(\w+)\s*\(\s*\)")
+_KEBAB: re.Pattern[str] = re.compile(r"[a-z][a-z0-9]*(-[a-z0-9]+)*")
 
 
 class SchemaError(Exception):
@@ -209,6 +211,9 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
         kind: object = record.get("kind")
         if kind == "control" and not record.get("parts"):
             findings.append(f"{identity}: a control declares no parts")
+        for item in record.get("properties", []):  # type: ignore[union-attr]
+            if not _KEBAB.fullmatch(str(item.get("name"))):
+                findings.append(f"{identity}: property {item.get('name')!r} is not kebab-case")
         expected: list[Interaction] = expected_interactions(str(record.get("type")), classes)
         exported: list[Interaction] = _interactions_of(record)
         if exported != expected:
@@ -269,8 +274,10 @@ def render_page(schema: Mapping[str, object]) -> str:
         "Part, state, item-system and interaction names are kebab-case identities that theme and",
         "form documents address (`::part(thumb):state(pressed)`). C++ reads the same anatomy as",
         "typed records (`(*bar).parts().thumb`) and registers handlers through each type's events",
-        "(`(*button).clicked()`). An interaction's payload is the handler's argument types; *by",
-        "reference* marks a payload the handler receives by mutable reference.",
+        "(`(*button).clicked()`). Property names are registered in kebab-case too; PropertyGrid",
+        "and C# show the derived display name (`auto-size-mode` is `AutoSizeMode`). An",
+        "interaction's payload is the handler's argument types; *by reference* marks a payload",
+        "the handler receives by mutable reference.",
         "",
         "Every control also has these properties: "
         + ", ".join(_code(name) for name in common_properties) + ".",

@@ -647,19 +647,19 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require(window.dispatch_text({"Edited through metadata"}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 (*target).text() == "Edited through metadata" &&
-                !changes.empty() && changes.back().property_name == "Text" &&
+                !changes.empty() && changes.back().property_name == "text" &&
                 changes.back().origin == PropertyValueOrigin::local,
             "committing a PropertyGrid text editor must use the target's registered setter and event");
 
     (*checked).set_checked(true);
-    require((*target).checked() && changes.back().property_name == "Checked" &&
+    require((*target).checked() && changes.back().property_name == "checked" &&
                 std::get<bool>(changes.back().current_value),
             "Boolean PropertyGrid edits must use a retained CheckBox and commit immediately");
 
     (*target).set_text("Programmatic update");
     text = std::dynamic_pointer_cast<TextBox>((*grid).editor("Text"));
     require(text && (*text).text() == "Programmatic update" &&
-                changes.back().property_name == "Text",
+                changes.back().property_name == "text",
             "truthful target change notifications must refresh the live editor without rebuilding the grid");
 
     const std::uint32_t tab_index_before = (*target).tab_index();
@@ -707,7 +707,7 @@ void test_property_origins_and_metadata_driven_property_grid() {
     require(padding_reset && (*padding_reset).enabled() &&
                 (*padding_reset).perform_click() &&
                 (*target).padding() == Insets{} && !(*padding_reset).enabled() &&
-                changes.back().property_name == "Padding" &&
+                changes.back().property_name == "padding" &&
                 changes.back().reset,
             "the visible Reset control must invoke the owning property's actual reset contract and disable at default");
     const SemanticSnapshot expanded_semantics = window.semantic_snapshot();
@@ -1004,7 +1004,7 @@ void test_default_flags_and_color_property_editors() {
     require(window.dispatch_text({"not-a-color"}) &&
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 (*target).foreground() == retained && !failures.empty() &&
-                failures.back().property_name == "ForeColor" &&
+                failures.back().property_name == "fore-color" &&
                 failures.back().attempted_value == "not-a-color" &&
                 (*color).visual_status() == ControlVisualStatus::invalid,
             "invalid color input must preserve retained state and publish exact inline failure feedback");

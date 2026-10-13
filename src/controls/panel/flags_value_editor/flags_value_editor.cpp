@@ -50,7 +50,7 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
     std::optional<PropertyEnumValue> normalized_value;
     if (!value_.type_name.empty()) {
         PropertyDescriptor property;
-        property.name = "Value";
+        property.name = "value";
         property.kind = BindingValueKind::enumeration;
         property.enumeration =
             std::make_shared<const PropertyEnumDescriptor>(descriptor);
@@ -74,7 +74,7 @@ void FlagsValueEditor::set_descriptor(PropertyEnumDescriptor descriptor) {
 void FlagsValueEditor::set_value(PropertyEnumValue value) {
     require_mutable();
     PropertyDescriptor property;
-    property.name = "Value";
+    property.name = "value";
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);
@@ -251,7 +251,7 @@ void FlagsValueEditor::apply_popup_choice(std::size_t popup_index,
         bits &= ~static_cast<std::uint64_t>(choice.value);
     }
     PropertyDescriptor property;
-    property.name = "Value";
+    property.name = "value";
     property.kind = BindingValueKind::enumeration;
     property.enumeration =
         std::make_shared<const PropertyEnumDescriptor>(descriptor_);

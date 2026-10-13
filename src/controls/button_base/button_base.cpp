@@ -132,7 +132,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
     set_focusable(true);
     set_cursor(CursorKind::hand);
     define_bindable_property({
-        {"Text", BindingValueKind::text, "Appearance",
+        {"text", BindingValueKind::text, "Appearance",
          "Text displayed by the button.", BindingValue{std::string{}},
          invalidation::text_content},
         detail::BindingMemberGetter<ButtonBase, std::string>(
@@ -143,7 +143,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
         detail::EventChangeConnector<const std::string&>(text_changed_), {}, {}});
 
     PropertyDescriptor font;
-    font.name = "Font";
+    font.name = "font";
     font.kind = BindingValueKind::font;
     font.category = "Appearance";
     font.description = "Font used for button measurement and painting.";
@@ -159,7 +159,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
             *this, &ButtonBase::set_font), {}, {}, {}});
 
     PropertyDescriptor image;
-    image.name = "Image";
+    image.name = "image";
     image.kind = BindingValueKind::image;
     image.category = "Appearance";
     image.description = "Direct generational image resource for button content.";
@@ -178,7 +178,7 @@ ButtonBase::ButtonBase(StableId stable_id, std::string text)
             *this, &ButtonBase::should_serialize_image)});
 
     PropertyDescriptor content_padding;
-    content_padding.name = "ContentPadding";
+    content_padding.name = "content-padding";
     content_padding.kind = BindingValueKind::insets;
     content_padding.category = "Layout";
     content_padding.description =

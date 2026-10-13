@@ -412,10 +412,31 @@ void test_nested_property_values_are_bounded_immutable_and_structural() {
             "nested property construction must reject ambiguous names, failed homogeneous conversion, and over-depth trees");
 }
 
+// A property has one registered name, in kebab-case; its display name is
+// derived, and either finds the property.
+void test_property_names_are_registered_in_kebab_case() {
+    require(canonical_property_name("AutoSizeMode") == "auto-size-mode" &&
+                canonical_property_name("auto-size-mode") == "auto-size-mode" &&
+                canonical_property_name(" Text ") == "text" &&
+                property_display_name("auto-size-mode") == "AutoSizeMode" &&
+                property_display_name("text") == "Text",
+            "display names and registered names convert one to the other");
+    std::shared_ptr<gui_forms::Panel> panel = make_control<Panel>(StableId("property.names"));
+    const std::optional<PropertyDescriptor> by_registered = (*panel).property_descriptor("auto-size-mode");
+    const std::optional<PropertyDescriptor> by_display = (*panel).property_descriptor("AutoSizeMode");
+    require(by_registered && by_display && (*by_registered).name == "auto-size-mode" &&
+                (*by_display).name == "auto-size-mode",
+            "a property is registered in kebab-case and found by either spelling");
+    const std::vector<PropertyDescriptor> descriptors = (*panel).property_descriptors();
+    for (const PropertyDescriptor& descriptor : descriptors) {
+        require(is_kebab_case_name(descriptor.name), "every stock property name is kebab-case");
+    }
+}
+
 void test_property_metadata_defaults_reset_and_serialization() {
     std::shared_ptr<gui_forms::TextBox> editor = make_control<TextBox>(StableId("property.editor"), "Seed");
     const std::optional<PropertyDescriptor> text = (*editor).property_descriptor(" text ");
-    require(text && (*text).name == "Text" &&
+    require(text && (*text).name == "text" &&
                 (*text).kind == BindingValueKind::text &&
                 (*text).category == "Appearance" && (*text).readable &&
                 (*text).writable && (*text).browsable && (*text).bindable &&
@@ -456,13 +477,13 @@ void test_property_metadata_defaults_reset_and_serialization() {
 
     const std::vector<std::string> names = (*editor).bindable_property_names();
     require(names == std::vector<std::string>{
-                "AutoSize", "CausesValidation", "Enabled", "Name", "Text",
-                "Visible"},
-            "bindable property enumeration must be deterministic and retain authored casing");
+                "auto-size", "causes-validation", "enabled", "name", "text",
+                "visible"},
+            "bindable property enumeration must be deterministic and use the registered names");
     const std::vector<PropertyDescriptor> descriptors = (*editor).property_descriptors();
     require(descriptors.size() == 21U &&
-                descriptors.front().name == "AccessibleDescription" &&
-                descriptors.back().name == "Visible",
+                descriptors.front().name == "accessible-description" &&
+                descriptors.back().name == "visible",
             "property descriptor snapshots must follow deterministic canonical order");
 
     const std::optional<PropertyDescriptor> bounds = (*editor).property_descriptor("Bounds");
@@ -1027,6 +1048,7 @@ int main() {
         test_nested_property_values_are_bounded_immutable_and_structural();
         test_property_enum_schema_bounds_and_unicode();
         test_property_metadata_defaults_reset_and_serialization();
+        test_property_names_are_registered_in_kebab_case();
         test_property_mutation_initialization_thread_and_lifetime_guards();
         test_visual_property_values_drive_stock_controls();
         test_multi_control_two_way_currency_and_event_order();

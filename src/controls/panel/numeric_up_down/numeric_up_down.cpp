@@ -20,7 +20,7 @@ NumericUpDown::NumericUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
     set_border_style(BorderStyle::line);
     set_background(style().paper);
     define_bindable_property({
-        {"Value", BindingValueKind::number, "Behavior",
+        {"value", BindingValueKind::number, "Behavior",
          "Current numeric value.", BindingValue{0.0},
          Dirty::paint | Dirty::semantics},
         detail::BindingMemberGetter<NumericUpDown, double>(

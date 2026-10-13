@@ -159,6 +159,13 @@ no longer needed. Record the coverage table and test run under `results/`.
    already moves there. Text published as layout slots rather than measured
    extents is also left open, proposed for T2's text work.
 
+7. **A property has one registered name, in kebab-case** (owner,
+   2026-10-13: "css is registeredspelling inside"). As in CSS, the name a
+   document writes is the name the property is registered under; other
+   spellings are derived from it. `auto-size-mode` is registered;
+   `AutoSizeMode` is its display name, for PropertyGrid and C#, and is not
+   stored.
+
 ## Close-out, 2026-10-13
 
 - **Item systems.** `ControlAnatomy::item_systems` lists named item kinds;
@@ -177,9 +184,11 @@ no longer needed. Record the coverage table and test run under `results/`.
   `tools/control_schema.py check` proves every type's interactions equal its
   headers' public events, and `render` writes
   `docs/controls/generated/schema.md`. Both run in CI's house-style job.
-- Property names in the export are the registered names (`Text`,
-  `Checked`). Whether form documents spell them in kebab-case is FD's
-  decision.
+- **Property names** (decision 7): every property is registered in
+  kebab-case (`text`, `auto-size-mode`); the export, documents and the C ABI
+  use that name. PropertyGrid shows the derived display name
+  (`AutoSizeMode`), and lookup accepts either spelling. Members inside a
+  compound value (`Bounds.Width`) keep their spelling for now.
 
 ## Read first
 

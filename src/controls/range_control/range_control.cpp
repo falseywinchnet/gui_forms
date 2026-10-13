@@ -35,7 +35,7 @@ void RangeControl::unbind() noexcept { value_binding_.reset(); }
 RangeControl::RangeControl(StableId stable_id)
     : Control(std::move(stable_id)) {
     define_bindable_property({
-        {"Value", BindingValueKind::number, "Behavior",
+        {"value", BindingValueKind::number, "Behavior",
          "Current value within the retained range.", BindingValue{0.0},
          Dirty::paint | Dirty::semantics},
         detail::BindingMemberGetter<RangeControl, double>(

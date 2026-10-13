@@ -66,18 +66,18 @@ struct PropertyGrid::Impl final {
         bool operator()(const PropertyDescriptor& left,
                         const PropertyDescriptor& right) const {
             if (sort == PropertySort::alphabetical) {
-                return canonical_binding_name(left.name) <
-                       canonical_binding_name(right.name);
+                return canonical_property_name(left.name) <
+                       canonical_property_name(right.name);
             }
             const std::string left_category =
-                canonical_binding_name(left.category);
+                canonical_property_name(left.category);
             const std::string right_category =
-                canonical_binding_name(right.category);
+                canonical_property_name(right.category);
             if (left_category != right_category) {
                 return left_category < right_category;
             }
-            return canonical_binding_name(left.name) <
-                   canonical_binding_name(right.name);
+            return canonical_property_name(left.name) <
+                   canonical_property_name(right.name);
         }
     };
 
@@ -129,7 +129,7 @@ struct PropertyGrid::Impl final {
                 (*implementation).row_to_property.find(change.row_id);
             if (property == (*implementation).row_to_property.end()) return;
             const std::string canonical =
-                canonical_binding_name((*property).second);
+                canonical_property_name((*property).second);
             if (change.expanded) {
                 (*implementation).expanded_properties.insert(canonical);
             } else {
@@ -183,11 +183,11 @@ struct PropertyGrid::Impl final {
             if (segment.kind == PathSegmentKind::object_member) {
                 const gui_forms::PropertyObjectValue* object = std::get_if<PropertyObjectValue>(&value);
                 if (!object || !*object) return {};
-                const std::string wanted = canonical_binding_name(segment.name);
+                const std::string wanted = canonical_property_name(segment.name);
                 const PropertyObjectMember* member = nullptr;
                 for (const PropertyObjectMember& candidate :
                      (*object).members()) {
-                    if (canonical_binding_name(candidate.name) == wanted) {
+                    if (canonical_property_name(candidate.name) == wanted) {
                         member = &candidate;
                         break;
                     }
@@ -224,10 +224,10 @@ struct PropertyGrid::Impl final {
             if (!object || !*object) return {};
             std::vector<PropertyObjectMember> members(
                 (*object).members().begin(), (*object).members().end());
-            const std::string wanted = canonical_binding_name(segment.name);
+            const std::string wanted = canonical_property_name(segment.name);
             std::vector<PropertyObjectMember>::iterator member = members.begin();
             while (member != members.end() &&
-                   canonical_binding_name((*member).name) != wanted) {
+                   canonical_property_name((*member).name) != wanted) {
                 ++member;
             }
             if (member == members.end() || !(*member).writable) return {};
@@ -267,8 +267,8 @@ struct PropertyGrid::Impl final {
                     (*left_object).members()[index];
                 const PropertyObjectMember& right_member =
                     (*right_object).members()[index];
-                if (canonical_binding_name(left_member.name) !=
-                        canonical_binding_name(right_member.name) ||
+                if (canonical_property_name(left_member.name) !=
+                        canonical_property_name(right_member.name) ||
                     left_member.description != right_member.description ||
                     left_member.writable != right_member.writable ||
                     left_member.declared_kind != right_member.declared_kind ||
@@ -324,12 +324,12 @@ struct PropertyGrid::Impl final {
 
     [[nodiscard]] std::string row_id(std::string_view property_name) const {
         return std::string(owner.stable_id().value()) + ".property." +
-               canonical_binding_name(property_name);
+               canonical_property_name(property_name);
     }
 
     [[nodiscard]] std::string group_id(std::string_view category) const {
         return std::string(owner.stable_id().value()) + ".category." +
-               canonical_binding_name(category);
+               canonical_property_name(category);
     }
 
     [[nodiscard]] std::string display_value(
@@ -453,7 +453,7 @@ struct PropertyGrid::Impl final {
         std::vector<std::string> authored_choices = {},
         std::string owner_property_name = {}) {
         if (owner_property_name.empty()) owner_property_name = descriptor.name;
-        const std::string canonical = canonical_binding_name(path);
+        const std::string canonical = canonical_property_name(path);
         const std::string id = row_id(path);
         const bool expandable = expandable_value(value);
         const bool expanded = expanded_properties.contains(canonical);
@@ -635,13 +635,14 @@ struct PropertyGrid::Impl final {
         for (const PropertyDescriptor& descriptor : visible) {
             const std::optional<BindingValue> value = (*object).property_value(descriptor.name);
             if (!value) continue;
-            const std::string canonical = canonical_binding_name(descriptor.name);
+            const std::string canonical = canonical_property_name(descriptor.name);
             const PropertyValueOrigin origin =
                 (*object).property_value_origin(descriptor.name);
             std::vector<PropertyRowSpec> projected_rows;
             append_projected_rows(
                 projected_rows, descriptor, *value, descriptor.name,
-                descriptor.name, description_for(descriptor, origin), {}, 0U,
+                property_display_name(descriptor.name),
+                description_for(descriptor, origin), {}, 0U,
                 descriptor.writable, {}, true);
             if (sort == PropertySort::alphabetical) {
                 alphabetical.rows.insert(alphabetical.rows.end(),
@@ -759,7 +760,7 @@ struct PropertyGrid::Impl final {
             rebuild();
             return;
         }
-        const std::string canonical = canonical_binding_name(canonical_name);
+        const std::string canonical = canonical_property_name(canonical_name);
         const DescriptorMap::iterator descriptor = descriptors.find(canonical);
         const StringMap::iterator row = property_to_row.find(canonical);
         if (descriptor == descriptors.end() || row == property_to_row.end()) {
@@ -780,7 +781,7 @@ struct PropertyGrid::Impl final {
                  edit_targets) {
                 const std::string& path_name = target_entry.first;
                 const EditTarget& target_spec = target_entry.second;
-                if (canonical_binding_name(target_spec.property_name) != canonical) {
+                if (canonical_property_name(target_spec.property_name) != canonical) {
                     continue;
                 }
                 const std::optional<BindingValue> path_value = value_at(*current, target_spec.path);
@@ -828,7 +829,7 @@ struct PropertyGrid::Impl final {
         last_error = PropertyGridEditError{
             std::move(property_name), std::move(attempted), std::move(message)};
         const std::string canonical =
-            canonical_binding_name((*last_error).property_name);
+            canonical_property_name((*last_error).property_name);
         if (const StringMap::iterator row = property_to_row.find(canonical);
             row != property_to_row.end()) {
             static_cast<void>((*list).set_validation((*row).second,
@@ -842,7 +843,7 @@ struct PropertyGrid::Impl final {
         const Control::Ptr object = target();
         const std::vector<Control::Ptr> objects = targets();
         if (!object || objects.empty()) return false;
-        const std::string canonical = canonical_binding_name(property_name);
+        const std::string canonical = canonical_property_name(property_name);
         const EditTargetMap::iterator edit_target = edit_targets.find(canonical);
         if (edit_target == edit_targets.end()) {
             report_error(std::string(property_name),
@@ -850,7 +851,7 @@ struct PropertyGrid::Impl final {
                          "Property is not available for editing");
             return false;
         }
-        const std::string property_canonical = canonical_binding_name(
+        const std::string property_canonical = canonical_property_name(
             (*edit_target).second.property_name);
         const DescriptorMap::iterator descriptor =
             descriptors.find(property_canonical);
@@ -1017,7 +1018,7 @@ struct PropertyGrid::Impl final {
         std::string_view property_name) {
         const Control::Ptr object = target();
         if (!object) return {};
-        const std::string canonical = canonical_binding_name(property_name);
+        const std::string canonical = canonical_property_name(property_name);
         const EditTargetMap::iterator target_entry =
             edit_targets.find(canonical);
         if (target_entry == edit_targets.end()) return {};
@@ -1119,7 +1120,7 @@ struct PropertyGrid::Impl final {
         const StringMap::iterator property =
             row_to_property.find(change.row_id);
         if (property == row_to_property.end()) return;
-        const std::string canonical = canonical_binding_name((*property).second);
+        const std::string canonical = canonical_property_name((*property).second);
         const EditTargetMap::iterator target_spec =
             edit_targets.find(canonical);
         const ValueMap::iterator current = values.find(canonical);
@@ -1132,7 +1133,7 @@ struct PropertyGrid::Impl final {
         if (!converted) {
             report_error((*property).second, change.current_value,
                          "Property text cannot convert through its declared converter");
-            refresh_one(canonical_binding_name(
+            refresh_one(canonical_property_name(
                 (*target_spec).second.property_name), false);
             return;
         }
@@ -1289,7 +1290,7 @@ void PropertyGrid::set_editor_registry(
 Control::Ptr PropertyGrid::editor(std::string_view property_name) const {
     if (!(*impl_).list) return {};
     const Impl::StringMap::iterator found = (*impl_).property_to_row.find(
-        canonical_binding_name(property_name));
+        canonical_property_name(property_name));
     return found == (*impl_).property_to_row.end()
         ? Control::Ptr{} : (*(*impl_).list).editor((*found).second);
 }
@@ -1298,7 +1299,7 @@ std::shared_ptr<Button> PropertyGrid::reset_button(
     std::string_view property_name) const {
     if (!(*impl_).list) return {};
     const Impl::StringMap::iterator found = (*impl_).property_to_row.find(
-        canonical_binding_name(property_name));
+        canonical_property_name(property_name));
     return found == (*impl_).property_to_row.end()
         ? std::shared_ptr<Button>{}
         : (*(*impl_).list).reset_button((*found).second);
@@ -1306,7 +1307,7 @@ std::shared_ptr<Button> PropertyGrid::reset_button(
 
 std::optional<PropertyDescriptor> PropertyGrid::selected_descriptor(
     std::string_view property_name) const {
-    const std::string canonical = canonical_binding_name(property_name);
+    const std::string canonical = canonical_property_name(property_name);
     const Impl::EditTargetMap::iterator target =
         (*impl_).edit_targets.find(canonical);
     return target == (*impl_).edit_targets.end()
@@ -1319,7 +1320,7 @@ std::optional<PropertyValueOrigin> PropertyGrid::selected_origin(
     const Control::Ptr selected = selected_object();
     if (!selected) return {};
     const Impl::EditTargetMap::iterator target = (*impl_).edit_targets.find(
-        canonical_binding_name(property_name));
+        canonical_property_name(property_name));
     return target != (*impl_).edit_targets.end()
         ? std::optional<PropertyValueOrigin>{
               (*selected).property_value_origin((*target).second.property_name)}
@@ -1330,7 +1331,7 @@ bool PropertyGrid::set_property_expanded(std::string_view property_name,
                                          bool expanded) {
     require_mutable();
     if (!(*impl_).list) initialize_control_tree();
-    const std::string canonical = canonical_binding_name(property_name);
+    const std::string canonical = canonical_property_name(property_name);
     const Impl::StringMap::iterator found =
         (*impl_).property_to_row.find(canonical);
     const Impl::EditTargetMap::iterator target =
@@ -1345,7 +1346,7 @@ bool PropertyGrid::set_property_expanded(std::string_view property_name,
 std::optional<bool> PropertyGrid::property_expanded(
     std::string_view property_name) const {
     if (!(*impl_).list) return {};
-    const std::string canonical = canonical_binding_name(property_name);
+    const std::string canonical = canonical_property_name(property_name);
     const Impl::StringMap::iterator found =
         (*impl_).property_to_row.find(canonical);
     return found == (*impl_).property_to_row.end()
@@ -1363,7 +1364,7 @@ bool PropertyGrid::try_set_property_text(std::string_view property_name,
                                          std::string_view text) {
     require_mutable();
     if (!(*impl_).list) initialize_control_tree();
-    const std::string canonical = canonical_binding_name(property_name);
+    const std::string canonical = canonical_property_name(property_name);
     const Impl::EditTargetMap::iterator target =
         (*impl_).edit_targets.find(canonical);
     const Impl::ValueMap::iterator current = (*impl_).values.find(canonical);

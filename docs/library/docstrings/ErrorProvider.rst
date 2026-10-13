@@ -183,7 +183,7 @@ controls:
    field_errors["email"] = "Enter a complete e-mail address.";
    std::shared_ptr<gf::BindingSource> people = std::make_shared<gf::BindingSource>(window);
    (*people).set_records({gf::BindingRecord("person.1", fields, true, field_errors)});
-   (*email).data_bindings().add("Text", people, "email");
+   (*email).data_bindings().add("text", people, "email");
 
    gf::ErrorProvider errors(window);
    errors.bind_to_data_and_errors(people);

@@ -23,7 +23,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
     set_focusable(true);
     set_cursor(CursorKind::hand);
     PropertyDescriptor items_descriptor;
-    items_descriptor.name = "Items";
+    items_descriptor.name = "items";
     items_descriptor.kind = BindingValueKind::collection;
     items_descriptor.category = "Data";
     items_descriptor.description =
@@ -54,7 +54,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
 
     gui_forms::PropertyRegistration index_registration;
     index_registration.descriptor = {
-        "SelectedIndex", BindingValueKind::signed_integer, "Behavior",
+        "selected-index", BindingValueKind::signed_integer, "Behavior",
         "Zero-based selected item index, or -1 when no item is selected.",
         BindingValue{std::int64_t{-1}}, Dirty::paint | Dirty::semantics};
     index_registration.get = detail::BoundMemberFunction<
@@ -70,7 +70,7 @@ ComboBox::ComboBox(StableId stable_id) : Panel(std::move(stable_id)) {
 
     gui_forms::PropertyRegistration text_registration;
     text_registration.descriptor = {
-        "Text", BindingValueKind::text, "Appearance",
+        "text", BindingValueKind::text, "Appearance",
         "Text of the selected item, or empty when no item is selected.",
         BindingValue{std::string{}}, Dirty::paint | Dirty::semantics};
     text_registration.get = detail::BoundMemberFunction<
