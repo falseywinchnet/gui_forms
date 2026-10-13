@@ -1379,4 +1379,22 @@ std::vector<PropertyList::ItemEntry> PropertyList::item_entries() const {
     return entries;
 }
 
+namespace {
+
+// The events PropertyList adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> property_list_interactions{{
+    {.name = "value-changed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "value-committed", .payload = "PropertyValueChange", .mutable_payload = false},
+    {.name = "group-changed", .payload = "PropertyGroupChange", .mutable_payload = false},
+    {.name = "row-expansion-changed", .payload = "PropertyRowExpansionChange", .mutable_payload = false},
+    {.name = "reset-requested", .payload = "PropertyResetRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void PropertyList::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), property_list_interactions.begin(), property_list_interactions.end());
+}
+
 } // namespace gui_forms

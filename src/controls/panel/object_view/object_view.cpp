@@ -2040,4 +2040,21 @@ std::vector<ObjectView::Column> ObjectView::realized_columns() const {
     return records;
 }
 
+namespace {
+
+// The events ObjectView adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 4> object_view_interactions{{
+    {.name = "sort-requested", .payload = "ObjectDetailsSort", .mutable_payload = false},
+    {.name = "selection-changed", .payload = "ObjectSelectionChange", .mutable_payload = false},
+    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context-requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ObjectView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), object_view_interactions.begin(), object_view_interactions.end());
+}
+
 } // namespace gui_forms

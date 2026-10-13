@@ -294,4 +294,19 @@ ColorValueEditor::States ColorValueEditor::states() const {
     return record;
 }
 
+namespace {
+
+// The events ColorValueEditor adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> color_value_editor_interactions{{
+    {.name = "value-changed", .payload = "Color", .mutable_payload = false},
+    {.name = "edit-failed", .payload = "PropertyEditorInputError", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ColorValueEditor::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), color_value_editor_interactions.begin(), color_value_editor_interactions.end());
+}
+
 } // namespace gui_forms

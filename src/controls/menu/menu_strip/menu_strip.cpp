@@ -698,4 +698,19 @@ std::vector<MenuStrip::Item> MenuStrip::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events MenuStrip adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> menu_strip_interactions{{
+    {.name = "item-invoked", .payload = "MenuStripInvocation", .mutable_payload = false},
+    {.name = "open-changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+}};
+
+} // namespace
+
+void MenuStrip::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), menu_strip_interactions.begin(), menu_strip_interactions.end());
+}
+
 } // namespace gui_forms

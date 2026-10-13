@@ -1,6 +1,7 @@
 #include "gui_forms/controls/container/master_detail_view/master_detail_view.hpp"
 #include "../../scrollable_control/scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -316,6 +317,20 @@ constexpr ControlAnatomy master_detail_view_anatomy{
 
 const ControlAnatomy& MasterDetailView::anatomy() const noexcept {
     return master_detail_view_anatomy;
+}
+
+namespace {
+
+// The events MasterDetailView adds to those of ContainerControl, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> master_detail_view_interactions{{
+    {.name = "presentation-changed", .payload = "MasterDetailPresentationChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void MasterDetailView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ContainerControl::append_interactions(interactions);
+    interactions.insert(interactions.end(), master_detail_view_interactions.begin(), master_detail_view_interactions.end());
 }
 
 } // namespace gui_forms

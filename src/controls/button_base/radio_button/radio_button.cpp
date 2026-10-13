@@ -302,4 +302,18 @@ SemanticDescriptor RadioButton::semantic_descriptor() const {
     return descriptor;
 }
 
+namespace {
+
+// The events RadioButton adds to those of ButtonBase, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> radio_button_interactions{{
+    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void RadioButton::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ButtonBase::append_interactions(interactions);
+    interactions.insert(interactions.end(), radio_button_interactions.begin(), radio_button_interactions.end());
+}
+
 } // namespace gui_forms

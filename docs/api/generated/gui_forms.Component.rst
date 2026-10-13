@@ -41,6 +41,9 @@ gui_forms::Component
          How many event connections the component currently owns. It walks the
          list, so use it for diagnostics and tests rather than in a loop.
 
+      **interactions** : ``std::vector<InteractionDeclaration>``, read-only
+         The interactions the dynamic type raises (stage T1): one record per public event, its base types' first.
+
    .. rubric:: Methods
 
    .. list-table::
@@ -153,6 +156,10 @@ gui_forms::Component
       How many event connections the component currently owns. It walks the
       list, so use it for diagnostics and tests rather than in a loop.
 
+   .. cpp:function:: std::vector<InteractionDeclaration> interactions() const
+
+      The interactions the dynamic type raises (stage T1): one record per public event, its base types' first.
+
 
    .. rubric:: Methods
 
@@ -179,6 +186,12 @@ gui_forms::Component
 
 
    .. rubric:: Extension points
+
+   .. cpp:function:: virtual void append_interactions(std::vector<InteractionDeclaration>& interactions) const
+
+      *Protected.*
+
+      Appends the type's own interactions to :cpp:func:`interactions <gui_forms::Component::interactions>`. A type with events of its own overrides this and calls its base type's first.
 
    .. cpp:function:: virtual void verify_dispose_thread()
 

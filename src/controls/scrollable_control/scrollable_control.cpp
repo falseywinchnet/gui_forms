@@ -864,4 +864,18 @@ ScrollableControl::States ScrollableControl::states() const {
     return record;
 }
 
+namespace {
+
+// The events ScrollableControl adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> scrollable_control_interactions{{
+    {.name = "scroll", .payload = "ScrollEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void ScrollableControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), scrollable_control_interactions.begin(), scrollable_control_interactions.end());
+}
+
 } // namespace gui_forms

@@ -1395,6 +1395,10 @@ gui_forms::Control
 
    .. cpp:function:: virtual AnatomyStateSet realized_item_anatomy_states(std::size_t item) const
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: virtual void publish_part_geometry(std::span<PartGeometry> geometry) const
 
       *Protected.*

@@ -261,6 +261,7 @@ public:
     [[nodiscard]] std::vector<Column> realized_columns() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
     [[nodiscard]] ItemSystemIndex publish_realized_item_system(std::size_t item) const override;

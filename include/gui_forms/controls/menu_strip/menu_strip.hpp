@@ -115,6 +115,7 @@ public:
     [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_dispose() noexcept override;
     [[nodiscard]] bool mnemonic_matches(
         char32_t character) const noexcept override;

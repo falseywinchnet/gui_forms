@@ -317,6 +317,10 @@ gui_forms::RangeControl
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: Rect local_bounds() const noexcept
 
       *Protected.*

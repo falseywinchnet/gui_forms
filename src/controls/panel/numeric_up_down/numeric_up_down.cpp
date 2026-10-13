@@ -345,4 +345,18 @@ AnatomyStateSet NumericUpDown::anatomy_states() const {
     return states;
 }
 
+namespace {
+
+// The events NumericUpDown adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> numeric_up_down_interactions{{
+    {.name = "value-changed", .payload = "double", .mutable_payload = false},
+}};
+
+} // namespace
+
+void NumericUpDown::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), numeric_up_down_interactions.begin(), numeric_up_down_interactions.end());
+}
+
 } // namespace gui_forms

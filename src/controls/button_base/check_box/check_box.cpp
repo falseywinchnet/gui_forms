@@ -373,4 +373,19 @@ SemanticDescriptor CheckBox::semantic_descriptor() const {
     return descriptor;
 }
 
+namespace {
+
+// The events CheckBox adds to those of ButtonBase, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> check_box_interactions{{
+    {.name = "check-state-changed", .payload = "CheckState", .mutable_payload = false},
+    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CheckBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ButtonBase::append_interactions(interactions);
+    interactions.insert(interactions.end(), check_box_interactions.begin(), check_box_interactions.end());
+}
+
 } // namespace gui_forms

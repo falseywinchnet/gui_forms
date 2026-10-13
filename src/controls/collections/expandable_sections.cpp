@@ -2,6 +2,7 @@
 #include "gui_forms/text.hpp"
 #include "../panel/panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -243,6 +244,20 @@ constexpr ControlAnatomy expandable_sections_anatomy{
 
 const ControlAnatomy& ExpandableSections::anatomy() const noexcept {
     return expandable_sections_anatomy;
+}
+
+namespace {
+
+// The events ExpandableSections adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> expandable_sections_interactions{{
+    {.name = "toggled", .payload = "int, bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ExpandableSections::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), expandable_sections_interactions.begin(), expandable_sections_interactions.end());
 }
 
 } // namespace gui_forms

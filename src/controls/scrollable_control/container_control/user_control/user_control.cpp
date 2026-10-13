@@ -1,6 +1,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/user_control/user_control.hpp"
 #include "../../scrollable_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -45,6 +46,20 @@ constexpr ControlAnatomy user_control_anatomy{
 
 const ControlAnatomy& UserControl::anatomy() const noexcept {
     return user_control_anatomy;
+}
+
+namespace {
+
+// The events UserControl adds to those of ContainerControl, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> user_control_interactions{{
+    {.name = "loaded", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void UserControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ContainerControl::append_interactions(interactions);
+    interactions.insert(interactions.end(), user_control_interactions.begin(), user_control_interactions.end());
 }
 
 } // namespace gui_forms

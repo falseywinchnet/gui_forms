@@ -219,6 +219,7 @@ public:
     [[nodiscard]] States states() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_detaching_from_window(Window& former_window) noexcept override;
     void on_detached_from_window() noexcept override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;

@@ -6,6 +6,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -765,6 +766,21 @@ void ContextMenu::set_outside_pointer_handler(
 
 void ContextMenu::on_dispose() noexcept {
     close();
+}
+
+namespace {
+
+// The events ContextMenu adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> context_menu_interactions{{
+    {.name = "item-invoked", .payload = "MenuItemInvocation", .mutable_payload = false},
+    {.name = "open-changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ContextMenu::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), context_menu_interactions.begin(), context_menu_interactions.end());
 }
 
 } // namespace gui_forms

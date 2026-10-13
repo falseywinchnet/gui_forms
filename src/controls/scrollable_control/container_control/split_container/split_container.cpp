@@ -889,4 +889,18 @@ SplitContainer::States SplitContainer::states() const {
     return record;
 }
 
+namespace {
+
+// The events SplitContainer adds to those of ContainerControl, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> split_container_interactions{{
+    {.name = "splitter-changed", .payload = "SplitChangeEvent", .mutable_payload = false},
+}};
+
+} // namespace
+
+void SplitContainer::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ContainerControl::append_interactions(interactions);
+    interactions.insert(interactions.end(), split_container_interactions.begin(), split_container_interactions.end());
+}
+
 } // namespace gui_forms

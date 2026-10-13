@@ -4,6 +4,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <charconv>
@@ -125,6 +126,20 @@ void BindingContext::on_dispose() noexcept {
     sources_.clear();
     collection_changed_.disconnect_all();
     window_lifetime_.reset();
+}
+
+namespace {
+
+// The events BindingContext adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> binding_context_interactions{{
+    {.name = "collection-changed", .payload = "BindingContextChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void BindingContext::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), binding_context_interactions.begin(), binding_context_interactions.end());
 }
 
 } // namespace gui_forms

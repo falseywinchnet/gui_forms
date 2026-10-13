@@ -445,6 +445,10 @@ gui_forms::PropertyGrid
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: void on_dispose() noexcept override
 
       *Protected.*

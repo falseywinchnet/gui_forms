@@ -7,6 +7,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -1463,6 +1464,22 @@ constexpr ControlAnatomy property_grid_anatomy{
 
 const ControlAnatomy& PropertyGrid::anatomy() const noexcept {
     return property_grid_anatomy;
+}
+
+namespace {
+
+// The events PropertyGrid adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> property_grid_interactions{{
+    {.name = "selected-object-changed", .payload = "Control::Ptr", .mutable_payload = false},
+    {.name = "property-value-changed", .payload = "PropertyGridValueChange", .mutable_payload = false},
+    {.name = "edit-failed", .payload = "PropertyGridEditError", .mutable_payload = false},
+}};
+
+} // namespace
+
+void PropertyGrid::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), property_grid_interactions.begin(), property_grid_interactions.end());
 }
 
 } // namespace gui_forms

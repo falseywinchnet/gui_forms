@@ -232,4 +232,20 @@ RangeControl::States RangeControl::states() const {
     return record;
 }
 
+namespace {
+
+// The events RangeControl adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> range_control_interactions{{
+    {.name = "range-changed", .payload = "double, double", .mutable_payload = false},
+    {.name = "value-changed", .payload = "double", .mutable_payload = false},
+    {.name = "scroll", .payload = "RangeScrollEvent", .mutable_payload = false},
+}};
+
+} // namespace
+
+void RangeControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), range_control_interactions.begin(), range_control_interactions.end());
+}
+
 } // namespace gui_forms

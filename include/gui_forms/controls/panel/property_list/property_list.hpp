@@ -114,6 +114,7 @@ public:
     [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_dispose() noexcept override;
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
     void publish_realized_item_geometry(std::size_t item,

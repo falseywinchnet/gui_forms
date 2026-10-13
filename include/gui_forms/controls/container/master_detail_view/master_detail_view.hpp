@@ -93,6 +93,9 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     [[nodiscard]] Control::Ptr replace_role(Control::Ptr& slot,
                                             const std::shared_ptr<SplitterPanel>& panel,

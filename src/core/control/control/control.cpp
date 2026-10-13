@@ -2779,4 +2779,30 @@ void Control::on_dispose() noexcept {
     }
 }
 
+namespace {
+
+// The events Control adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 13> control_interactions{{
+    {.name = "name-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "visible-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "enabled-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "auto-size-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "causes-validation-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "validating", .payload = "ControlValidationEvent", .mutable_payload = true},
+    {.name = "validated", .payload = "", .mutable_payload = false},
+    {.name = "initialization-completed", .payload = "Dirty, bool", .mutable_payload = false},
+    {.name = "pointer-observed", .payload = "PointerEvent", .mutable_payload = false},
+    {.name = "pointer-preview-observed", .payload = "PointerEvent", .mutable_payload = false},
+    {.name = "focus-observed", .payload = "bool", .mutable_payload = false},
+    {.name = "arranged-bounds-changed", .payload = "Rect", .mutable_payload = false},
+    {.name = "help-requested", .payload = "HelpRequestEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void Control::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), control_interactions.begin(), control_interactions.end());
+}
+
 } // namespace gui_forms

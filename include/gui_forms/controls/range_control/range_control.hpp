@@ -84,6 +84,7 @@ public:
     [[nodiscard]] States states() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     [[nodiscard]] Rect local_bounds() const noexcept;
     bool set_value_from_input(double value, RangeAction action);
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;

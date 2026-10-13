@@ -26,6 +26,9 @@ public:
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
 
+protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
+
 private:
     [[nodiscard]] AutoValidate authored_auto_validate() const noexcept override {
         return auto_validate_;

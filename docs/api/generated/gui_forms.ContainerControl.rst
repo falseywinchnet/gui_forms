@@ -232,3 +232,7 @@ gui_forms::ContainerControl
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
+
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*

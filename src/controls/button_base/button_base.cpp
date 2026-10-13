@@ -1034,4 +1034,20 @@ bool ButtonBase::on_semantic_action(SemanticAction action, std::string_view valu
     return Control::on_semantic_action(action, value);
 }
 
+namespace {
+
+// The events ButtonBase adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> button_base_interactions{{
+    {.name = "expanded-changed", .payload = "std::optional<bool>", .mutable_payload = false},
+    {.name = "clicked", .payload = "ButtonBase", .mutable_payload = true},
+    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ButtonBase::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), button_base_interactions.begin(), button_base_interactions.end());
+}
+
 } // namespace gui_forms

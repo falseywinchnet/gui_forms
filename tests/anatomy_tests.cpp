@@ -9,6 +9,8 @@
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/material.hpp"
 #include "gui_forms/range_controls.hpp"
+#include "gui_forms/schema.hpp"
+#include "gui_forms/timer.hpp"
 #include "gui_forms/window.hpp"
 
 #include <array>
@@ -946,6 +948,55 @@ void test_part_states_are_validated() {
             "a part's declaration lists the states it takes on its own");
 }
 
+// A type's interactions are its public events, base types first, named in
+// kebab-case with their payload as the accessor spells it.
+void test_interactions_follow_the_type() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("anatomy.interactions.root"));
+    std::shared_ptr<Button> button =
+        make_control<Button>(StableId("anatomy.interactions.button"), "Go");
+    (*root).add_child(button);
+    Window window(root, Size{200.0, 100.0});
+    const std::vector<InteractionDeclaration> declared = (*button).interactions();
+    require(validate_interactions(declared).defect == InteractionDefect::none,
+            "a button's interactions validate");
+    const std::size_t visible = find_interaction(declared, "visible-changed");
+    const std::size_t clicked = find_interaction(declared, "clicked");
+    const std::size_t dialog = find_interaction(declared, "dialog-result-changed");
+    require(visible < clicked && clicked < dialog && dialog < declared.size(),
+            "Control's events come before ButtonBase's, and those before Button's");
+    require(declared[clicked].payload == "ButtonBase" && declared[clicked].mutable_payload,
+            "clicked passes the button by mutable reference");
+    const std::size_t validating = find_interaction(declared, "validating");
+    const std::size_t text = find_interaction(declared, "text-changed");
+    require(declared[validating].mutable_payload && declared[text].payload == "std::string" &&
+                !declared[text].mutable_payload,
+            "payloads are spelled without const or reference marks");
+    require(find_interaction(declared, "tick") == declared.size(),
+            "a control lists only events its type raises");
+
+    Timer timer(window, std::chrono::milliseconds(10));
+    const std::vector<InteractionDeclaration> timer_declared = timer.interactions();
+    require(timer_declared.size() == 1U && timer_declared[0].name == "tick" &&
+                timer_declared[0].payload.empty(),
+            "a component lists its own events");
+}
+
+constexpr std::array<InteractionDeclaration, 2> repeated_interactions{{
+    {.name = "clicked", .payload = {}, .mutable_payload = false},
+    {.name = "clicked", .payload = {}, .mutable_payload = false},
+}};
+constexpr std::array<InteractionDeclaration, 1> snake_interaction{{
+    {.name = "value_changed", .payload = "double", .mutable_payload = false},
+}};
+
+void test_interactions_are_validated() {
+    require(validate_interactions(repeated_interactions).defect == InteractionDefect::duplicate_name,
+            "an interaction name appears once in a type");
+    require(validate_interactions(snake_interaction).defect ==
+                InteractionDefect::name_not_kebab_case,
+            "interaction names are kebab-case");
+}
+
 void test_item_systems_are_distinct() {
     const ControlAnatomy two{
         .control_id = "grid", .parts = single_region, .states = {},
@@ -1263,6 +1314,8 @@ int main() {
         test_item_custom_states_never_shadow_standard_states();
         test_item_systems_are_distinct();
         test_part_states_are_validated();
+        test_interactions_follow_the_type();
+        test_interactions_are_validated();
         test_object_view_columns_are_items();
         std::cout << "gui_forms_anatomy_tests: all tests passed\n";
         return EXIT_SUCCESS;

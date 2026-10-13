@@ -597,4 +597,20 @@ AnatomyStateSet DateTimePicker::anatomy_states() const {
     return states;
 }
 
+namespace {
+
+// The events DateTimePicker adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> date_time_picker_interactions{{
+    {.name = "value-changed", .payload = "DateTimeValue", .mutable_payload = false},
+    {.name = "checked-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "drop-down-changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void DateTimePicker::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), date_time_picker_interactions.begin(), date_time_picker_interactions.end());
+}
+
 } // namespace gui_forms

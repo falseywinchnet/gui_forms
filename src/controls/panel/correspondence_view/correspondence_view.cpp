@@ -1146,4 +1146,22 @@ std::vector<CorrespondenceView::Item> CorrespondenceView::realized_items() const
     return records;
 }
 
+namespace {
+
+// The events CorrespondenceView adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> correspondence_view_interactions{{
+    {.name = "selection-changed", .payload = "CorrespondenceSelectionChange", .mutable_payload = false},
+    {.name = "pin-changed", .payload = "CorrespondencePinChange", .mutable_payload = false},
+    {.name = "expansion-changed", .payload = "CorrespondenceExpansionChange", .mutable_payload = false},
+    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "context-requested", .payload = "ObjectContextRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CorrespondenceView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), correspondence_view_interactions.begin(), correspondence_view_interactions.end());
+}
+
 } // namespace gui_forms

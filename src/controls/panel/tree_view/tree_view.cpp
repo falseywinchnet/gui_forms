@@ -672,4 +672,20 @@ std::vector<TreeView::Item> TreeView::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events TreeView adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> tree_view_interactions{{
+    {.name = "selection-changed", .payload = "TreeSelectionChange", .mutable_payload = false},
+    {.name = "expansion-changed", .payload = "TreeExpansionChange", .mutable_payload = false},
+    {.name = "item-activated", .payload = "std::string", .mutable_payload = false},
+}};
+
+} // namespace
+
+void TreeView::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), tree_view_interactions.begin(), tree_view_interactions.end());
+}
+
 } // namespace gui_forms

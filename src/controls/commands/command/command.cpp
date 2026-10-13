@@ -3,6 +3,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -129,6 +130,21 @@ bool Command::execute(std::string_view source_id) {
                                  next_sequence_++};
     invoked_.emit(invocation);
     return true;
+}
+
+namespace {
+
+// The events Command adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> command_interactions{{
+    {.name = "state-changed", .payload = "CommandState", .mutable_payload = false},
+    {.name = "invoked", .payload = "CommandInvocation", .mutable_payload = false},
+}};
+
+} // namespace
+
+void Command::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), command_interactions.begin(), command_interactions.end());
 }
 
 } // namespace gui_forms

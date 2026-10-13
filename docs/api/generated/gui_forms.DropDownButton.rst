@@ -289,6 +289,10 @@ gui_forms::DropDownButton
 
    .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: void on_activate() override
 
       *Protected.*

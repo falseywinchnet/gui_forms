@@ -147,6 +147,17 @@ void inspect_control(const Control& control, std::vector<std::string>& seen_ids)
                                      " publishes an undeclared part state");
         }
     }
+    // Every control raises Control's events and validates its own list.
+    const std::vector<InteractionDeclaration> interactions = control.interactions();
+    const InteractionValidation interaction_validation = validate_interactions(interactions);
+    if (interaction_validation.defect != InteractionDefect::none) {
+        throw std::runtime_error(std::string(anatomy.control_id) + " interactions are malformed: " +
+                                 std::string(interaction_defect_name(interaction_validation.defect)));
+    }
+    if (find_interaction(interactions, "visible-changed") == interactions.size()) {
+        throw std::runtime_error(std::string(anatomy.control_id) +
+                                 " does not inherit Control's interactions");
+    }
     const AnatomyStateSet active = control.anatomy_states();
     for (std::size_t index = 0; index < anatomy_state_count; ++index) {
         const AnatomyState state = static_cast<AnatomyState>(index);

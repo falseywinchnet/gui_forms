@@ -6,6 +6,7 @@
 
 #include "../support/binding_support.hpp"
 
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <charconv>
@@ -543,6 +544,28 @@ bool BindingSource::transfer_bindings(bool source_to_control) {
     }
     compact_expired_bindings();
     return accepted;
+}
+
+namespace {
+
+// The events BindingSource adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 9> binding_source_interactions{{
+    {.name = "list-changed", .payload = "BindingListChange", .mutable_payload = false},
+    {.name = "current-changed", .payload = "", .mutable_payload = false},
+    {.name = "current-item-changed", .payload = "", .mutable_payload = false},
+    {.name = "position-changed", .payload = "std::ptrdiff_t", .mutable_payload = false},
+    {.name = "data-error", .payload = "std::string", .mutable_payload = false},
+    {.name = "data-source-changed", .payload = "", .mutable_payload = false},
+    {.name = "data-member-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "binding-complete", .payload = "BindingCompleteEvent", .mutable_payload = true},
+    {.name = "disposed-event", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void BindingSource::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), binding_source_interactions.begin(), binding_source_interactions.end());
 }
 
 } // namespace gui_forms

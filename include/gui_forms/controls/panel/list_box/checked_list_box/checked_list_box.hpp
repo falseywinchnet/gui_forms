@@ -79,6 +79,7 @@ public:
     [[nodiscard]] std::vector<Item> realized_items() const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     [[nodiscard]] double row_text_left() const noexcept override;
     void paint_row_adornment(Painter& painter, std::size_t index,
                              Rect row_bounds, bool selected,

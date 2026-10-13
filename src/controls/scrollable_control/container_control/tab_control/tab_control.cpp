@@ -655,4 +655,18 @@ std::vector<TabControl::Item> TabControl::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events TabControl adds to those of ContainerControl, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> tab_control_interactions{{
+    {.name = "selected-index-changed", .payload = "TabSelectionChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void TabControl::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ContainerControl::append_interactions(interactions);
+    interactions.insert(interactions.end(), tab_control_interactions.begin(), tab_control_interactions.end());
+}
+
 } // namespace gui_forms

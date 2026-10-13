@@ -272,4 +272,18 @@ PictureBox::Parts PictureBox::parts() const {
     return record;
 }
 
+namespace {
+
+// The events PictureBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> picture_box_interactions{{
+    {.name = "image-changed", .payload = "ImageId", .mutable_payload = false},
+}};
+
+} // namespace
+
+void PictureBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), picture_box_interactions.begin(), picture_box_interactions.end());
+}
+
 } // namespace gui_forms

@@ -648,4 +648,20 @@ AnatomyStateSet ComboBox::anatomy_states() const {
     return states;
 }
 
+namespace {
+
+// The events ComboBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> combo_box_interactions{{
+    {.name = "selected-index-changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+    {.name = "drop-down-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "items-changed", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ComboBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), combo_box_interactions.begin(), combo_box_interactions.end());
+}
+
 } // namespace gui_forms

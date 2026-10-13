@@ -344,4 +344,19 @@ std::vector<CheckedListBox::Item> CheckedListBox::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events CheckedListBox adds to those of ListBox, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> checked_list_box_interactions{{
+    {.name = "item-checking", .payload = "ItemCheckEvent", .mutable_payload = true},
+    {.name = "item-check-state-changed", .payload = "std::size_t, CheckState", .mutable_payload = false},
+}};
+
+} // namespace
+
+void CheckedListBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    ListBox::append_interactions(interactions);
+    interactions.insert(interactions.end(), checked_list_box_interactions.begin(), checked_list_box_interactions.end());
+}
+
 } // namespace gui_forms

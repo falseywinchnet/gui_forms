@@ -724,6 +724,7 @@ public:
         std::size_t item) const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     // Called by fill_part_geometry with `geometry` already sized to
     // anatomy().parts.size() and every record reset to absent.
     virtual void publish_part_geometry(std::span<PartGeometry> geometry) const;

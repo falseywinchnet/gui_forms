@@ -517,4 +517,18 @@ SemanticDescriptor Label::semantic_descriptor() const {
     return descriptor;
 }
 
+namespace {
+
+// The events Label adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> label_interactions{{
+    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
+}};
+
+} // namespace
+
+void Label::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), label_interactions.begin(), label_interactions.end());
+}
+
 } // namespace gui_forms

@@ -9,6 +9,7 @@
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -670,6 +671,23 @@ void ErrorProvider::on_dispose() noexcept {
     tool_tip_.reset();
     tag_.reset();
     window_lifetime_.reset();
+}
+
+namespace {
+
+// The events ErrorProvider adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 4> error_provider_interactions{{
+    {.name = "right-to-left-changed", .payload = "bool", .mutable_payload = false},
+    {.name = "data-source-changed", .payload = "", .mutable_payload = false},
+    {.name = "data-member-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "error-changed", .payload = "ErrorProviderChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ErrorProvider::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), error_provider_interactions.begin(), error_provider_interactions.end());
 }
 
 } // namespace gui_forms

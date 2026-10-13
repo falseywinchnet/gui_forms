@@ -6,6 +6,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -1084,6 +1085,24 @@ constexpr ControlAnatomy instrument_rack_anatomy{
 
 const ControlAnatomy& InstrumentRack::anatomy() const noexcept {
     return instrument_rack_anatomy;
+}
+
+namespace {
+
+// The events InstrumentRack adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 5> instrument_rack_interactions{{
+    {.name = "field-changed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "field-committed", .payload = "InstrumentFieldChange", .mutable_payload = false},
+    {.name = "module-toggled", .payload = "InstrumentModuleToggle", .mutable_payload = false},
+    {.name = "remove-requested", .payload = "InstrumentModuleRequest", .mutable_payload = false},
+    {.name = "move-requested", .payload = "InstrumentModuleMoveRequest", .mutable_payload = false},
+}};
+
+} // namespace
+
+void InstrumentRack::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), instrument_rack_interactions.begin(), instrument_rack_interactions.end());
 }
 
 } // namespace gui_forms

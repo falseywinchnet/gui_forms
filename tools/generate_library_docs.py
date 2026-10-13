@@ -84,8 +84,9 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
     Group("control-and-component", "Control and component",
           "The base classes every control and nonvisual component derives from, "
           "with layout, docking, anchoring and validation vocabularies, and the "
-          "anatomy each control publishes: named parts, part roles and states.",
-          ("control", "component", "anatomy")),
+          "anatomy each control publishes: named parts, part roles and states, "
+          "and the interactions each type raises.",
+          ("control", "component", "anatomy", "schema")),
     Group("events-values-and-commands", "Events, values and commands",
           "Retained events and owned handlers, application-owned `Value` state, "
           "command bindings and semantic feedback records.",

@@ -226,6 +226,10 @@ gui_forms::ReviewCard
 
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:member:: constexpr bool initialize_tree_after_construction
 
       Default: ``true``.

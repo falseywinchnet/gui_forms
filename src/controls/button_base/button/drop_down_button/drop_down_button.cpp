@@ -299,4 +299,19 @@ void DropDownButton::on_activate() {
     ButtonBase::on_activate();
 }
 
+namespace {
+
+// The events DropDownButton adds to those of Button, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> drop_down_button_interactions{{
+    {.name = "drop-down-requested", .payload = "DropDownButton", .mutable_payload = true},
+    {.name = "drop-down-close-requested", .payload = "DropDownButton", .mutable_payload = true},
+}};
+
+} // namespace
+
+void DropDownButton::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Button::append_interactions(interactions);
+    interactions.insert(interactions.end(), drop_down_button_interactions.begin(), drop_down_button_interactions.end());
+}
+
 } // namespace gui_forms

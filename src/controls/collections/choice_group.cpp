@@ -3,6 +3,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel/panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -282,6 +283,21 @@ constexpr ControlAnatomy choice_group_anatomy{
 
 const ControlAnatomy& ChoiceGroup::anatomy() const noexcept {
     return choice_group_anatomy;
+}
+
+namespace {
+
+// The events ChoiceGroup adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> choice_group_interactions{{
+    {.name = "changed", .payload = "int", .mutable_payload = false},
+    {.name = "activated", .payload = "int", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ChoiceGroup::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), choice_group_interactions.begin(), choice_group_interactions.end());
 }
 
 } // namespace gui_forms

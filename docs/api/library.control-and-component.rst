@@ -5,7 +5,7 @@
 Control and component
 =====================
 
-The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states.
+The base classes every control and nonvisual component derives from, with layout, docking, anchoring and validation vocabularies, and the anatomy each control publishes: named parts, part roles and states, and the interactions each type raises.
 
 .. list-table::
    :class: autosummary longtable
@@ -52,6 +52,10 @@ Related types
      - One application-defined finite state, as written in ``:state(name)``.
    * - :cpp:class:`CustomStateIndex <gui_forms::CustomStateIndex>`
      - Position of an application-defined state in its control type's declaration list.
+   * - :cpp:class:`InteractionDeclaration <gui_forms::InteractionDeclaration>`
+     - One interaction.
+   * - :cpp:class:`InteractionValidation <gui_forms::InteractionValidation>`
+     - The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
    * - :cpp:class:`ItemSystemDeclaration <gui_forms::ItemSystemDeclaration>`
      - One kind of repeated item a control paints (owner decision 5): a list row, a tree node, a details-view column header.
    * - :cpp:class:`ItemSystemIndex <gui_forms::ItemSystemIndex>`
@@ -274,6 +278,34 @@ Related types
    Position of an application-defined state in its control type's declaration list.
 
    .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: InteractionDeclaration final
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   One interaction. ``payload`` spells the handler's argument types as the event accessor declares them, without ``const`` or reference marks and separated by ", " ("ButtonBase", "std::size_t, CheckState"); it is empty for an interaction without arguments. ``mutable_payload`` is true when some argument reaches the handler by mutable reference, as a validation the handler may cancel does.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: std::string_view payload
+
+   .. cpp:member:: bool mutable_payload
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: InteractionValidation final
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   The result of validate_interactions: the first defect found and the index of the interaction it concerns, or none.
+
+   .. cpp:member:: InteractionDefect defect
+
+      Default: ``{InteractionDefect::none}``.
+
+   .. cpp:member:: std::size_t index
 
 .. cpp:namespace:: gui_forms
 
@@ -786,6 +818,20 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: InteractionDefect
+
+   ``#include <gui_forms/schema/types/schema_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: too_many_interactions
+
+   .. cpp:enumerator:: name_not_kebab_case
+
+   .. cpp:enumerator:: duplicate_name
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: OwnerDecorationLayer
 
    ``#include <gui_forms/control/control/control.hpp>``
@@ -1000,3 +1046,19 @@ Functions, constants and aliases
 ``#include <gui_forms/control/static_tree/control_factory/control_factory.hpp>``
 
 .. cpp:function:: Control::Ptr build_static_tree(const StaticNode& node, const ControlFactory& factory)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/schema/types/schema_types.hpp>``
+
+.. cpp:function:: std::string_view interaction_defect_name(InteractionDefect defect) noexcept
+
+.. cpp:function:: InteractionValidation validate_interactions(std::span<const InteractionDeclaration> interactions) noexcept
+
+.. cpp:function:: std::size_t find_interaction(std::span<const InteractionDeclaration> interactions, std::string_view name) noexcept
+
+   The position of the interaction named ``name``, or ``interactions.size()``.
+
+.. cpp:var:: constexpr std::size_t maximum_interactions
+
+   Upper bound on one type's interactions, its inherited ones included. Value: ``64``.

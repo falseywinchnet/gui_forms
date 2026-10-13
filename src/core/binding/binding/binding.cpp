@@ -6,6 +6,7 @@
 
 #include "../support/binding_support.hpp"
 
+#include <array>
 #include <algorithm>
 #include <bit>
 #include <charconv>
@@ -319,6 +320,22 @@ void Binding::on_dispose() noexcept {
     binding_complete_.disconnect_all();
     source_.reset();
     target_ = nullptr;
+}
+
+namespace {
+
+// The events Binding adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 3> binding_interactions{{
+    {.name = "format", .payload = "BindingConvertEvent", .mutable_payload = true},
+    {.name = "parse", .payload = "BindingConvertEvent", .mutable_payload = true},
+    {.name = "binding-complete", .payload = "BindingCompleteEvent", .mutable_payload = true},
+}};
+
+} // namespace
+
+void Binding::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), binding_interactions.begin(), binding_interactions.end());
 }
 
 } // namespace gui_forms

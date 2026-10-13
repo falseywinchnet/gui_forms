@@ -643,4 +643,19 @@ std::vector<ListBox::Item> ListBox::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events ListBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> list_box_interactions{{
+    {.name = "selection-changed", .payload = "ListSelectionChange", .mutable_payload = false},
+    {.name = "item-activated", .payload = "std::size_t", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ListBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), list_box_interactions.begin(), list_box_interactions.end());
+}
+
 } // namespace gui_forms

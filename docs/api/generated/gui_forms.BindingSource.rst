@@ -560,6 +560,10 @@ gui_forms::BindingSource
 
    .. rubric:: Extension points
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: void verify_dispose_thread() override
 
       *Protected.*

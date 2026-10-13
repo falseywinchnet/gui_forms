@@ -137,6 +137,7 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
     src/core/anatomy/types/anatomy_types.cpp
+    src/core/schema/types/schema_types.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp

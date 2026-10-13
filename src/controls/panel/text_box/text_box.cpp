@@ -1414,4 +1414,21 @@ AnatomyStateSet TextBox::anatomy_states() const {
     return states;
 }
 
+namespace {
+
+// The events TextBox adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 4> text_box_interactions{{
+    {.name = "text-changed", .payload = "std::string", .mutable_payload = false},
+    {.name = "selection-changed", .payload = "TextSelection", .mutable_payload = false},
+    {.name = "committed", .payload = "std::string", .mutable_payload = false},
+    {.name = "cancelled", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void TextBox::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), text_box_interactions.begin(), text_box_interactions.end());
+}
+
 } // namespace gui_forms

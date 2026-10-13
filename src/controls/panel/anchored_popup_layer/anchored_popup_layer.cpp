@@ -4,6 +4,7 @@
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -156,6 +157,20 @@ constexpr ControlAnatomy anchored_popup_layer_anatomy{
 
 const ControlAnatomy& AnchoredPopupLayer::anatomy() const noexcept {
     return anchored_popup_layer_anatomy;
+}
+
+namespace {
+
+// The events AnchoredPopupLayer adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> anchored_popup_layer_interactions{{
+    {.name = "dismiss-requested", .payload = "PopupDismissReason", .mutable_payload = false},
+}};
+
+} // namespace
+
+void AnchoredPopupLayer::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), anchored_popup_layer_interactions.begin(), anchored_popup_layer_interactions.end());
 }
 
 } // namespace gui_forms

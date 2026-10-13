@@ -7,6 +7,7 @@
 #include "gui_forms/timer.hpp"
 #include "gui_forms/window.hpp"
 
+#include <array>
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -458,5 +459,18 @@ void ToolTip::on_dispose() noexcept {
     window_lifetime_.reset();
 }
 
+namespace {
+
+// The events ToolTip adds to those of Component, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> tool_tip_interactions{{
+    {.name = "visibility-changed", .payload = "ToolTipEvent", .mutable_payload = false},
+}};
+
+} // namespace
+
+void ToolTip::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Component::append_interactions(interactions);
+    interactions.insert(interactions.end(), tool_tip_interactions.begin(), tool_tip_interactions.end());
+}
 
 } // namespace gui_forms

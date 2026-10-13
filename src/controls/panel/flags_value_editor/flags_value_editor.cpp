@@ -485,4 +485,19 @@ FlagsValueEditor::States FlagsValueEditor::states() const {
     return record;
 }
 
+namespace {
+
+// The events FlagsValueEditor adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> flags_value_editor_interactions{{
+    {.name = "value-changed", .payload = "PropertyEnumValue", .mutable_payload = false},
+    {.name = "drop-down-changed", .payload = "bool", .mutable_payload = false},
+}};
+
+} // namespace
+
+void FlagsValueEditor::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), flags_value_editor_interactions.begin(), flags_value_editor_interactions.end());
+}
+
 } // namespace gui_forms

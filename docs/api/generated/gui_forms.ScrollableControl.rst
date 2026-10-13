@@ -444,6 +444,10 @@ gui_forms::ScrollableControl
 
    .. cpp:function:: AnatomyStateSet anatomy_states() const override
 
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
+
    .. cpp:function:: virtual void on_scroll_position_changed()
 
       *Protected.*

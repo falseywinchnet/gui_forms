@@ -847,4 +847,23 @@ std::vector<BreadcrumbTrail::Item> BreadcrumbTrail::realized_items() const {
     return records;
 }
 
+namespace {
+
+// The events BreadcrumbTrail adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 6> breadcrumb_trail_interactions{{
+    {.name = "segment-activated", .payload = "std::string", .mutable_payload = false},
+    {.name = "overflow-activated", .payload = "", .mutable_payload = false},
+    {.name = "edit-committed", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit-started", .payload = "std::string", .mutable_payload = false},
+    {.name = "edit-cancelled", .payload = "", .mutable_payload = false},
+    {.name = "edit-completion-requested", .payload = "", .mutable_payload = false},
+}};
+
+} // namespace
+
+void BreadcrumbTrail::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), breadcrumb_trail_interactions.begin(), breadcrumb_trail_interactions.end());
+}
+
 } // namespace gui_forms
