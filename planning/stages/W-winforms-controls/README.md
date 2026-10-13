@@ -99,18 +99,17 @@ Missing or partial, per the matrix:
 
 ## Gate
 
-Proposed, for owner review: the catalogue is regenerated from the official
+Accepted by the owner on 2026-10-13: the catalogue is regenerated from the official
 .NET 8+ reference surface; every in-scope matrix row is either implemented
 and tested on every platform, or excluded or deferred with a written reason;
 the manifest records each in-scope type and member, and the docs are generated
 from it. Record under `results/`.
 
-## Open decisions (ask, do not decide)
+## Owner decisions, 2026-10-13
 
-1. **Timing.** Proposed: start after T4, so no new control is hand-painted
-   and later moved onto the engine. The alternative is starting now in
-   parallel and re-plumbing later.
-2. **This stage's gate** above is a proposal.
+1. **Timing.** Start after T4, so no new control is hand-painted and later
+   moved onto the engine.
+2. **The gate above is accepted.**
 
 ## Read first
 

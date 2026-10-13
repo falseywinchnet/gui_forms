@@ -234,7 +234,7 @@ missing controls (`DataGridView`, `ListView`, the `ToolStrip` and
 `MonthCalendar`, `NotifyIcon` and member depth), each articulated and
 engine-painted from birth.
 
-Gate (proposed): the catalogue is regenerated from the official .NET 8+
+Gate (accepted 2026-10-13; W starts after T4): the catalogue is regenerated from the official .NET 8+
 surface; every in-scope row of `CONTROL_COMPLETENESS_MATRIX.md` is implemented
 and tested on every platform, or excluded or deferred with a reason; the
 manifest records every in-scope type and member and the docs are generated
