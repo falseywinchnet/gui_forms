@@ -55,27 +55,6 @@ namespace gui_forms::detail {
     return true;
 }
 
-// A presentation region in surface pixels, as window points. It widens by one
-// surface pixel so a filtered, scaled draw also refreshes neighbours that
-// sample changed pixels, then rounds outward to whole device pixels.
-[[nodiscard]] inline Rect live_damage_in_window(
-    const Rect damage, const Rect destination, const std::uint32_t width,
-    const std::uint32_t height, const double scale) noexcept {
-    if (damage.empty() || width == 0U || height == 0U || destination.empty() ||
-        !destination.finite()) {
-        return {};
-    }
-    const Rect surface{0.0, 0.0, static_cast<double>(width), static_cast<double>(height)};
-    const Rect widened = Rect::intersection(
-        {damage.x - 1.0, damage.y - 1.0, damage.width + 2.0, damage.height + 2.0}, surface);
-    const double horizontal = destination.width / static_cast<double>(width);
-    const double vertical = destination.height / static_cast<double>(height);
-    const Rect mapped{destination.x + widened.x * horizontal, destination.y + widened.y * vertical,
-                      widened.width * horizontal, widened.height * vertical};
-    const Rect result = align_damage_outward(mapped, scale);
-    return result;
-}
-
 // Fragments beyond this fall back to the whole dirty rectangle: retained
 // painting more than needed is slower, never wrong.
 inline constexpr std::size_t maximum_uncovered_live_fragments = 64U;
