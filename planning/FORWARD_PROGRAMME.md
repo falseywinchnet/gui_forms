@@ -375,5 +375,8 @@ open-source corpus proposed for approval; fonts are OFL, MIT or Apache only,
 the substitution table precedes host fonts in GUI.Drawing, and Consolas maps
 to the owner's Portsmouth Mono; the Web.Forms fidelity oracle moves into
 `tools/` and Chromium stays a test oracle; the SDRSharp spectrum and
-waterfall route is deferred to careful later work. Each stage brief records
-its decisions.
+waterfall route is deferred to careful later work; and the resource questions
+RC002, RC005 and RC006 are answered (parent-locale fallback, live validated
+configuration edits, one settings file per plugin; see
+`interview/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` §8). Each stage brief
+records its decisions.

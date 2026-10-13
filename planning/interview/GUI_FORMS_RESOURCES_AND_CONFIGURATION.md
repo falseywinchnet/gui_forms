@@ -291,6 +291,19 @@ separate decision after representative settings are enumerated.
 
 ## 8. Remaining resource questions
 
+All six were answered by the owner by 2026-10-13:
+
+| Question | Answer |
+|---|---|
+| RC001 | Data-only: theme and language assemblies never contain executable code. |
+| RC002 | A selected language falls through its parent locale, then the built-in catalogue (for example `fr-CA` → `fr` → built-in). |
+| RC003 | Theme and language collections may change live, through atomic replacement that preserves focus, selection and edits. |
+| RC004 | External packs need a content hash for integrity; no signature. |
+| RC005 | The runtime configuration may be hand-edited while the program runs: the program watches the file, validates the whole file, and applies it atomically; an invalid edit is rejected with a diagnostic and the running settings stay. |
+| RC006 | One settings file per plugin, so one plugin's failure or corruption cannot affect another. |
+
+The original questions follow.
+
 - **RC001:** Are theme and language assemblies strictly data-only as proposed,
   or does “compiled assembly” imply executable native code? Data-only preserves
   the safe-fallback guarantee.
