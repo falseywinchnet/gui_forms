@@ -2618,6 +2618,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/live-surfaces_tests.cpp
             tests/gallery_pages/typography-and-inspection_tests.cpp
             tests/gallery_pages/semantic-feedback_tests.cpp
+            tests/gallery_pages/anatomy_coverage_tests.cpp
         )
         target_include_directories(gui_forms_gallery_pages_tests PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}

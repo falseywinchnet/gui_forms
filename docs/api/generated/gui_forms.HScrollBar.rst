@@ -66,3 +66,8 @@ gui_forms::HScrollBar
    .. rubric:: Construction
 
    .. cpp:function:: explicit HScrollBar(StableId stable_id)
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

@@ -70,3 +70,8 @@ gui_forms::VScrollBar
    .. rubric:: Construction
 
    .. cpp:function:: explicit VScrollBar(StableId stable_id)
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override

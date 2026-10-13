@@ -207,7 +207,7 @@ void test_range_control_anatomies_validate() {
                 std::string(anatomy.control_id) + " must declare its region");
     }
     require((*track).anatomy().control_id == "track-bar" &&
-                (*scroll).anatomy().control_id == "scroll-bar" &&
+                (*scroll).anatomy().control_id == "h-scroll-bar" &&
                 (*progress).anatomy().control_id == "progress-bar",
             "range controls must publish their registry ids");
     require(&(*track).anatomy() == &(*make_control<TrackBar>(StableId("anatomy.track.2"))).anatomy(),

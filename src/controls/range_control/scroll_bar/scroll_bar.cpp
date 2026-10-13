@@ -1,6 +1,7 @@
 #include "gui_forms/controls/range_control/scroll_bar/scroll_bar.hpp"
 
 #include "../range_control_rendering.hpp"
+#include "scroll_bar_anatomy.hpp"
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
@@ -132,29 +133,10 @@ ScrollBarPart ScrollBar::part_at(Point local_point) const noexcept {
 
 namespace {
 
-constexpr std::array<PartDeclaration, 6> scroll_bar_parts{{
-    {.name = "region", .role = PartRole::region, .composed_from = {}},
-    {.name = "decrement-arrow", .role = PartRole::actuator, .composed_from = "button"},
-    {.name = "increment-arrow", .role = PartRole::actuator, .composed_from = "button"},
-    {.name = "track", .role = PartRole::track, .composed_from = {}},
-    {.name = "thumb", .role = PartRole::thumb, .composed_from = {}},
-    {.name = "focus", .role = PartRole::focus, .composed_from = {}},
-}};
-
-constexpr std::array<AnatomyState, 7> scroll_bar_states{
-    AnatomyState::normal,
-    AnatomyState::pressed,
-    AnatomyState::captured,
-    AnatomyState::enabled,
-    AnatomyState::disabled,
-    AnatomyState::focused,
-    AnatomyState::focus_visible,
-};
-
 constexpr ControlAnatomy scroll_bar_anatomy{
     .control_id = "scroll-bar",
-    .parts = scroll_bar_parts,
-    .states = scroll_bar_states,
+    .parts = scroll_bar_detail::parts,
+    .states = scroll_bar_detail::states,
     .custom_states = {},
 };
 
