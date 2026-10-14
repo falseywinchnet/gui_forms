@@ -346,6 +346,11 @@ void popups() {
     require((*drop_down).open_popup(anchor) && (*drop_down).popup_open(), "a drop-down gallery opens under a button");
     (*drop_down).close_popup();
     require(!(*drop_down).popup_open(), "and closes");
+
+    require((*gallery).show_more() && (*full).popup_open(), "the full gallery opens again");
+    static_cast<void>((*root).remove_child((*gallery).runtime_id()));
+    (*gallery).dispose();
+    require(!(*full).is_alive() && !(*full).popup_open(), "disposing a gallery disposes and closes its full gallery");
 }
 
 void semantics() {
