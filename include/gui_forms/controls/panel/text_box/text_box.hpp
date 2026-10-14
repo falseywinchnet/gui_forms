@@ -169,9 +169,11 @@ public:
     // The edit filter sees every user edit (TextEditKind) after the TextBox's
     // own checks (read-only, UTF-8, grapheme boundaries) and before it is
     // applied; a composite control uses it to refuse or rewrite input, as
-    // MaskedTextBox does. It does not see set_text, undo or redo. The filter
-    // must not change this TextBox; an edit during whose filter call the text
-    // changed anyway is abandoned. A rewrite is applied as one history step
+    // MaskedTextBox does. It does not see set_text, undo or redo. A filter
+    // may change this TextBox's text (with set_text) only when it refuses the
+    // edit, to show a value it looked up, as a read-only DomainUpDown does;
+    // an edit during whose filter call the text changed is abandoned whatever
+    // the verdict. A rewrite is applied as one history step
     // and is still subject to maximum_length and the multiline limits. The
     // delegate does not own its target; clear it (an empty Delegate) before
     // the target goes away.

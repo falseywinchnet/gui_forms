@@ -303,8 +303,8 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
         TextEdit edit{.kind = kind, .start = start, .end = end, .replacement = replacement};
         const std::uint64_t revision = store_.revision();
         edit_filter_(edit);
-        // The filter may not change the text; if it did, the proposal no
-        // longer describes this text.
+        // A refusing filter may have shown a looked-up value; whatever the
+        // verdict, the proposal no longer describes a changed text.
         if (store_.revision() != revision) return false;
         if (edit.verdict == TextEditVerdict::refuse) return false;
         if (edit.verdict == TextEditVerdict::rewrite) {

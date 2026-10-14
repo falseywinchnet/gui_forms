@@ -54,6 +54,12 @@ DomainUpDown::DomainUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
     set_background(style().paper);
 }
 
+DomainUpDown::~DomainUpDown() {
+    // The editor may outlive this control (anyone may hold editor()); its
+    // filter must not call into a destroyed control.
+    if (editor_) (*editor_).set_edit_filter(Delegate<TextEdit&>{});
+}
+
 void DomainUpDown::EditorChangeCallback::operator()(const std::string&) const {
     const std::shared_ptr<DomainUpDown> domain = target.lock();
     if (domain && !(*domain).synchronizing_) (*domain).match_text();
@@ -74,7 +80,10 @@ void DomainUpDown::initialize_control_tree() {
     const std::string prefix(stable_id().value());
     editor_ = make_control<TextBox>(StableId(prefix + ".editor"));
     (*editor_).set_border_style(BorderStyle::none);
-    (*editor_).set_read_only(read_only_);
+    // The editor stays writable: read-only is enforced by the edit filter,
+    // which also sees the characters a read-only field refuses.
+    (*editor_).set_edit_filter(
+        Delegate<TextEdit&>::bind<DomainUpDown, &DomainUpDown::filter_edit>(*this));
     spinner_ = make_control<SpinButtons>(StableId(prefix + ".spinner"));
     add_child(editor_);
     add_child(spinner_);
@@ -83,6 +92,41 @@ void DomainUpDown::initialize_control_tree() {
     editor_change_ = (*editor_).text_changed().subscribe(*this, EditorChangeCallback{weak});
     SpinButtons& spin = static_cast<SpinButtons&>(*spinner_);
     spinner_step_ = spin.stepped().subscribe(*this, SpinnerStepCallback{weak});
+}
+
+void DomainUpDown::filter_edit(TextEdit& edit) {
+    if (!read_only_) return;
+    edit.verdict = TextEditVerdict::refuse;
+    if (edit.kind != TextEditKind::typing || edit.replacement.empty()) return;
+    // The first character typed, as its UTF-8 bytes.
+    const unsigned char lead = static_cast<unsigned char>(edit.replacement[0]);
+    std::size_t length = 1U;
+    if (lead >= 0xF0U) {
+        length = 4U;
+    } else if (lead >= 0xE0U) {
+        length = 3U;
+    } else if (lead >= 0xC0U) {
+        length = 2U;
+    }
+    const std::string_view typed = edit.replacement.substr(0U, length);
+    const std::optional<std::size_t> found = next_item_starting_with(typed);
+    // Showing the item changes the editor's text inside its filter call; the
+    // refused edit is then abandoned, as TextBox's filter contract states.
+    if (found) select(found, true);
+}
+
+std::optional<std::size_t> DomainUpDown::next_item_starting_with(std::string_view prefix) const {
+    const std::size_t count = items_.size();
+    if (count == 0U || prefix.empty()) return std::nullopt;
+    const std::size_t start = selected_index_ ? *selected_index_ + 1U : 0U;
+    for (std::size_t step = 0U; step < count; ++step) {
+        const std::size_t index = (start + step) % count;
+        const std::string_view item = items_[index];
+        if (item.size() >= prefix.size() && equal_folded(item.substr(0U, prefix.size()), prefix)) {
+            return index;
+        }
+    }
+    return std::nullopt;
 }
 
 std::optional<std::size_t> DomainUpDown::matching_index(std::string_view text) const {
@@ -179,7 +223,9 @@ void DomainUpDown::set_read_only(bool read_only) {
     require_mutable();
     if (read_only_ == read_only) return;
     read_only_ = read_only;
-    if (editor_) (*editor_).set_read_only(read_only_);
+    // Undo and redo do not pass the edit filter; history from before the
+    // field became read-only must not change it.
+    if (editor_) (*editor_).clear_undo_history();
     invalidate(Dirty::paint | Dirty::semantics);
 }
 

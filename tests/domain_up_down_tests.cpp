@@ -107,11 +107,33 @@ void read_only_and_semantics() {
     (*domain).set_read_only(true);
     Window window(domain, {180.0, 32.0});
     window.perform_layout();
-    require((*(*domain).editor()).read_only() && (*domain).states().read_only,
-            "a read-only domain has a read-only editor and publishes read_only");
+    require((*domain).states().read_only, "a read-only domain publishes read_only");
     require(window.request_focus((*domain).editor()), "the editor takes focus");
-    static_cast<void>(window.dispatch_text({"FM"}));
-    require((*domain).text().empty() && !(*domain).selected_index(), "a read-only field takes no typing");
+    std::vector<std::optional<std::size_t>> seen;
+    SubscriptionToken token = (*domain).selected_index_changed().subscribe(RecordSelection{&seen});
+    static_cast<void>(window.dispatch_text({"x"}));
+    require((*domain).text().empty() && !(*domain).selected_index() && seen.empty(),
+            "a character no item starts with changes nothing");
+    static_cast<void>(window.dispatch_text({"f"}));
+    require((*domain).text() == "FM" && (*domain).selected_index() == 1U && seen.size() == 1U,
+            "a typed first letter selects the item it starts, ignoring case");
+    (*domain).set_items({"AM", "FM", "WFM", "fax", "USB"});
+    static_cast<void>(window.dispatch_text({"F"}));
+    require((*domain).text() == "fax" && (*domain).selected_index() == 3U,
+            "the same letter again moves to the next item it starts");
+    static_cast<void>(window.dispatch_text({"f"}));
+    require((*domain).text() == "FM" && (*domain).selected_index() == 1U,
+            "the lookup wraps past the last item");
+    static_cast<void>(window.dispatch_key({KeyAction::down, PhysicalKey::backspace}));
+    require((*domain).text() == "FM", "a read-only field refuses deletion");
+    require(!(*(*domain).editor()).undo() && (*domain).text() == "FM",
+            "the editor has no history to undo into");
+    (*domain).set_read_only(false);
+    require(window.dispatch_text({"x"}) && (*domain).text() == "FMx" && !(*domain).selected_index(),
+            "an editable field takes text again");
+    (*domain).set_read_only(true);
+    (*domain).set_items({"AM", "FM", "WFM"});
+    (*domain).set_text("");
 
     const SemanticDescriptor descriptor = (*domain).semantic_descriptor();
     require(descriptor.role == SemanticRole::combo_box &&

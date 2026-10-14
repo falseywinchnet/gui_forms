@@ -19,12 +19,14 @@ namespace gui_forms {
 // The selection follows the text. Choosing an item puts its text in the
 // field; text typed into an editable field selects the item it equals
 // (ignoring ASCII case) and clears the selection when it equals none. A
-// read-only field takes no typing; its value changes only by stepping or
-// set_selected_index.
+// read-only field takes no text: a typed character selects the next item
+// that starts with it (ignoring ASCII case, wrapping past the end), and
+// otherwise the value changes only by stepping or set_selected_index.
 class DomainUpDown final : public Panel {
 public:
     static constexpr bool initialize_tree_after_construction = true;
     explicit DomainUpDown(StableId stable_id);
+    ~DomainUpDown() override;
     void initialize_control_tree();
 
     // The items in display order: kept sorted (ASCII case folded, then byte
@@ -118,6 +120,12 @@ private:
         void operator()(int direction) const;
     };
 
+    // The editor's edit filter: refuses every edit while read-only and looks
+    // up the item a typed character starts.
+    void filter_edit(TextEdit& edit);
+    // The next item after the selection (wrapping, the selected item last)
+    // whose text starts with `prefix`, ignoring ASCII case.
+    [[nodiscard]] std::optional<std::size_t> next_item_starting_with(std::string_view prefix) const;
     // Moves the selection by `offset` items (-1 up, +1 down).
     void step(std::ptrdiff_t offset);
     void select(std::optional<std::size_t> index, bool show_text);

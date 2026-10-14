@@ -30,8 +30,9 @@ wrap : default ``false``
     Whether stepping past the last item continues at the first, and before
     the first at the last. Without it a step stops at the end.
 read_only : default ``false``
-    Whether the editor refuses typing. The value then changes only by
-    stepping or from the program.
+    Whether the field refuses text. A typed character then selects the next
+    item that starts with it, ignoring ASCII case and wrapping past the last
+    item; otherwise the value changes only by stepping or from the program.
 sorted : default ``false``
     Whether the items are kept sorted: ignoring ASCII case, then by byte, so
     ``"Apple"`` sorts before ``"apple"``. Turning it on sorts the list;
@@ -70,9 +71,11 @@ it equals, ignoring ASCII case, and clears the selection when it equals no
 item; the text the user typed stays as typed. Removing the selected item
 clears the selection and keeps its text in the field.
 
-A read-only field does not yet jump to an item when the user types its first
-letter, as Windows Forms does; that needs the editor to report the text it
-refused.
+A read-only field keeps its editor writable and refuses every edit through
+the editor's edit filter (`TextBox::set_edit_filter`), which also sees the
+character the user typed: that is how the field finds the next item starting
+with it. The editor is not exposed to accessibility, so the read-only state
+is published by the control itself.
 
 The control publishes the accessibility role `combo_box` with the text as its
 value and the read-only state. `SemanticAction::increment` moves to the next
