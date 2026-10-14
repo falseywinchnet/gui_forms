@@ -344,6 +344,12 @@ public:
         request.handled = true;
     }
 
+    void ribbon_help_requested(const RibbonToolTipHelpRequest& request) {
+        const std::shared_ptr<PageContext> context = context_.lock();
+        if (!context) return;
+        (*(*context).status).set_text("Help topic · " + request.help_topic);
+    }
+
     void toggle_provider_error() {
         const std::shared_ptr<PageContext> context = context_.lock();
         if (!context) return;
@@ -405,11 +411,13 @@ void initialize_gallery_runtime(Window& window) {
 
     (*context).ui_timer = std::make_shared<Timer>(window, 250ms);
     (*context).tooltips = std::make_shared<ToolTip>(window);
+    (*context).ribbon_tooltips = std::make_shared<RibbonToolTip>(window);
     (*context).error_provider = std::make_shared<ErrorProvider>(window);
     (*context).help_provider = std::make_shared<HelpProvider>(window);
     (*context).binding_source = std::make_shared<BindingSource>(window);
     (*context).components.add((*context).ui_timer);
     (*context).components.add((*context).tooltips);
+    (*context).components.add((*context).ribbon_tooltips);
     (*context).components.add((*context).error_provider);
     (*context).components.add((*context).help_provider);
     (*context).components.add((*context).binding_source);
@@ -474,6 +482,20 @@ void initialize_gallery_runtime(Window& window) {
             navigation, "Open the " + (*navigation).text() + " Gallery page.");
     }
 
+    // Enhanced tooltips on the commands page's ToolStrip items: title,
+    // description and shortcut come from each item's Command; Save shows
+    // its availability reason while the document is clean.
+    const std::shared_ptr<ToolStrip> document_tools =
+        std::dynamic_pointer_cast<ToolStrip>(window.find("gallery.commands.tool-strip"));
+    if (document_tools) {
+        (*(*context).ribbon_tooltips).set_item_tool_tip(document_tools, "strip.new",
+                                                        {.help_topic = "gallery.commands.new"});
+        (*(*context).ribbon_tooltips).set_item_tool_tip(
+            document_tools, "strip.save",
+            {.disabled_reason = "Nothing to save: the document has no changes.",
+             .help_topic = "gallery.commands.save"});
+        (*(*context).ribbon_tooltips).set_item_tool_tip(document_tools, "strip.wrap", {});
+    }
     (*actions).set_persistent_tooltip_target(persistent);
     on((*(*context).binding_source).current_changed(), *actions, &RuntimeActions::update_binding_status);
     on((*(*context).binding_source).current_item_changed(), *actions,
@@ -482,6 +504,7 @@ void initialize_gallery_runtime(Window& window) {
     on((*(*context).binding_next).clicked(), *actions, &RuntimeActions::navigate_binding, 1);
     (*actions).update_binding_status();
     on((*(*context).help_provider).help_requested(), *actions, &RuntimeActions::help_requested);
+    on((*(*context).ribbon_tooltips).help_requested(), *actions, &RuntimeActions::ribbon_help_requested);
     on((*(*context).provider_error_toggle).clicked(), *actions, &RuntimeActions::toggle_provider_error);
     // The timing page's own Commands and Value drive start, stop and interval;
     // the shell keeps only the tick, since the Timer needs the Window.

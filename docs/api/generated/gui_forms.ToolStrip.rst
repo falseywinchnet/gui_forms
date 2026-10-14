@@ -59,6 +59,9 @@ gui_forms::ToolStrip
       **overflow_item_ids** : ``std::vector<std::string>``, read-only
          The items currently in the overflow menu, in strip order.
 
+      **focused_item_id** : ``std::string``, read-only
+         The ID of the item the keyboard is on while the strip has focus; empty otherwise.
+
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
@@ -75,6 +78,8 @@ gui_forms::ToolStrip
          Raised when the user chooses from a drop-down or split button's menu, or
          from the overflow menu's copy of one. It names the item whose menu it was
          and carries the :cpp:class:`MenuItemInvocation <gui_forms::MenuItemInvocation>`.
+
+      **item_focus_changed** : ``Event<const ToolStripItemFocus&>``
 
    :Inherited:
 
@@ -100,6 +105,8 @@ gui_forms::ToolStrip
         - Closes any open menu.
       * - :cpp:func:`show_overflow <gui_forms::ToolStrip::show_overflow>`
         - Opens the overflow menu.
+      * - :cpp:func:`item_id_at <gui_forms::ToolStrip::item_id_at>`
+        - The ID of the laid-out item under a point in window coordinates, enabled or not; empty when no item is there.
       * - :cpp:func:`set_item_text <gui_forms::ToolStrip::set_item_text>`
         - Replaces one item's text (a hosted item's accessible name).
       * - :cpp:func:`set_item_checked <gui_forms::ToolStrip::set_item_checked>`
@@ -240,6 +247,10 @@ gui_forms::ToolStrip
 
       The items currently in the overflow menu, in strip order.
 
+   .. cpp:function:: std::string focused_item_id() const
+
+      The ID of the item the keyboard is on while the strip has focus; empty otherwise.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
@@ -260,6 +271,8 @@ gui_forms::ToolStrip
       Raised when the user chooses from a drop-down or split button's menu, or
       from the overflow menu's copy of one. It names the item whose menu it was
       and carries the :cpp:class:`MenuItemInvocation <gui_forms::MenuItemInvocation>`.
+
+   .. cpp:function:: Event<const ToolStripItemFocus&>& item_focus_changed() noexcept
 
 
    .. rubric:: Methods
@@ -291,6 +304,10 @@ gui_forms::ToolStrip
    .. cpp:function:: bool show_overflow(MenuOpenMode mode = MenuOpenMode::keyboard)
 
       Opens the overflow menu. Returns false when nothing overflows.
+
+   .. cpp:function:: std::string item_id_at(Point window_point) const
+
+      The ID of the laid-out item under a point in window coordinates, enabled or not; empty when no item is there. For providers that describe items, such as RibbonToolTip.
 
    .. cpp:function:: void set_item_text(std::string_view item_id, std::string text)
 
@@ -348,6 +365,18 @@ gui_forms::ToolStrip
    .. cpp:function:: bool sizing_grip_visible() const noexcept
 
       *Protected.*
+
+   .. cpp:function:: void set_end_reserve(double logical_width)
+
+      *Protected.*
+
+      For QuickAccessToolbar: logical units kept free at the strip's far end for a part the derived control paints there (its customize button). Items and the overflow button sit before it. Zero by default. Throws std::invalid_argument for a width that is negative, not finite or over 64.
+
+   .. cpp:function:: virtual void validate_items(const std::vector<ToolStripItemSpec>& items) const
+
+      *Protected.*
+
+      Checks items before set_items changes anything. ToolStrip accepts every valid item; a derived strip that admits fewer kinds throws std::invalid_argument for the others.
 
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
 
