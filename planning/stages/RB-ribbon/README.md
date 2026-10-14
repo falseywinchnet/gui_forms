@@ -5,7 +5,7 @@ proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
 study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
 (decisions 1 to 10 below), part 2 (decisions 11 to 16; no KeyTips) and
-part 3 (decisions 17 to 24); taste questions T3, T4 and T6 remain. The controls are built in
+part 3 (decisions 17 to 25); taste questions T3 and T6 remain. The controls are built in
 stage W (decision 1). Authority: this brief and
 `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
@@ -152,6 +152,8 @@ From part 3 (2026-10-14):
 24. **Minimized ribbon and QAT (T7, T8-1):** the minimized ribbon shows its
     tab row only and its temporary popup casts the overlay shadow; Quick
     Access Toolbar buttons are flat.
+25. **Contextual tab sets are a tint (T4-2)** on their tabs and command plane,
+    from the theme's accent ramp; no captioned band.
 
 ## Gate
 

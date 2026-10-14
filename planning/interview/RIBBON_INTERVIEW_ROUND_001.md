@@ -3,8 +3,8 @@
 Date: 2026-10-14
 
 Status: **owner verdicts recorded for parts 1, 2 and 3, except taste
-questions T3 (Backstage topic tabs, explained further), T4 (contextual tab
-sets, shown as mockups) and T6 (unanswered)**.
+questions T3 (Backstage topic tabs, explained further) and T6 (asked
+again); T4 answered after mockups**.
 
 The questions are section 8 of `planning/stages/RB-ribbon/RIBBON_STUDY.md`,
 cited by their IDs (A1, B2 and so on). Each answer names the option number of
@@ -213,3 +213,17 @@ Recorded as:
   temporary popup casts the overlay shadow (design language §3.4, E4).
 - **GIVEN T8-1:** Quick Access Toolbar buttons are flat, like the other
   tab-row members.
+
+### Note, 2026-10-14: T4 after the mockups
+
+Shown three mockups of a "Picture tools" contextual set holding a "Format"
+tab: (1) a captioned band above the tabs, as Office 2007 and 2010; (2) a
+tint on the tab (and its command plane) only, no band; (3) both. The owner,
+verbatim:
+
+> 2. tint only.
+
+- **GIVEN T4-2.** A contextual tab set is marked by a tint on its tabs and
+  their command plane, from the theme's accent ramp (F1-1, G7); no captioned
+  band above the tabs. How loud the tint may be is left to T4 (the default
+  theme), beside the tab stack of the rendering reference.
