@@ -4,6 +4,7 @@
 
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/text.hpp"
+#include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window.hpp"
 
 #include <array>
@@ -83,6 +84,27 @@ struct ContextMenu::Impl final {
             set_paint_plane(PaintPlane::overlay);
             set_background(Color::rgba(250, 253, 255));
             set_border_style(BorderStyle::line);
+        }
+
+        // The panel overlaps the window's content, so it casts the theme's
+        // overlay shadow (owner decision RB-37) from its square face before
+        // painting the face.
+        void on_paint(Painter& painter, Rect local_damage) override {
+            PartPaint shadow;
+            shadow.role = PartRole::shadow;
+            shadow.family = ControlVisualRole::panel;
+            shadow.bounds = local_bounds();
+            shadow.corner_radius = 0.0;
+            paint_part(painter, *this, shadow);
+            Panel::on_paint(painter, local_damage);
+        }
+
+        [[nodiscard]] Insets visual_outsets() const noexcept override {
+            const Insets panel = Panel::visual_outsets();
+            const Insets shadow = overlay_shadow_outsets(*this);
+            const Insets result{std::max(panel.left, shadow.left), std::max(panel.top, shadow.top),
+                                std::max(panel.right, shadow.right), std::max(panel.bottom, shadow.bottom)};
+            return result;
         }
 
         void on_pointer(PointerEvent& event) override {

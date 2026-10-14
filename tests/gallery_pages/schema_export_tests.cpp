@@ -112,8 +112,8 @@ void append_name_list(std::string& out, std::span<const std::string_view> names)
 }
 
 // The atom vocabulary (design language 8.5 and 12.7): every part role,
-// state, mark, value type and semantic role, in enum order. `none` is the
-// absence of a mark, not a mark, and is left out.
+// state, mark, value type, recipe family and semantic role, in enum order.
+// `none` is the absence of a mark, not a mark, and is left out.
 void append_vocabulary(std::string& out) {
     std::vector<std::string_view> names;
     out += "  \"vocabulary\": {\n";
@@ -141,6 +141,13 @@ void append_vocabulary(std::string& out) {
     names.clear();
     names.push_back("accent_index");
     append_key(out, "    ", "values");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    for (std::size_t index = 0; index < control_visual_role_count; ++index) {
+        names.push_back(control_visual_role_name(static_cast<ControlVisualRole>(index)));
+    }
+    append_key(out, "    ", "families");
     append_name_list(out, names);
     out += ",\n";
     names.clear();

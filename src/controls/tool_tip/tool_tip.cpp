@@ -340,6 +340,7 @@ void ToolTip::show_now(const std::shared_ptr<Control>& target,
 
     PopupToken token = (*owner).open_popup(
         target, layer, PopupOptions{.require_enabled_owner = !show_always_});
+    (*bubble).apply_family_text_colour();
     overlay_layer_ = layer;
     overlay_bubble_ = bubble;
     visible_target_ = target;

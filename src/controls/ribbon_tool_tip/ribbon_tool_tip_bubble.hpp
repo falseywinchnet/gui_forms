@@ -27,7 +27,9 @@ struct RibbonToolTipLine final {
 
 // Where every part of the bubble sits, in the bubble's local logical units,
 // from one pass: the overlay is sized from it and the bubble paints from it.
-// The face leaves `shadow_offset` units right and below for the shadow.
+// `size` is the face's; `shadow` is the casting surface's rect (the face),
+// and the theme's overlay shadow falls outside it, within the bubble's
+// visual outsets.
 struct RibbonToolTipLayout final {
     Size size{};
     Rect face{};
@@ -56,6 +58,8 @@ public:
     RibbonToolTipBubble(StableId stable_id, RibbonToolTipBubbleContent content, RibbonToolTipLayout layout);
 
     void on_paint(Painter& painter, Rect local_damage) override;
+    // The theme's overlay shadow reach, outside the bubble's bounds.
+    [[nodiscard]] Insets visual_outsets() const noexcept override;
     [[nodiscard]] bool hit_test_local(Point point) const override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] const RibbonToolTipLayout& layout() const noexcept { return layout_; }

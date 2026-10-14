@@ -90,14 +90,31 @@ struct PartPaint final {
     const Control& control, AnatomyStateSet states) noexcept;
 
 // Paints one part of `control` by its role (see PartPaint). Roles that draw
-// nothing of their own (region, shadow, edge, perimeter, sheen) are no-ops:
-// the material of the surface they belong to draws them. An empty or
-// non-finite `bounds` paints nothing.
+// nothing of their own (region, edge, perimeter, sheen) are no-ops: the
+// material of the surface they belong to draws them. An empty or non-finite
+// `bounds` paints nothing.
+//
+// The shadow role paints the theme's overlay shadow (owner decision RB-37):
+// `bounds` is the rect of the surface that casts it (a tooltip's face, a
+// menu's panel), with the corner radius of `corner_radius` or else of the
+// `family` recipe, and the shadow falls outside it, down and right. Paint it
+// before the surface. Only surfaces that really overlap content cast it; a
+// control's own contact shadow stays in its material. Nothing is painted
+// where the theme casts no overlay shadow (high contrast, by default). A
+// control that paints a shadow part reports overlay_shadow_outsets from its
+// visual_outsets, so that damage and replay cover the blur.
 void paint_part(Painter& painter, const Control& control, const PartPaint& part);
+
+// How far `control`'s theme's overlay shadow reaches outside the casting
+// surface's rect, in the control's presentation (ordinary or high
+// contrast). Zero on every side when the theme casts none.
+[[nodiscard]] Insets overlay_shadow_outsets(const Control& control) noexcept;
 
 // paint_part's drawing, with the recipe and context already resolved. For
 // helpers that resolve a recipe themselves (the existing controls' focus and
-// default cues), so that every part is drawn by one implementation.
+// default cues), so that every part is drawn by one implementation. The
+// shadow role paints nothing here: the overlay shadow is the theme's value,
+// not the recipe's, so it is drawn only through paint_part.
 void paint_part_from_recipe(Painter& painter, const PartPaint& part,
                             const ControlVisualRecipe& recipe, ControlVisualContext context);
 
