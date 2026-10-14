@@ -1368,9 +1368,11 @@ From the ribbon interview's last note (stage RB, decisions 37 to 41):
   enhanced tooltips use it.
 - **Help (RB-39, RB-41).** Focused help stays (F1, with a showing
   tooltip's topic first). In addition, programs always offer a question
-  mark in the upper right corner that opens a tooltip when clicked. Its
-  placement outside the ribbon and a possible whole-screen help overlay
-  are open.
+  mark in the upper right corner that opens a tooltip when clicked: at the
+  right end of a ribbon's tab row, otherwise a small button at the top
+  right of the client area over the content (RB-42). Its tooltip is the
+  program's help card for the whole window (RB-43). A possible
+  whole-screen help overlay is open.
 
 ## Appendix A. Anti-models
 

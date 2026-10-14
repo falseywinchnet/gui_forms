@@ -204,6 +204,12 @@ note):
     help, GUI.Forms programs always offer a question mark in the upper
     right corner which, when clicked, opens a tooltip. A whole-screen help
     overlay (instead, or on right click) is the owner's open design work.
+42. **Where the question mark sits (H1):** at the right end of a ribbon's
+    tab row; in a window without a ribbon, a small button at the top right
+    of the client area, over the content, the same on every host.
+43. **What it shows (H2):** a help card for the whole window, supplied by
+    the program (title, description, help topic), with F1 opening that
+    topic while the card shows.
 
 ## Gate
 

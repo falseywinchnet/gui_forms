@@ -334,3 +334,26 @@ verbatim:
   clicked, opens a tooltip. A whole-screen help overlay, instead of the
   tooltip or on right click, is the owner's open design work and is not
   decided.
+
+### Note, 2026-10-14: the help question mark
+
+Asked as: (H1) where the question mark sits in a window without a ribbon
+(ribbon windows put it at the right end of the tab row, as Office 2010
+does): the top right of the window's own client area, as a small button
+over the content, the same in every window and on every host
+(recommended), or in the title bar where GUI.Forms draws its own, or only
+at the right end of a menu bar, toolbar or ribbon; (H2) what its tooltip
+shows: a help card for the whole window supplied by the program (title,
+description, help topic), F1 opening that topic while the card shows
+(recommended), or help for the focused control, or a list of topics. The
+owner, verbatim:
+
+> yes, yes.
+
+- **GIVEN H1:** in a window without a ribbon the question mark is a small
+  button at the top right of the client area, over the content, the same
+  in every window and on every host. A ribbon window puts it at the right
+  end of the tab row.
+- **GIVEN H2:** its tooltip is a help card for the whole window that the
+  program supplies (title, description, help topic); F1 opens that topic
+  while the card shows.
