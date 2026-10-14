@@ -4,6 +4,9 @@
 #include "gui_forms/components/context_menu/context_menu.hpp"
 #include "gui_forms/control.hpp"
 #include "gui_forms/event.hpp"
+#include "gui_forms/controls/panel/combo_box/combo_box.hpp"
+#include "gui_forms/controls/panel/text_box/text_box.hpp"
+#include "gui_forms/controls/range_control/progress_bar/progress_bar.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -17,15 +20,20 @@
 namespace gui_forms {
 
 // The kinds of item a ToolStrip shows (Windows Forms' ToolStripButton,
-// ToolStripLabel, ToolStripSeparator, ToolStripDropDownButton and
-// ToolStripSplitButton). Hosted controls (combo box, text box, progress bar)
-// are not items yet.
+// ToolStripLabel, ToolStripSeparator, ToolStripDropDownButton,
+// ToolStripSplitButton, ToolStripComboBox, ToolStripTextBox and
+// ToolStripProgressBar). The last three are hosted items: the strip owns a
+// real ComboBox, TextBox or ProgressBar child control for each and places it
+// at the item's bounds.
 enum class ToolStripItemKind : std::uint8_t {
     button,
     label,
     separator,
     drop_down_button,
     split_button,
+    combo_box,
+    text_box,
+    progress_bar,
 };
 
 // What an item shows: its text, its image, or both (the default; an item
@@ -48,6 +56,15 @@ enum class ToolStripOverflow : std::uint8_t { as_needed, never };
 // state. `drop_down` is the menu of a drop-down or split button and must be
 // empty for other kinds. `spring` is honoured only by StatusStrip, on labels:
 // spring labels share the width the other items leave.
+//
+// A hosted item (combo box, text box, progress bar) takes no command, menu or
+// check. Its `text` is the hosted control's accessible name, `choices` are a
+// combo box's items, and `width` its width in logical units (zero for the
+// default: 120 for a combo box, 100 otherwise). Hosted items never move to the
+// overflow menu, whatever their `overflow`: a menu row cannot hold a control.
+// The application reaches the control through combo_box(), text_box() or
+// progress_bar(); it keeps its state while set_items keeps an item of the
+// same ID and kind.
 struct ToolStripItemSpec final {
     std::string stable_id{};
     ToolStripItemKind kind{ToolStripItemKind::button};
@@ -65,6 +82,8 @@ struct ToolStripItemSpec final {
     bool check_on_click{};
     bool checked{};
     bool spring{};
+    std::vector<std::string> choices{};
+    double width{};
 };
 
 // A click on an item, after any command it carries has executed.
@@ -95,8 +114,15 @@ public:
     [[nodiscard]] const std::vector<ToolStripItemSpec>& items() const noexcept { return items_; }
     // Replaces the items. Throws std::invalid_argument for an empty or
     // duplicate ID, invalid UTF-8, a drop-down menu on a kind that has none,
-    // a drop-down or split button without one, or an invalid menu.
+    // a drop-down or split button without one, an invalid menu, a hosted
+    // item with a command or check, choices on an item that is not a combo
+    // box, or a width that is negative, not finite or over 1024.
     void set_items(std::vector<ToolStripItemSpec> items);
+    // The control a hosted item holds. Throws std::out_of_range for an ID
+    // that names no item of that kind.
+    [[nodiscard]] std::shared_ptr<ComboBox> combo_box(std::string_view item_id) const;
+    [[nodiscard]] std::shared_ptr<TextBox> text_box(std::string_view item_id) const;
+    [[nodiscard]] std::shared_ptr<ProgressBar> progress_bar(std::string_view item_id) const;
     // The checked state the strip shows for an item: its command's when it
     // has one. Throws std::out_of_range for an unknown ID.
     [[nodiscard]] bool item_checked(std::string_view item_id) const;
@@ -121,6 +147,7 @@ public:
     }
 
     [[nodiscard]] Size measure(Size available) override;
+    void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
     void on_key(KeyEvent& event) override;
@@ -154,6 +181,10 @@ public:
         PartGeometry item_arrow_glyph;
         PartGeometry item_separator;
         PartGeometry item_focus;
+        // The hosted control of a combo box, text box or progress bar item.
+        PartGeometry item_combo_box;
+        PartGeometry item_text_box;
+        PartGeometry item_progress_bar;
     };
     struct ItemStates final {
         bool hot{};
@@ -188,6 +219,7 @@ protected:
         Rect sizing_grip{};
     };
     [[nodiscard]] Layout layout() const;
+    [[nodiscard]] Layout layout_for(Rect surface) const;
     [[nodiscard]] bool status_layout() const noexcept { return status_layout_; }
     void set_sizing_grip_visible(bool visible);
     [[nodiscard]] bool sizing_grip_visible() const noexcept { return sizing_grip_visible_; }
@@ -206,9 +238,14 @@ private:
     struct ItemState final {
         bool checked{};
         std::shared_ptr<Command> overflow_command{};
+        // The child control of a hosted item; null for other kinds.
+        Control::Ptr hosted{};
     };
 
     void construct();
+    [[nodiscard]] Control::Ptr hosted_control(std::string_view item_id, ToolStripItemKind kind) const;
+    [[nodiscard]] Control::Ptr make_hosted(const ToolStripItemSpec& item) const;
+    void configure_hosted(const ToolStripItemSpec& item, Control& hosted) const;
     [[nodiscard]] std::optional<std::size_t> index_of(std::string_view item_id) const;
     [[nodiscard]] Size item_size(const ToolStripItemSpec& item) const;
     [[nodiscard]] std::string item_text(const ToolStripItemSpec& item) const;

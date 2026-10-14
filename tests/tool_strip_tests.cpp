@@ -1,11 +1,13 @@
 // ToolStrip and StatusStrip (stage W): item layout and parts, clicks and
 // commands, check-on-click, split and drop-down buttons, overflow, keyboard,
-// semantics, and the status layout's spring labels and sizing grip.
+// semantics, the status layout's spring labels and sizing grip, and hosted
+// combo box, text box and progress bar items.
 
 #include "gui_forms/gui_forms.hpp"
 
 #include <cstdlib>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -198,6 +200,102 @@ void status_strip() {
     require((*status).semantic_descriptor().role == SemanticRole::group, "a status strip is a named group");
 }
 
+
+std::vector<ToolStripItemSpec> hosted_items() {
+    std::vector<ToolStripItemSpec> items;
+    items.push_back({.stable_id = "new", .text = "New"});
+    items.push_back({.stable_id = "zoom", .kind = ToolStripItemKind::combo_box, .text = "Zoom",
+                     .choices = {"50%", "100%", "200%"}});
+    items.push_back({.stable_id = "find", .kind = ToolStripItemKind::text_box, .text = "Find", .width = 80.0});
+    items.push_back({.stable_id = "load", .kind = ToolStripItemKind::progress_bar, .text = "Loading"});
+    items.push_back({.stable_id = "help", .text = "Help"});
+    return items;
+}
+
+template <typename Expected>
+bool refuses(std::shared_ptr<ToolStrip>& strip, std::vector<ToolStripItemSpec> items) {
+    try {
+        (*strip).set_items(std::move(items));
+    } catch (const Expected&) {
+        return true;
+    }
+    return false;
+}
+
+void hosted_controls() {
+    std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("strip"));
+    (*strip).set_items(hosted_items());
+    Window window(strip, {640.0, 25.0});
+    window.perform_layout();
+    const std::shared_ptr<ComboBox> zoom = (*strip).combo_box("zoom");
+    const std::shared_ptr<TextBox> find = (*strip).text_box("find");
+    const std::shared_ptr<ProgressBar> load = (*strip).progress_bar("load");
+    require(zoom && find && load && (*strip).children().size() == 3U,
+            "each hosted item owns one child control of its kind");
+    require((*zoom).items().size() == 3U && (*zoom).accessible_name() == "Zoom" &&
+                (*zoom).stable_id().value() == "strip.zoom",
+            "a combo box takes its choices and name from the item, and its ID from the strip and item");
+    const std::vector<ToolStrip::Item> items = (*strip).realized_items();
+    const ToolStrip::Item* combo = find_item(items, "zoom");
+    const ToolStrip::Item* text = find_item(items, "find");
+    const ToolStrip::Item* progress = find_item(items, "load");
+    require(combo != nullptr && (*combo).parts.item_combo_box.present && !(*combo).parts.item_face.present &&
+                (*combo).parts.item_combo_box.bounds == (*zoom).committed_arranged_bounds(),
+            "a combo box item publishes its hosted part where the strip placed the control");
+    require(text != nullptr && (*text).parts.item_text_box.present &&
+                (*text).parts.item_text_box.bounds.width == 80.0 &&
+                (*text).parts.item_text_box.bounds == (*find).committed_arranged_bounds(),
+            "a text box item takes its width from the item");
+    require(progress != nullptr && (*progress).parts.item_progress_bar.present,
+            "a progress bar item publishes its hosted part");
+    (*load).set_value(40.0);
+    require((*(*strip).progress_bar("load")).value() == 40.0, "the application drives the hosted control");
+
+    const Point inside = centre((*text).parts.item_text_box.bounds);
+    static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, inside}));
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, inside}));
+    require(window.focused_control() == find, "a click on a hosted text box focuses it");
+
+    const std::vector<SemanticNode> children = (*strip).semantic_virtual_children();
+    require(children.size() == 2U, "hosted controls describe themselves, not as virtual children");
+
+    (*find).set_text("needle");
+    std::vector<ToolStripItemSpec> next = hosted_items();
+    next[1].choices = {"Fit"};
+    next[3].kind = ToolStripItemKind::text_box;
+    (*strip).set_items(std::move(next));
+    require((*strip).text_box("find") == find && (*find).text() == "needle",
+            "set_items keeps a hosted control of the same ID and kind, with its state");
+    require((*(*strip).combo_box("zoom")).items().size() == 1U, "set_items updates a combo box's choices");
+    require((*strip).text_box("load") != nullptr && (*strip).children().size() == 3U,
+            "an item that changes kind gets a new control and the old one is removed");
+
+    (*strip).set_items(hosted_items());
+    window.resize({200.0, 25.0});
+    window.perform_layout();
+    const std::vector<std::string> overflowed = (*strip).overflow_item_ids();
+    for (const std::string& id : overflowed) {
+        require(id != "zoom" && id != "find" && id != "load", "hosted items never move to the overflow menu");
+    }
+    require(!overflowed.empty(), "a narrow strip still overflows its buttons");
+
+    std::vector<ToolStripItemSpec> commanded = hosted_items();
+    commanded[1].command = std::make_shared<Command>("zoom", "Zoom");
+    require(refuses<std::invalid_argument>(strip, std::move(commanded)), "a hosted item takes no command");
+    std::vector<ToolStripItemSpec> chosen = hosted_items();
+    chosen[0].choices = {"x"};
+    require(refuses<std::invalid_argument>(strip, std::move(chosen)), "only a combo box takes choices");
+    std::vector<ToolStripItemSpec> wide = hosted_items();
+    wide[2].width = -1.0;
+    require(refuses<std::invalid_argument>(strip, std::move(wide)), "a negative width is refused");
+    bool threw = false;
+    try {
+        static_cast<void>((*strip).combo_box("find"));
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    require(threw, "asking for the wrong kind of hosted control is refused");
+}
 } // namespace
 
 int main() {
@@ -205,6 +303,7 @@ int main() {
     clicks_and_commands();
     overflow_and_keyboard();
     status_strip();
+    hosted_controls();
     std::cout << "ToolStrip and StatusStrip: parts, clicks, commands, split and drop-down, overflow, keys, semantics and status layout passed\n";
     return 0;
 }

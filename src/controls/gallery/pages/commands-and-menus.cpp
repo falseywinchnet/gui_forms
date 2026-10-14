@@ -243,8 +243,9 @@ private:
         (*context_group).add_at(note, {22.0, 84.0, 410.0, 120.0});
     }
 
-    // A ToolStrip over the same Commands, narrow enough that its last items
-    // overflow, and a StatusStrip with a spring label.
+    // A ToolStrip over the same Commands with a hosted combo box, narrow
+    // enough that its last buttons overflow, and a StatusStrip with a spring
+    // label and a hosted progress bar.
     void build_strips(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> strips = group(
             "gallery.commands.strips", "ToolStrip · StatusStrip · by-role painted items", {930.0, 132.0});
@@ -257,6 +258,8 @@ private:
         tools.push_back({.stable_id = "strip.delete", .command = delete_});
         tools.push_back({.stable_id = "strip.separator", .kind = ToolStripItemKind::separator});
         tools.push_back({.stable_id = "strip.wrap", .command = wrap_command_});
+        tools.push_back({.stable_id = "strip.zoom", .kind = ToolStripItemKind::combo_box, .text = "Zoom",
+                         .choices = {"50%", "100%", "200%"}, .width = 72.0});
         tools.push_back({.stable_id = "strip.export", .kind = ToolStripItemKind::drop_down_button,
                          .text = "Export", .drop_down = export_items("strip.export")});
         tools.push_back({.stable_id = "strip.run", .kind = ToolStripItemKind::split_button,
@@ -273,7 +276,9 @@ private:
             {.stable_id = "status.separator", .kind = ToolStripItemKind::separator},
             {.stable_id = "status.position", .kind = ToolStripItemKind::label, .text = "Ln 1, Col 1"},
             {.stable_id = "status.encoding", .kind = ToolStripItemKind::label, .text = "UTF-8"},
+            {.stable_id = "status.progress", .kind = ToolStripItemKind::progress_bar, .text = "Indexing"},
         });
+        (*(*status).progress_bar("status.progress")).set_value(60.0);
         (*strips).add_at(status, {22.0, 84.0, 880.0, 24.0});
     }
 

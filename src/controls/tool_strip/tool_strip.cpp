@@ -33,6 +33,9 @@ constexpr double split_arrow_width = 12.0;
 constexpr double arrow_glyph_size = 7.0;
 constexpr double overflow_button_width = 12.0;
 constexpr double sizing_grip_size = 12.0;
+constexpr double default_combo_box_width = 120.0;
+constexpr double default_hosted_width = 100.0;
+constexpr double maximum_hosted_width = 1024.0;
 
 // Virtual semantic children carry a runtime ID derived from their stable ID,
 // in the high half so it never meets a control's own runtime ID.
@@ -49,6 +52,13 @@ std::uint64_t item_runtime_id(std::string_view id) noexcept {
 bool has_menu(ToolStripItemKind kind) noexcept {
     const bool result = kind == ToolStripItemKind::drop_down_button ||
                         kind == ToolStripItemKind::split_button;
+    return result;
+}
+
+// A combo box, text box or progress bar: an item that holds a child control.
+bool hosted(ToolStripItemKind kind) noexcept {
+    const bool result = kind == ToolStripItemKind::combo_box || kind == ToolStripItemKind::text_box ||
+                        kind == ToolStripItemKind::progress_bar;
     return result;
 }
 
@@ -118,6 +128,18 @@ void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
             !validate_utf8(item.text).valid() || !item_ids.insert(item.stable_id).second) {
             throw std::invalid_argument("ToolStrip items require unique stable IDs and valid UTF-8");
         }
+        if (hosted(item.kind) && (item.command || item.check_on_click || item.checked)) {
+            throw std::invalid_argument("ToolStrip hosted items take no command or check");
+        }
+        if (item.kind != ToolStripItemKind::combo_box && !item.choices.empty()) {
+            throw std::invalid_argument("ToolStrip choices belong to combo box items only");
+        }
+        for (const std::string& choice : item.choices) {
+            if (!validate_utf8(choice).valid()) throw std::invalid_argument("ToolStrip choices must be valid UTF-8");
+        }
+        if (!std::isfinite(item.width) || item.width < 0.0 || item.width > maximum_hosted_width) {
+            throw std::invalid_argument("ToolStrip item width must be finite and between 0 and 1024");
+        }
         if (has_menu(item.kind) != !item.drop_down.empty()) {
             throw std::invalid_argument(
                 "ToolStrip drop-down and split buttons require a menu, and other items have none");
@@ -137,8 +159,37 @@ void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
         }
     }
     close_drop_down();
+    // Hosted controls carry over to an item of the same ID and kind; the
+    // others are removed. New hosted items get new controls.
+    std::vector<ItemState> next_states(items.size(), ItemState{});
+    std::vector<bool> kept(items_.size(), false);
+    for (std::size_t index = 0; index < items.size(); ++index) {
+        if (!hosted(items[index].kind)) continue;
+        for (std::size_t old = 0; old < items_.size(); ++old) {
+            if (kept[old] || !item_states_[old].hosted || items_[old].stable_id != items[index].stable_id ||
+                items_[old].kind != items[index].kind) {
+                continue;
+            }
+            next_states[index].hosted = item_states_[old].hosted;
+            kept[old] = true;
+            break;
+        }
+    }
+    for (std::size_t old = 0; old < items_.size(); ++old) {
+        if (item_states_[old].hosted && !kept[old]) {
+            static_cast<void>(remove_child((*item_states_[old].hosted).runtime_id()));
+        }
+    }
     items_ = std::move(items);
-    item_states_.assign(items_.size(), ItemState{});
+    item_states_ = std::move(next_states);
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        if (!hosted(items_[index].kind)) continue;
+        if (!item_states_[index].hosted) {
+            item_states_[index].hosted = make_hosted(items_[index]);
+            add_child(item_states_[index].hosted);
+        }
+        configure_hosted(items_[index], *item_states_[index].hosted);
+    }
     command_tokens_.clear();
     for (std::size_t index = 0; index < items_.size(); ++index) {
         item_states_[index].checked = items_[index].checked;
@@ -150,6 +201,46 @@ void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
     hot_index_.reset();
     pressed_index_.reset();
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+Control::Ptr ToolStrip::make_hosted(const ToolStripItemSpec& item) const {
+    // The control is named after the strip and the item.
+    const StableId identity(std::string(stable_id().value()) + "." + item.stable_id);
+    if (item.kind == ToolStripItemKind::combo_box) return make_control<ComboBox>(identity);
+    if (item.kind == ToolStripItemKind::text_box) return make_control<TextBox>(identity);
+    return make_control<ProgressBar>(identity);
+}
+
+void ToolStrip::configure_hosted(const ToolStripItemSpec& item, Control& control) const {
+    control.set_accessible_name(item.text);
+    control.set_enabled(item.enabled);
+    if (item.kind == ToolStripItemKind::combo_box) {
+        ComboBox& combo = static_cast<ComboBox&>(control);
+        const std::span<const std::string> current = combo.items();
+        const bool same = current.size() == item.choices.size() &&
+                          std::equal(current.begin(), current.end(), item.choices.begin());
+        if (!same) combo.set_items(item.choices);
+    }
+}
+
+Control::Ptr ToolStrip::hosted_control(std::string_view item_id, ToolStripItemKind kind) const {
+    const std::optional<std::size_t> index = index_of(item_id);
+    if (!index || items_[*index].kind != kind || !item_states_[*index].hosted) {
+        throw std::out_of_range("ToolStrip has no hosted item of this kind with this ID");
+    }
+    return item_states_[*index].hosted;
+}
+
+std::shared_ptr<ComboBox> ToolStrip::combo_box(std::string_view item_id) const {
+    return std::static_pointer_cast<ComboBox>(hosted_control(item_id, ToolStripItemKind::combo_box));
+}
+
+std::shared_ptr<TextBox> ToolStrip::text_box(std::string_view item_id) const {
+    return std::static_pointer_cast<TextBox>(hosted_control(item_id, ToolStripItemKind::text_box));
+}
+
+std::shared_ptr<ProgressBar> ToolStrip::progress_bar(std::string_view item_id) const {
+    return std::static_pointer_cast<ProgressBar>(hosted_control(item_id, ToolStripItemKind::progress_bar));
 }
 
 void ToolStrip::on_command_state(const CommandState&) {
@@ -181,7 +272,7 @@ bool ToolStrip::item_visible(const ToolStripItemSpec& item) const {
 bool ToolStrip::item_interactive(std::size_t index) const {
     const ToolStripItemSpec& item = items_[index];
     const bool result = item.kind != ToolStripItemKind::label &&
-                        item.kind != ToolStripItemKind::separator && item_enabled(item);
+                        item.kind != ToolStripItemKind::separator && !hosted(item.kind) && item_enabled(item);
     return result;
 }
 
@@ -242,6 +333,12 @@ Size ToolStrip::measure(Size available) {
 Size ToolStrip::item_size(const ToolStripItemSpec& item) const {
     const double scale = effective_text_scale();
     if (item.kind == ToolStripItemKind::separator) return {separator_width * scale, 0.0};
+    if (hosted(item.kind)) {
+        const double fallback = item.kind == ToolStripItemKind::combo_box ? default_combo_box_width
+                                                                          : default_hosted_width;
+        const double width = item.width > 0.0 ? item.width : fallback;
+        return {width * scale, 0.0};
+    }
     const bool shows_image = item.image.value != 0U && item.display != ToolStripItemDisplay::text;
     const std::string text = item_text(item);
     const bool shows_text = !text.empty() && item.display != ToolStripItemDisplay::image;
@@ -256,8 +353,11 @@ Size ToolStrip::item_size(const ToolStripItemSpec& item) const {
 }
 
 ToolStrip::Layout ToolStrip::layout() const {
+    return layout_for(client_rectangle());
+}
+
+ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
     const double scale = effective_text_scale();
-    const Rect surface = client_rectangle();
     const double inset = edge_inset * scale;
     const std::size_t count = items_.size();
     Layout result;
@@ -304,7 +404,11 @@ ToolStrip::Layout ToolStrip::layout() const {
         bool moved = false;
         for (std::size_t step = count; step > 0U && total > end - reserved - start; --step) {
             const std::size_t index = step - 1U;
-            if (!shown[index] || items_[index].overflow != ToolStripOverflow::as_needed) continue;
+            // Hosted items stay on the strip: a menu row cannot hold a control.
+            if (!shown[index] || items_[index].overflow != ToolStripOverflow::as_needed ||
+                hosted(items_[index].kind)) {
+                continue;
+            }
             result.overflowed[index] = true;
             total -= widths[index];
             moved = true;
@@ -336,6 +440,19 @@ ToolStrip::ItemParts ToolStrip::item_parts(std::size_t index, Rect bounds) const
     const ToolStripItemSpec& item = items_[index];
     ItemParts parts;
     if (bounds.empty()) return parts;
+    // A hosted control fills its item; the strip paints nothing of it.
+    if (item.kind == ToolStripItemKind::combo_box) {
+        parts.item_combo_box = PartGeometry::from_bounds(bounds);
+        return parts;
+    }
+    if (item.kind == ToolStripItemKind::text_box) {
+        parts.item_text_box = PartGeometry::from_bounds(bounds);
+        return parts;
+    }
+    if (item.kind == ToolStripItemKind::progress_bar) {
+        parts.item_progress_bar = PartGeometry::from_bounds(bounds);
+        return parts;
+    }
     if (item.kind == ToolStripItemKind::separator) {
         const double inset = 2.0 * scale;
         const Rect rule{std::floor(bounds.x + bounds.width * 0.5), bounds.y + inset, 1.0,
@@ -396,10 +513,24 @@ AnatomyStateSet ToolStrip::item_states(std::size_t index) const {
     return states;
 }
 
+void ToolStrip::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    const Layout placed = layout_for({0.0, 0.0, final_bounds.width, final_bounds.height});
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        const Control::Ptr& control = item_states_[index].hosted;
+        if (!control) continue;
+        const Rect bounds = placed.items[index];
+        set_child_layout_collapsed(control, bounds.empty());
+        if (!bounds.empty()) set_child_layout(control, bounds);
+    }
+}
+
 // -- paint -------------------------------------------------------------------
 
 void ToolStrip::paint_item(Painter& painter, std::size_t index, Rect bounds) const {
     const ToolStripItemSpec& item = items_[index];
+    // A hosted item's control paints itself.
+    if (hosted(item.kind)) return;
     const ItemParts parts = item_parts(index, bounds);
     const AnatomyStateSet states = item_states(index);
     if (item.kind == ToolStripItemKind::separator) {
@@ -800,6 +931,8 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
         const Rect bounds = placed.items[index];
         if (bounds.empty()) continue;
         const ToolStripItemSpec& item = items_[index];
+        // A hosted control describes itself as a child of the strip.
+        if (hosted(item.kind)) continue;
         SemanticNode node{};
         node.stable_id = item.stable_id;
         node.runtime_id = item_runtime_id(node.stable_id);
@@ -883,7 +1016,7 @@ constexpr std::array<PartField<ToolStrip::Parts>, 6> tool_strip_part_fields{{
      .member = &ToolStrip::Parts::focus},
 }};
 
-constexpr std::array<PartField<ToolStrip::ItemParts>, 7> tool_strip_item_part_fields{{
+constexpr std::array<PartField<ToolStrip::ItemParts>, 10> tool_strip_item_part_fields{{
     {.declaration = {.name = "item_face", .role = PartRole::face, .composed_from = {}},
      .member = &ToolStrip::ItemParts::item_face},
     {.declaration = {.name = "item_icon", .role = PartRole::icon, .composed_from = {}},
@@ -899,6 +1032,12 @@ constexpr std::array<PartField<ToolStrip::ItemParts>, 7> tool_strip_item_part_fi
      .member = &ToolStrip::ItemParts::item_separator},
     {.declaration = {.name = "item_focus", .role = PartRole::focus, .composed_from = {}},
      .member = &ToolStrip::ItemParts::item_focus},
+    {.declaration = {.name = "item_combo_box", .role = PartRole::well, .composed_from = "combo_box"},
+     .member = &ToolStrip::ItemParts::item_combo_box},
+    {.declaration = {.name = "item_text_box", .role = PartRole::well, .composed_from = "text_box"},
+     .member = &ToolStrip::ItemParts::item_text_box},
+    {.declaration = {.name = "item_progress_bar", .role = PartRole::track, .composed_from = "progress_bar"},
+     .member = &ToolStrip::ItemParts::item_progress_bar},
 }};
 
 constexpr std::array<StateField<ToolStrip::ItemStates>, 6> tool_strip_item_state_fields{{
@@ -911,7 +1050,7 @@ constexpr std::array<StateField<ToolStrip::ItemStates>, 6> tool_strip_item_state
 }};
 
 constexpr std::array<PartDeclaration, 6> tool_strip_parts = part_declarations(tool_strip_part_fields);
-constexpr std::array<PartDeclaration, 7> tool_strip_item_parts = part_declarations(tool_strip_item_part_fields);
+constexpr std::array<PartDeclaration, 10> tool_strip_item_parts = part_declarations(tool_strip_item_part_fields);
 constexpr std::array<AnatomyState, 6> tool_strip_item_states = state_declarations(tool_strip_item_state_fields);
 constexpr std::array<AnatomyState, 5> tool_strip_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,

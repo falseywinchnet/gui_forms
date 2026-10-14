@@ -258,6 +258,14 @@ Related types
 
    .. cpp:member:: PartGeometry item_focus
 
+   .. cpp:member:: PartGeometry item_combo_box
+
+      The hosted control of a combo box, text box or progress bar item.
+
+   .. cpp:member:: PartGeometry item_text_box
+
+   .. cpp:member:: PartGeometry item_progress_bar
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ToolStrip::ItemStates final
@@ -328,7 +336,7 @@ Related types
 
    ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
 
-   One item. ``stable_id`` is unique within the strip and names the item in events, semantics and the published anatomy. An item with a ``command`` takes its text (when ``text`` is empty), enabled, visible and checked state from it, and a click executes it. An item without one uses ``text``, ``enabled``, ``visible`` and the strip's own checked state. ``drop_down`` is the menu of a drop-down or split button and must be empty for other kinds. ``spring`` is honoured only by StatusStrip, on labels: spring labels share the width the other items leave.
+   One item. ``stable_id`` is unique within the strip and names the item in events, semantics and the published anatomy. An item with a ``command`` takes its text (when ``text`` is empty), enabled, visible and checked state from it, and a click executes it. An item without one uses ``text``, ``enabled``, ``visible`` and the strip's own checked state. ``drop_down`` is the menu of a drop-down or split button and must be empty for other kinds. ``spring`` is honoured only by StatusStrip, on labels: spring labels share the width the other items leave. A hosted item (combo box, text box, progress bar) takes no command, menu or check. Its ``text`` is the hosted control's accessible name, ``choices`` are a combo box's items, and ``width`` its width in logical units (zero for the default: 120 for a combo box, 100 otherwise). Hosted items never move to the overflow menu, whatever their ``overflow``: a menu row cannot hold a control. The application reaches the control through combo_box(), text_box() or progress_bar(); it keeps its state while set_items keeps an item of the same ID and kind.
 
    .. cpp:member:: std::string stable_id
 
@@ -371,6 +379,10 @@ Related types
    .. cpp:member:: bool checked
 
    .. cpp:member:: bool spring
+
+   .. cpp:member:: std::vector<std::string> choices
+
+   .. cpp:member:: double width
 
 Enumerations
 ------------
@@ -428,6 +440,12 @@ Enumerations
    .. cpp:enumerator:: drop_down_button
 
    .. cpp:enumerator:: split_button
+
+   .. cpp:enumerator:: combo_box
+
+   .. cpp:enumerator:: text_box
+
+   .. cpp:enumerator:: progress_bar
 
 .. cpp:namespace:: gui_forms
 

@@ -1828,6 +1828,9 @@ Item system `item`:
 | `item_arrow_glyph` | glyph |  |  |
 | `item_separator` | divider |  |  |
 | `item_focus` | focus |  |  |
+| `item_combo_box` | well | `combo_box` |  |
+| `item_text_box` | well | `text_box` |  |
+| `item_progress_bar` | track | `progress_bar` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 
@@ -1860,6 +1863,9 @@ Item system `item`:
 | `item_arrow_glyph` | glyph |  |  |
 | `item_separator` | divider |  |  |
 | `item_focus` | focus |  |  |
+| `item_combo_box` | well | `combo_box` |  |
+| `item_text_box` | well | `text_box` |  |
+| `item_progress_bar` | track | `progress_bar` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 

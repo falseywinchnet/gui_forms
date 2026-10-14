@@ -14,8 +14,9 @@ gui_forms::ToolStrip
    A command strip of buttons, labels, separators and drop-down buttons.
 
    A tool strip lays out a row of items described by :cpp:class:`ToolStripItemSpec <gui_forms::ToolStripItemSpec>`
-   records: buttons, labels, separators, drop-down buttons that open a menu, and
-   split buttons whose arrow opens a menu while the rest clicks. Items that do not
+   records: buttons, labels, separators, drop-down buttons that open a menu,
+   split buttons whose arrow opens a menu while the rest clicks, and hosted
+   combo boxes, text boxes and progress bars. Items that do not
    fit move to an overflow menu opened from a button at the strip's end. Give an
    item a shared :cpp:class:`Command <gui_forms::Command>` and the strip shows the command's text, enabled,
    visible and checked state, and executes it on a click; the same command can sit
@@ -35,7 +36,9 @@ gui_forms::ToolStrip
          The items, in strip order. :cpp:func:`set_items <gui_forms::ToolStrip::set_items>` replaces them and throws
          ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
          menu on an item that has none, a drop-down or split button without one,
-         or a menu item ID that repeats an item ID.
+         a menu item ID that repeats an item ID, a hosted item with a command or
+         check, choices on an item that is not a combo box, or a width outside 0
+         to 1024.
 
       **grip_visible** : ``bool``, default ``true``
          Whether the grip shows at the strip's start.
@@ -76,6 +79,12 @@ gui_forms::ToolStrip
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`combo_box <gui_forms::ToolStrip::combo_box>`
+        - The :cpp:class:`ComboBox <gui_forms::ComboBox>` a combo box item holds.
+      * - :cpp:func:`text_box <gui_forms::ToolStrip::text_box>`
+        -  
+      * - :cpp:func:`progress_bar <gui_forms::ToolStrip::progress_bar>`
+        -  
       * - :cpp:func:`item_checked <gui_forms::ToolStrip::item_checked>`
         - The checked state an item shows: its command's when it has one.
       * - :cpp:func:`show_drop_down <gui_forms::ToolStrip::show_drop_down>`
@@ -125,8 +134,22 @@ gui_forms::ToolStrip
    closes it. The strip publishes the accessibility role ``toolbar``, with a
    child per item: ``button``, ``static_text`` or ``separator``.
 
-   Not supported yet: vertical strips, hosted controls (a combo box, text box or
-   progress bar in the strip), tool tips on items, and dragging the grip.
+   Hosted items hold real child controls (:cpp:class:`ComboBox <gui_forms::ComboBox>`, :cpp:class:`TextBox <gui_forms::TextBox>`,
+   :cpp:class:`ProgressBar <gui_forms::ProgressBar>`) named ``<stable_id>.<item id>``, placed at the item's bounds
+   by the strip's layout. The item's ``text`` is the control's accessible name,
+   a combo box's ``choices`` are its items, and ``width`` sets the width (120 for a
+   combo box and 100 otherwise when zero). The application drives the control
+   through :cpp:func:`combo_box <gui_forms::ToolStrip::combo_box>`, :cpp:func:`text_box <gui_forms::ToolStrip::text_box>` or :cpp:func:`progress_bar <gui_forms::ToolStrip::progress_bar>`; :cpp:func:`set_items <gui_forms::ToolStrip::set_items>` keeps a
+   control, with its state, while an item of the same ID and kind remains.
+   Hosted items publish ``item_combo_box``, ``item_text_box`` or
+   ``item_progress_bar``, paint themselves, and describe themselves to
+   accessibility as children of the strip. They never move to the overflow
+   menu, whatever their ``overflow`` setting: a menu row cannot hold a control
+   (Windows Forms shows them inside its overflow drop-down). Arrow keys skip
+   them; Tab reaches them.
+
+   Not supported yet: vertical strips, hosted controls in the overflow menu,
+   tool tips on items, and dragging the grip.
 
    .. rubric:: Examples
 
@@ -159,7 +182,9 @@ gui_forms::ToolStrip
       The items, in strip order. :cpp:func:`set_items <gui_forms::ToolStrip::set_items>` replaces them and throws
       ``std::invalid_argument`` for an empty or repeated ID, invalid UTF-8, a
       menu on an item that has none, a drop-down or split button without one,
-      or a menu item ID that repeats an item ID.
+      a menu item ID that repeats an item ID, a hosted item with a command or
+      check, choices on an item that is not a combo box, or a width outside 0
+      to 1024.
 
    .. cpp:function:: void set_items(std::vector<ToolStripItemSpec> items)
 
@@ -213,6 +238,16 @@ gui_forms::ToolStrip
 
    .. rubric:: Methods
 
+   .. cpp:function:: std::shared_ptr<ComboBox> combo_box(std::string_view item_id) const
+
+      The :cpp:class:`ComboBox <gui_forms::ComboBox>` a combo box item holds. :cpp:func:`text_box <gui_forms::ToolStrip::text_box>` and :cpp:func:`progress_bar <gui_forms::ToolStrip::progress_bar>`
+      return a text box or progress bar item's control. Each throws
+      ``std::out_of_range`` for an ID that names no item of that kind.
+
+   .. cpp:function:: std::shared_ptr<TextBox> text_box(std::string_view item_id) const
+
+   .. cpp:function:: std::shared_ptr<ProgressBar> progress_bar(std::string_view item_id) const
+
    .. cpp:function:: bool item_checked(std::string_view item_id) const
 
       The checked state an item shows: its command's when it has one. An
@@ -238,6 +273,8 @@ gui_forms::ToolStrip
 
    .. cpp:function:: Size measure(Size available) override
 
+   .. cpp:function:: void arrange(Rect final_bounds) override
+
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
 
    .. cpp:function:: void on_pointer(PointerEvent& event) override
@@ -261,6 +298,10 @@ gui_forms::ToolStrip
    .. cpp:function:: AnatomyStateSet realized_item_anatomy_states(std::size_t item) const override
 
    .. cpp:function:: Layout layout() const
+
+      *Protected.*
+
+   .. cpp:function:: Layout layout_for(Rect surface) const
 
       *Protected.*
 

@@ -3868,7 +3868,10 @@
             {"name": "item_arrow", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed"]},
             {"name": "item_arrow_glyph", "role": "glyph", "composed_from": null, "states": []},
             {"name": "item_separator", "role": "divider", "composed_from": null, "states": []},
-            {"name": "item_focus", "role": "focus", "composed_from": null, "states": []}
+            {"name": "item_focus", "role": "focus", "composed_from": null, "states": []},
+            {"name": "item_combo_box", "role": "well", "composed_from": "combo_box", "states": []},
+            {"name": "item_text_box", "role": "well", "composed_from": "text_box", "states": []},
+            {"name": "item_progress_bar", "role": "track", "composed_from": "progress_bar", "states": []}
           ],
           "states": ["hot", "pressed", "checked", "open", "disabled", "focus_visible"],
           "custom_states": []
@@ -3936,7 +3939,10 @@
             {"name": "item_arrow", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed"]},
             {"name": "item_arrow_glyph", "role": "glyph", "composed_from": null, "states": []},
             {"name": "item_separator", "role": "divider", "composed_from": null, "states": []},
-            {"name": "item_focus", "role": "focus", "composed_from": null, "states": []}
+            {"name": "item_focus", "role": "focus", "composed_from": null, "states": []},
+            {"name": "item_combo_box", "role": "well", "composed_from": "combo_box", "states": []},
+            {"name": "item_text_box", "role": "well", "composed_from": "text_box", "states": []},
+            {"name": "item_progress_bar", "role": "track", "composed_from": "progress_bar", "states": []}
           ],
           "states": ["hot", "pressed", "checked", "open", "disabled", "focus_visible"],
           "custom_states": []
