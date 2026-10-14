@@ -5,6 +5,7 @@
 #include "gui_forms/controls/panel/object_view/object_view.hpp"
 #include "gui_forms/controls/panel/list_view/list_view.hpp"
 #include "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp"
+#include "gui_forms/controls/data_grid_view/data_grid_view.hpp"
 
 #include "gui_forms/controls/collections/command_bar.hpp"
 #include "gui_forms/controls/collections/choice_group.hpp"

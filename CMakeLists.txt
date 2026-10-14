@@ -426,6 +426,8 @@ add_library(gui_forms_controls STATIC
     src/controls/menu/menu_strip/menu_strip.cpp
     src/controls/tool_strip/tool_strip.cpp
     src/controls/status_strip/status_strip.cpp
+    src/controls/data_grid_view/data_grid_view.cpp
+    src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -2370,6 +2372,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
+
+    add_executable(gui_forms_data_grid_view_tests tests/data_grid_view_tests.cpp)
+    target_link_libraries(gui_forms_data_grid_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_data_grid_view_tests COMMAND gui_forms_data_grid_view_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
