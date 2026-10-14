@@ -13,8 +13,8 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
 
    * - :cpp:class:`Timer <gui_forms::Timer>`
      - A component that raises ``tick`` at a fixed interval on a window's UI thread.
-   * - :cpp:class:`BackgroundWorker <gui_forms::BackgroundWorker>`
-     - Runs work on a worker thread and reports progress and completion on the UI thread.
+   * - :cpp:class:`NotifyIcon <gui_forms::NotifyIcon>`
+     - An icon in the desktop's notification area, with clicks, a menu and notification text.
    * - :cpp:class:`ImageList <gui_forms::ImageList>`
      - A keyed collection of images that buttons, trees and object views share.
    * - :cpp:class:`ErrorProvider <gui_forms::ErrorProvider>`
@@ -34,7 +34,7 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
    :hidden:
 
    generated/gui_forms.Timer
-   generated/gui_forms.BackgroundWorker
+   generated/gui_forms.NotifyIcon
    generated/gui_forms.ImageList
    generated/gui_forms.ErrorProvider
    generated/gui_forms.HelpProvider
@@ -50,12 +50,6 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
-   * - :cpp:class:`BackgroundWorkerCompleted <gui_forms::BackgroundWorkerCompleted>`
-     - The end of a run, delivered on the UI thread.
-   * - :cpp:class:`BackgroundWorkerProgress <gui_forms::BackgroundWorkerProgress>`
-     - One progress report, delivered on the UI thread.
-   * - :cpp:class:`BackgroundWorkerTask <gui_forms::BackgroundWorkerTask>`
-     - The one object the work function may touch on the worker thread: the argument, the result, the cancellation request and progress reports.
    * - :cpp:class:`ErrorIconSnapshot <gui_forms::ErrorIconSnapshot>`
      - ErrorIconSnapshot is a read-only diagnostic record for one target: stable identity, message, exact glyph bounds, target availability, popup presentation, blink activity, and current phase visibility.
    * - :cpp:class:`ErrorProviderChange <gui_forms::ErrorProviderChange>`
@@ -70,68 +64,8 @@ Related types
      - ImageListChange identifies revision, mutation kind, entry index, and key affected by one retained resource mutation.
    * - :cpp:class:`ImageListResolution <gui_forms::ImageListResolution>`
      - ImageListResolution returns the exact registered ImageId plus source pixel size, chosen scale variant, revision, and stable entry identity.
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: BackgroundWorkerCompleted final
-
-   ``#include <gui_forms/background_worker/background_worker.hpp>``
-
-   The end of a run, delivered on the UI thread. ``error`` holds the exception the work threw, if any, and ``error_message`` its what() text; ``result`` is then empty. ``cancelled`` is true when the work acknowledged a cancellation.
-
-   .. cpp:member:: BindingValue result
-
-   .. cpp:member:: std::exception_ptr error
-
-   .. cpp:member:: std::string error_message
-
-   .. cpp:member:: bool cancelled
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: BackgroundWorkerProgress final
-
-   ``#include <gui_forms/background_worker/background_worker.hpp>``
-
-   One progress report, delivered on the UI thread.
-
-   .. cpp:member:: int percent
-
-   .. cpp:member:: BindingValue user_state
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:class:: BackgroundWorkerTask final
-
-   ``#include <gui_forms/background_worker/background_worker.hpp>``
-
-   The one object the work function may touch on the worker thread: the argument, the result, the cancellation request and progress reports. It lives for one run; a run's work must not keep it after returning.
-
-
-   .. rubric:: Properties
-
-   .. cpp:function:: const BindingValue& argument() const noexcept
-
-      The value run_worker_async was given.
-
-   .. cpp:function:: bool cancellation_pending() const noexcept
-
-      Whether cancel_async was called during this run. The work polls it.
-
-
-   .. rubric:: Methods
-
-   .. cpp:function:: void report_progress(int percent, BindingValue user_state = {})
-
-      Posts a progress report to the UI thread, where progress_changed raises it. Throws std::logic_error when the worker does not report progress and std::out_of_range for a percentage outside 0 to 100. A report the dispatcher no longer accepts (its window closed) is dropped.
-
-   .. cpp:function:: void set_result(BindingValue result)
-
-      The value run_worker_completed reports; empty until set.
-
-   .. cpp:function:: void set_cancelled(bool cancelled) noexcept
-
-      The work acknowledges a cancellation: run_worker_completed reports the run as cancelled, as Windows Forms' DoWorkEventArgs.Cancel does.
+   * - :cpp:class:`NotifyIconClick <gui_forms::NotifyIconClick>`
+     - A click on the icon: ``button`` is primary for a click and secondary for the platform's context gesture.
 
 .. cpp:namespace:: gui_forms
 
@@ -272,6 +206,18 @@ Related types
    .. cpp:member:: double resolved_scale
 
       Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NotifyIconClick final
+
+   ``#include <gui_forms/components/notify_icon/notify_icon.hpp>``
+
+   A click on the icon: ``button`` is primary for a click and secondary for the platform's context gesture.
+
+   .. cpp:member:: PointerButton button
+
+      Default: ``{PointerButton::primary}``.
 
 Enumerations
 ------------

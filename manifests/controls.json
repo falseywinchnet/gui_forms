@@ -866,6 +866,17 @@
       "doc": "api/generated/gui_forms.BackgroundWorker.rst"
     },
     {
+      "id": "notify_icon",
+      "type": "NotifyIcon",
+      "header": "gui_forms/components/notify_icon/notify_icon.hpp",
+      "category": "Components",
+      "purpose": "Icon in the desktop's notification area (Windows tray, macOS status item, X11 system tray) with a tooltip, clicks, a native context menu and notification text, each refused explicitly where the host lacks the capability.",
+      "winforms": "NotifyIcon",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.NotifyIcon.rst"
+    },
+    {
       "id": "image_list",
       "type": "ImageList",
       "header": "gui_forms/image_list/image_list/image_list.hpp",

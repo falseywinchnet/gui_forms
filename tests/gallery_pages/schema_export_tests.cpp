@@ -408,6 +408,7 @@ void test_schema_export() {
         std::make_shared<Timer>(window, std::chrono::milliseconds(1000));
     const std::shared_ptr<BackgroundWorker> background_worker = std::make_shared<BackgroundWorker>(window);
     const std::shared_ptr<ImageList> image_list = std::make_shared<ImageList>(window);
+    const std::shared_ptr<NotifyIcon> notify_icon = std::make_shared<NotifyIcon>(window);
     const std::shared_ptr<ErrorProvider> error_provider = std::make_shared<ErrorProvider>(window);
     const std::shared_ptr<HelpProvider> help_provider = std::make_shared<HelpProvider>(window);
     const std::shared_ptr<SemanticFeedback> feedback = std::make_shared<SemanticFeedback>(window);
@@ -422,6 +423,7 @@ void test_schema_export() {
     record_component("tool_tip", *tool_tip, records);
     record_component("timer", *timer, records);
     record_component("background_worker", *background_worker, records);
+    record_component("notify_icon", *notify_icon, records);
     record_component("image_list", *image_list, records);
     record_component("error_provider", *error_provider, records);
     record_component("help_provider", *help_provider, records);

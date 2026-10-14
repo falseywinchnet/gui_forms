@@ -194,6 +194,7 @@ Every stock control, grouped by function; the table is generated from
 | [`ErrorProvider`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ErrorProvider.html) |  | Validation adornment provider that projects error text onto the target semantic node and gives each visible target an independent overlay glyph. |
 | [`HelpProvider`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.HelpProvider.html) |  | Policy-free help provider that retains authored metadata and routes F1 and pointer help requests to the consumer. |
 | [`ImageList`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.ImageList.html) |  | Ordered, keyed collection of PNG-sourced Window image resources with density and state variants and atomic mutation. |
+| [`NotifyIcon`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.NotifyIcon.html) |  | Icon in the desktop's notification area (Windows tray, macOS status item, X11 system tray) with a tooltip, clicks, a native context menu and notification text, each refused explicitly where the host lacks the capability. |
 | [`SemanticFeedback`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.SemanticFeedback.html) |  | Turns one-shot application transitions into bounded, traceable host cues. |
 | [`Timer`](https://gui-forms.readthedocs.io/en/latest/api/generated/gui_forms.Timer.html) |  | Timer whose callbacks are serialized with input, layout, and paint on the owning Window's UI thread and whose late ticks are coalesced. |
 <!-- controls:end -->

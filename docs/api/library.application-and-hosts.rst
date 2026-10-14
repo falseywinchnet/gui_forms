@@ -124,6 +124,20 @@ Related types
      - HostSoundCueRequest carries semantic meaning, normalized gain, and caller-supplied monotonic time for reproducible coalescing.
    * - :cpp:class:`HostTooltipRequest <gui_forms::HostTooltipRequest>`
      - HostTooltipRequest carries UTF-8 text, root-client logical anchor, and bounded lifetime while adapters own screen clamping/nonactivation.
+   * - :cpp:class:`HostTrayIconEvent <gui_forms::HostTrayIconEvent>`
+     -  
+   * - :cpp:class:`HostTrayIconRequest <gui_forms::HostTrayIconRequest>`
+     - Notification-area (system tray) icons.
+   * - :cpp:class:`HostTrayIconResult <gui_forms::HostTrayIconResult>`
+     -  
+   * - :cpp:class:`HostTrayMenuItem <gui_forms::HostTrayMenuItem>`
+     - One row of a native tray menu: a command with an identity, or a separator.
+   * - :cpp:class:`HostTrayMenuRequest <gui_forms::HostTrayMenuRequest>`
+     -  
+   * - :cpp:class:`HostTrayMenuResult <gui_forms::HostTrayMenuResult>`
+     - The chosen row's identity, or empty when the menu was dismissed.
+   * - :cpp:class:`HostTrayNotificationRequest <gui_forms::HostTrayNotificationRequest>`
+     - Notification text from a tray icon: a title of at most 63 bytes and text of at most 255 bytes of UTF-8, shown for about ``timeout_milliseconds`` where the platform honours a timeout (zero leaves it to the platform).
    * - :cpp:class:`LinuxApplicationWindow <gui_forms::host::LinuxApplicationWindow>`
      -  
    * - :cpp:class:`LinuxHostOptions <gui_forms::host::LinuxHostOptions>`
@@ -809,6 +823,10 @@ Related types
 
    .. rubric:: Events
 
+   .. cpp:function:: Event<const HostTrayIconEvent&>& tray_icon_events() noexcept
+
+      Raised on the UI thread for each user action on a live tray icon.
+
    .. cpp:function:: Event<const HostModalTransition&>& modal_changed() noexcept
 
       Returns the ordered modal enter/leave event consumed by HostSession.
@@ -855,6 +873,24 @@ Related types
    .. cpp:function:: HostServiceStatus play_sound_cue(const HostSoundCueRequest& request)
 
       Validates semantic cue/gain/monotonic time, applies configurable same-cue burst coalescing and mute policy, delegates native playback, and accounts every outcome.
+
+   .. cpp:function:: HostTrayIconResult add_tray_icon(const HostTrayIconRequest& request)
+
+      Notification-area icons (capability notification_area). The base class assigns identities, validates images and text, bounds the icon count and removes every live icon at shutdown, so adapters agree on those rules. An unknown or removed identity is an invalid_argument.
+
+   .. cpp:function:: HostServiceStatus update_tray_icon(std::uint64_t icon_id, const HostTrayIconRequest& request)
+
+   .. cpp:function:: HostServiceStatus remove_tray_icon(std::uint64_t icon_id)
+
+   .. cpp:function:: HostServiceStatus show_tray_notification(std::uint64_t icon_id, const HostTrayNotificationRequest& request)
+
+      Capability notification_area_messages.
+
+   .. cpp:function:: HostTrayMenuResult show_tray_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request)
+
+      Capability notification_area_menus. Shows a native menu at the icon and returns when it closes, as show_dialog does.
+
+   .. cpp:function:: bool tray_icon_live(std::uint64_t icon_id) const noexcept
 
    .. cpp:function:: void shutdown() noexcept
 
@@ -959,6 +995,36 @@ Related types
 
       Lets the concrete adapter release native resources after portable terminal state commits.
 
+   .. cpp:function:: virtual HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request)
+
+      *Protected.*
+
+      Tray adapters: called with a validated request and an identity the base class assigned. The defaults refuse as unsupported.
+
+   .. cpp:function:: virtual HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request)
+
+      *Protected.*
+
+   .. cpp:function:: virtual void remove_tray_icon_impl(std::uint64_t icon_id) noexcept
+
+      *Protected.*
+
+      Must not fail in a way that leaves the icon shown; called at shutdown.
+
+   .. cpp:function:: virtual HostServiceStatus show_tray_notification_impl(std::uint64_t icon_id, const HostTrayNotificationRequest& request)
+
+      *Protected.*
+
+   .. cpp:function:: virtual HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id, const HostTrayMenuRequest& request)
+
+      *Protected.*
+
+   .. cpp:function:: void publish_tray_icon_event(const HostTrayIconEvent& event)
+
+      *Protected.*
+
+      Adapters report native tray events here, on the UI thread. Events for identities that are not live are dropped.
+
    .. cpp:member:: constexpr std::size_t maximum_clipboard_text_bytes
 
       Default: ``16U * 1024U * 1024U``.
@@ -982,6 +1048,34 @@ Related types
    .. cpp:member:: constexpr std::uint32_t maximum_nested_modal_depth
 
       Default: ``8U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_icons
+
+      Default: ``16U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_icon_images
+
+      Default: ``8U``.
+
+   .. cpp:member:: constexpr std::uint32_t maximum_tray_icon_side
+
+      Default: ``256U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_tooltip_bytes
+
+      Default: ``127U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_title_bytes
+
+      Default: ``63U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_text_bytes
+
+      Default: ``255U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_tray_menu_items
+
+      Default: ``64U``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1041,6 +1135,16 @@ Related types
    .. cpp:member:: std::uint32_t modal_depth
 
    .. cpp:member:: std::uint32_t maximum_modal_depth
+
+   .. cpp:member:: std::uint64_t tray_icons
+
+   .. cpp:member:: std::uint64_t tray_icon_updates
+
+   .. cpp:member:: std::uint64_t tray_notifications
+
+   .. cpp:member:: std::uint64_t tray_menus
+
+   .. cpp:member:: std::uint64_t tray_events
 
    .. cpp:member:: std::uint64_t rejected_requests
 
@@ -1207,6 +1311,98 @@ Related types
    .. cpp:member:: Point anchor
 
    .. cpp:member:: std::uint32_t duration_milliseconds
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayIconEvent final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:member:: std::uint64_t icon_id
+
+   .. cpp:member:: HostTrayIconAction action
+
+      Default: ``{HostTrayIconAction::click}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayIconRequest final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   Notification-area (system tray) icons. An icon is named by the identity HostServices::add_tray_icon returns; no native handle enters the portable contract. ``images`` holds the icon at one or more sizes (each at most 256 pixels a side); an adapter shows the image nearest the size its tray asks for (select_tray_icon_image). ``tooltip`` is at most 127 bytes of UTF-8.
+
+   .. cpp:member:: std::vector<HostImage> images
+
+   .. cpp:member:: std::string tooltip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayIconResult final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: std::uint64_t icon_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayMenuItem final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   One row of a native tray menu: a command with an identity, or a separator.
+
+   .. cpp:member:: std::string id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool separator
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayMenuRequest final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:member:: std::vector<HostTrayMenuItem> items
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayMenuResult final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   The chosen row's identity, or empty when the menu was dismissed.
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: std::string chosen_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayNotificationRequest final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   Notification text from a tray icon: a title of at most 63 bytes and text of at most 255 bytes of UTF-8, shown for about ``timeout_milliseconds`` where the platform honours a timeout (zero leaves it to the platform).
+
+   .. cpp:member:: std::string title
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: HostTrayNotificationIcon icon
+
+      Default: ``{HostTrayNotificationIcon::none}``.
+
+   .. cpp:member:: std::uint32_t timeout_milliseconds
 
 .. cpp:namespace:: gui_forms::host
 
@@ -1683,6 +1879,12 @@ Enumerations
 
    .. cpp:enumerator:: frame_capture
 
+   .. cpp:enumerator:: notification_area
+
+   .. cpp:enumerator:: notification_area_messages
+
+   .. cpp:enumerator:: notification_area_menus
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: HostCloseReason
@@ -1853,6 +2055,36 @@ Enumerations
 
    .. cpp:enumerator:: operation_complete
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: HostTrayIconAction
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:enumerator:: click
+
+   .. cpp:enumerator:: double_click
+
+   .. cpp:enumerator:: context
+
+   .. cpp:enumerator:: notification_clicked
+
+   .. cpp:enumerator:: notification_closed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: HostTrayNotificationIcon
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: information
+
+   .. cpp:enumerator:: warning
+
+   .. cpp:enumerator:: error
+
 .. cpp:namespace:: gui_forms::host
 
 .. cpp:enum-class:: MacTitlebarPresentation
@@ -1912,6 +2144,10 @@ Functions, constants and aliases
 
 .. cpp:function:: WindowChromeHit resolve_window_chrome_hit(Window& window, Point position, std::span<const std::string> drag_region_ids)
 
+.. cpp:function:: std::size_t select_tray_icon_image(std::span<const HostImage> images, std::uint32_t wanted_side) noexcept
+
+   The index of the image to show for a tray that asks for ``wanted_side`` pixels: the smallest image whose larger side reaches it, or the largest image when none does. ``images`` must not be empty.
+
 .. cpp:function:: const char* host_dispatch_error_name(HostDispatchError error) noexcept
 
 .. cpp:function:: const char* host_lifecycle_phase_name(HostLifecyclePhase phase) noexcept
@@ -1931,6 +2167,8 @@ Functions, constants and aliases
 .. cpp:function:: const char* host_dialog_choice_name(HostDialogChoice choice) noexcept
 
 .. cpp:function:: const char* host_sound_cue_name(HostSoundCue cue) noexcept
+
+.. cpp:function:: const char* host_tray_icon_action_name(HostTrayIconAction action) noexcept
 
 .. cpp:type:: HostDialogRequestPayload = std::variant< HostMessageDialogRequest, HostOpenFileDialogRequest, HostSaveFileDialogRequest, HostFolderDialogRequest, HostColorDialogRequest>
 
