@@ -1305,6 +1305,17 @@ void example() {
 }
 }  // namespace doc_example_FlowLayoutPanel_2
 
+namespace doc_example_FontDialog_1 {
+void example() {
+    std::shared_ptr<gf::FontDialog> dialog =
+        gf::make_control<gf::FontDialog>(gf::StableId("log.font"));
+    (*dialog).set_font({gf::FontRole::monospace, 11.0, 400, false});
+    (*dialog).set_size_range(8.0, 24.0);
+    const gf::FontSpec chosen = (*dialog).selection();   // 11-unit Cousine
+    // (*dialog).show(owner) opens it; its closed event carries the result.
+}
+}  // namespace doc_example_FontDialog_1
+
 namespace doc_example_GroupBox_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> mode =
@@ -3263,6 +3274,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);

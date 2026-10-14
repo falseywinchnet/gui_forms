@@ -1986,6 +1986,37 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `dismiss_requested` | `PopupDismissReason` |
 
+## `font_dialog` (FontDialog, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+| `face` | face |  |  |
+| `title` | label |  |  |
+| `preview_well` | well |  |  |
+| `preview_text` | content |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `apply` | `FontSpec` |
+| `closed` | `FontDialogResult` |
+
 ## `tool_tip` (ToolTip, component)
 
 | Interaction | Payload |

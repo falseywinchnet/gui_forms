@@ -37,6 +37,10 @@ private:
     void build_messages(const std::shared_ptr<Surface>& body);
     void build_paths(const std::shared_ptr<Surface>& body);
     void build_services(const std::shared_ptr<Surface>& body);
+    void build_font_dialog(const std::shared_ptr<LayoutGroup>& services_group);
+    void on_choose_font();
+    void on_font_closed(const FontDialogResult& result);
+    void on_font_applied(const FontSpec& font);
 
     void on_message_dialog(int index, const CommandInvocation& invocation);
     void on_path_dialog(int index, const CommandInvocation& invocation);
@@ -58,6 +62,10 @@ private:
     std::array<Command, 5> service_commands_{};
     std::shared_ptr<Label> status_;
     std::shared_ptr<TextBox> clipboard_;
+    Command choose_font_{};
+    std::shared_ptr<Button> font_button_;
+    std::shared_ptr<FontDialog> font_dialog_;
+    std::shared_ptr<Label> font_sample_;
     std::string last_acceptance_{"No accepted dialog value yet"};
     std::uint64_t next_request_id_{1U};
 };
@@ -72,6 +80,38 @@ HostServicesPage::HostServicesPage(const std::shared_ptr<Surface>& body) {
     build_messages(body);
     build_paths(body);
     build_services(body);
+}
+
+// The FontDialog specimen, beside the service status: a button opens the
+// in-window dialog over the page; OK and Apply restyle the sample label,
+// Cancel leaves it.
+void HostServicesPage::build_font_dialog(const std::shared_ptr<LayoutGroup>& fonts) {
+    choose_font_.set_text("Choose font...");
+    choose_font_.set_description("Open the in-window font dialog");
+    font_button_ = make_control<Button>(StableId("gallery.host.font.choose"), "Choose font...");
+    (*font_button_).set_visual_style(ButtonVisualStyle::command);
+    (*font_button_).bind(choose_font_);
+    (*fonts).add_at(font_button_, {488.0, 142.0, 150.0, 36.0});
+    font_sample_ = label("gallery.host.font.sample", "Sample text in the chosen font", 12.0, 400,
+                         shell_blue_dark);
+    (*fonts).add_at(font_sample_, {650.0, 142.0, 246.0, 56.0});
+    font_dialog_ = make_control<FontDialog>(StableId("gallery.host.font.dialog"));
+    (*font_dialog_).set_font((*font_sample_).font());
+    on(choose_font_.invoked(), *this, &HostServicesPage::on_choose_font);
+    on((*font_dialog_).closed(), *this, &HostServicesPage::on_font_closed);
+    on((*font_dialog_).apply(), *this, &HostServicesPage::on_font_applied);
+}
+
+void HostServicesPage::on_choose_font() {
+    static_cast<void>((*font_dialog_).show(font_button_));
+}
+
+void HostServicesPage::on_font_closed(const FontDialogResult& result) {
+    if (result.result == DialogResult::ok) (*font_sample_).set_font(result.font);
+}
+
+void HostServicesPage::on_font_applied(const FontSpec& font) {
+    (*font_sample_).set_font(font);
 }
 
 void HostServicesPage::build_messages(const std::shared_ptr<Surface>& body) {
@@ -151,7 +191,8 @@ void HostServicesPage::build_services(const std::shared_ptr<Surface>& body) {
                     11.0, 600, green);
     (*status_).set_text_wrapping(TextWrapping::word);
     (*status_).set_vertical_alignment(VerticalAlignment::near);
-    (*services_group).add_at(status_, {24.0, 142.0, 872.0, 56.0});
+    (*services_group).add_at(status_, {24.0, 142.0, 440.0, 56.0});
+    build_font_dialog(services_group);
 }
 
 HostServices* HostServicesPage::services() const {

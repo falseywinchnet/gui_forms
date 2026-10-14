@@ -261,7 +261,7 @@ void test_anatomy_coverage() {
         make_control<ButtonBase>(StableId("anatomy.coverage.button-base"), "Base");
     const std::shared_ptr<ScrollBar> scroll_bar =
         make_control<ScrollBar>(StableId("anatomy.coverage.scroll-bar"));
-    // Popups open only on demand and live outside the root tree.
+    // Popups and dialogs open only on demand and live outside the root tree.
     const std::shared_ptr<AnchoredPopupLayer> popup_layer = make_control<AnchoredPopupLayer>(
         StableId("anatomy.coverage.anchored-popup-layer"), button_base,
         AnchoredPopupPlacement{});
@@ -271,7 +271,11 @@ void test_anatomy_coverage() {
     inspect_control(*scroll_bar, seen_ids);
     inspect_control(*popup_layer, seen_ids);
     inspect_control(*range_control, seen_ids);
-    inspected += 4U;
+    // A dialog opens on demand, outside the root tree.
+    const std::shared_ptr<FontDialog> font_dialog =
+        make_control<FontDialog>(StableId("anatomy.coverage.font-dialog"));
+    inspect_control(*font_dialog, seen_ids);
+    inspected += 5U;
 
     std::string unexpected_gaps;
     std::string stale_pending;

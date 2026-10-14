@@ -472,6 +472,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/numeric_up_down/numeric_up_down.cpp
     src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
     src/controls/panel/flags_value_editor/flags_value_editor.cpp
+    src/controls/panel/font_dialog/font_dialog.cpp
     src/controls/panel/color_value_editor/color_value_editor.cpp
     src/controls/inspection/property_row_spec/property_row_spec.cpp
     src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp
@@ -2397,6 +2398,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_binding_navigator_tests tests/binding_navigator_tests.cpp)
     target_link_libraries(gui_forms_binding_navigator_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_binding_navigator_tests COMMAND gui_forms_binding_navigator_tests)
+
+    add_executable(gui_forms_font_dialog_tests tests/font_dialog_tests.cpp)
+    target_link_libraries(gui_forms_font_dialog_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_font_dialog_tests COMMAND gui_forms_font_dialog_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

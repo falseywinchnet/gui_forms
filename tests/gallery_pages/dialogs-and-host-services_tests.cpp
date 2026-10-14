@@ -58,6 +58,18 @@ void test_dialogs_and_host_services(gui_forms::Window& window,
                 snapshot.clipboard_writes == 1U && snapshot.clipboard_reads == 1U &&
                 snapshot.monitor_queries == 1U && snapshot.sound_playbacks == 1U,
             "host-services board must leave exact modal and service accounting");
+
+    const std::shared_ptr<gui_forms::Label> sample = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.host.font.sample"));
+    click(window, window.find("gallery.host.font.choose"));
+    const std::shared_ptr<gui_forms::FontDialog> dialog = std::dynamic_pointer_cast<FontDialog>(
+        window.find("gallery.host.font.dialog"));
+    require(sample && dialog && (*dialog).is_open() && window.focus_scope_depth() == 1U,
+            "the font button opens the in-window dialog");
+    (*(*dialog).face_list()).select_index(2U);
+    require((*(*dialog).ok_button()).perform_click() && !(*dialog).is_open() &&
+                (*sample).font().role == FontRole::monospace && window.focus_scope_depth() == 0U,
+            "OK restyles the sample and closes the dialog");
 }
 
 } // namespace gallery_pages_tests

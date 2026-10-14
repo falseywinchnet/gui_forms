@@ -393,6 +393,9 @@ void test_schema_export() {
     record_control(*scroll_bar, records);
     record_control(*popup_layer, records);
     record_control(*range_control, records);
+    // A dialog opens on demand, outside the root tree.
+    const std::shared_ptr<FontDialog> font_dialog = make_control<FontDialog>(StableId("schema.font-dialog"));
+    record_control(*font_dialog, records);
 
     // Components, constructed directly.
     const std::shared_ptr<Command> command = std::make_shared<Command>();
