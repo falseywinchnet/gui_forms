@@ -168,6 +168,39 @@ Properties beyond every control's: `text` (text).
 | `committed` | `std::string` |
 | `cancelled` | none |
 
+## `masked_text_box` (MaskedTextBox, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+| `face` | face |  |  |
+| `edge` | edge |  |  |
+| `field` | well | `text_box` |  |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`, `invalid`, `pending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `mask_input_rejected` | `MaskInputRejection` |
+| `text_changed` | `std::string` |
+| `mask_changed` | `std::string` |
+| `overwrite_mode_changed` | `bool` |
+| `type_validation_completed` | `MaskValidation` |
+
 ## `label` (Label, control)
 
 | Part | Role | Reuses | Own states |

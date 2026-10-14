@@ -56,6 +56,20 @@ void test_text_and_input(gui_forms::Window& window,
     require(clipboard_metrics.clipboard_writes == 2U &&
                 clipboard_metrics.clipboard_reads == 2U,
             "gallery clipboard commands must leave exact transport accounting");
+
+    const std::shared_ptr<gui_forms::MaskedTextBox> phone = std::dynamic_pointer_cast<MaskedTextBox>(
+        window.find("gallery.text.masked.phone"));
+    const std::shared_ptr<gui_forms::Label> masked_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.text.masked.status"));
+    require(phone && masked_status && (*(*phone).editor()).text() == "(___) ___-____",
+            "the masked specimen shows its prompts and literals");
+    require(window.request_focus((*phone).editor()) && window.dispatch_text({"555"}) &&
+                (*phone).text() == "(555" &&
+                (*masked_status).text() == "Telephone (555 · incomplete",
+            "typed digits pass the mask and report to the page");
+    require(!window.dispatch_text({"x"}) &&
+                (*masked_status).text().find("refused \"x\" at position 6") != std::string::npos,
+            "a refused letter is reported with its position");
 }
 
 } // namespace gallery_pages_tests

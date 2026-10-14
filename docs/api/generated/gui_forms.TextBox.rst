@@ -174,6 +174,8 @@ gui_forms::TextBox
         - Copies the selection and then deletes it.
       * - :cpp:func:`paste <gui_forms::TextBox::paste>`
         - Replaces the selection with clipboard text.
+      * - :cpp:func:`set_edit_filter <gui_forms::TextBox::set_edit_filter>`
+        - Installs a filter that sees every user edit (typing, deletion, paste and assistive set-value, as a :cpp:class:`TextEdit <gui_forms::TextEdit>` with its :cpp:enum:`TextEditKind <gui_forms::TextEditKind>`) before it is applied, and accepts it, refuses it, or rewrites the whole text and places the caret.
 
    .. seealso::
 
@@ -496,6 +498,17 @@ gui_forms::TextBox
       Replaces the selection with clipboard text. It returns false when the box
       is read-only, the window has no host clipboard, the clipboard holds no
       text, or the edit is refused.
+
+   .. cpp:function:: void set_edit_filter(Delegate<TextEdit&> filter) noexcept
+
+      Installs a filter that sees every user edit (typing, deletion, paste and
+      assistive set-value, as a :cpp:class:`TextEdit <gui_forms::TextEdit>` with its :cpp:enum:`TextEditKind <gui_forms::TextEditKind>`) before it
+      is applied, and accepts it, refuses it, or rewrites the whole text and
+      places the caret. :cpp:func:`set_text <gui_forms::TextBox::set_text>`, undo and redo do not pass through it. The
+      filter must not change the box; an edit during whose filter call the text
+      changed anyway is abandoned. The delegate does not own its target; clear
+      it with an empty :cpp:class:`Delegate <gui_forms::Delegate>` before the target goes away. :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
+      uses it to put input through its mask.
 
 
    .. rubric:: Extension points

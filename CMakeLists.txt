@@ -462,6 +462,8 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/combo_box/combo_box.cpp
     src/controls/panel/up_down/spin_buttons.cpp
     src/controls/panel/domain_up_down/domain_up_down.cpp
+    src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp
+    src/controls/panel/masked_text_box/masked_text_box.cpp
     src/controls/panel/numeric_up_down/numeric_up_down.cpp
     src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
     src/controls/panel/flags_value_editor/flags_value_editor.cpp
@@ -2376,6 +2378,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_data_grid_view_tests tests/data_grid_view_tests.cpp)
     target_link_libraries(gui_forms_data_grid_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_data_grid_view_tests COMMAND gui_forms_data_grid_view_tests)
+
+    add_executable(gui_forms_masked_text_box_tests tests/masked_text_box_tests.cpp)
+    target_link_libraries(gui_forms_masked_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_masked_text_box_tests COMMAND gui_forms_masked_text_box_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

@@ -360,6 +360,8 @@ std::uint32_t key_usage(KeySym key) {
     return PhysicalKey::minus;
   case XK_equal:
     return PhysicalKey::equal;
+  case XK_Insert:
+    return PhysicalKey::insert;
   case XK_Home:
     return PhysicalKey::home;
   case XK_End:

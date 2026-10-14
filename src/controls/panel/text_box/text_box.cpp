@@ -289,7 +289,7 @@ bool TextBox::redo() {
 }
 
 bool TextBox::replace(Utf8Offset start, Utf8Offset end,
-                      std::string_view replacement, bool record_history) {
+                      std::string_view replacement, TextEditKind kind) {
     require_mutable();
     const Utf8ValidationResult replacement_validation =
         validate_utf8(replacement);
@@ -298,6 +298,19 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
         !store_.is_grapheme_boundary(end) ||
         !replacement_validation.valid()) {
         return false;
+    }
+    if (edit_filter_) {
+        TextEdit edit{.kind = kind, .start = start, .end = end, .replacement = replacement};
+        const std::uint64_t revision = store_.revision();
+        edit_filter_(edit);
+        // The filter may not change the text; if it did, the proposal no
+        // longer describes this text.
+        if (store_.revision() != revision) return false;
+        if (edit.verdict == TextEditVerdict::refuse) return false;
+        if (edit.verdict == TextEditVerdict::rewrite) {
+            const bool rewritten = apply_rewrite(edit.rewritten_text, edit.rewritten_caret);
+            return rewritten;
+        }
     }
     if (multiline_ && replacement.size() > maximum_multiline_bytes -
             (text().size() - (end.value() - start.value()))) return false;
@@ -323,10 +336,8 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
     }
     Snapshot previous = snapshot();
     static_cast<void>(store_.replace({start, end}, replacement));
-    if (record_history) {
-        clear_redo();
-        push_history(undo_, std::move(previous));
-    }
+    clear_redo();
+    push_history(undo_, std::move(previous));
     Utf8Offset next(start.value() + replacement.size());
     // An insertion may join a following combining sequence or CRLF. Keep the
     // resulting caret on a boundary of the new text, not merely the old text.
@@ -342,10 +353,43 @@ bool TextBox::replace(Utf8Offset start, Utf8Offset end,
     return true;
 }
 
+bool TextBox::apply_rewrite(std::string_view rewritten, Utf8Offset caret) {
+    const Utf8ValidationResult validation = validate_utf8(rewritten);
+    if (!validation.valid()) return false;
+    if (multiline_ && validate_multiline_text(rewritten) != MultilineValidation::valid) return false;
+    if (maximum_length_ != 0U && validation.scalar_count > maximum_length_) return false;
+    const bool changes = rewritten != store_.utf8();
+    if (changes) {
+        Snapshot previous = snapshot();
+        store_.set_text(rewritten);
+        clear_redo();
+        push_history(undo_, std::move(previous));
+    }
+    // The caret lands on a grapheme boundary at or after the requested one.
+    Utf8Offset next = store_.utf8_size();
+    if (caret.value() < next.value() && store_.is_scalar_boundary(caret)) next = caret;
+    while (!store_.is_grapheme_boundary(next)) next = store_.next_scalar_boundary(next);
+    if (!changes) {
+        // Only the caret moves (input that matched a literal, for example).
+        set_selection({next, next});
+        return true;
+    }
+    selection_ = {next, next};
+    layout_positions_.clear();
+    layout_offsets_.clear();
+    reset_caret_blink();
+    invalidate(Dirty::measure | Dirty::paint | Dirty::semantics);
+    const std::string value(store_.utf8());
+    publish_change(text_changed_, value);
+    publish_change(selection_changed_, selection_);
+    return true;
+}
+
 bool TextBox::replace_selection(std::string_view replacement) {
     const Utf8Offset start = selection_.start();
     const Utf8Offset end = selection_.end();
-    const bool result = replace(start, end, replacement);
+    const TextEditKind kind = replacement.empty() ? TextEditKind::deletion : TextEditKind::typing;
+    const bool result = replace(start, end, replacement, kind);
     return result;
 }
 
@@ -387,7 +431,9 @@ bool TextBox::paste() {
     const HostClipboardTextResult result =
         (*(*window()).host_services()).read_clipboard_text();
     if (!result.status.accepted() || !result.has_text) return false;
-    const bool replaced = replace_selection(result.text_utf8);
+    const Utf8Offset start = selection_.start();
+    const Utf8Offset end = selection_.end();
+    const bool replaced = replace(start, end, result.text_utf8, TextEditKind::paste);
     return replaced;
 }
 
@@ -1112,7 +1158,7 @@ void TextBox::on_key(KeyEvent& event) {
                     : store_.next_grapheme_boundary(selection_.caret);
             }
             event.handled = replace(std::min(other, selection_.caret),
-                                    std::max(other, selection_.caret), {});
+                                    std::max(other, selection_.caret), {}, TextEditKind::deletion);
         }
     }
 }
@@ -1139,7 +1185,7 @@ void TextBox::on_text_input(TextInputEvent& event) {
             return;
         }
     }
-    event.handled = replace(start, end, event.text_utf8);
+    event.handled = replace(start, end, event.text_utf8, TextEditKind::typing);
 }
 
 void TextBox::reset_caret_blink() {
@@ -1248,7 +1294,7 @@ bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) 
     if (action == SemanticAction::set_value && !read_only_) {
         const Utf8Offset start(0U);
         const Utf8Offset end = store_.utf8_size();
-        const bool replaced = replace(start, end, value);
+        const bool replaced = replace(start, end, value, TextEditKind::value);
         return replaced;
     }
     const bool handled = Panel::on_semantic_action(action, value);

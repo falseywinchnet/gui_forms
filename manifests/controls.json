@@ -74,6 +74,17 @@
       "doc": "api/generated/gui_forms.TextBox.rst"
     },
     {
+      "id": "masked_text_box",
+      "type": "MaskedTextBox",
+      "header": "gui_forms/controls/panel/masked_text_box/masked_text_box.hpp",
+      "category": "Text editing",
+      "purpose": "Text box that takes input through a mask (digits, letters, literals, case shifts, culture separators); refused input is reported with its position and reason.",
+      "winforms": "MaskedTextBox",
+      "status": "stable",
+      "gallery_page": "text-and-input",
+      "doc": "api/generated/gui_forms.MaskedTextBox.rst"
+    },
+    {
       "id": "label",
       "type": "Label",
       "header": "gui_forms/controls/label/label.hpp",

@@ -30,6 +30,7 @@ namespace gui_forms::host::detail {
     case VK_TAB: return PhysicalKey::tab;
     case VK_SPACE: return PhysicalKey::space;
     case VK_OEM_2: return PhysicalKey::slash;
+    case VK_INSERT: return PhysicalKey::insert;
     case VK_HOME: return PhysicalKey::home;
     case VK_PRIOR: return PhysicalKey::page_up;
     case VK_END: return PhysicalKey::end;

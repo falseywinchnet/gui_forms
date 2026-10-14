@@ -1620,6 +1620,26 @@ void example() {
 }
 }  // namespace doc_example_LiveSurface_2
 
+namespace doc_example_MaskedTextBox_1 {
+void example() {
+    std::shared_ptr<gf::MaskedTextBox> phone =
+        gf::make_control<gf::MaskedTextBox>(gf::StableId("contact.phone"), "(000) 000-0000");
+    (*phone).set_text("5551234567");   // the field shows "(555) 123-4567"
+    const bool complete = (*phone).mask_completed();   // true
+    const gf::MaskEditResult refused = (*phone).set_text("55x");
+    // refused.hint == gf::MaskResultHint::digit_expected; the text is unchanged
+}
+}  // namespace doc_example_MaskedTextBox_1
+
+namespace doc_example_MaskedTextProvider_1 {
+void example() {
+    gf::MaskedTextProvider part(">LL-0000");
+    const gf::MaskEditResult placed = part.set_text("ab1234");
+    const std::string shown = part.display_text();   // "AB-1234"
+    const std::string bare = part.to_string(gf::MaskTextFormat::exclude_prompt_and_literals);   // "AB1234"
+}
+}  // namespace doc_example_MaskedTextProvider_1
+
 namespace doc_example_MasterDetailView_1 {
 struct Settings final : gf::Component {
     std::shared_ptr<gf::MasterDetailView> view =
@@ -3211,6 +3231,8 @@ int main() {
     failures += run("ListView example 1", &doc_example_ListView_1::example);
     failures += run("LiveSurface example 1", &doc_example_LiveSurface_1::example);
     failures += run("LiveSurface example 2", &doc_example_LiveSurface_2::example);
+    failures += run("MaskedTextBox example 1", &doc_example_MaskedTextBox_1::example);
+    failures += run("MaskedTextProvider example 1", &doc_example_MaskedTextProvider_1::example);
     failures += run("MasterDetailView example 1", &doc_example_MasterDetailView_1::example);
     failures += run("MaterialPanel example 1", &doc_example_MaterialPanel_1::example);
     failures += run("MenuStrip example 1", &doc_example_MenuStrip_1::example);

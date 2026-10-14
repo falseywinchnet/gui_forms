@@ -379,6 +379,10 @@ Types
 
       Default: ``0x45U``.
 
+   .. cpp:member:: constexpr std::uint32_t insert
+
+      Default: ``0x49U``.
+
    .. cpp:member:: constexpr std::uint32_t home
 
       Default: ``0x4AU``.

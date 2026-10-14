@@ -131,6 +131,7 @@ struct PhysicalKey final {
     static constexpr std::uint32_t f10 = 0x43U;
     static constexpr std::uint32_t f11 = 0x44U;
     static constexpr std::uint32_t f12 = 0x45U;
+    static constexpr std::uint32_t insert = 0x49U;
     static constexpr std::uint32_t home = 0x4AU;
     static constexpr std::uint32_t page_up = 0x4BU;
     static constexpr std::uint32_t end = 0x4DU;
