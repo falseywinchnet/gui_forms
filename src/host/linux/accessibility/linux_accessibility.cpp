@@ -7,6 +7,7 @@
 #include <map>
 #include <poll.h>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 namespace gui_forms::host::linux_detail {
 namespace {

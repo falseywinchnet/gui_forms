@@ -1235,7 +1235,7 @@ bool Window::move_focus_region(bool forward) {
     const std::size_t count = focus_regions_.size();
     // The region holding the focused control, if any.
     const Control::Ptr focused = focused_.lock();
-    std::optional<std::size_t> current;
+    std::optional<std::size_t> current{};
     for (std::size_t index = 0; index < count && focused; ++index) {
         const Control::Ptr region = focus_regions_[index].region.lock();
         if (region && (region == focused || (*region).contains(*focused))) {
