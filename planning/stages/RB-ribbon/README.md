@@ -3,8 +3,10 @@
 Release: not yet placed on the public roadmap; the plan this stage produces
 proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
-study delivered (`RIBBON_STUDY.md`); the owner interview is next. Authority:
-this brief, until the owner's decisions are recorded.
+study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
+(decisions 1 to 10 below), parts 2 and 3 pending. The controls are built in
+stage W (decision 1). Authority: this brief and
+`planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
 Read [the shared brief](../README.md) first.
 
@@ -75,6 +77,31 @@ into Windows Forms-style pieces.
 - The design language's ribbon looks (§3.5 bulge and dithered bulge, the
   tab rail, the command plane, §12.4 to §12.6 decisions), the T4 rendering
   reference for the ribbon button, and Plan Paint's ribbon.
+
+## Owner decisions
+
+From interview round 001, part 1 (2026-10-14); the record is
+`planning/interview/RIBBON_INTERVIEW_ROUND_001.md`, the questions are
+`RIBBON_STUDY.md` §8.
+
+1. **Stage W builds the ribbon (A1-2)**, beside `ToolStrip`. RB stays the
+   planning ministage.
+2. **Commands are records (A2-1)** in a command item system, as `ToolStrip`'s
+   items; hosted editors and galleries are child controls.
+3. **The File tab opens an application menu now and Backstage later (A3-4).**
+4. **Scaling is studied across several ribbons (A4-3, the owner's own
+   option)**: the reference for group scaling is a comparative study of the
+   canonical ribbons, not one fixture. Whether it may observe ribbons running
+   on the owner's machine is question A4a.
+5. **WPF/MFC scaling model (B1-2)**: per-group size definitions plus a tab
+   reduction order, with a deterministic default when the order runs out.
+6. **Labels are never dropped (B2-2)**; groups shrink by image size, rows and
+   popup groups only.
+7. **The ribbon hides by a content-derived rule (B3-2)**, not fixed sizes.
+8. **Galleries may give up one column at a time (B4-1).**
+9. **No simplified one-line ribbon (B5-1).**
+10. **Follow Office 2010 and earlier (T1)** where the canonical ribbons
+    differ.
 
 ## Gate
 
