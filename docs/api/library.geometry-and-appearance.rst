@@ -781,6 +781,10 @@ Types
 
    .. cpp:member:: std::optional<double> corner_radius
 
+   .. cpp:member:: std::optional<AccentIndex> accent
+
+      The part's position in the theme's accent ramp (§8.5), or none. A surface part with an accent is tinted from the ramp over its material; text and mark roles ignore it.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: Point
@@ -944,6 +948,10 @@ Types
 
       Bounds role/state indices and chooses ordinary, selected, high-contrast, or high-contrast-selected recipe deterministically.
 
+   .. cpp:function:: Color accent(AccentIndex index) const noexcept
+
+      The ramp colour for an accent index; an index past the end of the ramp wraps around it.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ThemeDefinition final
@@ -961,6 +969,10 @@ Types
    .. cpp:member:: std::array<ControlRoleRecipes, control_visual_role_count> roles
 
    .. cpp:member:: ThemeStructureTokens structure
+
+   .. cpp:member:: std::vector<Color> accent_ramp
+
+      At least one colour; Theme::create refuses an empty ramp. Default: ``{provisional_accent_ramp()}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1369,6 +1381,14 @@ Enumerations
 
    .. cpp:enumerator:: grip_dots
 
+   .. cpp:enumerator:: dialog_launcher
+
+   .. cpp:enumerator:: more
+
+   .. cpp:enumerator:: overflow
+
+   .. cpp:enumerator:: customize
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
@@ -1426,6 +1446,10 @@ Functions, constants and aliases
 
 ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
 
+.. cpp:function:: std::string_view part_mark_name(PartMark mark) noexcept
+
+   Registered (snake_case) name of a mark, as the schema's vocabulary lists it.
+
 .. cpp:function:: ControlVisualContext part_visual_context(const Control& control, AnatomyStateSet states) noexcept
 
    The theme context a part's states select: hot, pressed or captured, selection (selected, checked, current, open, active_tool), the visible focus cue and preselect. The control supplies what the part does not carry: its enabled, invalid and pending status, window activity and high contrast. A part that is itself disabled or unavailable is drawn disabled.
@@ -1437,6 +1461,10 @@ Functions, constants and aliases
 .. cpp:function:: void paint_part_from_recipe(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe, ControlVisualContext context)
 
    paint_part's drawing, with the recipe and context already resolved. For helpers that resolve a recipe themselves (the existing controls' focus and default cues), so that every part is drawn by one implementation.
+
+.. cpp:var:: constexpr std::size_t part_mark_count
+
+   Value: ``static_cast<std::size_t>(PartMark::count)``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1453,6 +1481,10 @@ Functions, constants and aliases
 .. cpp:function:: bool valid_control_visual_recipe(const ControlVisualRecipe& value) noexcept
 
 .. cpp:function:: bool valid_control_state_recipes(const ControlStateRecipes& value) noexcept
+
+.. cpp:function:: inline std::vector<Color> provisional_accent_ramp()
+
+   The accent ramp a theme offers parts that carry an AccentIndex (design language 8.5). Provisional: six translucent tints (amber, green, violet, orange, red, teal) laid over a part's material, until the default theme (stage T4) defines its own ramp and the engine (T2) its tint.
 
 .. cpp:var:: constexpr std::size_t control_visual_role_count
 

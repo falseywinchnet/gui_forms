@@ -1,6 +1,9 @@
 #pragma once
 
+#include "gui_forms/anatomy/types/anatomy_types.hpp"
 #include "gui_forms/theme/types/theme_types.hpp"
+
+#include <cstddef>
 
 #include <memory>
 #include <string_view>
@@ -23,6 +26,12 @@ public:
         ControlVisualRole role, ControlVisualContext context) const noexcept;
     [[nodiscard]] const ThemeDefinition& definition() const noexcept {
         return definition_;
+    }
+    // The ramp colour for an accent index; an index past the end of the
+    // ramp wraps around it.
+    [[nodiscard]] Color accent(AccentIndex index) const noexcept {
+        const std::size_t position = static_cast<std::size_t>(index.value) % definition_.accent_ramp.size();
+        return definition_.accent_ramp[position];
     }
 
 private:

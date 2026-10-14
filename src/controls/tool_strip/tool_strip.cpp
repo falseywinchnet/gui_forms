@@ -684,7 +684,7 @@ void ToolStrip::on_paint(Painter& painter, Rect) {
         paint_part(painter, *this, overflow);
         overflow.role = PartRole::glyph;
         overflow.bounds = centred_glyph(placed.overflow_button, arrow_glyph_size * effective_text_scale());
-        overflow.mark = PartMark::arrow_down;
+        overflow.mark = PartMark::overflow;
         paint_part(painter, *this, overflow);
     }
     if (!placed.sizing_grip.empty()) {
@@ -1020,7 +1020,12 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
         } else if (item.kind == ToolStripItemKind::label) {
             node.role = SemanticRole::static_text;
         } else {
+            // A split button clicks beside its menu arrow; a drop-down
+            // button is one button that opens its menu.
             node.role = SemanticRole::button;
+            if (item.kind == ToolStripItemKind::split_button) node.role = SemanticRole::split_button;
+            if (item.kind == ToolStripItemKind::drop_down_button) node.role = SemanticRole::menu_button;
+            node.has_popup = has_menu(item.kind);
             node.states |= SemanticState::focusable;
             const AnatomyStateSet states = item_states(index);
             if (states.contains(AnatomyState::checked)) node.states |= SemanticState::checked;

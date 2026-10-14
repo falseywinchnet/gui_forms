@@ -37,10 +37,45 @@ int ForeignWindowScope::handle(Display *display, XErrorEvent *error) {
              ? (*scope).previous_(display, error)
              : 0;
 }
+namespace {
+// The X11 host shows notification-area icons only where a system tray owned
+// the tray selection when the window's services were made.
+HostCapabilities with_tray(HostCapabilities capabilities, Display *display) {
+  if (X11TrayIcons::tray_present(display))
+    capabilities.available =
+        capabilities.available | HostCapability::notification_area;
+  return capabilities;
+}
+} // namespace
 Services::Services(NativeWindow &window)
-    : HostServices(linux_capabilities()), window_(window) {}
+    : HostServices(with_tray(linux_capabilities(), window.runtime.display)),
+      window_(window) {}
 Services::~Services() { shutdown(); }
+bool Services::tray_event(const XEvent &event) {
+  if (!tray_)
+    return false;
+  return (*tray_).handle_event(event);
+}
+HostServiceStatus Services::add_tray_icon_impl(std::uint64_t icon_id,
+                                               const HostTrayIconRequest &request) {
+  if (!tray_)
+    tray_ = std::make_unique<X11TrayIcons>(
+        window_.runtime.display,
+        Delegate<const HostTrayIconEvent &>::bind<Services, &Services::forward_tray_event>(*this));
+  return (*tray_).add(icon_id, request);
+}
+HostServiceStatus Services::update_tray_icon_impl(std::uint64_t icon_id,
+                                                  const HostTrayIconRequest &request) {
+  if (!tray_)
+    return {HostServiceError::backend_failure};
+  return (*tray_).update(icon_id, request);
+}
+void Services::remove_tray_icon_impl(std::uint64_t icon_id) noexcept {
+  if (tray_)
+    (*tray_).remove(icon_id);
+}
 void Services::shutdown_impl() noexcept {
+  tray_.reset();
   for (const CursorEntry& entry : cursors_) XFreeCursor(window_.runtime.display, entry.native);
   cursors_.clear();
 }

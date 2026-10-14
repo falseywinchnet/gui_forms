@@ -139,6 +139,43 @@ const char* host_sound_cue_name(HostSoundCue cue) noexcept {
     return "unknown";
 }
 
+const char* host_tray_icon_action_name(HostTrayIconAction action) noexcept {
+    switch (action) {
+    case HostTrayIconAction::click: return "click";
+    case HostTrayIconAction::double_click: return "double_click";
+    case HostTrayIconAction::context: return "context";
+    case HostTrayIconAction::notification_clicked: return "notification_clicked";
+    case HostTrayIconAction::notification_closed: return "notification_closed";
+    }
+    return "unknown";
+}
+
+std::size_t select_tray_icon_image(std::span<const HostImage> images, std::uint32_t wanted_side) noexcept {
+    std::size_t best = 0U;
+    std::uint32_t best_side = 0U;
+    bool reaches = false;
+    for (std::size_t index = 0; index < images.size(); ++index) {
+        const std::uint32_t side = std::max(images[index].width, images[index].height);
+        const bool candidate_reaches = side >= wanted_side;
+        bool better = false;
+        if (index == 0U) {
+            better = true;
+        } else if (candidate_reaches && !reaches) {
+            better = true;
+        } else if (candidate_reaches && reaches) {
+            better = side < best_side;
+        } else if (!candidate_reaches && !reaches) {
+            better = side > best_side;
+        }
+        if (better) {
+            best = index;
+            best_side = side;
+            reaches = candidate_reaches;
+        }
+    }
+    return best;
+}
+
 const char* cursor_kind_name(CursorKind cursor) noexcept {
     switch (cursor) {
     case CursorKind::arrow: return "arrow";

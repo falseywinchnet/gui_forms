@@ -429,10 +429,15 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_strip_panel/tool_strip_panel.cpp
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
+    src/controls/ribbon/ribbon.cpp
     src/controls/status_strip/status_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
+    src/controls/notify_icon/notify_icon.cpp
+    src/controls/ribbon_gallery/ribbon_gallery.cpp
+    src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
+    src/controls/commands/gallery_command/gallery_command.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -920,6 +925,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/application/macos_host.mm
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
+        src/host/macos/services/appkit_status_items.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -1010,6 +1016,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
         src/host/linux/application/linux_host.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
+        src/host/linux/services/x11_tray_icons.cpp
         src/host/linux/services/linux_drag_drop.cpp
         src/host/linux/services/linux_dialogs.cpp)
     set_target_properties(gui_forms_host_linux PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -1046,6 +1053,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/application/windows_host.cpp
         src/host/windows/accessibility/windows_accessibility.cpp
         src/host/windows/services/windows_clipboard_image.cpp
+        src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
@@ -1913,7 +1921,15 @@ if(GUI_FORMS_BUILD_TESTS)
         target_include_directories(gui_forms_windows_message_queue_native_probe PRIVATE src/host/windows/input)
         target_compile_features(gui_forms_windows_message_queue_native_probe PRIVATE cxx_std_20)
         target_link_libraries(gui_forms_windows_message_queue_native_probe PRIVATE user32)
-        add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
+        add_executable(gui_forms_windows_notify_icon_tests
+            tests/windows_notify_icon_tests.cpp
+            src/host/windows/services/windows_notify_icons.cpp)
+        target_include_directories(gui_forms_windows_notify_icon_tests PRIVATE src/host/windows)
+        target_compile_definitions(gui_forms_windows_notify_icon_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_notify_icon_tests PRIVATE gui_forms_core user32 gdi32 shell32)
+        add_test(NAME gui_forms_windows_notify_icon_tests COMMAND gui_forms_windows_notify_icon_tests)
+                add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
         target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)
         add_test(NAME gui_forms_windows_cursors COMMAND gui_forms_windows_cursor_tests)
         add_executable(gui_forms_windows_key_translation_tests tests/windows_key_translation_tests.cpp)
@@ -1937,6 +1953,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                 src/host/windows/raster/dib_frame_store.cpp)
             target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
@@ -1955,6 +1972,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                 src/host/windows/raster/dib_frame_store.cpp)
             target_include_directories(gui_forms_windows_tooltip_tests PRIVATE
@@ -1974,6 +1992,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/application/windows_host.cpp
                     src/host/windows/accessibility/windows_accessibility.cpp
                     src/host/windows/services/windows_clipboard_image.cpp
+                    src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                     src/host/windows/raster/dib_frame_store.cpp
                     src/host/windows/raster/prepared_text_compositor.cpp)
@@ -2394,6 +2413,19 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
     target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_month_calendar_tests COMMAND gui_forms_month_calendar_tests)
+
+    add_executable(gui_forms_ribbon_gallery_tests tests/ribbon_gallery_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_gallery_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_gallery_tests COMMAND gui_forms_ribbon_gallery_tests)
+    add_executable(gui_forms_focus_region_tests tests/focus_region_tests.cpp)
+    target_link_libraries(gui_forms_focus_region_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_focus_region_tests COMMAND gui_forms_focus_region_tests)
+    add_executable(gui_forms_ribbon_vocabulary_tests tests/ribbon_vocabulary_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_vocabulary_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_vocabulary_tests COMMAND gui_forms_ribbon_vocabulary_tests)
+    add_executable(gui_forms_ribbon_tests tests/ribbon_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_tests COMMAND gui_forms_ribbon_tests)
     add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
@@ -2413,6 +2445,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_task_dialog_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_task_dialog_tests COMMAND gui_forms_task_dialog_tests)
     set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
+
+    add_executable(gui_forms_notify_icon_tests tests/notify_icon_tests.cpp)
+    target_link_libraries(gui_forms_notify_icon_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_notify_icon_tests COMMAND gui_forms_notify_icon_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

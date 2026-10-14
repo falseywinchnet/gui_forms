@@ -15,6 +15,8 @@ Commands, menu strips and context menus.
      - A window's menu bar: a row of top-level menus such as File, Edit and View.
    * - :cpp:class:`ToolStrip <gui_forms::ToolStrip>`
      - A command strip of buttons, labels, separators and drop-down buttons.
+   * - :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>`
+     - A ribbon gallery: a grid of image items in categories, in the ribbon or as a drop-down.
    * - :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
      - A status bar laid out as a strip of labels along the bottom of a window.
    * - :cpp:class:`ToolStripPanel <gui_forms::ToolStripPanel>`
@@ -23,22 +25,29 @@ Commands, menu strips and context menus.
      - Four ToolStripPanels around a content panel.
    * - :cpp:class:`BindingNavigator <gui_forms::BindingNavigator>`
      - A ToolStrip that moves through a BindingSource.
+   * - :cpp:class:`Ribbon <gui_forms::Ribbon>`
+     - A ribbon: the File tab and core tabs over a command plane of groups.
    * - :cpp:class:`ContextMenu <gui_forms::ContextMenu>`
      - A popup menu of commands that the application opens at a point, such as on a right-click.
    * - :cpp:class:`Command <gui_forms::Command>`
      - An application action, such as Save or Copy, shared by every button, menu item and shortcut that triggers it.
+   * - :cpp:class:`GalleryCommand <gui_forms::GalleryCommand>`
+     - The value command of a gallery: a shared Command, the chosen item, and live preview.
 
 .. toctree::
    :hidden:
 
    generated/gui_forms.MenuStrip
    generated/gui_forms.ToolStrip
+   generated/gui_forms.RibbonGallery
    generated/gui_forms.StatusStrip
    generated/gui_forms.ToolStripPanel
    generated/gui_forms.ToolStripContainer
    generated/gui_forms.BindingNavigator
+   generated/gui_forms.Ribbon
    generated/gui_forms.ContextMenu
    generated/gui_forms.Command
+   generated/gui_forms.GalleryCommand
 
 Related types
 -------------
@@ -49,6 +58,8 @@ Related types
 
    * - :cpp:class:`BindingNavigatorAddNew <gui_forms::BindingNavigatorAddNew>`
      - Raised by a BindingNavigator's add command.
+   * - :cpp:class:`GalleryPreview <gui_forms::GalleryPreview>`
+     - A preview a gallery asks the application to show (preview_requested) or to withdraw (preview_cancelled): the gallery item's stable ID and the stable ID of the gallery that asked.
    * - :cpp:class:`MenuItemInvocation <gui_forms::MenuItemInvocation>`
      - MenuItemInvocation reports the exact stable item identity and source owner for one accepted menu activation.
    * - :cpp:class:`MenuItemSpec <gui_forms::MenuItemSpec>`
@@ -65,6 +76,54 @@ Related types
      - MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation.
    * - :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>`
      - MenuStripItemSpec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu.
+   * - :cpp:class:`Ribbon::CommandItem <gui_forms::Ribbon::CommandItem>`
+     -  
+   * - :cpp:class:`Ribbon::CommandParts <gui_forms::Ribbon::CommandParts>`
+     - The "command" item system: one command of the selected tab.
+   * - :cpp:class:`Ribbon::CommandStates <gui_forms::Ribbon::CommandStates>`
+     -  
+   * - :cpp:class:`Ribbon::Group <gui_forms::Ribbon::Group>`
+     -  
+   * - :cpp:class:`Ribbon::GroupParts <gui_forms::Ribbon::GroupParts>`
+     - The "group" item system: one group of the selected tab.
+   * - :cpp:class:`Ribbon::Parts <gui_forms::Ribbon::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`Ribbon::Tab <gui_forms::Ribbon::Tab>`
+     -  
+   * - :cpp:class:`Ribbon::TabParts <gui_forms::Ribbon::TabParts>`
+     - The "tab" item system: one core tab on the tab row.
+   * - :cpp:class:`Ribbon::TabStates <gui_forms::Ribbon::TabStates>`
+     -  
+   * - :cpp:class:`RibbonCommandClick <gui_forms::RibbonCommandClick>`
+     - A click on a button-family command (or its split face), after its Command ran.
+   * - :cpp:class:`RibbonCommandSpec <gui_forms::RibbonCommandSpec>`
+     - One command record.
+   * - :cpp:class:`RibbonDialogLaunch <gui_forms::RibbonDialogLaunch>`
+     - A click on a group's dialog launcher.
+   * - :cpp:class:`RibbonDropDownInvocation <gui_forms::RibbonDropDownInvocation>`
+     - A choice from a split or drop-down command's menu.
+   * - :cpp:class:`RibbonGallery::Category <gui_forms::RibbonGallery::Category>`
+     -  
+   * - :cpp:class:`RibbonGallery::CategoryParts <gui_forms::RibbonGallery::CategoryParts>`
+     - The "gallery_category" item system: one realized item per caption in view (drop-down form only).
+   * - :cpp:class:`RibbonGallery::Item <gui_forms::RibbonGallery::Item>`
+     -  
+   * - :cpp:class:`RibbonGallery::ItemParts <gui_forms::RibbonGallery::ItemParts>`
+     - The "gallery_item" item system: one realized item per item in view.
+   * - :cpp:class:`RibbonGallery::ItemStates <gui_forms::RibbonGallery::ItemStates>`
+     -  
+   * - :cpp:class:`RibbonGallery::Parts <gui_forms::RibbonGallery::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`RibbonGalleryCategory <gui_forms::RibbonGalleryCategory>`
+     - One category: its items show together under the caption in the drop-down form.
+   * - :cpp:class:`RibbonGalleryItem <gui_forms::RibbonGalleryItem>`
+     - One item: an image with an optional label shown under it.
+   * - :cpp:class:`RibbonGroupSpec <gui_forms::RibbonGroupSpec>`
+     - A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner.
+   * - :cpp:class:`RibbonTabChange <gui_forms::RibbonTabChange>`
+     - The selected tab after it changed.
+   * - :cpp:class:`RibbonTabSpec <gui_forms::RibbonTabSpec>`
+     - A core tab.
    * - :cpp:class:`StatusStrip::Parts <gui_forms::StatusStrip::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's, and its items are ToolStrip's "item" system.
    * - :cpp:class:`ToolStrip::Item <gui_forms::ToolStrip::Item>`
@@ -97,6 +156,18 @@ Related types
    .. cpp:member:: std::string navigator_id
 
    .. cpp:member:: std::optional<BindingRecord> record
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: GalleryPreview final
+
+   ``#include <gui_forms/commands/gallery_command/gallery_command.hpp>``
+
+   A preview a gallery asks the application to show (preview_requested) or to withdraw (preview_cancelled): the gallery item's stable ID and the stable ID of the gallery that asked.
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: std::string source_id
 
 .. cpp:namespace:: gui_forms
 
@@ -232,6 +303,410 @@ Related types
    .. cpp:member:: bool visible
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::CommandItem final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: std::size_t group
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: CommandParts parts
+
+   .. cpp:member:: CommandStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::CommandParts final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   The "command" item system: one command of the selected tab.
+
+   .. cpp:member:: PartGeometry command_face
+
+   .. cpp:member:: PartGeometry command_icon
+
+   .. cpp:member:: PartGeometry command_label
+
+   .. cpp:member:: PartGeometry command_arrow
+
+   .. cpp:member:: PartGeometry command_arrow_glyph
+
+   .. cpp:member:: PartGeometry command_focus
+
+   .. cpp:member:: PartGeometry command_combo_box
+
+   .. cpp:member:: PartGeometry command_numeric_up_down
+
+   .. cpp:member:: PartGeometry command_check_box
+
+   .. cpp:member:: PartGeometry command_text_box
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::CommandStates final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::Group final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: GroupParts parts
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::GroupParts final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   The "group" item system: one group of the selected tab.
+
+   .. cpp:member:: PartGeometry group_region
+
+   .. cpp:member:: PartGeometry group_caption
+
+   .. cpp:member:: PartGeometry group_divider
+
+   .. cpp:member:: PartGeometry group_launcher
+
+   .. cpp:member:: PartGeometry group_launcher_glyph
+
+   .. cpp:member:: PartGeometry group_launcher_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::Parts final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry tab_rail
+
+   .. cpp:member:: PartGeometry application_button
+
+   .. cpp:member:: PartGeometry application_label
+
+   .. cpp:member:: PartGeometry command_plane
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::Tab final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: TabParts parts
+
+   .. cpp:member:: TabStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::TabParts final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   The "tab" item system: one core tab on the tab row.
+
+   .. cpp:member:: PartGeometry tab
+
+   .. cpp:member:: PartGeometry tab_label
+
+   .. cpp:member:: PartGeometry tab_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Ribbon::TabStates final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonCommandClick final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A click on a button-family command (or its split face), after its Command ran.
+
+   .. cpp:member:: std::string ribbon_id
+
+   .. cpp:member:: std::string command_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonCommandSpec final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   One command record. ``stable_id`` is unique within the ribbon (across tabs, groups and commands) and names the command in events, semantics and the published anatomy. A button, toggle or split takes its text (when ``text`` is empty), enabled, visible and checked state from its required ``command``, and runs it on a click; a drop-down's command is optional. ``text`` may carry a mnemonic ("&Paste"). Labels are always shown (owner decision 6); a small command with an image may leave its label out (``show_label`` false: an authored icon-only command, decision 30). ``drop_down`` is the menu of a split or drop-down command. A hosted command's ``text`` is its control's accessible name (and a check box's caption); ``choices`` are a combo box's items and ``width`` its width in logical units (zero for the default).
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RibbonCommandKind kind
+
+      Default: ``{RibbonCommandKind::button}``.
+
+   .. cpp:member:: RibbonCommandSize size
+
+      Default: ``{RibbonCommandSize::large}``.
+
+   .. cpp:member:: std::shared_ptr<Command> command
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: bool show_label
+
+      Default: ``{true}``.
+
+   .. cpp:member:: std::vector<MenuItemSpec> drop_down
+
+   .. cpp:member:: std::vector<std::string> choices
+
+   .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonDialogLaunch final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A click on a group's dialog launcher.
+
+   .. cpp:member:: std::string ribbon_id
+
+   .. cpp:member:: std::string group_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonDropDownInvocation final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A choice from a split or drop-down command's menu.
+
+   .. cpp:member:: std::string ribbon_id
+
+   .. cpp:member:: std::string command_id
+
+   .. cpp:member:: MenuItemInvocation choice
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::Category final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: CategoryParts parts
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::CategoryParts final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   The "gallery_category" item system: one realized item per caption in view (drop-down form only).
+
+   .. cpp:member:: PartGeometry category_caption
+
+   .. cpp:member:: PartGeometry category_divider
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::Item final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::ItemParts final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   The "gallery_item" item system: one realized item per item in view.
+
+   .. cpp:member:: PartGeometry item_face
+
+   .. cpp:member:: PartGeometry item_selection
+
+   .. cpp:member:: PartGeometry item_icon
+
+   .. cpp:member:: PartGeometry item_label
+
+   .. cpp:member:: PartGeometry item_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::ItemStates final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGallery::Parts final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry item_viewport
+
+   .. cpp:member:: PartGeometry scroll_up
+
+   .. cpp:member:: PartGeometry scroll_up_glyph
+
+   .. cpp:member:: PartGeometry scroll_down
+
+   .. cpp:member:: PartGeometry scroll_down_glyph
+
+   .. cpp:member:: PartGeometry more_button
+
+   .. cpp:member:: PartGeometry more_glyph
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGalleryCategory final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   One category: its items show together under the caption in the drop-down form.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string caption
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGalleryItem final
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   One item: an image with an optional label shown under it. ``label`` is also the item's accessible name. ``category`` names a category's stable ID, or is empty for an item shown before every category.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string label
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: std::string category
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonGroupSpec final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: bool dialog_launcher
+
+   .. cpp:member:: std::vector<RibbonCommandSpec> commands
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonTabChange final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   The selected tab after it changed.
+
+   .. cpp:member:: std::string ribbon_id
+
+   .. cpp:member:: std::size_t tab
+
+   .. cpp:member:: std::string tab_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonTabSpec final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A core tab. ``text`` may carry a mnemonic ("&Home").
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::vector<RibbonGroupSpec> groups
 
 .. cpp:namespace:: gui_forms
 
@@ -471,6 +946,78 @@ Enumerations
    .. cpp:enumerator:: keyboard
 
    .. cpp:enumerator:: pointer
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: Ribbon::Hit::Kind
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: application
+
+   .. cpp:enumerator:: tab
+
+   .. cpp:enumerator:: command
+
+   .. cpp:enumerator:: launcher
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: Ribbon::RealizedItem::Kind
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: tab
+
+   .. cpp:enumerator:: group
+
+   .. cpp:enumerator:: command
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonCommandKind
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: button
+
+   .. cpp:enumerator:: toggle
+
+   .. cpp:enumerator:: split
+
+   .. cpp:enumerator:: drop_down
+
+   .. cpp:enumerator:: combo_box
+
+   .. cpp:enumerator:: numeric_up_down
+
+   .. cpp:enumerator:: check_box
+
+   .. cpp:enumerator:: text_box
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonCommandSize
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: large
+
+   .. cpp:enumerator:: small
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonGalleryForm
+
+   ``#include <gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp>``
+
+   .. cpp:enumerator:: in_ribbon
+
+   .. cpp:enumerator:: drop_down
 
 .. cpp:namespace:: gui_forms
 

@@ -25,6 +25,15 @@ public:
     [[nodiscard]] const std::string& sound_trace() const noexcept {
         return sound_trace_;
     }
+    // Tray icons, kept as requested so tests can read what an application
+    // asked to show, and driven by simulated user actions.
+    [[nodiscard]] const HostTrayIconRequest* tray_icon(std::uint64_t icon_id) const noexcept;
+    [[nodiscard]] const std::string& tray_trace() const noexcept { return tray_trace_; }
+    // Raises a tray event as a user action would; dropped for icons that are
+    // not live.
+    void simulate_tray_icon_event(HostTrayIconEvent event);
+    // The choice the next show_tray_menu returns; empty dismisses the menu.
+    void queue_tray_menu_choice(std::string chosen_id);
 
 protected:
     [[nodiscard]] HostMonitorResult query_monitors_impl() override;
@@ -41,8 +50,21 @@ protected:
     [[nodiscard]] HostServiceStatus play_sound_cue_impl(
         const HostSoundCueRequest& request) override;
     void shutdown_impl() noexcept override;
+    [[nodiscard]] HostServiceStatus add_tray_icon_impl(
+        std::uint64_t icon_id, const HostTrayIconRequest& request) override;
+    [[nodiscard]] HostServiceStatus update_tray_icon_impl(
+        std::uint64_t icon_id, const HostTrayIconRequest& request) override;
+    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override;
+    [[nodiscard]] HostServiceStatus show_tray_notification_impl(
+        std::uint64_t icon_id, const HostTrayNotificationRequest& request) override;
+    [[nodiscard]] HostTrayMenuResult show_tray_menu_impl(
+        std::uint64_t icon_id, const HostTrayMenuRequest& request) override;
 
 private:
+    struct TrayIcon final {
+        std::uint64_t id{};
+        HostTrayIconRequest request;
+    };
     std::vector<HostMonitor> monitors_;
     HostImage clipboard_image_;
     bool clipboard_has_image_{};
@@ -53,6 +75,9 @@ private:
     DialogHandler dialog_handler_;
     std::string dialog_trace_;
     std::string sound_trace_;
+    std::vector<TrayIcon> tray_icons_;
+    std::deque<std::string> tray_menu_choices_;
+    std::string tray_trace_;
 };
 
 } // namespace gui_forms::host

@@ -31,7 +31,7 @@ gui_forms::Command
 
       **state** : ``CommandState``, read-only
          The command's current :cpp:class:`CommandState <gui_forms::CommandState>`: ``text``, ``description``, ``icon_id``,
-         ``shortcut``, ``mnemonic``, ``key_tip``, ``availability_reason``, ``enabled``
+         ``shortcut``, ``mnemonic``, ``availability_reason``, ``enabled``
          (default true), ``visible`` (default true), ``checked`` and ``checkable``
          (both default false), ``default_action``, ``destructive``, and a
          ``generation`` counter that increases with every change.
@@ -74,8 +74,6 @@ gui_forms::Command
         - The shortcut label, such as ``"Ctrl+S"``, drawn at the right of the command's menu items.
       * - :cpp:func:`set_mnemonic <gui_forms::Command::set_mnemonic>`
         - A mnemonic kept in :cpp:func:`state <gui_forms::Command::state>` for your own presentations.
-      * - :cpp:func:`set_key_tip <gui_forms::Command::set_key_tip>`
-        - A key tip kept in :cpp:func:`state <gui_forms::Command::state>` for your own presentations.
       * - :cpp:func:`set_availability_reason <gui_forms::Command::set_availability_reason>`
         - Why the command is unavailable.
       * - :cpp:func:`set_enabled <gui_forms::Command::set_enabled>`
@@ -189,7 +187,7 @@ gui_forms::Command
    .. cpp:function:: const CommandState& state() const noexcept
 
       The command's current :cpp:class:`CommandState <gui_forms::CommandState>`: ``text``, ``description``, ``icon_id``,
-      ``shortcut``, ``mnemonic``, ``key_tip``, ``availability_reason``, ``enabled``
+      ``shortcut``, ``mnemonic``, ``availability_reason``, ``enabled``
       (default true), ``visible`` (default true), ``checked`` and ``checkable``
       (both default false), ``default_action``, ``destructive``, and a
       ``generation`` counter that increases with every change.
@@ -256,10 +254,6 @@ gui_forms::Command
 
       A mnemonic kept in :cpp:func:`state <gui_forms::Command::state>` for your own presentations. Menus take their
       mnemonics from the ``&`` in the item text instead.
-
-   .. cpp:function:: void set_key_tip(std::string key_tip)
-
-      A key tip kept in :cpp:func:`state <gui_forms::Command::state>` for your own presentations.
 
    .. cpp:function:: void set_availability_reason(std::string reason)
 

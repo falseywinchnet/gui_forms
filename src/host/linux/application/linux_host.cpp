@@ -1218,6 +1218,10 @@ void Runtime::dispatch(XEvent &event) {
   }
   if (event.type == PropertyNotify)
     selection_property(event.xproperty);
+  // Tray icon windows belong to a window's services, not to the window.
+  for (std::size_t i = 0; i < windows.size(); ++i)
+    if ((*windows[i]).services && (*(*windows[i]).services).tray_event(event))
+      return;
   if (XFilterEvent(&event, None))
     return;
   const std::vector<std::shared_ptr<NativeWindow>> snapshot = windows;

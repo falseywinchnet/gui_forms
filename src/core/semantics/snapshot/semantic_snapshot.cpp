@@ -43,6 +43,13 @@ void append_node(std::ostringstream& stream, const SemanticNode& node) {
     stream << ",\"maximum_value\":";
     if (node.maximum_value) stream << *node.maximum_value;
     else stream << "null";
+    stream << ",\"position_in_set\":";
+    if (node.position_in_set) stream << *node.position_in_set;
+    else stream << "null";
+    stream << ",\"set_size\":";
+    if (node.set_size) stream << *node.set_size;
+    else stream << "null";
+    stream << ",\"has_popup\":" << (node.has_popup ? "true" : "false");
     stream << ",\"bounds\":[" << node.bounds.x << ',' << node.bounds.y << ','
            << node.bounds.width << ',' << node.bounds.height << "],\"states\":"
            << static_cast<std::uint32_t>(node.states) << ",\"actions\":[";
@@ -96,6 +103,9 @@ const char* semantic_role_name(SemanticRole role) noexcept {
     case SemanticRole::menu: return "menu";
     case SemanticRole::menu_item: return "menu_item";
     case SemanticRole::separator: return "separator";
+    case SemanticRole::split_button: return "split_button";
+    case SemanticRole::menu_button: return "menu_button";
+    case SemanticRole::count: return "generic";
     }
     return "generic";
 }

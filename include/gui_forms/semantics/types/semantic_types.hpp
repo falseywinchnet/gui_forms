@@ -2,6 +2,7 @@
 
 #include "gui_forms/types.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -9,14 +10,21 @@
 
 namespace gui_forms {
 
+// Semantic roles (design language 8.5). split_button (a button with a
+// separate menu arrow) and menu_button (a button that opens a menu) were
+// admitted with the ribbon plan (owner decision RB-22, 12.8). `count` is
+// not a role; it sizes tables over the roles.
 enum class SemanticRole : std::uint8_t {
     generic, group, static_text, button, check_box, radio_button, link,
     text_box, list, list_item, check_list_item, combo_box, slider,
     scroll_bar, progress_bar, image, tab_group, tab, split_pane,
     numeric_field, tool_tip, date_picker, calendar, date_cell, property_grid,
     property_group, property_row, menu_bar, menu_bar_item, menu, menu_item,
-    separator, toolbar, radio_group,
+    separator, toolbar, radio_group, split_button, menu_button,
+    count,
 };
+
+inline constexpr std::size_t semantic_role_count = static_cast<std::size_t>(SemanticRole::count);
 
 enum class SemanticState : std::uint32_t {
     none = 0,
@@ -55,6 +63,11 @@ enum class SemanticAction : std::uint8_t {
     set_value,
 };
 
+// The position of an element among its siblings of one set (a list's items,
+// a strip's buttons) and the set's size, both counting from one, and whether
+// the element opens a popup (a menu, a list or a dialog) when activated.
+// These node fields were admitted with the ribbon plan (owner decision
+// RB-22); a position is published with its set size or not at all.
 struct SemanticDescriptor final {
     SemanticRole role{SemanticRole::generic};
     std::string name;
@@ -63,6 +76,9 @@ struct SemanticDescriptor final {
     std::optional<double> numeric_value;
     std::optional<double> minimum_value;
     std::optional<double> maximum_value;
+    std::optional<std::size_t> position_in_set;
+    std::optional<std::size_t> set_size;
+    bool has_popup{};
     SemanticState states{SemanticState::none};
     std::vector<SemanticAction> actions;
     bool exposed{};
@@ -79,6 +95,9 @@ struct SemanticNode final {
     std::optional<double> numeric_value;
     std::optional<double> minimum_value;
     std::optional<double> maximum_value;
+    std::optional<std::size_t> position_in_set;
+    std::optional<std::size_t> set_size;
+    bool has_popup{};
     Rect bounds{};
     SemanticState states{SemanticState::none};
     std::vector<SemanticAction> actions;

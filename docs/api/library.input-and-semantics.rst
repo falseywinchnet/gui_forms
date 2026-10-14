@@ -487,6 +487,12 @@ Types
 
    .. cpp:member:: std::optional<double> maximum_value
 
+   .. cpp:member:: std::optional<std::size_t> position_in_set
+
+   .. cpp:member:: std::optional<std::size_t> set_size
+
+   .. cpp:member:: bool has_popup
+
    .. cpp:member:: SemanticState states
 
       Default: ``{SemanticState::none}``.
@@ -526,6 +532,12 @@ Types
    .. cpp:member:: std::optional<double> minimum_value
 
    .. cpp:member:: std::optional<double> maximum_value
+
+   .. cpp:member:: std::optional<std::size_t> position_in_set
+
+   .. cpp:member:: std::optional<std::size_t> set_size
+
+   .. cpp:member:: bool has_popup
 
    .. cpp:member:: Rect bounds
 
@@ -777,6 +789,12 @@ Enumerations
 
    .. cpp:enumerator:: radio_group
 
+   .. cpp:enumerator:: split_button
+
+   .. cpp:enumerator:: menu_button
+
+   .. cpp:enumerator:: count
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: SemanticState
@@ -831,3 +849,7 @@ Functions, constants and aliases
 .. cpp:function:: const char* semantic_role_name(SemanticRole role) noexcept
 
 .. cpp:function:: const char* semantic_action_name(SemanticAction action) noexcept
+
+.. cpp:var:: constexpr std::size_t semantic_role_count
+
+   Value: ``static_cast<std::size_t>(SemanticRole::count)``.

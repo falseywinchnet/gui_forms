@@ -31,6 +31,9 @@ whole record for logs.
 | `dialogs` | the five portable common-dialog request/result families | yes | yes | yes |
 | `sound_cues` | system alert sounds | yes | yes | yes |
 | `frame_capture` | encode the presented framebuffer as PNG | yes | yes | yes |
+| `notification_area` | notification-area (tray) icons with click, double-click and context events (`NotifyIcon`) | yes (status item) | yes | when a system tray owns `_NET_SYSTEM_TRAY_Sn` at startup |
+| `notification_area_messages` | notification text from a tray icon | no | yes | no |
+| `notification_area_menus` | a native menu shown from a tray icon | yes | yes | no |
 | `menus` | native menu-bar publication | no | no | no |
 | `font_discovery` | host font enumeration | no, by design | no, by design | no, by design |
 | `accessibility` | native accessibility publication of the semantic tree | not yet advertised | not yet advertised | not yet advertised |

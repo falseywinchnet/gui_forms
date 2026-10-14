@@ -256,7 +256,7 @@ void test_atomic_grouping_hit_cracks_focus_and_semantics() {
     require(first_semantics.role == SemanticRole::button &&
                 middle_semantics.role == SemanticRole::check_box &&
                 has_semantic_state(middle_semantics.states, SemanticState::checked) &&
-                last_semantics.role == SemanticRole::button &&
+                last_semantics.role == SemanticRole::split_button && last_semantics.has_popup &&
                 std::find(last_semantics.actions.begin(), last_semantics.actions.end(),
                           SemanticAction::show_menu) != last_semantics.actions.end(),
             "connection must preserve separate roles, checked state, and disclosure actions");

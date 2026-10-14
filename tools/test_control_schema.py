@@ -65,9 +65,22 @@ public:
         schema = cs.load_schema()
         types = [dict(record) for record in schema["types"]]
         types[0]["interactions"] = types[0]["interactions"][:-1]
-        findings = cs.validate({"types": types}, cr.load_registry(), cs.scan_classes())
+        findings = cs.validate({"types": types, "vocabulary": schema["vocabulary"]},
+                               cr.load_registry(), cs.scan_classes())
         self.assertEqual(len(findings), 1)
         self.assertIn(types[0]["id"], findings[0])
+
+    def test_the_vocabulary_is_required_and_lists_the_ribbon_atoms(self) -> None:
+        schema = cs.load_schema()
+        vocabulary = schema["vocabulary"]
+        for mark in ("dialog_launcher", "more", "overflow", "customize"):
+            self.assertIn(mark, vocabulary["marks"])
+        self.assertIn("accent_index", vocabulary["values"])
+        self.assertIn("split_button", vocabulary["semantic_roles"])
+        self.assertIn("menu_button", vocabulary["semantic_roles"])
+        findings = cs.validate({"types": schema["types"]}, cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 1)
+        self.assertIn("vocabulary", findings[0])
 
 
 if __name__ == "__main__":

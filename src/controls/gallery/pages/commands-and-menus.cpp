@@ -33,6 +33,8 @@ public:
         build_context_menu(body);
         build_strips(body);
         build_container(body);
+        build_ribbon(body);
+        build_gallery(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -283,6 +285,75 @@ private:
         (*strips).add_at(status, {22.0, 84.0, 880.0, 24.0});
     }
 
+    // A RibbonGallery in the ribbon form, a drop-down gallery under a button,
+    // and the gallery value command they share, standalone until the ribbon
+    // (phase 1) can host them.
+    void build_gallery(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> gallery_group = group(
+            "gallery.commands.gallery", "RibbonGallery · value command, live preview, more button, drop-down form",
+            {930.0, 150.0});
+        (*body).add_at(gallery_group, {24.0, 1202.0, 930.0, 150.0});
+        const std::shared_ptr<Command> styles = std::make_shared<Command>("gallery.commands.styles", "Styles");
+        styles_ = std::make_shared<GalleryCommand>(styles);
+        std::vector<RibbonGalleryCategory> categories{{"headings", "Headings"}, {"body", "Body text"},
+                                                      {"quotes", "Quotations"}};
+        std::vector<RibbonGalleryItem> items;
+        const std::array<const char*, 4> heading_names{"Title", "Heading 1", "Heading 2", "Heading 3"};
+        const std::array<const char*, 4> body_names{"Normal", "Compact", "Emphasis", "Strong"};
+        const std::array<const char*, 3> quote_names{"Quote", "Intense", "Reference"};
+        for (const char* name : heading_names) items.push_back({std::string("style.") + name, name, {}, "headings"});
+        for (const char* name : body_names) items.push_back({std::string("style.") + name, name, {}, "body"});
+        for (const char* name : quote_names) items.push_back({std::string("style.") + name, name, {}, "quotes"});
+        std::shared_ptr<RibbonGallery> in_ribbon = make_control<RibbonGallery>(StableId("gallery.commands.styles"));
+        (*in_ribbon).set_accessible_name("Styles");
+        (*in_ribbon).set_item_size({72.0, 24.0});
+        (*in_ribbon).set_show_labels(true);
+        (*in_ribbon).set_visible_rows(2U);
+        (*in_ribbon).set_column_range(2U, 4U);
+        (*in_ribbon).set_columns(4U);
+        (*in_ribbon).set_drop_down_size(4U, 4U);
+        (*in_ribbon).set_items(categories, items);
+        (*in_ribbon).set_command(styles_);
+        (*gallery_group).add_at(in_ribbon, {22.0, 36.0, 312.0, 84.0});
+        gallery_button_ = make_control<Button>(StableId("gallery.commands.styles.button"), "Styles");
+        (*gallery_group).add_at(gallery_button_, {354.0, 40.0, 110.0, 32.0});
+        drop_down_gallery_ = make_control<RibbonGallery>(StableId("gallery.commands.styles.drop-down"),
+                                                        RibbonGalleryForm::drop_down);
+        (*drop_down_gallery_).set_accessible_name("Styles");
+        (*drop_down_gallery_).set_item_size({72.0, 24.0});
+        (*drop_down_gallery_).set_show_labels(true);
+        (*drop_down_gallery_).set_drop_down_size(3U, 5U);
+        (*drop_down_gallery_).set_items(std::move(categories), std::move(items));
+        (*drop_down_gallery_).set_command(styles_);
+        gallery_status_ = label("gallery.commands.gallery.status", "Hover an item for 300 ms to preview it",
+                                11.0, 400, muted);
+        (*gallery_group).add_at(gallery_status_, {484.0, 44.0, 420.0, 24.0});
+        on((*gallery_button_).clicked(), *this, &CommandsAndMenusPage::on_styles_button);
+        on((*styles_).preview_requested(), *this, &CommandsAndMenusPage::on_style_preview);
+        on((*styles_).preview_cancelled(), *this, &CommandsAndMenusPage::on_style_cancel);
+        on((*styles_).value_changed(), *this, &CommandsAndMenusPage::on_style_value);
+    }
+
+    void on_styles_button(ButtonBase&) {
+        if ((*drop_down_gallery_).popup_open()) {
+            (*drop_down_gallery_).close_popup();
+            return;
+        }
+        static_cast<void>((*drop_down_gallery_).open_popup(gallery_button_));
+    }
+
+    void on_style_preview(const GalleryPreview& preview) {
+        (*gallery_status_).set_text("Previewing " + preview.item_id + " from " + preview.source_id);
+    }
+
+    void on_style_cancel(const GalleryPreview& preview) {
+        (*gallery_status_).set_text("Preview of " + preview.item_id + " withdrawn");
+    }
+
+    void on_style_value(const std::optional<std::string>& value) {
+        (*gallery_status_).set_text("Committed " + value.value_or(std::string("nothing")));
+    }
+
     // A ToolStripContainer: a strip in the top panel, a vertical strip in
     // the left panel and a status strip in the bottom panel around content.
     void build_container(const std::shared_ptr<Surface>& body) {
@@ -323,6 +394,62 @@ private:
         (*content).set_dock(DockStyle::fill);
         (*(*frame).content_panel()).add_child(content);
         (*frame_group).add_at(frame, {22.0, 36.0, 880.0, 176.0});
+    }
+
+    // A Ribbon over the same Commands (stage RB, phase 1): Home with a
+    // launcher, a large split, small commands and a toggle; Insert with
+    // hosted controls; the File tab's application menu.
+    void build_ribbon(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> ribbon_group = group(
+            "gallery.commands.ribbon", "Ribbon · phase 1: tabs, groups, launchers, hosted controls", {930.0, 160.0});
+        (*body).add_at(ribbon_group, {24.0, 1030.0, 930.0, 160.0});
+        std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("gallery.commands.ribbon.bar"));
+        (*ribbon).set_accessible_name("Document ribbon");
+        std::vector<RibbonTabSpec> tabs;
+        RibbonTabSpec home{.stable_id = "ribbon.home", .text = "&Home"};
+        RibbonGroupSpec document{.stable_id = "ribbon.document", .caption = "Document", .dialog_launcher = true};
+        document.commands.push_back({.stable_id = "ribbon.new", .command = new_});
+        document.commands.push_back({.stable_id = "ribbon.save", .kind = RibbonCommandKind::split, .command = save_,
+                                     .drop_down = export_items("ribbon.save.export")});
+        document.commands.push_back({.stable_id = "ribbon.delete", .size = RibbonCommandSize::small,
+                                     .command = delete_});
+        document.commands.push_back({.stable_id = "ribbon.wrap", .kind = RibbonCommandKind::toggle,
+                                     .size = RibbonCommandSize::small, .command = wrap_command_});
+        document.commands.push_back({.stable_id = "ribbon.export", .kind = RibbonCommandKind::drop_down,
+                                     .size = RibbonCommandSize::small, .text = "Export",
+                                     .drop_down = export_items("ribbon.export")});
+        RibbonGroupSpec view{.stable_id = "ribbon.view", .caption = "View"};
+        view.commands.push_back({.stable_id = "ribbon.icons", .size = RibbonCommandSize::small, .command = icons_});
+        view.commands.push_back({.stable_id = "ribbon.details", .size = RibbonCommandSize::small,
+                                 .command = details_});
+        view.commands.push_back({.stable_id = "ribbon.zoom", .kind = RibbonCommandKind::combo_box, .text = "Zoom",
+                                 .choices = {"50%", "100%", "200%"}, .width = 80.0});
+        RibbonGroupSpec run{.stable_id = "ribbon.run-group", .caption = "Run"};
+        run.commands.push_back({.stable_id = "ribbon.run", .kind = RibbonCommandKind::split, .command = run_,
+                                .drop_down = {item("ribbon.run.verbose", run_options_[0]),
+                                              item("ribbon.run.watch", run_options_[1])}});
+        home.groups.push_back(std::move(document));
+        home.groups.push_back(std::move(view));
+        home.groups.push_back(std::move(run));
+        RibbonTabSpec insert{.stable_id = "ribbon.insert", .text = "&Insert"};
+        RibbonGroupSpec find{.stable_id = "ribbon.find-group", .caption = "Find", .dialog_launcher = true};
+        find.commands.push_back({.stable_id = "ribbon.find", .kind = RibbonCommandKind::text_box, .text = "Find"});
+        find.commands.push_back({.stable_id = "ribbon.matches", .kind = RibbonCommandKind::numeric_up_down,
+                                 .text = "Matches"});
+        find.commands.push_back({.stable_id = "ribbon.case", .kind = RibbonCommandKind::check_box,
+                                 .text = "Match case"});
+        insert.groups.push_back(std::move(find));
+        tabs.push_back(std::move(home));
+        tabs.push_back(std::move(insert));
+        (*ribbon).set_tabs(std::move(tabs));
+        (*ribbon).set_application_menu({item("ribbon.file.new", new_), item("ribbon.file.save", save_),
+                                        separator("ribbon.file.separator"), item("ribbon.file.about", about_)});
+        on((*ribbon).dialog_launcher_clicked(), *this, &CommandsAndMenusPage::on_ribbon_launcher);
+        (*ribbon_group).add_at(ribbon, {22.0, 36.0, 880.0, 112.0});
+    }
+
+    void on_ribbon_launcher(const RibbonDialogLaunch& launch) {
+        (*status_).set_text("Ribbon dialog launcher · " + launch.group_id);
     }
 
     // Shared application state.
@@ -450,6 +577,10 @@ private:
     std::shared_ptr<Button> context_button_;
     std::shared_ptr<Label> status_;
     std::shared_ptr<Label> saves_label_;
+    std::shared_ptr<GalleryCommand> styles_;
+    std::shared_ptr<Button> gallery_button_;
+    std::shared_ptr<RibbonGallery> drop_down_gallery_;
+    std::shared_ptr<Label> gallery_status_;
     Value<bool> dirty_{false};
     Value<bool> wrap_{false};
     unsigned saves_{};

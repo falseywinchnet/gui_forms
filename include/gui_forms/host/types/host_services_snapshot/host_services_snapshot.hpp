@@ -29,6 +29,11 @@ struct HostServicesSnapshot final {
     std::uint64_t sound_coalescing_window_nanoseconds{50'000'000U};
     std::uint32_t modal_depth{};
     std::uint32_t maximum_modal_depth{};
+    std::uint64_t tray_icons{};
+    std::uint64_t tray_icon_updates{};
+    std::uint64_t tray_notifications{};
+    std::uint64_t tray_menus{};
+    std::uint64_t tray_events{};
     std::uint64_t rejected_requests{};
     bool shutdown{};
 

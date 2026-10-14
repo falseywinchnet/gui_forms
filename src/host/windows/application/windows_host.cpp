@@ -3,6 +3,7 @@
 #include "../accessibility/windows_accessibility.hpp"
 #include "../services/windows_clipboard_image.hpp"
 #include "../services/windows_cursor.hpp"
+#include "../services/windows_notify_icons.hpp"
 #include "../input/windows_key_translation.hpp"
 #include "../input/windows_message_queue.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
@@ -3967,7 +3968,10 @@ HostCapabilities windows_capabilities() {
                 HostCapability::clipboard |
                 HostCapability::clipboard_images |
                 HostCapability::dialogs |
-                HostCapability::sound_cues};
+                HostCapability::sound_cues |
+                HostCapability::notification_area |
+                HostCapability::notification_area_messages |
+                HostCapability::notification_area_menus};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {

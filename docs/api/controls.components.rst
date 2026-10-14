@@ -15,6 +15,8 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
      - A component that raises ``tick`` at a fixed interval on a window's UI thread.
    * - :cpp:class:`BackgroundWorker <gui_forms::BackgroundWorker>`
      - Runs work on a worker thread and reports progress and completion on the UI thread.
+   * - :cpp:class:`NotifyIcon <gui_forms::NotifyIcon>`
+     - An icon in the desktop's notification area, with clicks, a menu and notification text.
    * - :cpp:class:`ImageList <gui_forms::ImageList>`
      - A keyed collection of images that buttons, trees and object views share.
    * - :cpp:class:`ErrorProvider <gui_forms::ErrorProvider>`
@@ -35,6 +37,7 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
 
    generated/gui_forms.Timer
    generated/gui_forms.BackgroundWorker
+   generated/gui_forms.NotifyIcon
    generated/gui_forms.ImageList
    generated/gui_forms.ErrorProvider
    generated/gui_forms.HelpProvider
@@ -70,6 +73,8 @@ Related types
      - ImageListChange identifies revision, mutation kind, entry index, and key affected by one retained resource mutation.
    * - :cpp:class:`ImageListResolution <gui_forms::ImageListResolution>`
      - ImageListResolution returns the exact registered ImageId plus source pixel size, chosen scale variant, revision, and stable entry identity.
+   * - :cpp:class:`NotifyIconClick <gui_forms::NotifyIconClick>`
+     - A click on the icon: ``button`` is primary for a click and secondary for the platform's context gesture.
 
 .. cpp:namespace:: gui_forms
 
@@ -272,6 +277,18 @@ Related types
    .. cpp:member:: double resolved_scale
 
       Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NotifyIconClick final
+
+   ``#include <gui_forms/components/notify_icon/notify_icon.hpp>``
+
+   A click on the icon: ``button`` is primary for a click and secondary for the platform's context gesture.
+
+   .. cpp:member:: PointerButton button
+
+      Default: ``{PointerButton::primary}``.
 
 Enumerations
 ------------

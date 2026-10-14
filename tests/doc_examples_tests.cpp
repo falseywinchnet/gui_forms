@@ -1339,6 +1339,15 @@ void example() {
 }
 }  // namespace doc_example_FontDialog_1
 
+namespace doc_example_GalleryCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> styles = std::make_shared<gf::Command>("doc.styles", "Styles");
+    std::shared_ptr<gf::GalleryCommand> gallery = std::make_shared<gf::GalleryCommand>(styles);
+    (*gallery).preview("style.heading", "doc.gallery");   // preview_requested
+    (*gallery).commit("style.heading", "doc.gallery");    // value_changed, then styles' invoked
+}
+}  // namespace doc_example_GalleryCommand_1
+
 namespace doc_example_GroupBox_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> mode =
@@ -1825,6 +1834,25 @@ void example() {
 }
 }  // namespace doc_example_MonthCalendar_1
 
+namespace doc_example_NotifyIcon_1 {
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    gf::HostImage pixel;
+    pixel.width = 16U;
+    pixel.height = 16U;
+    pixel.row_bytes = 64U;
+    pixel.pixels.assign(64U * 16U, std::byte{0xFF});
+    gf::NotifyIcon icon(window);
+    icon.set_icon({pixel});
+    icon.set_text("Radio: FM 98.1");
+    const gf::HostServiceStatus status = icon.set_visible(true);
+    if (!status.accepted()) {
+        // Without a host, status.error is gf::HostServiceError::unsupported.
+    }
+}
+}  // namespace doc_example_NotifyIcon_1
+
 namespace doc_example_NumericUpDown_1 {
 void example() {
     std::shared_ptr<gf::NumericUpDown> zoom =
@@ -2289,6 +2317,33 @@ void example() {
     // the card is now selected, and reviews.opened is "fonts"
 }
 }  // namespace doc_example_ReviewCard_2
+
+namespace doc_example_Ribbon_1 {
+void example() {
+    std::shared_ptr<gf::Command> paste = std::make_shared<gf::Command>("edit.paste", "&Paste");
+    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("main.ribbon"));
+    gf::RibbonGroupSpec clipboard{.stable_id = "clipboard", .caption = "Clipboard", .dialog_launcher = true};
+    clipboard.commands.push_back({.stable_id = "paste", .command = paste});
+    gf::RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
+    home.groups.push_back(std::move(clipboard));
+    (*ribbon).set_tabs({std::move(home)});
+}
+}  // namespace doc_example_Ribbon_1
+
+namespace doc_example_RibbonGallery_1 {
+void example() {
+    std::shared_ptr<gf::Command> styles = std::make_shared<gf::Command>("doc.styles", "Styles");
+    std::shared_ptr<gf::GalleryCommand> command = std::make_shared<gf::GalleryCommand>(styles);
+    std::shared_ptr<gf::RibbonGallery> gallery =
+        gf::make_control<gf::RibbonGallery>(gf::StableId("doc.styles.gallery"));
+    (*gallery).set_items({{"headings", "Headings"}},
+                         {{"style.title", "Title", {}, "headings"},
+                          {"style.heading", "Heading 1", {}, "headings"}});
+    (*gallery).set_column_range(2U, 6U);
+    (*gallery).set_columns(4U);
+    (*gallery).set_command(command);
+}
+}  // namespace doc_example_RibbonGallery_1
 
 namespace doc_example_ScaledGroupBox_1 {
 void example() {
@@ -3317,6 +3372,7 @@ int main() {
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
+    failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);
@@ -3341,6 +3397,7 @@ int main() {
     failures += run("MetricsView example 1", &doc_example_MetricsView_1::example);
     failures += run("MetricsView example 2", &doc_example_MetricsView_2::example);
     failures += run("MonthCalendar example 1", &doc_example_MonthCalendar_1::example);
+    failures += run("NotifyIcon example 1", &doc_example_NotifyIcon_1::example);
     failures += run("NumericUpDown example 1", &doc_example_NumericUpDown_1::example);
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
@@ -3363,6 +3420,8 @@ int main() {
     failures += run("ResponsiveTrackPanel example 1", &doc_example_ResponsiveTrackPanel_1::example);
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
+    failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
+    failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);
     failures += run("ScrollBar example 1", &doc_example_ScrollBar_1::example);

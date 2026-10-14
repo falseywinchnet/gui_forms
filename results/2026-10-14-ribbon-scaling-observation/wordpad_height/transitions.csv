@@ -1,0 +1,7 @@
+"tab","ladder","direction","fixed","last_px_of_from","first_px_of_to","from","to"
+"Home","height","shrinking","1600","238","237","S1","S2"
+"Home","height","growing","1600","237","238","S2","S1"
+"Home","height","shrinking","800","238","237","S3","S2"
+"Home","height","growing","800","237","238","S2","S3"
+"Home","height","shrinking","600","238","237","S4","S2"
+"Home","height","growing","600","237","238","S2","S4"
