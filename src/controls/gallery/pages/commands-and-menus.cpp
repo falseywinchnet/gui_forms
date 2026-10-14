@@ -32,6 +32,7 @@ public:
         build_shared_state(body);
         build_context_menu(body);
         build_strips(body);
+        build_container(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -280,6 +281,48 @@ private:
         });
         (*(*status).progress_bar("status.progress")).set_value(60.0);
         (*strips).add_at(status, {22.0, 84.0, 880.0, 24.0});
+    }
+
+    // A ToolStripContainer: a strip in the top panel, a vertical strip in
+    // the left panel and a status strip in the bottom panel around content.
+    void build_container(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> frame_group = group(
+            "gallery.commands.container", "ToolStripContainer · top, left and bottom panels around content",
+            {930.0, 230.0});
+        (*body).add_at(frame_group, {24.0, 780.0, 930.0, 230.0});
+        std::shared_ptr<ToolStripContainer> frame =
+            make_control<ToolStripContainer>(StableId("gallery.commands.container.frame"));
+        (*frame).set_accessible_name("Drawing frame");
+        std::shared_ptr<ToolStrip> top = make_control<ToolStrip>(StableId("gallery.commands.container.top-strip"));
+        (*top).set_accessible_name("File tools");
+        (*top).set_items({
+            {.stable_id = "frame.new", .command = new_},
+            {.stable_id = "frame.save", .command = save_},
+            {.stable_id = "frame.rule", .kind = ToolStripItemKind::separator},
+            {.stable_id = "frame.find", .kind = ToolStripItemKind::text_box, .text = "Find"},
+        });
+        (*(*frame).top_panel()).join(top);
+        std::shared_ptr<ToolStrip> left = make_control<ToolStrip>(StableId("gallery.commands.container.left-strip"));
+        (*left).set_accessible_name("Drawing tools");
+        (*left).set_items({
+            {.stable_id = "frame.pen", .text = "Pen", .check_on_click = true, .checked = true},
+            {.stable_id = "frame.brush", .text = "Brush", .check_on_click = true},
+            {.stable_id = "frame.tools-rule", .kind = ToolStripItemKind::separator},
+            {.stable_id = "frame.fill", .text = "Fill"},
+        });
+        (*(*frame).left_panel()).join(left);
+        std::shared_ptr<StatusStrip> status =
+            make_control<StatusStrip>(StableId("gallery.commands.container.status-strip"));
+        (*status).set_accessible_name("Drawing status");
+        (*status).set_items({{.stable_id = "frame.status", .kind = ToolStripItemKind::label,
+                              .text = "Content panel between the strips", .spring = true}});
+        (*(*frame).bottom_panel()).join(status);
+        std::shared_ptr<Label> content = label("gallery.commands.container.content",
+                                               "Content: the application's controls go in content_panel().", 11.0,
+                                               400, muted);
+        (*content).set_dock(DockStyle::fill);
+        (*(*frame).content_panel()).add_child(content);
+        (*frame_group).add_at(frame, {22.0, 36.0, 880.0, 176.0});
     }
 
     // Shared application state.

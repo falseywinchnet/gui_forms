@@ -46,6 +46,13 @@ gui_forms::ToolStrip
       **font** : ``FontSpec``
          The font of item text.
 
+      **orientation** : ``Orientation``, default ``Orientation::horizontal``
+         Horizontal strips run left to right. Vertical strips run top to bottom,
+         one item per row, and are as wide as their widest item; a
+         :cpp:class:`ToolStripPanel <gui_forms::ToolStripPanel>` on the left or right turns its strips vertical. A
+         :cpp:class:`StatusStrip <gui_forms::StatusStrip>` stays horizontal and throws ``std::logic_error`` when set
+         vertical.
+
       **drop_down_open** : ``bool``, read-only
          Whether a drop-down, split or overflow menu is open.
 
@@ -101,6 +108,9 @@ gui_forms::ToolStrip
       :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
          A strip laid out for the bottom of a window.
 
+      :cpp:class:`ToolStripContainer <gui_forms::ToolStripContainer>`
+         Panels that hold strips around a content panel.
+
       :cpp:class:`MenuStrip <gui_forms::MenuStrip>`
          The application's menu bar.
 
@@ -131,7 +141,8 @@ gui_forms::ToolStrip
 
    With focus, Left and Right move between enabled buttons, Enter and Space
    click (or open a drop-down button's menu), Down opens a menu and Escape
-   closes it. The strip publishes the accessibility role ``toolbar``, with a
+   closes it. On a vertical strip Up and Down move between buttons and Right
+   opens a menu, which opens beside the item. The strip publishes the accessibility role ``toolbar``, with a
    child per item: ``button``, ``static_text`` or ``separator``.
 
    Hosted items hold real child controls (:cpp:class:`ComboBox <gui_forms::ComboBox>`, :cpp:class:`TextBox <gui_forms::TextBox>`,
@@ -148,8 +159,8 @@ gui_forms::ToolStrip
    (Windows Forms shows them inside its overflow drop-down). Arrow keys skip
    them; Tab reaches them.
 
-   Not supported yet: vertical strips, hosted controls in the overflow menu,
-   tool tips on items, and dragging the grip.
+   Not supported yet: hosted controls in the overflow menu, tool tips on items,
+   and dragging the grip.
 
    .. rubric:: Examples
 
@@ -205,6 +216,18 @@ gui_forms::ToolStrip
    .. cpp:function:: void set_font(FontSpec font)
 
       Sets :cpp:func:`font <gui_forms::ToolStrip::font>`; see the property's description above.
+
+   .. cpp:function:: Orientation orientation() const noexcept
+
+      Horizontal strips run left to right. Vertical strips run top to bottom,
+      one item per row, and are as wide as their widest item; a
+      :cpp:class:`ToolStripPanel <gui_forms::ToolStripPanel>` on the left or right turns its strips vertical. A
+      :cpp:class:`StatusStrip <gui_forms::StatusStrip>` stays horizontal and throws ``std::logic_error`` when set
+      vertical.
+
+   .. cpp:function:: void set_orientation(Orientation orientation)
+
+      Sets :cpp:func:`orientation <gui_forms::ToolStrip::orientation>`; see the property's description above.
 
    .. cpp:function:: bool drop_down_open() const noexcept
 

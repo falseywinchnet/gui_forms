@@ -17,6 +17,10 @@ Commands, menu strips and context menus.
      - A command strip of buttons, labels, separators and drop-down buttons.
    * - :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
      - A status bar laid out as a strip of labels along the bottom of a window.
+   * - :cpp:class:`ToolStripPanel <gui_forms::ToolStripPanel>`
+     - A band along one edge that holds ToolStrips.
+   * - :cpp:class:`ToolStripContainer <gui_forms::ToolStripContainer>`
+     - Four ToolStripPanels around a content panel.
    * - :cpp:class:`ContextMenu <gui_forms::ContextMenu>`
      - A popup menu of commands that the application opens at a point, such as on a right-click.
    * - :cpp:class:`Command <gui_forms::Command>`
@@ -28,6 +32,8 @@ Commands, menu strips and context menus.
    generated/gui_forms.MenuStrip
    generated/gui_forms.ToolStrip
    generated/gui_forms.StatusStrip
+   generated/gui_forms.ToolStripPanel
+   generated/gui_forms.ToolStripContainer
    generated/gui_forms.ContextMenu
    generated/gui_forms.Command
 
@@ -64,12 +70,16 @@ Related types
      -  
    * - :cpp:class:`ToolStrip::Parts <gui_forms::ToolStrip::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`ToolStripContainer::Parts <gui_forms::ToolStripContainer::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`ToolStripDropDownInvocation <gui_forms::ToolStripDropDownInvocation>`
      - A choice from a drop-down or split button's menu, or from the overflow menu's copy of one.
    * - :cpp:class:`ToolStripItemClick <gui_forms::ToolStripItemClick>`
      - A click on an item, after any command it carries has executed.
    * - :cpp:class:`ToolStripItemSpec <gui_forms::ToolStripItemSpec>`
      - One item.
+   * - :cpp:class:`ToolStripPanel::Parts <gui_forms::ToolStripPanel::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
 
 .. cpp:namespace:: gui_forms
 
@@ -306,6 +316,26 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ToolStripContainer::Parts final
+
+   ``#include <gui_forms/controls/tool_strip_container/tool_strip_container.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry top_panel
+
+   .. cpp:member:: PartGeometry bottom_panel
+
+   .. cpp:member:: PartGeometry left_panel
+
+   .. cpp:member:: PartGeometry right_panel
+
+   .. cpp:member:: PartGeometry content_panel
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ToolStripDropDownInvocation final
 
    ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
@@ -383,6 +413,18 @@ Related types
    .. cpp:member:: std::vector<std::string> choices
 
    .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStripPanel::Parts final
+
+   ``#include <gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
 
 Enumerations
 ------------
@@ -466,6 +508,20 @@ Enumerations
    .. cpp:enumerator:: as_needed
 
    .. cpp:enumerator:: never
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ToolStripPanelEdge
+
+   ``#include <gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp>``
+
+   .. cpp:enumerator:: top
+
+   .. cpp:enumerator:: bottom
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: right
 
 Functions, constants and aliases
 --------------------------------

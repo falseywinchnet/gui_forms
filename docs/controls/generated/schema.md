@@ -1876,6 +1876,36 @@ Properties beyond every control's: none.
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 
+## `tool_strip_panel` (ToolStripPanel, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+Interactions beyond every control's: none.
+
+## `tool_strip_container` (ToolStripContainer, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `top_panel` | face | `tool_strip_panel` |  |
+| `bottom_panel` | face | `tool_strip_panel` |  |
+| `left_panel` | face | `tool_strip_panel` |  |
+| `right_panel` | face | `tool_strip_panel` |  |
+| `content_panel` | region | `panel` |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+Interactions beyond every control's: none.
+
 ## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |

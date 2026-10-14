@@ -105,7 +105,8 @@ struct ToolStripDropDownInvocation final {
 // child controls; the strip lays them out as its "item" item system and
 // paints every part through the by-role paint path. Items that do not fit
 // move to an overflow menu opened from the overflow button at the strip's
-// end. Laid out horizontally; vertical strips are not supported yet.
+// end. A strip is laid out horizontally, or vertically (top to bottom) for
+// the left and right panels of a ToolStripContainer.
 class ToolStrip : public Control {
 public:
     explicit ToolStrip(StableId stable_id);
@@ -132,6 +133,11 @@ public:
     void set_grip_visible(bool visible);
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
+    // Horizontal strips run left to right; vertical strips run top to bottom
+    // and are as wide as their widest item. A StatusStrip stays horizontal
+    // and throws std::logic_error when set vertical.
+    [[nodiscard]] Orientation orientation() const noexcept { return orientation_; }
+    void set_orientation(Orientation orientation);
 
     // Opens a drop-down or split button's menu, or closes any open menu.
     bool show_drop_down(std::string_view item_id, MenuOpenMode mode = MenuOpenMode::keyboard);
@@ -243,6 +249,7 @@ private:
     };
 
     void construct();
+    [[nodiscard]] bool vertical() const noexcept;
     [[nodiscard]] Control::Ptr hosted_control(std::string_view item_id, ToolStripItemKind kind) const;
     [[nodiscard]] Control::Ptr make_hosted(const ToolStripItemSpec& item) const;
     void configure_hosted(const ToolStripItemSpec& item, Control& hosted) const;
@@ -278,6 +285,7 @@ private:
     bool overflow_hot_{};
     bool focused_{};
     bool grip_visible_{true};
+    Orientation orientation_{Orientation::horizontal};
     bool status_layout_{};
     bool sizing_grip_visible_{};
     FontSpec font_{FontRole::control, 10.5, 400, false, 0.12};

@@ -657,6 +657,28 @@
       "doc": "api/generated/gui_forms.StatusStrip.rst"
     },
     {
+      "id": "tool_strip_panel",
+      "type": "ToolStripPanel",
+      "header": "gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp",
+      "category": "Menus and commands",
+      "purpose": "Band along one edge that stacks joined ToolStrips in rows (top, bottom) or vertical columns (left, right), as thick as its strips.",
+      "winforms": "ToolStripPanel",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStripPanel.rst"
+    },
+    {
+      "id": "tool_strip_container",
+      "type": "ToolStripContainer",
+      "header": "gui_forms/controls/tool_strip_container/tool_strip_container.hpp",
+      "category": "Menus and commands",
+      "purpose": "Four ToolStripPanels around a content panel; the edge panels take the room their strips need and the content takes the rest.",
+      "winforms": "ToolStripContainer",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStripContainer.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",

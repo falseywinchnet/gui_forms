@@ -2734,6 +2734,32 @@ void example() {
 }
 }  // namespace doc_example_ToolStrip_1
 
+namespace doc_example_ToolStripContainer_1 {
+void example() {
+    std::shared_ptr<gf::ToolStripContainer> frame =
+        gf::make_control<gf::ToolStripContainer>(gf::StableId("frame"));
+    std::shared_ptr<gf::ToolStrip> tools =
+        gf::make_control<gf::ToolStrip>(gf::StableId("frame.tools"));
+    std::shared_ptr<gf::StatusStrip> status =
+        gf::make_control<gf::StatusStrip>(gf::StableId("frame.status"));
+    (*(*frame).top_panel()).join(tools);
+    (*(*frame).bottom_panel()).join(status);
+}
+}  // namespace doc_example_ToolStripContainer_1
+
+namespace doc_example_ToolStripPanel_1 {
+void example() {
+    std::shared_ptr<gf::ToolStripPanel> panel =
+        gf::make_control<gf::ToolStripPanel>(gf::StableId("tools.panel"));
+    std::shared_ptr<gf::ToolStrip> file =
+        gf::make_control<gf::ToolStrip>(gf::StableId("tools.file"));
+    std::shared_ptr<gf::ToolStrip> edit =
+        gf::make_control<gf::ToolStrip>(gf::StableId("tools.edit"));
+    (*panel).join(file);
+    (*panel).join(edit);
+}
+}  // namespace doc_example_ToolStripPanel_1
+
 namespace doc_example_ToolTip_1 {
 void example() {
     std::shared_ptr<gf::Panel> toolbar =
@@ -3297,6 +3323,8 @@ int main() {
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
+    failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
+    failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);
     failures += run("ToolTip example 1", &doc_example_ToolTip_1::example);
     failures += run("ToolTip example 2", &doc_example_ToolTip_2::example);
     failures += run("TrackBar example 1", &doc_example_TrackBar_1::example);

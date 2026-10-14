@@ -28,6 +28,12 @@ grip_visible : default ``true``
     Whether the grip shows at the strip's start.
 font
     The font of item text.
+orientation : default ``Orientation::horizontal``
+    Horizontal strips run left to right. Vertical strips run top to bottom,
+    one item per row, and are as wide as their widest item; a
+    `ToolStripPanel` on the left or right turns its strips vertical. A
+    `StatusStrip` stays horizontal and throws `std::logic_error` when set
+    vertical.
 overflow_item_ids
     The items currently in the overflow menu, in strip order.
 drop_down_open
@@ -64,6 +70,7 @@ close_drop_down
 See Also
 --------
 StatusStrip : A strip laid out for the bottom of a window.
+ToolStripContainer : Panels that hold strips around a content panel.
 MenuStrip : The application's menu bar.
 CommandBar : A row of command buttons that are child controls.
 Command : The shared action an item carries.
@@ -89,7 +96,8 @@ button becomes a submenu of its menu, and labels are left out.
 
 With focus, Left and Right move between enabled buttons, Enter and Space
 click (or open a drop-down button's menu), Down opens a menu and Escape
-closes it. The strip publishes the accessibility role `toolbar`, with a
+closes it. On a vertical strip Up and Down move between buttons and Right
+opens a menu, which opens beside the item. The strip publishes the accessibility role `toolbar`, with a
 child per item: `button`, `static_text` or `separator`.
 
 Hosted items hold real child controls (`ComboBox`, `TextBox`,
@@ -106,8 +114,8 @@ menu, whatever their `overflow` setting: a menu row cannot hold a control
 (Windows Forms shows them inside its overflow drop-down). Arrow keys skip
 them; Tab reaches them.
 
-Not supported yet: vertical strips, hosted controls in the overflow menu,
-tool tips on items, and dragging the grip.
+Not supported yet: hosted controls in the overflow menu, tool tips on items,
+and dragging the grip.
 
 Examples
 --------

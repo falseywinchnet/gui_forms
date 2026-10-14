@@ -33,6 +33,7 @@ constexpr double split_arrow_width = 12.0;
 constexpr double arrow_glyph_size = 7.0;
 constexpr double overflow_button_width = 12.0;
 constexpr double sizing_grip_size = 12.0;
+constexpr double vertical_item_extent = 22.0;
 constexpr double default_combo_box_width = 120.0;
 constexpr double default_hosted_width = 100.0;
 constexpr double maximum_hosted_width = 1024.0;
@@ -59,6 +60,17 @@ bool has_menu(ToolStripItemKind kind) noexcept {
 bool hosted(ToolStripItemKind kind) noexcept {
     const bool result = kind == ToolStripItemKind::combo_box || kind == ToolStripItemKind::text_box ||
                         kind == ToolStripItemKind::progress_bar;
+    return result;
+}
+
+// A rectangle from `position` for `extent` along a strip's main axis and
+// from `cross_start` for `cross_extent` across it.
+Rect axis_rect(bool vertical, double position, double extent, double cross_start, double cross_extent) noexcept {
+    if (vertical) {
+        const Rect result{cross_start, position, cross_extent, extent};
+        return result;
+    }
+    const Rect result{position, cross_start, extent, cross_extent};
     return result;
 }
 
@@ -326,8 +338,37 @@ Size ToolStrip::measure(Size available) {
     const double scale = effective_text_scale();
     const ResolvedTextLayout metrics = resolve_text_layout_utf8("Mg", effective_font(font_));
     const double preferred = std::max(strip_height * scale, metrics.logical_size.height + 10.0 * scale);
-    const Size result{.width = available.width, .height = std::min(available.height, preferred)};
+    if (!vertical()) {
+        const Size result{.width = available.width, .height = std::min(available.height, preferred)};
+        return result;
+    }
+    // A vertical strip is as wide as its widest visible item.
+    double widest = 0.0;
+    for (const ToolStripItemSpec& item : items_) {
+        if (item_visible(item)) widest = std::max(widest, item_size(item).width);
+    }
+    const double width = std::max(preferred, widest + edge_inset * scale * 2.0);
+    const Size result{.width = std::min(available.width, width), .height = available.height};
     return result;
+}
+
+bool ToolStrip::vertical() const noexcept {
+    const bool result = orientation_ == Orientation::vertical && !status_layout_;
+    return result;
+}
+
+void ToolStrip::set_orientation(Orientation orientation) {
+    require_mutable();
+    if (orientation != Orientation::horizontal && orientation != Orientation::vertical) {
+        throw std::invalid_argument("ToolStrip orientation is invalid");
+    }
+    if (status_layout_ && orientation == Orientation::vertical) {
+        throw std::logic_error("A StatusStrip is laid out horizontally");
+    }
+    if (orientation_ == orientation) return;
+    close_drop_down();
+    orientation_ = orientation;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
 Size ToolStrip::item_size(const ToolStripItemSpec& item) const {
@@ -363,11 +404,16 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
     Layout result;
     result.items.assign(count, Rect{});
     result.overflowed.assign(count, false);
-    const double item_height = std::max(0.0, surface.height - inset * 2.0);
+    // Items run along the main axis (left to right, or top to bottom on a
+    // vertical strip) and fill the strip across it.
+    const bool along_height = vertical();
+    const double main_extent = along_height ? surface.height : surface.width;
+    const double cross_extent = along_height ? surface.width : surface.height;
+    const double item_cross = std::max(0.0, cross_extent - inset * 2.0);
     double start = inset;
-    double end = surface.width - inset;
+    double end = main_extent - inset;
     if (!status_layout_ && grip_visible_) {
-        result.grip = {inset, inset, grip_width * scale, item_height};
+        result.grip = axis_rect(along_height, inset, grip_width * scale, inset, item_cross);
         start = inset * 2.0 + grip_width * scale;
     }
     if (status_layout_ && sizing_grip_visible_) {
@@ -382,6 +428,9 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
         shown[index] = item_visible(items_[index]);
         if (!shown[index]) continue;
         widths[index] = item_size(items_[index]).width;
+        if (along_height && items_[index].kind != ToolStripItemKind::separator) {
+            widths[index] = vertical_item_extent * scale;
+        }
         if (!(status_layout_ && items_[index].spring && items_[index].kind == ToolStripItemKind::label)) {
             total += widths[index];
         }
@@ -415,14 +464,14 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
         }
         if (moved) {
             end -= reserved;
-            result.overflow_button = {end, inset, reserved, item_height};
+            result.overflow_button = axis_rect(along_height, end, reserved, inset, item_cross);
         }
     }
     double next = start;
     for (std::size_t index = 0; index < count; ++index) {
         if (!shown[index] || result.overflowed[index] ||
             items_[index].placement != ToolStripItemPlacement::start) continue;
-        result.items[index] = {next, inset, widths[index], item_height};
+        result.items[index] = axis_rect(along_height, next, widths[index], inset, item_cross);
         next += widths[index];
     }
     double last = end;
@@ -430,7 +479,7 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
         if (!shown[index] || result.overflowed[index] ||
             items_[index].placement != ToolStripItemPlacement::end) continue;
         last -= widths[index];
-        result.items[index] = {last, inset, widths[index], item_height};
+        result.items[index] = axis_rect(along_height, last, widths[index], inset, item_cross);
     }
     return result;
 }
@@ -454,9 +503,15 @@ ToolStrip::ItemParts ToolStrip::item_parts(std::size_t index, Rect bounds) const
         return parts;
     }
     if (item.kind == ToolStripItemKind::separator) {
+        // A rule across the strip: upright on a horizontal strip, level on
+        // a vertical one.
         const double inset = 2.0 * scale;
-        const Rect rule{std::floor(bounds.x + bounds.width * 0.5), bounds.y + inset, 1.0,
-                        std::max(0.0, bounds.height - inset * 2.0)};
+        Rect rule{std::floor(bounds.x + bounds.width * 0.5), bounds.y + inset, 1.0,
+                  std::max(0.0, bounds.height - inset * 2.0)};
+        if (vertical()) {
+            rule = {bounds.x + inset, std::floor(bounds.y + bounds.height * 0.5),
+                    std::max(0.0, bounds.width - inset * 2.0), 1.0};
+        }
         parts.item_separator = PartGeometry::from_bounds(rule);
         return parts;
     }
@@ -747,9 +802,15 @@ void ToolStrip::on_key(KeyEvent& event) {
     if (!current) current = next_interactive(items_.size() == 0U ? 0U : items_.size() - 1U, 1);
     if (!current) return;
     const ToolStripItemSpec& item = items_[*current];
-    if (event.physical_key == PhysicalKey::left || event.physical_key == PhysicalKey::right) {
+    // The arrows along the strip move between items; the arrow away from
+    // it (Down, or Right on a vertical strip) opens a menu.
+    const bool along_height = vertical();
+    const std::uint32_t previous_key = along_height ? PhysicalKey::up : PhysicalKey::left;
+    const std::uint32_t next_key = along_height ? PhysicalKey::down : PhysicalKey::right;
+    const std::uint32_t open_key = along_height ? PhysicalKey::right : PhysicalKey::down;
+    if (event.physical_key == previous_key || event.physical_key == next_key) {
         const std::optional<std::size_t> next =
-            next_interactive(*current, event.physical_key == PhysicalKey::right ? 1 : -1);
+            next_interactive(*current, event.physical_key == next_key ? 1 : -1);
         if (next) set_hot(next, ItemZone::main);
     } else if (event.physical_key == PhysicalKey::enter || event.physical_key == PhysicalKey::space) {
         set_hot(current, ItemZone::main);
@@ -758,7 +819,7 @@ void ToolStrip::on_key(KeyEvent& event) {
         } else {
             click(*current);
         }
-    } else if (event.physical_key == PhysicalKey::down && has_menu(item.kind)) {
+    } else if (event.physical_key == open_key && has_menu(item.kind)) {
         static_cast<void>(show_drop_down(item.stable_id));
     } else if (event.physical_key == PhysicalKey::escape) {
         close_drop_down();
@@ -792,7 +853,10 @@ bool ToolStrip::show_drop_down(std::string_view item_id, MenuOpenMode mode) {
     close_drop_down();
     (*popup_).set_items(items_[*index].drop_down);
     const Rect absolute = absolute_bounds();
-    (*popup_).show(shared_from_this(), {absolute.x + bounds.x, absolute.y + bounds.y + bounds.height}, mode);
+    // A menu opens below an item, or beside it on a vertical strip.
+    Point anchor{absolute.x + bounds.x, absolute.y + bounds.y + bounds.height};
+    if (vertical()) anchor = {absolute.x + bounds.x + bounds.width, absolute.y + bounds.y};
+    (*popup_).show(shared_from_this(), anchor, mode);
     open_index_ = index;
     invalidate(Dirty::paint | Dirty::semantics);
     return true;
@@ -845,10 +909,10 @@ bool ToolStrip::show_overflow(MenuOpenMode mode) {
     (*popup_).set_items(std::move(menu));
     const Rect absolute = absolute_bounds();
     const double right = absolute.x + placed.overflow_button.x + placed.overflow_button.width;
-    (*popup_).show(shared_from_this(),
-                   {std::max(absolute.x, right - (*popup_).preferred_width()),
-                    absolute.y + placed.overflow_button.y + placed.overflow_button.height},
-                   mode);
+    Point anchor{std::max(absolute.x, right - (*popup_).preferred_width()),
+                 absolute.y + placed.overflow_button.y + placed.overflow_button.height};
+    if (vertical()) anchor = {right, absolute.y + placed.overflow_button.y};
+    (*popup_).show(shared_from_this(), anchor, mode);
     overflow_open_ = true;
     invalidate(Dirty::paint | Dirty::semantics);
     return true;

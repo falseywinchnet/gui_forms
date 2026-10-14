@@ -425,6 +425,8 @@ add_library(gui_forms_controls STATIC
     src/controls/menu/context_menu/context_menu.cpp
     src/controls/menu/menu_strip/menu_strip.cpp
     src/controls/tool_strip/tool_strip.cpp
+    src/controls/tool_strip_panel/tool_strip_panel.cpp
+    src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/status_strip/status_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
@@ -2388,6 +2390,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
     target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_month_calendar_tests COMMAND gui_forms_month_calendar_tests)
+    add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
+    target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
