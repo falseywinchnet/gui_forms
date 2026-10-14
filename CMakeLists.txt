@@ -1047,6 +1047,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/application/windows_host.cpp
         src/host/windows/accessibility/windows_accessibility.cpp
         src/host/windows/services/windows_clipboard_image.cpp
+        src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
     )
     target_include_directories(gui_forms_host_windows PUBLIC
@@ -1914,7 +1915,15 @@ if(GUI_FORMS_BUILD_TESTS)
         target_include_directories(gui_forms_windows_message_queue_native_probe PRIVATE src/host/windows/input)
         target_compile_features(gui_forms_windows_message_queue_native_probe PRIVATE cxx_std_20)
         target_link_libraries(gui_forms_windows_message_queue_native_probe PRIVATE user32)
-        add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
+        add_executable(gui_forms_windows_notify_icon_tests
+            tests/windows_notify_icon_tests.cpp
+            src/host/windows/services/windows_notify_icons.cpp)
+        target_include_directories(gui_forms_windows_notify_icon_tests PRIVATE src/host/windows)
+        target_compile_definitions(gui_forms_windows_notify_icon_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_notify_icon_tests PRIVATE gui_forms_core user32 gdi32 shell32)
+        add_test(NAME gui_forms_windows_notify_icon_tests COMMAND gui_forms_windows_notify_icon_tests)
+                add_executable(gui_forms_windows_cursor_tests tests/windows_cursor_tests.cpp)
         target_link_libraries(gui_forms_windows_cursor_tests PRIVATE gui_forms_core user32 gdi32)
         add_test(NAME gui_forms_windows_cursors COMMAND gui_forms_windows_cursor_tests)
         add_executable(gui_forms_windows_key_translation_tests tests/windows_key_translation_tests.cpp)
@@ -1938,6 +1947,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                 src/host/windows/raster/dib_frame_store.cpp)
             target_include_directories(gui_forms_windows_dib_lifecycle_tests PRIVATE
@@ -1956,6 +1966,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
+                src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                 src/host/windows/raster/dib_frame_store.cpp)
             target_include_directories(gui_forms_windows_tooltip_tests PRIVATE
@@ -1975,6 +1986,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/application/windows_host.cpp
                     src/host/windows/accessibility/windows_accessibility.cpp
                     src/host/windows/services/windows_clipboard_image.cpp
+                    src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
                     src/host/windows/raster/dib_frame_store.cpp
                     src/host/windows/raster/prepared_text_compositor.cpp)

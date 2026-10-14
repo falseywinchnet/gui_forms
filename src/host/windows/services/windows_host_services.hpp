@@ -114,7 +114,40 @@ protected:
         return {};
     }
 
+    // Notification-area icons: one WindowsNotifyIcons, created with the first
+    // icon, whose hidden window reports shell events back through
+    // forward_tray_event on the UI thread.
+    HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request) override {
+        if (!notify_icons_) {
+            notify_icons_ = std::make_unique<gui_forms::host::detail::WindowsNotifyIcons>(
+                Delegate<const HostTrayIconEvent&>::bind<WindowsHostServices, &WindowsHostServices::forward_tray_event>(
+                    *this));
+        }
+        return (*notify_icons_).add(icon_id, request);
+    }
+    HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request) override {
+        if (!notify_icons_) return {HostServiceError::backend_failure};
+        return (*notify_icons_).update(icon_id, request);
+    }
+    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override {
+        if (notify_icons_) (*notify_icons_).remove(icon_id);
+    }
+    HostServiceStatus show_tray_notification_impl(std::uint64_t icon_id,
+                                                  const HostTrayNotificationRequest& request) override {
+        if (!notify_icons_) return {HostServiceError::backend_failure};
+        return (*notify_icons_).notify(icon_id, request);
+    }
+    HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id, const HostTrayMenuRequest& request) override {
+        if (!notify_icons_) {
+            HostTrayMenuResult refused;
+            refused.status = {HostServiceError::backend_failure};
+            return refused;
+        }
+        return (*notify_icons_).show_menu(icon_id, request);
+    }
+
     void shutdown_impl() noexcept override {
+        notify_icons_.reset();
         for (const CursorEntry& entry : cursors_) {
             if (GetCursor() == entry.native) apply_system_cursor(CursorKind::arrow);
             DestroyCursor(entry.native);
@@ -276,6 +309,8 @@ protected:
 
 
 private:
+    void forward_tray_event(const HostTrayIconEvent& event) { publish_tray_icon_event(event); }
+
     struct CursorEntry final {
         CursorImagesPtr images;
         double scale;
@@ -313,5 +348,6 @@ private:
 
     HWND owner_{};
     Window* cursor_model_{};
+    std::unique_ptr<gui_forms::host::detail::WindowsNotifyIcons> notify_icons_;
     std::array<COLORREF, 16> custom_colors_{};
 };
