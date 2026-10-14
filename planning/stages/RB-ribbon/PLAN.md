@@ -1,7 +1,8 @@
 # Ribbon framework: plan
 
-Date: 2026-10-14. Status: **proposed; awaiting the owner's acceptance** (the
-gate of stage RB). Sources: the decisions in `README.md` (from interview
+Date: 2026-10-14. Status: **accepted by the owner on 2026-10-14** ("i
+accept"), closing stage RB's gate; building proceeds in stage W, phase 0
+first. Sources: the decisions in `README.md` (from interview
 round 001, `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`) and the study,
 `RIBBON_STUDY.md`. Where this plan and a recorded decision disagree, the
 decision governs; fix the plan.
@@ -9,8 +10,7 @@ decision governs; fix the plan.
 The ribbon is built in stage W (decision 1), under the atom vocabulary ruling
 (design language §12.7): every part is painted through `paint_part`, the
 controls use only admitted atoms, and its look comes from the theme (T4) and
-its motion from the engine (T2). Nothing here is built before the owner
-accepts this plan.
+its motion from the engine (T2).
 
 ## What the framework is
 
