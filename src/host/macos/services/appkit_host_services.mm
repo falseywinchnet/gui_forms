@@ -5,6 +5,7 @@
 
 #include "macos_host.hpp"
 #include "appkit_clipboard_image.hpp"
+#include "appkit_status_items.hpp"
 #include "../../../core/damage/device_damage/device_damage.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
 
@@ -570,7 +571,37 @@ protected:
                             : HostServiceStatus{HostServiceError::backend_failure};
     }
 
+    // Notification-area icons: NSStatusItems in the menu bar, created with the
+    // first icon. Notification text is not offered (see AppKitStatusItems).
+    HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id,
+                                         const gui_forms::HostTrayIconRequest& request) override {
+        if (!status_items_) {
+            status_items_ = std::make_unique<gui_forms::host::detail::AppKitStatusItems>(
+                gui_forms::Delegate<const gui_forms::HostTrayIconEvent&>::bind<
+                    AppKitHostServices, &AppKitHostServices::forward_tray_event>(*this));
+        }
+        return (*status_items_).add(icon_id, request);
+    }
+    HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id,
+                                            const gui_forms::HostTrayIconRequest& request) override {
+        if (!status_items_) return {HostServiceError::backend_failure};
+        return (*status_items_).update(icon_id, request);
+    }
+    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override {
+        if (status_items_) (*status_items_).remove(icon_id);
+    }
+    gui_forms::HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id,
+                                                      const gui_forms::HostTrayMenuRequest& request) override {
+        if (!status_items_) {
+            gui_forms::HostTrayMenuResult refused;
+            refused.status = {HostServiceError::backend_failure};
+            return refused;
+        }
+        return (*status_items_).show_menu(icon_id, request);
+    }
+
     void shutdown_impl() noexcept override {
+        status_items_.reset();
         for (const CursorEntry& entry : cursors_) {
             if ([NSCursor currentCursor] == entry.native) [[NSCursor arrowCursor] set];
         }
@@ -579,6 +610,8 @@ protected:
     }
 
 private:
+    void forward_tray_event(const gui_forms::HostTrayIconEvent& event) { publish_tray_icon_event(event); }
+
     struct CursorEntry final {
         gui_forms::CursorImagesPtr images;
         double scale;
@@ -587,6 +620,7 @@ private:
     std::vector<CursorEntry> cursors_;
     __strong NSPasteboard* pasteboard_{};
     bool cancel_dialogs_for_testing_{};
+    std::unique_ptr<gui_forms::host::detail::AppKitStatusItems> status_items_;
 };
 
 } // namespace

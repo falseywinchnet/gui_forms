@@ -921,6 +921,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
         src/host/macos/application/macos_host.mm
         src/host/macos/services/appkit_host_services.mm
         src/host/macos/services/appkit_clipboard_image.mm
+        src/host/macos/services/appkit_status_items.mm
     )
     target_include_directories(gui_forms_host_macos PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/host/macos
@@ -1011,6 +1012,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
         src/host/linux/application/linux_host.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
+        src/host/linux/services/x11_tray_icons.cpp
         src/host/linux/services/linux_drag_drop.cpp
         src/host/linux/services/linux_dialogs.cpp)
     set_target_properties(gui_forms_host_linux PROPERTIES POSITION_INDEPENDENT_CODE ON)

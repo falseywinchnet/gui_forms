@@ -1,6 +1,7 @@
 #pragma once
 #include "../accessibility/linux_accessibility.hpp"
 #include "../../../render/skia/raster/skia_raster.hpp"
+#include "../services/x11_tray_icons.hpp"
 #include "gui_forms/platform/linux_host.hpp"
 #include <X11/Xlib.h>
 #include <array>
@@ -17,6 +18,8 @@ class Services final : public HostServices {
 public:
   explicit Services(NativeWindow &window);
   ~Services() override;
+  // Offers an X event to the tray icons; true when one of them took it.
+  bool tray_event(const XEvent &event);
 
 protected:
   HostMonitorResult query_monitors_impl() override;
@@ -32,6 +35,11 @@ protected:
   HostServiceStatus write_clipboard_image_impl(HostImageView image) override;
   HostDialogResult show_dialog_impl(const HostDialogRequest &request) override;
   HostServiceStatus play_sound_cue_impl(const HostSoundCueRequest &) override;
+  HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id,
+                                       const HostTrayIconRequest &request) override;
+  HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id,
+                                          const HostTrayIconRequest &request) override;
+  void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override;
 
 private:
   struct CursorEntry final {
@@ -39,8 +47,11 @@ private:
     double scale;
     ::Cursor native;
   };
+  void forward_tray_event(const HostTrayIconEvent &event) { publish_tray_icon_event(event); }
   std::vector<CursorEntry> cursors_;
   NativeWindow &window_;
+  // Created with the first icon.
+  std::unique_ptr<X11TrayIcons> tray_;
 };
 struct Wake final {
   int descriptor{-1};

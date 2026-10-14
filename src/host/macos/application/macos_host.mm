@@ -2824,7 +2824,9 @@ HostCapabilities macos_capabilities() {
                 HostCapability::clipboard_images |
                 HostCapability::typed_drag_destination |
                 HostCapability::dialogs |
-                HostCapability::sound_cues};
+                HostCapability::sound_cues |
+                HostCapability::notification_area |
+                HostCapability::notification_area_menus};
 }
 
 class DispatchAndCollectWake final {
