@@ -19,6 +19,8 @@ Commands, menu strips and context menus.
      - A ribbon gallery: a grid of image items in categories, in the ribbon or as a drop-down.
    * - :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
      - A status bar laid out as a strip of labels along the bottom of a window.
+   * - :cpp:class:`QuickAccessToolbar <gui_forms::QuickAccessToolbar>`
+     - The Quick Access Toolbar of a ribbon window: a small strip of command buttons the user chooses.
    * - :cpp:class:`ToolStripPanel <gui_forms::ToolStripPanel>`
      - A band along one edge that holds ToolStrips.
    * - :cpp:class:`ToolStripContainer <gui_forms::ToolStripContainer>`
@@ -41,6 +43,7 @@ Commands, menu strips and context menus.
    generated/gui_forms.ToolStrip
    generated/gui_forms.RibbonGallery
    generated/gui_forms.StatusStrip
+   generated/gui_forms.QuickAccessToolbar
    generated/gui_forms.ToolStripPanel
    generated/gui_forms.ToolStripContainer
    generated/gui_forms.BindingNavigator
@@ -76,6 +79,14 @@ Related types
      - MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation.
    * - :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>`
      - MenuStripItemSpec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu.
+   * - :cpp:class:`QuickAccessToolbar::Parts <gui_forms::QuickAccessToolbar::Parts>`
+     - Stage T1 anatomy, as dot members: ToolStrip's parts and the customize button.
+   * - :cpp:class:`QuickAccessToolbarCommand <gui_forms::QuickAccessToolbarCommand>`
+     - One command the toolbar may show.
+   * - :cpp:class:`QuickAccessToolbarCustomization <gui_forms::QuickAccessToolbarCustomization>`
+     - The user showed or hid a command from the customize menu, or the application did through set_command_shown.
+   * - :cpp:class:`QuickAccessToolbarPlacementChange <gui_forms::QuickAccessToolbarPlacementChange>`
+     -  
    * - :cpp:class:`Ribbon::CommandItem <gui_forms::Ribbon::CommandItem>`
      -  
    * - :cpp:class:`Ribbon::CommandParts <gui_forms::Ribbon::CommandParts>`
@@ -120,6 +131,12 @@ Related types
      - One item: an image with an optional label shown under it.
    * - :cpp:class:`RibbonGroupSpec <gui_forms::RibbonGroupSpec>`
      - A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner.
+   * - :cpp:class:`RibbonState <gui_forms::RibbonState>`
+     - What a ribbon window keeps between sessions (owner decision RB-12, D4-1): the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized.
+   * - :cpp:class:`RibbonStateDiagnostic <gui_forms::RibbonStateDiagnostic>`
+     -  
+   * - :cpp:class:`RibbonStateParseResult <gui_forms::RibbonStateParseResult>`
+     - A parse never fails as a whole: a malformed known entry is reported and its built-in default kept, as the configuration contract (§7) asks.
    * - :cpp:class:`RibbonTabChange <gui_forms::RibbonTabChange>`
      - The selected tab after it changed.
    * - :cpp:class:`RibbonTabSpec <gui_forms::RibbonTabSpec>`
@@ -140,6 +157,8 @@ Related types
      - A choice from a drop-down or split button's menu, or from the overflow menu's copy of one.
    * - :cpp:class:`ToolStripItemClick <gui_forms::ToolStripItemClick>`
      - A click on an item, after any command it carries has executed.
+   * - :cpp:class:`ToolStripItemFocus <gui_forms::ToolStripItemFocus>`
+     - The item the keyboard is on changed while the strip has focus: the strip took focus, or an arrow key or a semantic focus action moved it.
    * - :cpp:class:`ToolStripItemSpec <gui_forms::ToolStripItemSpec>`
      - One item.
    * - :cpp:class:`ToolStripPanel::Parts <gui_forms::ToolStripPanel::Parts>`
@@ -303,6 +322,72 @@ Related types
    .. cpp:member:: bool visible
 
       Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: QuickAccessToolbar::Parts final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp>``
+
+   Stage T1 anatomy, as dot members: ToolStrip's parts and the customize button. Its states are Control's; its item system is ToolStrip's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry grip
+
+   .. cpp:member:: PartGeometry overflow_button
+
+   .. cpp:member:: PartGeometry overflow_glyph
+
+   .. cpp:member:: PartGeometry customize_button
+
+   .. cpp:member:: PartGeometry customize_glyph
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: QuickAccessToolbarCommand final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp>``
+
+   One command the toolbar may show. Every declared command is listed, with a check, in the customize menu; ``shown`` is whether the toolbar shows it before the user customizes. ``image`` is the button's icon: a command with one shows only its icon, a command without one its text.
+
+   .. cpp:member:: std::shared_ptr<Command> command
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: bool shown
+
+      Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: QuickAccessToolbarCustomization final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp>``
+
+   The user showed or hid a command from the customize menu, or the application did through set_command_shown.
+
+   .. cpp:member:: std::string toolbar_id
+
+   .. cpp:member:: std::string command_id
+
+   .. cpp:member:: bool shown
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: QuickAccessToolbarPlacementChange final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp>``
+
+   .. cpp:member:: std::string toolbar_id
+
+   .. cpp:member:: QuickAccessToolbarPlacement placement
+
+      Default: ``{QuickAccessToolbarPlacement::above_ribbon}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -682,6 +767,52 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RibbonState final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
+
+   What a ribbon window keeps between sessions (owner decision RB-12, D4-1): the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized. The last selected tab is not kept. GUI.Forms has no runtime layout or session store yet (the resources and configuration interview, §2.4 and §7, leaves its syntax open), so the state is saved and loaded explicitly as text: serialize_ribbon_state and parse_ribbon_state. When the store exists, the Ribbon saves this value through it.
+
+   .. cpp:member:: std::vector<std::string> quick_access_command_ids
+
+   .. cpp:member:: QuickAccessToolbarPlacement quick_access_placement
+
+      Default: ``{QuickAccessToolbarPlacement::above_ribbon}``.
+
+   .. cpp:member:: bool minimized
+
+   .. cpp:member:: std::vector<std::string> unrecognized_entries
+
+      Lines with keys this version does not know, kept in order and written back unchanged, so a state from a later version survives a round trip.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonStateDiagnostic final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
+
+   .. cpp:member:: std::size_t line
+
+      one-based
+
+   .. cpp:member:: RibbonStateIssue issue
+
+      Default: ``{RibbonStateIssue::malformed_line}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonStateParseResult final
+
+   ``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
+
+   A parse never fails as a whole: a malformed known entry is reported and its built-in default kept, as the configuration contract (§7) asks. A missing or unsupported header yields the default state.
+
+   .. cpp:member:: RibbonState state
+
+   .. cpp:member:: std::vector<RibbonStateDiagnostic> diagnostics
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RibbonTabChange final
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
@@ -854,6 +985,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ToolStripItemFocus final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   The item the keyboard is on changed while the strip has focus: the strip took focus, or an arrow key or a semantic focus action moved it.
+
+   .. cpp:member:: std::string strip_id
+
+   .. cpp:member:: std::string item_id
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ToolStripItemSpec final
 
    ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
@@ -949,6 +1092,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: QuickAccessToolbarPlacement
+
+   ``#include <gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp>``
+
+   .. cpp:enumerator:: above_ribbon
+
+   .. cpp:enumerator:: below_ribbon
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: Ribbon::Hit::Kind
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
@@ -1018,6 +1171,24 @@ Enumerations
    .. cpp:enumerator:: in_ribbon
 
    .. cpp:enumerator:: drop_down
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonStateIssue
+
+   ``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
+
+   .. cpp:enumerator:: missing_header
+
+   .. cpp:enumerator:: unsupported_version
+
+   .. cpp:enumerator:: malformed_line
+
+   .. cpp:enumerator:: invalid_value
+
+   .. cpp:enumerator:: duplicate_key
+
+   .. cpp:enumerator:: too_many_commands
 
 .. cpp:namespace:: gui_forms
 
@@ -1101,3 +1272,19 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_menu_items
 
    Value: ``1024U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
+
+.. cpp:function:: std::string serialize_ribbon_state(const RibbonState& state)
+
+   The stable text form, one entry per line, LF-terminated: gui_forms.ribbon_state 1 quick_access.placement=above_ribbon (or below_ribbon) ribbon.minimized=false (or true) quick_access.command=<command ID> (one line per ID, in order) <unrecognized entries, unchanged> Command IDs are written verbatim; an ID may not be empty or hold a line break or other control character. Throws std::invalid_argument for such an ID, a repeated ID, more than QuickAccessToolbar::maximum_commands IDs, or an unrecognized entry that holds a line break.
+
+.. cpp:function:: RibbonStateParseResult parse_ribbon_state(std::string_view text)
+
+.. cpp:function:: RibbonState capture_ribbon_state(const QuickAccessToolbar& toolbar, bool minimized)
+
+   The toolbar's part of the state, and its application to a toolbar. ``minimized`` is the Ribbon's, which applies it. Command IDs the toolbar does not declare survive apply and capture (the toolbar keeps them, inert); unrecognized entries are not the toolbar's, so capture returns none and a caller that keeps them copies them from the state it loaded. Applying sets the toolbar's shown commands and placement, emitting placement_changed when the placement changes.
+
+.. cpp:function:: void apply_ribbon_state(QuickAccessToolbar& toolbar, const RibbonState& state)
