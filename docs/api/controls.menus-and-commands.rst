@@ -13,6 +13,10 @@ Commands, menu strips and context menus.
 
    * - :cpp:class:`MenuStrip <gui_forms::MenuStrip>`
      - A window's menu bar: a row of top-level menus such as File, Edit and View.
+   * - :cpp:class:`ToolStrip <gui_forms::ToolStrip>`
+     - A command strip of buttons, labels, separators and drop-down buttons.
+   * - :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
+     - A status bar laid out as a strip of labels along the bottom of a window.
    * - :cpp:class:`ContextMenu <gui_forms::ContextMenu>`
      - A popup menu of commands that the application opens at a point, such as on a right-click.
    * - :cpp:class:`Command <gui_forms::Command>`
@@ -22,6 +26,8 @@ Commands, menu strips and context menus.
    :hidden:
 
    generated/gui_forms.MenuStrip
+   generated/gui_forms.ToolStrip
+   generated/gui_forms.StatusStrip
    generated/gui_forms.ContextMenu
    generated/gui_forms.Command
 
@@ -48,6 +54,22 @@ Related types
      - MenuStripInvocation correlates a top-level menu and exact nested item identity after accepted activation.
    * - :cpp:class:`MenuStripItemSpec <gui_forms::MenuStripItemSpec>`
      - MenuStripItemSpec owns stable identity, mnemonic label, enabled state, and the popup item tree for one top-level menu.
+   * - :cpp:class:`StatusStrip::Parts <gui_forms::StatusStrip::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's, and its items are ToolStrip's "item" system.
+   * - :cpp:class:`ToolStrip::Item <gui_forms::ToolStrip::Item>`
+     -  
+   * - :cpp:class:`ToolStrip::ItemParts <gui_forms::ToolStrip::ItemParts>`
+     - Item part names carry an item_ prefix: an item part may not repeat one of the strip's own part names (face, focus).
+   * - :cpp:class:`ToolStrip::ItemStates <gui_forms::ToolStrip::ItemStates>`
+     -  
+   * - :cpp:class:`ToolStrip::Parts <gui_forms::ToolStrip::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`ToolStripDropDownInvocation <gui_forms::ToolStripDropDownInvocation>`
+     - A choice from a drop-down or split button's menu, or from the overflow menu's copy of one.
+   * - :cpp:class:`ToolStripItemClick <gui_forms::ToolStripItemClick>`
+     - A click on an item, after any command it carries has executed.
+   * - :cpp:class:`ToolStripItemSpec <gui_forms::ToolStripItemSpec>`
+     - One item.
 
 .. cpp:namespace:: gui_forms
 
@@ -184,6 +206,172 @@ Related types
 
       Default: ``{true}``.
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: StatusStrip::Parts final
+
+   ``#include <gui_forms/controls/status_strip/status_strip.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's, and its items are ToolStrip's "item" system.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry sizing_grip
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStrip::Item final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStrip::ItemParts final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   Item part names carry an item_ prefix: an item part may not repeat one of the strip's own part names (face, focus).
+
+   .. cpp:member:: PartGeometry item_face
+
+   .. cpp:member:: PartGeometry item_icon
+
+   .. cpp:member:: PartGeometry item_label
+
+   .. cpp:member:: PartGeometry item_arrow
+
+   .. cpp:member:: PartGeometry item_arrow_glyph
+
+   .. cpp:member:: PartGeometry item_separator
+
+   .. cpp:member:: PartGeometry item_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStrip::ItemStates final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStrip::Parts final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry grip
+
+   .. cpp:member:: PartGeometry overflow_button
+
+   .. cpp:member:: PartGeometry overflow_glyph
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStripDropDownInvocation final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   A choice from a drop-down or split button's menu, or from the overflow menu's copy of one.
+
+   .. cpp:member:: std::string strip_id
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: MenuItemInvocation choice
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStripItemClick final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   A click on an item, after any command it carries has executed.
+
+   .. cpp:member:: std::string strip_id
+
+   .. cpp:member:: std::string item_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ToolStripItemSpec final
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   One item. ``stable_id`` is unique within the strip and names the item in events, semantics and the published anatomy. An item with a ``command`` takes its text (when ``text`` is empty), enabled, visible and checked state from it, and a click executes it. An item without one uses ``text``, ``enabled``, ``visible`` and the strip's own checked state. ``drop_down`` is the menu of a drop-down or split button and must be empty for other kinds. ``spring`` is honoured only by StatusStrip, on labels: spring labels share the width the other items leave.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ToolStripItemKind kind
+
+      Default: ``{ToolStripItemKind::button}``.
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: ToolStripItemDisplay display
+
+      Default: ``{ToolStripItemDisplay::image_and_text}``.
+
+   .. cpp:member:: std::shared_ptr<Command> command
+
+   .. cpp:member:: std::vector<MenuItemSpec> drop_down
+
+   .. cpp:member:: ToolStripItemPlacement placement
+
+      Default: ``{ToolStripItemPlacement::start}``.
+
+   .. cpp:member:: ToolStripOverflow overflow
+
+      Default: ``{ToolStripOverflow::as_needed}``.
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+   .. cpp:member:: bool visible
+
+      Default: ``{true}``.
+
+   .. cpp:member:: bool check_on_click
+
+      A button that toggles its checked state on each click (Windows Forms' CheckOnClick); with a command, the command's checked state toggles.
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool spring
+
 Enumerations
 ------------
 
@@ -212,6 +400,54 @@ Enumerations
    .. cpp:enumerator:: keyboard
 
    .. cpp:enumerator:: pointer
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ToolStripItemDisplay
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:enumerator:: text
+
+   .. cpp:enumerator:: image
+
+   .. cpp:enumerator:: image_and_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ToolStripItemKind
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:enumerator:: button
+
+   .. cpp:enumerator:: label
+
+   .. cpp:enumerator:: separator
+
+   .. cpp:enumerator:: drop_down_button
+
+   .. cpp:enumerator:: split_button
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ToolStripItemPlacement
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:enumerator:: start
+
+   .. cpp:enumerator:: end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ToolStripOverflow
+
+   ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
+
+   .. cpp:enumerator:: as_needed
+
+   .. cpp:enumerator:: never
 
 Functions, constants and aliases
 --------------------------------

@@ -591,6 +591,28 @@
       "doc": "api/generated/gui_forms.MenuStrip.rst"
     },
     {
+      "id": "tool_strip",
+      "type": "ToolStrip",
+      "header": "gui_forms/controls/tool_strip/tool_strip.hpp",
+      "category": "Menus and commands",
+      "purpose": "Command strip of buttons, labels, separators, drop-down and split buttons laid out as an item system, with an overflow menu for items that do not fit.",
+      "winforms": "ToolStrip",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStrip.rst"
+    },
+    {
+      "id": "status_strip",
+      "type": "StatusStrip",
+      "header": "gui_forms/controls/status_strip/status_strip.hpp",
+      "category": "Menus and commands",
+      "purpose": "Status bar laid out as a ToolStrip that never overflows, with spring labels sharing the free width and a sizing grip.",
+      "winforms": "StatusStrip",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.StatusStrip.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",

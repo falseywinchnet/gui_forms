@@ -31,6 +31,7 @@ public:
         build_command_row(body);
         build_shared_state(body);
         build_context_menu(body);
+        build_strips(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -240,6 +241,40 @@ private:
         (*note).set_text_wrapping(TextWrapping::word);
         (*note).set_vertical_alignment(VerticalAlignment::near);
         (*context_group).add_at(note, {22.0, 84.0, 410.0, 120.0});
+    }
+
+    // A ToolStrip over the same Commands, narrow enough that its last items
+    // overflow, and a StatusStrip with a spring label.
+    void build_strips(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> strips = group(
+            "gallery.commands.strips", "ToolStrip · StatusStrip · by-role painted items", {930.0, 132.0});
+        (*body).add_at(strips, {24.0, 636.0, 930.0, 132.0});
+        std::shared_ptr<ToolStrip> tool = make_control<ToolStrip>(StableId("gallery.commands.tool-strip"));
+        (*tool).set_accessible_name("Document tools");
+        std::vector<ToolStripItemSpec> tools;
+        tools.push_back({.stable_id = "strip.new", .command = new_});
+        tools.push_back({.stable_id = "strip.save", .command = save_});
+        tools.push_back({.stable_id = "strip.delete", .command = delete_});
+        tools.push_back({.stable_id = "strip.separator", .kind = ToolStripItemKind::separator});
+        tools.push_back({.stable_id = "strip.wrap", .command = wrap_command_});
+        tools.push_back({.stable_id = "strip.export", .kind = ToolStripItemKind::drop_down_button,
+                         .text = "Export", .drop_down = export_items("strip.export")});
+        tools.push_back({.stable_id = "strip.run", .kind = ToolStripItemKind::split_button,
+                         .command = run_,
+                         .drop_down = {item("strip.run.verbose", run_options_[0]),
+                                       item("strip.run.watch", run_options_[1])}});
+        tools.push_back({.stable_id = "strip.about", .command = about_});
+        (*tool).set_items(std::move(tools));
+        (*strips).add_at(tool, {22.0, 36.0, 430.0, 27.0});
+        std::shared_ptr<StatusStrip> status = make_control<StatusStrip>(StableId("gallery.commands.status-strip"));
+        (*status).set_accessible_name("Document status");
+        (*status).set_items({
+            {.stable_id = "status.state", .kind = ToolStripItemKind::label, .text = "Ready", .spring = true},
+            {.stable_id = "status.separator", .kind = ToolStripItemKind::separator},
+            {.stable_id = "status.position", .kind = ToolStripItemKind::label, .text = "Ln 1, Col 1"},
+            {.stable_id = "status.encoding", .kind = ToolStripItemKind::label, .text = "UTF-8"},
+        });
+        (*strips).add_at(status, {22.0, 84.0, 880.0, 24.0});
     }
 
     // Shared application state.

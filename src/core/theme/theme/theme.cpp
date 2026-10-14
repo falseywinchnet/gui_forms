@@ -745,6 +745,17 @@ ThemeDefinition windows_professional_theme_definition() {
         professional_role(Color::rgba(255, 255, 255, 0),
                           Color::rgba(255, 255, 255, 0),
                           Color::rgba(148, 162, 175, 0), ink, 2.0);
+    // Menu and command-strip items are flat at rest (design language: strip
+    // commands may be flat when dividers and strip shading carry the
+    // structure): a disabled or deactivated item keeps the transparent
+    // resting plate and only its text changes. Hot, pressed and selected
+    // items still draw a plate.
+    ControlRoleRecipes& menu_items =
+        result.roles[static_cast<std::size_t>(ControlVisualRole::menu_item)];
+    const SurfaceMaterial resting =
+        menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::normal)].material;
+    menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::disabled)].material = resting;
+    menu_items.ordinary[static_cast<std::size_t>(ControlSurfaceState::deactivated)].material = resting;
     result.roles[static_cast<std::size_t>(ControlVisualRole::selection)] =
         professional_role(Color::rgba(255, 255, 255, 0),
                           Color::rgba(255, 255, 255, 0),

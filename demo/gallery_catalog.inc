@@ -21,7 +21,7 @@ inline constexpr std::array<std::string_view, 14> catalog_categories {{
     "Components",
 }};
 
-inline constexpr std::array<CatalogEntry, 73> control_catalog {{
+inline constexpr std::array<CatalogEntry, 75> control_catalog {{
     {"button_base", "ButtonBase", "gui_forms/controls/button_base/button_base.hpp", "Commands", "Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize.", "ButtonBase", "stable", "control-spectrum"},
     {"button", "Button", "gui_forms/controls/button_base/button/button.hpp", "Commands", "Push button with accept/cancel dialog results, default-button state, and four visual policies.", "Button", "stable", "control-spectrum"},
     {"drop_down_button", "DropDownButton", "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp", "Commands", "Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region.", "ToolStripSplitButton", "provisional", "commands-and-menus"},
@@ -75,6 +75,8 @@ inline constexpr std::array<CatalogEntry, 73> control_catalog {{
     {"h_scroll_bar", "HScrollBar", "gui_forms/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.hpp", "Scrolling", "Explicit horizontal ScrollBar leaf type.", "HScrollBar", "stable", "ranges-and-progress"},
     {"v_scroll_bar", "VScrollBar", "gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp", "Scrolling", "Explicit vertical ScrollBar leaf type.", "VScrollBar", "stable", "ranges-and-progress"},
     {"menu_strip", "MenuStrip", "gui_forms/controls/menu_strip/menu_strip.hpp", "Menus and commands", "Top-level application menu bar whose active menu is presented by ContextMenu as a separate popup root bound to shared Command instances.", "MenuStrip", "stable", "commands-and-menus"},
+    {"tool_strip", "ToolStrip", "gui_forms/controls/tool_strip/tool_strip.hpp", "Menus and commands", "Command strip of buttons, labels, separators, drop-down and split buttons laid out as an item system, with an overflow menu for items that do not fit.", "ToolStrip", "stable", "commands-and-menus"},
+    {"status_strip", "StatusStrip", "gui_forms/controls/status_strip/status_strip.hpp", "Menus and commands", "Status bar laid out as a ToolStrip that never overflows, with spring labels sharing the free width and a sizing grip.", "StatusStrip", "stable", "commands-and-menus"},
     {"context_menu", "ContextMenu", "gui_forms/components/context_menu/context_menu.hpp", "Menus and commands", "Popup-menu controller whose rows are temporary popup presentations over stable MenuItemSpec identities and bound Commands.", "ContextMenuStrip", "stable", "commands-and-menus"},
     {"command", "Command", "gui_forms/commands/command/command.hpp", "Menus and commands", "Shared retained authority for menu, shortcut, context, semantic, and test surfaces with validated UTF-8 state and enabled-only invocation.", "GUI.Forms-only", "stable", "commands-and-menus"},
     {"anchored_popup_layer", "AnchoredPopupLayer", "gui_forms/controls/panel/anchored_popup_layer/anchored_popup_layer.hpp", "Dialogs and popups", "Full-client overlay that owns one retained popup content subtree, re-resolves anchored bounds on resize, and reports click-away and Escape requests.", "GUI.Forms-only", "stable", "anchored-popups"},

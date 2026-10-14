@@ -1,0 +1,107 @@
+A command strip of buttons, labels, separators and drop-down buttons.
+
+A tool strip lays out a row of items described by `ToolStripItemSpec`
+records: buttons, labels, separators, drop-down buttons that open a menu, and
+split buttons whose arrow opens a menu while the rest clicks. Items that do not
+fit move to an overflow menu opened from a button at the strip's end. Give an
+item a shared `Command` and the strip shows the command's text, enabled,
+visible and checked state, and executes it on a click; the same command can sit
+in a `MenuStrip`, a `ContextMenu` and a `CommandBar`.
+
+Parameters
+----------
+stable_id
+    Identity of the strip, unique within its window. Its menus are shown by a
+    `ContextMenu` named ``<stable_id>.menu``.
+
+Properties
+----------
+items
+    The items, in strip order. `set_items` replaces them and throws
+    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, a
+    menu on an item that has none, a drop-down or split button without one,
+    or a menu item ID that repeats an item ID.
+grip_visible : default ``true``
+    Whether the grip shows at the strip's start.
+font
+    The font of item text.
+overflow_item_ids
+    The items currently in the overflow menu, in strip order.
+drop_down_open
+    Whether a drop-down, split or overflow menu is open.
+
+Events
+------
+item_clicked
+    Raised after a button or split button is clicked, by pointer, keyboard,
+    accessibility or the overflow menu, and after any command it carries has
+    executed. It names the strip and the item.
+drop_down_item_invoked
+    Raised when the user chooses from a drop-down or split button's menu, or
+    from the overflow menu's copy of one. It names the item whose menu it was
+    and carries the `MenuItemInvocation`.
+
+Methods
+-------
+item_checked
+    The checked state an item shows: its command's when it has one. An
+    unknown ID throws `std::out_of_range`, as does `set_item_checked`.
+show_drop_down
+    Opens a drop-down or split button's menu below it. Returns false for an
+    item that has no menu, is disabled or is in the overflow menu.
+show_overflow
+    Opens the overflow menu. Returns false when nothing overflows.
+close_drop_down
+    Closes any open menu.
+
+See Also
+--------
+StatusStrip : A strip laid out for the bottom of a window.
+MenuStrip : The application's menu bar.
+CommandBar : A row of command buttons that are child controls.
+Command : The shared action an item carries.
+
+Notes
+-----
+Items are records, not child controls: the strip lays them out as its
+``item`` item system and paints every part through the by-role paint path
+(`paint_part`). Each item publishes ``item_face``, ``item_icon``,
+``item_label``, ``item_arrow`` (a split button's arrow), ``item_arrow_glyph``,
+``item_separator`` and ``item_focus``, with the states hot, pressed, checked,
+open, disabled and focus_visible. The strip itself publishes ``region``,
+``face``, ``grip``, ``overflow_button``, ``overflow_glyph`` and ``focus``.
+Items are flat at rest: the theme's menu-item plate is transparent until an
+item is hot, pressed or checked.
+
+A click is a press and release on the same part of the same item. A check-on-
+click item toggles its checked state, or its command's, before
+`item_clicked`. Items overflow from the last one back, skipping items whose
+`overflow` is `ToolStripOverflow::never`. In the overflow menu a button
+without a command is given a private one for its row, a drop-down or split
+button becomes a submenu of its menu, and labels are left out.
+
+With focus, Left and Right move between enabled buttons, Enter and Space
+click (or open a drop-down button's menu), Down opens a menu and Escape
+closes it. The strip publishes the accessibility role `toolbar`, with a
+child per item: `button`, `static_text` or `separator`.
+
+Not supported yet: vertical strips, hosted controls (a combo box, text box or
+progress bar in the strip), tool tips on items, and dragging the grip.
+
+Examples
+--------
+A strip over shared commands, with a drop-down button:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "Save");
+   std::shared_ptr<gf::Command> pdf = std::make_shared<gf::Command>("doc.pdf", "PDF");
+   std::shared_ptr<gf::ToolStrip> strip =
+       gf::make_control<gf::ToolStrip>(gf::StableId("doc.tools"));
+   std::vector<gf::ToolStripItemSpec> items;
+   items.push_back({.stable_id = "tools.save", .command = save});
+   items.push_back({.stable_id = "tools.rule", .kind = gf::ToolStripItemKind::separator});
+   items.push_back({.stable_id = "tools.export", .kind = gf::ToolStripItemKind::drop_down_button,
+                    .text = "Export",
+                    .drop_down = {gf::MenuItemSpec("tools.export.pdf", gf::MenuItemKind::command, pdf)}});
+   (*strip).set_items(std::move(items));

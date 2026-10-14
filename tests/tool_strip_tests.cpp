@@ -1,0 +1,210 @@
+// ToolStrip and StatusStrip (stage W): item layout and parts, clicks and
+// commands, check-on-click, split and drop-down buttons, overflow, keyboard,
+// semantics, and the status layout's spring labels and sizing grip.
+
+#include "gui_forms/gui_forms.hpp"
+
+#include <cstdlib>
+#include <iostream>
+#include <string>
+#include <vector>
+
+namespace {
+using namespace gui_forms;
+
+void require(bool condition, const char* message) {
+    if (condition) return;
+    std::cerr << message << '\n';
+    std::exit(1);
+}
+
+struct RecordClick final {
+    std::vector<std::string>* seen{};
+    void operator()(const ToolStripItemClick& click) const { (*seen).push_back(click.item_id); }
+};
+
+struct CountInvocation final {
+    int* count{};
+    void operator()(const CommandInvocation&) const { ++*count; }
+};
+
+Point centre(Rect bounds) {
+    const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
+    return point;
+}
+
+const ToolStrip::Item* find_item(const std::vector<ToolStrip::Item>& items, std::string_view id) {
+    for (const ToolStrip::Item& item : items) {
+        if (item.stable_id == id) return &item;
+    }
+    return nullptr;
+}
+
+void press(Window& window, Point point) {
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, point}),
+            "the strip takes the press");
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, point}));
+}
+
+std::vector<ToolStripItemSpec> sample_items(const std::shared_ptr<Command>& save,
+                                            const std::shared_ptr<Command>& choice) {
+    std::vector<ToolStripItemSpec> items;
+    items.push_back({.stable_id = "new", .text = "New"});
+    items.push_back({.stable_id = "save", .command = save});
+    items.push_back({.stable_id = "rule", .kind = ToolStripItemKind::separator});
+    items.push_back({.stable_id = "bold", .text = "Bold", .check_on_click = true});
+    items.push_back({.stable_id = "export", .kind = ToolStripItemKind::drop_down_button, .text = "Export",
+                     .drop_down = {MenuItemSpec("export.pdf", MenuItemKind::command, choice, "PDF")}});
+    items.push_back({.stable_id = "run", .kind = ToolStripItemKind::split_button, .text = "Run",
+                     .drop_down = {MenuItemSpec("run.watch", MenuItemKind::command, choice, "Watch")}});
+    items.push_back({.stable_id = "zoom", .kind = ToolStripItemKind::label, .text = "Zoom"});
+    return items;
+}
+
+void layout_and_parts() {
+    const std::shared_ptr<Command> save = std::make_shared<Command>("save", "Save");
+    const std::shared_ptr<Command> choice = std::make_shared<Command>("choice", "Choice");
+    std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("strip"));
+    (*strip).set_items(sample_items(save, choice));
+    Window window(strip, {640.0, 25.0});
+    window.perform_layout();
+    const ControlAnatomy& anatomy = (*strip).anatomy();
+    require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "tool_strip",
+            "ToolStrip publishes a valid anatomy");
+    require((*strip).overflow_item_ids().empty() && !(*strip).parts().overflow_button.present,
+            "a wide strip overflows nothing and shows no overflow button");
+    require((*strip).parts().grip.present, "a tool strip shows its grip");
+    const std::vector<ToolStrip::Item> items = (*strip).realized_items();
+    require(items.size() == 7U, "every item is laid out");
+    const ToolStrip::Item* rule = find_item(items, "rule");
+    const ToolStrip::Item* run = find_item(items, "run");
+    const ToolStrip::Item* exported = find_item(items, "export");
+    const ToolStrip::Item* zoom = find_item(items, "zoom");
+    const ToolStrip::Item* saved = find_item(items, "save");
+    require(rule != nullptr && (*rule).parts.item_separator.present && !(*rule).parts.item_face.present,
+            "a separator is a divider part with no face");
+    require(run != nullptr && (*run).parts.item_arrow.present && (*run).parts.item_arrow_glyph.present &&
+                (*run).parts.item_face.bounds.x + (*run).parts.item_face.bounds.width <= (*run).parts.item_arrow.bounds.x + 0.001,
+            "a split button's face and arrow sit side by side");
+    require(exported != nullptr && !(*exported).parts.item_arrow.present && (*exported).parts.item_arrow_glyph.present,
+            "a drop-down button is one actuator with an arrow glyph");
+    require(zoom != nullptr && !(*zoom).parts.item_face.present && (*zoom).parts.item_label.present,
+            "a label shows text without a face");
+    require(saved != nullptr && (*saved).parts.item_label.present,
+            "an item with a command shows the command's text");
+}
+
+void clicks_and_commands() {
+    const std::shared_ptr<Command> save = std::make_shared<Command>("save", "Save");
+    const std::shared_ptr<Command> choice = std::make_shared<Command>("choice", "Choice");
+    int saves = 0;
+    SubscriptionToken counted = (*save).invoked().subscribe(CountInvocation{&saves});
+    std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("strip"));
+    (*strip).set_items(sample_items(save, choice));
+    Window window(strip, {640.0, 25.0});
+    window.perform_layout();
+    std::vector<std::string> clicks;
+    SubscriptionToken token = (*strip).item_clicked().subscribe(RecordClick{&clicks});
+
+    std::vector<ToolStrip::Item> items = (*strip).realized_items();
+    press(window, centre((*find_item(items, "save")).parts.item_face.bounds));
+    require(saves == 1 && clicks.size() == 1U && clicks[0] == "save",
+            "clicking an item executes its command and reports the click");
+
+    press(window, centre((*find_item(items, "bold")).parts.item_face.bounds));
+    require((*strip).item_checked("bold") && (*find_item((*strip).realized_items(), "bold")).states.checked,
+            "check-on-click toggles and publishes checked");
+
+    (*save).set_enabled(false);
+    items = (*strip).realized_items();
+    require((*find_item(items, "save")).states.disabled, "a disabled command disables its item");
+    const Point disabled = centre((*find_item(items, "save")).parts.item_face.bounds);
+    require(!window.dispatch_pointer({PointerAction::down, PointerButton::primary, disabled}),
+            "a disabled item does not take the press");
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, disabled}));
+    require(saves == 1, "a disabled item does not click");
+
+    const ToolStrip::Item run = *find_item(items, "run");
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, centre(run.parts.item_arrow.bounds)}),
+            "the split arrow takes the press");
+    require((*strip).drop_down_open() && (*find_item((*strip).realized_items(), "run")).states.open,
+            "pressing a split button's arrow opens its menu");
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, centre(run.parts.item_arrow.bounds)}));
+    (*strip).close_drop_down();
+    require(!(*strip).drop_down_open(), "the menu closes");
+    const std::size_t before = clicks.size();
+    press(window, centre(run.parts.item_face.bounds));
+    require(clicks.size() == before + 1U && clicks.back() == "run",
+            "pressing a split button's face clicks it without opening the menu");
+}
+
+void overflow_and_keyboard() {
+    const std::shared_ptr<Command> save = std::make_shared<Command>("save", "Save");
+    const std::shared_ptr<Command> choice = std::make_shared<Command>("choice", "Choice");
+    std::shared_ptr<ToolStrip> strip = make_control<ToolStrip>(StableId("strip"));
+    (*strip).set_items(sample_items(save, choice));
+    Window window(strip, {160.0, 25.0});
+    window.perform_layout();
+    const std::vector<std::string> overflowed = (*strip).overflow_item_ids();
+    require(!overflowed.empty() && overflowed.back() == "zoom", "a narrow strip overflows from its last item");
+    require((*strip).parts().overflow_button.present && (*strip).parts().overflow_glyph.present,
+            "an overflowing strip shows its overflow button");
+    require((*strip).realized_items().size() + overflowed.size() == 7U,
+            "an item is either on the strip or in the overflow menu");
+    require((*strip).show_overflow() && (*strip).drop_down_open(), "the overflow menu opens");
+    (*strip).close_drop_down();
+
+    std::vector<std::string> clicks;
+    SubscriptionToken token = (*strip).item_clicked().subscribe(RecordClick{&clicks});
+    require(window.request_focus(strip), "the strip takes focus");
+    KeyEvent enter{KeyAction::down, PhysicalKey::enter};
+    require(window.dispatch_key(enter) && clicks.size() == 1U && clicks[0] == "new",
+            "Enter clicks the first item when the strip takes focus");
+    KeyEvent right{KeyAction::down, PhysicalKey::right};
+    require(window.dispatch_key(right) && window.dispatch_key(enter) && clicks.back() == "save",
+            "Right moves to the next item");
+
+    const SemanticDescriptor descriptor = (*strip).semantic_descriptor();
+    const std::vector<SemanticNode> children = (*strip).semantic_virtual_children();
+    require(descriptor.role == SemanticRole::toolbar && !children.empty() &&
+                children[0].role == SemanticRole::button,
+            "a strip is a toolbar of buttons to accessibility");
+}
+
+void status_strip() {
+    std::shared_ptr<StatusStrip> status = make_control<StatusStrip>(StableId("status"));
+    (*status).set_items({
+        {.stable_id = "state", .kind = ToolStripItemKind::label, .text = "Ready", .spring = true},
+        {.stable_id = "position", .kind = ToolStripItemKind::label, .text = "Ln 1, Col 1"},
+        {.stable_id = "encoding", .kind = ToolStripItemKind::label, .text = "UTF-8"},
+    });
+    Window window(status, {600.0, 24.0});
+    window.perform_layout();
+    require((*status).anatomy().control_id == "status_strip" &&
+                (*status).anatomy().item_systems.size() == 1U &&
+                validate_control_anatomy((*status).anatomy()).defect == AnatomyDefect::none,
+            "StatusStrip publishes its own anatomy with ToolStrip's item system");
+    require((*status).parts().sizing_grip.present, "a status strip shows its sizing grip");
+    const std::vector<ToolStrip::Item> items = (*status).realized_items();
+    require(items.size() == 3U, "every status item is laid out");
+    const ToolStrip::Item* encoding = find_item(items, "encoding");
+    require(encoding != nullptr &&
+                (*encoding).parts.item_label.bounds.x + (*encoding).parts.item_label.bounds.width >
+                    600.0 - 12.0 - 60.0,
+            "a spring label pushes the items after it to the end");
+    require((*status).overflow_item_ids().empty(), "a status strip never overflows");
+    (*status).set_sizing_grip(false);
+    require(!(*status).parts().sizing_grip.present, "the sizing grip can be hidden");
+    require((*status).semantic_descriptor().role == SemanticRole::group, "a status strip is a named group");
+}
+
+} // namespace
+
+int main() {
+    layout_and_parts();
+    clicks_and_commands();
+    overflow_and_keyboard();
+    status_strip();
+    std::cout << "ToolStrip and StatusStrip: parts, clicks, commands, split and drop-down, overflow, keys, semantics and status layout passed\n";
+    return 0;
+}

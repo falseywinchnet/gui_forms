@@ -1579,6 +1579,72 @@ Properties beyond every control's: none.
 | `item_invoked` | `MenuStripInvocation` |
 | `open_changed` | `std::optional<std::size_t>` |
 
+## `tool_strip` (ToolStrip, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `grip` | grip |  |  |
+| `overflow_button` | actuator | `button` | hot, open |
+| `overflow_glyph` | glyph |  | hot, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_arrow` | actuator | `button` | hot, pressed |
+| `item_arrow_glyph` | glyph |  |  |
+| `item_separator` | divider |  |  |
+| `item_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `item_clicked` | `ToolStripItemClick` |
+| `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+
+## `status_strip` (StatusStrip, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `sizing_grip` | grip |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_arrow` | actuator | `button` | hot, pressed |
+| `item_arrow_glyph` | glyph |  |  |
+| `item_separator` | divider |  |  |
+| `item_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `item_clicked` | `ToolStripItemClick` |
+| `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+
 ## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |

@@ -2422,6 +2422,18 @@ void example() {
 }
 }  // namespace doc_example_StableId_2
 
+namespace doc_example_StatusStrip_1 {
+void example() {
+    std::shared_ptr<gf::StatusStrip> status =
+        gf::make_control<gf::StatusStrip>(gf::StableId("editor.status"));
+    (*status).set_items({
+        {.stable_id = "status.message", .kind = gf::ToolStripItemKind::label, .text = "Ready", .spring = true},
+        {.stable_id = "status.position", .kind = gf::ToolStripItemKind::label, .text = "Ln 1, Col 1"},
+        {.stable_id = "status.encoding", .kind = gf::ToolStripItemKind::label, .text = "UTF-8"},
+    });
+}
+}  // namespace doc_example_StatusStrip_1
+
 namespace doc_example_TabControl_1 {
 void example() {
     std::shared_ptr<gf::TabControl> tabs =
@@ -2635,6 +2647,22 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_ToolStrip_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "Save");
+    std::shared_ptr<gf::Command> pdf = std::make_shared<gf::Command>("doc.pdf", "PDF");
+    std::shared_ptr<gf::ToolStrip> strip =
+        gf::make_control<gf::ToolStrip>(gf::StableId("doc.tools"));
+    std::vector<gf::ToolStripItemSpec> items;
+    items.push_back({.stable_id = "tools.save", .command = save});
+    items.push_back({.stable_id = "tools.rule", .kind = gf::ToolStripItemKind::separator});
+    items.push_back({.stable_id = "tools.export", .kind = gf::ToolStripItemKind::drop_down_button,
+                     .text = "Export",
+                     .drop_down = {gf::MenuItemSpec("tools.export.pdf", gf::MenuItemKind::command, pdf)}});
+    (*strip).set_items(std::move(items));
+}
+}  // namespace doc_example_ToolStrip_1
 
 namespace doc_example_ToolTip_1 {
 void example() {
@@ -3183,6 +3211,7 @@ int main() {
     failures += run("SplitterPanel example 1", &doc_example_SplitterPanel_1::example);
     failures += run("StableId example 1", &doc_example_StableId_1::example);
     failures += run("StableId example 2", &doc_example_StableId_2::example);
+    failures += run("StatusStrip example 1", &doc_example_StatusStrip_1::example);
     failures += run("TabControl example 1", &doc_example_TabControl_1::example);
     failures += run("TabControl example 2", &doc_example_TabControl_2::example);
     failures += run("TabPage example 1", &doc_example_TabPage_1::example);
@@ -3192,6 +3221,7 @@ int main() {
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
     failures += run("ToolTip example 1", &doc_example_ToolTip_1::example);
     failures += run("ToolTip example 2", &doc_example_ToolTip_2::example);
     failures += run("TrackBar example 1", &doc_example_TrackBar_1::example);
