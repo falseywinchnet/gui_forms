@@ -412,6 +412,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/breadcrumb_trail/breadcrumb_trail.cpp
     src/controls/panel/tree_view/tree_view.cpp
     src/controls/panel/object_view/object_view.cpp
+    src/controls/panel/list_view/list_view.cpp
     src/controls/panel/correspondence_view/correspondence_view.cpp
     src/controls/panel/card/card.cpp
     src/controls/panel/card/review_card/review_card.cpp
@@ -2366,6 +2367,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
+    target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

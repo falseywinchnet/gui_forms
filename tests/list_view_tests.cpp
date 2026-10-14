@@ -1,0 +1,551 @@
+// ListView (stage W): the details, list and icon views and their published
+// parts, selection by pointer and keyboard, check boxes, column clicks,
+// sorting and resizing, virtual mode, type-ahead, scrolling, semantics and
+// refusals.
+
+#include "gui_forms/gui_forms.hpp"
+
+#include <algorithm>
+#include <cstdint>
+#include <cstdlib>
+#include <iostream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+using namespace gui_forms;
+
+void require(bool condition, const char* message) {
+    if (condition) return;
+    std::cerr << message << '\n';
+    std::exit(1);
+}
+
+class RecordingPainter final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect, Color) override {}
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view text, FontSpec, Color) override { texts.emplace_back(text); }
+    void draw_image(ImageId, Rect, double) override { ++images; }
+
+    std::vector<std::string> texts;
+    std::uint64_t images{};
+};
+
+bool painted(const RecordingPainter& painter, std::string_view text) {
+    for (const std::string& seen : painter.texts) {
+        if (seen == text) return true;
+    }
+    return false;
+}
+
+struct CountSelection final {
+    int* count{};
+    void operator()(const ListViewSelectionChange&) const { ++*count; }
+};
+
+struct RecordActivation final {
+    std::vector<std::size_t>* seen{};
+    void operator()(const ListViewItemActivation& activation) const { (*seen).push_back(activation.index); }
+};
+
+struct RecordColumnClick final {
+    std::vector<std::size_t>* seen{};
+    void operator()(const ListViewColumnClick& click) const { (*seen).push_back(click.column); }
+};
+
+struct RecordWidth final {
+    std::vector<double>* seen{};
+    void operator()(const ListViewColumnWidthChange& change) const { (*seen).push_back(change.width); }
+};
+
+struct CancelChecking final {
+    bool* cancel{};
+    int* seen{};
+    void operator()(ListViewItemCheck& check) const {
+        ++*seen;
+        check.cancel = *cancel;
+    }
+};
+
+struct CountChecked final {
+    int* count{};
+    void operator()(const ListViewItemCheck&) const { ++*count; }
+};
+
+// A million rows made on demand; counts how often the view asks.
+class CountingSource final : public ListViewItemSource {
+public:
+    explicit CountingSource(std::size_t count) : count_(count) {}
+    [[nodiscard]] std::size_t item_count() const override { return count_; }
+    void retrieve_item(std::size_t index, ListViewItem& item) const override {
+        ++retrievals;
+        item.stable_id = "row-" + std::to_string(index);
+        item.text = "Row " + std::to_string(index);
+        item.sub_items.assign(1U, std::to_string(index * 2U));
+        item.image_key.clear();
+        item.checked = index < checked.size() && checked[index];
+    }
+    void set_count(std::size_t count) { count_ = count; }
+
+    mutable std::size_t retrievals{};
+    std::vector<bool> checked{};
+
+private:
+    std::size_t count_{};
+};
+
+struct StoreVirtualCheck final {
+    CountingSource* source{};
+    void operator()(ListViewItemCheck& check) const {
+        if ((*source).checked.size() <= check.index) (*source).checked.resize(check.index + 1U, false);
+        (*source).checked[check.index] = check.new_value;
+    }
+};
+
+Point centre(Rect bounds) {
+    const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
+    return point;
+}
+
+Point to_window(const ListView& view, Point local) {
+    const Rect absolute = view.absolute_bounds();
+    const Point point{absolute.x + local.x, absolute.y + local.y};
+    return point;
+}
+
+void click(Window& window, Point point, Modifier modifiers = Modifier::none, std::uint32_t clicks = 1U) {
+    PointerEvent down{PointerAction::down, PointerButton::primary, point};
+    down.modifiers = modifiers;
+    down.click_count = clicks;
+    static_cast<void>(window.dispatch_pointer(down));
+    PointerEvent up{PointerAction::up, PointerButton::primary, point};
+    up.modifiers = modifiers;
+    static_cast<void>(window.dispatch_pointer(up));
+}
+
+bool key(Window& window, std::uint32_t physical, Modifier modifiers = Modifier::none) {
+    KeyEvent event{KeyAction::down, physical};
+    event.modifiers = modifiers;
+    const bool handled = window.dispatch_key(event);
+    return handled;
+}
+
+std::vector<ListViewColumn> sample_columns() {
+    std::vector<ListViewColumn> columns;
+    columns.push_back({.stable_id = "name", .text = "Name", .width = 140.0});
+    columns.push_back({.stable_id = "size", .text = "Size", .width = 80.0, .alignment = ListViewAlignment::right});
+    columns.push_back({.stable_id = "kind", .text = "Kind", .width = 100.0});
+    return columns;
+}
+
+std::vector<ListViewItem> sample_items(std::size_t count) {
+    static const char* const names[] = {"Delta", "alpha", "Charlie", "bravo", "Echo", "foxtrot"};
+    std::vector<ListViewItem> items;
+    for (std::size_t index = 0; index < count; ++index) {
+        ListViewItem item;
+        item.stable_id = "item-" + std::to_string(index);
+        item.text = std::string(names[index % 6U]) + " " + std::to_string(index);
+        item.sub_items = {std::to_string(index + 1U) + " KB", index % 2U == 0U ? "Image" : "Text"};
+        items.push_back(std::move(item));
+    }
+    return items;
+}
+
+std::shared_ptr<ListView> details_view(std::size_t count) {
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("list"));
+    (*view).set_columns(sample_columns());
+    (*view).set_items(sample_items(count));
+    return view;
+}
+
+void details_parts_and_paint() {
+    std::shared_ptr<ListView> view = details_view(6U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    const ControlAnatomy& anatomy = (*view).anatomy();
+    require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "list_view" &&
+                anatomy.item_systems.size() == 3U && find_item_system(anatomy, "column").has_value() &&
+                find_item_part(anatomy.item_systems[2], "sort_glyph").has_value(),
+            "ListView publishes a valid anatomy with item, sub-item and column systems");
+    const ListView::Parts parts = (*view).parts();
+    require(parts.well.present && parts.header.present && !parts.vertical_scroll_bar.present,
+            "a short details view shows its well and header and no scroll bar");
+    const std::vector<ListView::Item> items = (*view).realized_items();
+    require(items.size() == 6U, "every row of a short list is realized");
+    require(items[0].parts.text.present && items[0].parts.item_face.present && !items[0].parts.check_well.present &&
+                !items[0].parts.icon.present,
+            "a row without check boxes or images shows its face and text only");
+    require(items[0].parts.cell.bounds.y >= parts.header.bounds.y + parts.header.bounds.height - 0.001 &&
+                items[1].parts.cell.bounds.y > items[0].parts.cell.bounds.y,
+            "rows sit under the header, one under another");
+    const std::vector<ListView::SubItem> sub_items = (*view).realized_sub_items();
+    require(sub_items.size() == 12U && sub_items[0].column == 1U && sub_items[1].column == 2U &&
+                sub_items[0].stable_id == "item-0.sub.size",
+            "each row realizes one sub-item per visible column after the first");
+    std::vector<ListView::Column> columns = (*view).realized_columns();
+    require(columns.size() == 3U && columns[1].stable_id == "list.column.size" &&
+                columns[1].parts.column_label.present && columns[1].parts.column_divider.present &&
+                !columns[1].parts.sort_glyph.present,
+            "each visible column publishes its header parts; no sort glyph unsorted");
+    require((*view).realized_item_count() == 6U + 12U + 3U && (*view).realized_item_system(0U).value == 0U &&
+                (*view).realized_item_system(6U).value == 1U && (*view).realized_item_system(20U).value == 2U,
+            "the generic path lists rows, then sub-items, then columns");
+    (*view).set_sort_indicator(std::size_t{1U}, ListViewSortOrder::ascending);
+    columns = (*view).realized_columns();
+    require(columns[1].parts.sort_glyph.present && columns[1].states.sorted_ascending &&
+                !columns[0].states.sorted_ascending,
+            "the sort indicator shows a glyph and a custom state on its column only");
+    require((*view).items()[0].text == "Delta 0", "a sort indicator never reorders the items");
+
+    RecordingPainter painter;
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 400.0, 240.0}));
+    require(painted(painter, "Name") && painted(painter, "Delta 0") && painted(painter, "1 KB") &&
+                painted(painter, "Image"),
+            "the view paints headers, item text and sub-items");
+}
+
+void selection_by_pointer_and_keyboard() {
+    std::shared_ptr<ListView> view = details_view(20U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    int changes = 0;
+    SubscriptionToken counted = (*view).selection_changed().subscribe(CountSelection{&changes});
+    std::vector<std::size_t> activations;
+    SubscriptionToken activated = (*view).item_activated().subscribe(RecordActivation{&activations});
+    std::vector<ListView::Item> items = (*view).realized_items();
+    click(window, to_window(*view, centre(items[1].parts.text.bounds)));
+    require((*view).selected_count() == 1U && (*view).is_selected(1U) && (*view).focused_index() == 1U &&
+                changes == 1,
+            "a click selects the item, focuses it and reports the change");
+    click(window, to_window(*view, centre(items[3].parts.text.bounds)), Modifier::control);
+    require((*view).selected_indices() == std::vector<std::size_t>({1U, 3U}), "Control-click adds an item");
+    click(window, to_window(*view, centre(items[5].parts.text.bounds)), Modifier::shift);
+    require((*view).selected_indices() == std::vector<std::size_t>({3U, 4U, 5U}),
+            "Shift-click selects the range from the anchor");
+    click(window, to_window(*view, centre(items[3].parts.text.bounds)), Modifier::control);
+    require(!(*view).is_selected(3U) && (*view).selected_count() == 2U, "Control-click removes a selected item");
+    items = (*view).realized_items();
+    require(items[5].states.selected && items[3].states.current && !items[3].states.selected,
+            "rows publish selected and current");
+
+    require(window.request_focus(view), "the view takes focus");
+    require(key(window, PhysicalKey::down) && (*view).focused_index() == 4U && (*view).selected_count() == 1U &&
+                (*view).is_selected(4U),
+            "Down selects the next item alone");
+    require(key(window, PhysicalKey::down, Modifier::shift) && key(window, PhysicalKey::down, Modifier::shift) &&
+                (*view).selected_indices() == std::vector<std::size_t>({4U, 5U, 6U}),
+            "Shift with Down extends the selection from the anchor");
+    require(key(window, PhysicalKey::down, Modifier::control) && (*view).focused_index() == 7U &&
+                (*view).selected_count() == 3U,
+            "Control with Down moves the focus without selecting");
+    require(key(window, PhysicalKey::space, Modifier::control) && (*view).is_selected(7U) &&
+                (*view).selected_count() == 4U,
+            "Control with Space toggles the focused item");
+    require(key(window, PhysicalKey::end) && (*view).focused_index() == 19U && (*view).is_selected(19U),
+            "End goes to the last item");
+    require((*view).top_index() > 0U, "moving to an item out of view scrolls it into view");
+    require(key(window, PhysicalKey::home) && (*view).focused_index() == 0U && (*view).top_index() == 0U,
+            "Home goes to the first item and scrolls back");
+    require(key(window, PhysicalKey::a, Modifier::control) && (*view).selected_count() == 20U,
+            "Control with A selects everything");
+    require(key(window, PhysicalKey::enter) && activations.size() == 1U && activations[0] == 0U,
+            "Enter activates the focused item");
+    items = (*view).realized_items();
+    click(window, to_window(*view, centre(items[2].parts.text.bounds)));
+    click(window, to_window(*view, centre(items[2].parts.text.bounds)), Modifier::none, 2U);
+    require(activations.size() == 2U && activations[1] == 2U, "a double click activates the item");
+
+    (*view).set_multi_select(false);
+    require((*view).selected_count() == 1U, "single selection keeps one item");
+    click(window, to_window(*view, centre(items[4].parts.text.bounds)), Modifier::shift);
+    require((*view).selected_count() == 1U && (*view).is_selected(4U), "Shift-click selects one item in single mode");
+}
+
+void type_ahead() {
+    std::shared_ptr<ListView> view = details_view(6U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    require(window.request_focus(view), "the view takes focus");
+    TextInputEvent typed{};
+    typed.text_utf8 = "c";
+    require(window.dispatch_text(typed) && (*view).focused_index() == 2U && (*view).is_selected(2U),
+            "typing a letter selects the next item starting with it, ignoring case");
+}
+
+void check_boxes() {
+    std::shared_ptr<ListView> view = details_view(4U);
+    (*view).set_check_boxes(true);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    bool cancel = true;
+    int checking = 0;
+    int checked = 0;
+    SubscriptionToken vetoed = (*view).item_checking().subscribe(CancelChecking{&cancel, &checking});
+    SubscriptionToken counted = (*view).item_checked().subscribe(CountChecked{&checked});
+    std::vector<ListView::Item> items = (*view).realized_items();
+    require(items[0].parts.check_well.present && items[0].parts.check.present &&
+                items[0].parts.text.bounds.x > items[0].parts.check_well.bounds.x,
+            "check boxes put a check well before the text");
+    click(window, to_window(*view, centre(items[1].parts.check_well.bounds)));
+    require(checking == 1 && checked == 0 && !(*view).item_checked(1U), "a cancelled check changes nothing");
+    cancel = false;
+    click(window, to_window(*view, centre(items[1].parts.check_well.bounds)));
+    require(checking == 2 && checked == 1 && (*view).item_checked(1U) && (*view).selected_count() == 0U,
+            "a click on the check box toggles it without selecting");
+    require((*view).realized_items()[1].states.checked, "a checked item publishes checked");
+    require(window.request_focus(view) && key(window, PhysicalKey::space) && (*view).item_checked(1U) == false,
+            "Space toggles the focused item's check box");
+    const std::vector<SemanticNode> children = (*view).semantic_virtual_children();
+    require(children.size() == 3U + 4U && children[3].role == SemanticRole::check_list_item &&
+                children[3].value == "unchecked",
+            "rows with check boxes are check-list items");
+    require((*view).on_semantic_child_action("item-2", SemanticAction::press, {}) && (*view).item_checked(2U),
+            "the semantic press toggles a check-list item");
+    (*view).set_item_checked(3U, true);
+    require((*view).item_checked(3U) && checked == 4, "the program sets a check and item_checked reports it");
+}
+
+void columns_click_sort_and_resize() {
+    std::shared_ptr<ListView> view = details_view(6U);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    std::vector<std::size_t> clicks;
+    SubscriptionToken clicked = (*view).column_click().subscribe(RecordColumnClick{&clicks});
+    std::vector<double> widths;
+    SubscriptionToken resized = (*view).column_width_changed().subscribe(RecordWidth{&widths});
+    std::vector<ListView::Column> columns = (*view).realized_columns();
+    click(window, to_window(*view, centre(columns[0].parts.column_label.bounds)));
+    require(clicks.size() == 1U && clicks[0] == 0U && (*view).items()[0].text == "Delta 0",
+            "a header click raises column_click and does not reorder");
+
+    click(window, to_window(*view, centre((*view).realized_items()[0].parts.text.bounds)));
+    require((*view).is_selected(0U), "the first item is selected");
+    (*view).sort_items(0U, ListViewSortOrder::ascending);
+    require((*view).items()[0].text == "alpha 1" && (*view).items()[1].text == "bravo 3" &&
+                (*view).sort_column() == 0U && (*view).sort_order() == ListViewSortOrder::ascending,
+            "sort_items orders by the column's text, folding ASCII case, and shows the glyph");
+    const std::optional<std::size_t> delta = (*view).index_of("item-0");
+    require(delta.has_value() && (*view).is_selected(*delta) && (*view).focused_index() == delta,
+            "the selection and focus follow their item through a sort");
+    (*view).sort_items(1U, ListViewSortOrder::descending);
+    require((*view).items()[0].sub_items[0] == "6 KB", "sort_items sorts sub-item columns descending");
+
+    columns = (*view).realized_columns();
+    const Rect grip = columns[0].parts.column_grip.bounds;
+    const Point start = to_window(*view, centre(grip));
+    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, start}),
+            "the divider takes the press");
+    require((*view).realized_columns()[0].states.captured, "a column being resized is captured");
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::primary,
+                                               {start.x + 30.0, start.y}}));
+    require((*view).columns()[0].width == 170.0 && widths.empty(), "dragging the divider resizes live");
+    static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary,
+                                               {start.x + 30.0, start.y}}));
+    require(widths.size() == 1U && widths[0] == 170.0 && clicks.size() == 1U,
+            "releasing the divider reports the width once and is no header click");
+    (*view).set_column_width(1U, 60.0);
+    require(widths.size() == 2U && (*view).columns()[1].width == 60.0, "set_column_width reports the change");
+}
+
+void views_lay_out_items() {
+    std::shared_ptr<ListView> view = details_view(30U);
+    Window window(view, {360.0, 200.0});
+    (*view).set_view(ListViewView::list);
+    window.perform_layout();
+    std::vector<ListView::Item> items = (*view).realized_items();
+    require(items.size() > 2U && items[1].parts.cell.bounds.y > items[0].parts.cell.bounds.y &&
+                items[1].parts.cell.bounds.x == items[0].parts.cell.bounds.x,
+            "the list view fills a column top to bottom");
+    require(!(*view).parts().header.present && (*view).realized_columns().empty() &&
+                (*view).realized_sub_items().empty(),
+            "only the details view has headers and sub-items");
+    require((*view).parts().horizontal_scroll_bar.present && !(*view).parts().vertical_scroll_bar.present,
+            "the list view scrolls sideways");
+    require(window.request_focus(view) && key(window, PhysicalKey::right) && (*view).focused_index().has_value() &&
+                *(*view).focused_index() > 1U,
+            "Right moves to the next column of the list view");
+
+    (*view).set_view(ListViewView::small_icon);
+    window.perform_layout();
+    items = (*view).realized_items();
+    require(items[1].parts.cell.bounds.x > items[0].parts.cell.bounds.x &&
+                items[1].parts.cell.bounds.y == items[0].parts.cell.bounds.y,
+            "the small-icon view fills a row left to right");
+
+    (*view).set_view(ListViewView::large_icon);
+    window.perform_layout();
+    items = (*view).realized_items();
+    require(items[0].parts.text.present && items[0].parts.cell.bounds.height > 40.0 &&
+                (*view).parts().vertical_scroll_bar.present,
+            "the large-icon view shows tall cells and scrolls down");
+    require(items[0].parts.text.bounds.y > items[0].parts.cell.bounds.y + 30.0,
+            "the large-icon label sits under the icon's place");
+}
+
+void scrolling() {
+    std::shared_ptr<ListView> view = details_view(200U);
+    std::vector<ListViewColumn> wide = sample_columns();
+    wide[2].width = 400.0;
+    (*view).set_columns(wide);
+    Window window(view, {300.0, 200.0});
+    window.perform_layout();
+    const ListView::Parts parts = (*view).parts();
+    require(parts.vertical_scroll_bar.present && parts.horizontal_scroll_bar.present && parts.scroll_corner.present,
+            "a view with more rows and columns than fit shows both bars and their corner");
+    const std::size_t rows = (*view).realized_items().size();
+    require(rows < 20U, "only the visible rows are realized");
+    const Point inside = to_window(*view, centre((*view).realized_items()[0].parts.cell.bounds));
+    PointerEvent wheel{PointerAction::wheel, PointerButton::none, inside};
+    wheel.wheel_delta = {0.0, -1.0};
+    static_cast<void>(window.dispatch_pointer(wheel));
+    require((*view).top_index() == 3U, "the wheel scrolls three rows");
+    (*view).set_horizontal_offset(50.0);
+    require((*view).horizontal_offset() == 50.0 &&
+                (*view).realized_columns()[0].parts.column_header.bounds.width < 140.0,
+            "a sideways offset scrolls the columns");
+    (*view).ensure_visible(150U);
+    require((*view).top_index() <= 150U && (*view).top_index() + rows > 150U, "ensure_visible scrolls to an item");
+}
+
+void virtual_mode() {
+    std::shared_ptr<CountingSource> source = std::make_shared<CountingSource>(1'000'000U);
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("virtual"));
+    (*view).set_columns(sample_columns());
+    (*view).set_virtual_source(source);
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    require((*view).virtual_mode() && (*view).item_count() == 1'000'000U && (*view).items().empty(),
+            "a virtual view takes its count from the source");
+    (*source).retrievals = 0U;
+    const std::vector<ListView::Item> items = (*view).realized_items();
+    require(items.size() < 20U && items[0].stable_id == "row-0", "a virtual view realizes a screenful");
+    RecordingPainter painter;
+    (*source).retrievals = 0U;
+    static_cast<void>(window.paint(painter, {0.0, 0.0, 400.0, 240.0}));
+    require((*source).retrievals > 0U && (*source).retrievals <= 40U && painted(painter, "Row 3"),
+            "painting retrieves only the visible items");
+    require(window.request_focus(view) && key(window, PhysicalKey::end) && (*view).focused_index() == 999'999U &&
+                (*view).is_selected(999'999U),
+            "End reaches the last virtual item");
+    require((*view).realized_items().back().stable_id == "row-999999", "the view scrolls to the end");
+    require(key(window, PhysicalKey::a, Modifier::control) && (*view).selected_count() == 1'000'000U,
+            "select-all selects every virtual item");
+    (*source).set_count(10U);
+    (*view).refresh_virtual_items();
+    require((*view).item_count() == 10U && (*view).selected_count() == 10U && !(*view).focused_index().has_value(),
+            "a refresh keeps the selection below the new count and drops a focus past it");
+    (*view).set_check_boxes(true);
+    SubscriptionToken stored = (*view).item_checking().subscribe(StoreVirtualCheck{source.get()});
+    window.perform_layout();
+    const std::vector<ListView::Item> rows = (*view).realized_items();
+    click(window, to_window(*view, centre(rows[2].parts.check_well.bounds)));
+    require((*view).item_checked(2U) && (*view).realized_items()[2].states.checked,
+            "a virtual check is stored by the application and shown from the source");
+    bool threw = false;
+    try {
+        (*view).set_items(sample_items(2U));
+    } catch (const std::logic_error&) {
+        threw = true;
+    }
+    require(threw, "a virtual view refuses ordinary items");
+    threw = false;
+    try {
+        (*view).set_item_checked(0U, true);
+    } catch (const std::logic_error&) {
+        threw = true;
+    }
+    require(threw, "a virtual view's source owns the checked state");
+}
+
+void semantics() {
+    std::shared_ptr<ListView> view = details_view(3U);
+    (*view).set_accessible_name("Files");
+    Window window(view, {400.0, 240.0});
+    window.perform_layout();
+    const SemanticDescriptor descriptor = (*view).semantic_descriptor();
+    require(descriptor.role == SemanticRole::list && descriptor.name == "Files", "the view is a named list");
+    const std::vector<SemanticNode> children = (*view).semantic_virtual_children();
+    require(children.size() == 3U + 3U && children[0].role == SemanticRole::button && children[0].name == "Name" &&
+                children[3].role == SemanticRole::list_item && children[3].name == "Delta 0" &&
+                children[3].description == "Size: 1 KB; Kind: Image",
+            "column headers are buttons and rows are list items describing their sub-items");
+    std::vector<std::size_t> clicks;
+    SubscriptionToken clicked = (*view).column_click().subscribe(RecordColumnClick{&clicks});
+    require((*view).on_semantic_child_action("list.column.kind", SemanticAction::press, {}) && clicks.size() == 1U &&
+                clicks[0] == 2U,
+            "pressing a header node raises column_click");
+    require((*view).on_semantic_child_action("item-1", SemanticAction::select, {}) && (*view).is_selected(1U) &&
+                (*view).semantic_descriptor().value == "alpha 1",
+            "the select action selects an item, and the list's value names it");
+    require(!(*view).on_semantic_child_action("missing", SemanticAction::select, {}),
+            "an unknown item refuses the action");
+}
+
+void refusals() {
+    std::shared_ptr<ListView> view = make_control<ListView>(StableId("refusals"));
+    bool threw = false;
+    try {
+        std::vector<ListViewItem> items = sample_items(2U);
+        items[1].stable_id = items[0].stable_id;
+        (*view).set_items(std::move(items));
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw && (*view).item_count() == 0U, "duplicate item IDs are refused and leave the model unchanged");
+    threw = false;
+    try {
+        std::vector<ListViewColumn> columns = sample_columns();
+        columns[0].width = 5.0;
+        (*view).set_columns(std::move(columns));
+    } catch (const std::invalid_argument&) {
+        threw = true;
+    }
+    require(threw && (*view).columns().empty(), "a column narrower than the minimum is refused");
+    threw = false;
+    try {
+        (*view).set_selected(0U, true);
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    require(threw, "selecting past the end is refused");
+    threw = false;
+    try {
+        (*view).refresh_virtual_items();
+    } catch (const std::logic_error&) {
+        threw = true;
+    }
+    require(threw, "refreshing an ordinary view is refused");
+    (*view).set_items(sample_items(2U));
+    threw = false;
+    try {
+        (*view).sort_items(0U, ListViewSortOrder::ascending);
+    } catch (const std::out_of_range&) {
+        threw = true;
+    }
+    require(threw, "sorting by a missing column is refused");
+}
+
+} // namespace
+
+int main() {
+    details_parts_and_paint();
+    selection_by_pointer_and_keyboard();
+    type_ahead();
+    check_boxes();
+    columns_click_sort_and_resize();
+    views_lay_out_items();
+    scrolling();
+    virtual_mode();
+    semantics();
+    refusals();
+    std::cout << "ListView: parts, views, selection, keys, checks, columns, sorting, resizing, virtual mode, "
+                 "scrolling, semantics and refusals passed\n";
+    return 0;
+}

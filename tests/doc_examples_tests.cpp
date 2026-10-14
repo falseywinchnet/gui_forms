@@ -1533,6 +1533,23 @@ void example() {
 }
 }  // namespace doc_example_ListBox_2
 
+namespace doc_example_ListView_1 {
+void example() {
+    std::shared_ptr<gf::ListView> files =
+        gf::make_control<gf::ListView>(gf::StableId("files"));
+    (*files).set_columns({
+        {.stable_id = "name", .text = "Name", .width = 200.0},
+        {.stable_id = "size", .text = "Size", .width = 80.0,
+         .alignment = gf::ListViewAlignment::right},
+    });
+    (*files).set_items({
+        {.stable_id = "a", .text = "notes.txt", .sub_items = {"4 KB"}},
+        {.stable_id = "b", .text = "logo.png", .sub_items = {"12 KB"}},
+    });
+    (*files).sort_items(0U, gf::ListViewSortOrder::ascending);
+}
+}  // namespace doc_example_ListView_1
+
 namespace doc_example_LiveSurface_1 {
 void example() {
     gf::LiveSurfaceDescription description;
@@ -3169,6 +3186,7 @@ int main() {
     failures += run("LinkLabel example 1", &doc_example_LinkLabel_1::example);
     failures += run("ListBox example 1", &doc_example_ListBox_1::example);
     failures += run("ListBox example 2", &doc_example_ListBox_2::example);
+    failures += run("ListView example 1", &doc_example_ListView_1::example);
     failures += run("LiveSurface example 1", &doc_example_LiveSurface_1::example);
     failures += run("LiveSurface example 2", &doc_example_LiveSurface_2::example);
     failures += run("MasterDetailView example 1", &doc_example_MasterDetailView_1::example);

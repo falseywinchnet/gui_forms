@@ -1,0 +1,206 @@
+A list of items shown as details rows, a list, small icons or large icons.
+
+A list view shows records described by `ListViewItem`: a stable ID, the
+item's text, its sub-items (the further columns of the details view), an
+image key and a checked state. The details view shows `ListViewColumn`
+headers above the rows; the list, small-icon and large-icon views show one
+cell per item. Only the visible items are laid out, painted and described to
+accessibility. In virtual mode the application keeps the items and the view
+asks a `ListViewItemSource` for the visible ones only, so a list of millions
+of rows costs a screenful.
+
+Parameters
+----------
+stable_id
+    Identity of the view, unique within its window. Its scroll bars are
+    child controls named ``<stable_id>.vertical_scroll_bar`` and
+    ``<stable_id>.horizontal_scroll_bar``.
+
+Properties
+----------
+view : default ``ListViewView::details``
+    How the items are arranged: ``details``, ``list`` (columns filled top to
+    bottom, scrolled sideways), ``small_icon`` or ``large_icon`` (rows
+    filled left to right).
+columns
+    The details view's columns. `set_columns` replaces them and throws
+    `std::invalid_argument` for an empty or repeated ID, invalid UTF-8, a
+    width outside `minimum_column_width` and `maximum_column_width`, or more
+    than `maximum_columns` columns. The details view shows nothing without
+    columns.
+items
+    The items of an ordinary view; empty in virtual mode. `set_items`
+    replaces them, keeps the selection, the focused item and the anchor on
+    their items by stable ID, and throws `std::invalid_argument` for an empty
+    or repeated ID or invalid UTF-8, and `std::logic_error` in virtual mode.
+item_count
+    The number of items: the ordinary items, or the count the source last
+    reported.
+virtual_mode
+    Whether a `ListViewItemSource` supplies the items.
+virtual_source
+    The source, or null. `set_virtual_source` drops the ordinary items,
+    clears the selection and reads the source's count.
+check_boxes : default ``false``
+    Whether each item shows a check box.
+multi_select : default ``true``
+    Whether more than one item can be selected. Turning it off keeps one
+    selected item.
+full_row_select : default ``false``
+    Whether the details view highlights the whole row rather than the first
+    column's text.
+selected_count
+    The number of selected items.
+selected_indices
+    The selected items' indices, ascending.
+focused_index
+    The item with the focus cue and the keyboard's position, or none.
+    `set_focused_index` moves it and scrolls the item into view.
+top_index
+    The first item laid out in the visible area.
+horizontal_offset
+    The details view's sideways scroll, in logical units.
+sort_column
+    The column showing the sort glyph, or none.
+sort_order : default ``ListViewSortOrder::none``
+    The order the sort glyph shows.
+small_image_list
+    The images of the details, list and small-icon views, looked up by
+    each item's `image_key`. Without it those views show no icons.
+large_image_list
+    The images of the large-icon view.
+font
+    The font of item and header text.
+realized_items
+    The visible items' parts and states, in paint order.
+realized_sub_items
+    The visible details cells past the first column.
+realized_columns
+    The visible column headers.
+
+Events
+------
+selection_changed
+    Raised after the set of selected items changes, by the user or the
+    program. It carries the selected count and the focused item; read the
+    indices with `selected_indices`.
+item_activated
+    Raised on a double click, on Enter, and on the accessibility press of an
+    item in a view without check boxes.
+item_checking
+    Raised before the user toggles a check box. A handler may cancel the
+    change or alter its new value. In virtual mode the handler stores the new
+    value in the application's data.
+item_checked
+    Raised after a check box changes, by the user or by `set_item_checked`.
+column_click
+    Raised when a column header is clicked or pressed through accessibility.
+    The view does not sort.
+column_width_changed
+    Raised when a divider drag ends with a new width, or `set_column_width`
+    changes one.
+
+Methods
+-------
+set_column_width
+    Sets one column's width in logical units. Throws `std::out_of_range` for
+    a column past the end and `std::invalid_argument` for a width outside
+    the bounds.
+index_of
+    The index of the item with an ID in an ordinary view; none in virtual
+    mode.
+refresh_virtual_items
+    Re-reads the source's count after the application changed its data,
+    keeps the selection, focus and anchor below the new count and repaints.
+    Throws `std::logic_error` outside virtual mode.
+item_checked
+    Whether an item is checked. `set_item_checked` changes an ordinary item
+    and throws `std::logic_error` in virtual mode, where the source owns the
+    state.
+is_selected
+    Whether an item is selected. `set_selected` selects or deselects one
+    item; in single-selection mode selecting an item deselects the rest.
+select_all
+    Selects every item (one item in single-selection mode).
+clear_selection
+    Deselects every item.
+ensure_visible
+    Scrolls until an item is fully visible.
+set_sort_indicator
+    Shows the sort glyph on one column, or on none. It never reorders items.
+sort_items
+    A helper for a column_click handler: stable-sorts an ordinary view's
+    items by one column's text (ASCII case folded, then byte order) and shows
+    the sort glyph. The selection and focus follow their items. Throws
+    `std::logic_error` in virtual mode.
+item_index_at
+    The item under a point in window coordinates, or none.
+
+See Also
+--------
+ObjectView : A stable-ID object collection with icon and details projections.
+CheckedListBox : A single-column list with three-state check boxes.
+ListBox : A single-column list.
+TreeView : A hierarchical list.
+
+Notes
+-----
+Items are records, not child controls, and every part is painted through the
+by-role paint path (`paint_part`). The view publishes ``region``, ``well``,
+``header``, ``vertical_scroll_bar``, ``horizontal_scroll_bar``,
+``scroll_corner`` and ``focus``. Three item systems describe the visible
+items: ``item`` (``cell``, ``item_face``, ``check_well``, ``check``,
+``icon``, ``text`` and ``cell_focus``, with the states selected, hot,
+current, checked, disabled and focus_visible), ``sub_item`` (``sub_item_cell``
+and ``sub_item_text``, selected and disabled) and ``column`` (named as
+ObjectView's: ``column_header``, ``column_label``, ``sort_glyph``,
+``column_divider`` and ``column_grip``, hot, pressed and captured, with the
+custom states sorted_ascending and sorted_descending). Item faces use the
+theme's selection family, which is transparent until an item is hot or
+selected; header cells use the menu-item family, flat at rest.
+
+A click selects an item; Control-click toggles it and Shift-click selects
+the range from the anchor (Control and Shift adds the range). A click on a
+check box toggles it without changing the selection. Dragging a header's
+divider resizes its column; Escape during the drag restores the width. The
+wheel scrolls three lines; with Shift, or sideways, it scrolls the details
+view's columns.
+
+With focus, the arrows move through the items as the view lays them out
+(Left and Right scroll the details view sideways), Home and End go to the
+first and last item, Page Up and Page Down move a page, Shift extends the
+selection and Control moves the focus without selecting. Space toggles the
+focused item's check box (or selects it without check boxes); Control and
+Space toggles its selection; Control and A selects everything; Enter
+activates. Typing the first letters of an item's text selects the next
+matching item; virtual views do not search yet.
+
+The view publishes the accessibility role `list`. Its children are the
+visible column headers (as `button`: there is no column-header role) and
+the visible items, as `list_item`, or `check_list_item` with check boxes,
+whose description names each sub-item with its column. There is no table
+role. The select action selects an item; press activates it, or toggles a
+check-list item.
+
+Not supported yet: groups, the tile view, label editing, the insertion mark,
+owner drawing, item tooltips, hot-tracking activation, column reordering,
+type-ahead in virtual mode, and wrapping large-icon labels over two lines.
+
+Examples
+--------
+A details view whose header click sorts:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::ListView> files =
+       gf::make_control<gf::ListView>(gf::StableId("files"));
+   (*files).set_columns({
+       {.stable_id = "name", .text = "Name", .width = 200.0},
+       {.stable_id = "size", .text = "Size", .width = 80.0,
+        .alignment = gf::ListViewAlignment::right},
+   });
+   (*files).set_items({
+       {.stable_id = "a", .text = "notes.txt", .sub_items = {"4 KB"}},
+       {.stable_id = "b", .text = "logo.png", .sub_items = {"12 KB"}},
+   });
+   (*files).sort_items(0U, gf::ListViewSortOrder::ascending);

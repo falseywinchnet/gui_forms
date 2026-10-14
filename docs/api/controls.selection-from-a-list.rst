@@ -21,6 +21,8 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
      - A hierarchy of labelled items that the user expands, collapses and selects.
    * - :cpp:class:`ObjectView <gui_forms::ObjectView>`
      - A view of many items, shown as a grid of icons or as rows with details columns.
+   * - :cpp:class:`ListView <gui_forms::ListView>`
+     - A list of items shown as details rows, a list, small icons or large icons.
    * - :cpp:class:`CorrespondenceView <gui_forms::CorrespondenceView>`
      - A scrolling list of records whose rows expand to show the evidence behind them.
    * - :cpp:class:`ChoiceGroup <gui_forms::ChoiceGroup>`
@@ -36,6 +38,7 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
    generated/gui_forms.ComboBox
    generated/gui_forms.TreeView
    generated/gui_forms.ObjectView
+   generated/gui_forms.ListView
    generated/gui_forms.CorrespondenceView
    generated/gui_forms.ChoiceGroup
    generated/gui_forms.BreadcrumbTrail
@@ -95,6 +98,42 @@ Related types
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`ListSelectionChange <gui_forms::ListSelectionChange>`
      - ListSelectionChange reports previous/current indices plus the exact selected-index snapshot after one mutation.
+   * - :cpp:class:`ListView::Column <gui_forms::ListView::Column>`
+     -  
+   * - :cpp:class:`ListView::ColumnParts <gui_forms::ListView::ColumnParts>`
+     - The "column" item system, named as ObjectView's: one visible column header of the details view.
+   * - :cpp:class:`ListView::ColumnStates <gui_forms::ListView::ColumnStates>`
+     -  
+   * - :cpp:class:`ListView::Item <gui_forms::ListView::Item>`
+     -  
+   * - :cpp:class:`ListView::ItemParts <gui_forms::ListView::ItemParts>`
+     - The "item" item system: one realized item (a details row, or a cell of the other views).
+   * - :cpp:class:`ListView::ItemStates <gui_forms::ListView::ItemStates>`
+     -  
+   * - :cpp:class:`ListView::Parts <gui_forms::ListView::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`ListView::SubItem <gui_forms::ListView::SubItem>`
+     -  
+   * - :cpp:class:`ListView::SubItemParts <gui_forms::ListView::SubItemParts>`
+     - The "sub_item" item system: one visible details-view cell past the first column.
+   * - :cpp:class:`ListView::SubItemStates <gui_forms::ListView::SubItemStates>`
+     -  
+   * - :cpp:class:`ListViewColumn <gui_forms::ListViewColumn>`
+     - One details-view column.
+   * - :cpp:class:`ListViewColumnClick <gui_forms::ListViewColumnClick>`
+     - A click on a column header.
+   * - :cpp:class:`ListViewColumnWidthChange <gui_forms::ListViewColumnWidthChange>`
+     - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`ListViewItem <gui_forms::ListViewItem>`
+     - One item.
+   * - :cpp:class:`ListViewItemActivation <gui_forms::ListViewItemActivation>`
+     - An item activated by a double click, Enter, or the semantic press action on a view without check boxes.
+   * - :cpp:class:`ListViewItemCheck <gui_forms::ListViewItemCheck>`
+     - A check box toggled by the user.
+   * - :cpp:class:`ListViewItemSource <gui_forms::ListViewItemSource>`
+     - The items of a virtual ListView (Windows Forms' VirtualMode with RetrieveVirtualItem).
+   * - :cpp:class:`ListViewSelectionChange <gui_forms::ListViewSelectionChange>`
+     - A change of the selected items, after it happened.
    * - :cpp:class:`ObjectColumnId <gui_forms::ObjectColumnId>`
      -  
    * - :cpp:class:`ObjectContextRequest <gui_forms::ObjectContextRequest>`
@@ -552,6 +591,303 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ListView::Column final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ColumnParts parts
+
+   .. cpp:member:: ColumnStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::ColumnParts final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   The "column" item system, named as ObjectView's: one visible column header of the details view. Its identity is the view's stable ID, ".column.", and the column's ID.
+
+   .. cpp:member:: PartGeometry column_header
+
+   .. cpp:member:: PartGeometry column_label
+
+   .. cpp:member:: PartGeometry sort_glyph
+
+   .. cpp:member:: PartGeometry column_divider
+
+   .. cpp:member:: PartGeometry column_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::ColumnStates final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool sorted_ascending
+
+      Application-defined column states.
+
+   .. cpp:member:: bool sorted_descending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::Item final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+      The item's position in the model.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::ItemParts final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   The "item" item system: one realized item (a details row, or a cell of the other views).
+
+   .. cpp:member:: PartGeometry cell
+
+   .. cpp:member:: PartGeometry item_face
+
+   .. cpp:member:: PartGeometry check_well
+
+   .. cpp:member:: PartGeometry check
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry text
+
+   .. cpp:member:: PartGeometry cell_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::ItemStates final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::Parts final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry vertical_scroll_bar
+
+   .. cpp:member:: PartGeometry horizontal_scroll_bar
+
+   .. cpp:member:: PartGeometry scroll_corner
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::SubItem final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: SubItemParts parts
+
+   .. cpp:member:: SubItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::SubItemParts final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   The "sub_item" item system: one visible details-view cell past the first column. Its identity is the item's ID, ".sub.", and the column's.
+
+   .. cpp:member:: PartGeometry sub_item_cell
+
+   .. cpp:member:: PartGeometry sub_item_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListView::SubItemStates final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewColumn final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   One details-view column. ``stable_id`` is unique within the view and names the column in the published anatomy and semantics. ``width`` is in logical units at text scale 1.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: double width
+
+      Default: ``{120.0}``.
+
+   .. cpp:member:: ListViewAlignment alignment
+
+      Default: ``{ListViewAlignment::left}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewColumnClick final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   A click on a column header. The view does not sort: the application reorders its items (sort_items() is a helper for that) and shows the order with set_sort_indicator().
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string column_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewColumnWidthChange final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewItem final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   One item. ``text`` is shown in the first column (and as the label in the other views); ``sub_items[n]`` in column n + 1 of the details view. Sub-items past the last column are kept but not shown. ``image_key`` names an image in the small image list (details, list and small-icon views) or the large one (large-icon view); an empty or unknown key shows no image. ``checked`` is shown while the view has check boxes.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::vector<std::string> sub_items
+
+   .. cpp:member:: std::string image_key
+
+   .. cpp:member:: bool checked
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewItemActivation final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   An item activated by a double click, Enter, or the semantic press action on a view without check boxes.
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string item_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewItemCheck final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   A check box toggled by the user. item_checking is raised first and may cancel the change or alter ``new_value``; item_checked follows once the change is made. In a virtual view the application owns the checked state: it stores ``new_value`` when handling item_checking, and the view shows what the source then retrieves.
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: bool current_value
+
+   .. cpp:member:: bool new_value
+
+   .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ListViewItemSource
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   The items of a virtual ListView (Windows Forms' VirtualMode with RetrieveVirtualItem). The application owns the data; the view asks for the count when the source is set or refresh_virtual_items() is called, and for single items only when it paints, lays out or describes the visible ones. Both functions are called on the view's UI thread from inside the view's own (const) work and must not change the view.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual std::size_t item_count() const = 0
+
+   .. cpp:function:: virtual void retrieve_item(std::size_t index, ListViewItem& item) const = 0
+
+      Fills ``item`` for ``index`` (below the last count the view read). ``item`` is reused between calls: overwrite every field. An empty stable ID is replaced by "#" and the index; text that is not valid UTF-8 is shown empty.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ListViewSelectionChange final
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   A change of the selected items, after it happened. The selected indices are read from the view (selected_indices()); a virtual view with a large selection does not copy them into every event.
+
+   .. cpp:member:: std::string list_id
+
+   .. cpp:member:: std::size_t selected_count
+
+   .. cpp:member:: std::optional<std::size_t> focused_index
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ObjectColumnId final
 
    ``#include <gui_forms/controls/panel/object_view/object_view.hpp>``
@@ -946,6 +1282,44 @@ Enumerations
    .. cpp:enumerator:: one
 
    .. cpp:enumerator:: multiple_extended
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ListViewAlignment
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: right
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ListViewSortOrder
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: ascending
+
+   .. cpp:enumerator:: descending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ListViewView
+
+   ``#include <gui_forms/controls/panel/list_view/list_view.hpp>``
+
+   .. cpp:enumerator:: details
+
+   .. cpp:enumerator:: list
+
+   .. cpp:enumerator:: small_icon
+
+   .. cpp:enumerator:: large_icon
 
 .. cpp:namespace:: gui_forms
 

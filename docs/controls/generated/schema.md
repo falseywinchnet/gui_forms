@@ -482,6 +482,66 @@ Properties beyond every control's: none.
 | `item_activated` | `std::string` |
 | `context_requested` | `ObjectContextRequest` |
 
+## `list_view` (ListView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `header` | face |  |  |
+| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
+| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `cell` | region |  |  |
+| `item_face` | face |  |  |
+| `check_well` | well |  |  |
+| `check` | indicator |  |  |
+| `icon` | icon |  |  |
+| `text` | content |  |  |
+| `cell_focus` | focus |  |  |
+
+Item states: `selected`, `hot`, `current`, `checked`, `disabled`, `focus_visible`.
+
+Item system `sub_item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `sub_item_cell` | region |  |  |
+| `sub_item_text` | content |  |  |
+
+Item states: `selected`, `disabled`.
+
+Item system `column`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `column_header` | face |  |  |
+| `column_label` | label |  |  |
+| `sort_glyph` | glyph |  |  |
+| `column_divider` | divider |  |  |
+| `column_grip` | grip |  |  |
+
+Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `selection_changed` | `ListViewSelectionChange` |
+| `item_activated` | `ListViewItemActivation` |
+| `item_checking` | `ListViewItemCheck`, by reference |
+| `item_checked` | `ListViewItemCheck` |
+| `column_click` | `ListViewColumnClick` |
+| `column_width_changed` | `ListViewColumnWidthChange` |
+
 ## `correspondence_view` (CorrespondenceView, control)
 
 | Part | Role | Reuses | Own states |

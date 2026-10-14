@@ -21,7 +21,7 @@ inline constexpr std::array<std::string_view, 14> catalog_categories {{
     "Components",
 }};
 
-inline constexpr std::array<CatalogEntry, 75> control_catalog {{
+inline constexpr std::array<CatalogEntry, 76> control_catalog {{
     {"button_base", "ButtonBase", "gui_forms/controls/button_base/button_base.hpp", "Commands", "Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize.", "ButtonBase", "stable", "control-spectrum"},
     {"button", "Button", "gui_forms/controls/button_base/button/button.hpp", "Commands", "Push button with accept/cancel dialog results, default-button state, and four visual policies.", "Button", "stable", "control-spectrum"},
     {"drop_down_button", "DropDownButton", "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp", "Commands", "Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region.", "ToolStripSplitButton", "provisional", "commands-and-menus"},
@@ -37,6 +37,7 @@ inline constexpr std::array<CatalogEntry, 75> control_catalog {{
     {"combo_box", "ComboBox", "gui_forms/controls/panel/combo_box/combo_box.hpp", "Selection from a list", "Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup.", "ComboBox", "stable", "collections-and-popups"},
     {"tree_view", "TreeView", "gui_forms/controls/panel/tree_view/tree_view.hpp", "Selection from a list", "Flat-model retained tree that paints and publishes only visible rows while item identity and expansion state stay stable for unrealized descendants.", "TreeView", "stable", "tree-and-object-views"},
     {"object_view", "ObjectView", "gui_forms/controls/panel/object_view/object_view.hpp", "Selection from a list", "Stable-ID virtual object collection with icon and details projections that owns no per-item controls.", "ListView", "stable", "tree-and-object-views"},
+    {"list_view", "ListView", "gui_forms/controls/panel/list_view/list_view.hpp", "Selection from a list", "Item list with details, list, small-icon and large-icon views, check boxes, column headers that report clicks and resize, and a virtual mode that realizes only visible items.", "ListView", "stable", "checked-collections"},
     {"correspondence_view", "CorrespondenceView", "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp", "Selection from a list", "Variable-height virtual list with independent keyboard focus, delayed pointer inspection, and one persistent pinned item.", "GUI.Forms-only", "stable", "tree-and-object-views"},
     {"choice_group", "ChoiceGroup", "gui_forms/controls/collections/choice_group.hpp", "Selection from a list", "Row of retained item buttons that selects exactly one ChoiceItem and exposes the selection as a bindable Value.", "GUI.Forms-only", "provisional", "choices-and-sections"},
     {"breadcrumb_trail", "BreadcrumbTrail", "gui_forms/controls/panel/breadcrumb_trail/breadcrumb_trail.hpp", "Selection from a list", "Location instrument whose logical path segments are virtual semantic children and whose exact-path TextBox occupies the row only while editing.", "GUI.Forms-only", "provisional", "tree-and-object-views"},
