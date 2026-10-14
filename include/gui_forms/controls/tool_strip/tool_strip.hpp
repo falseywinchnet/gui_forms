@@ -144,7 +144,7 @@ public:
         PartGeometry focus;
     };
     [[nodiscard]] Parts parts() const;
-    // Item part names carry an item_ prefix: an item part may not repeat
+    // Item part names start with the word item (item_face): an item part may not repeat
     // one of the strip's own part names (face, focus).
     struct ItemParts final {
         PartGeometry item_face;

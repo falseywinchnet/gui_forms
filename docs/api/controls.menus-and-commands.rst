@@ -59,7 +59,7 @@ Related types
    * - :cpp:class:`ToolStrip::Item <gui_forms::ToolStrip::Item>`
      -  
    * - :cpp:class:`ToolStrip::ItemParts <gui_forms::ToolStrip::ItemParts>`
-     - Item part names carry an item_ prefix: an item part may not repeat one of the strip's own part names (face, focus).
+     - Item part names start with the word item (item_face): an item part may not repeat one of the strip's own part names (face, focus).
    * - :cpp:class:`ToolStrip::ItemStates <gui_forms::ToolStrip::ItemStates>`
      -  
    * - :cpp:class:`ToolStrip::Parts <gui_forms::ToolStrip::Parts>`
@@ -242,7 +242,7 @@ Related types
 
    ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
 
-   Item part names carry an item_ prefix: an item part may not repeat one of the strip's own part names (face, focus).
+   Item part names start with the word item (item_face): an item part may not repeat one of the strip's own part names (face, focus).
 
    .. cpp:member:: PartGeometry item_face
 
