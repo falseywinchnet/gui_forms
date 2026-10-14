@@ -21,6 +21,13 @@ public:
     static constexpr std::size_t maximum_dialog_extensions = 64U;
     static constexpr std::size_t maximum_dialog_paths = 64U;
     static constexpr std::uint32_t maximum_nested_modal_depth = 8U;
+    static constexpr std::size_t maximum_tray_icons = 16U;
+    static constexpr std::size_t maximum_tray_icon_images = 8U;
+    static constexpr std::uint32_t maximum_tray_icon_side = 256U;
+    static constexpr std::size_t maximum_tray_tooltip_bytes = 127U;
+    static constexpr std::size_t maximum_tray_title_bytes = 63U;
+    static constexpr std::size_t maximum_tray_text_bytes = 255U;
+    static constexpr std::size_t maximum_tray_menu_items = 64U;
 
     explicit HostServices(HostCapabilities capabilities);
     virtual ~HostServices();
@@ -67,6 +74,26 @@ public:
     // theme or consumer setting from suppressing a semantic cue indefinitely.
     [[nodiscard]] HostServiceStatus set_sound_cue_coalescing_window(
         std::chrono::nanoseconds window);
+    // Notification-area icons (capability notification_area). The base class
+    // assigns identities, validates images and text, bounds the icon count
+    // and removes every live icon at shutdown, so adapters agree on those
+    // rules. An unknown or removed identity is an invalid_argument.
+    [[nodiscard]] HostTrayIconResult add_tray_icon(const HostTrayIconRequest& request);
+    [[nodiscard]] HostServiceStatus update_tray_icon(std::uint64_t icon_id,
+                                                     const HostTrayIconRequest& request);
+    [[nodiscard]] HostServiceStatus remove_tray_icon(std::uint64_t icon_id);
+    // Capability notification_area_messages.
+    [[nodiscard]] HostServiceStatus show_tray_notification(
+        std::uint64_t icon_id, const HostTrayNotificationRequest& request);
+    // Capability notification_area_menus. Shows a native menu at the icon and
+    // returns when it closes, as show_dialog does.
+    [[nodiscard]] HostTrayMenuResult show_tray_menu(std::uint64_t icon_id,
+                                                    const HostTrayMenuRequest& request);
+    // Raised on the UI thread for each user action on a live tray icon.
+    [[nodiscard]] Event<const HostTrayIconEvent&>& tray_icon_events() noexcept {
+        return tray_icon_events_;
+    }
+    [[nodiscard]] bool tray_icon_live(std::uint64_t icon_id) const noexcept;
     void shutdown() noexcept;
 
     [[nodiscard]] HostServicesSnapshot snapshot() const;
@@ -97,6 +124,21 @@ protected:
     [[nodiscard]] virtual HostServiceStatus play_sound_cue_impl(
         const HostSoundCueRequest& request) = 0;
     virtual void shutdown_impl() noexcept {}
+    // Tray adapters: called with a validated request and an identity the base
+    // class assigned. The defaults refuse as unsupported.
+    [[nodiscard]] virtual HostServiceStatus add_tray_icon_impl(
+        std::uint64_t icon_id, const HostTrayIconRequest& request);
+    [[nodiscard]] virtual HostServiceStatus update_tray_icon_impl(
+        std::uint64_t icon_id, const HostTrayIconRequest& request);
+    // Must not fail in a way that leaves the icon shown; called at shutdown.
+    virtual void remove_tray_icon_impl(std::uint64_t icon_id) noexcept;
+    [[nodiscard]] virtual HostServiceStatus show_tray_notification_impl(
+        std::uint64_t icon_id, const HostTrayNotificationRequest& request);
+    [[nodiscard]] virtual HostTrayMenuResult show_tray_menu_impl(
+        std::uint64_t icon_id, const HostTrayMenuRequest& request);
+    // Adapters report native tray events here, on the UI thread. Events for
+    // identities that are not live are dropped.
+    void publish_tray_icon_event(const HostTrayIconEvent& event);
 
 private:
     friend class CursorHiddenLease;
@@ -105,6 +147,9 @@ private:
     std::shared_ptr<CursorLeaseState> cursor_lease_{};
     [[nodiscard]] HostServiceStatus validate_request(
         HostCapability capability) noexcept;
+    [[nodiscard]] HostServiceStatus validate_tray_icon_request(
+        const HostTrayIconRequest& request) const noexcept;
+    [[nodiscard]] HostServiceStatus reject(HostServiceError error) noexcept;
 
     CursorImagesPtr prepared_cursor_images_;
     CursorImage prepared_cursor_;
@@ -120,6 +165,10 @@ private:
     std::vector<std::uint64_t> modal_stack_;
     std::optional<HostSoundCue> last_sound_cue_;
     std::uint64_t last_sound_timestamp_{};
+    // Live tray icon identities, in creation order; identities are never reused.
+    std::vector<std::uint64_t> tray_icons_;
+    std::uint64_t next_tray_icon_id_{1U};
+    Event<const HostTrayIconEvent&> tray_icon_events_;
 };
 
 } // namespace gui_forms

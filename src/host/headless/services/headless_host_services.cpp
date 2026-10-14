@@ -114,7 +114,77 @@ HostServiceStatus HeadlessHostServices::play_sound_cue_impl(
     return {};
 }
 
+const HostTrayIconRequest* HeadlessHostServices::tray_icon(std::uint64_t icon_id) const noexcept {
+    for (const TrayIcon& icon : tray_icons_) {
+        if (icon.id == icon_id) return &icon.request;
+    }
+    return nullptr;
+}
+
+void HeadlessHostServices::simulate_tray_icon_event(HostTrayIconEvent event) {
+    publish_tray_icon_event(event);
+}
+
+void HeadlessHostServices::queue_tray_menu_choice(std::string chosen_id) {
+    tray_menu_choices_.push_back(std::move(chosen_id));
+}
+
+HostServiceStatus HeadlessHostServices::add_tray_icon_impl(std::uint64_t icon_id,
+                                                           const HostTrayIconRequest& request) {
+    tray_icons_.push_back({icon_id, request});
+    std::ostringstream line;
+    line << "tray add id=" << icon_id << " images=" << request.images.size()
+         << " tooltip=" << request.tooltip << '\n';
+    tray_trace_ += line.str();
+    return {};
+}
+
+HostServiceStatus HeadlessHostServices::update_tray_icon_impl(std::uint64_t icon_id,
+                                                              const HostTrayIconRequest& request) {
+    for (TrayIcon& icon : tray_icons_) {
+        if (icon.id == icon_id) icon.request = request;
+    }
+    std::ostringstream line;
+    line << "tray update id=" << icon_id << " tooltip=" << request.tooltip << '\n';
+    tray_trace_ += line.str();
+    return {};
+}
+
+void HeadlessHostServices::remove_tray_icon_impl(std::uint64_t icon_id) noexcept {
+    for (std::size_t index = 0; index < tray_icons_.size(); ++index) {
+        if (tray_icons_[index].id == icon_id) {
+            tray_icons_.erase(tray_icons_.begin() + static_cast<std::ptrdiff_t>(index));
+            break;
+        }
+    }
+    try {
+        tray_trace_ += "tray remove id=" + std::to_string(icon_id) + '\n';
+    } catch (...) {
+    }
+}
+
+HostServiceStatus HeadlessHostServices::show_tray_notification_impl(
+    std::uint64_t icon_id, const HostTrayNotificationRequest& request) {
+    std::ostringstream line;
+    line << "tray notify id=" << icon_id << " title=" << request.title << " text=" << request.text << '\n';
+    tray_trace_ += line.str();
+    return {};
+}
+
+HostTrayMenuResult HeadlessHostServices::show_tray_menu_impl(std::uint64_t icon_id,
+                                                             const HostTrayMenuRequest& request) {
+    HostTrayMenuResult result;
+    std::ostringstream line;
+    line << "tray menu id=" << icon_id << " items=" << request.items.size() << '\n';
+    tray_trace_ += line.str();
+    if (tray_menu_choices_.empty()) return result;
+    result.chosen_id = std::move(tray_menu_choices_.front());
+    tray_menu_choices_.pop_front();
+    return result;
+}
+
 void HeadlessHostServices::shutdown_impl() noexcept {
+    tray_menu_choices_.clear();
     clipboard_text_.clear();
     clipboard_has_text_ = false;
     clipboard_image_ = {};

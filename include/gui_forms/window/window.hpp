@@ -41,6 +41,7 @@ class ImageList;
 class HostServices;
 class HostSession;
 class BindingSource;
+class NotifyIcon;
 class BindingContext;
 class LiveSurface;
 class PaintFramebuffer;
@@ -546,6 +547,7 @@ private:
     friend class HelpProvider;
     friend class ImageList;
     friend class BindingSource;
+    friend class NotifyIcon;
     friend class BindingContext;
     friend class detail::PopupAttachment;
     friend class detail::AcceleratorAttachment;
