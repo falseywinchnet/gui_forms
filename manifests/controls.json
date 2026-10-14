@@ -690,6 +690,17 @@
       "doc": "api/generated/gui_forms.BindingNavigator.rst"
     },
     {
+      "id": "ribbon",
+      "type": "Ribbon",
+      "header": "gui_forms/controls/ribbon/ribbon.hpp",
+      "category": "Menus and commands",
+      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors, and minimizing by a click on the selected tab.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.Ribbon.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",

@@ -294,6 +294,8 @@ gui_forms::Window
         -  
       * - :cpp:func:`move_focus <gui_forms::Window::move_focus>`
         - Moves focus to the next Tab stop, or with ``false`` the previous one, within the active focus scope or the whole window, wrapping around.
+      * - :cpp:func:`add_focus_region <gui_forms::Window::add_focus_region>`
+        - Appends one region to :cpp:func:`focus_regions <gui_forms::Window::focus_regions>`, as a Ribbon does for itself.
       * - :cpp:func:`move_focus_region <gui_forms::Window::move_focus_region>`
         - Moves focus as F6 does, or with ``false`` as Shift+F6.
       * - :cpp:func:`capture_pointer <gui_forms::Window::capture_pointer>`
@@ -902,6 +904,12 @@ gui_forms::Window
       Moves focus to the next Tab stop, or with ``false`` the previous one,
       within the active focus scope or the whole window, wrapping around.
       Returns false when there is nothing to focus.
+
+   .. cpp:function:: bool add_focus_region(const Control::Ptr& region)
+
+      Appends one region to :cpp:func:`focus_regions <gui_forms::Window::focus_regions>`, as a Ribbon does for itself.
+      Returns false, changing nothing, for a control that is not attached to
+      this window, is already a region, or nests with one.
 
    .. cpp:function:: bool move_focus_region(bool forward = true)
 

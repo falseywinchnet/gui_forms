@@ -2309,6 +2309,18 @@ void example() {
 }
 }  // namespace doc_example_ReviewCard_2
 
+namespace doc_example_Ribbon_1 {
+void example() {
+    std::shared_ptr<gf::Command> paste = std::make_shared<gf::Command>("edit.paste", "&Paste");
+    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("main.ribbon"));
+    gf::RibbonGroupSpec clipboard{.stable_id = "clipboard", .caption = "Clipboard", .dialog_launcher = true};
+    clipboard.commands.push_back({.stable_id = "paste", .command = paste});
+    gf::RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
+    home.groups.push_back(std::move(clipboard));
+    (*ribbon).set_tabs({std::move(home)});
+}
+}  // namespace doc_example_Ribbon_1
+
 namespace doc_example_ScaledGroupBox_1 {
 void example() {
     std::shared_ptr<gf::ScaledGroupBox> pad = gf::make_control<gf::ScaledGroupBox>(
@@ -3383,6 +3395,7 @@ int main() {
     failures += run("ResponsiveTrackPanel example 1", &doc_example_ResponsiveTrackPanel_1::example);
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
+    failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);
     failures += run("ScrollBar example 1", &doc_example_ScrollBar_1::example);

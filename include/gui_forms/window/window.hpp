@@ -475,6 +475,10 @@ public:
     // disabled, or holds no Tab stop, is skipped.
     void set_focus_regions(std::vector<Control::Ptr> regions);
     [[nodiscard]] std::vector<Control::Ptr> focus_regions() const;
+    // Appends one region, for a control that registers itself (a Ribbon).
+    // Returns false, changing nothing, for a control that is not attached to
+    // this window, is already a region, or nests with one.
+    bool add_focus_region(const Control::Ptr& region);
     // Moves focus as F6 (forward) or Shift+F6 does. From outside every
     // region, forward enters the first region and backward the last. Returns
     // false, leaving focus alone, when no other region can take focus or a

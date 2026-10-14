@@ -1958,6 +1958,70 @@ Properties beyond every control's: none.
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 | `adding_new` | `BindingNavigatorAddNew`, by reference |
 
+## `ribbon` (Ribbon, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `tab_rail` | face |  |  |
+| `application_button` | face | `button` | hot, pressed, open, focus_visible |
+| `application_label` | label |  | hot, pressed, open, focus_visible |
+| `command_plane` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `tab`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `tab` | face |  |  |
+| `tab_label` | label |  |  |
+| `tab_focus` | focus |  |  |
+
+Item states: `hot`, `selected`, `focus_visible`.
+
+Item system `group`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `group_region` | region |  |  |
+| `group_caption` | caption |  |  |
+| `group_divider` | divider |  |  |
+| `group_launcher` | actuator | `button` | hot, pressed, focus_visible |
+| `group_launcher_glyph` | glyph |  | hot, pressed, focus_visible |
+| `group_launcher_focus` | focus |  | hot, pressed, focus_visible |
+
+Item states: none.
+
+Item system `command`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `command_face` | face |  |  |
+| `command_icon` | icon |  |  |
+| `command_label` | label |  |  |
+| `command_arrow` | actuator | `button` | hot, pressed |
+| `command_arrow_glyph` | glyph |  |  |
+| `command_focus` | focus |  |  |
+| `command_combo_box` | well | `combo_box` |  |
+| `command_numeric_up_down` | well | `numeric_up_down` |  |
+| `command_check_box` | indicator | `check_box` |  |
+| `command_text_box` | well | `text_box` |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `command_clicked` | `RibbonCommandClick` |
+| `drop_down_item_invoked` | `RibbonDropDownInvocation` |
+| `dialog_launcher_clicked` | `RibbonDialogLaunch` |
+| `selected_tab_changed` | `RibbonTabChange` |
+| `minimized_changed` | `bool` |
+| `application_menu_item_invoked` | `MenuItemInvocation` |
+
 ## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |

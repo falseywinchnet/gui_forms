@@ -159,6 +159,10 @@ move_focus
     Moves focus to the next Tab stop, or with `false` the previous one,
     within the active focus scope or the whole window, wrapping around.
     Returns false when there is nothing to focus.
+add_focus_region
+    Appends one region to `focus_regions`, as a Ribbon does for itself.
+    Returns false, changing nothing, for a control that is not attached to
+    this window, is already a region, or nests with one.
 move_focus_region
     Moves focus as F6 does, or with `false` as Shift+F6. From outside every
     region, forward enters the first region and backward the last. Regions

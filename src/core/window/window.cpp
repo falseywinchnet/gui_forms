@@ -1203,6 +1203,22 @@ std::vector<Control::Ptr> Window::focus_regions() const {
     return regions;
 }
 
+bool Window::add_focus_region(const Control::Ptr& region) {
+    require_ui_thread("focus region mutation");
+    if (!region || !(*region).is_alive() || (*region).attached_window() != this) return false;
+    for (const FocusRegion& entry : focus_regions_) {
+        const Control::Ptr existing = entry.region.lock();
+        if (!existing) continue;
+        if (existing == region || (*existing).contains(*region) || (*region).contains(*existing)) return false;
+    }
+    FocusRegion entry;
+    entry.region = region;
+    const Control::Ptr focused = focused_.lock();
+    if (focused && (focused == region || (*region).contains(*focused))) entry.remembered = focused;
+    focus_regions_.push_back(std::move(entry));
+    return true;
+}
+
 void Window::remember_region_focus(const Control::Ptr& control) {
     for (FocusRegion& entry : focus_regions_) {
         const Control::Ptr region = entry.region.lock();
