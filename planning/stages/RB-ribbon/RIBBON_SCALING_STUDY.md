@@ -642,6 +642,10 @@ the plane is not hidden, scroll buttons appear at both ends (MFC, WRF); a click
 scrolls by one group; the focused command, else the first group, is kept in
 view. No partial group is shown under a scroll button.
 
+*Superseded in part, 2026-10-14:* the owner replaced H1 with the document
+area's own minimum and dropped H2 (RB decisions 34 to 36, after the
+observation); the hysteresis stays.
+
 **Hide rule (decision 7), content-derived.** The command plane (not the tab
 row; decision 19, question 7.1) is hidden when either holds:
 

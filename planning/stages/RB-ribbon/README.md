@@ -170,11 +170,46 @@ From the scaling study's questions (2026-10-14, `RIBBON_SCALING_STUDY.md` §7):
 30. **Authored icon-only commands and ellipsized tab labels are allowed
     (S3)**; scaling never removes a label.
 31. **The hide rule as recommended (S4)**, with 8 units of hysteresis.
+    Its two tests are replaced by decisions 34 and 35; the hysteresis
+    stands (decision 36).
 32. **Default reduction order: WPF's cycle (S5)**, one step per group, right
     to left, repeating.
 33. **The observation runs on WordPad and Word 2010 (S6)**; the owner
     installed Word 2010 as a 30-day trial for it. Later sessions are asked
     again.
+
+From phase 4 and the observation (2026-10-14, interview round 001, last
+note):
+
+34. **The plane hides when the document area would be too small (Q5).**
+    The measure is the space left within the available document area under
+    the ribbon, not the ribbon's own height: the plane hides when that area
+    would fall below the minimum the document area declares. With no
+    declared minimum it hides only when no document area would be left,
+    as Word 2010 and WordPad do (119 logical units; see
+    `results/2026-10-14-ribbon-scaling-observation/`). Replaces S4's
+    height test.
+35. **Never hide by width (Q6);** the ribbon scrolls at any width.
+    Replaces S4's width test.
+36. **The 8 units of hysteresis stay (Q7).**
+37. **An overlay shadow joins the vocabulary (Q1)**: soft, offset down and
+    right from the upper-left light, cast by tooltips, popups, menus and
+    the minimized ribbon's popup (decision 24).
+38. **A tooltip visual family (Q2)**, used by plain and enhanced tooltips.
+39. **F1 opens a showing tooltip's help topic first (Q3),** ahead of the
+    focused control's help.
+40. **Tooltip defaults (Q4):** 10 s auto-pop, maximum width 318, the line
+    "Press F1 for more help.".
+41. **An always-present help question mark.** In addition to focused
+    help, GUI.Forms programs always offer a question mark in the upper
+    right corner which, when clicked, opens a tooltip. A whole-screen help
+    overlay (instead, or on right click) is the owner's open design work.
+42. **Where the question mark sits (H1):** at the right end of a ribbon's
+    tab row; in a window without a ribbon, a small button at the top right
+    of the client area, over the content, the same on every host.
+43. **What it shows (H2):** a help card for the whole window, supplied by
+    the program (title, description, help topic), with F1 opening that
+    topic while the card shows.
 
 ## Gate
 

@@ -73,8 +73,9 @@ state changes repaint only their item; minimizing by tab click; schema check.
   the order runs out; groups shrink by image size, rows and finally a
   collapsed-group button (icon, caption and chevron, decision 27) that opens
   the group in a popup; galleries give up one column at a time (decision 8);
-  labels never drop (decision 6); a content-derived rule hides the command
-  plane in a small window (decision 7); widths cached per step. Tests: golden
+  labels never drop (decision 6); the command plane hides only when the
+  document area under it would fall below its declared minimum, never by
+  width, with 8 units of hysteresis (decisions 7, 34 to 36); widths cached per step. Tests: golden
   layouts at a width ladder and at text scales 1 and 1.5; the reduction order
   followed; the hide rule at its threshold; comparison with 2a's recorded
   ladders where the models agree.
@@ -89,7 +90,8 @@ commit and cancel; virtualization bound.
 QAT on the tab row or below the ribbon, flat buttons, commands only, its
 customize menu and overflow (decisions 12, 24); the minimized ribbon's
 temporary popup with the overlay shadow, a click outside it consumed
-(decisions 12, 24); `RibbonToolTip` with F1 help; the ribbon saving QAT
+(decisions 12, 24); `RibbonToolTip` with F1 help, in the tooltip family and casting the
+overlay shadow (decisions 37 to 40); the ribbon saving QAT
 items and position and the minimized state through the runtime layout store,
 with explicit save and load (decision 12). Tests: QAT placement and overflow;
 the popup's open, close and focus order; persistence round trip.

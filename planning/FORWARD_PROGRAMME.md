@@ -240,6 +240,14 @@ be built before T4 when it uses only atoms of the vocabulary (design language
 replaces with the engine. The catalogue was regenerated from the official
 surface on 2026-10-14 (`WINFORMS_API_CATALOGUE.md`).
 
+Advanced candidates (owner, 2026-10-14; matrix rows 51 to 57): `PageView`
+with strip, document-tab, navigation-strip and Outlook-style modes
+(studied in DK, since docking reuses it), a virtual grid and
+`TreeListView` on `ObjectView`'s stable row identity (W decision 4, which
+also moves `DataGridView`'s virtual mode onto it), the ribbon (RB),
+advanced editors (auto-complete, a searchable `ComboBox`, a token box),
+and `Diagram` and `DataLayout`, each after a study of its own.
+
 Gate (accepted 2026-10-13): the catalogue is regenerated from the official .NET 8+
 surface; every in-scope row of `CONTROL_COMPLETENESS_MATRIX.md` is implemented
 and tested on every platform, or excluded or deferred with a reason; the
@@ -386,3 +394,9 @@ RC002, RC005 and RC006 are answered (parent-locale fallback, live validated
 configuration edits, one settings file per plugin; see
 `interview/GUI_FORMS_RESOURCES_AND_CONFIGURATION.md` §8). Each stage brief
 records its decisions.
+
+Decided 2026-10-14: the atom vocabulary is the canonical source of what
+controls and the engine address (design language §12.7); the ribbon plan
+(RB) and the docking stage (DK) are admitted; the advanced candidates
+above are admitted (matrix rows 51 to 57), `PageView` is studied inside
+DK, and grids and tree lists use stable row identity (W decision 4).
