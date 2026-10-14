@@ -55,6 +55,10 @@ Methods
 item_checked
     The checked state an item shows: its command's when it has one. An
     unknown ID throws `std::out_of_range`, as does `set_item_checked`.
+set_item_text
+    Replaces one item's text (a hosted item's accessible name). Throws
+    `std::out_of_range` for an unknown ID and `std::invalid_argument` for
+    invalid UTF-8.
 combo_box
     The `ComboBox` a combo box item holds. `text_box` and `progress_bar`
     return a text box or progress bar item's control. Each throws

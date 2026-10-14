@@ -101,7 +101,7 @@ gui_forms::ToolStrip
       * - :cpp:func:`show_overflow <gui_forms::ToolStrip::show_overflow>`
         - Opens the overflow menu.
       * - :cpp:func:`set_item_text <gui_forms::ToolStrip::set_item_text>`
-        - The checked state the strip shows for an item: its command's when it has one.
+        - Replaces one item's text (a hosted item's accessible name).
       * - :cpp:func:`set_item_checked <gui_forms::ToolStrip::set_item_checked>`
         -  
 
@@ -293,7 +293,9 @@ gui_forms::ToolStrip
 
    .. cpp:function:: void set_item_text(std::string_view item_id, std::string text)
 
-      The checked state the strip shows for an item: its command's when it has one. Throws std::out_of_range for an unknown ID. Replaces one item's text (a hosted item's accessible name). Throws std::out_of_range for an unknown ID and std::invalid_argument for invalid UTF-8.
+      Replaces one item's text (a hosted item's accessible name). Throws
+      ``std::out_of_range`` for an unknown ID and ``std::invalid_argument`` for
+      invalid UTF-8.
 
    .. cpp:function:: void set_item_checked(std::string_view item_id, bool checked)
 
