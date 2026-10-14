@@ -121,6 +121,9 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.numeric_value = descriptor.numeric_value;
     node.minimum_value = descriptor.minimum_value;
     node.maximum_value = descriptor.maximum_value;
+    node.position_in_set = descriptor.position_in_set;
+    node.set_size = descriptor.set_size;
+    node.has_popup = descriptor.has_popup;
     node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;

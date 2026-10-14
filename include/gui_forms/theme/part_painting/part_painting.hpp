@@ -3,6 +3,7 @@
 #include "gui_forms/theme/types/theme_types.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
@@ -23,8 +24,12 @@ class Painter;
 // ControlVisualRole whose recipe the part uses, and the part's states select
 // the recipe's surface state, focus and default cues.
 
-// The drawn mark of a glyph or indicator part. Marks are engine vocabulary:
-// a control names the mark, never strokes it.
+// The drawn mark of a glyph or indicator part. Marks are engine vocabulary
+// (design language §8.5): a control names the mark, never strokes it. The
+// last four were admitted with the ribbon plan (owner decision RB-20,
+// §12.8): the dialog launcher of a ribbon group, the "more" button of a
+// gallery, the overflow (double chevron) of a strip, and the customize
+// button of a Quick Access Toolbar.
 enum class PartMark : std::uint8_t {
     none,
     check,
@@ -39,8 +44,17 @@ enum class PartMark : std::uint8_t {
     chevron_right,
     close,
     grip_dots,
+    dialog_launcher,
+    more,
+    overflow,
+    customize,
     count,
 };
+
+inline constexpr std::size_t part_mark_count = static_cast<std::size_t>(PartMark::count);
+
+// Registered (snake_case) name of a mark, as the schema's vocabulary lists it.
+[[nodiscard]] std::string_view part_mark_name(PartMark mark) noexcept;
 
 enum class PartTextAlignment : std::uint8_t { start, center, end };
 
@@ -61,6 +75,10 @@ struct PartPaint final {
     PartTextAlignment alignment{PartTextAlignment::start};
     ImageId image{};
     std::optional<double> corner_radius{};
+    // The part's position in the theme's accent ramp (§8.5), or none. A
+    // surface part with an accent is tinted from the ramp over its
+    // material; text and mark roles ignore it.
+    std::optional<AccentIndex> accent{};
 };
 
 // The theme context a part's states select: hot, pressed or captured,

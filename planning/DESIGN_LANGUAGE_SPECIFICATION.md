@@ -875,6 +875,53 @@ activation behaviour stays platform-owned (DDV-007-01).
    invalid, disabled, deactivated) plus selected, focused, defaulted and
    high-contrast flags (theme types); the rest is not yet reachable.
 
+### 8.5 Marks, values and semantic roles
+
+Besides part roles (§8.1) and states (§8.4), the atom vocabulary (§12.7)
+names the marks a glyph or indicator part shows, the values a part carries,
+and the semantic roles and node fields controls publish to accessibility.
+Their machine forms are `PartMark` (`gui_forms/theme/part_painting`),
+`AccentIndex` (`gui_forms/anatomy/types`) and `SemanticRole` and
+`SemanticNode` (`gui_forms/semantics/types`); the schema export lists the
+marks, values and roles under `vocabulary`.
+
+| Mark | What it shows | Used by |
+|---|---|---|
+| check, indeterminate, radio_dot, toggle_knob | binary and tri-state indicators | check box, radio, switch |
+| arrow_up, arrow_down, arrow_left, arrow_right | solid direction arrows | spinners, scroll arrows, drop-down arrows |
+| chevron_down, chevron_right | open direction chevrons | disclosure |
+| close | a cross | close buttons |
+| grip_dots | a dot field | grips |
+| dialog_launcher | the top-left corner of a small window with an arrow leaving it towards the bottom right | a ribbon group's dialog launcher |
+| more | a bar over a solid down arrow | a gallery's "more" button |
+| overflow | a double chevron | a strip's overflow button (`ToolStrip` adopts it), a Quick Access Toolbar's overflow |
+| customize | a short bar over an open down chevron | a Quick Access Toolbar's customize button |
+
+Marks are drawn in one restrained style: one- or 1.5-unit strokes or solid
+fills in the recipe's glyph colour, inside the part's bounds, nothing drawn
+when the part is too small to read.
+
+**Accent index.** A value, not a state: a part's position in the theme's
+accent ramp, the ordered colours a theme offers for telling sets of items
+apart (a ribbon's contextual tab sets, §12.8). Index 0 is the first colour;
+an index past a theme's ramp wraps around it. A part publishes it in its
+geometry record and a painter receives it with the part; a surface part
+with an accent is tinted from the ramp. Until the default theme (T4) defines
+the ramp and the engine (T2) the tint, the theme records carry a
+provisional six-colour ramp of translucent tints laid over the part's
+material.
+
+**Semantic roles and node fields.** Besides the roles controls published
+before 2026-10-14, `split_button` (a button whose primary press acts, with a
+separate arrow that opens a menu) and `menu_button` (a button that opens a
+menu) are admitted. A node may carry its position in a set and the set's
+size (both counting from one, published together) and whether it opens a
+popup. Each host maps them as far as its accessibility API allows: MSAA
+(Windows) has split-button and button-menu roles and a has-popup state but
+no position in a set; AppKit (macOS) has a menu-button role and an index
+but no split-button role or set size; ATK (Linux) has a has-popup state and
+the `posinset` and `setsize` object attributes.
+
 ## 9. Motion, effects and sound
 
 ### 9.1 Character
@@ -1289,6 +1336,23 @@ These supersede the conflicting sources and options of the first draft.
   (`gui_forms/theme/part_painting/part_painting.hpp`: `paint_part`). T4
   replaces that path's body with the engine, so such a control is not moved
   later. This revises stage W's decision 1.
+
+### 12.8 Owner decisions, sixth round, 2026-10-14 (ribbon)
+
+From the ribbon interview (`planning/interview/RIBBON_INTERVIEW_ROUND_001.md`;
+stage RB, decisions 20 and 22), admitted to the vocabulary together with the
+enum and the schema as §12.7 requires (§8.5):
+
+- **New marks (RB-20, questions G2 to G4).** `dialog_launcher`, `more`,
+  `overflow` (a double chevron, which `ToolStrip`'s overflow button adopts)
+  and `customize`. No `chevron_up`: the ribbon has no minimize button
+  (RB-19).
+- **Vocabulary (RB-22, questions G7 to G9).** A per-item accent value for
+  contextual tab sets (`AccentIndex`, a position in the theme's accent
+  ramp); the semantic roles `split_button` and `menu_button` (a toggle
+  button stays `button` with `checked`); and the semantic node fields
+  position in set, set size and has-popup. No access-key or keytip field:
+  the ribbon has no KeyTips (RB-16).
 
 ## Appendix A. Anti-models
 
