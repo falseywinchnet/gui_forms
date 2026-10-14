@@ -41,6 +41,9 @@ private:
     void on_choose_font();
     void on_font_closed(const FontDialogResult& result);
     void on_font_applied(const FontSpec& font);
+    void build_task_dialog(const std::shared_ptr<Surface>& body);
+    void on_show_task_dialog();
+    void on_task_dialog_closed(const TaskDialogResult& result);
 
     void on_message_dialog(int index, const CommandInvocation& invocation);
     void on_path_dialog(int index, const CommandInvocation& invocation);
@@ -66,6 +69,9 @@ private:
     std::shared_ptr<Button> font_button_;
     std::shared_ptr<FontDialog> font_dialog_;
     std::shared_ptr<Label> font_sample_;
+    Command task_dialog_command_{};
+    std::shared_ptr<Button> task_dialog_button_;
+    std::shared_ptr<TaskDialog> task_dialog_;
     std::string last_acceptance_{"No accepted dialog value yet"};
     std::uint64_t next_request_id_{1U};
 };
@@ -80,6 +86,54 @@ HostServicesPage::HostServicesPage(const std::shared_ptr<Surface>& body) {
     build_messages(body);
     build_paths(body);
     build_services(body);
+    build_task_dialog(body);
+}
+
+// A TaskDialog: an owned dialog built from GUI.Forms controls inside the
+// window, the same on every host.
+void HostServicesPage::build_task_dialog(const std::shared_ptr<Surface>& body) {
+    std::shared_ptr<LayoutGroup> group_box = group(
+        "gallery.host.task-dialog", "TaskDialog · in-window owned dialog, the same on every host",
+        {930.0, 96.0});
+    (*body).add_at(group_box, {24.0, 648.0, 930.0, 96.0});
+    task_dialog_command_.set_text("Show task dialog");
+    task_dialog_command_.set_description("Show a TaskDialog over this window");
+    task_dialog_button_ = make_control<Button>(StableId("gallery.host.task-dialog.show"), "Show task dialog");
+    (*task_dialog_button_).set_visual_style(ButtonVisualStyle::accent);
+    (*task_dialog_button_).bind(task_dialog_command_);
+    (*group_box).add_at(task_dialog_button_, {24.0, 40.0, 202.0, 38.0});
+    (*group_box).add_at(label("gallery.host.task-dialog.note",
+                              "Heading, text, icon, radio buttons, a check box, details and a footnote; the result arrives in closed.",
+                              11.0, 400, muted), {244.0, 46.0, 660.0, 24.0});
+    task_dialog_ = make_control<TaskDialog>(StableId("gallery.host.task-dialog.dialog"));
+    TaskDialogPage page;
+    page.caption = "Export evidence";
+    page.heading = "Export the evidence bundle?";
+    page.text = "The bundle holds the page captures and the control schema. It is written next to the build.";
+    page.icon = TaskDialogIcon::information;
+    page.buttons = {{.stable_id = "export", .text = "Export"}, {.standard = TaskDialogStandardButton::cancel}};
+    page.default_button = "export";
+    page.radio_buttons = {{.stable_id = "zip", .text = "One archive", .checked = true},
+                          {.stable_id = "folder", .text = "A folder of files"}};
+    page.verification_text = "Open the folder afterwards";
+    page.expander = TaskDialogExpander{.text = "Captures: 25 pages. Schema: manifests/control-schema.json."};
+    page.footnote = "Nothing leaves this machine.";
+    page.footnote_icon = TaskDialogIcon::information;
+    page.allow_cancel = true;
+    (*task_dialog_).set_page(std::move(page));
+    on(task_dialog_command_.invoked(), *this, &HostServicesPage::on_show_task_dialog);
+    on((*task_dialog_).closed(), *this, &HostServicesPage::on_task_dialog_closed);
+}
+
+void HostServicesPage::on_show_task_dialog() {
+    if (!(*task_dialog_).show(task_dialog_button_)) return;
+    (*status_).set_text("TaskDialog shown · the window behind it takes no input until it closes");
+}
+
+void HostServicesPage::on_task_dialog_closed(const TaskDialogResult& result) {
+    (*status_).set_text("TaskDialog closed with " + result.button_id + " · " +
+                        (result.radio_button_id.empty() ? std::string("no choice") : result.radio_button_id) +
+                        (result.verification_checked ? " · open afterwards" : ""));
 }
 
 // The FontDialog specimen, beside the service status: a button opens the

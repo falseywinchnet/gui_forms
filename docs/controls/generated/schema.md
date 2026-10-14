@@ -168,39 +168,6 @@ Properties beyond every control's: `text` (text).
 | `committed` | `std::string` |
 | `cancelled` | none |
 
-## `masked_text_box` (MaskedTextBox, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `viewport` | region |  |  |
-| `horizontal_decrement_arrow` | actuator | `button` |  |
-| `horizontal_track` | track |  |  |
-| `horizontal_thumb` | thumb |  | pressed, captured |
-| `horizontal_increment_arrow` | actuator | `button` |  |
-| `vertical_decrement_arrow` | actuator | `button` |  |
-| `vertical_track` | track |  |  |
-| `vertical_thumb` | thumb |  | pressed, captured |
-| `vertical_increment_arrow` | actuator | `button` |  |
-| `scroll_corner` | face |  |  |
-| `focus` | focus |  |  |
-| `face` | face |  |  |
-| `edge` | edge |  |  |
-| `field` | well | `text_box` |  |
-
-States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`, `invalid`, `pending`.
-
-Properties beyond every control's: none.
-
-| Interaction | Payload |
-|---|---|
-| `scroll` | `ScrollEvent`, by reference |
-| `mask_input_rejected` | `MaskInputRejection` |
-| `text_changed` | `std::string` |
-| `mask_changed` | `std::string` |
-| `overwrite_mode_changed` | `bool` |
-| `type_validation_completed` | `MaskValidation` |
-
 ## `label` (Label, control)
 
 | Part | Role | Reuses | Own states |
@@ -515,66 +482,6 @@ Properties beyond every control's: none.
 | `item_activated` | `std::string` |
 | `context_requested` | `ObjectContextRequest` |
 
-## `list_view` (ListView, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `well` | well |  |  |
-| `header` | face |  |  |
-| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
-| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
-| `scroll_corner` | face |  |  |
-| `focus` | focus |  |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
-
-Item system `item`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `cell` | region |  |  |
-| `item_face` | face |  |  |
-| `check_well` | well |  |  |
-| `check` | indicator |  |  |
-| `icon` | icon |  |  |
-| `text` | content |  |  |
-| `cell_focus` | focus |  |  |
-
-Item states: `selected`, `hot`, `current`, `checked`, `disabled`, `focus_visible`.
-
-Item system `sub_item`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `sub_item_cell` | region |  |  |
-| `sub_item_text` | content |  |  |
-
-Item states: `selected`, `disabled`.
-
-Item system `column`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `column_header` | face |  |  |
-| `column_label` | label |  |  |
-| `sort_glyph` | glyph |  |  |
-| `column_divider` | divider |  |  |
-| `column_grip` | grip |  |  |
-
-Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
-
-Properties beyond every control's: none.
-
-| Interaction | Payload |
-|---|---|
-| `selection_changed` | `ListViewSelectionChange` |
-| `item_activated` | `ListViewItemActivation` |
-| `item_checking` | `ListViewItemCheck`, by reference |
-| `item_checked` | `ListViewItemCheck` |
-| `column_click` | `ListViewColumnClick` |
-| `column_width_changed` | `ListViewColumnWidthChange` |
-
 ## `correspondence_view` (CorrespondenceView, control)
 
 | Part | Role | Reuses | Own states |
@@ -621,80 +528,6 @@ Properties beyond every control's: none.
 | `expansion_changed` | `CorrespondenceExpansionChange` |
 | `item_activated` | `std::string` |
 | `context_requested` | `ObjectContextRequest` |
-
-## `data_grid_view` (DataGridView, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `well` | well |  |  |
-| `edge` | edge |  |  |
-| `column_header_band` | face |  |  |
-| `row_header_band` | face |  |  |
-| `top_left_header` | face |  |  |
-| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
-| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
-| `scroll_corner` | face |  |  |
-| `editor` | well | `text_box` |  |
-| `focus` | focus |  |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`.
-
-Item system `row`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `row_header` | face |  |  |
-| `row_header_label` | label |  |  |
-| `row_glyph` | glyph |  |  |
-| `row_rule` | divider |  |  |
-
-Item states: `selected`, `current`, `read_only`.
-
-Item system `cell`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `cell` | region |  |  |
-| `cell_selection` | selection |  |  |
-| `cell_content` | content |  |  |
-| `cell_check_well` | well | `check_box` |  |
-| `cell_check_indicator` | indicator |  |  |
-| `cell_button_face` | face | `button` |  |
-| `cell_button_label` | label |  |  |
-| `cell_drop_down` | actuator | `button` |  |
-| `cell_drop_down_glyph` | glyph |  |  |
-| `cell_vertical_rule` | divider |  |  |
-| `cell_horizontal_rule` | divider |  |  |
-| `cell_focus` | focus |  |  |
-
-Item states: `selected`, `current`, `read_only`, `invalid`, `checked`, `pressed`, `open`, `focus_visible`.
-
-Item system `column`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `column_header` | face |  |  |
-| `column_label` | label |  |  |
-| `sort_glyph` | glyph |  |  |
-| `column_divider` | divider |  |  |
-| `column_grip` | grip |  |  |
-
-Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
-
-Properties beyond every control's: none.
-
-| Interaction | Payload |
-|---|---|
-| `selection_changed` | none |
-| `current_cell_changed` | `std::optional<DataGridViewCellAddress>` |
-| `cell_begin_edit` | `DataGridViewCellCancelEvent`, by reference |
-| `cell_end_edit` | `DataGridViewCellEvent` |
-| `cell_validating` | `DataGridViewCellValidatingEvent`, by reference |
-| `cell_value_changed` | `DataGridViewCellEvent` |
-| `cell_content_click` | `DataGridViewCellEvent` |
-| `column_header_click` | `std::size_t` |
-| `column_width_changed` | `std::size_t` |
 
 ## `choice_group` (ChoiceGroup, control)
 
@@ -1126,64 +959,6 @@ Properties beyond every control's: none.
 | `value_changed` | `DateTimeValue` |
 | `checked_changed` | `bool` |
 | `drop_down_changed` | `bool` |
-
-## `month_calendar` (MonthCalendar, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `face` | face |  |  |
-| `previous_arrow` | actuator | `button` | hot, pressed, disabled |
-| `previous_glyph` | glyph |  | hot, pressed, disabled |
-| `next_arrow` | actuator | `button` | hot, pressed, disabled |
-| `next_glyph` | glyph |  | hot, pressed, disabled |
-| `today_label` | label |  |  |
-| `focus` | focus |  |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
-
-Item system `month`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `month_title` | label |  |  |
-| `weekday_rule` | divider |  |  |
-
-Item states: none.
-
-Item system `weekday`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `weekday_label` | label |  |  |
-
-Item states: none.
-
-Item system `week`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `week_label` | label |  |  |
-
-Item states: none.
-
-Item system `day`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `day_face` | face |  |  |
-| `day_text` | content |  |  |
-| `day_marker` | perimeter |  | current |
-| `day_focus` | focus |  |  |
-
-Item states: `hot`, `pressed`, `selected`, `current`, `disabled`, `focus_visible`. Application-defined: `bolded`.
-
-Properties beyond every control's: none.
-
-| Interaction | Payload |
-|---|---|
-| `date_changed` | `CalendarDateRange` |
-| `date_selected` | `CalendarDateRange` |
 
 ## `panel` (Panel, control)
 
@@ -1828,9 +1603,6 @@ Item system `item`:
 | `item_arrow_glyph` | glyph |  |  |
 | `item_separator` | divider |  |  |
 | `item_focus` | focus |  |  |
-| `item_combo_box` | well | `combo_box` |  |
-| `item_text_box` | well | `text_box` |  |
-| `item_progress_bar` | track | `progress_bar` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 
@@ -1863,9 +1635,6 @@ Item system `item`:
 | `item_arrow_glyph` | glyph |  |  |
 | `item_separator` | divider |  |  |
 | `item_focus` | focus |  |  |
-| `item_combo_box` | well | `combo_box` |  |
-| `item_text_box` | well | `text_box` |  |
-| `item_progress_bar` | track | `progress_bar` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 
@@ -1875,74 +1644,6 @@ Properties beyond every control's: none.
 |---|---|
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
-
-## `tool_strip_panel` (ToolStripPanel, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `face` | face |  |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
-
-Properties beyond every control's: none.
-
-Interactions beyond every control's: none.
-
-## `tool_strip_container` (ToolStripContainer, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `top_panel` | face | `tool_strip_panel` |  |
-| `bottom_panel` | face | `tool_strip_panel` |  |
-| `left_panel` | face | `tool_strip_panel` |  |
-| `right_panel` | face | `tool_strip_panel` |  |
-| `content_panel` | region | `panel` |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
-
-Properties beyond every control's: none.
-
-Interactions beyond every control's: none.
-
-## `binding_navigator` (BindingNavigator, control)
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `region` | region |  |  |
-| `face` | face |  |  |
-| `grip` | grip |  |  |
-| `overflow_button` | actuator | `button` | hot, open |
-| `overflow_glyph` | glyph |  | hot, open |
-| `focus` | focus |  |  |
-
-States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
-
-Item system `item`:
-
-| Part | Role | Reuses | Own states |
-|---|---|---|---|
-| `item_face` | face |  |  |
-| `item_icon` | icon |  |  |
-| `item_label` | label |  |  |
-| `item_arrow` | actuator | `button` | hot, pressed |
-| `item_arrow_glyph` | glyph |  |  |
-| `item_separator` | divider |  |  |
-| `item_focus` | focus |  |  |
-| `item_combo_box` | well | `combo_box` |  |
-| `item_text_box` | well | `text_box` |  |
-| `item_progress_bar` | track | `progress_bar` |  |
-
-Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
-
-Properties beyond every control's: none.
-
-| Interaction | Payload |
-|---|---|
-| `item_clicked` | `ToolStripItemClick` |
-| `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
-| `adding_new` | `BindingNavigatorAddNew`, by reference |
 
 ## `context_menu` (ContextMenu, component)
 
@@ -1986,26 +1687,36 @@ Properties beyond every control's: none.
 | `scroll` | `ScrollEvent`, by reference |
 | `dismiss_requested` | `PopupDismissReason` |
 
-## `font_dialog` (FontDialog, control)
+## `task_dialog` (TaskDialog, control)
 
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `region` | region |  |  |
-| `viewport` | region |  |  |
-| `horizontal_decrement_arrow` | actuator | `button` |  |
-| `horizontal_track` | track |  |  |
-| `horizontal_thumb` | thumb |  | pressed, captured |
-| `horizontal_increment_arrow` | actuator | `button` |  |
-| `vertical_decrement_arrow` | actuator | `button` |  |
-| `vertical_track` | track |  |  |
-| `vertical_thumb` | thumb |  | pressed, captured |
-| `vertical_increment_arrow` | actuator | `button` |  |
-| `scroll_corner` | face |  |  |
-| `focus` | focus |  |  |
 | `face` | face |  |  |
-| `title` | label |  |  |
-| `preview_well` | well |  |  |
-| `preview_text` | content |  |  |
+| `edge` | edge |  |  |
+| `caption_band` | face |  |  |
+| `caption` | label |  |  |
+| `icon_plate` | chip |  |  |
+| `icon_image` | icon |  |  |
+| `icon_glyph` | glyph |  |  |
+| `icon_label` | label |  |  |
+| `heading` | label | `label` |  |
+| `text` | content | `label` |  |
+| `progress` | track | `progress_bar` |  |
+| `radio_group` | region | `radio_button` |  |
+| `expander_glyph` | disclosure |  | open |
+| `expander_button` | face | `button` |  |
+| `expanded_text` | content | `label` |  |
+| `verification` | indicator | `check_box` |  |
+| `button_band` | face |  |  |
+| `button_divider` | divider |  |  |
+| `button_row` | region | `button` |  |
+| `footnote_band` | face |  |  |
+| `footnote_plate` | chip |  |  |
+| `footnote_glyph` | glyph |  |  |
+| `footnote_label` | label |  |  |
+| `footnote` | content | `label` |  |
+| `focus` | focus |  |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
@@ -2013,9 +1724,12 @@ Properties beyond every control's: none.
 
 | Interaction | Payload |
 |---|---|
-| `scroll` | `ScrollEvent`, by reference |
-| `apply` | `FontSpec` |
-| `closed` | `FontDialogResult` |
+| `button_clicked` | `TaskDialogButtonClick`, by reference |
+| `closed` | `TaskDialogResult` |
+| `navigated` | none |
+| `expanded_changed` | `bool` |
+| `verification_changed` | `bool` |
+| `radio_button_changed` | `std::string` |
 
 ## `tool_tip` (ToolTip, component)
 

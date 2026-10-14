@@ -2677,6 +2677,24 @@ void example() {
 }
 }  // namespace doc_example_TableLayoutPanel_2
 
+namespace doc_example_TaskDialog_1 {
+void example() {
+    std::shared_ptr<gf::TaskDialog> dialog =
+        gf::make_control<gf::TaskDialog>(gf::StableId("app.replace"));
+    gf::TaskDialogPage page;
+    page.heading = "Replace the saved stations?";
+    page.text = "Replacing the list removes the stations you saved by hand.";
+    page.icon = gf::TaskDialogIcon::warning;
+    page.buttons = {{.standard = gf::TaskDialogStandardButton::yes},
+                    {.standard = gf::TaskDialogStandardButton::no}};
+    page.default_button = "no";
+    page.verification_text = "Do not ask again";
+    (*dialog).set_page(std::move(page));
+    // (*dialog).show(owner) lays it over the owner's window; closed reports
+    // the button ("yes" or "no") and the check box.
+}
+}  // namespace doc_example_TaskDialog_1
+
 namespace doc_example_TextBox_1 {
 struct Search final : gf::Component {
     std::shared_ptr<gf::TextBox> field =
@@ -3364,6 +3382,7 @@ int main() {
     failures += run("TabPage example 1", &doc_example_TabPage_1::example);
     failures += run("TableLayoutPanel example 1", &doc_example_TableLayoutPanel_1::example);
     failures += run("TableLayoutPanel example 2", &doc_example_TableLayoutPanel_2::example);
+    failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);

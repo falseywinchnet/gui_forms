@@ -268,6 +268,8 @@ void test_anatomy_coverage() {
         AnchoredPopupPlacement{});
     const std::shared_ptr<RangeControl> range_control =
         make_control<RangeControl>(StableId("anatomy.coverage.range-control"));
+    const std::shared_ptr<TaskDialog> task_dialog =
+        make_control<TaskDialog>(StableId("anatomy.coverage.task-dialog"));
     inspect_control(*button_base, seen_ids);
     inspect_control(*scroll_bar, seen_ids);
     inspect_control(*popup_layer, seen_ids);
@@ -276,6 +278,7 @@ void test_anatomy_coverage() {
     const std::shared_ptr<FontDialog> font_dialog =
         make_control<FontDialog>(StableId("anatomy.coverage.font-dialog"));
     inspect_control(*font_dialog, seen_ids);
+    inspect_control(*task_dialog, seen_ids);
     inspected += 5U;
 
     std::string unexpected_gaps;

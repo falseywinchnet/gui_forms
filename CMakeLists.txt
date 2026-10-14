@@ -432,6 +432,7 @@ add_library(gui_forms_controls STATIC
     src/controls/status_strip/status_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
+    src/controls/task_dialog/task_dialog.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -2407,6 +2408,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_background_worker_tests tests/background_worker_tests.cpp)
     target_link_libraries(gui_forms_background_worker_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_background_worker_tests COMMAND gui_forms_background_worker_tests)
+
+    add_executable(gui_forms_task_dialog_tests tests/task_dialog_tests.cpp)
+    target_link_libraries(gui_forms_task_dialog_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_task_dialog_tests COMMAND gui_forms_task_dialog_tests)
     set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)

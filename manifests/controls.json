@@ -734,6 +734,17 @@
       "doc": "api/generated/gui_forms.FontDialog.rst"
     },
     {
+      "id": "task_dialog",
+      "type": "TaskDialog",
+      "header": "gui_forms/controls/task_dialog/task_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "In-window owned message dialog of TaskDialogPage pages: heading, text, icon, standard and custom buttons, radio buttons, a verification check box, an expander, a footnote and a progress bar, with navigation between pages.",
+      "winforms": "TaskDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.TaskDialog.rst"
+    },
+    {
       "id": "tool_tip",
       "type": "ToolTip",
       "header": "gui_forms/components/tool_tip/tool_tip.hpp",

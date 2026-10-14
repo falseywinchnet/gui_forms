@@ -389,6 +389,7 @@ void test_schema_export() {
         StableId("schema.anchored-popup-layer"), button_base, AnchoredPopupPlacement{});
     const std::shared_ptr<RangeControl> range_control =
         make_control<RangeControl>(StableId("schema.range-control"));
+    const std::shared_ptr<TaskDialog> task_dialog = make_control<TaskDialog>(StableId("schema.task-dialog"));
     record_control(*button_base, records);
     record_control(*scroll_bar, records);
     record_control(*popup_layer, records);
@@ -396,6 +397,7 @@ void test_schema_export() {
     // A dialog opens on demand, outside the root tree.
     const std::shared_ptr<FontDialog> font_dialog = make_control<FontDialog>(StableId("schema.font-dialog"));
     record_control(*font_dialog, records);
+    record_control(*task_dialog, records);
 
     // Components, constructed directly.
     const std::shared_ptr<Command> command = std::make_shared<Command>();
