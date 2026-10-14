@@ -58,6 +58,8 @@ Types
      - MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
+   * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
+     - One part to paint, in the control's local coordinates.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`Rect <gui_forms::Rect>`
@@ -745,6 +747,42 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartPaint final
+
+   ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
+
+   One part to paint, in the control's local coordinates. ``text``, ``image`` and ``mark`` are read only by roles that show them (label, caption and content; icon; glyph and indicator). ``text`` is borrowed for the call. ``font`` is an effective font (Control::effective_font). ``corner_radius``, when set, gives a surface part its shape; the theme (T4) will own shapes, so a control sets it only where today's recipe has no shape for the part.
+
+   .. cpp:member:: PartRole role
+
+      Default: ``{PartRole::region}``.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: ControlVisualRole family
+
+      Default: ``{ControlVisualRole::panel}``.
+
+   .. cpp:member:: PartMark mark
+
+      Default: ``{PartMark::none}``.
+
+   .. cpp:member:: std::string_view text
+
+   .. cpp:member:: FontSpec font
+
+   .. cpp:member:: PartTextAlignment alignment
+
+      Default: ``{PartTextAlignment::start}``.
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: std::optional<double> corner_radius
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Point
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -1299,6 +1337,52 @@ Enumerations
 
    .. cpp:enumerator:: css_angle
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PartMark
+
+   ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: check
+
+   .. cpp:enumerator:: indeterminate
+
+   .. cpp:enumerator:: radio_dot
+
+   .. cpp:enumerator:: toggle_knob
+
+   .. cpp:enumerator:: arrow_up
+
+   .. cpp:enumerator:: arrow_down
+
+   .. cpp:enumerator:: arrow_left
+
+   .. cpp:enumerator:: arrow_right
+
+   .. cpp:enumerator:: chevron_down
+
+   .. cpp:enumerator:: chevron_right
+
+   .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: grip_dots
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PartTextAlignment
+
+   ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
+
+   .. cpp:enumerator:: start
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: end
+
 Functions, constants and aliases
 --------------------------------
 
@@ -1337,6 +1421,22 @@ Functions, constants and aliases
 .. cpp:function:: void paint_surface_material(Painter& painter, Rect bounds, const SurfaceMaterial& material)
 
 .. cpp:function:: Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/theme/part_painting/part_painting.hpp>``
+
+.. cpp:function:: ControlVisualContext part_visual_context(const Control& control, AnatomyStateSet states) noexcept
+
+   The theme context a part's states select: hot, pressed or captured, selection (selected, checked, current, open, active_tool), the visible focus cue and preselect. The control supplies what the part does not carry: its enabled, invalid and pending status, window activity and high contrast. A part that is itself disabled or unavailable is drawn disabled.
+
+.. cpp:function:: void paint_part(Painter& painter, const Control& control, const PartPaint& part)
+
+   Paints one part of ``control`` by its role (see PartPaint). Roles that draw nothing of their own (region, shadow, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing.
+
+.. cpp:function:: void paint_part_from_recipe(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe, ControlVisualContext context)
+
+   paint_part's drawing, with the recipe and context already resolved. For helpers that resolve a recipe themselves (the existing controls' focus and default cues), so that every part is drawn by one implementation.
 
 .. cpp:namespace:: gui_forms
 

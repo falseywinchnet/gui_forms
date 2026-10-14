@@ -235,6 +235,10 @@ For the stages that build on T1 (T2, T3, L, FD, C), as of 2026-10-13:
   live frame sequence on every host; see its brief) and
   `ApplicationWindowHandle::request_client_size` (#81), the portable way to
   ask the native window for a size. `Window::resize` is host-only.
+- **Ruling, 2026-10-14.** The atom vocabulary T1 defined (part roles,
+  states, value types, engine inputs) is the canonical source of what can be
+  addressed; controls and the engine both declare against it (design language
+  §12.7). New controls paint every part through `paint_part`.
 - **Next.** Start T2 from `planning/stages/T2-engine-core/README.md`; L can
   start in parallel from `planning/stages/L-layout/README.md`.
 

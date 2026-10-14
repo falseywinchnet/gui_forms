@@ -234,7 +234,13 @@ missing controls (`DataGridView`, `ListView`, the `ToolStrip` and
 `MonthCalendar`, `NotifyIcon` and member depth), each articulated and
 engine-painted from birth.
 
-Gate (accepted 2026-10-13; W starts after T4): the catalogue is regenerated from the official .NET 8+
+Timing (owner, 2026-10-14, revising "W starts after T4"): a new control may
+be built before T4 when it uses only atoms of the vocabulary (design language
+§12.7) and paints every part through the shared by-role paint path, which T4
+replaces with the engine. The catalogue was regenerated from the official
+surface on 2026-10-14 (`WINFORMS_API_CATALOGUE.md`).
+
+Gate (accepted 2026-10-13): the catalogue is regenerated from the official .NET 8+
 surface; every in-scope row of `CONTROL_COMPLETENESS_MATRIX.md` is implemented
 and tested on every platform, or excluded or deferred with a reason; the
 manifest records every in-scope type and member and the docs are generated

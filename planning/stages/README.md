@@ -41,7 +41,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | L | [Real dynamic layout](L-layout/README.md) | 0.4 Flexible | T1 | not started; ready (T1 gate recorded) |
 | FD | [Form documents](FD-form-documents/README.md) | 0.4 Flexible | T1, T3 | not started; format decided |
 | DP | [Damage-preserving painting](DP-damage-preserving-painting/README.md) | 0.4 Flexible | none | in progress: rectangle sets painted and presented on every host, paint contract version 2 (#59 to #78); X11 direct live frames in #80; Windows gate recorded (`results/2026-10-13-dp-gate-windows`), macOS and X11 records pending PlaySuite's runs against #80 |
-| W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4 | not started |
+| W | [Windows Forms control coverage (.NET 8+ only)](W-winforms-controls/README.md) | 0.4 Flexible to 0.6 Bindings | T4, or the by-role paint path (ruling 2026-10-14) | started 2026-10-14: catalogue regenerated from the official surface; by-role paint path in place |
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
@@ -60,7 +60,10 @@ core**, now unblocked; T1's decision 6 hands it two items (hit regions
 derived from part geometry, and text published as layout slots), listed in
 the T1 brief's hand-off. **L** is also unblocked; **C** waits for T2 and
 **FD** for T3. **DP** is open only for its macOS and X11 gate records (see
-its brief), and A and F have not started. Open pull requests at hand-off:
+its brief), and A and F have not started. **W** started on 2026-10-14 under
+the owner's ruling that the atom vocabulary is the canonical source (design
+language §12.7): new controls use only vocabulary atoms and paint through the
+by-role path `paint_part`, so they can be built before T4. Open pull requests at hand-off:
 #80 (X11 draws opaque live frames directly, DP) and #81 (stacked on it:
 `ApplicationWindowHandle::request_client_size`, the portable native resize
 request). Read `planning/stages/T1-anatomy/README.md` "Hand-off" before

@@ -17,7 +17,22 @@ import re
 import xml.etree.ElementTree as ET
 
 
-UPSTREAM_COMMIT = "1457ed5beef24a7d7e3688a4725c7487da09791e"
+# The official Windows Forms shipped API lists (dotnet/winforms) and
+# reference packs (Microsoft.WindowsDesktop.App.Ref) the catalogue was last
+# generated from. Recorded in the summary; regenerate when they move.
+OFFICIAL_SOURCES = (
+    ("8.0", "release/8.0", "edebee640e06f291a2a2e770cfb86d6bd42563f9", "8.0.32"),
+    ("9.0", "release/9.0", "3e991f572c195fadf3b06e9e06c7c56d8ac4cd48", "9.0.21"),
+    ("10.0", "release/10.0", "f3adc279ed152f9b88ec678218011168e90b0bdb", "10.0.13"),
+)
+
+# The catalogue before stage W regenerated it from the official surface.
+PREVIOUS_FORMS_ROWS = 14575
+PREVIOUS_FORMS_MISSING = 9850
+
+# The C# compiler marks every ref struct [Obsolete] with this message for
+# compilers that predate ref structs; it is not a deprecation.
+REF_STRUCT_MESSAGE = "Types with embedded references are not supported"
 
 FORM_EXCLUSIONS = {
     "activex": ("System.Windows.Forms.AxHost", "System.Windows.Forms.ActiveX"),
@@ -50,6 +65,14 @@ FORM_EXCLUSIONS = {
         "System.Windows.Forms.StatusBar",
         "System.Windows.Forms.ToolBar",
     ),
+}
+
+# Families excluded by the start of their type name, nested types included:
+# a namespace-style prefix such as "System.Windows.Forms.Html" would not match
+# HtmlElement or WebBrowserBase, which are siblings, not children.
+FORM_EXCLUDED_STEMS = {
+    "browser": ("Html", "WebBrowser"),
+    "mdi": ("Mdi",),
 }
 
 FORM_PARTIAL_NATIVE = (
@@ -232,9 +255,21 @@ def prefix_match(owner: str, prefixes: tuple[str, ...]) -> bool:
     return any(owner == prefix or owner.startswith(prefix + ".") for prefix in prefixes)
 
 
+def forms_type_stem(owner: str) -> str:
+    """The first type name under System.Windows.Forms in `owner`."""
+    prefix = "System.Windows.Forms."
+    if not owner.startswith(prefix):
+        return ""
+    return owner[len(prefix):].split(".", 1)[0]
+
+
 def classify_forms(owner: str, member: str) -> tuple[str, str]:
     for reason, prefixes in FORM_EXCLUSIONS.items():
         if prefix_match(owner, prefixes):
+            return "excluded", reason
+    stem = forms_type_stem(owner)
+    for reason, stems in FORM_EXCLUDED_STEMS.items():
+        if stem.startswith(stems):
             return "excluded", reason
     if owner.startswith("System.Windows.Forms.ComponentModel.Com2Interop"):
         return "excluded", "com_interop"
@@ -664,23 +699,114 @@ def classify_drawing(owner: str, member: str) -> tuple[str, str]:
     return "missing", "admitted GUI.Drawing oversight or unresolved package placement"
 
 
-def read_forms(path: Path) -> list[dict[str, str]]:
-    raw = []
-    for number, source in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
-        if not source.strip() or source.startswith("#"):
+def version_key(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+
+def member_name_and_count(member: str) -> tuple[str, int | None]:
+    """The member's name and, for a call, its parameter count.
+
+    `Scale(float factor)` is ("Scale", 1); `AutoScale.get` is ("AutoScale",
+    None); an event or field is its name with None.
+    """
+    if "(" not in member:
+        return member.split(".", 1)[0], None
+    name, arguments = member.split("(", 1)
+    arguments = arguments.rsplit(")", 1)[0].strip()
+    if not arguments:
+        return name, 0
+    depth = 0
+    count = 1
+    for character in arguments:
+        if character in "<[(":
+            depth += 1
+        elif character in ">])":
+            depth -= 1
+        elif character == "," and depth == 0:
+            count += 1
+    return name, count
+
+
+def read_obsolete(path: Path | None) -> dict[str, list[dict[str, str]]]:
+    """Obsolete entries by package major.minor version (read_obsolete.py output)."""
+    entries: dict[str, list[dict[str, str]]] = {}
+    if path is None:
+        return entries
+    with path.open(encoding="utf-8") as stream:
+        for row in csv.DictReader(stream, dialect="excel-tab"):
+            if row["message"].startswith(REF_STRUCT_MESSAGE):
+                continue
+            version = ".".join(row["version"].split(".")[:2])
+            entries.setdefault(version, []).append(row)
+    return entries
+
+
+def obsolete_marker(owner: str, member: str, entries: list[dict[str, str]]) -> str:
+    """The diagnostic of the entry making this type or member obsolete, or ""."""
+    name, count = member_name_and_count(member) if member else ("", None)
+    for entry in entries:
+        diagnostic = entry["diagnostic"] or "obsolete"
+        if entry["kind"] == "type":
+            if owner == entry["owner"] or owner.startswith(entry["owner"] + "."):
+                return diagnostic
             continue
-        api, marker = clean_api_line(source)
-        raw.append((number, api, marker))
-    types = sorted((api for _, api, _ in raw if " -> " not in api), key=len, reverse=True)
+        if not member or owner != entry["owner"] or name != entry["member"]:
+            continue
+        if entry["kind"] == "method":
+            if count is not None and str(count) == entry["parameters"]:
+                return diagnostic
+            continue
+        return diagnostic
+    return ""
+
+
+def read_forms(sources: list[str], obsolete: dict[str, list[dict[str, str]]]) -> list[dict[str, str]]:
+    """Forms rows from shipped API lists given as VERSION=PATH.
+
+    A row is one public API. The same API is spelled without nullability
+    annotations in some lists and with them (`!`, `?`) in later ones, so lines
+    are identified with the annotations removed; the row keeps the spelling of
+    the latest list and records every version that lists it. The scope rule
+    (owner, 2026-10-13) admits a row when some version of .NET 8.0 or later
+    lists it without [Obsolete].
+    """
+    first_seen: dict[str, tuple[str, str, str]] = {}
+    spelling: dict[str, str] = {}
+    versions: dict[str, list[str]] = {}
+    order: list[str] = []
+    for source in sources:
+        version, _, location = source.partition("=")
+        path = Path(location)
+        for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+            if not line.strip() or line.startswith("#") or line.startswith("*REMOVED*"):
+                continue
+            api, marker = clean_api_line(line)
+            identity = re.sub(r"[!?]", "", api)
+            if identity not in first_seen:
+                first_seen[identity] = (f"{version}:{path.name}:{number}", marker, version)
+                versions[identity] = []
+                order.append(identity)
+            spelling[identity] = api
+            if version not in versions[identity]:
+                versions[identity].append(version)
+    types = sorted((spelling[identity] for identity in order if " -> " not in identity), key=len, reverse=True)
     rows = []
-    for number, api, marker in raw:
+    for identity in order:
+        api = spelling[identity]
+        source_line, marker, _ = first_seen[identity]
         kind = "type" if " -> " not in api else "member"
         owner = api if kind == "type" else owner_for(api.split(" -> ", 1)[0], types)
         member = "" if kind == "type" else api[len(owner) + 1 :].split(" -> ", 1)[0]
+        listed = sorted(versions[identity], key=version_key)
+        markers = {version: obsolete_marker(owner, member, obsolete.get(version, [])) for version in listed}
+        obsolete_in = [f"{version}:{markers[version]}" for version in listed if markers[version]]
+        supported = [version for version in listed if not markers[version]]
         status, reason = classify_forms(owner, member)
+        if not supported:
+            status, reason = "excluded", "obsolete in every listing version: " + ", ".join(obsolete_in)
         rows.append({
             "surface": "System.Windows.Forms",
-            "source_line": str(number),
+            "source_line": source_line,
             "kind": kind,
             "owner": owner,
             "member": member,
@@ -690,7 +816,22 @@ def read_forms(path: Path) -> list[dict[str, str]]:
             "status": status,
             "reason": reason,
             "source_marker": marker,
+            "versions": " ".join(listed),
+            "obsolete": " ".join(obsolete_in),
         })
+    return rows
+
+
+def read_drawing_rows(path: Path) -> list[dict[str, str]]:
+    """System.Drawing rows carried from an earlier catalogue unchanged."""
+    rows = []
+    with path.open(encoding="utf-8") as stream:
+        for row in csv.DictReader(stream, dialect="excel-tab"):
+            if row["surface"] != "System.Drawing":
+                continue
+            row.setdefault("versions", "")
+            row.setdefault("obsolete", "")
+            rows.append(row)
     return rows
 
 
@@ -722,6 +863,8 @@ def read_drawing(paths: list[Path]) -> list[dict[str, str]]:
                 "status": status,
                 "reason": reason,
                 "source_marker": "",
+                "versions": "",
+                "obsolete": "",
             })
     return rows
 
@@ -736,7 +879,15 @@ def write_summary(path: Path, rows: list[dict[str, str]]) -> None:
         "",
         "Status: **OBSERVED upstream inventory; conservative implementation ledger**.",
         "",
-        f"LibreWinForms source: `wieslawsoltes/LibreWinForms` branch `librewinforms-progpu-port`, commit `{UPSTREAM_COMMIT}`. Forms rows come from its `src/System.Windows.Forms/PublicAPI.Shipped.txt`. Drawing rows come from the pinned local .NET 10.0.3 reference XML. The generated TSV is the member-level authority; this summary is navigation.",
+        "Forms rows come from the official shipped API lists of `dotnet/winforms` (`PublicAPI.Shipped.txt` of `System.Windows.Forms` and `System.Windows.Forms.Primitives`), one row per public API line, with the versions that list it. `[Obsolete]` markers come from the `Microsoft.WindowsDesktop.App.Ref` reference assemblies of the same versions (`tools/winforms_catalogue/read_obsolete.py`). Sources:",
+        "",
+        "| .NET | dotnet/winforms branch | Commit | Reference pack |",
+        "|---|---|---|---|",
+        *[f"| {version} | `{branch}` | `{commit}` | `{pack}` |" for version, branch, commit, pack in OFFICIAL_SOURCES],
+        "",
+        "Drawing rows are carried unchanged from the earlier catalogue (the pinned .NET 10.0.3 `System.Drawing` reference XML). The generated TSV is the member-level authority; this summary is navigation.",
+        "",
+        "**Scope rule (owner, 2026-10-13):** a Forms row is in scope when some version of .NET 8.0 or later lists it without `[Obsolete]`, and it is not otherwise excluded below. Rows obsolete in every version that lists them are excluded with their diagnostic.",
         "",
         "A `partial_native` row means only that a corresponding retained GUI.Forms/GUI.Drawing type exists. `measured_partial` identifies an exact behavioral center with named evidence while retaining its stated gaps. Neither status claims that every overload, exception, event order, accessibility projection, or raster result is complete. `missing` is the default for admitted calls without direct evidence.",
         "",
@@ -747,6 +898,40 @@ def write_summary(path: Path, rows: list[dict[str, str]]) -> None:
     ]
     for surface in sorted(surfaces):
         lines.append(f"| `{surface}` | {surfaces[surface]} | {dispositions[surface, 'admitted']} | {dispositions[surface, 'excluded']} |")
+    forms_missing = statuses["System.Windows.Forms", "missing"]
+    lines += [
+        "",
+        f"The previous catalogue, generated from the LibreWinForms fork's API list, had {PREVIOUS_FORMS_ROWS} Forms rows, {PREVIOUS_FORMS_MISSING} of them `missing`. Against the official surface: {surfaces['System.Windows.Forms']} rows, {forms_missing} `missing`.",
+    ]
+    since = Counter((row["versions"].split(" ")[0] if row["versions"] else "") for row in rows if row["surface"] == "System.Windows.Forms")
+    obsolete_later = sum(1 for row in rows if row["surface"] == "System.Windows.Forms" and row["obsolete"] and row["disposition"] == "admitted")
+    lines += ["", "## Forms rows by first listing version", "", "| First listed in | Rows |", "|---|---:|"]
+    for version in sorted(since, key=version_key):
+        lines.append(f"| .NET {version} | {since[version]} |")
+    lines += [
+        "",
+        f"{obsolete_later} admitted rows are marked `[Obsolete]` in a later version but listed without it in an earlier one; the `obsolete` column names them.",
+    ]
+    missing_types = sorted(
+        row["owner"] for row in rows
+        if row["surface"] == "System.Windows.Forms" and row["kind"] == "type" and row["status"] == "missing"
+        and row["owner"].count(".") == 3
+    )
+    missing_members = Counter(
+        row["owner"] for row in rows
+        if row["surface"] == "System.Windows.Forms" and row["kind"] == "member" and row["status"] == "missing"
+    )
+    lines += [
+        "",
+        "## Admitted Forms types still `missing`",
+        "",
+        f"{len(missing_types)} top-level `System.Windows.Forms` types are admitted and `missing` (nested types are counted with their owner). Controls, components, event arguments, delegates and enumerations are listed together; the number is the type's own `missing` member rows. `missing` means no row is mapped to GUI.Forms evidence yet: some of these have GUI.Forms equivalents that are not mapped (the common dialogs are host services, `Keys` is GUI.Forms' key code, `PropertyGrid` exists without a managed facade), and the rest have no counterpart.",
+        "",
+        "| Type | Missing members |",
+        "|---|---:|",
+    ]
+    for owner in missing_types:
+        lines.append(f"| `{owner.rsplit('.', 1)[-1]}` | {missing_members[owner]} |")
     lines += ["", "## Honest current states", "", "| Surface | State | Rows |", "|---|---|---:|"]
     for (surface, status), count in sorted(statuses.items()):
         lines.append(f"| `{surface}` | `{status}` | {count} |")
@@ -771,12 +956,21 @@ def write_summary(path: Path, rows: list[dict[str, str]]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--forms-api", required=True, type=Path)
-    parser.add_argument("--drawing-xml", required=True, type=Path, action="append")
+    parser.add_argument("--forms-api", required=True, action="append",
+                        help="VERSION=PATH of a PublicAPI.Shipped.txt; repeat per file")
+    parser.add_argument("--obsolete", type=Path, help="read_obsolete.py output")
+    parser.add_argument("--drawing-xml", type=Path, action="append")
+    parser.add_argument("--drawing-rows", type=Path, help="earlier catalogue TSV to carry Drawing rows from")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--summary", required=True, type=Path)
     args = parser.parse_args()
-    rows = read_forms(args.forms_api) + read_drawing(args.drawing_xml)
+    if args.drawing_rows is not None:
+        drawing = read_drawing_rows(args.drawing_rows)
+    elif args.drawing_xml:
+        drawing = read_drawing(args.drawing_xml)
+    else:
+        parser.error("give --drawing-xml or --drawing-rows")
+    rows = read_forms(args.forms_api, read_obsolete(args.obsolete)) + drawing
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     fields = [
@@ -791,6 +985,8 @@ def main() -> None:
         "status",
         "source_marker",
         "reason",
+        "versions",
+        "obsolete",
     ]
     with args.output.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.DictWriter(

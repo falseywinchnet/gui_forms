@@ -116,6 +116,7 @@ add_library(gui_forms_core STATIC
     src/core/types/painter/painter.cpp
     src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
+    src/core/theme/part_painting/part_painting.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2116,6 +2117,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
+
+    add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
+    target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
 
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
