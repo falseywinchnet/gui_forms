@@ -285,3 +285,52 @@ session. The owner, verbatim:
   Recorded reading: this answers the first session; later sessions are
   asked again (decision 11). The worker accepts no licence or activation
   prompt and signs in to nothing; if Word shows one, it stops and asks.
+
+### Note, 2026-10-14: phase 4 and the observation's questions
+
+Phase 4 (PR #102) and the observation (PR #101) raised seven questions,
+asked as: (Q1) the overlay shadow decision 24 needs cannot be drawn; admit
+an overlay shadow to the vocabulary now, soft and offset down and right
+from the upper-left light, used by tooltips, popups and menus
+(recommended), or a one-pixel contact shadow, or none until T4; (Q2) the
+enhanced tooltip borrows the card family; admit a tooltip family for
+plain and enhanced tooltips (recommended), or keep card; (Q3) while an
+enhanced tooltip with a help topic shows, F1 opens that topic ahead of the
+focused control's help (recommended), or always the focused control's
+help, or the topic only for keyboard-opened tooltips; (Q4) defaults of a
+10 s auto-pop, a maximum width of 318 and the line "Press F1 for more
+help." kept (recommended); (Q5) Word 2010 and WordPad hide the command
+plane only at a client height of 119 logical units or less, while S4
+hides at about 218: follow Office and hide only when almost no room is
+left for the document (recommended), keep S4, or hide at half the
+ribbon's height; (Q6) neither program ever hides by width: never hide by
+width (recommended) or keep S4's width test; (Q7) keep S4's 8 units of
+hysteresis (recommended) or drop it as Office has none. The owner,
+verbatim:
+
+> accepted.  we handle help slightly differently than most programs, however- in addition to focused help, we offer a question mark in the upper right corner always, which, when clicked, pulls up a tooltip. it may in the future instead or when right clicked generate a whole-screen overlay, but im still working that out on my own. q5: hide when the space left *within* the avail document area is too small.
+> scroll at any width. anti flicker: keep.
+
+- **GIVEN Q1:** an overlay shadow joins the vocabulary, soft and offset
+  down and right from the upper-left light; tooltips, popups and menus
+  cast it, and the minimized ribbon's popup (decision 24).
+- **GIVEN Q2:** a tooltip visual family, used by plain and enhanced
+  tooltips.
+- **GIVEN Q3:** while an enhanced tooltip with a help topic shows, F1
+  opens that topic ahead of the focused control's help.
+- **GIVEN Q4:** the defaults stand: 10 s auto-pop, maximum width 318, the
+  line "Press F1 for more help.".
+- **GIVEN Q5:** the command plane hides when the space left within the
+  available document area is too small. Recorded reading: the measure is
+  the document area under the ribbon, not the ribbon's own height; the
+  plane hides when that area would fall below its minimum, which the
+  document area declares; with no declared minimum the plane hides only
+  when no document area would be left, which matches Word 2010 and
+  WordPad (119 logical units).
+- **GIVEN Q6:** never hide by width; scroll at any width.
+- **GIVEN Q7:** keep the 8 units of hysteresis.
+- **GIVEN, help:** in addition to focused help (F1), GUI.Forms programs
+  always offer a question mark in the upper right corner which, when
+  clicked, opens a tooltip. A whole-screen help overlay, instead of the
+  tooltip or on right click, is the owner's open design work and is not
+  decided.

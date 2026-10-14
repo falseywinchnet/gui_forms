@@ -1354,6 +1354,24 @@ enum and the schema as §12.7 requires (§8.5):
   position in set, set size and has-popup. No access-key or keytip field:
   the ribbon has no KeyTips (RB-16).
 
+### 12.9 Owner decisions, seventh round, 2026-10-14 (tooltips and help)
+
+From the ribbon interview's last note (stage RB, decisions 37 to 41):
+
+- **Overlay shadow (RB-37).** An engine input: a soft shadow offset down
+  and right from the one upper-left light (§3), cast by surfaces that
+  really overlap content: tooltips, popups, menus and the minimized
+  ribbon's popup. It is the "real layering" case of the shadow rule, not
+  decoration. The `shadow` part role paints it.
+- **Tooltip family (RB-38).** A `tool_tip` visual family beside `card` and
+  `menu_item`, so a theme gives tooltips their own face and edge; plain and
+  enhanced tooltips use it.
+- **Help (RB-39, RB-41).** Focused help stays (F1, with a showing
+  tooltip's topic first). In addition, programs always offer a question
+  mark in the upper right corner that opens a tooltip when clicked. Its
+  placement outside the ribbon and a possible whole-screen help overlay
+  are open.
+
 ## Appendix A. Anti-models
 
 Rejected for the default and, unless a row says otherwise, every shipped house
