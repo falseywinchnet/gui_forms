@@ -1854,6 +1854,7 @@ Properties beyond every control's: none.
 |---|---|
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+| `item_focus_changed` | `ToolStripItemFocus` |
 
 ## `ribbon_gallery` (RibbonGallery, control)
 
@@ -1934,6 +1935,49 @@ Properties beyond every control's: none.
 |---|---|
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+| `item_focus_changed` | `ToolStripItemFocus` |
+
+## `quick_access_toolbar` (QuickAccessToolbar, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `grip` | grip |  |  |
+| `overflow_button` | actuator | `button` | hot, open |
+| `overflow_glyph` | glyph |  | hot, open |
+| `customize_button` | actuator | `button` | hot, open |
+| `customize_glyph` | glyph |  | hot, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_arrow` | actuator | `button` | hot, pressed |
+| `item_arrow_glyph` | glyph |  |  |
+| `item_separator` | divider |  |  |
+| `item_focus` | focus |  |  |
+| `item_combo_box` | well | `combo_box` |  |
+| `item_text_box` | well | `text_box` |  |
+| `item_progress_bar` | track | `progress_bar` |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `item_clicked` | `ToolStripItemClick` |
+| `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+| `item_focus_changed` | `ToolStripItemFocus` |
+| `customized` | `QuickAccessToolbarCustomization` |
+| `placement_changed` | `QuickAccessToolbarPlacementChange` |
 
 ## `tool_strip_panel` (ToolStripPanel, control)
 
@@ -2001,6 +2045,7 @@ Properties beyond every control's: none.
 |---|---|
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+| `item_focus_changed` | `ToolStripItemFocus` |
 | `adding_new` | `BindingNavigatorAddNew`, by reference |
 
 ## `ribbon` (Ribbon, control)
@@ -2197,6 +2242,13 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `visibility_changed` | `ToolTipEvent` |
+
+## `ribbon_tool_tip` (RibbonToolTip, component)
+
+| Interaction | Payload |
+|---|---|
+| `visibility_changed` | `RibbonToolTipEvent` |
+| `help_requested` | `RibbonToolTipHelpRequest` |
 
 ## `drawing_surface` (DrawingSurface, control)
 

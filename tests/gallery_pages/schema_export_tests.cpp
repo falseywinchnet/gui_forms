@@ -456,6 +456,7 @@ void test_schema_export() {
     const std::shared_ptr<ContextMenu> context_menu =
         std::make_shared<ContextMenu>("schema.context-menu");
     const std::shared_ptr<ToolTip> tool_tip = std::make_shared<ToolTip>(window);
+    const std::shared_ptr<RibbonToolTip> ribbon_tool_tip = std::make_shared<RibbonToolTip>(window);
     const std::shared_ptr<Timer> timer =
         std::make_shared<Timer>(window, std::chrono::milliseconds(1000));
     const std::shared_ptr<BackgroundWorker> background_worker = std::make_shared<BackgroundWorker>(window);
@@ -474,6 +475,7 @@ void test_schema_export() {
     record_component("gallery_command", *gallery_command, records);
     record_component("context_menu", *context_menu, records);
     record_component("tool_tip", *tool_tip, records);
+    record_component("ribbon_tool_tip", *ribbon_tool_tip, records);
     record_component("timer", *timer, records);
     record_component("background_worker", *background_worker, records);
     record_component("notify_icon", *notify_icon, records);
