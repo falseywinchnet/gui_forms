@@ -248,3 +248,40 @@ its own page with a Back button; (3) no Backstage, keep the application menu
   contrast between that column and the page helps.
 - **GIVEN T6-1.** A collapsed group's button shows the group's icon, its
   caption and a chevron, as Office 2010 does.
+
+### Note, 2026-10-14: the scaling study's questions
+
+`RIBBON_SCALING_STUDY.md` §7 raised six questions, asked as: (1) only the
+command plane hides in a small window and the tab row stays (read as settled
+by decision 19), confirm; (2) an authored reduction order naming an unknown
+group or shrinking a group past its smallest layout is rejected or ignored,
+recommendation rejected; (3) may an author make some commands icon-only on
+purpose (Bold and Italic in a toolbar-style row) and may long tab labels
+shorten with an ellipsis, recommendation yes to both with scaling never
+removing a label; (4) the hide-rule numbers (the plane hides when the space
+below it would be shorter than the plane, or narrower than one collapsed
+group plus scroll buttons; 8 units of hysteresis); (5) the default order is
+WPF's one step per group, right to left, repeating; (6) may a worker run the
+observation script on WordPad on the owner's machine, asking before each
+session. The owner, verbatim:
+
+> confirm. 2: rejected. labels: yes.
+> 4: confirmed.
+> 5: ok. 6: wordpad is installed here. I also installed a 30 day trial of microsoft office word 2010 to study.
+
+- **GIVEN S1:** in a small window only the command plane hides; the tab row
+  stays (decision 19).
+- **GIVEN S2:** an authored reduction order that names an unknown group or
+  shrinks a group past its smallest layout is rejected when the ribbon is
+  defined.
+- **GIVEN S3:** an author may make commands icon-only on purpose (a
+  toolbar-style row), and long tab labels may shorten with an ellipsis;
+  scaling itself never removes a label (decision 6 stands for scaling).
+- **GIVEN S4:** the hide rule as recommended, with 8 units of hysteresis.
+- **GIVEN S5:** the default reduction order is WPF's cycle: one step per
+  group, right to left, repeating.
+- **GIVEN S6:** the observation may run on the owner's machine, on WordPad and
+  on Word 2010, which the owner installed as a 30-day trial for the study.
+  Recorded reading: this answers the first session; later sessions are
+  asked again (decision 11). The worker accepts no licence or activation
+  prompt and signs in to nothing; if Word shows one, it stops and asks.

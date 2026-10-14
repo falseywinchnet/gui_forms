@@ -162,6 +162,20 @@ From part 3 (2026-10-14):
 27. **A collapsed group's button shows its icon, caption and a chevron
     (T6-1).**
 
+From the scaling study's questions (2026-10-14, `RIBBON_SCALING_STUDY.md` §7):
+
+28. **Only the command plane hides in a small window (S1)**; the tab row
+    stays.
+29. **Invalid reduction orders are rejected (S2)** when the ribbon is defined.
+30. **Authored icon-only commands and ellipsized tab labels are allowed
+    (S3)**; scaling never removes a label.
+31. **The hide rule as recommended (S4)**, with 8 units of hysteresis.
+32. **Default reduction order: WPF's cycle (S5)**, one step per group, right
+    to left, repeating.
+33. **The observation runs on WordPad and Word 2010 (S6)**; the owner
+    installed Word 2010 as a 30-day trial for it. Later sessions are asked
+    again.
+
 ## Gate
 
 The interview round is recorded, the decisions are in this brief, and the
