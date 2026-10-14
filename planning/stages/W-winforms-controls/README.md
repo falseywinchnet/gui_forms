@@ -127,6 +127,34 @@ from it. Record under `results/`.
    inputs. So a control built now, from vocabulary atoms only and painted
    through the by-role path, needs no move when the engine arrives, and W may
    start before T4 on those terms.
+4. **Grids and tree lists use stable row identity** (owner, 2026-10-14,
+   accepting the recommendation). A virtual grid, `TreeListView` and
+   `DataGridView`'s virtual mode use `ObjectView`'s stable-ID virtualization
+   rather than a second row-ownership model. `DataGridView`'s virtual mode
+   today asks its provider for values by row number
+   (`DataGridViewCellValueProvider::cell_value(row, column)` in
+   `data_grid_view.hpp`); it moves onto stable row IDs, and row numbers
+   become presentation positions only. The control is provisional, so the
+   change is allowed.
+
+## Advanced candidates, 2026-10-14
+
+The owner listed common advanced controls from other frameworks and
+admitted them as candidates (matrix rows 51 to 57). Built in W, by
+workers, once decision 4's grid work is planned:
+
+- `TreeListView` (row 53): `TreeView`'s flat model with the shared details
+  columns (`src/controls/panel/details_columns.hpp`).
+- The virtual grid on stable row identity (row 52), and `DataGridView`'s
+  virtual mode moved onto it.
+- Advanced editors (row 56): Windows Forms `AutoCompleteMode`,
+  `AutoCompleteSource` and `AutoCompleteCustomSource` on `TextBox` and
+  `ComboBox` (in the .NET 8 catalogue); a searchable, filtering
+  `ComboBox`; a token box.
+
+Studied elsewhere first: `PageView` (row 51) in stage DK, because docking
+reuses it; the ribbon (row 54) in stage RB; `Diagram` (row 55) and
+`DataLayout` (row 57, after stage FD) in studies of their own.
 
 ## Read first
 
