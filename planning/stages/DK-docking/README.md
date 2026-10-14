@@ -38,7 +38,7 @@ them.
 
 ## Sequence
 
-1. **Study** (written 2026-10-14: `DOCKING_STUDY.md`, with `PAGEVIEW_STUDY.md` to follow). The canonical docking systems
+1. **Study** (written 2026-10-14: `DOCKING_STUDY.md`, with `PAGEVIEW_STUDY.md`). The canonical docking systems
    (DockPanel Suite, Telerik RadDock, DevExpress, Infragistics, AvalonDock,
    the Visual Studio shell, Qt Advanced Docking System, GIMP's dockables,
    JetBrains tool windows, Eclipse part stacks); the windowing foundation
