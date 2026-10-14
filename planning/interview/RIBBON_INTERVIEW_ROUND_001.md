@@ -2,9 +2,8 @@
 
 Date: 2026-10-14
 
-Status: **owner verdicts recorded for parts 1, 2 and 3, except taste
-questions T3 (Backstage topic tabs, explained further) and T6 (asked
-again); T4 answered after mockups**.
+Status: **complete. Owner verdicts recorded for every question of the round
+(parts 1 to 3 and the notes below).**
 
 The questions are section 8 of `planning/stages/RB-ribbon/RIBBON_STUDY.md`,
 cited by their IDs (A1, B2 and so on). Each answer names the option number of
@@ -227,3 +226,25 @@ verbatim:
   their command plane, from the theme's accent ramp (F1-1, G7); no captioned
   band above the tabs. How loud the tint may be is left to T4 (the default
   theme), beside the tab stack of the rendering reference.
+
+### Note, 2026-10-14: T3 and T6 after the mockups
+
+Shown three mockups: the application menu (Office 2007) dropping over the
+ribbon; Backstage (Office 2010) replacing the window below the tab row, with a
+dark left column of commands and topics (Save, Open, Close, Info, Recent, New,
+Print, Options) and the chosen topic's page beside it; and a group collapsed
+to one button (icon, caption and chevron; or caption only). T3 was asked as:
+(1) Backstage later, with the left column of topics as Office 2010; (2)
+Backstage later without a topic column, each application-menu item opening
+its own page with a Back button; (3) no Backstage, keep the application menu
+(revising A3-4). The owner, verbatim:
+
+> on your three depictions:  backstage is good.  the color contrast also helps here.
+> so option 1.
+> T6: 1.
+
+- **GIVEN T3-1.** Backstage, when it comes (A3-4), has the left column of
+  commands and topics as Office 2010 does; the owner notes that the colour
+  contrast between that column and the page helps.
+- **GIVEN T6-1.** A collapsed group's button shows the group's icon, its
+  caption and a chevron, as Office 2010 does.

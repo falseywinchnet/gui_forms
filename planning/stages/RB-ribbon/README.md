@@ -5,7 +5,8 @@ proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
 study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
 (decisions 1 to 10 below), part 2 (decisions 11 to 16; no KeyTips) and
-part 3 (decisions 17 to 25); taste questions T3 and T6 remain. The controls are built in
+part 3 (decisions 17 to 27); the round is complete. The plan
+(`PLAN.md`) is proposed and awaits the owner's acceptance. The controls are built in
 stage W (decision 1). Authority: this brief and
 `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
@@ -59,7 +60,7 @@ into Windows Forms-style pieces.
    roles) the ribbon needs; vocabulary changes also go to the design
    language (§8, §12) and `anatomy_types.hpp` as the ruling of 2026-10-14
    requires.
-4. **Plan.** The controls, structure and behaviour of the framework, each with
+4. **Plan** (`PLAN.md`, proposed 2026-10-14). The controls, structure and behaviour of the framework, each with
    its scope, dependencies and the tests that prove it; where it sits among
    the stages (W controls, FD form documents, D interface builder, T2/T4
    theming, A accessibility); and its gate. Nothing is built before the plan
@@ -154,6 +155,11 @@ From part 3 (2026-10-14):
     Access Toolbar buttons are flat.
 25. **Contextual tab sets are a tint (T4-2)** on their tabs and command plane,
     from the theme's accent ramp; no captioned band.
+26. **Backstage, when it comes, has the left column of commands and topics
+    (T3-1)**, as Office 2010; the owner notes that the colour contrast between
+    the column and the page helps.
+27. **A collapsed group's button shows its icon, caption and a chevron
+    (T6-1).**
 
 ## Gate
 
