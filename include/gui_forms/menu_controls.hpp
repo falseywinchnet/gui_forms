@@ -8,3 +8,4 @@
 #include "gui_forms/controls/tool_strip/tool_strip.hpp"
 #include "gui_forms/controls/tool_strip_container/tool_strip_container.hpp"
 #include "gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp"
+#include "gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp"

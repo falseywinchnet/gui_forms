@@ -435,6 +435,9 @@ add_library(gui_forms_controls STATIC
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
+    src/controls/ribbon_gallery/ribbon_gallery.cpp
+    src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
+    src/controls/commands/gallery_command/gallery_command.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -2410,6 +2413,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
     target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_month_calendar_tests COMMAND gui_forms_month_calendar_tests)
+
+    add_executable(gui_forms_ribbon_gallery_tests tests/ribbon_gallery_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_gallery_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_gallery_tests COMMAND gui_forms_ribbon_gallery_tests)
     add_executable(gui_forms_focus_region_tests tests/focus_region_tests.cpp)
     target_link_libraries(gui_forms_focus_region_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_focus_region_tests COMMAND gui_forms_focus_region_tests)
