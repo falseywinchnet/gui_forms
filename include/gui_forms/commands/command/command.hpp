@@ -30,7 +30,6 @@ public:
     void set_icon_id(std::string icon_id);
     void set_shortcut(std::string shortcut);
     void set_mnemonic(std::string mnemonic);
-    void set_key_tip(std::string key_tip);
     void set_availability_reason(std::string reason);
     void set_enabled(bool enabled);
     void set_visible(bool visible);

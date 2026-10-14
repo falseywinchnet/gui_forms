@@ -27,7 +27,7 @@ stable_id
     The identity given to the constructor, or an empty string.
 state
     The command's current `CommandState`: `text`, `description`, `icon_id`,
-    `shortcut`, `mnemonic`, `key_tip`, `availability_reason`, `enabled`
+    `shortcut`, `mnemonic`, `availability_reason`, `enabled`
     (default true), `visible` (default true), `checked` and `checkable`
     (both default false), `default_action`, `destructive`, and a
     `generation` counter that increases with every change.
@@ -75,8 +75,6 @@ set_icon_id
 set_mnemonic
     A mnemonic kept in `state` for your own presentations. Menus take their
     mnemonics from the `&` in the item text instead.
-set_key_tip
-    A key tip kept in `state` for your own presentations.
 set_enabled
     Enables or disables the command. A disabled command cannot run, and
     bound buttons, menu items and shortcuts are disabled with it.

@@ -62,7 +62,6 @@ GUI_FORMS_COMMAND_STRING_SETTER(set_description, description, "description")
 GUI_FORMS_COMMAND_STRING_SETTER(set_icon_id, icon_id, "icon ID")
 GUI_FORMS_COMMAND_STRING_SETTER(set_shortcut, shortcut, "shortcut")
 GUI_FORMS_COMMAND_STRING_SETTER(set_mnemonic, mnemonic, "mnemonic")
-GUI_FORMS_COMMAND_STRING_SETTER(set_key_tip, key_tip, "key tip")
 GUI_FORMS_COMMAND_STRING_SETTER(set_availability_reason, availability_reason,
                                 "availability reason")
 

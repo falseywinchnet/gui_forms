@@ -11,7 +11,6 @@ struct CommandState final {
     std::string icon_id;
     std::string shortcut;
     std::string mnemonic;
-    std::string key_tip;
     std::string availability_reason;
     bool enabled{true};
     bool visible{true};
