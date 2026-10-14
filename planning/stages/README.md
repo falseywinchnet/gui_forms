@@ -45,6 +45,8 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | R | [SDRSharp reflection](R-sdrsharp-reflection/README.md) | not on the public site | T4, F | last run 2026-08-10 |
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
+| RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
+| DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): study under way; interview and decisions follow before any build |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |
