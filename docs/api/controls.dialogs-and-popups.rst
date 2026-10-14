@@ -13,6 +13,8 @@ Anchored popups and tooltips.
 
    * - :cpp:class:`AnchoredPopupLayer <gui_forms::AnchoredPopupLayer>`
      - A transparent full-window overlay that shows one popup control next to an anchor control.
+   * - :cpp:class:`FontDialog <gui_forms::FontDialog>`
+     - A dialog for choosing one of GUI.Forms' bundled fonts.
    * - :cpp:class:`TaskDialog <gui_forms::TaskDialog>`
      - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
@@ -22,6 +24,7 @@ Anchored popups and tooltips.
    :hidden:
 
    generated/gui_forms.AnchoredPopupLayer
+   generated/gui_forms.FontDialog
    generated/gui_forms.TaskDialog
    generated/gui_forms.ToolTip
 
@@ -36,6 +39,12 @@ Related types
      - AnchoredPopupPlacement is the caller-authored geometry policy for preferred size, horizontal alignment, preferred vertical side, gap, viewport margin, and optional vertical flipping.
    * - :cpp:class:`AnchoredPopupPlacementResult <gui_forms::AnchoredPopupPlacementResult>`
      - AnchoredPopupPlacementResult is the exact output of placement resolution: client-relative bounds plus whether the popup moved above its anchor or had either dimension clamped.
+   * - :cpp:class:`BundledFontFace <gui_forms::BundledFontFace>`
+     - One face GUI.Forms bundles for a FontRole, as every host registers it: its family name, what the role is for, and whether it has italic faces.
+   * - :cpp:class:`FontDialog::Parts <gui_forms::FontDialog::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
+     - How a FontDialog closed, and the font it holds then.
    * - :cpp:class:`TaskDialog::Parts <gui_forms::TaskDialog::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`TaskDialogButton <gui_forms::TaskDialogButton>`
@@ -94,6 +103,56 @@ Related types
    .. cpp:member:: bool width_clamped
 
    .. cpp:member:: bool height_clamped
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BundledFontFace final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   One face GUI.Forms bundles for a FontRole, as every host registers it: its family name, what the role is for, and whether it has italic faces. Every face has regular (400) and bold (700) weights. The Noto faces are fallbacks for scripts and emoji, not choices, and are not listed.
+
+   .. cpp:member:: FontRole role
+
+      Default: ``{FontRole::control}``.
+
+   .. cpp:member:: std::string_view family
+
+   .. cpp:member:: std::string_view use
+
+   .. cpp:member:: bool italic
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FontDialog::Parts final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry title
+
+   .. cpp:member:: PartGeometry preview_well
+
+   .. cpp:member:: PartGeometry preview_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FontDialogResult final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   How a FontDialog closed, and the font it holds then.
+
+   .. cpp:member:: DialogResult result
+
+      Default: ``{DialogResult::none}``.
+
+   .. cpp:member:: FontSpec font
 
 .. cpp:namespace:: gui_forms
 
@@ -412,3 +471,11 @@ Functions, constants and aliases
 .. cpp:function:: AnchoredPopupPlacementResult resolve_anchored_popup(Rect anchor_bounds, Size client_size, AnchoredPopupPlacement placement)
 
    Resolves an owner-relative popup into logical window-client coordinates. The result is deterministic, bounded to the client margin, and flips across the anchor only when the preferred side cannot contain the requested height.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+.. cpp:function:: std::span<const BundledFontFace> bundled_font_faces() noexcept
+
+   The bundled faces a FontDialog offers, in its list order.
