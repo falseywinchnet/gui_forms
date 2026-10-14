@@ -18,6 +18,7 @@ public:
         build_formats(body);
         build_modes(body);
         build_lifecycle(body);
+        build_month_calendar(body);
         on((*primary_).value_changed(), *this, &DatesPage::value_committed);
         on((*primary_).drop_down_changed(), *this, &DatesPage::drop_down_changed);
         on((*optional_).checked_changed(), *this, &DatesPage::optional_checked);
@@ -142,6 +143,39 @@ private:
         (*lifecycle).add_at(status_, {22.0, 86.0, 884.0, 34.0});
     }
 
+    // A two-month MonthCalendar with week numbers, bold dates and a bounded
+    // range; its selection reports to its own status label.
+    void build_month_calendar(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> months = group(
+            "gallery.date.month", "MonthCalendar · two months, week numbers, bold dates, bounded range",
+            {930.0, 280.0});
+        (*body).add_at(months, {24.0, 644.0, 930.0, 280.0});
+        month_ = make_control<MonthCalendar>(StableId("gallery.date.month.calendar"));
+        (*month_).set_accessible_name("Appointment calendar");
+        (*month_).set_today_date(specimen);
+        (*month_).set_range({2026, 8U, 1U}, {2026, 12U, 31U});
+        (*month_).set_calendar_dimensions({2U, 1U});
+        (*month_).set_show_week_numbers(true);
+        (*month_).set_bolded_dates({{2026, 8U, 21U}, {2026, 9U, 7U}});
+        (*month_).add_monthly_bolded_date({2026, 1U, 1U});
+        (*month_).set_date({2026, 8U, 12U});
+        (*months).add_at(month_, {22.0, 38.0, 500.0, 216.0});
+        month_status_ = label("gallery.date.month.status",
+                              "Drag to select up to seven days · arrows, Page Up/Down, Home, End", 10.0, 600, green);
+        (*month_status_).set_text_wrapping(TextWrapping::word);
+        (*month_status_).set_vertical_alignment(VerticalAlignment::near);
+        (*months).add_at(month_status_, {546.0, 44.0, 360.0, 60.0});
+        on((*month_).date_changed(), *this, &DatesPage::month_changed);
+    }
+
+    void month_changed(const CalendarDateRange& range) {
+        std::string text = "Selected " + std::to_string(range.start.month) + "/" + std::to_string(range.start.day);
+        if (!(range.start == range.end)) {
+            text += " to " + std::to_string(range.end.month) + "/" + std::to_string(range.end.day);
+        }
+        (*month_status_).set_text(text);
+    }
+
     // The commands' enabled state is the single authority their buttons show.
     void project_commands() {
         const DateTimeValue value = (*primary_).value();
@@ -183,6 +217,8 @@ private:
     std::shared_ptr<DateTimePicker> primary_;
     std::shared_ptr<CommandBar> commands_;
     std::shared_ptr<Label> status_;
+    std::shared_ptr<MonthCalendar> month_;
+    std::shared_ptr<Label> month_status_;
 };
 
 void add_dates_and_calendar(const std::shared_ptr<Surface>& page,

@@ -371,6 +371,17 @@
       "doc": "api/generated/gui_forms.DateTimePicker.rst"
     },
     {
+      "id": "month_calendar",
+      "type": "MonthCalendar",
+      "header": "gui_forms/controls/panel/month_calendar/month_calendar.hpp",
+      "category": "Date setting",
+      "purpose": "One or more month pages for selecting a date or a run of dates, with a date range, today marker, bold dates, week numbers and keyboard navigation.",
+      "winforms": "MonthCalendar",
+      "status": "stable",
+      "gallery_page": "dates-and-calendar",
+      "doc": "api/generated/gui_forms.MonthCalendar.rst"
+    },
+    {
       "id": "panel",
       "type": "Panel",
       "header": "gui_forms/controls/panel/panel.hpp",

@@ -1770,6 +1770,18 @@ void example() {
 }
 }  // namespace doc_example_MetricsView_2
 
+namespace doc_example_MonthCalendar_1 {
+void example() {
+    std::shared_ptr<gf::MonthCalendar> calendar =
+        gf::make_control<gf::MonthCalendar>(gf::StableId("booking.calendar"));
+    (*calendar).set_range({2026, 8U, 1U}, {2026, 12U, 31U});
+    (*calendar).set_today_date({2026, 8U, 12U});
+    (*calendar).set_selection_range({2026, 8U, 14U}, {2026, 8U, 30U});
+    // Seven days at most: the selection is 14 to 20 August.
+    (*calendar).add_bolded_date({2026, 8U, 21U});
+}
+}  // namespace doc_example_MonthCalendar_1
+
 namespace doc_example_NumericUpDown_1 {
 void example() {
     std::shared_ptr<gf::NumericUpDown> zoom =
@@ -3238,6 +3250,7 @@ int main() {
     failures += run("MenuStrip example 1", &doc_example_MenuStrip_1::example);
     failures += run("MetricsView example 1", &doc_example_MetricsView_1::example);
     failures += run("MetricsView example 2", &doc_example_MetricsView_2::example);
+    failures += run("MonthCalendar example 1", &doc_example_MonthCalendar_1::example);
     failures += run("NumericUpDown example 1", &doc_example_NumericUpDown_1::example);
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);

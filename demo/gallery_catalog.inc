@@ -21,7 +21,7 @@ inline constexpr std::array<std::string_view, 14> catalog_categories {{
     "Components",
 }};
 
-inline constexpr std::array<CatalogEntry, 78> control_catalog {{
+inline constexpr std::array<CatalogEntry, 79> control_catalog {{
     {"button_base", "ButtonBase", "gui_forms/controls/button_base/button_base.hpp", "Commands", "Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize.", "ButtonBase", "stable", "control-spectrum"},
     {"button", "Button", "gui_forms/controls/button_base/button/button.hpp", "Commands", "Push button with accept/cancel dialog results, default-button state, and four visual policies.", "Button", "stable", "control-spectrum"},
     {"drop_down_button", "DropDownButton", "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp", "Commands", "Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region.", "ToolStripSplitButton", "provisional", "commands-and-menus"},
@@ -55,6 +55,7 @@ inline constexpr std::array<CatalogEntry, 78> control_catalog {{
     {"property_list", "PropertyList", "gui_forms/controls/panel/property_list/property_list.hpp", "Value setting", "Settings surface over caller-authored stable groups and rows that owns stock or replacement child editors, reset buttons, and one vertical scroll plane.", "GUI.Forms-only", "stable", "value-editors"},
     {"instrument_rack", "InstrumentRack", "gui_forms/controls/panel/instrument_rack/instrument_rack.hpp", "Value setting", "Bounded retained rack of compact editing modules that reconciles stable module and field identities across model replacement.", "GUI.Forms-only", "stable", "value-editors"},
     {"date_time_picker", "DateTimePicker", "gui_forms/controls/panel/date_time_picker/date_time_picker.hpp", "Date setting", "Civil date/time field with validated bounds, four formatting policies, optional check state, and calendar or spin presentation.", "DateTimePicker", "stable", "dates-and-calendar"},
+    {"month_calendar", "MonthCalendar", "gui_forms/controls/panel/month_calendar/month_calendar.hpp", "Date setting", "One or more month pages for selecting a date or a run of dates, with a date range, today marker, bold dates, week numbers and keyboard navigation.", "MonthCalendar", "stable", "dates-and-calendar"},
     {"panel", "Panel", "gui_forms/controls/panel/panel.hpp", "Grouping", "Scroll-capable surface primitive with theme-role rendering, explicit background and border overrides, and optional named-group semantics.", "Panel", "stable", "containers-and-focus"},
     {"group_box", "GroupBox", "gui_forms/controls/panel/group_box/group_box.hpp", "Grouping", "Titled Panel with mnemonic focus routing, caption-aware border painting, and group semantics.", "GroupBox", "stable", "choices-and-sections"},
     {"scaled_group_box", "ScaledGroupBox", "gui_forms/controls/panel/group_box/scaled_group_box/scaled_group_box.hpp", "Grouping", "GroupBox whose children occupy stable design-space slots arranged proportionally to the current content bounds.", "GUI.Forms-only", "stable", "containers-and-focus"},

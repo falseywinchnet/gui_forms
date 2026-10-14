@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../calendar_grid/calendar_grid.hpp"
 #include "../date_time_utilities.hpp"
 #include "gui_forms/control.hpp"
 
@@ -15,6 +16,12 @@
 
 namespace gui_forms {
 using namespace date_time_detail;
+
+// The popup's day grid, shared in form with MonthCalendar: cells 37 by 25
+// on a 39 by 27 pitch, from (5, 66).
+inline constexpr calendar_detail::MonthGridMetrics calendar_popup_grid{
+    .cell_left = 5.0, .cell_top = 66.0, .column_pitch = 39.0, .row_pitch = 27.0,
+    .cell_width = 37.0, .cell_height = 25.0};
 
 class CalendarPopup final : public Control {
 public:
@@ -78,11 +85,8 @@ public:
         }
         const std::array<DateTimeValue, 42> dates = cell_dates();
         for (std::size_t cell = 0U; cell < dates.size(); ++cell) {
-            const std::size_t row = cell / 7U;
-            const std::size_t column = cell % 7U;
-            const Rect cell_bounds{(5.0 + static_cast<double>(column) * 39.0) * s,
-                                   (66.0 + static_cast<double>(row) * 27.0) * s,
-                                   37.0 * s, 25.0 * s};
+            const Rect cell_bounds =
+                calendar_detail::month_grid_cell_bounds(calendar_popup_grid, cell, s);
             const DateTimeValue date = dates[cell];
             const bool in_range = civil_in_range(date, minimum_, maximum_);
             const bool in_month = date.month == display_month_ &&
@@ -245,13 +249,10 @@ public:
             node.role = SemanticRole::date_cell;
             node.name = format_date_time(date, provider_.long_date_pattern, provider_);
             node.value = iso_date(date);
-            const std::size_t row = cell / 7U;
-            const std::size_t column = cell % 7U;
-            node.bounds = {popup.x +
-                               (5.0 + static_cast<double>(column) * 39.0) * s,
-                           popup.y +
-                               (66.0 + static_cast<double>(row) * 27.0) * s,
-                           37.0 * s, 25.0 * s};
+            const Rect cell_bounds =
+                calendar_detail::month_grid_cell_bounds(calendar_popup_grid, cell, s);
+            node.bounds = {popup.x + cell_bounds.x, popup.y + cell_bounds.y,
+                           cell_bounds.width, cell_bounds.height};
             node.states |= SemanticState::visible | SemanticState::focusable;
             if (civil_in_range(date, minimum_, maximum_)) {
                 node.states |= SemanticState::enabled;
@@ -299,30 +300,20 @@ public:
 
 private:
     [[nodiscard]] std::array<DateTimeValue, 42> cell_dates() const noexcept {
-        std::array<DateTimeValue, 42> result{};
         DateTimeValue first = selected_;
         first.year = display_year_;
         first.month = display_month_;
         first.day = 1U;
-        const DateTimeValue start = add_days(first, -static_cast<int>(day_of_week(first)));
-        for (std::size_t index = 0U; index < result.size(); ++index) {
-            result[index] = add_days(start, static_cast<std::int64_t>(index));
-        }
+        // Weeks start on Sunday in the popup.
+        const std::array<DateTimeValue, 42> result = calendar_detail::month_page_dates(first, 0U);
         return result;
     }
 
     [[nodiscard]] std::optional<std::size_t> cell_at(Point local) const noexcept {
         const double s = effective_text_scale();
-        if (local.x < 5.0 * s || local.y < 66.0 * s ||
-            local.x >= 278.0 * s || local.y >= 228.0 * s) {
-            return {};
-        }
-        const std::size_t column = static_cast<std::size_t>(
-            (local.x - 5.0 * s) / (39.0 * s));
-        const std::size_t row = static_cast<std::size_t>(
-            (local.y - 66.0 * s) / (27.0 * s));
-        if (column >= 7U || row >= 6U) return {};
-        return row * 7U + column;
+        const std::optional<std::size_t> cell =
+            calendar_detail::month_grid_cell_at(calendar_popup_grid, local, s);
+        return cell;
     }
 
     void move_selection(int days) {
@@ -337,14 +328,9 @@ private:
     }
 
     [[nodiscard]] DateTimeValue month_candidate(int direction) const noexcept {
-        int month_index = display_year_ * 12 + static_cast<int>(display_month_) - 1 + direction;
-        std::int32_t year = month_index >= 0 ? month_index / 12
-            : static_cast<std::int32_t>((month_index - 11) / 12);
-        int month = month_index - year * 12 + 1;
-        DateTimeValue next = selected_;
-        next.year = year;
-        next.month = static_cast<std::uint8_t>(month);
-        next.day = std::min(next.day, days_in_month(next.year, next.month));
+        const calendar_detail::CalendarMonth target = calendar_detail::shifted_month(
+            calendar_detail::CalendarMonth{display_year_, display_month_}, direction);
+        const DateTimeValue next = calendar_detail::in_month(selected_, target);
         return std::clamp(next, minimum_, maximum_);
     }
 

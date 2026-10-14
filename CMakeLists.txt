@@ -444,11 +444,13 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
     src/controls/scrollable_control/container_control/split_container/split_container.cpp
     src/controls/panel/date_time_picker/date_time_utilities.cpp
+    src/controls/panel/date_time_picker/calendar_grid/calendar_grid.cpp
     src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
     src/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.cpp
     src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.cpp
     src/controls/panel/date_time_picker/calendar_popup/calendar_popup.cpp
     src/controls/panel/date_time_picker/date_time_picker.cpp
+    src/controls/panel/month_calendar/month_calendar.cpp
     src/controls/drawing_surface/drawing_surface.cpp
     src/controls/metrics_view/metrics_view.cpp
     src/controls/visual_inspector_view/visual_inspector_view.cpp
@@ -2382,6 +2384,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_masked_text_box_tests tests/masked_text_box_tests.cpp)
     target_link_libraries(gui_forms_masked_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_masked_text_box_tests COMMAND gui_forms_masked_text_box_tests)
+
+    add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
+    target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_month_calendar_tests COMMAND gui_forms_month_calendar_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

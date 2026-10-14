@@ -1127,6 +1127,64 @@ Properties beyond every control's: none.
 | `checked_changed` | `bool` |
 | `drop_down_changed` | `bool` |
 
+## `month_calendar` (MonthCalendar, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `previous_arrow` | actuator | `button` | hot, pressed, disabled |
+| `previous_glyph` | glyph |  | hot, pressed, disabled |
+| `next_arrow` | actuator | `button` | hot, pressed, disabled |
+| `next_glyph` | glyph |  | hot, pressed, disabled |
+| `today_label` | label |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `month`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `month_title` | label |  |  |
+| `weekday_rule` | divider |  |  |
+
+Item states: none.
+
+Item system `weekday`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `weekday_label` | label |  |  |
+
+Item states: none.
+
+Item system `week`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `week_label` | label |  |  |
+
+Item states: none.
+
+Item system `day`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `day_face` | face |  |  |
+| `day_text` | content |  |  |
+| `day_marker` | perimeter |  | current |
+| `day_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `current`, `disabled`, `focus_visible`. Application-defined: `bolded`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `date_changed` | `CalendarDateRange` |
+| `date_selected` | `CalendarDateRange` |
+
 ## `panel` (Panel, control)
 
 | Part | Role | Reuses | Own states |
