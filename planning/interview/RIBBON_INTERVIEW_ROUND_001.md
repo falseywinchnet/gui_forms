@@ -2,9 +2,8 @@
 
 Date: 2026-10-14
 
-Status: **owner verdicts recorded for part 1 (scope, structure, layout and
-scaling, and taste question T1) and part 2 except keyboard (C1 to C4, asked
-again after an explanation of KeyTips); part 3 pending**.
+Status: **owner verdicts recorded for parts 1 and 2 (KeyTips declined after
+explanation); part 3 pending**.
 
 The questions are section 8 of `planning/stages/RB-ribbon/RIBBON_STUDY.md`,
 cited by their IDs (A1, B2 and so on). Each answer names the option number of
@@ -126,6 +125,24 @@ Recorded as:
   mode set choosing core tabs and groups, as in the Windows Ribbon
   Framework); contextual tab selection rules are built in, driven by the
   application's availability calls.
+
+### Note, 2026-10-14: KeyTips
+
+After the explanation (Alt or F10 shows letter badges over tabs and commands;
+typing a badge's letters opens a tab or runs a command), the owner, verbatim:
+
+> we use shortcuts, memnonics, and tab,arrow navigation. we wont implement these keytips.
+
+Recorded as:
+
+- **GIVEN: no KeyTips.** The ribbon's keyboard model is GUI.Forms' existing
+  one: shortcuts (key gestures bound to commands), mnemonics (underlined
+  letters in labels), and Tab and arrow navigation. C1, C2 and C4 fall away,
+  with the study's §5.3 KeyTip state machine and the KeyTip parts and states
+  of §4 (G5, G10, taste question T5).
+- **C3 (F6 cycling between window regions) is not answered by this note**;
+  asked in part 3. So is what becomes of `Command::key_tip`, which nothing
+  reads and now has no planned reader.
 
 ## Part 3. Pending
 

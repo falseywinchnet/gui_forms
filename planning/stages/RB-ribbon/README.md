@@ -4,8 +4,8 @@ Release: not yet placed on the public roadmap; the plan this stage produces
 proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
 study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
-(decisions 1 to 10 below) and part 2 except keyboard (decisions 11 to 15;
-C1 to C4 asked again after an explanation of KeyTips); part 3 pending. The controls are built in
+(decisions 1 to 10 below) and part 2 (decisions 11 to 16; no KeyTips);
+part 3 pending. The controls are built in
 stage W (decision 1). Authority: this brief and
 `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
@@ -125,6 +125,10 @@ From part 2 (2026-10-14):
     pointer it rises to form the button, so the user sees the control can be
     used; animated later (a T2 settling primitive). The states it needs
     already exist; "flat at rest, raised when hot" is theme data.
+16. **No KeyTips** (owner, after explanation: "we use shortcuts, memnonics,
+    and tab,arrow navigation. we wont implement these keytips."). The
+    ribbon's keyboard model is shortcuts, mnemonics, and Tab and arrow
+    navigation. The study's KeyTip model (§5.3, G5, G10, T5) is dropped.
 
 ## Gate
 
