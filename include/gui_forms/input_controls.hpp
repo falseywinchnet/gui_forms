@@ -6,4 +6,6 @@
 #include "gui_forms/controls/panel/list_box/list_box.hpp"
 #include "gui_forms/controls/panel/list_box/checked_list_box/checked_list_box.hpp"
 #include "gui_forms/controls/panel/combo_box/combo_box.hpp"
+#include "gui_forms/controls/panel/domain_up_down/domain_up_down.hpp"
+#include "gui_forms/controls/panel/masked_text_box/masked_text_box.hpp"
 #include "gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp"

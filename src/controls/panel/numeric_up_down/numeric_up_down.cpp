@@ -1,6 +1,6 @@
 #include "gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp"
 
-#include "spin_buttons.hpp"
+#include "../up_down/spin_buttons.hpp"
 #include "gui_forms/detail/property_binding_adapters.hpp"
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
@@ -251,17 +251,28 @@ bool NumericUpDown::on_semantic_action(SemanticAction action,
 
 namespace {
 
-constexpr std::array<PartField<NumericUpDown::Parts>, 5> numeric_up_down_extra_part_fields{{
+// The spin arrows are hot under the pointer and pressed while held.
+constexpr std::array<AnatomyState, 2> spin_arrow_states{{AnatomyState::hot, AnatomyState::pressed}};
+
+constexpr std::array<PartField<NumericUpDown::Parts>, 7> numeric_up_down_extra_part_fields{{
     {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
      .member = &NumericUpDown::Parts::face},
     {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
      .member = &NumericUpDown::Parts::edge},
     {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text_box"},
      .member = &NumericUpDown::Parts::field},
-    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "increment_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = spin_arrow_states},
      .member = &NumericUpDown::Parts::increment_arrow},
-    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button"},
+    {.declaration = {.name = "decrement_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = spin_arrow_states},
      .member = &NumericUpDown::Parts::decrement_arrow},
+    {.declaration = {.name = "increment_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = spin_arrow_states},
+     .member = &NumericUpDown::Parts::increment_glyph},
+    {.declaration = {.name = "decrement_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = spin_arrow_states},
+     .member = &NumericUpDown::Parts::decrement_glyph},
 }};
 
 constexpr std::array<StateField<NumericUpDown::States>, 9> numeric_up_down_state_fields{{
@@ -276,7 +287,7 @@ constexpr std::array<StateField<NumericUpDown::States>, 9> numeric_up_down_state
     {.state = AnatomyState::pending, .member = &NumericUpDown::States::pending},
 }};
 
-constexpr std::array<PartDeclaration, scrollable_detail::part_count + 5>
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 7>
     numeric_up_down_parts = joined_declarations(scrollable_detail::parts,
                                          part_declarations(numeric_up_down_extra_part_fields));
 constexpr std::array<AnatomyState, 9> numeric_up_down_states =
@@ -317,19 +328,22 @@ void NumericUpDown::publish_part_geometry(std::span<PartGeometry> geometry) cons
     record.face = panel.face;
     record.edge = panel.edge;
     // The field is the child text box, which publishes its own well, content
-    // and caret; the actuators are the halves of the spin control, split at
-    // the row its divider is drawn on.
+    // and caret; the actuators and their glyphs are the spin column's halves,
+    // from the same geometry the column paints with.
     if (editor_) {
         record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
     }
     if (spinner_) {
-        const Rect spinner = (*spinner_).committed_arranged_bounds();
-        const double middle = std::floor(spinner.height * 0.5);
-        const Rect upper{spinner.x, spinner.y, spinner.width, middle};
-        const Rect lower{spinner.x, spinner.y + middle, spinner.width,
-                         std::max(0.0, spinner.height - middle)};
-        record.increment_arrow = PartGeometry::from_bounds(upper);
-        record.decrement_arrow = PartGeometry::from_bounds(lower);
+        const SpinButtons& spin = static_cast<const SpinButtons&>(*spinner_);
+        const SpinHalves halves = spin_halves((*spinner_).committed_arranged_bounds());
+        record.increment_arrow = PartGeometry::from_bounds(halves.upper);
+        record.decrement_arrow = PartGeometry::from_bounds(halves.lower);
+        record.increment_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
+        record.decrement_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
+        record.increment_arrow.states = spin.half_states(SpinHalf::upper);
+        record.decrement_arrow.states = spin.half_states(SpinHalf::lower);
+        record.increment_glyph.states = record.increment_arrow.states;
+        record.decrement_glyph.states = record.decrement_arrow.states;
     }
     write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
     write_parts(anatomy(), numeric_up_down_extra_part_fields, record, geometry);

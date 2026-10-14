@@ -1,6 +1,7 @@
 #include "gui_forms/controls/panel/object_view/object_view.hpp"
 
 #include "../collection_control_utilities.hpp"
+#include "../details_columns.hpp"
 #include "../../basic/basic_control_rendering.hpp"
 #include "gui_forms/window.hpp"
 #include "../panel_anatomy.hpp"
@@ -1575,33 +1576,8 @@ const std::string& ObjectView::details_text(Painter& painter,
     cached.column = column;
     cached.header = header;
     cached.width = width;
-    cached.text.assign(text);
     ++details_paint_work_.text_preparations;
-    if (width <= 0.0) cached.text.clear();
-    else if (painter.measure_text_utf8(text, font).width > width) {
-        constexpr std::string_view ellipsis = "…";
-        if (painter.measure_text_utf8(ellipsis, font).width > width) cached.text.clear();
-        else {
-            const TextStore store(text);
-            std::size_t lower = 0U;
-            std::size_t upper = store.grapheme_count().value();
-            // Reuse the destination string in a bounded interval search. Each
-            // accepted lower endpoint was measured to fit. Nonmonotonic shaping
-            // can make this nonmaximal, but cannot authorize an unmeasured fit.
-            // Every candidate ends at a grapheme boundary, never a UTF-8 cut.
-            while (lower < upper) {
-                const std::size_t middle = lower + (upper - lower + 1U) / 2U;
-                const std::size_t end = store.utf8_offset(GraphemeIndex(middle)).value();
-                cached.text.assign(text.substr(0U, end));
-                cached.text.append(ellipsis);
-                if (painter.measure_text_utf8(cached.text, font).width <= width) lower = middle;
-                else upper = middle - 1U;
-            }
-            const std::size_t end = store.utf8_offset(GraphemeIndex(lower)).value();
-            cached.text.assign(text.substr(0U, end));
-            cached.text.append(ellipsis);
-        }
-    }
+    details_detail::elide_to_width(painter, text, font, width, cached.text);
     const Size measured = painter.measure_text_utf8(cached.text, font);
     cached.measured_width = measured.width;
     cached.valid = true;
@@ -1889,25 +1865,15 @@ ObjectView::ColumnParts ObjectView::column_parts(std::size_t column) const {
     const Rect bounds = local_bounds();
     const double viewport_right = std::max(4.0, bounds.width - 4.0);
     const Rect clip{4.0, 2.0, std::max(0.0, viewport_right - 4.0), header_height()};
-    const Rect cell = column_bounds(column);
     const bool sorted = details_columns_[column].id == details_sort_.column;
-    const double reserved = sorted ? 22.0 : 12.0;
-    const Rect label{cell.x + 6.0, cell.y, std::max(0.0, cell.width - reserved), cell.height};
-    const double edge = cell.x + cell.width;
-    const Rect divider{edge - 1.5, cell.y + 3.0, 1.0, std::max(0.0, cell.height - 6.0)};
-    const Rect grip{edge - 4.0, cell.y, 8.0, cell.height};
-    Rect glyph{};
-    if (sorted) {
-        const double center = edge - 10.0;
-        glyph = {center - 3.0, cell.y + cell.height * .5 - 3.0, 6.0, 6.0};
-    }
+    const details_detail::ColumnHeaderGeometry header =
+        details_detail::column_header_geometry(column_bounds(column), clip, sorted, 1.0);
     ColumnParts record;
-    const Rect visible_cell = Rect::intersection(cell, clip);
-    record.column_header = PartGeometry::from_bounds(visible_cell);
-    record.column_label = PartGeometry::from_bounds(Rect::intersection(label, visible_cell));
-    record.sort_glyph = PartGeometry::from_bounds(Rect::intersection(glyph, visible_cell));
-    record.column_divider = PartGeometry::from_bounds(Rect::intersection(divider, visible_cell));
-    record.column_grip = PartGeometry::from_bounds(Rect::intersection(grip, clip));
+    record.column_header = PartGeometry::from_bounds(header.header);
+    record.column_label = PartGeometry::from_bounds(header.label);
+    record.sort_glyph = PartGeometry::from_bounds(header.sort_glyph);
+    record.column_divider = PartGeometry::from_bounds(header.divider);
+    record.column_grip = PartGeometry::from_bounds(header.grip);
     record.column_focus = record.column_header;
     return record;
 }

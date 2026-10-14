@@ -13,11 +13,17 @@ Text entry.
 
    * - :cpp:class:`TextBox <gui_forms::TextBox>`
      - An editable text field: one line by default, or a plain-text document with ``multiline``.
+   * - :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
+     - A text box that takes input through a mask.
+   * - :cpp:class:`MaskedTextProvider <gui_forms::MaskedTextProvider>`
+     - A mask and the text assigned to it, without a control.
 
 .. toctree::
    :hidden:
 
    generated/gui_forms.TextBox
+   generated/gui_forms.MaskedTextBox
+   generated/gui_forms.MaskedTextProvider
 
 Related types
 -------------
@@ -26,12 +32,151 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`MaskCulture <gui_forms::MaskCulture>`
+     - The symbols the mask's culture characters stand for: ``.`` the decimal separator, ``,`` the group separator, ``:`` the time separator, ``/`` the date separator and ``$`` the currency symbol.
+   * - :cpp:class:`MaskEditResult <gui_forms::MaskEditResult>`
+     - What an edit did.
+   * - :cpp:class:`MaskedTextBox::Parts <gui_forms::MaskedTextBox::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`MaskedTextBox::States <gui_forms::MaskedTextBox::States>`
+     -  
+   * - :cpp:class:`MaskInputRejection <gui_forms::MaskInputRejection>`
+     - Input the mask refused: the position the character was tested at, why, and the refused text (one character typed, or the whole value offered).
+   * - :cpp:class:`MaskValidation <gui_forms::MaskValidation>`
+     - One run of the validation hook (Windows Forms' TypeValidationCompleted).
    * - :cpp:class:`TextBox::Parts <gui_forms::TextBox::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`TextBox::States <gui_forms::TextBox::States>`
      -  
+   * - :cpp:class:`TextEdit <gui_forms::TextEdit>`
+     - One user edit, offered to the edit filter before the TextBox changes anything: replace [start, end) of text() with ``replacement``.
    * - :cpp:class:`TextSelection <gui_forms::TextSelection>`
      - TextSelection is TextBox's normalized byte-boundary selection value.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskCulture final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
+
+   The symbols the mask's culture characters stand for: ``.`` the decimal separator, ``,`` the group separator, ``:`` the time separator, ``/`` the date separator and ``$`` the currency symbol. Each symbol is one or more Unicode scalars and each scalar becomes one literal slot. GUI.Forms has no culture service, so the default is the invariant culture's symbols (the invariant currency symbol is U+00A4, the generic currency sign); a caller that wants another culture supplies its symbols.
+
+   .. cpp:member:: std::string decimal_separator
+
+      Default: ``{"."}``.
+
+   .. cpp:member:: std::string group_separator
+
+      Default: ``{","}``.
+
+   .. cpp:member:: std::string time_separator
+
+      Default: ``{":"}``.
+
+   .. cpp:member:: std::string date_separator
+
+      Default: ``{"/"}``.
+
+   .. cpp:member:: std::string currency_symbol
+
+      Default: ``{"\xC2\xA4"}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskEditResult final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
+
+   What an edit did. On success ``position`` is the last position the edit wrote or passed over (the start position when the input was empty); on failure it is the position the refused character was tested at, and the provider is unchanged.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool succeeded() const noexcept
+
+   .. cpp:member:: MaskResultHint hint
+
+      Default: ``{MaskResultHint::success}``.
+
+   .. cpp:member:: MaskPosition position
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskedTextBox::Parts final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_box.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry field
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskedTextBox::States final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskInputRejection final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_box.hpp>``
+
+   Input the mask refused: the position the character was tested at, why, and the refused text (one character typed, or the whole value offered).
+
+   .. cpp:member:: MaskPosition position
+
+   .. cpp:member:: MaskResultHint hint
+
+      Default: ``{MaskResultHint::invalid_input}``.
+
+   .. cpp:member:: std::string text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MaskValidation final
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_box.hpp>``
+
+   One run of the validation hook (Windows Forms' TypeValidationCompleted). The hook reads ``text`` (the text in text_mask_format) and writes ``valid`` and, when it refuses, a ``message``; setting ``cancel`` keeps the focus in the box when validation runs because the focus is leaving.
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: bool mask_completed
+
+   .. cpp:member:: bool valid
+
+      Default: ``{true}``.
+
+   .. cpp:member:: std::string message
+
+   .. cpp:member:: bool cancel
 
 .. cpp:namespace:: gui_forms
 
@@ -83,6 +228,34 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: TextEdit final
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+   One user edit, offered to the edit filter before the TextBox changes anything: replace [start, end) of text() with ``replacement``. The filter reads the proposal and writes its verdict; with ``rewrite`` it also writes the whole new text and where the caret goes in it. ``replacement`` and the caret offsets are borrowed for the call. For a deletion with an empty selection the range is the grapheme Backspace or Delete would remove.
+
+   .. cpp:member:: TextEditKind kind
+
+      Default: ``{TextEditKind::typing}``.
+
+   .. cpp:member:: Utf8Offset start
+
+   .. cpp:member:: Utf8Offset end
+
+   .. cpp:member:: std::string_view replacement
+
+   .. cpp:member:: TextEditVerdict verdict
+
+      Default: ``{TextEditVerdict::accept}``.
+
+   .. cpp:member:: std::string rewritten_text
+
+   .. cpp:member:: Utf8Offset rewritten_caret
+
+      A byte offset in rewritten_text; moved forward to a grapheme boundary.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TextSelection final
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
@@ -120,6 +293,50 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MaskResultHint
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
+
+   .. cpp:enumerator:: success
+
+   .. cpp:enumerator:: character_escaped
+
+   .. cpp:enumerator:: digit_expected
+
+   .. cpp:enumerator:: signed_digit_expected
+
+   .. cpp:enumerator:: letter_expected
+
+   .. cpp:enumerator:: alphanumeric_expected
+
+   .. cpp:enumerator:: ascii_character_expected
+
+   .. cpp:enumerator:: invalid_input
+
+   .. cpp:enumerator:: prompt_character_not_allowed
+
+   .. cpp:enumerator:: unavailable_edit_position
+
+   .. cpp:enumerator:: non_edit_position
+
+   .. cpp:enumerator:: position_out_of_range
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MaskTextFormat
+
+   ``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
+
+   .. cpp:enumerator:: exclude_prompt_and_literals
+
+   .. cpp:enumerator:: include_prompt
+
+   .. cpp:enumerator:: include_literals
+
+   .. cpp:enumerator:: include_prompt_and_literals
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextBox::MultilineValidation
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
@@ -131,3 +348,42 @@ Enumerations
    .. cpp:enumerator:: document_too_large
 
    .. cpp:enumerator:: line_too_long
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TextEditKind
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+   .. cpp:enumerator:: typing
+
+   .. cpp:enumerator:: deletion
+
+   .. cpp:enumerator:: paste
+
+   .. cpp:enumerator:: value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TextEditVerdict
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+   .. cpp:enumerator:: accept
+
+   .. cpp:enumerator:: refuse
+
+   .. cpp:enumerator:: rewrite
+
+Functions, constants and aliases
+--------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
+
+.. cpp:function:: std::string_view mask_result_hint_name(MaskResultHint hint) noexcept
+
+.. cpp:type:: MaskPosition = TextUnitIndex<MaskPositionTag>
+
+   A position in a mask: the index of one slot, editable or literal. Every slot shows as exactly one Unicode scalar in the display text, so a position is also the scalar index of its slot in display_text(). It is not a byte offset; display_offset converts.

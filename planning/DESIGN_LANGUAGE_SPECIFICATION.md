@@ -1270,6 +1270,26 @@ These supersede the conflicting sources and options of the first draft.
 - **Live theme switching** is allowed; external theme packs need a content
   hash, not a signature.
 
+### 12.7 Owner decisions, fifth round, 2026-10-14
+
+- **The atom vocabulary is the canonical source** of what can be addressed
+  and manipulated. The atoms are part roles (`PartRole`, §8), states
+  (`AnatomyState`, §8.4), value types and the inputs the engine publishes.
+  This specification is their human-readable authority,
+  `include/gui_forms/anatomy/types/anatomy_types.hpp` their machine form and
+  the schema export (`manifests/control-schema.json`) their projection.
+  Controls declare which atoms they instantiate (their anatomy); engine
+  primitives declare which atoms they consume (the T2 registry). Neither end
+  defines the vocabulary, and a theme rule is valid when the vocabulary names
+  its atoms. Adding an atom is a vocabulary change (specification, enum and
+  schema version together) and an owner decision.
+- **Consequence for new controls.** A control may be built before the engine
+  (T2) and the default theme (T4) when it uses only vocabulary atoms and
+  paints every part through the shared by-role paint path
+  (`gui_forms/theme/part_painting/part_painting.hpp`: `paint_part`). T4
+  replaces that path's body with the engine, so such a control is not moved
+  later. This revises stage W's decision 1.
+
 ## Appendix A. Anti-models
 
 Rejected for the default and, unless a row says otherwise, every shipped house

@@ -25,8 +25,9 @@ Windows Forms exposed it.
 On scope: only Windows Forms types and members supported on .NET 8.0 or later
 are in scope (owner, 2026-10-13: "no dotnet 2.0 items"; that "also
 eliminates .NET 4.5"). Stage W builds the missing controls. The Windows Forms
-catalogue counts about 9,850 members GUI.Forms
-lacks. The owner: "I do want to try to expand on the number of controls in
+catalogue, regenerated from the official .NET 8+ surface on 2026-10-14,
+counts 9,469 in-scope members GUI.Forms lacks (it counted about 9,850 from a
+fork's list when the owner said this). The owner: "I do want to try to expand on the number of controls in
 Forms, but 9850 does include some massive amount of deprecated redundancy
 probably from the .NET 2.0 era." Coverage is driven by real applications,
 not the whole catalogue.

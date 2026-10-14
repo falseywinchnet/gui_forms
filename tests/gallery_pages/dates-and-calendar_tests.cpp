@@ -101,6 +101,19 @@ void test_dates_and_calendar(gui_forms::Window& window) {
     require(!(*primary).dropped_down() && window.focus_scope_depth() == 0U &&
                 !window.find("gallery.date.primary.popup.calendar"),
             "hiding a page must revoke its open calendar and contained focus");
+    (*window.find("gallery.surface.dates-and-calendar")).set_visible(true);
+
+    const std::shared_ptr<gui_forms::MonthCalendar> month = std::dynamic_pointer_cast<MonthCalendar>(
+        window.find("gallery.date.month.calendar"));
+    const std::shared_ptr<gui_forms::Label> month_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.date.month.status"));
+    require(month && month_status && (*month).realized_days().size() == 31U + 30U &&
+                (*month).calendar_dimensions() == CalendarDimensions{2U, 1U},
+            "the month calendar specimen shows August and September");
+    require(window.perform_semantic_action("gallery.date.month.calendar.day.2026-09-07", SemanticAction::select) &&
+                (*month).selection_start() == DateTimeValue{2026, 9U, 7U} &&
+                (*month_status).text() == "Selected 9/7",
+            "selecting a day reports to the page");
 }
 
 } // namespace gallery_pages_tests

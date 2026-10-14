@@ -20,11 +20,12 @@ constexpr std::array<std::string_view, 0> anatomy_pending{
 // Registry entries that are not controls: nonvisual components and the
 // LiveSurface service type. They have no parts; a component that shows
 // something (a context menu, a tool tip) does so through an internal control.
-constexpr std::array<std::string_view, 12> nonvisual_entries{
+constexpr std::array<std::string_view, 13> nonvisual_entries{
     "command",
     "context_menu",
     "tool_tip",
     "timer",
+    "background_worker",
     "image_list",
     "error_provider",
     "help_provider",
@@ -261,17 +262,24 @@ void test_anatomy_coverage() {
         make_control<ButtonBase>(StableId("anatomy.coverage.button-base"), "Base");
     const std::shared_ptr<ScrollBar> scroll_bar =
         make_control<ScrollBar>(StableId("anatomy.coverage.scroll-bar"));
-    // Popups open only on demand and live outside the root tree.
+    // Popups and dialogs open only on demand and live outside the root tree.
     const std::shared_ptr<AnchoredPopupLayer> popup_layer = make_control<AnchoredPopupLayer>(
         StableId("anatomy.coverage.anchored-popup-layer"), button_base,
         AnchoredPopupPlacement{});
     const std::shared_ptr<RangeControl> range_control =
         make_control<RangeControl>(StableId("anatomy.coverage.range-control"));
+    const std::shared_ptr<TaskDialog> task_dialog =
+        make_control<TaskDialog>(StableId("anatomy.coverage.task-dialog"));
     inspect_control(*button_base, seen_ids);
     inspect_control(*scroll_bar, seen_ids);
     inspect_control(*popup_layer, seen_ids);
     inspect_control(*range_control, seen_ids);
-    inspected += 4U;
+    // A dialog opens on demand, outside the root tree.
+    const std::shared_ptr<FontDialog> font_dialog =
+        make_control<FontDialog>(StableId("anatomy.coverage.font-dialog"));
+    inspect_control(*font_dialog, seen_ids);
+    inspect_control(*task_dialog, seen_ids);
+    inspected += 5U;
 
     std::string unexpected_gaps;
     std::string stale_pending;

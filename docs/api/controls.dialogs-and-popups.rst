@@ -13,6 +13,10 @@ Anchored popups and tooltips.
 
    * - :cpp:class:`AnchoredPopupLayer <gui_forms::AnchoredPopupLayer>`
      - A transparent full-window overlay that shows one popup control next to an anchor control.
+   * - :cpp:class:`FontDialog <gui_forms::FontDialog>`
+     - A dialog for choosing one of GUI.Forms' bundled fonts.
+   * - :cpp:class:`TaskDialog <gui_forms::TaskDialog>`
+     - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
 
@@ -20,6 +24,8 @@ Anchored popups and tooltips.
    :hidden:
 
    generated/gui_forms.AnchoredPopupLayer
+   generated/gui_forms.FontDialog
+   generated/gui_forms.TaskDialog
    generated/gui_forms.ToolTip
 
 Related types
@@ -33,6 +39,28 @@ Related types
      - AnchoredPopupPlacement is the caller-authored geometry policy for preferred size, horizontal alignment, preferred vertical side, gap, viewport margin, and optional vertical flipping.
    * - :cpp:class:`AnchoredPopupPlacementResult <gui_forms::AnchoredPopupPlacementResult>`
      - AnchoredPopupPlacementResult is the exact output of placement resolution: client-relative bounds plus whether the popup moved above its anchor or had either dimension clamped.
+   * - :cpp:class:`BundledFontFace <gui_forms::BundledFontFace>`
+     - One face GUI.Forms bundles for a FontRole, as every host registers it: its family name, what the role is for, and whether it has italic faces.
+   * - :cpp:class:`FontDialog::Parts <gui_forms::FontDialog::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
+     - How a FontDialog closed, and the font it holds then.
+   * - :cpp:class:`TaskDialog::Parts <gui_forms::TaskDialog::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`TaskDialogButton <gui_forms::TaskDialogButton>`
+     - One command button.
+   * - :cpp:class:`TaskDialogButtonClick <gui_forms::TaskDialogButtonClick>`
+     - A click on a button, before the dialog closes.
+   * - :cpp:class:`TaskDialogExpander <gui_forms::TaskDialogExpander>`
+     - Expanded information, shown below the text while expanded.
+   * - :cpp:class:`TaskDialogPage <gui_forms::TaskDialogPage>`
+     - One page (Windows Forms' TaskDialogPage).
+   * - :cpp:class:`TaskDialogProgressBar <gui_forms::TaskDialogProgressBar>`
+     - A progress bar below the text: a value between the bounds, or a marquee.
+   * - :cpp:class:`TaskDialogRadioButton <gui_forms::TaskDialogRadioButton>`
+     - One radio button; at most one of a page's radio buttons is checked.
+   * - :cpp:class:`TaskDialogResult <gui_forms::TaskDialogResult>`
+     - How a dialog closed: the button that closed it (the cancel button's ID, or "cancel", for Escape and a dialog revoked by its window), and the state of the verification check box and the radio buttons at that moment.
    * - :cpp:class:`ToolTipEvent <gui_forms::ToolTipEvent>`
      - ToolTipEvent is the immutable publication payload for a tooltip visibility transition.
 
@@ -75,6 +103,266 @@ Related types
    .. cpp:member:: bool width_clamped
 
    .. cpp:member:: bool height_clamped
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BundledFontFace final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   One face GUI.Forms bundles for a FontRole, as every host registers it: its family name, what the role is for, and whether it has italic faces. Every face has regular (400) and bold (700) weights. The Noto faces are fallbacks for scripts and emoji, not choices, and are not listed.
+
+   .. cpp:member:: FontRole role
+
+      Default: ``{FontRole::control}``.
+
+   .. cpp:member:: std::string_view family
+
+   .. cpp:member:: std::string_view use
+
+   .. cpp:member:: bool italic
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FontDialog::Parts final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry title
+
+   .. cpp:member:: PartGeometry preview_well
+
+   .. cpp:member:: PartGeometry preview_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FontDialogResult final
+
+   ``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+   How a FontDialog closed, and the font it holds then.
+
+   .. cpp:member:: DialogResult result
+
+      Default: ``{DialogResult::none}``.
+
+   .. cpp:member:: FontSpec font
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialog::Parts final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   Stage T1 anatomy, as dot members. Its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry caption_band
+
+   .. cpp:member:: PartGeometry caption
+
+   .. cpp:member:: PartGeometry icon_plate
+
+   .. cpp:member:: PartGeometry icon_image
+
+   .. cpp:member:: PartGeometry icon_glyph
+
+   .. cpp:member:: PartGeometry icon_label
+
+   .. cpp:member:: PartGeometry heading
+
+   .. cpp:member:: PartGeometry text
+
+   .. cpp:member:: PartGeometry progress
+
+   .. cpp:member:: PartGeometry radio_group
+
+   .. cpp:member:: PartGeometry expander_glyph
+
+   .. cpp:member:: PartGeometry expander_button
+
+   .. cpp:member:: PartGeometry expanded_text
+
+   .. cpp:member:: PartGeometry verification
+
+   .. cpp:member:: PartGeometry button_band
+
+   .. cpp:member:: PartGeometry button_divider
+
+   .. cpp:member:: PartGeometry button_row
+
+   .. cpp:member:: PartGeometry footnote_band
+
+   .. cpp:member:: PartGeometry footnote_plate
+
+   .. cpp:member:: PartGeometry footnote_glyph
+
+   .. cpp:member:: PartGeometry footnote_label
+
+   .. cpp:member:: PartGeometry footnote
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogButton final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   One command button. ``stable_id`` names the button in results and events and is unique within the page; a standard button with an empty ID takes its standard name ("ok", "cancel", "try_again", ...), and a standard button with empty text shows its standard text. A button whose ``allow_close`` is false raises button_clicked and leaves the dialog open.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: TaskDialogStandardButton standard
+
+      Default: ``{TaskDialogStandardButton::none}``.
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+   .. cpp:member:: bool allow_close
+
+      Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogButtonClick final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   A click on a button, before the dialog closes. Setting ``keep_open`` keeps the dialog open, as a button whose allow_close is false does.
+
+   .. cpp:member:: std::string button_id
+
+   .. cpp:member:: bool keep_open
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogExpander final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   Expanded information, shown below the text while expanded. The expander button shows one text or the other.
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::string collapsed_button_text
+
+      Default: ``{"Show details"}``.
+
+   .. cpp:member:: std::string expanded_button_text
+
+      Default: ``{"Hide details"}``.
+
+   .. cpp:member:: bool expanded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogPage final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   One page (Windows Forms' TaskDialogPage). Empty strings leave their part out: no caption row, heading, text, verification check box or footnote. A page without buttons gets an OK button. ``default_button`` names the button Enter clicks and that takes focus first; empty names the first. With ``allow_cancel``, Escape closes the dialog as its cancel button would.
+
+   .. cpp:member:: std::string caption
+
+   .. cpp:member:: std::string heading
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: TaskDialogIcon icon
+
+      Default: ``{TaskDialogIcon::none}``.
+
+   .. cpp:member:: ImageId icon_image
+
+      A custom icon image, shown instead of a standard icon when set.
+
+   .. cpp:member:: std::vector<TaskDialogButton> buttons
+
+   .. cpp:member:: std::string default_button
+
+   .. cpp:member:: std::vector<TaskDialogRadioButton> radio_buttons
+
+   .. cpp:member:: std::string verification_text
+
+   .. cpp:member:: bool verification_checked
+
+   .. cpp:member:: std::optional<TaskDialogExpander> expander
+
+   .. cpp:member:: std::string footnote
+
+   .. cpp:member:: TaskDialogIcon footnote_icon
+
+      Default: ``{TaskDialogIcon::none}``.
+
+   .. cpp:member:: std::optional<TaskDialogProgressBar> progress_bar
+
+   .. cpp:member:: bool allow_cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogProgressBar final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   A progress bar below the text: a value between the bounds, or a marquee.
+
+   .. cpp:member:: double minimum
+
+   .. cpp:member:: double maximum
+
+      Default: ``{100.0}``.
+
+   .. cpp:member:: double value
+
+   .. cpp:member:: bool marquee
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogRadioButton final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   One radio button; at most one of a page's radio buttons is checked.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TaskDialogResult final
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   How a dialog closed: the button that closed it (the cancel button's ID, or "cancel", for Escape and a dialog revoked by its window), and the state of the verification check box and the radio buttons at that moment.
+
+   .. cpp:member:: std::string button_id
+
+   .. cpp:member:: bool verification_checked
+
+   .. cpp:member:: std::string radio_button_id
 
 .. cpp:namespace:: gui_forms
 
@@ -127,6 +415,52 @@ Enumerations
 
    .. cpp:enumerator:: above
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TaskDialogIcon
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: information
+
+   .. cpp:enumerator:: warning
+
+   .. cpp:enumerator:: error
+
+   .. cpp:enumerator:: shield
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TaskDialogStandardButton
+
+   ``#include <gui_forms/controls/task_dialog/task_dialog.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: ok
+
+   .. cpp:enumerator:: cancel
+
+   .. cpp:enumerator:: yes
+
+   .. cpp:enumerator:: no
+
+   .. cpp:enumerator:: retry
+
+   .. cpp:enumerator:: abort
+
+   .. cpp:enumerator:: ignore
+
+   .. cpp:enumerator:: try_again
+
+   .. cpp:enumerator:: continue_
+
+   .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: help
+
 Functions, constants and aliases
 --------------------------------
 
@@ -137,3 +471,11 @@ Functions, constants and aliases
 .. cpp:function:: AnchoredPopupPlacementResult resolve_anchored_popup(Rect anchor_bounds, Size client_size, AnchoredPopupPlacement placement)
 
    Resolves an owner-relative popup into logical window-client coordinates. The result is deterministic, bounded to the client margin, and flips across the anchor only when the preferred side cannot contain the requested height.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/panel/font_dialog/font_dialog.hpp>``
+
+.. cpp:function:: std::span<const BundledFontFace> bundled_font_faces() noexcept
+
+   The bundled faces a FontDialog offers, in its list order.

@@ -74,6 +74,17 @@
       "doc": "api/generated/gui_forms.TextBox.rst"
     },
     {
+      "id": "masked_text_box",
+      "type": "MaskedTextBox",
+      "header": "gui_forms/controls/panel/masked_text_box/masked_text_box.hpp",
+      "category": "Text editing",
+      "purpose": "Text box that takes input through a mask (digits, letters, literals, case shifts, culture separators); refused input is reported with its position and reason.",
+      "winforms": "MaskedTextBox",
+      "status": "stable",
+      "gallery_page": "text-and-input",
+      "doc": "api/generated/gui_forms.MaskedTextBox.rst"
+    },
+    {
       "id": "label",
       "type": "Label",
       "header": "gui_forms/controls/label/label.hpp",
@@ -173,6 +184,17 @@
       "doc": "api/generated/gui_forms.ObjectView.rst"
     },
     {
+      "id": "list_view",
+      "type": "ListView",
+      "header": "gui_forms/controls/panel/list_view/list_view.hpp",
+      "category": "Selection from a list",
+      "purpose": "Item list with details, list, small-icon and large-icon views, check boxes, column headers that report clicks and resize, and a virtual mode that realizes only visible items.",
+      "winforms": "ListView",
+      "status": "stable",
+      "gallery_page": "checked-collections",
+      "doc": "api/generated/gui_forms.ListView.rst"
+    },
+    {
       "id": "correspondence_view",
       "type": "CorrespondenceView",
       "header": "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
@@ -182,6 +204,17 @@
       "status": "stable",
       "gallery_page": "tree-and-object-views",
       "doc": "api/generated/gui_forms.CorrespondenceView.rst"
+    },
+    {
+      "id": "data_grid_view",
+      "type": "DataGridView",
+      "header": "gui_forms/controls/data_grid_view/data_grid_view.hpp",
+      "category": "Selection from a list",
+      "purpose": "Grid of text, check box, combo box and button columns over unbound, virtual or BindingSource rows, with cell or row selection, in-place editing and only visible rows realized.",
+      "winforms": "DataGridView",
+      "status": "provisional",
+      "gallery_page": "tree-and-object-views",
+      "doc": "api/generated/gui_forms.DataGridView.rst"
     },
     {
       "id": "choice_group",
@@ -261,6 +294,17 @@
       "doc": "api/generated/gui_forms.NumericUpDown.rst"
     },
     {
+      "id": "domain_up_down",
+      "type": "DomainUpDown",
+      "header": "gui_forms/controls/panel/domain_up_down/domain_up_down.hpp",
+      "category": "Value setting",
+      "purpose": "Text field with up and down arrows stepping through an ordered string list; the selection follows the text, with optional wrapping, sorting and a read-only field.",
+      "winforms": "DomainUpDown",
+      "status": "stable",
+      "gallery_page": "values-and-spinners",
+      "doc": "api/generated/gui_forms.DomainUpDown.rst"
+    },
+    {
       "id": "color_value_editor",
       "type": "ColorValueEditor",
       "header": "gui_forms/controls/panel/color_value_editor/color_value_editor.hpp",
@@ -325,6 +369,17 @@
       "status": "stable",
       "gallery_page": "dates-and-calendar",
       "doc": "api/generated/gui_forms.DateTimePicker.rst"
+    },
+    {
+      "id": "month_calendar",
+      "type": "MonthCalendar",
+      "header": "gui_forms/controls/panel/month_calendar/month_calendar.hpp",
+      "category": "Date setting",
+      "purpose": "One or more month pages for selecting a date or a run of dates, with a date range, today marker, bold dates, week numbers and keyboard navigation.",
+      "winforms": "MonthCalendar",
+      "status": "stable",
+      "gallery_page": "dates-and-calendar",
+      "doc": "api/generated/gui_forms.MonthCalendar.rst"
     },
     {
       "id": "panel",
@@ -580,6 +635,61 @@
       "doc": "api/generated/gui_forms.MenuStrip.rst"
     },
     {
+      "id": "tool_strip",
+      "type": "ToolStrip",
+      "header": "gui_forms/controls/tool_strip/tool_strip.hpp",
+      "category": "Menus and commands",
+      "purpose": "Command strip of buttons, labels, separators, drop-down and split buttons laid out as an item system, with an overflow menu for items that do not fit.",
+      "winforms": "ToolStrip",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStrip.rst"
+    },
+    {
+      "id": "status_strip",
+      "type": "StatusStrip",
+      "header": "gui_forms/controls/status_strip/status_strip.hpp",
+      "category": "Menus and commands",
+      "purpose": "Status bar laid out as a ToolStrip that never overflows, with spring labels sharing the free width and a sizing grip.",
+      "winforms": "StatusStrip",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.StatusStrip.rst"
+    },
+    {
+      "id": "tool_strip_panel",
+      "type": "ToolStripPanel",
+      "header": "gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp",
+      "category": "Menus and commands",
+      "purpose": "Band along one edge that stacks joined ToolStrips in rows (top, bottom) or vertical columns (left, right), as thick as its strips.",
+      "winforms": "ToolStripPanel",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStripPanel.rst"
+    },
+    {
+      "id": "tool_strip_container",
+      "type": "ToolStripContainer",
+      "header": "gui_forms/controls/tool_strip_container/tool_strip_container.hpp",
+      "category": "Menus and commands",
+      "purpose": "Four ToolStripPanels around a content panel; the edge panels take the room their strips need and the content takes the rest.",
+      "winforms": "ToolStripContainer",
+      "status": "stable",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ToolStripContainer.rst"
+    },
+    {
+      "id": "binding_navigator",
+      "type": "BindingNavigator",
+      "header": "gui_forms/controls/binding_navigator/binding_navigator.hpp",
+      "category": "Menus and commands",
+      "purpose": "ToolStrip that moves through a BindingSource with first, previous, position, count, next, last, add and delete, each a shared Command enabled by the source's position, count and permissions.",
+      "winforms": "BindingNavigator",
+      "status": "stable",
+      "gallery_page": "values-and-spinners",
+      "doc": "api/generated/gui_forms.BindingNavigator.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",
@@ -611,6 +721,28 @@
       "status": "stable",
       "gallery_page": "anchored-popups",
       "doc": "api/generated/gui_forms.AnchoredPopupLayer.rst"
+    },
+    {
+      "id": "font_dialog",
+      "type": "FontDialog",
+      "header": "gui_forms/controls/panel/font_dialog/font_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "In-window owned dialog choosing a bundled face by role, a style the face has, and a size, with a preview and Apply, OK and Cancel; returns a FontSpec.",
+      "winforms": "FontDialog",
+      "status": "stable",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.FontDialog.rst"
+    },
+    {
+      "id": "task_dialog",
+      "type": "TaskDialog",
+      "header": "gui_forms/controls/task_dialog/task_dialog.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "In-window owned message dialog of TaskDialogPage pages: heading, text, icon, standard and custom buttons, radio buttons, a verification check box, an expander, a footnote and a progress bar, with navigation between pages.",
+      "winforms": "TaskDialog",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.TaskDialog.rst"
     },
     {
       "id": "tool_tip",
@@ -721,6 +853,17 @@
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
       "doc": "api/generated/gui_forms.Timer.rst"
+    },
+    {
+      "id": "background_worker",
+      "type": "BackgroundWorker",
+      "header": "gui_forms/background_worker/background_worker.hpp",
+      "category": "Components",
+      "purpose": "Runs one work function at a time on a gui_forms Worker thread and delivers progress and completion on its window's UI thread through the dispatcher, with cooperative cancellation.",
+      "winforms": "BackgroundWorker",
+      "status": "provisional",
+      "gallery_page": "timing-and-tooltips",
+      "doc": "api/generated/gui_forms.BackgroundWorker.rst"
     },
     {
       "id": "image_list",

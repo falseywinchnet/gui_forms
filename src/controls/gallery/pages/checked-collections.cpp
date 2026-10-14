@@ -22,6 +22,7 @@ public:
         build_deliberate(body);
         build_immediate(body);
         build_commands(body);
+        build_list_view(body);
     }
 
 private:
@@ -109,6 +110,58 @@ private:
         (*commands).add_at(status_, {470.0, 38.0, 420.0, 48.0});
     }
 
+    // A details ListView with check boxes. A header click sorts through
+    // the sort_items helper; the view itself never reorders.
+    void build_list_view(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> list_group = group(
+            "gallery.checked.list-view", "ListView · details, check boxes, sortable columns, by-role painted parts",
+            {930.0, 250.0});
+        (*body).add_at(list_group, {24.0, 640.0, 930.0, 250.0});
+        list_view_ = make_control<ListView>(StableId("gallery.checked.list-view.list"));
+        (*list_view_).set_accessible_name("Release checklist");
+        (*list_view_).set_check_boxes(true);
+        (*list_view_).set_full_row_select(true);
+        (*list_view_).set_columns({
+            {.stable_id = "task", .text = "Task", .width = 260.0},
+            {.stable_id = "owner", .text = "Owner", .width = 140.0},
+            {.stable_id = "estimate", .text = "Estimate", .width = 100.0, .alignment = ListViewAlignment::right},
+            {.stable_id = "stage", .text = "Stage", .width = 120.0},
+        });
+        (*list_view_).set_items({
+            {.stable_id = "task.anatomy", .text = "Publish item anatomy", .sub_items = {"Controls", "2 d", "T1"},
+             .checked = true},
+            {.stable_id = "task.paint", .text = "Paint parts by role", .sub_items = {"Controls", "3 d", "W"},
+             .checked = true},
+            {.stable_id = "task.virtual", .text = "Virtual rows", .sub_items = {"Core", "1 d", "W"}},
+            {.stable_id = "task.engine", .text = "Theme engine", .sub_items = {"Engine", "10 d", "T2"}},
+            {.stable_id = "task.theme", .text = "Default theme", .sub_items = {"Design", "8 d", "T4"}},
+            {.stable_id = "task.abi", .text = "Stable C ABI", .sub_items = {"Core", "6 d", "C"}},
+        });
+        (*list_group).add_at(list_view_, {22.0, 36.0, 640.0, 196.0});
+        on((*list_view_).column_click(), *this, &CheckedCollectionsPage::on_column_click);
+        on((*list_view_).item_checked(), *this, &CheckedCollectionsPage::on_list_view_checked);
+        std::shared_ptr<Label> note = label(
+            "gallery.checked.list-view.note",
+            "Click a header to sort through the sort_items helper; drag a divider to resize. Space or a click on the box toggles a check.",
+            10.0, 400, muted);
+        (*note).set_text_wrapping(TextWrapping::word);
+        (*note).set_vertical_alignment(VerticalAlignment::near);
+        (*list_group).add_at(note, {686.0, 36.0, 220.0, 120.0});
+    }
+
+    void on_column_click(const ListViewColumnClick& click) {
+        const bool ascending = (*list_view_).sort_column() == click.column &&
+                               (*list_view_).sort_order() == ListViewSortOrder::ascending;
+        (*list_view_).sort_items(click.column, ascending ? ListViewSortOrder::descending
+                                                         : ListViewSortOrder::ascending);
+        (*status_).set_text("ListView sorted by " + click.column_id +
+                            (ascending ? " descending" : " ascending") + " · the application chose the order");
+    }
+
+    void on_list_view_checked(const ListViewItemCheck& check) {
+        (*status_).set_text("ListView item " + check.item_id + (check.new_value ? " checked" : " unchecked"));
+    }
+
     // Bound value 0/1 names the list; both lists share one handler.
     void on_item_checked(const int list, const std::size_t index, const CheckState state) {
         (*status_).set_text(std::string(list == 0 ? "Deliberate" : "Immediate") + " item " +
@@ -132,6 +185,7 @@ private:
     }
 
     std::shared_ptr<CheckedListBox> immediate_;
+    std::shared_ptr<ListView> list_view_;
     std::shared_ptr<Label> status_;
 };
 

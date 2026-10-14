@@ -13,11 +13,14 @@ Date and time fields.
 
    * - :cpp:class:`DateTimePicker <gui_forms::DateTimePicker>`
      - A field that shows a date and time and lets the user pick a date from a drop-down calendar.
+   * - :cpp:class:`MonthCalendar <gui_forms::MonthCalendar>`
+     - A calendar of one or more months on which the user selects dates.
 
 .. toctree::
    :hidden:
 
    generated/gui_forms.DateTimePicker
+   generated/gui_forms.MonthCalendar
 
 Related types
 -------------
@@ -26,6 +29,10 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`CalendarDateRange <gui_forms::CalendarDateRange>`
+     - A run of whole days, first to last inclusive; the time of day is zero.
+   * - :cpp:class:`CalendarDimensions <gui_forms::CalendarDimensions>`
+     - How many months the calendar shows: columns by rows, at most twelve.
    * - :cpp:class:`DateTimeFormatProvider <gui_forms::DateTimeFormatProvider>`
      - DateTimeFormatProvider is an immutable caller-substitutable vocabulary and pattern bundle for DateTimePicker formatting.
    * - :cpp:class:`DateTimePicker::Parts <gui_forms::DateTimePicker::Parts>`
@@ -34,6 +41,48 @@ Related types
      -  
    * - :cpp:class:`DateTimeValue <gui_forms::DateTimeValue>`
      - DateTimeValue is DateTimePicker's timezone-free civil date/time value.
+   * - :cpp:class:`MonthCalendar::Day <gui_forms::MonthCalendar::Day>`
+     -  
+   * - :cpp:class:`MonthCalendar::DayParts <gui_forms::MonthCalendar::DayParts>`
+     -  
+   * - :cpp:class:`MonthCalendar::DayStates <gui_forms::MonthCalendar::DayStates>`
+     -  
+   * - :cpp:class:`MonthCalendar::MonthParts <gui_forms::MonthCalendar::MonthParts>`
+     - Item part names are unique within the control, so each names its system.
+   * - :cpp:class:`MonthCalendar::Parts <gui_forms::MonthCalendar::Parts>`
+     - Stage T1 anatomy, as dot members; the control's states are Control's.
+   * - :cpp:class:`MonthCalendar::WeekdayParts <gui_forms::MonthCalendar::WeekdayParts>`
+     -  
+   * - :cpp:class:`MonthCalendar::WeekParts <gui_forms::MonthCalendar::WeekParts>`
+     -  
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CalendarDateRange final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   A run of whole days, first to last inclusive; the time of day is zero.
+
+   .. cpp:member:: DateTimeValue start
+
+   .. cpp:member:: DateTimeValue end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CalendarDimensions final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   How many months the calendar shows: columns by rows, at most twelve.
+
+   .. cpp:member:: std::uint32_t columns
+
+      Default: ``{1U}``.
+
+   .. cpp:member:: std::uint32_t rows
+
+      Default: ``{1U}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -160,8 +209,128 @@ Related types
 
    .. cpp:member:: std::uint16_t millisecond
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::Day final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:member:: DateTimeValue date
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: DayParts parts
+
+   .. cpp:member:: DayStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::DayParts final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:member:: PartGeometry day_face
+
+   .. cpp:member:: PartGeometry day_text
+
+   .. cpp:member:: PartGeometry day_marker
+
+   .. cpp:member:: PartGeometry day_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::DayStates final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool bolded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::MonthParts final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   Item part names are unique within the control, so each names its system.
+
+   .. cpp:member:: PartGeometry month_title
+
+   .. cpp:member:: PartGeometry weekday_rule
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::Parts final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   Stage T1 anatomy, as dot members; the control's states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry previous_arrow
+
+   .. cpp:member:: PartGeometry previous_glyph
+
+   .. cpp:member:: PartGeometry next_arrow
+
+   .. cpp:member:: PartGeometry next_glyph
+
+   .. cpp:member:: PartGeometry today_label
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::WeekdayParts final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:member:: PartGeometry weekday_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MonthCalendar::WeekParts final
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:member:: PartGeometry week_label
+
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CalendarWeekday
+
+   ``#include <gui_forms/controls/panel/month_calendar/month_calendar.hpp>``
+
+   .. cpp:enumerator:: sunday
+
+   .. cpp:enumerator:: monday
+
+   .. cpp:enumerator:: tuesday
+
+   .. cpp:enumerator:: wednesday
+
+   .. cpp:enumerator:: thursday
+
+   .. cpp:enumerator:: friday
+
+   .. cpp:enumerator:: saturday
 
 .. cpp:namespace:: gui_forms
 

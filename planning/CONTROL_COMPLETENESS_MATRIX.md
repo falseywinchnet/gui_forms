@@ -23,7 +23,9 @@ drawing service is an oracle/scaffold, not the implementation. See
 `GUI_DRAWING_REVISION_PLAN.md`.
 
 **OBSERVED broader catalogue:** `WINFORMS_API_CATALOGUE.md` and its generated
-TSV enumerate 14,575 LibreWinForms Forms rows plus 3,522 .NET 10 Drawing rows.
+TSV enumerate 14,762 Forms rows from the official .NET 8, 9 and 10 shipped API
+lists (12,934 in scope; regenerated 2026-10-14, replacing the 14,575 rows of
+the LibreWinForms fork) plus 3,522 .NET 10 Drawing rows.
 That member-level catalogue is the nominal-base oversight authority. The 1,104
 captured-specimen identities below are a required floor, not a completeness
 denominator. `partial_native` never means an untested member is supported.

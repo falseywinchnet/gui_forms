@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/controls/panel/panel.hpp"
+#include "gui_forms/delegate.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/text.hpp"
 
@@ -44,6 +45,38 @@ struct TextSelection final {
         const bool result = left.anchor == right.anchor && left.caret == right.caret;
         return result;
     }
+};
+
+// The kind of user edit a TextBox offers its edit filter.
+enum class TextEditKind : std::uint8_t {
+    typing,    // text input (including composition), Tab and Enter in a multiline box, replace_selection
+    deletion,  // Backspace, Delete, cut, delete_selection
+    paste,     // paste from the clipboard
+    value,     // SemanticAction::set_value: the whole text
+};
+
+// What an edit filter decides about a proposed edit.
+enum class TextEditVerdict : std::uint8_t {
+    accept,   // apply the edit as proposed
+    refuse,   // apply nothing
+    rewrite,  // replace the whole text with rewritten_text instead
+};
+
+// One user edit, offered to the edit filter before the TextBox changes
+// anything: replace [start, end) of text() with `replacement`. The filter
+// reads the proposal and writes its verdict; with `rewrite` it also writes
+// the whole new text and where the caret goes in it. `replacement` and the
+// caret offsets are borrowed for the call. For a deletion with an empty
+// selection the range is the grapheme Backspace or Delete would remove.
+struct TextEdit final {
+    TextEditKind kind{TextEditKind::typing};
+    Utf8Offset start{};
+    Utf8Offset end{};
+    std::string_view replacement{};
+    TextEditVerdict verdict{TextEditVerdict::accept};
+    std::string rewritten_text{};
+    // A byte offset in rewritten_text; moved forward to a grapheme boundary.
+    Utf8Offset rewritten_caret{};
 };
 
 class TextBox final : public Panel {
@@ -133,6 +166,18 @@ public:
     bool copy();
     bool cut();
     bool paste();
+    // The edit filter sees every user edit (TextEditKind) after the TextBox's
+    // own checks (read-only, UTF-8, grapheme boundaries) and before it is
+    // applied; a composite control uses it to refuse or rewrite input, as
+    // MaskedTextBox does. It does not see set_text, undo or redo. A filter
+    // may change this TextBox's text (with set_text) only when it refuses the
+    // edit, to show a value it looked up, as a read-only DomainUpDown does;
+    // an edit during whose filter call the text changed is abandoned whatever
+    // the verdict. A rewrite is applied as one history step
+    // and is still subject to maximum_length and the multiline limits. The
+    // delegate does not own its target; clear it (an empty Delegate) before
+    // the target goes away.
+    void set_edit_filter(Delegate<TextEdit&> filter) noexcept { edit_filter_ = filter; }
 
     [[nodiscard]] Event<const std::string&>& text_changed() noexcept {
         return text_changed_;
@@ -220,7 +265,9 @@ private:
     void apply_snapshot(Snapshot snapshot);
     void set_selection(TextSelection selection, bool reveal_caret = true);
     bool replace(Utf8Offset start, Utf8Offset end,
-                 std::string_view replacement, bool record_history = true);
+                 std::string_view replacement, TextEditKind kind);
+    // Replaces the whole text with a filter's rewrite, as one history step.
+    bool apply_rewrite(std::string_view rewritten, Utf8Offset caret);
     [[nodiscard]] Utf8Offset position_at(double local_x) const noexcept;
     [[nodiscard]] double boundary_x(Utf8Offset offset) const noexcept;
     [[nodiscard]] Utf8Offset previous_word_boundary(Utf8Offset offset) const;
@@ -286,6 +333,7 @@ private:
     std::deque<Snapshot> undo_{};
     std::deque<Snapshot> redo_{};
     std::size_t history_bytes_{};
+    Delegate<TextEdit&> edit_filter_{};
     Event<const std::string&> text_changed_{};
     Event<const TextSelection&> selection_changed_{};
     Event<const std::string&> committed_{};

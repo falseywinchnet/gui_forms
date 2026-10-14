@@ -1,4 +1,5 @@
 #include "basic_control_rendering.hpp"
+#include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/text.hpp"
 
 #include <algorithm>
@@ -340,40 +341,14 @@ void paint_focus(Painter& painter, Rect bounds, Color color) {
 void paint_theme_cues(Painter& painter, Rect bounds,
                       const ControlVisualRecipe& recipe,
                       ControlVisualContext context) {
-    if (context.defaulted && recipe.default_width > 0.0 &&
-        bounds.width > recipe.default_width * 2.0 &&
-        bounds.height > recipe.default_width * 2.0) {
-        const double inset = recipe.default_width * 0.5;
-        painter.stroke_rounded_rect(
-            {bounds.x + inset, bounds.y + inset,
-             bounds.width - inset * 2.0, bounds.height - inset * 2.0},
-            std::max(0.0, recipe.material.corner_radius - inset),
-            recipe.default_ring, recipe.default_width);
-    }
-    if (context.focused && recipe.focus_width > 0.0 &&
-        bounds.width > 8.0 && bounds.height > 8.0) {
-        if (recipe.authored_focus_outline) {
-            const double outset = recipe.focus_offset + recipe.focus_width * 0.5;
-            const Rect outline_bounds{
-                bounds.x - outset, bounds.y - outset,
-                bounds.width + outset * 2.0,
-                bounds.height + outset * 2.0,
-            };
-            if (!outline_bounds.empty()) {
-                painter.stroke_rounded_rect(
-                    outline_bounds,
-                    std::max(0.0, recipe.material.corner_radius + outset),
-                    recipe.focus_ring, recipe.focus_width);
-            }
-            return;
-        }
-        const double inset = std::max(3.0, recipe.default_width + 1.0);
-        painter.stroke_rounded_rect(
-            {bounds.x + inset, bounds.y + inset,
-             bounds.width - inset * 2.0, bounds.height - inset * 2.0},
-            std::max(0.0, recipe.material.corner_radius - inset),
-            recipe.focus_ring, recipe.focus_width);
-    }
+    // The default ring first, then the focus ring over it, both drawn by the
+    // by-role paint path.
+    PartPaint cue;
+    cue.bounds = bounds;
+    cue.role = PartRole::preselect;
+    paint_part_from_recipe(painter, cue, recipe, context);
+    cue.role = PartRole::focus;
+    paint_part_from_recipe(painter, cue, recipe, context);
 }
 
 } // namespace gui_forms

@@ -116,6 +116,7 @@ add_library(gui_forms_core STATIC
     src/core/types/painter/painter.cpp
     src/core/types/rect/rect.cpp
     src/core/theme/theme/theme.cpp
+    src/core/theme/part_painting/part_painting.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -171,6 +172,7 @@ add_library(gui_forms_core STATIC
     src/core/component/component/component.cpp
     src/core/component/component_container/component_container.cpp
     src/core/timer/timer/timer.cpp
+    src/core/background_worker/background_worker.cpp
     src/core/control/control/control.cpp
     src/core/control/stable_id/stable_id.cpp
     src/core/control/static_tree/control_factory/control_factory.cpp
@@ -411,6 +413,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/breadcrumb_trail/breadcrumb_trail.cpp
     src/controls/panel/tree_view/tree_view.cpp
     src/controls/panel/object_view/object_view.cpp
+    src/controls/panel/list_view/list_view.cpp
     src/controls/panel/correspondence_view/correspondence_view.cpp
     src/controls/panel/card/card.cpp
     src/controls/panel/card/review_card/review_card.cpp
@@ -422,6 +425,14 @@ add_library(gui_forms_controls STATIC
     src/controls/commands/command_binding/command_binding.cpp
     src/controls/menu/context_menu/context_menu.cpp
     src/controls/menu/menu_strip/menu_strip.cpp
+    src/controls/tool_strip/tool_strip.cpp
+    src/controls/tool_strip_panel/tool_strip_panel.cpp
+    src/controls/tool_strip_container/tool_strip_container.cpp
+    src/controls/binding_navigator/binding_navigator.cpp
+    src/controls/status_strip/status_strip.cpp
+    src/controls/data_grid_view/data_grid_view.cpp
+    src/controls/data_grid_view/data_grid_view_parts.cpp
+    src/controls/task_dialog/task_dialog.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -438,11 +449,13 @@ add_library(gui_forms_controls STATIC
     src/controls/scrollable_control/container_control/split_container/splitter_grip.cpp
     src/controls/scrollable_control/container_control/split_container/split_container.cpp
     src/controls/panel/date_time_picker/date_time_utilities.cpp
+    src/controls/panel/date_time_picker/calendar_grid/calendar_grid.cpp
     src/controls/panel/date_time_picker/date_time_value/date_time_value.cpp
     src/controls/panel/date_time_picker/date_time_format_provider/date_time_format_provider.cpp
     src/controls/panel/date_time_picker/calendar_popup_layer/calendar_popup_layer.cpp
     src/controls/panel/date_time_picker/calendar_popup/calendar_popup.cpp
     src/controls/panel/date_time_picker/date_time_picker.cpp
+    src/controls/panel/month_calendar/month_calendar.cpp
     src/controls/drawing_surface/drawing_surface.cpp
     src/controls/metrics_view/metrics_view.cpp
     src/controls/visual_inspector_view/visual_inspector_view.cpp
@@ -454,10 +467,14 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
     src/controls/panel/combo_box/drop_down_layer.cpp
     src/controls/panel/combo_box/combo_box.cpp
-    src/controls/panel/numeric_up_down/spin_buttons.cpp
+    src/controls/panel/up_down/spin_buttons.cpp
+    src/controls/panel/domain_up_down/domain_up_down.cpp
+    src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp
+    src/controls/panel/masked_text_box/masked_text_box.cpp
     src/controls/panel/numeric_up_down/numeric_up_down.cpp
     src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
     src/controls/panel/flags_value_editor/flags_value_editor.cpp
+    src/controls/panel/font_dialog/font_dialog.cpp
     src/controls/panel/color_value_editor/color_value_editor.cpp
     src/controls/inspection/property_row_spec/property_row_spec.cpp
     src/controls/inspection/property_value_converter_registry/property_value_converter_registry.cpp
@@ -2117,6 +2134,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
 
+    add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
+    target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
+
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_damage_clip_tests COMMAND gui_forms_damage_clip_tests)
@@ -2350,6 +2371,48 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
+
+    add_executable(gui_forms_domain_up_down_tests tests/domain_up_down_tests.cpp)
+    target_link_libraries(gui_forms_domain_up_down_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_domain_up_down_tests COMMAND gui_forms_domain_up_down_tests)
+
+    add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
+    target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
+    target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
+
+    add_executable(gui_forms_data_grid_view_tests tests/data_grid_view_tests.cpp)
+    target_link_libraries(gui_forms_data_grid_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_data_grid_view_tests COMMAND gui_forms_data_grid_view_tests)
+
+    add_executable(gui_forms_masked_text_box_tests tests/masked_text_box_tests.cpp)
+    target_link_libraries(gui_forms_masked_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_masked_text_box_tests COMMAND gui_forms_masked_text_box_tests)
+
+    add_executable(gui_forms_month_calendar_tests tests/month_calendar_tests.cpp)
+    target_link_libraries(gui_forms_month_calendar_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_month_calendar_tests COMMAND gui_forms_month_calendar_tests)
+    add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
+    target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
+    add_executable(gui_forms_binding_navigator_tests tests/binding_navigator_tests.cpp)
+    target_link_libraries(gui_forms_binding_navigator_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_binding_navigator_tests COMMAND gui_forms_binding_navigator_tests)
+
+    add_executable(gui_forms_font_dialog_tests tests/font_dialog_tests.cpp)
+    target_link_libraries(gui_forms_font_dialog_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_font_dialog_tests COMMAND gui_forms_font_dialog_tests)
+
+    add_executable(gui_forms_background_worker_tests tests/background_worker_tests.cpp)
+    target_link_libraries(gui_forms_background_worker_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_background_worker_tests COMMAND gui_forms_background_worker_tests)
+
+    add_executable(gui_forms_task_dialog_tests tests/task_dialog_tests.cpp)
+    target_link_libraries(gui_forms_task_dialog_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_task_dialog_tests COMMAND gui_forms_task_dialog_tests)
+    set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

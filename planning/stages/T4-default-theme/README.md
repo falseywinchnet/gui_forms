@@ -139,6 +139,15 @@ specimen sheet, contrast report and approval under `results/`.
    recreated, never Microsoft's bitmaps. The Aero-like theme exercises glass
    and compositor cooperation (T5).
 
+4. **The by-role paint path is the seam** (owner ruling, 2026-10-14; design
+   language §12.7). `paint_part` draws a part from its role, states and the
+   theme records today. T4 replaces its body with the engine and moves the
+   existing controls onto it; controls built after the ruling already paint
+   only through it. The paint audit of 2026-10-14 found 13 controls on theme
+   recipes, 11 on the flat `BasicControlStyle` palette and 17 with
+   theme-independent or literal colours, and no paint code reading the
+   published anatomy; those are T4's moves.
+
 ## Read first
 
 - [`RENDERING_REFERENCE.md`](RENDERING_REFERENCE.md) and

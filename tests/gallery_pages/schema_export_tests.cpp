@@ -389,10 +389,15 @@ void test_schema_export() {
         StableId("schema.anchored-popup-layer"), button_base, AnchoredPopupPlacement{});
     const std::shared_ptr<RangeControl> range_control =
         make_control<RangeControl>(StableId("schema.range-control"));
+    const std::shared_ptr<TaskDialog> task_dialog = make_control<TaskDialog>(StableId("schema.task-dialog"));
     record_control(*button_base, records);
     record_control(*scroll_bar, records);
     record_control(*popup_layer, records);
     record_control(*range_control, records);
+    // A dialog opens on demand, outside the root tree.
+    const std::shared_ptr<FontDialog> font_dialog = make_control<FontDialog>(StableId("schema.font-dialog"));
+    record_control(*font_dialog, records);
+    record_control(*task_dialog, records);
 
     // Components, constructed directly.
     const std::shared_ptr<Command> command = std::make_shared<Command>();
@@ -401,6 +406,7 @@ void test_schema_export() {
     const std::shared_ptr<ToolTip> tool_tip = std::make_shared<ToolTip>(window);
     const std::shared_ptr<Timer> timer =
         std::make_shared<Timer>(window, std::chrono::milliseconds(1000));
+    const std::shared_ptr<BackgroundWorker> background_worker = std::make_shared<BackgroundWorker>(window);
     const std::shared_ptr<ImageList> image_list = std::make_shared<ImageList>(window);
     const std::shared_ptr<ErrorProvider> error_provider = std::make_shared<ErrorProvider>(window);
     const std::shared_ptr<HelpProvider> help_provider = std::make_shared<HelpProvider>(window);
@@ -415,6 +421,7 @@ void test_schema_export() {
     record_component("context_menu", *context_menu, records);
     record_component("tool_tip", *tool_tip, records);
     record_component("timer", *timer, records);
+    record_component("background_worker", *background_worker, records);
     record_component("image_list", *image_list, records);
     record_component("error_provider", *error_provider, records);
     record_component("help_provider", *help_provider, records);

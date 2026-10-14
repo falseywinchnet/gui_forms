@@ -131,6 +131,16 @@ paste
     Replaces the selection with clipboard text. It returns false when the box
     is read-only, the window has no host clipboard, the clipboard holds no
     text, or the edit is refused.
+set_edit_filter
+    Installs a filter that sees every user edit (typing, deletion, paste and
+    assistive set-value, as a `TextEdit` with its `TextEditKind`) before it
+    is applied, and accepts it, refuses it, or rewrites the whole text and
+    places the caret. `set_text`, undo and redo do not pass through it. A
+    filter may set the text itself only when it refuses the edit, to show a
+    value it looked up (a read-only `DomainUpDown` does); an edit during whose
+    filter call the text changed is abandoned whatever the verdict. The delegate does not own its target; clear
+    it with an empty `Delegate` before the target goes away. `MaskedTextBox`
+    uses it to put input through its mask.
 visual_line_count
     The number of displayed lines after wrapping; 1 for a single-line box.
 validate_multiline_text

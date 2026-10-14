@@ -67,6 +67,29 @@ void example() {
 }
 }  // namespace doc_example_AnchoredPopupLayer_1
 
+namespace doc_example_BackgroundWorker_1 {
+struct Sums final {
+    void work(gf::BackgroundWorkerTask& task) {
+        const std::int64_t limit = gf::binding_value_to_signed(task.argument()).value_or(0);
+        std::int64_t total = 0;
+        for (std::int64_t value = 1; value <= limit && !task.cancellation_pending(); ++value) {
+            total += value;
+        }
+        task.set_result(gf::BindingValue{total});
+    }
+};
+
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    Sums sums;
+    gf::BackgroundWorker worker(window);
+    worker.set_do_work(gf::BackgroundWorker::Work::bind<Sums, &Sums::work>(sums));
+    worker.run_worker_async(gf::BindingValue{std::int64_t{100}});
+    // run_worker_completed reports 5050 when the window's dispatcher runs.
+}
+}  // namespace doc_example_BackgroundWorker_1
+
 namespace doc_example_Binding_1 {
 void example() {
     std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("form"));
@@ -160,6 +183,15 @@ void example() {
     (*customers).dispose();        // counter.sources is 0
 }
 }  // namespace doc_example_BindingContext_2
+
+namespace doc_example_BindingNavigator_1 {
+void example() {
+    std::shared_ptr<gf::BindingNavigator> navigator =
+        gf::make_control<gf::BindingNavigator>(gf::StableId("people.navigator"));
+    const std::shared_ptr<gf::Command>& next = (*navigator).move_next_command();
+    gf::MenuItemSpec menu_item("people.menu.next", gf::MenuItemKind::command, next, "Next person");
+}
+}  // namespace doc_example_BindingNavigator_1
 
 namespace doc_example_BindingSource_1 {
 void example() {
@@ -899,6 +931,27 @@ void example() {
 }
 }  // namespace doc_example_CorrespondenceView_2
 
+namespace doc_example_DataGridView_1 {
+void example() {
+    std::shared_ptr<gf::DataGridView> grid =
+        gf::make_control<gf::DataGridView>(gf::StableId("radio.stations"));
+    (*grid).set_columns({
+        {.name = "name", .header_text = "Station", .width = 160.0},
+        {.name = "favourite", .header_text = "Favourite", .kind = gf::DataGridViewColumnKind::check_box,
+         .width = 70.0},
+        {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
+         .width = 90.0, .items = {"AM", "FM", "USB"}},
+    });
+    (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
+                                                    gf::BindingValue{true},
+                                                    gf::BindingValue{std::string("FM")}}});
+    (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                    gf::BindingValue{false},
+                                                    gf::BindingValue{std::string("AM")}}});
+    (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+}
+}  // namespace doc_example_DataGridView_1
+
 namespace doc_example_DateTimePicker_1 {
 void example() {
     std::shared_ptr<gf::DateTimePicker> due =
@@ -940,6 +993,17 @@ void example() {
     // has_date is true again and date is January 2, 2000
 }
 }  // namespace doc_example_DateTimePicker_2
+
+namespace doc_example_DomainUpDown_1 {
+void example() {
+    std::shared_ptr<gf::DomainUpDown> mode =
+        gf::make_control<gf::DomainUpDown>(gf::StableId("radio.mode"));
+    (*mode).set_items({"AM", "FM", "USB", "LSB"});
+    (*mode).set_wrap(true);
+    (*mode).set_selected_index(3U);   // the field shows "LSB"
+    (*mode).down_button();            // wraps: the field shows "AM"
+}
+}  // namespace doc_example_DomainUpDown_1
 
 namespace doc_example_DrawingSurface_1 {
 struct StatusBadge final {
@@ -1264,6 +1328,17 @@ void example() {
 }
 }  // namespace doc_example_FlowLayoutPanel_2
 
+namespace doc_example_FontDialog_1 {
+void example() {
+    std::shared_ptr<gf::FontDialog> dialog =
+        gf::make_control<gf::FontDialog>(gf::StableId("log.font"));
+    (*dialog).set_font({gf::FontRole::monospace, 11.0, 400, false});
+    (*dialog).set_size_range(8.0, 24.0);
+    const gf::FontSpec chosen = (*dialog).selection();   // 11-unit Cousine
+    // (*dialog).show(owner) opens it; its closed event carries the result.
+}
+}  // namespace doc_example_FontDialog_1
+
 namespace doc_example_GroupBox_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> mode =
@@ -1522,6 +1597,23 @@ void example() {
 }
 }  // namespace doc_example_ListBox_2
 
+namespace doc_example_ListView_1 {
+void example() {
+    std::shared_ptr<gf::ListView> files =
+        gf::make_control<gf::ListView>(gf::StableId("files"));
+    (*files).set_columns({
+        {.stable_id = "name", .text = "Name", .width = 200.0},
+        {.stable_id = "size", .text = "Size", .width = 80.0,
+         .alignment = gf::ListViewAlignment::right},
+    });
+    (*files).set_items({
+        {.stable_id = "a", .text = "notes.txt", .sub_items = {"4 KB"}},
+        {.stable_id = "b", .text = "logo.png", .sub_items = {"12 KB"}},
+    });
+    (*files).sort_items(0U, gf::ListViewSortOrder::ascending);
+}
+}  // namespace doc_example_ListView_1
+
 namespace doc_example_LiveSurface_1 {
 void example() {
     gf::LiveSurfaceDescription description;
@@ -1570,6 +1662,26 @@ void example() {
     (*view).invalidate(gf::Dirty::paint);
 }
 }  // namespace doc_example_LiveSurface_2
+
+namespace doc_example_MaskedTextBox_1 {
+void example() {
+    std::shared_ptr<gf::MaskedTextBox> phone =
+        gf::make_control<gf::MaskedTextBox>(gf::StableId("contact.phone"), "(000) 000-0000");
+    (*phone).set_text("5551234567");   // the field shows "(555) 123-4567"
+    const bool complete = (*phone).mask_completed();   // true
+    const gf::MaskEditResult refused = (*phone).set_text("55x");
+    // refused.hint == gf::MaskResultHint::digit_expected; the text is unchanged
+}
+}  // namespace doc_example_MaskedTextBox_1
+
+namespace doc_example_MaskedTextProvider_1 {
+void example() {
+    gf::MaskedTextProvider part(">LL-0000");
+    const gf::MaskEditResult placed = part.set_text("ab1234");
+    const std::string shown = part.display_text();   // "AB-1234"
+    const std::string bare = part.to_string(gf::MaskTextFormat::exclude_prompt_and_literals);   // "AB1234"
+}
+}  // namespace doc_example_MaskedTextProvider_1
 
 namespace doc_example_MasterDetailView_1 {
 struct Settings final : gf::Component {
@@ -1700,6 +1812,18 @@ void example() {
     MetricsRefresh refresh(window, metrics);
 }
 }  // namespace doc_example_MetricsView_2
+
+namespace doc_example_MonthCalendar_1 {
+void example() {
+    std::shared_ptr<gf::MonthCalendar> calendar =
+        gf::make_control<gf::MonthCalendar>(gf::StableId("booking.calendar"));
+    (*calendar).set_range({2026, 8U, 1U}, {2026, 12U, 31U});
+    (*calendar).set_today_date({2026, 8U, 12U});
+    (*calendar).set_selection_range({2026, 8U, 14U}, {2026, 8U, 30U});
+    // Seven days at most: the selection is 14 to 20 August.
+    (*calendar).add_bolded_date({2026, 8U, 21U});
+}
+}  // namespace doc_example_MonthCalendar_1
 
 namespace doc_example_NumericUpDown_1 {
 void example() {
@@ -2411,6 +2535,18 @@ void example() {
 }
 }  // namespace doc_example_StableId_2
 
+namespace doc_example_StatusStrip_1 {
+void example() {
+    std::shared_ptr<gf::StatusStrip> status =
+        gf::make_control<gf::StatusStrip>(gf::StableId("editor.status"));
+    (*status).set_items({
+        {.stable_id = "status.message", .kind = gf::ToolStripItemKind::label, .text = "Ready", .spring = true},
+        {.stable_id = "status.position", .kind = gf::ToolStripItemKind::label, .text = "Ln 1, Col 1"},
+        {.stable_id = "status.encoding", .kind = gf::ToolStripItemKind::label, .text = "UTF-8"},
+    });
+}
+}  // namespace doc_example_StatusStrip_1
+
 namespace doc_example_TabControl_1 {
 void example() {
     std::shared_ptr<gf::TabControl> tabs =
@@ -2541,6 +2677,24 @@ void example() {
 }
 }  // namespace doc_example_TableLayoutPanel_2
 
+namespace doc_example_TaskDialog_1 {
+void example() {
+    std::shared_ptr<gf::TaskDialog> dialog =
+        gf::make_control<gf::TaskDialog>(gf::StableId("app.replace"));
+    gf::TaskDialogPage page;
+    page.heading = "Replace the saved stations?";
+    page.text = "Replacing the list removes the stations you saved by hand.";
+    page.icon = gf::TaskDialogIcon::warning;
+    page.buttons = {{.standard = gf::TaskDialogStandardButton::yes},
+                    {.standard = gf::TaskDialogStandardButton::no}};
+    page.default_button = "no";
+    page.verification_text = "Do not ask again";
+    (*dialog).set_page(std::move(page));
+    // (*dialog).show(owner) lays it over the owner's window; closed reports
+    // the button ("yes" or "no") and the check box.
+}
+}  // namespace doc_example_TaskDialog_1
+
 namespace doc_example_TextBox_1 {
 struct Search final : gf::Component {
     std::shared_ptr<gf::TextBox> field =
@@ -2624,6 +2778,48 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_ToolStrip_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "Save");
+    std::shared_ptr<gf::Command> pdf = std::make_shared<gf::Command>("doc.pdf", "PDF");
+    std::shared_ptr<gf::ToolStrip> strip =
+        gf::make_control<gf::ToolStrip>(gf::StableId("doc.tools"));
+    std::vector<gf::ToolStripItemSpec> items;
+    items.push_back({.stable_id = "tools.save", .command = save});
+    items.push_back({.stable_id = "tools.rule", .kind = gf::ToolStripItemKind::separator});
+    items.push_back({.stable_id = "tools.export", .kind = gf::ToolStripItemKind::drop_down_button,
+                     .text = "Export",
+                     .drop_down = {gf::MenuItemSpec("tools.export.pdf", gf::MenuItemKind::command, pdf)}});
+    (*strip).set_items(std::move(items));
+}
+}  // namespace doc_example_ToolStrip_1
+
+namespace doc_example_ToolStripContainer_1 {
+void example() {
+    std::shared_ptr<gf::ToolStripContainer> frame =
+        gf::make_control<gf::ToolStripContainer>(gf::StableId("frame"));
+    std::shared_ptr<gf::ToolStrip> tools =
+        gf::make_control<gf::ToolStrip>(gf::StableId("frame.tools"));
+    std::shared_ptr<gf::StatusStrip> status =
+        gf::make_control<gf::StatusStrip>(gf::StableId("frame.status"));
+    (*(*frame).top_panel()).join(tools);
+    (*(*frame).bottom_panel()).join(status);
+}
+}  // namespace doc_example_ToolStripContainer_1
+
+namespace doc_example_ToolStripPanel_1 {
+void example() {
+    std::shared_ptr<gf::ToolStripPanel> panel =
+        gf::make_control<gf::ToolStripPanel>(gf::StableId("tools.panel"));
+    std::shared_ptr<gf::ToolStrip> file =
+        gf::make_control<gf::ToolStrip>(gf::StableId("tools.file"));
+    std::shared_ptr<gf::ToolStrip> edit =
+        gf::make_control<gf::ToolStrip>(gf::StableId("tools.edit"));
+    (*panel).join(file);
+    (*panel).join(edit);
+}
+}  // namespace doc_example_ToolStripPanel_1
 
 namespace doc_example_ToolTip_1 {
 void example() {
@@ -3060,10 +3256,12 @@ int run(const char* name, void (*example)()) {
 int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
+    failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);
     failures += run("BindingContext example 2", &doc_example_BindingContext_2::example);
+    failures += run("BindingNavigator example 1", &doc_example_BindingNavigator_1::example);
     failures += run("BindingSource example 1", &doc_example_BindingSource_1::example);
     failures += run("BindingSource example 2", &doc_example_BindingSource_2::example);
     failures += run("BreadcrumbTrail example 1", &doc_example_BreadcrumbTrail_1::example);
@@ -3100,8 +3298,10 @@ int main() {
     failures += run("Control example 2", &doc_example_Control_2::example);
     failures += run("CorrespondenceView example 1", &doc_example_CorrespondenceView_1::example);
     failures += run("CorrespondenceView example 2", &doc_example_CorrespondenceView_2::example);
+    failures += run("DataGridView example 1", &doc_example_DataGridView_1::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
+    failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);
     failures += run("DrawingSurface example 1", &doc_example_DrawingSurface_1::example);
     failures += run("DrawingSurface example 2", &doc_example_DrawingSurface_2::example);
     failures += run("DropDownButton example 1", &doc_example_DropDownButton_1::example);
@@ -3116,6 +3316,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);
@@ -3129,13 +3330,17 @@ int main() {
     failures += run("LinkLabel example 1", &doc_example_LinkLabel_1::example);
     failures += run("ListBox example 1", &doc_example_ListBox_1::example);
     failures += run("ListBox example 2", &doc_example_ListBox_2::example);
+    failures += run("ListView example 1", &doc_example_ListView_1::example);
     failures += run("LiveSurface example 1", &doc_example_LiveSurface_1::example);
     failures += run("LiveSurface example 2", &doc_example_LiveSurface_2::example);
+    failures += run("MaskedTextBox example 1", &doc_example_MaskedTextBox_1::example);
+    failures += run("MaskedTextProvider example 1", &doc_example_MaskedTextProvider_1::example);
     failures += run("MasterDetailView example 1", &doc_example_MasterDetailView_1::example);
     failures += run("MaterialPanel example 1", &doc_example_MaterialPanel_1::example);
     failures += run("MenuStrip example 1", &doc_example_MenuStrip_1::example);
     failures += run("MetricsView example 1", &doc_example_MetricsView_1::example);
     failures += run("MetricsView example 2", &doc_example_MetricsView_2::example);
+    failures += run("MonthCalendar example 1", &doc_example_MonthCalendar_1::example);
     failures += run("NumericUpDown example 1", &doc_example_NumericUpDown_1::example);
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
@@ -3171,15 +3376,20 @@ int main() {
     failures += run("SplitterPanel example 1", &doc_example_SplitterPanel_1::example);
     failures += run("StableId example 1", &doc_example_StableId_1::example);
     failures += run("StableId example 2", &doc_example_StableId_2::example);
+    failures += run("StatusStrip example 1", &doc_example_StatusStrip_1::example);
     failures += run("TabControl example 1", &doc_example_TabControl_1::example);
     failures += run("TabControl example 2", &doc_example_TabControl_2::example);
     failures += run("TabPage example 1", &doc_example_TabPage_1::example);
     failures += run("TableLayoutPanel example 1", &doc_example_TableLayoutPanel_1::example);
     failures += run("TableLayoutPanel example 2", &doc_example_TableLayoutPanel_2::example);
+    failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
+    failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
+    failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);
     failures += run("ToolTip example 1", &doc_example_ToolTip_1::example);
     failures += run("ToolTip example 2", &doc_example_ToolTip_2::example);
     failures += run("TrackBar example 1", &doc_example_TrackBar_1::example);

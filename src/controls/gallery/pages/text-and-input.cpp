@@ -25,6 +25,7 @@ public:
                              12.0, 400, muted), {26.0, 52.0, 900.0, 24.0});
         build_fields(body);
         build_commands(body);
+        build_masked(body);
         refresh_state();
     }
 
@@ -115,6 +116,42 @@ private:
         (*commands).add_at(guarantee, {24.0, 132.0, 830.0, 52.0});
     }
 
+    // MaskedTextBox specimens: a telephone mask, and a part code whose
+    // letters are shifted to upper and then lower case. The telephone
+    // field's refusals and completion report to the status label.
+    void build_masked(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> masked = group("gallery.text.masked",
+                                                    "MaskedTextBox · input through a mask", {930.0, 132.0});
+        (*body).add_at(masked, {24.0, 640.0, 930.0, 132.0});
+        (*masked).add_at(label("gallery.text.masked.phone.caption", "Telephone", 11.0, 600, muted),
+                         {24.0, 42.0, 130.0, 24.0});
+        phone_ = make_control<MaskedTextBox>(StableId("gallery.text.masked.phone"), "(000) 000-0000");
+        (*phone_).set_accessible_name("Telephone number");
+        (*masked).add_at(phone_, {154.0, 36.0, 260.0, 36.0});
+        (*masked).add_at(label("gallery.text.masked.code.caption", "Part code", 11.0, 600, muted),
+                         {440.0, 42.0, 110.0, 24.0});
+        std::shared_ptr<MaskedTextBox> code = make_control<MaskedTextBox>(
+            StableId("gallery.text.masked.code"), ">LL-0000-<aa");
+        (*code).set_accessible_name("Part code");
+        (*masked).add_at(code, {550.0, 36.0, 300.0, 36.0});
+        masked_status_ = label("gallery.text.masked.status",
+                               "Telephone: digits only; letters are refused and reported", 11.0, 600, green);
+        (*masked).add_at(masked_status_, {154.0, 86.0, 700.0, 26.0});
+        on((*phone_).mask_input_rejected(), *this, &TextAndInputPage::masked_rejected);
+        on((*phone_).text_changed(), *this, &TextAndInputPage::masked_changed);
+    }
+
+    void masked_rejected(const MaskInputRejection& rejection) {
+        (*masked_status_).set_text("Telephone refused \"" + rejection.text + "\" at position " +
+                                   std::to_string(rejection.position.value()) + " · " +
+                                   std::string(mask_result_hint_name(rejection.hint)));
+    }
+
+    void masked_changed(const std::string& text) {
+        (*masked_status_).set_text("Telephone " + text +
+                                   ((*phone_).mask_completed() ? " · complete" : " · incomplete"));
+    }
+
     void refresh_state() {
         const TextSelection selection = (*primary_).selection();
         (*state_).set_text("Selection: " + std::to_string(selection.start().value()) + ".." +
@@ -161,6 +198,8 @@ private:
     std::shared_ptr<Label> state_;
     std::shared_ptr<Label> clipboard_status_;
     std::shared_ptr<CommandBar> bar_;
+    std::shared_ptr<MaskedTextBox> phone_;
+    std::shared_ptr<Label> masked_status_;
     Command undo_{"gallery.text.command.undo", "Undo"};
     Command redo_{"gallery.text.command.redo", "Redo"};
 };

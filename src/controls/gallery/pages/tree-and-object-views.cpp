@@ -82,12 +82,13 @@ public:
         (*body).add_at(label("gallery.tree-and-object-views.heading", "TREES AND OBJECT VIEWS",
                              22.0, 700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
         (*body).add_at(label("gallery.tree-and-object-views.lead",
-                             "One project fixture: the TreeView selects a folder, the BreadcrumbTrail follows it, the ObjectView lists its children and the CorrespondenceView ledgers its files.",
+                             "One project fixture: the TreeView selects a folder, the BreadcrumbTrail follows it, the ObjectView lists its children, the CorrespondenceView ledgers its files and the DataGridView edits them.",
                              12.0, 400, muted), {26.0, 52.0, 920.0, 24.0});
         build_location(body);
         build_tree(body);
         build_objects(body);
         build_ledger(body);
+        build_grid(body);
         status_ = label("gallery.tree.status", "Ready", 11.0, 600, green);
         (*body).add_at(status_, {24.0, 634.0, 930.0, 22.0});
         on(view_mode_.changed(), *this, &TreeAndObjectViewsPage::on_view_mode_changed);
@@ -176,6 +177,46 @@ private:
         on((*ledger_).pin_changed(), *this, &TreeAndObjectViewsPage::on_pin_changed);
         on((*ledger_).expansion_changed(), *this, &TreeAndObjectViewsPage::on_file_expansion);
         on((*ledger_).item_activated(), *this, &TreeAndObjectViewsPage::on_file_activated);
+    }
+
+    // A DataGridView over the fixture's files: a text name, a combo box kind,
+    // a read-only size, a check box and a button column.
+    void build_grid(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> grid_group = group(
+            "gallery.tree.grid-group", "DataGridView · the project's files as typed, editable columns",
+            {930.0, 236.0});
+        (*body).add_at(grid_group, {24.0, 668.0, 930.0, 236.0});
+        grid_ = make_control<DataGridView>(StableId("gallery.tree.grid"));
+        (*grid_).set_accessible_name("Project files");
+        std::vector<std::string> kinds;
+        for (const ProjectNode& node : project) {
+            const std::string kind(node.kind);
+            if (!node.folder && std::find(kinds.begin(), kinds.end(), kind) == kinds.end()) kinds.push_back(kind);
+        }
+        (*grid_).set_columns({
+            {.name = "name", .header_text = "Name", .width = 160.0},
+            {.name = "kind", .header_text = "Kind", .kind = DataGridViewColumnKind::combo_box, .width = 130.0,
+             .items = kinds},
+            {.name = "size", .header_text = "Size", .width = 80.0, .read_only = true,
+             .alignment = DataGridViewCellAlignment::end},
+            {.name = "keep", .header_text = "Keep", .kind = DataGridViewColumnKind::check_box, .width = 56.0},
+            {.name = "note", .header_text = "Note", .width = 300.0},
+            {.name = "open", .header_text = "", .kind = DataGridViewColumnKind::button, .width = 70.0,
+             .button_text = "Open"},
+        });
+        std::vector<DataGridViewRow> rows;
+        for (const ProjectNode& node : project) {
+            if (node.folder) continue;
+            rows.push_back({.stable_id = std::string(node.id),
+                            .cells = {BindingValue{std::string(node.name)}, BindingValue{std::string(node.kind)},
+                                      BindingValue{std::string(node.size)}, BindingValue{true},
+                                      BindingValue{std::string(node.note)}}});
+        }
+        (*grid_).set_rows(std::move(rows));
+        (*grid_group).add_at(grid_, {18.0, 36.0, 894.0, 184.0});
+        on((*grid_).cell_value_changed(), *this, &TreeAndObjectViewsPage::on_grid_value_changed);
+        on((*grid_).cell_content_click(), *this, &TreeAndObjectViewsPage::on_grid_content_click);
+        on((*grid_).column_header_click(), *this, &TreeAndObjectViewsPage::on_grid_header_click);
     }
 
     [[nodiscard]] static std::size_t depth_of(std::size_t index) {
@@ -420,6 +461,28 @@ private:
         return text;
     }
 
+    // DataGridView
+    void on_grid_value_changed(const DataGridViewCellEvent& event) {
+        (*status_).set_text("Grid cell " + (*grid_).row_stable_id(event.row) + "." +
+                            (*grid_).columns()[event.column].name + " is now \"" +
+                            (*grid_).cell_text(event.row, event.column) + "\"");
+    }
+
+    void on_grid_content_click(const DataGridViewCellEvent& event) {
+        if ((*grid_).columns()[event.column].kind != DataGridViewColumnKind::button) return;
+        (*status_).set_text("Open " + (*grid_).cell_text(event.row, 0U) + " · a button cell's click");
+    }
+
+    // A header click sorts by that column, toggling the direction.
+    void on_grid_header_click(const std::size_t column) {
+        const DataGridViewSortDirection shown = (*grid_).columns()[column].sort_glyph;
+        const DataGridViewSortDirection next = shown == DataGridViewSortDirection::ascending
+            ? DataGridViewSortDirection::descending : DataGridViewSortDirection::ascending;
+        if (!(*grid_).sort(column, next)) return;
+        (*status_).set_text("Grid sorted by " + (*grid_).columns()[column].name +
+                            (next == DataGridViewSortDirection::ascending ? " ascending" : " descending"));
+    }
+
     // Value
     void on_view_mode_changed(const int mode) {
         (*objects_).set_view_mode(mode == 0 ? ObjectViewMode::icons : ObjectViewMode::details);
@@ -431,6 +494,7 @@ private:
     std::shared_ptr<TreeView> tree_;
     std::shared_ptr<ObjectView> objects_;
     std::shared_ptr<CorrespondenceView> ledger_;
+    std::shared_ptr<DataGridView> grid_;
     std::shared_ptr<Label> status_;
     Value<int> view_mode_{1};
     ObjectDetailsSort sort_{};

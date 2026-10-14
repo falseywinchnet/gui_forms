@@ -45,6 +45,18 @@ collector and a language to version forever. "Declarative now, scripts later"
 is a trap: every interesting theme would use the hatch and lose the
 guarantees. The hatch is new first-party C++ primitives, versioned.
 
+## The atom vocabulary (owner ruling, 2026-10-14)
+
+The engine does not define what can be addressed, and neither do controls:
+both declare against the vocabulary of part roles, states, value types and
+engine inputs (design language §12.7). Each primitive registers which roles
+it paints and which states and inputs it reads, in those words. New controls
+are already painted through `paint_part`
+(`gui_forms/theme/part_painting/part_painting.hpp`), which draws a part from
+its role, states and the theme records; T2's engine is what that path calls
+once T4 replaces its body, so the engine's entry point takes the same
+description (control, part role, bounds, states, content).
+
 ## What exists today
 
 - `SurfaceMaterial` (`include/gui_forms/surface_material/types/`): up to 8
