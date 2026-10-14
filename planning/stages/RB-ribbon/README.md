@@ -4,8 +4,8 @@ Release: not yet placed on the public roadmap; the plan this stage produces
 proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
 study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
-(decisions 1 to 10 below) and part 2 (decisions 11 to 16; no KeyTips);
-part 3 pending. The controls are built in
+(decisions 1 to 10 below), part 2 (decisions 11 to 16; no KeyTips) and
+part 3 (decisions 17 to 24); taste questions T3, T4 and T6 remain. The controls are built in
 stage W (decision 1). Authority: this brief and
 `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
@@ -129,6 +129,29 @@ From part 2 (2026-10-14):
     and tab,arrow navigation. we wont implement these keytips."). The
     ribbon's keyboard model is shortcuts, mnemonics, and Tab and arrow
     navigation. The study's KeyTip model (§5.3, G5, G10, T5) is dropped.
+
+From part 3 (2026-10-14):
+
+17. **F6 cycles between window regions (C3-1)** through a window-level
+    ordered list, shared with side panels and File Manager.
+18. **`Command::key_tip` is removed (C5-1).**
+19. **No minimize button (G1: no).** As in Plan Paint, clicking the tab
+    minimizes or opens the ribbon; the tabs are always visible.
+20. **New marks (G2 to G4):** dialog launcher, "more", overflow (double
+    chevron, which `ToolStrip` adopts) and customize.
+21. **Group size is not a theme selector (G6: no)**; it shows through part
+    presence.
+22. **Vocabulary (G7 to G9):** a per-item accent value for contextual tab
+    sets; semantic roles `split_button` and `menu_button`; semantic fields for
+    position in set, set size and has-popup.
+23. **Which parts take the dithered button (T2):** every large element that
+    conventionally shows a hover square; not small tab-row members, never
+    tabs. Menus opened from the ribbon are popups over it, never inside it
+    (the owner's note to T3, after Plan Paint, for consistency across
+    hosts).
+24. **Minimized ribbon and QAT (T7, T8-1):** the minimized ribbon shows its
+    tab row only and its temporary popup casts the overlay shadow; Quick
+    Access Toolbar buttons are flat.
 
 ## Gate
 

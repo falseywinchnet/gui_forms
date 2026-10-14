@@ -2,8 +2,9 @@
 
 Date: 2026-10-14
 
-Status: **owner verdicts recorded for parts 1 and 2 (KeyTips declined after
-explanation); part 3 pending**.
+Status: **owner verdicts recorded for parts 1, 2 and 3, except taste
+questions T3 (Backstage topic tabs, explained further), T4 (contextual tab
+sets, shown as mockups) and T6 (unanswered)**.
 
 The questions are section 8 of `planning/stages/RB-ribbon/RIBBON_STUDY.md`,
 cited by their IDs (A1, B2 and so on). Each answer names the option number of
@@ -144,6 +145,71 @@ Recorded as:
   asked in part 3. So is what becomes of `Command::key_tip`, which nothing
   reads and now has no planned reader.
 
-## Part 3. Pending
+## Part 3. Owner verdicts, 2026-10-14
 
-Vocabulary (G1 to G10) and the remaining taste questions (T2 to T8).
+Asked: C3 (F6 cycling between window regions), C5 (remove the unused
+`Command::key_tip`), G1 to G4 and G6 to G9 (G5 and G10 fell away with
+KeyTips), and taste questions T2, T3, T4, T6, T7 and T8 (T5 fell away). The
+owner's message, verbatim:
+
+> accepted recommendations. for G:
+> we dont have a minimize ribbon button. we follow plan paint- clicking the tab minimizes or opens the ribbon.tabs always visible.
+> arrow mark- okay. more: okay. customize: okay.
+> no. g7: yes. G8: yes. G9: yes.
+>
+> taste: anything large that normally draws a square under it when you mouse over. so yes.
+> T3: note i just thought of: plan paint puts menus over ribbon, not inside ribbon.
+> otherwise inconsistency cross platforms.
+> I have never seen this topic tabs behavior.
+> explain more.
+> T4:
+> unsure, show me.
+> T6:
+> T7: tab row only. cast shadow.
+> T8: 1
+
+Recorded as:
+
+- **GIVEN C3-1 and C5-1** ("accepted recommendations", read as answering the
+  two non-G questions asked first): F6 cycles focus between a window's
+  regions (ribbon, work pane, side panels, status) through a window-level
+  ordered list of regions, shared with side panels and File Manager; the
+  unused `Command::key_tip` is removed.
+- **G1: no.** There is no minimize-ribbon button. As in Plan Paint, clicking
+  the tab minimizes or opens the ribbon, and the tabs are always visible.
+  Recorded reading: clicking the selected tab collapses the ribbon to its
+  tab row; with the ribbon collapsed, clicking a tab opens that tab's
+  commands (as the temporary popup of D3 and T7); the up-chevron mark is not
+  needed. If clicking the selected tab of a collapsed ribbon should pin it
+  open again (Plan Paint's behaviour to be checked in its source), the plan
+  follows Plan Paint.
+- **GIVEN G2, G3, G4** ("arrow mark- okay. more: okay. customize: okay."):
+  a dialog-launcher mark; a "more" mark and an overflow (double chevron)
+  mark, which `ToolStrip`'s overflow button adopts; a customize mark for the
+  Quick Access Toolbar.
+- **GIVEN G6: no.** Themes do not select a group by its size; size shows
+  only through which parts are present.
+- **GIVEN G7, G8, G9: yes.** A per-item accent value for contextual tab sets
+  (from the theme's accent ramp, F1-1); semantic roles `split_button` and
+  `menu_button` (a toggle stays `button` plus checked); semantic node fields
+  for position in set, set size and has-popup (the access-key field fell
+  away with KeyTips).
+- **T2: "anything large that normally draws a square under it when you
+  mouse over. so yes."** Recorded rule: every large ribbon element that
+  conventionally shows a hover square (command buttons and their split
+  halves, collapsed-group buttons, gallery items, the dialog launcher and
+  similar) takes the dithered button that sinks into the plane at rest and
+  rises under the pointer. Small tab-row members do not (T8-1). Tabs never.
+- **T3 not answered; the owner asked for more and added a note:** "plan
+  paint puts menus over ribbon, not inside ribbon. otherwise inconsistency
+  cross platforms." Recorded: menus opened from the ribbon (drop-downs, the
+  application menu of A3-4) are popups over the ribbon, never laid out
+  inside it, so they behave the same on every host. The owner has not seen
+  Backstage's topic tabs; explained in the conversation and asked again.
+- **T4 not answered:** "unsure, show me". Shown as mockups in the
+  conversation and asked again.
+- **T6 not answered** (left blank); asked again.
+- **GIVEN T7:** the minimized ribbon shows its tab row only, and its
+  temporary popup casts the overlay shadow (design language §3.4, E4).
+- **GIVEN T8-1:** Quick Access Toolbar buttons are flat, like the other
+  tab-row members.
