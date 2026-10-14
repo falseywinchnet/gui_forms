@@ -261,6 +261,17 @@
       "doc": "api/generated/gui_forms.NumericUpDown.rst"
     },
     {
+      "id": "domain_up_down",
+      "type": "DomainUpDown",
+      "header": "gui_forms/controls/panel/domain_up_down/domain_up_down.hpp",
+      "category": "Value setting",
+      "purpose": "Text field with up and down arrows stepping through an ordered string list; the selection follows the text, with optional wrapping, sorting and a read-only field.",
+      "winforms": "DomainUpDown",
+      "status": "stable",
+      "gallery_page": "values-and-spinners",
+      "doc": "api/generated/gui_forms.DomainUpDown.rst"
+    },
+    {
       "id": "color_value_editor",
       "type": "ColorValueEditor",
       "header": "gui_forms/controls/panel/color_value_editor/color_value_editor.hpp",

@@ -2,7 +2,7 @@
 
 namespace gui_forms::gallery::pages {
 
-// Owner of the NumericUpDown specimens and the PropertyGrid inspector. The
+// Owner of the NumericUpDown and DomainUpDown specimens and the PropertyGrid inspector. The
 // four inspector actions are application Commands shown through one
 // CommandBar; the grid's commits and each spinner's state changes report to
 // the status label through named members.
@@ -19,6 +19,7 @@ public:
             "gallery.values.numeric", "NumericUpDown · public compound control", {930.0, 360.0});
         (*body).add_at(group_box, {24.0, 92.0, 930.0, 360.0});
         build_numerics(group_box);
+        build_domain(group_box);
         build_inspector(group_box);
         build_binding(body, context);
         on(inspect_numeric_.invoked(), *this, &ValuesPage::inspect_numeric);
@@ -67,6 +68,20 @@ private:
                static_cast<int>(index));
             numerics_.push_back(std::move(numeric));
         }
+    }
+
+    // A DomainUpDown below the numeric rows: demodulation modes, wrapping.
+    void build_domain(const std::shared_ptr<LayoutGroup>& group_box) {
+        const double row = static_cast<double>(captions.size()) * 62.0;
+        (*group_box).add_at(label("gallery.values.caption.domain", "Domain (wraps)", 11.0, 600, muted),
+                            {24.0, 44.0 + row, 170.0, 26.0});
+        domain_ = make_control<DomainUpDown>(StableId("gallery.values.domain"));
+        (*domain_).set_accessible_name("Demodulation mode");
+        (*domain_).set_items({"AM", "FM", "WFM", "USB", "LSB", "CW"});
+        (*domain_).set_wrap(true);
+        (*domain_).set_selected_index(1U);
+        (*group_box).add_at(domain_, {194.0, 38.0 + row, 260.0, 36.0});
+        on((*domain_).selected_index_changed(), *this, &ValuesPage::domain_changed);
     }
 
     void build_inspector(const std::shared_ptr<LayoutGroup>& group_box) {
@@ -188,6 +203,11 @@ private:
                             " · event emitted after value and editor synchronization");
     }
 
+    void domain_changed(const std::optional<std::size_t> index) {
+        (*status_).set_text(index ? "Domain selected " + (*domain_).items()[*index]
+                                  : std::string("Domain text matches no item"));
+    }
+
     void property_changed(const PropertyGridValueChange& change) {
         (*status_).set_text("PropertyGrid committed " + change.property_name + " · origin " +
                             std::string(property_value_origin_name(change.origin)) +
@@ -199,6 +219,7 @@ private:
     Command inspect_style_{};
     Command add_item_{};
     std::vector<std::shared_ptr<NumericUpDown>> numerics_;
+    std::shared_ptr<DomainUpDown> domain_;
     std::shared_ptr<PropertyGrid> inspector_;
     std::shared_ptr<ComboBox> items_target_;
     std::shared_ptr<CommandBar> commands_;

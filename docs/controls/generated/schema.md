@@ -705,8 +705,10 @@ Properties beyond every control's: `value` (number).
 | `face` | face |  |  |
 | `edge` | edge |  |  |
 | `field` | well | `text_box` |  |
-| `increment_arrow` | actuator | `button` |  |
-| `decrement_arrow` | actuator | `button` |  |
+| `increment_arrow` | actuator | `button` | hot, pressed |
+| `decrement_arrow` | actuator | `button` | hot, pressed |
+| `increment_glyph` | glyph |  | hot, pressed |
+| `decrement_glyph` | glyph |  | hot, pressed |
 
 States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `invalid`, `pending`.
 
@@ -716,6 +718,39 @@ Properties beyond every control's: `value` (number).
 |---|---|
 | `scroll` | `ScrollEvent`, by reference |
 | `value_changed` | `double` |
+
+## `domain_up_down` (DomainUpDown, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `viewport` | region |  |  |
+| `horizontal_decrement_arrow` | actuator | `button` |  |
+| `horizontal_track` | track |  |  |
+| `horizontal_thumb` | thumb |  | pressed, captured |
+| `horizontal_increment_arrow` | actuator | `button` |  |
+| `vertical_decrement_arrow` | actuator | `button` |  |
+| `vertical_track` | track |  |  |
+| `vertical_thumb` | thumb |  | pressed, captured |
+| `vertical_increment_arrow` | actuator | `button` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+| `face` | face |  |  |
+| `edge` | edge |  |  |
+| `field` | well | `text_box` |  |
+| `up_arrow` | actuator | `button` | hot, pressed |
+| `down_arrow` | actuator | `button` | hot, pressed |
+| `up_glyph` | glyph |  | hot, pressed |
+| `down_glyph` | glyph |  | hot, pressed |
+
+States: `normal`, `pressed`, `captured`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`, `invalid`, `pending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `scroll` | `ScrollEvent`, by reference |
+| `selected_index_changed` | `std::optional<std::size_t>` |
 
 ## `color_value_editor` (ColorValueEditor, control)
 

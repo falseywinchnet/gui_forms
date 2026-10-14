@@ -941,6 +941,17 @@ void example() {
 }
 }  // namespace doc_example_DateTimePicker_2
 
+namespace doc_example_DomainUpDown_1 {
+void example() {
+    std::shared_ptr<gf::DomainUpDown> mode =
+        gf::make_control<gf::DomainUpDown>(gf::StableId("radio.mode"));
+    (*mode).set_items({"AM", "FM", "USB", "LSB"});
+    (*mode).set_wrap(true);
+    (*mode).set_selected_index(3U);   // the field shows "LSB"
+    (*mode).down_button();            // wraps: the field shows "AM"
+}
+}  // namespace doc_example_DomainUpDown_1
+
 namespace doc_example_DrawingSurface_1 {
 struct StatusBadge final {
     gf::Color fill;
@@ -3102,6 +3113,7 @@ int main() {
     failures += run("CorrespondenceView example 2", &doc_example_CorrespondenceView_2::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
+    failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);
     failures += run("DrawingSurface example 1", &doc_example_DrawingSurface_1::example);
     failures += run("DrawingSurface example 2", &doc_example_DrawingSurface_2::example);
     failures += run("DropDownButton example 1", &doc_example_DropDownButton_1::example);

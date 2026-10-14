@@ -455,7 +455,8 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
     src/controls/panel/combo_box/drop_down_layer.cpp
     src/controls/panel/combo_box/combo_box.cpp
-    src/controls/panel/numeric_up_down/spin_buttons.cpp
+    src/controls/panel/up_down/spin_buttons.cpp
+    src/controls/panel/domain_up_down/domain_up_down.cpp
     src/controls/panel/numeric_up_down/numeric_up_down.cpp
     src/controls/panel/flags_value_editor/property_editor_drop_down_layer/property_editor_drop_down_layer.cpp
     src/controls/panel/flags_value_editor/flags_value_editor.cpp
@@ -2355,6 +2356,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_range_controls_tests tests/range_controls_tests.cpp)
     target_link_libraries(gui_forms_range_controls_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_range_controls_tests COMMAND gui_forms_range_controls_tests)
+
+    add_executable(gui_forms_domain_up_down_tests tests/domain_up_down_tests.cpp)
+    target_link_libraries(gui_forms_domain_up_down_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_domain_up_down_tests COMMAND gui_forms_domain_up_down_tests)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)

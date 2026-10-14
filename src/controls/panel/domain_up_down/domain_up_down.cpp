@@ -1,0 +1,430 @@
+#include "gui_forms/controls/panel/domain_up_down/domain_up_down.hpp"
+
+#include "../up_down/spin_buttons.hpp"
+#include "../panel_anatomy.hpp"
+#include "gui_forms/window.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <array>
+#include <stdexcept>
+#include <utility>
+
+namespace gui_forms {
+namespace {
+
+unsigned char folded(unsigned char byte) noexcept {
+    const bool upper = byte >= 'A' && byte <= 'Z';
+    const unsigned char result = upper ? static_cast<unsigned char>(byte - 'A' + 'a') : byte;
+    return result;
+}
+
+// Equal ignoring ASCII case: how typed text matches an item.
+bool equal_folded(std::string_view left, std::string_view right) noexcept {
+    if (left.size() != right.size()) return false;
+    for (std::size_t index = 0; index < left.size(); ++index) {
+        if (folded(static_cast<unsigned char>(left[index])) !=
+            folded(static_cast<unsigned char>(right[index]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// The sorted order: ASCII case folded, then byte order, so "apple" and
+// "Apple" keep a fixed order.
+struct SortedItemOrder final {
+    bool operator()(const std::string& left, const std::string& right) const noexcept {
+        const std::size_t shared = std::min(left.size(), right.size());
+        for (std::size_t index = 0; index < shared; ++index) {
+            const unsigned char a = folded(static_cast<unsigned char>(left[index]));
+            const unsigned char b = folded(static_cast<unsigned char>(right[index]));
+            if (a != b) return a < b;
+        }
+        if (left.size() != right.size()) return left.size() < right.size();
+        return left < right;
+    }
+};
+
+} // namespace
+
+DomainUpDown::DomainUpDown(StableId stable_id) : Panel(std::move(stable_id)) {
+    set_border_style(BorderStyle::line);
+    set_background(style().paper);
+}
+
+void DomainUpDown::EditorChangeCallback::operator()(const std::string&) const {
+    const std::shared_ptr<DomainUpDown> domain = target.lock();
+    if (domain && !(*domain).synchronizing_) (*domain).match_text();
+}
+
+void DomainUpDown::SpinnerStepCallback::operator()(int direction) const {
+    const std::shared_ptr<DomainUpDown> domain = target.lock();
+    if (!domain) return;
+    // The upper arrow moves up the list, to the previous item.
+    if (direction > 0) {
+        (*domain).up_button();
+    } else {
+        (*domain).down_button();
+    }
+}
+
+void DomainUpDown::initialize_control_tree() {
+    const std::string prefix(stable_id().value());
+    editor_ = make_control<TextBox>(StableId(prefix + ".editor"));
+    (*editor_).set_border_style(BorderStyle::none);
+    (*editor_).set_read_only(read_only_);
+    spinner_ = make_control<SpinButtons>(StableId(prefix + ".spinner"));
+    add_child(editor_);
+    add_child(spinner_);
+    const std::weak_ptr<DomainUpDown> weak =
+        std::static_pointer_cast<DomainUpDown>(shared_from_this());
+    editor_change_ = (*editor_).text_changed().subscribe(*this, EditorChangeCallback{weak});
+    SpinButtons& spin = static_cast<SpinButtons&>(*spinner_);
+    spinner_step_ = spin.stepped().subscribe(*this, SpinnerStepCallback{weak});
+}
+
+std::optional<std::size_t> DomainUpDown::matching_index(std::string_view text) const {
+    for (std::size_t index = 0; index < items_.size(); ++index) {
+        if (equal_folded(items_[index], text)) return index;
+    }
+    return std::nullopt;
+}
+
+void DomainUpDown::select(std::optional<std::size_t> index, bool show_text) {
+    if (show_text && index && editor_) {
+        synchronizing_ = true;
+        (*editor_).set_text(items_[*index]);
+        synchronizing_ = false;
+    }
+    if (selected_index_ == index) return;
+    selected_index_ = index;
+    invalidate(Dirty::paint | Dirty::semantics);
+    publish_change(selected_index_changed_, selected_index_);
+}
+
+void DomainUpDown::match_text() {
+    select(matching_index(text()), false);
+}
+
+void DomainUpDown::sort_items() {
+    if (!sorted_) return;
+    std::stable_sort(items_.begin(), items_.end(), SortedItemOrder{});
+}
+
+void DomainUpDown::set_items(std::vector<std::string> items) {
+    require_mutable();
+    items_ = std::move(items);
+    sort_items();
+    match_text();
+    invalidate(Dirty::semantics);
+}
+
+void DomainUpDown::add_item(std::string item) {
+    require_mutable();
+    items_.push_back(std::move(item));
+    sort_items();
+    match_text();
+    invalidate(Dirty::semantics);
+}
+
+void DomainUpDown::remove_item_at(std::size_t index) {
+    require_mutable();
+    if (index >= items_.size()) {
+        throw std::out_of_range("DomainUpDown item index is past the end");
+    }
+    items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(index));
+    // The text stays; the selection follows it, so the removed item's text
+    // matches nothing unless another item equals it.
+    match_text();
+    invalidate(Dirty::semantics);
+}
+
+void DomainUpDown::clear_items() {
+    require_mutable();
+    items_.clear();
+    select(std::nullopt, false);
+    invalidate(Dirty::semantics);
+}
+
+void DomainUpDown::set_selected_index(std::optional<std::size_t> index) {
+    require_mutable();
+    if (index && *index >= items_.size()) {
+        throw std::out_of_range("DomainUpDown selected index is past the end");
+    }
+    select(index, true);
+}
+
+std::string_view DomainUpDown::text() const noexcept {
+    if (!editor_) return {};
+    return (*editor_).text();
+}
+
+void DomainUpDown::set_text(std::string text) {
+    require_mutable();
+    if (!editor_) return;
+    synchronizing_ = true;
+    (*editor_).set_text(std::move(text));
+    synchronizing_ = false;
+    match_text();
+}
+
+void DomainUpDown::set_wrap(bool wrap) {
+    require_mutable();
+    wrap_ = wrap;
+}
+
+void DomainUpDown::set_read_only(bool read_only) {
+    require_mutable();
+    if (read_only_ == read_only) return;
+    read_only_ = read_only;
+    if (editor_) (*editor_).set_read_only(read_only_);
+    invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void DomainUpDown::set_sorted(bool sorted) {
+    require_mutable();
+    if (sorted_ == sorted) return;
+    sorted_ = sorted;
+    sort_items();
+    match_text();
+    invalidate(Dirty::semantics);
+}
+
+void DomainUpDown::set_button_width(double width) {
+    require_mutable();
+    if (!std::isfinite(width) || width < 12.0 || width > 64.0) {
+        throw std::out_of_range("DomainUpDown button width must be finite and between 12 and 64");
+    }
+    if (button_width_ == width) return;
+    button_width_ = width;
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
+void DomainUpDown::step(std::ptrdiff_t offset) {
+    if (items_.empty()) return;
+    const std::ptrdiff_t count = static_cast<std::ptrdiff_t>(items_.size());
+    std::ptrdiff_t next = 0;
+    if (!selected_index_) {
+        next = offset < 0 ? count - 1 : 0;
+    } else {
+        next = static_cast<std::ptrdiff_t>(*selected_index_) + offset;
+        if (next < 0) {
+            next = wrap_ ? count - 1 : 0;
+        } else if (next >= count) {
+            next = wrap_ ? 0 : count - 1;
+        }
+    }
+    select(static_cast<std::size_t>(next), true);
+    if (editor_ && window() != nullptr) {
+        static_cast<void>((*window()).request_focus(editor_));
+        (*editor_).select_all();
+    }
+}
+
+void DomainUpDown::up_button() {
+    step(-1);
+}
+
+void DomainUpDown::down_button() {
+    step(1);
+}
+
+void DomainUpDown::arrange(Rect final_bounds) {
+    arrange_self(final_bounds);
+    const double button_width = std::min(button_width_, std::max(0.0, final_bounds.width));
+    if (editor_) set_child_layout(
+        editor_, {0.0, 0.0, std::max(0.0, final_bounds.width - button_width), final_bounds.height});
+    if (spinner_) set_child_layout(
+        spinner_, {std::max(0.0, final_bounds.width - button_width), 0.0, button_width,
+                   final_bounds.height});
+}
+
+void DomainUpDown::on_key_preview(KeyEvent& event) {
+    if (!enabled() || event.action != KeyAction::down) return;
+    if (event.physical_key == PhysicalKey::up) {
+        up_button();
+        event.handled = true;
+    } else if (event.physical_key == PhysicalKey::down) {
+        down_button();
+        event.handled = true;
+    }
+}
+
+void DomainUpDown::on_pointer_preview(PointerEvent& event) {
+    if (!enabled() || event.action != PointerAction::wheel || event.wheel_delta.y == 0.0) return;
+    // Wheel up moves up the list.
+    if (event.wheel_delta.y > 0.0) {
+        up_button();
+    } else {
+        down_button();
+    }
+    event.handled = true;
+}
+
+SemanticDescriptor DomainUpDown::semantic_descriptor() const {
+    SemanticDescriptor descriptor;
+    descriptor.role = SemanticRole::combo_box;
+    descriptor.name = accessible_name();
+    descriptor.value = std::string(text());
+    descriptor.description = accessible_description();
+    descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
+                          SemanticAction::decrement, SemanticAction::set_value};
+    if (read_only_) descriptor.states |= SemanticState::read_only;
+    descriptor.exposed = true;
+    descriptor.include_descendants = false;
+    return descriptor;
+}
+
+bool DomainUpDown::on_semantic_action(SemanticAction action, std::string_view value_text) {
+    // Increment moves to the next item, as the down arrow does.
+    if (action == SemanticAction::increment) {
+        down_button();
+        return true;
+    }
+    if (action == SemanticAction::decrement) {
+        up_button();
+        return true;
+    }
+    if (action == SemanticAction::set_value) {
+        const std::optional<std::size_t> index = matching_index(value_text);
+        if (index) {
+            set_selected_index(index);
+            return true;
+        }
+        if (read_only_) return false;
+        set_text(std::string(value_text));
+        return true;
+    }
+    if (action == SemanticAction::focus && editor_ && window() != nullptr) {
+        return (*window()).request_focus(editor_);
+    }
+    return Panel::on_semantic_action(action, value_text);
+}
+
+namespace {
+
+// The spin arrows are hot under the pointer and pressed while held.
+constexpr std::array<AnatomyState, 2> spin_arrow_states{{AnatomyState::hot, AnatomyState::pressed}};
+
+constexpr std::array<PartField<DomainUpDown::Parts>, 7> domain_up_down_extra_part_fields{{
+    {.declaration = {.name = "face", .role = PartRole::face, .composed_from = {}},
+     .member = &DomainUpDown::Parts::face},
+    {.declaration = {.name = "edge", .role = PartRole::edge, .composed_from = {}},
+     .member = &DomainUpDown::Parts::edge},
+    {.declaration = {.name = "field", .role = PartRole::well, .composed_from = "text_box"},
+     .member = &DomainUpDown::Parts::field},
+    {.declaration = {.name = "up_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = spin_arrow_states},
+     .member = &DomainUpDown::Parts::up_arrow},
+    {.declaration = {.name = "down_arrow", .role = PartRole::actuator, .composed_from = "button",
+                     .states = spin_arrow_states},
+     .member = &DomainUpDown::Parts::down_arrow},
+    {.declaration = {.name = "up_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = spin_arrow_states},
+     .member = &DomainUpDown::Parts::up_glyph},
+    {.declaration = {.name = "down_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = spin_arrow_states},
+     .member = &DomainUpDown::Parts::down_glyph},
+}};
+
+constexpr std::array<StateField<DomainUpDown::States>, 10> domain_up_down_state_fields{{
+    {.state = AnatomyState::normal, .member = &DomainUpDown::States::normal},
+    {.state = AnatomyState::pressed, .member = &DomainUpDown::States::pressed},
+    {.state = AnatomyState::captured, .member = &DomainUpDown::States::captured},
+    {.state = AnatomyState::enabled, .member = &DomainUpDown::States::enabled},
+    {.state = AnatomyState::disabled, .member = &DomainUpDown::States::disabled},
+    {.state = AnatomyState::focused, .member = &DomainUpDown::States::focused},
+    {.state = AnatomyState::focus_visible, .member = &DomainUpDown::States::focus_visible},
+    {.state = AnatomyState::read_only, .member = &DomainUpDown::States::read_only},
+    {.state = AnatomyState::invalid, .member = &DomainUpDown::States::invalid},
+    {.state = AnatomyState::pending, .member = &DomainUpDown::States::pending},
+}};
+
+constexpr std::array<PartDeclaration, scrollable_detail::part_count + 7> domain_up_down_parts =
+    joined_declarations(scrollable_detail::parts, part_declarations(domain_up_down_extra_part_fields));
+constexpr std::array<AnatomyState, 10> domain_up_down_states =
+    state_declarations(domain_up_down_state_fields);
+
+constexpr ControlAnatomy domain_up_down_anatomy{
+    .control_id = "domain_up_down",
+    .parts = domain_up_down_parts,
+    .states = domain_up_down_states,
+    .custom_states = {},
+};
+
+} // namespace
+
+const ControlAnatomy& DomainUpDown::anatomy() const noexcept {
+    return domain_up_down_anatomy;
+}
+
+DomainUpDown::Parts DomainUpDown::parts() const {
+    const PartGeometryBuffer published = published_part_geometry();
+    Parts record;
+    read_parts(anatomy(), scrollable_detail::part_fields, published.parts(), record.scrollable);
+    read_parts(anatomy(), domain_up_down_extra_part_fields, published.parts(), record);
+    return record;
+}
+
+DomainUpDown::States DomainUpDown::states() const {
+    States record;
+    read_states(domain_up_down_state_fields, anatomy_states(), record);
+    return record;
+}
+
+void DomainUpDown::publish_part_geometry(std::span<PartGeometry> geometry) const {
+    const Panel::Parts panel = panel_parts();
+    Parts record;
+    record.scrollable = panel.scrollable;
+    record.face = panel.face;
+    record.edge = panel.edge;
+    // The field is the child text box; the arrows and their glyphs are the
+    // spin column's halves, from the geometry the column paints with.
+    if (editor_) {
+        record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
+    }
+    if (spinner_) {
+        const SpinButtons& spin = static_cast<const SpinButtons&>(*spinner_);
+        const SpinHalves halves = spin_halves((*spinner_).committed_arranged_bounds());
+        record.up_arrow = PartGeometry::from_bounds(halves.upper);
+        record.down_arrow = PartGeometry::from_bounds(halves.lower);
+        record.up_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
+        record.down_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
+        record.up_arrow.states = spin.half_states(SpinHalf::upper);
+        record.down_arrow.states = spin.half_states(SpinHalf::lower);
+        record.up_glyph.states = record.up_arrow.states;
+        record.down_glyph.states = record.down_arrow.states;
+    }
+    write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
+    write_parts(anatomy(), domain_up_down_extra_part_fields, record, geometry);
+}
+
+AnatomyStateSet DomainUpDown::anatomy_states() const {
+    AnatomyStateSet states = ScrollableControl::anatomy_states();
+    if (read_only_) states.insert(AnatomyState::read_only);
+    if (visual_status() == ControlVisualStatus::invalid) {
+        states.insert(AnatomyState::invalid);
+    } else if (visual_status() == ControlVisualStatus::pending) {
+        states.insert(AnatomyState::pending);
+    }
+    return states;
+}
+
+namespace {
+
+// The events DomainUpDown adds to those of Panel, in declaration order.
+constexpr std::array<InteractionDeclaration, 1> domain_up_down_interactions{{
+    {.name = "selected_index_changed", .payload = "std::optional<std::size_t>", .mutable_payload = false},
+}};
+
+} // namespace
+
+void DomainUpDown::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Panel::append_interactions(interactions);
+    interactions.insert(interactions.end(), domain_up_down_interactions.begin(),
+                        domain_up_down_interactions.end());
+}
+
+} // namespace gui_forms

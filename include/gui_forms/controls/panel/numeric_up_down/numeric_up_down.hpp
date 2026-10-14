@@ -50,6 +50,8 @@ public:
         PartGeometry field;
         PartGeometry increment_arrow;
         PartGeometry decrement_arrow;
+        PartGeometry increment_glyph;
+        PartGeometry decrement_glyph;
     };
     struct States final {
         bool normal{};

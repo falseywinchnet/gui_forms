@@ -21,6 +21,8 @@ Check boxes, radio buttons, ranges, numeric and colour editors, property grids a
      - A slider the user drags, clicks or steps with the keyboard to pick a value in a range.
    * - :cpp:class:`NumericUpDown <gui_forms::NumericUpDown>`
      - A text field for a number, with up and down buttons that step it.
+   * - :cpp:class:`DomainUpDown <gui_forms::DomainUpDown>`
+     - A text field with up and down buttons that steps through a list of strings.
    * - :cpp:class:`ColorValueEditor <gui_forms::ColorValueEditor>`
      - A colour field: a swatch beside a text box that edits the colour as hexadecimal text.
    * - :cpp:class:`FlagsValueEditor <gui_forms::FlagsValueEditor>`
@@ -40,6 +42,7 @@ Check boxes, radio buttons, ranges, numeric and colour editors, property grids a
    generated/gui_forms.RangeControl
    generated/gui_forms.TrackBar
    generated/gui_forms.NumericUpDown
+   generated/gui_forms.DomainUpDown
    generated/gui_forms.ColorValueEditor
    generated/gui_forms.FlagsValueEditor
    generated/gui_forms.PropertyGrid
@@ -60,6 +63,10 @@ Related types
    * - :cpp:class:`ColorValueEditor::Parts <gui_forms::ColorValueEditor::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`ColorValueEditor::States <gui_forms::ColorValueEditor::States>`
+     -  
+   * - :cpp:class:`DomainUpDown::Parts <gui_forms::DomainUpDown::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`DomainUpDown::States <gui_forms::DomainUpDown::States>`
      -  
    * - :cpp:class:`FlagsValueEditor::Parts <gui_forms::FlagsValueEditor::Parts>`
      - Stage T1 anatomy, as dot members.
@@ -217,6 +224,56 @@ Related types
    .. cpp:member:: bool focused
 
    .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool pending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DomainUpDown::Parts final
+
+   ``#include <gui_forms/controls/panel/domain_up_down/domain_up_down.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: ScrollableControl::Parts scrollable
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry field
+
+   .. cpp:member:: PartGeometry up_arrow
+
+   .. cpp:member:: PartGeometry down_arrow
+
+   .. cpp:member:: PartGeometry up_glyph
+
+   .. cpp:member:: PartGeometry down_glyph
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DomainUpDown::States final
+
+   ``#include <gui_forms/controls/panel/domain_up_down/domain_up_down.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool read_only
 
    .. cpp:member:: bool invalid
 
@@ -403,6 +460,10 @@ Related types
    .. cpp:member:: PartGeometry increment_arrow
 
    .. cpp:member:: PartGeometry decrement_arrow
+
+   .. cpp:member:: PartGeometry increment_glyph
+
+   .. cpp:member:: PartGeometry decrement_glyph
 
 .. cpp:namespace:: gui_forms
 
