@@ -117,6 +117,7 @@ struct PageContext final {
     std::shared_ptr<Button> binding_previous;
     std::shared_ptr<Button> binding_next;
     std::shared_ptr<Label> binding_status;
+    std::shared_ptr<BindingNavigator> binding_navigator;
     std::uint64_t timer_ticks{};
     std::size_t selected_page{};
     // Registry-driven shell state: page ids and titles in navigation order,

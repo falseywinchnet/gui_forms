@@ -21,6 +21,8 @@ Commands, menu strips and context menus.
      - A band along one edge that holds ToolStrips.
    * - :cpp:class:`ToolStripContainer <gui_forms::ToolStripContainer>`
      - Four ToolStripPanels around a content panel.
+   * - :cpp:class:`BindingNavigator <gui_forms::BindingNavigator>`
+     - A ToolStrip that moves through a BindingSource.
    * - :cpp:class:`ContextMenu <gui_forms::ContextMenu>`
      - A popup menu of commands that the application opens at a point, such as on a right-click.
    * - :cpp:class:`Command <gui_forms::Command>`
@@ -34,6 +36,7 @@ Commands, menu strips and context menus.
    generated/gui_forms.StatusStrip
    generated/gui_forms.ToolStripPanel
    generated/gui_forms.ToolStripContainer
+   generated/gui_forms.BindingNavigator
    generated/gui_forms.ContextMenu
    generated/gui_forms.Command
 
@@ -44,6 +47,8 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`BindingNavigatorAddNew <gui_forms::BindingNavigatorAddNew>`
+     - Raised by a BindingNavigator's add command.
    * - :cpp:class:`MenuItemInvocation <gui_forms::MenuItemInvocation>`
      - MenuItemInvocation reports the exact stable item identity and source owner for one accepted menu activation.
    * - :cpp:class:`MenuItemSpec <gui_forms::MenuItemSpec>`
@@ -80,6 +85,18 @@ Related types
      - One item.
    * - :cpp:class:`ToolStripPanel::Parts <gui_forms::ToolStripPanel::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BindingNavigatorAddNew final
+
+   ``#include <gui_forms/controls/binding_navigator/binding_navigator.hpp>``
+
+   Raised by a BindingNavigator's add command. A handler supplies the record to add; without one nothing is added. The navigator adds it to the end of the binding source and moves to it.
+
+   .. cpp:member:: std::string navigator_id
+
+   .. cpp:member:: std::optional<BindingRecord> record
 
 .. cpp:namespace:: gui_forms
 

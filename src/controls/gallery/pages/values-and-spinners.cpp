@@ -133,8 +133,8 @@ private:
                               const std::shared_ptr<PageContext>& context) {
         std::shared_ptr<LayoutGroup> binding = group(
             "gallery.values.binding",
-            "BindingSource · currency, edit, conversion, two-way controls", {930.0, 164.0});
-        (*body).add_at(binding, {24.0, 474.0, 930.0, 164.0});
+            "BindingSource · currency, edit, conversion, two-way controls · BindingNavigator", {930.0, 196.0});
+        (*body).add_at(binding, {24.0, 474.0, 930.0, 196.0});
         (*context).binding_editor = make_control<TextBox>(StableId("gallery.values.binding.name"));
         (*(*context).binding_editor).set_accessible_name("Bound profile name");
         (*context).binding_enabled = make_control<CheckBox>(
@@ -156,6 +156,10 @@ private:
         (*binding).add_at((*context).binding_previous, {630.0, 42.0, 128.0, 32.0});
         (*binding).add_at((*context).binding_next, {772.0, 42.0, 128.0, 32.0});
         (*binding).add_at((*context).binding_status, {20.0, 94.0, 880.0, 26.0});
+        // A BindingNavigator over the same source; the shell binds it.
+        (*context).binding_navigator = make_control<BindingNavigator>(StableId("gallery.values.binding.navigator"));
+        (*(*context).binding_navigator).set_accessible_name("Profile navigator");
+        (*binding).add_at((*context).binding_navigator, {20.0, 128.0, 520.0, 27.0});
     }
 
     void inspect_numeric() {

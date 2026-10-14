@@ -288,6 +288,17 @@ bool ToolStrip::item_interactive(std::size_t index) const {
     return result;
 }
 
+void ToolStrip::set_item_text(std::string_view item_id, std::string text) {
+    require_mutable();
+    const std::optional<std::size_t> index = index_of(item_id);
+    if (!index) throw std::out_of_range("ToolStrip has no item with this ID");
+    if (!validate_utf8(text).valid()) throw std::invalid_argument("ToolStrip item text must be valid UTF-8");
+    if (items_[*index].text == text) return;
+    items_[*index].text = std::move(text);
+    if (item_states_[*index].hosted) (*item_states_[*index].hosted).set_accessible_name(items_[*index].text);
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
 bool ToolStrip::item_checked(std::string_view item_id) const {
     const std::optional<std::size_t> index = index_of(item_id);
     if (!index) throw std::out_of_range("ToolStrip has no item with this ID");

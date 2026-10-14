@@ -1906,6 +1906,44 @@ Properties beyond every control's: none.
 
 Interactions beyond every control's: none.
 
+## `binding_navigator` (BindingNavigator, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `grip` | grip |  |  |
+| `overflow_button` | actuator | `button` | hot, open |
+| `overflow_glyph` | glyph |  | hot, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_arrow` | actuator | `button` | hot, pressed |
+| `item_arrow_glyph` | glyph |  |  |
+| `item_separator` | divider |  |  |
+| `item_focus` | focus |  |  |
+| `item_combo_box` | well | `combo_box` |  |
+| `item_text_box` | well | `text_box` |  |
+| `item_progress_bar` | track | `progress_bar` |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `item_clicked` | `ToolStripItemClick` |
+| `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
+| `adding_new` | `BindingNavigatorAddNew`, by reference |
+
 ## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |

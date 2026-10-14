@@ -161,6 +161,15 @@ void example() {
 }
 }  // namespace doc_example_BindingContext_2
 
+namespace doc_example_BindingNavigator_1 {
+void example() {
+    std::shared_ptr<gf::BindingNavigator> navigator =
+        gf::make_control<gf::BindingNavigator>(gf::StableId("people.navigator"));
+    const std::shared_ptr<gf::Command>& next = (*navigator).move_next_command();
+    gf::MenuItemSpec menu_item("people.menu.next", gf::MenuItemKind::command, next, "Next person");
+}
+}  // namespace doc_example_BindingNavigator_1
+
 namespace doc_example_BindingSource_1 {
 void example() {
     std::shared_ptr<gf::Control> root = gf::make_control<gf::Control>(gf::StableId("app"));
@@ -3199,6 +3208,7 @@ int main() {
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);
     failures += run("BindingContext example 2", &doc_example_BindingContext_2::example);
+    failures += run("BindingNavigator example 1", &doc_example_BindingNavigator_1::example);
     failures += run("BindingSource example 1", &doc_example_BindingSource_1::example);
     failures += run("BindingSource example 2", &doc_example_BindingSource_2::example);
     failures += run("BreadcrumbTrail example 1", &doc_example_BreadcrumbTrail_1::example);

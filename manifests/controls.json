@@ -679,6 +679,17 @@
       "doc": "api/generated/gui_forms.ToolStripContainer.rst"
     },
     {
+      "id": "binding_navigator",
+      "type": "BindingNavigator",
+      "header": "gui_forms/controls/binding_navigator/binding_navigator.hpp",
+      "category": "Menus and commands",
+      "purpose": "ToolStrip that moves through a BindingSource with first, previous, position, count, next, last, add and delete, each a shared Command enabled by the source's position, count and permissions.",
+      "winforms": "BindingNavigator",
+      "status": "stable",
+      "gallery_page": "values-and-spinners",
+      "doc": "api/generated/gui_forms.BindingNavigator.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",

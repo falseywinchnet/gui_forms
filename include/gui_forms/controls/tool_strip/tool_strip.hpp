@@ -126,6 +126,10 @@ public:
     [[nodiscard]] std::shared_ptr<ProgressBar> progress_bar(std::string_view item_id) const;
     // The checked state the strip shows for an item: its command's when it
     // has one. Throws std::out_of_range for an unknown ID.
+    // Replaces one item's text (a hosted item's accessible name). Throws
+    // std::out_of_range for an unknown ID and std::invalid_argument for
+    // invalid UTF-8.
+    void set_item_text(std::string_view item_id, std::string text);
     [[nodiscard]] bool item_checked(std::string_view item_id) const;
     void set_item_checked(std::string_view item_id, bool checked);
     // Whether the grip is shown at the strip's start.
