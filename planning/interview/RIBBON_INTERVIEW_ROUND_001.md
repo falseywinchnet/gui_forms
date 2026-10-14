@@ -3,7 +3,8 @@
 Date: 2026-10-14
 
 Status: **owner verdicts recorded for part 1 (scope, structure, layout and
-scaling, and taste question T1); parts 2 and 3 pending**.
+scaling, and taste question T1) and part 2 except keyboard (C1 to C4, asked
+again after an explanation of KeyTips); part 3 pending**.
 
 The questions are section 8 of `planning/stages/RB-ribbon/RIBBON_STUDY.md`,
 cited by their IDs (A1, B2 and so on). Each answer names the option number of
@@ -67,11 +68,64 @@ Recorded as:
   Paint's. Where 2007 and 2010 differ, A3-4 already orders them for the File
   area: 2007's application menu first, 2010's Backstage later.
 
-## Part 2. Pending
+## Part 2. Owner verdicts, 2026-10-14
 
-Keyboard (C1 to C4), the Quick Access Toolbar, minimizing and persistence
-(D1 to D4), galleries and commands (E1 to E3), contextual tabs (F1 to F3),
-and the A4 follow-up (A4a).
+The owner's message, verbatim:
+
+> round 2:
+> A4a: 2.
+> I could install office.
+> styling note for later:
+> note that from our interviews in the last couple of days i indicated a specific styling for buttons that isnt a crisp outline, but rathere a dithered 3d button, and that we can animate later - we can make it so the dithering sinks into the flat support, then you move the mouse over and it "raises" to form the button so you know the control can be interacted with.  modern office styling may give specific behavioral cues i dont approve of, but if that doesnt impact implementation then we're fine for now.
+> C: i dont know what a keytip is. explain.
+>
+> D:
+> follows all recommend, same thing for E,F
+
+A4a asked what the cross-ribbon scaling study may use: (1) documents only, or
+(2) documents plus observing ribbons running on the owner's Windows machine
+(WordPad uses the Windows Ribbon Framework there), asking before each use;
+recommendation 2.
+
+Recorded as:
+
+- **GIVEN A4a-2.** The scaling study may observe ribbons running on the owner's
+  Windows machine, asking before each use. The owner offered to install
+  Office for it ("I could install office"); installing it is the owner's
+  action, and the study asks before relying on it.
+- **Styling note, recorded for later (stages T2 and T4, and taste question
+  T2).** Ribbon buttons are not a crisp outline but the dithered 3D button of
+  the earlier interviews (design language §3.5, dithered bulge; §12.4 to
+  §12.6). At rest the dithering sinks into the flat support (the command
+  plane); when the pointer moves over a button it rises to form the button,
+  so the user knows the control can be interacted with; the rise can be
+  animated later. Modern Office styling may give behavioural cues the owner
+  does not approve of; that does not change the implementation now. Reading
+  for the implementation: the states the engine needs (rest, hot, pressed)
+  already exist; "flat at rest, raised when hot" is theme data, as the
+  `menu_item` family already makes strip items flat at rest; the animation
+  of the rise is a T2 settling primitive.
+- **C1 to C4 not answered:** the owner asked what a KeyTip is. Explained in
+  the conversation and asked again.
+- **GIVEN D1-1, D2-2, D3-1, D4-1** ("follows all recommend"): the Quick
+  Access Toolbar sits on the tab row beside the File tab, with "show below the
+  ribbon" as the user's alternative; commands only, not whole groups, for now;
+  a click outside the minimized ribbon's popup is consumed and only closes
+  it; the ribbon saves its state (Quick Access Toolbar items and position,
+  minimized) automatically through the runtime configuration's layout store,
+  with explicit save and load also available.
+- **GIVEN E1-1, E2-2, E3-2** ("same thing for E,F"): live preview and
+  cancel-preview events on gallery value commands only, previewing after a
+  300 ms hover and on keyboard focus; value-bearing commands (spinner, combo,
+  gallery, colour, font) are separate command types sharing identity,
+  enabled and visibility with `Command`; enhanced tooltips carry title,
+  description, shortcut, image, availability reason and a help topic opened
+  by F1.
+- **GIVEN F1-1, F2-1, F3-1:** contextual tab set colours come from an
+  ordered accent ramp the theme supplies; application modes are admitted (a
+  mode set choosing core tabs and groups, as in the Windows Ribbon
+  Framework); contextual tab selection rules are built in, driven by the
+  application's availability calls.
 
 ## Part 3. Pending
 

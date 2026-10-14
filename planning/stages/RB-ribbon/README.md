@@ -4,7 +4,8 @@ Release: not yet placed on the public roadmap; the plan this stage produces
 proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
 study delivered (`RIBBON_STUDY.md`); interview round 001 part 1 answered
-(decisions 1 to 10 below), parts 2 and 3 pending. The controls are built in
+(decisions 1 to 10 below) and part 2 except keyboard (decisions 11 to 15;
+C1 to C4 asked again after an explanation of KeyTips); part 3 pending. The controls are built in
 stage W (decision 1). Authority: this brief and
 `planning/interview/RIBBON_INTERVIEW_ROUND_001.md`.
 
@@ -102,6 +103,28 @@ From interview round 001, part 1 (2026-10-14); the record is
 9. **No simplified one-line ribbon (B5-1).**
 10. **Follow Office 2010 and earlier (T1)** where the canonical ribbons
     differ.
+
+From part 2 (2026-10-14):
+
+11. **The scaling study may observe ribbons running on the owner's Windows
+    machine (A4a-2)**, asking before each use; the owner offered to install
+    Office for it.
+12. **Quick Access Toolbar, minimize and state (D1-1, D2-2, D3-1, D4-1):** on
+    the tab row beside the File tab (or below the ribbon, the user's choice);
+    commands only; a click outside the minimized popup is consumed; the
+    ribbon saves its own state through the layout store, with explicit save
+    and load available.
+13. **Galleries and commands (E1-1, E2-2, E3-2):** preview events on gallery
+    value commands only (300 ms hover, and keyboard focus); value-bearing
+    commands are separate types sharing identity and state with `Command`;
+    enhanced tooltips with an F1 help topic.
+14. **Contextual tabs (F1-1, F2-1, F3-1):** theme accent ramp, application
+    modes, built-in selection rules.
+15. **Styling note for T2 and T4:** ribbon buttons are the dithered 3D button;
+    at rest the dithering sinks into the flat command plane, and under the
+    pointer it rises to form the button, so the user sees the control can be
+    used; animated later (a T2 settling primitive). The states it needs
+    already exist; "flat at rest, raised when hot" is theme data.
 
 ## Gate
 
