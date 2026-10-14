@@ -463,6 +463,23 @@ public:
     [[nodiscard]] std::size_t focus_scope_depth() const noexcept;
     [[nodiscard]] Control::Ptr active_focus_scope_root() const noexcept;
     bool move_focus(bool forward = true);
+    // F6 regions (owner decision RB-17): the window's ordered list of focus
+    // regions, such as a ribbon, a work pane, side panels and a status bar.
+    // F6 moves focus to the next region and Shift+F6 to the previous,
+    // wrapping around, when the focused control and its ancestors leave the
+    // key unhandled. Entering a region focuses the control that last had
+    // focus inside it, or else its first Tab stop. Regions must be attached
+    // to this window, distinct and not nested in one another; otherwise this
+    // throws std::invalid_argument and keeps the previous list. An empty
+    // list turns F6 cycling off. A region that is detached, hidden or
+    // disabled, or holds no Tab stop, is skipped.
+    void set_focus_regions(std::vector<Control::Ptr> regions);
+    [[nodiscard]] std::vector<Control::Ptr> focus_regions() const;
+    // Moves focus as F6 (forward) or Shift+F6 does. From outside every
+    // region, forward enters the first region and backward the last. Returns
+    // false, leaving focus alone, when no other region can take focus or a
+    // focus scope (a popup or dialog) is active.
+    bool move_focus_region(bool forward = true);
     void set_accept_button(const Control::Ptr& control);
     void set_cancel_button(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr accept_button() const noexcept {
@@ -744,6 +761,15 @@ private:
     bool active_{true};
     StableIdMap stable_ids_;
     Control::WeakPtr focused_;
+    // One F6 region and the control that last had focus inside it. Both are
+    // observed, never owned.
+    struct FocusRegion final {
+        Control::WeakPtr region;
+        Control::WeakPtr remembered;
+    };
+    std::vector<FocusRegion> focus_regions_;
+    void remember_region_focus(const Control::Ptr& control);
+    [[nodiscard]] bool focus_into_region(FocusRegion& region);
     bool focus_cue_visible_{};
     Control::WeakPtr accept_button_;
     Control::WeakPtr cancel_button_;

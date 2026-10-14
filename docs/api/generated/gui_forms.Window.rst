@@ -129,6 +129,16 @@ gui_forms::Window
       **active_focus_scope_root** : ``Control::Ptr``, read-only
          Returns the live root of the innermost active focus scope.
 
+      **focus_regions** : ``std::vector<Control::Ptr>``
+         The window's ordered list of focus regions (a ribbon, a work pane, side
+         panels, a status bar) that F6 and Shift+F6 cycle through, wrapping
+         around, when the focused control leaves the key unhandled. Entering a
+         region focuses the control that last had focus inside it, or else its
+         first Tab stop. :cpp:func:`set_focus_regions <gui_forms::Window::set_focus_regions>` throws ``std::invalid_argument`` for a
+         region that is not attached to this window, a repeated region or regions
+         nested in one another, and keeps the previous list; an empty list turns
+         F6 cycling off.
+
       **accept_button** : ``Control::Ptr``
          The control activated by Enter when the focused control does not handle
          it. It must be a live button (any :cpp:class:`ButtonBase <gui_forms::ButtonBase>`) in this window, or
@@ -284,6 +294,8 @@ gui_forms::Window
         -  
       * - :cpp:func:`move_focus <gui_forms::Window::move_focus>`
         - Moves focus to the next Tab stop, or with ``false`` the previous one, within the active focus scope or the whole window, wrapping around.
+      * - :cpp:func:`move_focus_region <gui_forms::Window::move_focus_region>`
+        - Moves focus as F6 does, or with ``false`` as Shift+F6.
       * - :cpp:func:`capture_pointer <gui_forms::Window::capture_pointer>`
         - Routes pointer input to a control until :cpp:func:`release_pointer <gui_forms::Window::release_pointer>`, wherever the pointer goes.
       * - :cpp:func:`release_pointer <gui_forms::Window::release_pointer>`
@@ -586,6 +598,21 @@ gui_forms::Window
 
    .. cpp:function:: Control::Ptr active_focus_scope_root() const noexcept
 
+   .. cpp:function:: std::vector<Control::Ptr> focus_regions() const
+
+      The window's ordered list of focus regions (a ribbon, a work pane, side
+      panels, a status bar) that F6 and Shift+F6 cycle through, wrapping
+      around, when the focused control leaves the key unhandled. Entering a
+      region focuses the control that last had focus inside it, or else its
+      first Tab stop. :cpp:func:`set_focus_regions <gui_forms::Window::set_focus_regions>` throws ``std::invalid_argument`` for a
+      region that is not attached to this window, a repeated region or regions
+      nested in one another, and keeps the previous list; an empty list turns
+      F6 cycling off.
+
+   .. cpp:function:: void set_focus_regions(std::vector<Control::Ptr> regions)
+
+      Sets :cpp:func:`focus_regions <gui_forms::Window::focus_regions>`; see the property's description above.
+
    .. cpp:function:: Control::Ptr accept_button() const noexcept
 
       The control activated by Enter when the focused control does not handle
@@ -875,6 +902,14 @@ gui_forms::Window
       Moves focus to the next Tab stop, or with ``false`` the previous one,
       within the active focus scope or the whole window, wrapping around.
       Returns false when there is nothing to focus.
+
+   .. cpp:function:: bool move_focus_region(bool forward = true)
+
+      Moves focus as F6 does, or with ``false`` as Shift+F6. From outside every
+      region, forward enters the first region and backward the last. Regions
+      that are detached, hidden, disabled or without a Tab stop are skipped.
+      Returns false, leaving focus alone, when no other region can take focus
+      or a popup or dialog focus scope is active.
 
    .. cpp:function:: void capture_pointer(const Control::Ptr& control, std::uint64_t pointer_id = 1)
 

@@ -32,6 +32,8 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`AccentIndex <gui_forms::AccentIndex>`
+     - A position in the theme's accent ramp (design language §8.5; owner decision RB-22): the ordered colours a theme offers for telling sets of items apart, such as a ribbon's contextual tab sets.
    * - :cpp:class:`AnatomyStateSet <gui_forms::AnatomyStateSet>`
      - A bounded set of active standard and custom states.
    * - :cpp:class:`AnatomyValidation <gui_forms::AnatomyValidation>`
@@ -82,6 +84,16 @@ Related types
      - One member of a states record and the standard state it reports.
    * - :cpp:class:`StaticNode <gui_forms::StaticNode>`
      - StaticNode is an inert declarative node containing a registered type name, stable ID, and owned child descriptions.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AccentIndex final
+
+   ``#include <gui_forms/anatomy/types/anatomy_types.hpp>``
+
+   A position in the theme's accent ramp (design language §8.5; owner decision RB-22): the ordered colours a theme offers for telling sets of items apart, such as a ribbon's contextual tab sets. Index 0 is the ramp's first colour; an index past the end of a theme's ramp wraps around it. A part or item carries one as data, not as a state.
+
+   .. cpp:member:: std::uint8_t value
 
 .. cpp:namespace:: gui_forms
 
@@ -437,6 +449,10 @@ Related types
    .. cpp:member:: bool present
 
    .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: std::optional<AccentIndex> accent
+
+      The accent the part is tinted with, or none (see AccentIndex).
 
 .. cpp:namespace:: gui_forms
 

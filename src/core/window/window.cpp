@@ -532,6 +532,7 @@ bool Window::request_focus(const Control::Ptr& control) {
     }
     if (control && eligible(control) && (*control).focusable_) {
         focused_ = control;
+        remember_region_focus(control);
         (*control).publish_change(
             static_cast<const void*>(&(*control).focus_observed_),
             FocusChangePublication{this, control, true});
@@ -1166,6 +1167,99 @@ bool Window::move_focus(bool forward) {
     return request_focus(candidates[index]);
 }
 
+void Window::set_focus_regions(std::vector<Control::Ptr> regions) {
+    require_ui_thread("focus region mutation");
+    for (std::size_t index = 0; index < regions.size(); ++index) {
+        const Control::Ptr& region = regions[index];
+        if (!region || !(*region).is_alive() || (*region).attached_window() != this) {
+            throw std::invalid_argument("GUI.Forms focus regions must be attached to this Window");
+        }
+        for (std::size_t other = 0; other < index; ++other) {
+            const Control::Ptr& earlier = regions[other];
+            if (earlier == region || (*earlier).contains(*region) || (*region).contains(*earlier)) {
+                throw std::invalid_argument("GUI.Forms focus regions must be distinct and not nested");
+            }
+        }
+    }
+    std::vector<FocusRegion> next;
+    next.reserve(regions.size());
+    const Control::Ptr focused = focused_.lock();
+    for (const Control::Ptr& region : regions) {
+        FocusRegion entry;
+        entry.region = region;
+        if (focused && (focused == region || (*region).contains(*focused))) entry.remembered = focused;
+        next.push_back(std::move(entry));
+    }
+    focus_regions_.swap(next);
+}
+
+std::vector<Control::Ptr> Window::focus_regions() const {
+    std::vector<Control::Ptr> regions;
+    regions.reserve(focus_regions_.size());
+    for (const FocusRegion& entry : focus_regions_) {
+        const Control::Ptr region = entry.region.lock();
+        if (region) regions.push_back(region);
+    }
+    return regions;
+}
+
+void Window::remember_region_focus(const Control::Ptr& control) {
+    for (FocusRegion& entry : focus_regions_) {
+        const Control::Ptr region = entry.region.lock();
+        if (region && (region == control || (*region).contains(*control))) entry.remembered = control;
+    }
+}
+
+// Focuses the region's remembered control while it is still inside the
+// region and can take focus, or else the region's first Tab stop.
+bool Window::focus_into_region(FocusRegion& entry) {
+    const Control::Ptr region = entry.region.lock();
+    if (!region || !(*region).is_alive() || (*region).attached_window() != this || !eligible(region)) {
+        return false;
+    }
+    const Control::Ptr remembered = entry.remembered.lock();
+    if (remembered && (*remembered).is_alive() && (*remembered).attached_window() == this &&
+        (remembered == region || (*region).contains(*remembered)) && request_focus(remembered)) {
+        return true;
+    }
+    const ControlList candidates = focus_candidates(region);
+    for (const Control::Ptr& candidate : candidates) {
+        if (request_focus(candidate)) return true;
+    }
+    return false;
+}
+
+bool Window::move_focus_region(bool forward) {
+    require_ui_thread("focus region traversal");
+    if (!focus_scopes_.empty() || focus_regions_.empty()) return false;
+    const std::size_t count = focus_regions_.size();
+    // The region holding the focused control, if any.
+    const Control::Ptr focused = focused_.lock();
+    std::optional<std::size_t> current;
+    for (std::size_t index = 0; index < count && focused; ++index) {
+        const Control::Ptr region = focus_regions_[index].region.lock();
+        if (region && (region == focused || (*region).contains(*focused))) {
+            current = index;
+            break;
+        }
+    }
+    // Try every other region once, in order from the current one.
+    for (std::size_t step = 0; step < count; ++step) {
+        std::size_t index = 0;
+        if (!current) {
+            index = forward ? step : count - 1U - step;
+        } else if (step + 1U == count) {
+            break;
+        } else if (forward) {
+            index = (*current + 1U + step) % count;
+        } else {
+            index = (*current + count - 1U - step) % count;
+        }
+        if (focus_into_region(focus_regions_[index])) return true;
+    }
+    return false;
+}
+
 void Window::capture_pointer(const Control::Ptr& control, std::uint64_t pointer_id) {
     require_ui_thread("pointer capture");
     if (control && !eligible(control)) {
@@ -1350,6 +1444,11 @@ bool Window::dispatch_key(KeyEvent event) {
     }
     const bool traversal_key = event.action == KeyAction::down &&
         event.physical_key == PhysicalKey::tab;
+    // F6 and Shift+F6 cycle the focus regions; other modifiers leave F6 to
+    // the application.
+    const bool region_key = event.action == KeyAction::down &&
+        event.physical_key == PhysicalKey::f6 &&
+        (event.modifiers == Modifier::none || event.modifiers == Modifier::shift);
     const bool forward =
         (static_cast<std::uint8_t>(event.modifiers) &
          static_cast<std::uint8_t>(Modifier::shift)) == 0U;
@@ -1358,6 +1457,7 @@ bool Window::dispatch_key(KeyEvent event) {
     if (!target || !eligible(target)) {
         if (dispatch_accelerator(event, false)) return true;
         if (dispatch_dialog_key(event)) return true;
+        if (region_key) return move_focus_region(forward);
         return traversal_key && move_focus(forward);
     }
     const std::vector<Control::Ptr> route = route_to(target);
@@ -1398,6 +1498,9 @@ bool Window::dispatch_key(KeyEvent event) {
     if (!event.handled && dispatch_dialog_key(event)) return true;
     if (!event.handled && traversal_key) {
         return move_focus(forward);
+    }
+    if (!event.handled && region_key) {
+        return move_focus_region(forward);
     }
     return event.handled;
 }
