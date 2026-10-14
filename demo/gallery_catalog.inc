@@ -21,7 +21,7 @@ inline constexpr std::array<std::string_view, 14> catalog_categories {{
     "Components",
 }};
 
-inline constexpr std::array<CatalogEntry, 76> control_catalog {{
+inline constexpr std::array<CatalogEntry, 77> control_catalog {{
     {"button_base", "ButtonBase", "gui_forms/controls/button_base/button_base.hpp", "Commands", "Shared retained command state machine for pointer, keyboard, mnemonic, semantic, and dialog activation that Button, CheckBox, RadioButton, and LinkLabel specialize.", "ButtonBase", "stable", "control-spectrum"},
     {"button", "Button", "gui_forms/controls/button_base/button/button.hpp", "Commands", "Push button with accept/cancel dialog results, default-button state, and four visual policies.", "Button", "stable", "control-spectrum"},
     {"drop_down_button", "DropDownButton", "gui_forms/controls/button_base/button/drop_down_button/drop_down_button.hpp", "Commands", "Command button with an explicit disclosure actuator that either routes the whole button to an owned popup menu or keeps a primary click region beside a trailing split region.", "ToolStripSplitButton", "provisional", "commands-and-menus"},
