@@ -3,8 +3,8 @@
 Release: not yet placed on the public roadmap; the plan this stage produces
 proposes where. Depends on: nothing to start; the controls it plans build on
 W's strip and gallery work and on the by-role paint path. Status 2026-10-14:
-study under way. Authority: this brief, until the owner's decisions are
-recorded.
+study delivered (`RIBBON_STUDY.md`); the owner interview is next. Authority:
+this brief, until the owner's decisions are recorded.
 
 Read [the shared brief](../README.md) first.
 
@@ -33,7 +33,7 @@ into Windows Forms-style pieces.
 
 ## Sequence
 
-1. **Study** (in progress, 2026-10-14). What a ribbon is in each canonical
+1. **Study** (delivered 2026-10-14: `RIBBON_STUDY.md` in this folder). What a ribbon is in each canonical
    implementation; the ribbon as Windows Forms pieces (what maps onto tab
    strips, `ToolStrip` items, drop-downs, list views, and what no Forms piece
    covers); what GUI.Forms has; a proposed anatomy in vocabulary terms with
@@ -83,7 +83,7 @@ owner accepts the plan.
 
 ## Read first
 
-- The study, once delivered (to be committed beside this brief).
+- `RIBBON_STUDY.md` (this folder), especially §8, the interview questions.
 - `planning/DESIGN_LANGUAGE_SPECIFICATION.md` §3.5, §8, §12.
 - `planning/stages/T4-default-theme/RENDERING_REFERENCE.md`.
 - `planning/stages/W-winforms-controls/README.md`.
