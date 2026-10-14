@@ -1360,7 +1360,7 @@ enum and the schema as §12.7 requires (§8.5):
 
 ### 12.9 Owner decisions, seventh round, 2026-10-14 (tooltips and help)
 
-From the ribbon interview's last note (stage RB, decisions 37 to 41):
+From the ribbon interview's last note (stage RB, decisions 37 to 43):
 
 - **Overlay shadow (RB-37).** An engine input: a soft shadow offset down
   and right from the one upper-left light (§3), cast by surfaces that
