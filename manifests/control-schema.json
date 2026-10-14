@@ -4690,6 +4690,15 @@
       ]
     },
     {
+      "id": "background_worker",
+      "type": "BackgroundWorker",
+      "kind": "component",
+      "interactions": [
+        {"name": "progress_changed", "payload": "BackgroundWorkerProgress", "mutable_payload": false},
+        {"name": "run_worker_completed", "payload": "BackgroundWorkerCompleted", "mutable_payload": false}
+      ]
+    },
+    {
       "id": "image_list",
       "type": "ImageList",
       "kind": "component",

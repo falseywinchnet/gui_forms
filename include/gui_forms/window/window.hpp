@@ -35,6 +35,7 @@ namespace gui_forms {
 
 class UpdateScope;
 class Timer;
+class BackgroundWorker;
 class ToolTip;
 class ImageList;
 class HostServices;
@@ -539,6 +540,7 @@ private:
     friend class Control;
     friend class UpdateScope;
     friend class Timer;
+    friend class BackgroundWorker;
     friend class ToolTip;
     friend class ErrorProvider;
     friend class HelpProvider;

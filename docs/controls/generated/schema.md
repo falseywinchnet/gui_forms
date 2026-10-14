@@ -2137,6 +2137,13 @@ Interactions beyond every control's: none.
 |---|---|
 | `tick` | none |
 
+## `background_worker` (BackgroundWorker, component)
+
+| Interaction | Payload |
+|---|---|
+| `progress_changed` | `BackgroundWorkerProgress` |
+| `run_worker_completed` | `BackgroundWorkerCompleted` |
+
 ## `image_list` (ImageList, component)
 
 | Interaction | Payload |

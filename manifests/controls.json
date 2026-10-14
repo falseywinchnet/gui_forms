@@ -844,6 +844,17 @@
       "doc": "api/generated/gui_forms.Timer.rst"
     },
     {
+      "id": "background_worker",
+      "type": "BackgroundWorker",
+      "header": "gui_forms/background_worker/background_worker.hpp",
+      "category": "Components",
+      "purpose": "Runs one work function at a time on a gui_forms Worker thread and delivers progress and completion on its window's UI thread through the dispatcher, with cooperative cancellation.",
+      "winforms": "BackgroundWorker",
+      "status": "provisional",
+      "gallery_page": "timing-and-tooltips",
+      "doc": "api/generated/gui_forms.BackgroundWorker.rst"
+    },
+    {
       "id": "image_list",
       "type": "ImageList",
       "header": "gui_forms/image_list/image_list/image_list.hpp",

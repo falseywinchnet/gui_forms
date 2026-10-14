@@ -15,6 +15,14 @@ public:
 private:
     void build_timer(const std::shared_ptr<Surface>& body, PageContext& context);
     void build_tooltips(const std::shared_ptr<Surface>& body, PageContext& context);
+    void build_worker(const std::shared_ptr<Surface>& body);
+    void on_run_work();
+    void on_cancel_work();
+    void on_work_progress(const BackgroundWorkerProgress& progress);
+    void on_work_completed(const BackgroundWorkerCompleted& completed);
+    // The BackgroundWorker's work, on its worker thread: it touches only its
+    // task.
+    void count_in_background(BackgroundWorkerTask& task);
     void on_start();
     void on_stop();
     void on_interval_changed(double milliseconds);
@@ -25,6 +33,13 @@ private:
     Command stop_{};
     Value<double> interval_{250.0};
     std::shared_ptr<Label> status_;
+    Command run_work_{};
+    Command cancel_work_{};
+    std::shared_ptr<Button> run_button_;
+    std::shared_ptr<ProgressBar> work_progress_;
+    std::shared_ptr<Label> work_status_;
+    // Created on the first run, when the page's window is known.
+    std::shared_ptr<BackgroundWorker> worker_;
 };
 
 TimingPage::TimingPage(const std::shared_ptr<Surface>& body,
@@ -37,6 +52,7 @@ TimingPage::TimingPage(const std::shared_ptr<Surface>& body,
                          12.0, 400, muted), {26.0, 52.0, 920.0, 24.0});
     build_timer(body, *context);
     build_tooltips(body, *context);
+    build_worker(body);
     on(start_.invoked(), *this, &TimingPage::on_start);
     on(stop_.invoked(), *this, &TimingPage::on_stop);
     on(interval_.changed(), *this, &TimingPage::on_interval_changed);
@@ -172,6 +188,88 @@ void TimingPage::build_tooltips(const std::shared_ptr<Surface>& body,
                                "ErrorProvider adornment · focus the field and press F1",
                                9.0, 400, muted),
                          {628.0, 210.0, 278.0, 22.0});
+}
+
+// A BackgroundWorker counting to 100 on a worker thread, its progress and
+// completion arriving on the UI thread.
+void TimingPage::build_worker(const std::shared_ptr<Surface>& body) {
+    std::shared_ptr<LayoutGroup> worker_group = group(
+        "gallery.timing.worker.group", "BackgroundWorker · work off the UI thread, results on it",
+        {930.0, 118.0});
+    (*body).add_at(worker_group, {24.0, 648.0, 930.0, 118.0});
+    run_work_.set_text("Run in background");
+    cancel_work_.set_text("Cancel");
+    cancel_work_.set_enabled(false);
+    run_button_ = make_control<Button>(StableId("gallery.timing.worker.run"), "Run in background");
+    (*run_button_).set_visual_style(ButtonVisualStyle::accent);
+    (*run_button_).bind(run_work_);
+    std::shared_ptr<Button> cancel = make_control<Button>(StableId("gallery.timing.worker.cancel"), "Cancel");
+    (*cancel).bind(cancel_work_);
+    (*worker_group).add_at(run_button_, {22.0, 38.0, 160.0, 34.0});
+    (*worker_group).add_at(cancel, {194.0, 38.0, 104.0, 34.0});
+    work_progress_ = make_control<ProgressBar>(StableId("gallery.timing.worker.progress"));
+    (*work_progress_).set_range(0.0, 100.0);
+    (*work_progress_).set_accessible_name("Background work");
+    (*worker_group).add_at(work_progress_, {322.0, 44.0, 264.0, 24.0});
+    work_status_ = label("gallery.timing.worker.status", "Idle", 11.0, 700, shell_blue_dark);
+    (*worker_group).add_at(work_status_, {612.0, 40.0, 294.0, 28.0});
+    (*worker_group).add_at(label("gallery.timing.worker.note",
+                                 "progress_changed and run_worker_completed arrive through the window's dispatcher.",
+                                 10.0, 400, muted),
+                           {22.0, 80.0, 884.0, 22.0});
+    on(run_work_.invoked(), *this, &TimingPage::on_run_work);
+    on(cancel_work_.invoked(), *this, &TimingPage::on_cancel_work);
+}
+
+void TimingPage::count_in_background(BackgroundWorkerTask& task) {
+    for (int percent = 0; percent <= 100; percent += 5) {
+        if (task.cancellation_pending()) {
+            task.set_cancelled(true);
+            return;
+        }
+        task.report_progress(percent);
+        std::this_thread::sleep_for(std::chrono::milliseconds(60));
+    }
+    task.set_result(BindingValue{std::string("Counted to 100")});
+}
+
+void TimingPage::on_run_work() {
+    Window* const window = (*run_button_).attached_window();
+    if (window == nullptr) return;
+    if (!worker_) {
+        worker_ = std::make_shared<BackgroundWorker>(*window);
+        (*worker_).set_worker_reports_progress(true);
+        (*worker_).set_worker_supports_cancellation(true);
+        (*worker_).set_do_work(
+            BackgroundWorker::Work::bind<TimingPage, &TimingPage::count_in_background>(*this));
+        on((*worker_).progress_changed(), *this, &TimingPage::on_work_progress);
+        on((*worker_).run_worker_completed(), *this, &TimingPage::on_work_completed);
+    }
+    if ((*worker_).is_busy()) return;
+    (*worker_).run_worker_async();
+    run_work_.set_enabled(false);
+    cancel_work_.set_enabled(true);
+    (*work_status_).set_text("Running on a worker thread");
+}
+
+void TimingPage::on_cancel_work() {
+    if (worker_ && (*worker_).is_busy()) (*worker_).cancel_async();
+}
+
+void TimingPage::on_work_progress(const BackgroundWorkerProgress& progress) {
+    (*work_progress_).set_value(static_cast<double>(progress.percent));
+}
+
+void TimingPage::on_work_completed(const BackgroundWorkerCompleted& completed) {
+    run_work_.set_enabled(true);
+    cancel_work_.set_enabled(false);
+    if (completed.cancelled) {
+        (*work_status_).set_text("Cancelled");
+    } else if (completed.error) {
+        (*work_status_).set_text("Failed: " + completed.error_message);
+    } else {
+        (*work_status_).set_text(binding_value_to_string(completed.result));
+    }
 }
 
 std::shared_ptr<Timer> TimingPage::timer() const {

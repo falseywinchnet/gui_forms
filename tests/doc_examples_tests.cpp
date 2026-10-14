@@ -67,6 +67,29 @@ void example() {
 }
 }  // namespace doc_example_AnchoredPopupLayer_1
 
+namespace doc_example_BackgroundWorker_1 {
+struct Sums final {
+    void work(gf::BackgroundWorkerTask& task) {
+        const std::int64_t limit = gf::binding_value_to_signed(task.argument()).value_or(0);
+        std::int64_t total = 0;
+        for (std::int64_t value = 1; value <= limit && !task.cancellation_pending(); ++value) {
+            total += value;
+        }
+        task.set_result(gf::BindingValue{total});
+    }
+};
+
+void example() {
+    std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
+    gf::Window window(root, {320.0, 200.0});
+    Sums sums;
+    gf::BackgroundWorker worker(window);
+    worker.set_do_work(gf::BackgroundWorker::Work::bind<Sums, &Sums::work>(sums));
+    worker.run_worker_async(gf::BindingValue{std::int64_t{100}});
+    // run_worker_completed reports 5050 when the window's dispatcher runs.
+}
+}  // namespace doc_example_BackgroundWorker_1
+
 namespace doc_example_Binding_1 {
 void example() {
     std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("form"));
@@ -3215,6 +3238,7 @@ int run(const char* name, void (*example)()) {
 int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
+    failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);

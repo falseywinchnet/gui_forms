@@ -172,6 +172,7 @@ add_library(gui_forms_core STATIC
     src/core/component/component/component.cpp
     src/core/component/component_container/component_container.cpp
     src/core/timer/timer/timer.cpp
+    src/core/background_worker/background_worker.cpp
     src/core/control/control/control.cpp
     src/core/control/stable_id/stable_id.cpp
     src/core/control/static_tree/control_factory/control_factory.cpp
@@ -2402,6 +2403,11 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_font_dialog_tests tests/font_dialog_tests.cpp)
     target_link_libraries(gui_forms_font_dialog_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_font_dialog_tests COMMAND gui_forms_font_dialog_tests)
+
+    add_executable(gui_forms_background_worker_tests tests/background_worker_tests.cpp)
+    target_link_libraries(gui_forms_background_worker_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_background_worker_tests COMMAND gui_forms_background_worker_tests)
+    set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
 
     add_executable(gui_forms_anatomy_tests tests/anatomy_tests.cpp)
     target_link_libraries(gui_forms_anatomy_tests PRIVATE gui_forms_controls)
