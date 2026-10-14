@@ -1,0 +1,229 @@
+{
+    "S1":  {
+               "signature":  "Clipboard{Paste:84x136;Cut:83x44;Copy:98x44} | Font{Font family:240x51;Font size:80x51;Grow font:46x44;Shrink font:44x44;Bold:46x44;Italic:48x44;Underline:48x44;Strikethrough:48x44;Subscript:48x44;Superscript:44x44;Text color:68x44;Text highlight color:66x44} | Paragraph{Decrease indent:46x44;Increase indent:44x44;Lists:70x44;Change line spacing:64x44;Align text left:46x44;Align text center:48x44;Align text right:48x44;Justify text:44x44;Paragraph:48x44} | Insert{Picture:84x136;Date and time:94x136;Insert object:84x136} | Editing{Find:90x44;Replace:123x44;Select all:133x44}",
+               "first_seen":  "height shrinking client 1600x1400",
+               "detail":  {
+                              "hidden":  false,
+                              "scrolling":  false,
+                              "tab":  "Home",
+                              "groups":  [
+                                             {
+                                                 "name":  "Clipboard",
+                                                 "x":  119,
+                                                 "w":  200,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Paste:84x136",
+                                                               "Cut:83x44",
+                                                               "Copy:98x44"
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Font",
+                                                 "x":  321,
+                                                 "w":  437,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Font family:240x51",
+                                                               "Font size:80x51",
+                                                               "Grow font:46x44",
+                                                               "Shrink font:44x44",
+                                                               "Bold:46x44",
+                                                               "Italic:48x44",
+                                                               "Underline:48x44",
+                                                               "Strikethrough:48x44",
+                                                               "Subscript:48x44",
+                                                               "Superscript:44x44",
+                                                               "Text color:68x44",
+                                                               "Text highlight color:66x44"
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Paragraph",
+                                                 "x":  760,
+                                                 "w":  255,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Decrease indent:46x44",
+                                                               "Increase indent:44x44",
+                                                               "Lists:70x44",
+                                                               "Change line spacing:64x44",
+                                                               "Align text left:46x44",
+                                                               "Align text center:48x44",
+                                                               "Align text right:48x44",
+                                                               "Justify text:44x44",
+                                                               "Paragraph:48x44"
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Insert",
+                                                 "x":  1017,
+                                                 "w":  280,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Picture:84x136",
+                                                               "Date and time:94x136",
+                                                               "Insert object:84x136"
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Editing",
+                                                 "x":  1299,
+                                                 "w":  151,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Find:90x44",
+                                                               "Replace:123x44",
+                                                               "Select all:133x44"
+                                                           ]
+                                             }
+                                         ],
+                              "ribbon":  "111,94,1600,304",
+                              "dock":  "111,156,1600,242,visible=1",
+                              "lower":  "111,204,1600,194"
+                          }
+           },
+    "S2":  {
+               "signature":  "HIDDEN",
+               "first_seen":  "height shrinking client 1600x220",
+               "detail":  {
+                              "hidden":  true,
+                              "scrolling":  false,
+                              "tab":  "",
+                              "groups":  [
+
+                                         ],
+                              "ribbon":  "111,36,1600,304",
+                              "dock":  "111,98,100,100,visible=0"
+                          }
+           },
+    "S3":  {
+               "signature":  "Clipboard[collapsed] | Font{Font family:240x51;Font size:80x51;Grow font:46x44;Shrink font:44x44;Bold:46x44;Italic:48x44;Underline:48x44;Strikethrough:48x44;Subscript:48x44;Superscript:44x44;Text color:68x44;Text highlight color:66x44} | Paragraph[collapsed] | Insert[collapsed] | Editing[collapsed]",
+               "first_seen":  "height shrinking client 800x1400",
+               "detail":  {
+                              "hidden":  false,
+                              "scrolling":  false,
+                              "tab":  "Home",
+                              "groups":  [
+                                             {
+                                                 "name":  "Clipboard",
+                                                 "x":  119,
+                                                 "w":  98,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Font",
+                                                 "x":  219,
+                                                 "w":  328,
+                                                 "collapsed":  false,
+                                                 "items":  [
+                                                               "Font family:240x51",
+                                                               "Font size:80x51",
+                                                               "Grow font:46x44",
+                                                               "Shrink font:44x44",
+                                                               "Bold:46x44",
+                                                               "Italic:48x44",
+                                                               "Underline:48x44",
+                                                               "Strikethrough:48x44",
+                                                               "Subscript:48x44",
+                                                               "Superscript:44x44",
+                                                               "Text color:68x44",
+                                                               "Text highlight color:66x44"
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Paragraph",
+                                                 "x":  549,
+                                                 "w":  103,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Insert",
+                                                 "x":  654,
+                                                 "w":  84,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Editing",
+                                                 "x":  740,
+                                                 "w":  84,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             }
+                                         ],
+                              "ribbon":  "111,94,800,304",
+                              "dock":  "111,156,800,242,visible=1",
+                              "lower":  "111,204,800,194"
+                          }
+           },
+    "S4":  {
+               "signature":  "Clipboard[collapsed] | Font[collapsed] | Paragraph[collapsed] | Insert[collapsed] | Editing[collapsed]",
+               "first_seen":  "height shrinking client 600x1400",
+               "detail":  {
+                              "hidden":  false,
+                              "scrolling":  false,
+                              "tab":  "Home",
+                              "groups":  [
+                                             {
+                                                 "name":  "Clipboard",
+                                                 "x":  119,
+                                                 "w":  98,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Font",
+                                                 "x":  219,
+                                                 "w":  84,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Paragraph",
+                                                 "x":  305,
+                                                 "w":  103,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Insert",
+                                                 "x":  410,
+                                                 "w":  84,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             },
+                                             {
+                                                 "name":  "Editing",
+                                                 "x":  496,
+                                                 "w":  84,
+                                                 "collapsed":  true,
+                                                 "items":  [
+
+                                                           ]
+                                             }
+                                         ],
+                              "ribbon":  "111,94,600,304",
+                              "dock":  "111,156,600,242,visible=1",
+                              "lower":  "111,204,600,194"
+                          }
+           }
+}
