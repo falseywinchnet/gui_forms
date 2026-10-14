@@ -132,8 +132,6 @@ Related types
 
    .. cpp:member:: std::string mnemonic
 
-   .. cpp:member:: std::string key_tip
-
    .. cpp:member:: std::string availability_reason
 
    .. cpp:member:: bool enabled

@@ -275,6 +275,73 @@ struct HostTooltipRequest final {
     std::uint32_t duration_milliseconds{};
 };
 
+// Notification-area (system tray) icons. An icon is named by the identity
+// HostServices::add_tray_icon returns; no native handle enters the portable
+// contract. `images` holds the icon at one or more sizes (each at most 256
+// pixels a side); an adapter shows the image nearest the size its tray asks
+// for (select_tray_icon_image). `tooltip` is at most 127 bytes of UTF-8.
+struct HostTrayIconRequest final {
+    std::vector<HostImage> images;
+    std::string tooltip;
+};
+
+struct HostTrayIconResult final {
+    HostServiceStatus status;
+    std::uint64_t icon_id{};
+};
+
+// What the user did to a tray icon, reported on the UI thread. `context` is
+// the platform's context gesture (a secondary click, or the menu key).
+enum class HostTrayIconAction : std::uint8_t {
+    click,
+    double_click,
+    context,
+    notification_clicked,
+    notification_closed,
+};
+
+struct HostTrayIconEvent final {
+    std::uint64_t icon_id{};
+    HostTrayIconAction action{HostTrayIconAction::click};
+};
+
+enum class HostTrayNotificationIcon : std::uint8_t { none, information, warning, error };
+
+// Notification text from a tray icon: a title of at most 63 bytes and text
+// of at most 255 bytes of UTF-8, shown for about `timeout_milliseconds` where
+// the platform honours a timeout (zero leaves it to the platform).
+struct HostTrayNotificationRequest final {
+    std::string title;
+    std::string text;
+    HostTrayNotificationIcon icon{HostTrayNotificationIcon::none};
+    std::uint32_t timeout_milliseconds{};
+};
+
+// One row of a native tray menu: a command with an identity, or a separator.
+struct HostTrayMenuItem final {
+    std::string id;
+    std::string text;
+    bool enabled{true};
+    bool checked{};
+    bool separator{};
+};
+
+struct HostTrayMenuRequest final {
+    std::vector<HostTrayMenuItem> items;
+};
+
+// The chosen row's identity, or empty when the menu was dismissed.
+struct HostTrayMenuResult final {
+    HostServiceStatus status;
+    std::string chosen_id;
+};
+
+// The index of the image to show for a tray that asks for `wanted_side`
+// pixels: the smallest image whose larger side reaches it, or the largest
+// image when none does. `images` must not be empty.
+[[nodiscard]] std::size_t select_tray_icon_image(std::span<const HostImage> images,
+                                                 std::uint32_t wanted_side) noexcept;
+
 struct HostModalTransition final {
     std::uint64_t request_id{};
     std::uint32_t depth{};
@@ -389,5 +456,6 @@ struct HostDispatchResult final {
 [[nodiscard]] const char* host_dialog_outcome_name(HostDialogOutcome outcome) noexcept;
 [[nodiscard]] const char* host_dialog_choice_name(HostDialogChoice choice) noexcept;
 [[nodiscard]] const char* host_sound_cue_name(HostSoundCue cue) noexcept;
+[[nodiscard]] const char* host_tray_icon_action_name(HostTrayIconAction action) noexcept;
 
 } // namespace gui_forms

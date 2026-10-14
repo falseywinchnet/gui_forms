@@ -33,6 +33,7 @@ public:
         build_context_menu(body);
         build_strips(body);
         build_container(body);
+        build_ribbon(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -323,6 +324,62 @@ private:
         (*content).set_dock(DockStyle::fill);
         (*(*frame).content_panel()).add_child(content);
         (*frame_group).add_at(frame, {22.0, 36.0, 880.0, 176.0});
+    }
+
+    // A Ribbon over the same Commands (stage RB, phase 1): Home with a
+    // launcher, a large split, small commands and a toggle; Insert with
+    // hosted controls; the File tab's application menu.
+    void build_ribbon(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> ribbon_group = group(
+            "gallery.commands.ribbon", "Ribbon · phase 1: tabs, groups, launchers, hosted controls", {930.0, 160.0});
+        (*body).add_at(ribbon_group, {24.0, 1030.0, 930.0, 160.0});
+        std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("gallery.commands.ribbon.bar"));
+        (*ribbon).set_accessible_name("Document ribbon");
+        std::vector<RibbonTabSpec> tabs;
+        RibbonTabSpec home{.stable_id = "ribbon.home", .text = "&Home"};
+        RibbonGroupSpec document{.stable_id = "ribbon.document", .caption = "Document", .dialog_launcher = true};
+        document.commands.push_back({.stable_id = "ribbon.new", .command = new_});
+        document.commands.push_back({.stable_id = "ribbon.save", .kind = RibbonCommandKind::split, .command = save_,
+                                     .drop_down = export_items("ribbon.save.export")});
+        document.commands.push_back({.stable_id = "ribbon.delete", .size = RibbonCommandSize::small,
+                                     .command = delete_});
+        document.commands.push_back({.stable_id = "ribbon.wrap", .kind = RibbonCommandKind::toggle,
+                                     .size = RibbonCommandSize::small, .command = wrap_command_});
+        document.commands.push_back({.stable_id = "ribbon.export", .kind = RibbonCommandKind::drop_down,
+                                     .size = RibbonCommandSize::small, .text = "Export",
+                                     .drop_down = export_items("ribbon.export")});
+        RibbonGroupSpec view{.stable_id = "ribbon.view", .caption = "View"};
+        view.commands.push_back({.stable_id = "ribbon.icons", .size = RibbonCommandSize::small, .command = icons_});
+        view.commands.push_back({.stable_id = "ribbon.details", .size = RibbonCommandSize::small,
+                                 .command = details_});
+        view.commands.push_back({.stable_id = "ribbon.zoom", .kind = RibbonCommandKind::combo_box, .text = "Zoom",
+                                 .choices = {"50%", "100%", "200%"}, .width = 80.0});
+        RibbonGroupSpec run{.stable_id = "ribbon.run-group", .caption = "Run"};
+        run.commands.push_back({.stable_id = "ribbon.run", .kind = RibbonCommandKind::split, .command = run_,
+                                .drop_down = {item("ribbon.run.verbose", run_options_[0]),
+                                              item("ribbon.run.watch", run_options_[1])}});
+        home.groups.push_back(std::move(document));
+        home.groups.push_back(std::move(view));
+        home.groups.push_back(std::move(run));
+        RibbonTabSpec insert{.stable_id = "ribbon.insert", .text = "&Insert"};
+        RibbonGroupSpec find{.stable_id = "ribbon.find-group", .caption = "Find", .dialog_launcher = true};
+        find.commands.push_back({.stable_id = "ribbon.find", .kind = RibbonCommandKind::text_box, .text = "Find"});
+        find.commands.push_back({.stable_id = "ribbon.matches", .kind = RibbonCommandKind::numeric_up_down,
+                                 .text = "Matches"});
+        find.commands.push_back({.stable_id = "ribbon.case", .kind = RibbonCommandKind::check_box,
+                                 .text = "Match case"});
+        insert.groups.push_back(std::move(find));
+        tabs.push_back(std::move(home));
+        tabs.push_back(std::move(insert));
+        (*ribbon).set_tabs(std::move(tabs));
+        (*ribbon).set_application_menu({item("ribbon.file.new", new_), item("ribbon.file.save", save_),
+                                        separator("ribbon.file.separator"), item("ribbon.file.about", about_)});
+        on((*ribbon).dialog_launcher_clicked(), *this, &CommandsAndMenusPage::on_ribbon_launcher);
+        (*ribbon_group).add_at(ribbon, {22.0, 36.0, 880.0, 112.0});
+    }
+
+    void on_ribbon_launcher(const RibbonDialogLaunch& launch) {
+        (*status_).set_text("Ribbon dialog launcher · " + launch.group_id);
     }
 
     // Shared application state.

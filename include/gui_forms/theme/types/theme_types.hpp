@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace gui_forms {
 
@@ -223,18 +224,34 @@ struct ThemeStructureTokens final {
                left.motion == right.motion;
     }
 };
+// The accent ramp a theme offers parts that carry an AccentIndex (design
+// language 8.5). Provisional: six translucent tints (amber, green, violet,
+// orange, red, teal) laid over a part's material, until the default theme
+// (stage T4) defines its own ramp and the engine (T2) its tint.
+[[nodiscard]] inline std::vector<Color> provisional_accent_ramp() {
+    std::vector<Color> ramp{
+        Color::rgba(241, 196, 15, 72), Color::rgba(88, 170, 80, 72),
+        Color::rgba(142, 108, 196, 72), Color::rgba(230, 126, 34, 72),
+        Color::rgba(208, 72, 72, 72), Color::rgba(38, 166, 154, 72),
+    };
+    return ramp;
+}
+
 struct ThemeDefinition final {
     std::string id{"windows-professional"};
     BasicControlStyle compatibility;
     std::array<ControlRoleRecipes, control_visual_role_count> roles;
     ThemeStructureTokens structure;
+    // At least one colour; Theme::create refuses an empty ramp.
+    std::vector<Color> accent_ramp{provisional_accent_ramp()};
     friend bool operator==(const ThemeDefinition& left,
                            const ThemeDefinition& right) noexcept(noexcept(
         left.id == right.id && left.compatibility == right.compatibility &&
         left.roles == right.roles && left.structure == right.structure)) {
         return left.id == right.id &&
                left.compatibility == right.compatibility &&
-               left.roles == right.roles && left.structure == right.structure;
+               left.roles == right.roles && left.structure == right.structure &&
+               left.accent_ramp == right.accent_ramp;
     }
 };
 

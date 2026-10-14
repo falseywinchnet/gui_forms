@@ -29,6 +29,15 @@ enum class HostCapability : std::uint64_t {
     // request (see the capture_path host option). Additive flag; no protocol
     // version change.
     frame_capture = 1ULL << 19U,
+    // Notification-area (system tray) icons with click, double-click and
+    // context events. Reported only where a tray is present (on X11, where a
+    // system tray owns the _NET_SYSTEM_TRAY_Sn selection at startup).
+    // Additive flags; no protocol version change.
+    notification_area = 1ULL << 20U,
+    // Notification text (a balloon or banner) shown from a tray icon.
+    notification_area_messages = 1ULL << 21U,
+    // A native menu shown from a tray icon (show_tray_menu).
+    notification_area_menus = 1ULL << 22U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

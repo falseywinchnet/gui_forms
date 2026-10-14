@@ -146,6 +146,19 @@ struct ItemSystemIndex final {
     }
 };
 
+// A position in the theme's accent ramp (design language §8.5; owner
+// decision RB-22): the ordered colours a theme offers for telling sets of
+// items apart, such as a ribbon's contextual tab sets. Index 0 is the ramp's
+// first colour; an index past the end of a theme's ramp wraps around it.
+// A part or item carries one as data, not as a state.
+struct AccentIndex final {
+    std::uint8_t value{};
+
+    friend constexpr bool operator==(AccentIndex left, AccentIndex right) noexcept {
+        return left.value == right.value;
+    }
+};
+
 // A bounded set of active standard and custom states.
 class AnatomyStateSet final {
 public:
@@ -254,6 +267,8 @@ struct PartGeometry final {
     Rect bounds{};
     bool present{};
     AnatomyStateSet states{};
+    // The accent the part is tinted with, or none (see AccentIndex).
+    std::optional<AccentIndex> accent{};
 
     // A part that is present exactly when `bounds` is not empty.
     [[nodiscard]] static constexpr PartGeometry from_bounds(Rect bounds) noexcept {
@@ -266,7 +281,7 @@ struct PartGeometry final {
     friend constexpr bool operator==(const PartGeometry& left,
                                      const PartGeometry& right) noexcept {
         return left.bounds == right.bounds && left.present == right.present &&
-               left.states == right.states;
+               left.states == right.states && left.accent == right.accent;
     }
 };
 

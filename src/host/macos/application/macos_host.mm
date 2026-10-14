@@ -762,7 +762,12 @@ NSString* native_accessibility_role(SemanticRole role) {
     // AppKit exposes no separator role. A visual menu separator is structural,
     // never an adjustable splitter, so retain it as a neutral group.
     case SemanticRole::separator: return NSAccessibilityGroupRole;
+    // AppKit has no split-button role. The primary action is a press, so a
+    // split button is a button; a menu button is AppKit's menu button.
+    case SemanticRole::split_button: return NSAccessibilityButtonRole;
+    case SemanticRole::menu_button: return NSAccessibilityMenuButtonRole;
     case SemanticRole::generic: return NSAccessibilityGroupRole;
+    case SemanticRole::count: return NSAccessibilityGroupRole;
     }
     return NSAccessibilityGroupRole;
 }
@@ -986,6 +991,13 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 }
 - (BOOL)isAccessibilityExpanded {
     return gui_forms::has_semantic_state(_node.states, SemanticState::expanded);
+}
+// AppKit's index attribute carries the zero-based position in a set; it has
+// no set-size or has-popup attribute (a menu button's role says it opens a
+// menu).
+- (NSInteger)accessibilityIndex {
+    if (!_node.position_in_set || *_node.position_in_set == 0) return 0;
+    return static_cast<NSInteger>(*_node.position_in_set - 1);
 }
 - (BOOL)isAccessibilityProtectedContent {
     return gui_forms::has_semantic_state(
@@ -2824,7 +2836,9 @@ HostCapabilities macos_capabilities() {
                 HostCapability::clipboard_images |
                 HostCapability::typed_drag_destination |
                 HostCapability::dialogs |
-                HostCapability::sound_cues};
+                HostCapability::sound_cues |
+                HostCapability::notification_area |
+                HostCapability::notification_area_menus};
 }
 
 class DispatchAndCollectWake final {

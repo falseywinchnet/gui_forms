@@ -7,6 +7,7 @@
 #include <map>
 #include <poll.h>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 namespace gui_forms::host::linux_detail {
 namespace {
@@ -51,6 +52,10 @@ AtkRole native_role(SemanticRole role) {
     case SemanticRole::tool_tip: return ATK_ROLE_TOOL_TIP;
     case SemanticRole::separator: return ATK_ROLE_SEPARATOR;
     case SemanticRole::link: return ATK_ROLE_LINK;
+    // ATK's push-button-menu role is too recent for the ATK versions CI
+    // builds against; a push button with the has-popup state says the same.
+    case SemanticRole::split_button: return ATK_ROLE_PUSH_BUTTON;
+    case SemanticRole::menu_button: return ATK_ROLE_PUSH_BUTTON;
     default: return ATK_ROLE_PANEL;
     }
 }
@@ -91,13 +96,31 @@ AtkStateSet* states(AtkObject* object) {
     if (value.node.role == SemanticRole::text_box && !has_semantic_state(value.node.states, SemanticState::read_only)) {
         atk_state_set_add_state(result, ATK_STATE_EDITABLE);
     }
+    if (value.node.has_popup) { atk_state_set_add_state(result, ATK_STATE_HAS_POPUP); }
     return result;
+}
+// Position in set and set size as the object attributes "posinset" and
+// "setsize", which AT-SPI clients read.
+AtkAttributeSet* add_attribute(AtkAttributeSet* set, const char* name, std::size_t number) {
+    AtkAttribute* attribute = g_new(AtkAttribute, 1);
+    (*attribute).name = g_strdup(name);
+    (*attribute).value = g_strdup(std::to_string(number).c_str());
+    return g_slist_prepend(set, attribute);
+}
+AtkAttributeSet* attributes(AtkObject* object) {
+    const NodeData& value = data(object);
+    AtkAttributeSet* set = nullptr;
+    if (!value.live || !value.node.position_in_set || !value.node.set_size) { return set; }
+    set = add_attribute(set, "setsize", *value.node.set_size);
+    set = add_attribute(set, "posinset", *value.node.position_in_set);
+    return set;
 }
 void class_init(gpointer raw, gpointer) {
     AtkObjectClass& object = *static_cast<AtkObjectClass*>(raw);
     object.get_name = name; object.get_description = description; object.get_parent = parent;
     object.get_index_in_parent = index_in_parent; object.get_n_children = child_count;
     object.ref_child = child_at; object.get_role = role; object.ref_state_set = states;
+    object.get_attributes = attributes;
     (*G_OBJECT_CLASS(raw)).finalize = finalize;
 }
 void instance_init(GTypeInstance* instance, gpointer) {

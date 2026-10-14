@@ -87,7 +87,8 @@ Items are records, not child controls: the strip lays them out as its
 ``item_label``, ``item_arrow`` (a split button's arrow), ``item_arrow_glyph``,
 ``item_separator`` and ``item_focus``, with the states hot, pressed, checked,
 open, disabled and focus_visible. The strip itself publishes ``region``,
-``face``, ``grip``, ``overflow_button``, ``overflow_glyph`` and ``focus``.
+``face``, ``grip``, ``overflow_button``, ``overflow_glyph`` (the overflow mark,
+a double chevron) and ``focus``.
 Items are flat at rest: the theme's menu-item plate is transparent until an
 item is hot, pressed or checked.
 

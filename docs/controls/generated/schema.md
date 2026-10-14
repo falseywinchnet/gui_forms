@@ -16,6 +16,20 @@ Every control also has these properties: `accessible_description`, `accessible_n
 
 Every control also raises these interactions: `name_changed`, `visible_changed`, `enabled_changed`, `auto_size_changed`, `causes_validation_changed`, `validating`, `validated`, `initialization_completed`, `pointer_observed`, `pointer_preview_observed`, `focus_observed`, `arranged_bounds_changed`, `help_requested`.
 
+## Vocabulary
+
+The atoms controls declare and themes address (design language §8.5 and §12.7).
+
+Part roles: `region`, `shadow`, `face`, `edge`, `keyline`, `perimeter`, `sheen`, `seam`, `divider`, `caption`, `cap`, `well`, `track`, `fill`, `thumb`, `actuator`, `indicator`, `activity`, `glyph`, `icon`, `label`, `content`, `caret`, `disclosure`, `grip`, `chip`, `focus`, `preselect`, `selection`, `validation`, `drop`.
+
+States: `normal`, `hot`, `pressed`, `captured`, `focused`, `focus_visible`, `preselect`, `selected`, `checked`, `indeterminate`, `current`, `active_tool`, `enabled`, `disabled`, `unavailable`, `read_only`, `invalid`, `pending`, `open`, `closed`, `expanding`, `collapsing`, `interrupted`, `drop_accepted`, `drop_rejected`, `key`, `secondary_participating`, `drag_proximate`, `deactivated`, `high_contrast`, `reduced_motion`.
+
+Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`.
+
+Values: `accent_index`.
+
+Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio_button`, `link`, `text_box`, `list`, `list_item`, `check_list_item`, `combo_box`, `slider`, `scroll_bar`, `progress_bar`, `image`, `tab_group`, `tab`, `split_pane`, `numeric_field`, `tool_tip`, `date_picker`, `calendar`, `date_cell`, `property_grid`, `property_group`, `property_row`, `menu_bar`, `menu_bar_item`, `menu`, `menu_item`, `separator`, `toolbar`, `radio_group`, `split_button`, `menu_button`.
+
 ## `button_base` (ButtonBase, control)
 
 | Part | Role | Reuses | Own states |
@@ -1944,6 +1958,70 @@ Properties beyond every control's: none.
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 | `adding_new` | `BindingNavigatorAddNew`, by reference |
 
+## `ribbon` (Ribbon, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `tab_rail` | face |  |  |
+| `application_button` | face | `button` | hot, pressed, open, focus_visible |
+| `application_label` | label |  | hot, pressed, open, focus_visible |
+| `command_plane` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `tab`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `tab` | face |  |  |
+| `tab_label` | label |  |  |
+| `tab_focus` | focus |  |  |
+
+Item states: `hot`, `selected`, `focus_visible`.
+
+Item system `group`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `group_region` | region |  |  |
+| `group_caption` | caption |  |  |
+| `group_divider` | divider |  |  |
+| `group_launcher` | actuator | `button` | hot, pressed, focus_visible |
+| `group_launcher_glyph` | glyph |  | hot, pressed, focus_visible |
+| `group_launcher_focus` | focus |  | hot, pressed, focus_visible |
+
+Item states: none.
+
+Item system `command`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `command_face` | face |  |  |
+| `command_icon` | icon |  |  |
+| `command_label` | label |  |  |
+| `command_arrow` | actuator | `button` | hot, pressed |
+| `command_arrow_glyph` | glyph |  |  |
+| `command_focus` | focus |  |  |
+| `command_combo_box` | well | `combo_box` |  |
+| `command_numeric_up_down` | well | `numeric_up_down` |  |
+| `command_check_box` | indicator | `check_box` |  |
+| `command_text_box` | well | `text_box` |  |
+
+Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `command_clicked` | `RibbonCommandClick` |
+| `drop_down_item_invoked` | `RibbonDropDownInvocation` |
+| `dialog_launcher_clicked` | `RibbonDialogLaunch` |
+| `selected_tab_changed` | `RibbonTabChange` |
+| `minimized_changed` | `bool` |
+| `application_menu_item_invoked` | `MenuItemInvocation` |
+
 ## `context_menu` (ContextMenu, component)
 
 | Interaction | Payload |
@@ -2187,6 +2265,16 @@ Interactions beyond every control's: none.
 |---|---|
 | `progress_changed` | `BackgroundWorkerProgress` |
 | `run_worker_completed` | `BackgroundWorkerCompleted` |
+
+## `notify_icon` (NotifyIcon, component)
+
+| Interaction | Payload |
+|---|---|
+| `click` | `NotifyIconClick` |
+| `double_click` | none |
+| `balloon_tip_clicked` | none |
+| `balloon_tip_closed` | none |
+| `menu_item_invoked` | `MenuItemInvocation` |
 
 ## `image_list` (ImageList, component)
 

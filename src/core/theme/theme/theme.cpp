@@ -687,6 +687,9 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
             throw std::invalid_argument("theme contains an invalid visual recipe");
         }
     }
+    if (definition.accent_ramp.empty() || definition.accent_ramp.size() > 256U) {
+        throw std::invalid_argument("theme accent ramp must hold 1 to 256 colours");
+    }
     if (!valid_structure(definition.structure)) {
         throw std::invalid_argument(
             "theme structural tokens must be finite, ordered, and bounded");

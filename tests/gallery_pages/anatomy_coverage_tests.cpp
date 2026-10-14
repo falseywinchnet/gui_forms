@@ -20,12 +20,13 @@ constexpr std::array<std::string_view, 0> anatomy_pending{
 // Registry entries that are not controls: nonvisual components and the
 // LiveSurface service type. They have no parts; a component that shows
 // something (a context menu, a tool tip) does so through an internal control.
-constexpr std::array<std::string_view, 13> nonvisual_entries{
+constexpr std::array<std::string_view, 14> nonvisual_entries{
     "command",
     "context_menu",
     "tool_tip",
     "timer",
     "background_worker",
+    "notify_icon",
     "image_list",
     "error_provider",
     "help_provider",

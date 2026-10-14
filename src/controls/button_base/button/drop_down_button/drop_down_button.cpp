@@ -269,6 +269,11 @@ void DropDownButton::on_key(KeyEvent& event) {
 
 SemanticDescriptor DropDownButton::semantic_descriptor() const {
     SemanticDescriptor descriptor = Button::semantic_descriptor();
+    // Split mode keeps a primary click beside the menu arrow; menu mode is
+    // one button that opens the menu.
+    descriptor.role = mode_ == DropDownButtonMode::split ? SemanticRole::split_button
+                                                         : SemanticRole::menu_button;
+    descriptor.has_popup = true;
     descriptor.actions.push_back(SemanticAction::show_menu);
     descriptor.actions.push_back(drop_down_open_ ? SemanticAction::collapse
                                                  : SemanticAction::expand);

@@ -436,6 +436,8 @@ std::vector<SemanticNode> ListBox::semantic_virtual_children() const {
         node.role = SemanticRole::list_item;
         node.name = items_[index];
         node.value = items_[index];
+        node.position_in_set = index + 1U;
+        node.set_size = items_.size();
         const double row_y = list_bounds.y + 2.0 +
             (static_cast<double>(index) - static_cast<double>(top_index_)) *
                 row_height;

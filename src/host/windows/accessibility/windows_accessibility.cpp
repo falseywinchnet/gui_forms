@@ -75,6 +75,8 @@ LONG role(SemanticRole value) noexcept {
     case SemanticRole::link: return ROLE_SYSTEM_LINK;
     case SemanticRole::tool_tip: return ROLE_SYSTEM_TOOLTIP;
     case SemanticRole::separator: return ROLE_SYSTEM_SEPARATOR;
+    case SemanticRole::split_button: return ROLE_SYSTEM_SPLITBUTTON;
+    case SemanticRole::menu_button: return ROLE_SYSTEM_BUTTONMENU;
     default: return ROLE_SYSTEM_GROUPING;
     }
 }
@@ -222,6 +224,9 @@ class WindowsAccessibility::Accessible final : public IAccessible {
         if (has_semantic_state(state, SemanticState::expanded)) { bits |= STATE_SYSTEM_EXPANDED; }
         if (has_semantic_state(state, SemanticState::protected_content)) { bits |= STATE_SYSTEM_PROTECTED; }
         if (has_semantic_state(state, SemanticState::busy)) { bits |= STATE_SYSTEM_BUSY; }
+        // MSAA has a has-popup state but no position-in-set field; UIA (stage A)
+        // will carry PositionInSet and SizeOfSet.
+        if ((*found).has_popup) { bits |= STATE_SYSTEM_HASPOPUP; }
         (*out).vt = VT_I4; (*out).lVal = bits; return S_OK;
     }
     HRESULT STDMETHODCALLTYPE get_accHelp(VARIANT child, BSTR* out) override { return property(child, out, 2); }

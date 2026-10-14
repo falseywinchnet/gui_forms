@@ -17,6 +17,26 @@ bool paintable(Rect bounds) noexcept {
     return result;
 }
 
+// Roles painted as a surface of the recipe's material: the ones an accent
+// tints.
+bool surface_role(PartRole role) noexcept {
+    switch (role) {
+    case PartRole::face:
+    case PartRole::well:
+    case PartRole::track:
+    case PartRole::fill:
+    case PartRole::thumb:
+    case PartRole::actuator:
+    case PartRole::chip:
+    case PartRole::cap:
+    case PartRole::activity:
+    case PartRole::selection:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool any_state(AnatomyStateSet states, AnatomyState first, AnatomyState second) noexcept {
     const bool result = states.contains(first) || states.contains(second);
     return result;
@@ -106,6 +126,77 @@ void fill_arrow(Painter& painter, Rect bounds, PartMark direction, Color color) 
     }
 }
 
+// The largest square that fits `box`, centred, on whole units.
+Rect square_in(Rect box) noexcept {
+    const double side = std::floor(std::min(box.width, box.height));
+    const Rect square{std::floor(box.x + (box.width - side) * 0.5),
+                      std::floor(box.y + (box.height - side) * 0.5), side, side};
+    return square;
+}
+
+// A ribbon group's dialog launcher: the top-left corner of a small window
+// and an arrow leaving it towards the bottom right, in one-unit strokes.
+void paint_dialog_launcher(Painter& painter, Rect box, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 4.0) return;
+    const double corner = side * 0.6;
+    const Point origin{square.x + 0.5, square.y + 0.5};
+    painter.draw_line(origin, {origin.x + corner, origin.y}, ink, 1.0);
+    painter.draw_line(origin, {origin.x, origin.y + corner}, ink, 1.0);
+    const Point tip{square.x + side - 0.5, square.y + side - 0.5};
+    const double head = side * 0.4;
+    painter.draw_line({origin.x + side * 0.3, origin.y + side * 0.3}, tip, ink, 1.0);
+    painter.draw_line({tip.x - head, tip.y}, tip, ink, 1.0);
+    painter.draw_line({tip.x, tip.y - head}, tip, ink, 1.0);
+}
+
+// A gallery's "more" button: a bar across the top third and a solid arrow
+// pointing down beneath it.
+void paint_more(Painter& painter, Rect box, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 4.0) return;
+    const double bar = std::max(1.0, std::floor(side / 8.0));
+    const double bar_top = std::floor(side * 0.2);
+    painter.fill_rect({square.x, square.y + bar_top, side, bar}, ink);
+    const double top = bar_top + bar + 1.0;
+    fill_arrow(painter, {square.x, square.y + top, side, side - top}, PartMark::arrow_down, ink);
+}
+
+// Overflow: a double chevron pointing to where the hidden items went, the
+// two chevrons a third of the square apart.
+void paint_overflow(Painter& painter, Rect box, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 4.0) return;
+    const double half = side * 0.25;
+    const double middle = square.y + side * 0.5;
+    const double gap = side / 3.0;
+    const double first_tip = square.x + side * 0.5 - gap * 0.5 + half * 0.5;
+    for (int chevron = 0; chevron < 2; ++chevron) {
+        const double tip = first_tip + gap * static_cast<double>(chevron);
+        painter.draw_line({tip - half, middle - half}, {tip, middle}, ink, 1.5);
+        painter.draw_line({tip, middle}, {tip - half, middle + half}, ink, 1.5);
+    }
+}
+
+// A Quick Access Toolbar's customize button: a short bar over an open
+// chevron pointing down. It differs from "more" by the open chevron and the
+// shorter bar.
+void paint_customize(Painter& painter, Rect box, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 4.0) return;
+    const double bar = std::max(1.0, std::floor(side / 8.0));
+    const double inset = std::floor(side * 0.2);
+    painter.fill_rect({square.x + inset, square.y + std::floor(side * 0.25), side - inset * 2.0, bar}, ink);
+    const double half = side * 0.25;
+    const Point middle{square.x + side * 0.5, square.y + side * 0.75};
+    painter.draw_line({middle.x - half, middle.y - half * 0.75}, middle, ink, 1.5);
+    painter.draw_line(middle, {middle.x + half, middle.y - half * 0.75}, ink, 1.5);
+}
+
 void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe) {
     const Rect box = part.bounds;
     const Color ink = recipe.glyph;
@@ -169,6 +260,18 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
         }
         return;
     }
+    case PartMark::dialog_launcher:
+        paint_dialog_launcher(painter, box, ink);
+        return;
+    case PartMark::more:
+        paint_more(painter, box, ink);
+        return;
+    case PartMark::overflow:
+        paint_overflow(painter, box, ink);
+        return;
+    case PartMark::customize:
+        paint_customize(painter, box, ink);
+        return;
     }
 }
 
@@ -209,11 +312,43 @@ ControlVisualContext part_visual_context(const Control& control, AnatomyStateSet
     return context;
 }
 
+std::string_view part_mark_name(PartMark mark) noexcept {
+    switch (mark) {
+    case PartMark::none: return "none";
+    case PartMark::check: return "check";
+    case PartMark::indeterminate: return "indeterminate";
+    case PartMark::radio_dot: return "radio_dot";
+    case PartMark::toggle_knob: return "toggle_knob";
+    case PartMark::arrow_up: return "arrow_up";
+    case PartMark::arrow_down: return "arrow_down";
+    case PartMark::arrow_left: return "arrow_left";
+    case PartMark::arrow_right: return "arrow_right";
+    case PartMark::chevron_down: return "chevron_down";
+    case PartMark::chevron_right: return "chevron_right";
+    case PartMark::close: return "close";
+    case PartMark::grip_dots: return "grip_dots";
+    case PartMark::dialog_launcher: return "dialog_launcher";
+    case PartMark::more: return "more";
+    case PartMark::overflow: return "overflow";
+    case PartMark::customize: return "customize";
+    case PartMark::count: return {};
+    }
+    return {};
+}
+
 void paint_part(Painter& painter, const Control& control, const PartPaint& part) {
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
-    const ControlVisualRecipe& recipe = control.effective_theme().resolve(part.family, context);
+    const Theme& theme = control.effective_theme();
+    const ControlVisualRecipe& recipe = theme.resolve(part.family, context);
     paint_part_from_recipe(painter, part, recipe, context);
+    if (!part.accent || !surface_role(part.role)) return;
+    // Provisional accent (design language 8.5): the ramp colour, which
+    // carries its own translucency, laid over the part's material in the
+    // part's shape. T4 replaces this with the engine's tint.
+    const Color tint = theme.accent(*part.accent);
+    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    painter.fill_rounded_rect(part.bounds, radius, tint);
 }
 
 void paint_part_from_recipe(Painter& painter, const PartPaint& part,

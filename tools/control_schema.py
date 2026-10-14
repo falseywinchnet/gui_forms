@@ -202,6 +202,20 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
         findings.append("the schema's types differ from manifests/controls.json "
                         f"(missing: {missing or 'none'}; extra: {extra or 'none'}; "
                         "or the order differs)")
+    vocabulary: object = schema.get("vocabulary")
+    if not isinstance(vocabulary, dict):
+        findings.append("the schema has no vocabulary (part roles, states, marks, values, semantic roles)")
+    else:
+        for key in ("part_roles", "states", "marks", "values", "semantic_roles"):
+            names: object = vocabulary.get(key)
+            if not isinstance(names, list) or not names:
+                findings.append(f"vocabulary: {key} is missing or empty")
+                continue
+            if len(set(names)) != len(names):
+                findings.append(f"vocabulary: {key} repeats a name")
+            for name in names:
+                if not _SNAKE.fullmatch(str(name)):
+                    findings.append(f"vocabulary: {key} name {name!r} is not snake_case")
     by_id: dict[str, control_registry.ControlRecord] = {record.id: record for record in registry.records}
     for record in types:
         identity: str = str(record.get("id"))
@@ -289,6 +303,19 @@ def render_page(schema: Mapping[str, object]) -> str:
         + ", ".join(_code(name) for name in common_interactions) + ".",
         "",
     ]
+    vocabulary: Mapping[str, object] = schema.get("vocabulary", {})  # type: ignore[assignment]
+    if vocabulary:
+        lines.append("## Vocabulary")
+        lines.append("")
+        lines.append("The atoms controls declare and themes address (design language §8.5 and §12.7).")
+        lines.append("")
+        titles: list[tuple[str, str]] = [("part_roles", "Part roles"), ("states", "States"),
+                                         ("marks", "Marks"), ("values", "Values"),
+                                         ("semantic_roles", "Semantic roles")]
+        for key, title in titles:
+            names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]
+            lines.append(f"{title}: " + ", ".join(_code(str(name)) for name in names) + ".")
+            lines.append("")
     for record in types:
         identity: str = str(record["id"])
         lines.append(f"## {_code(identity)} ({record['type']}, {record['kind']})")

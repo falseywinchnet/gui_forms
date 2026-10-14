@@ -690,6 +690,17 @@
       "doc": "api/generated/gui_forms.BindingNavigator.rst"
     },
     {
+      "id": "ribbon",
+      "type": "Ribbon",
+      "header": "gui_forms/controls/ribbon/ribbon.hpp",
+      "category": "Menus and commands",
+      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors, and minimizing by a click on the selected tab.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.Ribbon.rst"
+    },
+    {
       "id": "context_menu",
       "type": "ContextMenu",
       "header": "gui_forms/components/context_menu/context_menu.hpp",
@@ -864,6 +875,17 @@
       "status": "provisional",
       "gallery_page": "timing-and-tooltips",
       "doc": "api/generated/gui_forms.BackgroundWorker.rst"
+    },
+    {
+      "id": "notify_icon",
+      "type": "NotifyIcon",
+      "header": "gui_forms/components/notify_icon/notify_icon.hpp",
+      "category": "Components",
+      "purpose": "Icon in the desktop's notification area (Windows tray, macOS status item, X11 system tray) with a tooltip, clicks, a native context menu and notification text, each refused explicitly where the host lacks the capability.",
+      "winforms": "NotifyIcon",
+      "status": "provisional",
+      "gallery_page": "dialogs-and-host-services",
+      "doc": "api/generated/gui_forms.NotifyIcon.rst"
     },
     {
       "id": "image_list",

@@ -29,6 +29,11 @@ std::string HostServicesSnapshot::to_json() const {
            << sound_coalescing_window_nanoseconds
            << ",\"modal_depth\":" << modal_depth
            << ",\"maximum_modal_depth\":" << maximum_modal_depth
+           << ",\"tray_icons\":" << tray_icons
+           << ",\"tray_icon_updates\":" << tray_icon_updates
+           << ",\"tray_notifications\":" << tray_notifications
+           << ",\"tray_menus\":" << tray_menus
+           << ",\"tray_events\":" << tray_events
            << ",\"rejected_requests\":" << rejected_requests
            << ",\"shutdown\":" << (shutdown ? "true" : "false") << '}';
     return output.str();

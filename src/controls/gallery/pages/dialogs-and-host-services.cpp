@@ -44,6 +44,11 @@ private:
     void build_task_dialog(const std::shared_ptr<Surface>& body);
     void on_show_task_dialog();
     void on_task_dialog_closed(const TaskDialogResult& result);
+    void build_notify_icon(const std::shared_ptr<Surface>& body);
+    void on_toggle_notify_icon();
+    void on_notify();
+    void on_notify_icon_click(const NotifyIconClick& click);
+    void on_notify_icon_menu(const MenuItemInvocation& invocation);
 
     void on_message_dialog(int index, const CommandInvocation& invocation);
     void on_path_dialog(int index, const CommandInvocation& invocation);
@@ -72,6 +77,12 @@ private:
     Command task_dialog_command_{};
     std::shared_ptr<Button> task_dialog_button_;
     std::shared_ptr<TaskDialog> task_dialog_;
+    Command notify_toggle_command_{};
+    Command notify_message_command_{};
+    std::shared_ptr<Command> notify_menu_command_;
+    std::shared_ptr<Button> notify_toggle_button_;
+    // Made on first use, when the page's window is known.
+    std::shared_ptr<NotifyIcon> notify_icon_;
     std::string last_acceptance_{"No accepted dialog value yet"};
     std::uint64_t next_request_id_{1U};
 };
@@ -87,6 +98,7 @@ HostServicesPage::HostServicesPage(const std::shared_ptr<Surface>& body) {
     build_paths(body);
     build_services(body);
     build_task_dialog(body);
+    build_notify_icon(body);
 }
 
 // A TaskDialog: an owned dialog built from GUI.Forms controls inside the
@@ -166,6 +178,103 @@ void HostServicesPage::on_font_closed(const FontDialogResult& result) {
 
 void HostServicesPage::on_font_applied(const FontSpec& font) {
     (*font_sample_).set_font(font);
+}
+
+namespace {
+
+// A round icon of `side` pixels in the page's accent colour, straight alpha.
+HostImage round_icon(std::uint32_t side) {
+    HostImage image;
+    image.width = side;
+    image.height = side;
+    image.row_bytes = static_cast<std::uint64_t>(side) * 4U;
+    image.pixels.assign(static_cast<std::size_t>(image.row_bytes) * side, std::byte{0});
+    const double centre = static_cast<double>(side) * 0.5;
+    const double radius = centre - 1.0;
+    for (std::uint32_t row = 0; row < side; ++row) {
+        for (std::uint32_t column = 0; column < side; ++column) {
+            const double dx = static_cast<double>(column) + 0.5 - centre;
+            const double dy = static_cast<double>(row) + 0.5 - centre;
+            if (dx * dx + dy * dy > radius * radius) continue;
+            const std::size_t offset = static_cast<std::size_t>(row) * image.row_bytes + column * 4U;
+            image.pixels[offset + 0U] = std::byte{39};
+            image.pixels[offset + 1U] = std::byte{116};
+            image.pixels[offset + 2U] = std::byte{184};
+            image.pixels[offset + 3U] = std::byte{255};
+        }
+    }
+    return image;
+}
+
+std::string service_result(const HostServiceStatus& status) {
+    if (status.accepted()) return "accepted";
+    return host_service_error_name(status.error);
+}
+
+} // namespace
+
+// A NotifyIcon: the page's icon in the notification area, where the host
+// has one, with a context menu and notification text.
+void HostServicesPage::build_notify_icon(const std::shared_ptr<Surface>& body) {
+    std::shared_ptr<LayoutGroup> group_box = group(
+        "gallery.host.notify-icon", "NotifyIcon · an icon in the notification area, where the host has one",
+        {930.0, 96.0});
+    (*body).add_at(group_box, {24.0, 756.0, 930.0, 96.0});
+    notify_toggle_command_.set_text("Show tray icon");
+    notify_message_command_.set_text("Notify");
+    notify_toggle_button_ = make_control<Button>(StableId("gallery.host.notify-icon.toggle"), "Show tray icon");
+    (*notify_toggle_button_).set_visual_style(ButtonVisualStyle::accent);
+    (*notify_toggle_button_).bind(notify_toggle_command_);
+    std::shared_ptr<Button> notify = make_control<Button>(StableId("gallery.host.notify-icon.notify"), "Notify");
+    (*notify).bind(notify_message_command_);
+    (*group_box).add_at(notify_toggle_button_, {24.0, 40.0, 180.0, 38.0});
+    (*group_box).add_at(notify, {216.0, 40.0, 120.0, 38.0});
+    (*group_box).add_at(label("gallery.host.notify-icon.note",
+                              "Click, double-click or open the icon's menu; refusals report the host's capability.",
+                              11.0, 400, muted), {352.0, 46.0, 560.0, 24.0});
+    notify_menu_command_ = std::make_shared<Command>("gallery.host.notify-icon.hello", "Say hello");
+    on(notify_toggle_command_.invoked(), *this, &HostServicesPage::on_toggle_notify_icon);
+    on(notify_message_command_.invoked(), *this, &HostServicesPage::on_notify);
+}
+
+void HostServicesPage::on_toggle_notify_icon() {
+    Window* const window = (*notify_toggle_button_).attached_window();
+    if (window == nullptr) return;
+    if (!notify_icon_) {
+        notify_icon_ = std::make_shared<NotifyIcon>(*window);
+        (*notify_icon_).set_icon({round_icon(16U), round_icon(32U), round_icon(48U)});
+        (*notify_icon_).set_text("GUI.Forms Gallery");
+        std::shared_ptr<ContextMenu> menu = std::make_shared<ContextMenu>("gallery.host.notify-icon.menu");
+        (*menu).set_items({MenuItemSpec("gallery.host.notify-icon.menu.hello", MenuItemKind::command,
+                                        notify_menu_command_)});
+        (*notify_icon_).set_context_menu(menu);
+        on((*notify_icon_).click(), *this, &HostServicesPage::on_notify_icon_click);
+        on((*notify_icon_).menu_item_invoked(), *this, &HostServicesPage::on_notify_icon_menu);
+    }
+    const bool show = !(*notify_icon_).visible();
+    const HostServiceStatus status = (*notify_icon_).set_visible(show);
+    notify_toggle_command_.set_text(show ? "Hide tray icon" : "Show tray icon");
+    (*notify_toggle_button_).set_text(show ? "Hide tray icon" : "Show tray icon");
+    (*status_).set_text(std::string(show ? "Tray icon shown: " : "Tray icon hidden: ") + service_result(status));
+}
+
+void HostServicesPage::on_notify() {
+    if (!notify_icon_) {
+        (*status_).set_text("Show the tray icon first");
+        return;
+    }
+    const HostServiceStatus status = (*notify_icon_).show_balloon_tip(
+        "GUI.Forms", "Notification text from the Gallery", HostTrayNotificationIcon::information);
+    (*status_).set_text("Tray notification: " + service_result(status));
+}
+
+void HostServicesPage::on_notify_icon_click(const NotifyIconClick& click) {
+    (*status_).set_text(click.button == PointerButton::primary ? "Tray icon clicked"
+                                                               : "Tray icon context gesture");
+}
+
+void HostServicesPage::on_notify_icon_menu(const MenuItemInvocation& invocation) {
+    (*status_).set_text("Tray menu chose " + invocation.item_id);
 }
 
 void HostServicesPage::build_messages(const std::shared_ptr<Surface>& body) {
