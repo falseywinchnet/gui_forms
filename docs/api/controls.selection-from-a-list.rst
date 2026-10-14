@@ -25,6 +25,8 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
      - A list of items shown as details rows, a list, small icons or large icons.
    * - :cpp:class:`CorrespondenceView <gui_forms::CorrespondenceView>`
      - A scrolling list of records whose rows expand to show the evidence behind them.
+   * - :cpp:class:`DataGridView <gui_forms::DataGridView>`
+     - A grid of typed columns over rows the grid owns, virtual rows or a binding source.
    * - :cpp:class:`ChoiceGroup <gui_forms::ChoiceGroup>`
      - A row of buttons from which the user picks exactly one choice.
    * - :cpp:class:`BreadcrumbTrail <gui_forms::BreadcrumbTrail>`
@@ -40,6 +42,7 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
    generated/gui_forms.ObjectView
    generated/gui_forms.ListView
    generated/gui_forms.CorrespondenceView
+   generated/gui_forms.DataGridView
    generated/gui_forms.ChoiceGroup
    generated/gui_forms.BreadcrumbTrail
 
@@ -86,6 +89,42 @@ Related types
      -  
    * - :cpp:class:`CorrespondenceView::Parts <gui_forms::CorrespondenceView::Parts>`
      - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`DataGridView::Cell <gui_forms::DataGridView::Cell>`
+     -  
+   * - :cpp:class:`DataGridView::CellParts <gui_forms::DataGridView::CellParts>`
+     - The "cell" item system: one realized item per visible cell.
+   * - :cpp:class:`DataGridView::CellStates <gui_forms::DataGridView::CellStates>`
+     -  
+   * - :cpp:class:`DataGridView::Column <gui_forms::DataGridView::Column>`
+     -  
+   * - :cpp:class:`DataGridView::ColumnParts <gui_forms::DataGridView::ColumnParts>`
+     - The "column" item system: one realized item per visible column header.
+   * - :cpp:class:`DataGridView::ColumnStates <gui_forms::DataGridView::ColumnStates>`
+     -  
+   * - :cpp:class:`DataGridView::Parts <gui_forms::DataGridView::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`DataGridView::Row <gui_forms::DataGridView::Row>`
+     -  
+   * - :cpp:class:`DataGridView::RowParts <gui_forms::DataGridView::RowParts>`
+     - The "row" item system: one realized item per visible row.
+   * - :cpp:class:`DataGridView::RowStates <gui_forms::DataGridView::RowStates>`
+     -  
+   * - :cpp:class:`DataGridView::States <gui_forms::DataGridView::States>`
+     -  
+   * - :cpp:class:`DataGridViewCellAddress <gui_forms::DataGridViewCellAddress>`
+     - A cell by row and column position.
+   * - :cpp:class:`DataGridViewCellCancelEvent <gui_forms::DataGridViewCellCancelEvent>`
+     - Raised before an edit begins; setting ``cancel`` keeps the cell out of edit.
+   * - :cpp:class:`DataGridViewCellEvent <gui_forms::DataGridViewCellEvent>`
+     - The cell an event concerns.
+   * - :cpp:class:`DataGridViewCellValidatingEvent <gui_forms::DataGridViewCellValidatingEvent>`
+     - Raised before an edited text cell commits, with the text as typed.
+   * - :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
+     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed).
+   * - :cpp:class:`DataGridViewColumn <gui_forms::DataGridViewColumn>`
+     - One column.
+   * - :cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>`
+     - One unbound row.
    * - :cpp:class:`ItemCheckEvent <gui_forms::ItemCheckEvent>`
      - ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
    * - :cpp:class:`ListBox::Item <gui_forms::ListBox::Item>`
@@ -498,6 +537,351 @@ Related types
    .. cpp:member:: PartGeometry face
 
    .. cpp:member:: PartGeometry edge
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::Cell final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: DataGridViewCellAddress address
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: CellParts parts
+
+   .. cpp:member:: CellStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::CellParts final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   The "cell" item system: one realized item per visible cell. A part a cell's kind does not show is absent.
+
+   .. cpp:member:: PartGeometry cell
+
+   .. cpp:member:: PartGeometry cell_selection
+
+   .. cpp:member:: PartGeometry cell_content
+
+   .. cpp:member:: PartGeometry cell_check_well
+
+   .. cpp:member:: PartGeometry cell_check_indicator
+
+   .. cpp:member:: PartGeometry cell_button_face
+
+   .. cpp:member:: PartGeometry cell_button_label
+
+   .. cpp:member:: PartGeometry cell_drop_down
+
+   .. cpp:member:: PartGeometry cell_drop_down_glyph
+
+   .. cpp:member:: PartGeometry cell_vertical_rule
+
+   .. cpp:member:: PartGeometry cell_horizontal_rule
+
+   .. cpp:member:: PartGeometry cell_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::CellStates final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: bool invalid
+
+   .. cpp:member:: bool checked
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::Column final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ColumnParts parts
+
+   .. cpp:member:: ColumnStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::ColumnParts final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   The "column" item system: one realized item per visible column header.
+
+   .. cpp:member:: PartGeometry column_header
+
+   .. cpp:member:: PartGeometry column_label
+
+   .. cpp:member:: PartGeometry sort_glyph
+
+   .. cpp:member:: PartGeometry column_divider
+
+   .. cpp:member:: PartGeometry column_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::ColumnStates final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool sorted_ascending
+
+      Application-defined column states, as ObjectView's.
+
+   .. cpp:member:: bool sorted_descending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::Parts final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   Stage T1 anatomy, as dot members.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry edge
+
+   .. cpp:member:: PartGeometry column_header_band
+
+   .. cpp:member:: PartGeometry row_header_band
+
+   .. cpp:member:: PartGeometry top_left_header
+
+   .. cpp:member:: PartGeometry horizontal_scroll_bar
+
+   .. cpp:member:: PartGeometry vertical_scroll_bar
+
+   .. cpp:member:: PartGeometry scroll_corner
+
+   .. cpp:member:: PartGeometry editor
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::Row final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RowParts parts
+
+   .. cpp:member:: RowStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::RowParts final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   The "row" item system: one realized item per visible row.
+
+   .. cpp:member:: PartGeometry row_header
+
+   .. cpp:member:: PartGeometry row_header_label
+
+   .. cpp:member:: PartGeometry row_glyph
+
+   .. cpp:member:: PartGeometry row_rule
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::RowStates final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool read_only
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridView::States final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool read_only
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewCellAddress final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   A cell by row and column position. Positions are indices into the current rows and columns, not identities: inserting, removing or sorting rows moves them.
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewCellCancelEvent final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   Raised before an edit begins; setting ``cancel`` keeps the cell out of edit.
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewCellEvent final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   The cell an event concerns.
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewCellValidatingEvent final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   Raised before an edited text cell commits, with the text as typed. Setting ``cancel`` refuses the text: the cell stays in edit and is marked invalid.
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string formatted_value
+
+   .. cpp:member:: bool cancel
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: DataGridViewCellValueProvider
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed). The grid asks for the values of the cells it shows, of the current cell and of cells semantics or the application read; it never asks for a row it does not show. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual BindingValue cell_value(std::size_t row, std::size_t column) const = 0
+
+      The value of one cell; ``row`` is below the grid's row count.
+
+   .. cpp:function:: virtual bool push_cell_value(std::size_t row, std::size_t column, const BindingValue& value) = 0
+
+      Stores a committed value. Returning false refuses it: the cell keeps its old value and no cell_value_changed is raised.
+
+   .. cpp:function:: virtual std::string row_stable_id(std::size_t row) const
+
+      The stable ID of a row, for selection, events and accessibility. The default names row n "row.n"; a provider whose rows move overrides it.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewColumn final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   One column. ``name`` is the column's identity: unique within the grid, not empty, and without '.', since a cell's stable ID is its row's ID, '.' and the column's name. ``width`` and ``minimum_width`` are logical units at text scale 1. ``value_kind`` is the kind a committed text edit converts to (text by default; a number column takes signed_integer or number). ``items`` are a combo box column's choices and must be empty for other kinds. ``button_text`` is shown on a button cell whose value is empty. ``data_property_name`` names the BindingSource field a bound column shows.
+
+   .. cpp:member:: std::string name
+
+   .. cpp:member:: std::string header_text
+
+   .. cpp:member:: DataGridViewColumnKind kind
+
+      Default: ``{DataGridViewColumnKind::text}``.
+
+   .. cpp:member:: double width
+
+      Default: ``{100.0}``.
+
+   .. cpp:member:: double minimum_width
+
+      Default: ``{20.0}``.
+
+   .. cpp:member:: bool read_only
+
+   .. cpp:member:: DataGridViewCellAlignment alignment
+
+      Default: ``{DataGridViewCellAlignment::start}``.
+
+   .. cpp:member:: BindingValueKind value_kind
+
+      Default: ``{BindingValueKind::text}``.
+
+   .. cpp:member:: std::vector<std::string> items
+
+   .. cpp:member:: std::string button_text
+
+   .. cpp:member:: std::string data_property_name
+
+   .. cpp:member:: DataGridViewSortDirection sort_glyph
+
+      Default: ``{DataGridViewSortDirection::none}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRow final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   One unbound row. ``stable_id`` is unique within the grid; an empty ID is replaced by a generated one ("row.1", "row.2", ...). ``cells`` holds one value per column in column order; a shorter list is padded with empty values.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::vector<BindingValue> cells
+
+   .. cpp:member:: std::string header_text
+
+   .. cpp:member:: bool read_only
 
 .. cpp:namespace:: gui_forms
 
@@ -1272,6 +1656,66 @@ Enumerations
    .. cpp:enumerator:: keyboard_focus
 
    .. cpp:enumerator:: pin
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewCellAlignment
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: start
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: end
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewColumnKind
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: text
+
+   .. cpp:enumerator:: check_box
+
+   .. cpp:enumerator:: combo_box
+
+   .. cpp:enumerator:: button
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowSource
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: unbound
+
+   .. cpp:enumerator:: virtual_rows
+
+   .. cpp:enumerator:: binding_source
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewSelectionMode
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: cell_select
+
+   .. cpp:enumerator:: full_row_select
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewSortDirection
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: ascending
+
+   .. cpp:enumerator:: descending
 
 .. cpp:namespace:: gui_forms
 

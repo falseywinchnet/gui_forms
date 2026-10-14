@@ -899,6 +899,27 @@ void example() {
 }
 }  // namespace doc_example_CorrespondenceView_2
 
+namespace doc_example_DataGridView_1 {
+void example() {
+    std::shared_ptr<gf::DataGridView> grid =
+        gf::make_control<gf::DataGridView>(gf::StableId("radio.stations"));
+    (*grid).set_columns({
+        {.name = "name", .header_text = "Station", .width = 160.0},
+        {.name = "favourite", .header_text = "Favourite", .kind = gf::DataGridViewColumnKind::check_box,
+         .width = 70.0},
+        {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
+         .width = 90.0, .items = {"AM", "FM", "USB"}},
+    });
+    (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
+                                                    gf::BindingValue{true},
+                                                    gf::BindingValue{std::string("FM")}}});
+    (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                    gf::BindingValue{false},
+                                                    gf::BindingValue{std::string("AM")}}});
+    (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+}
+}  // namespace doc_example_DataGridView_1
+
 namespace doc_example_DateTimePicker_1 {
 void example() {
     std::shared_ptr<gf::DateTimePicker> due =
@@ -3156,6 +3177,7 @@ int main() {
     failures += run("Control example 2", &doc_example_Control_2::example);
     failures += run("CorrespondenceView example 1", &doc_example_CorrespondenceView_1::example);
     failures += run("CorrespondenceView example 2", &doc_example_CorrespondenceView_2::example);
+    failures += run("DataGridView example 1", &doc_example_DataGridView_1::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
     failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);

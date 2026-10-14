@@ -211,6 +211,11 @@ void columns_and_rows() {
     require((*grid).row_count() == 6U, "an unbound row count grows with generated rows");
     (*grid).set_row_count(3U);
     require((*grid).row_count() == 3U && (*grid).row_index("charlie") == 2U, "and is cut from the end");
+    std::shared_ptr<DataGridView> fresh = make_control<DataGridView>(StableId("grid.model.fresh"));
+    (*fresh).set_columns(sample_columns());
+    (*fresh).set_rows({{.stable_id = "row.1"}, {}});
+    require((*fresh).row_stable_id(1U) != "row.1" && !(*fresh).row_stable_id(1U).empty(),
+            "a generated row ID skips the IDs the rows already use");
     require(throws_invalid(AddDottedColumn{grid.get()}), "a column name with '.' is refused");
     require(throws_invalid(AddDuplicateRow{grid.get()}), "a duplicate row ID is refused");
     require(throws_invalid(AddItemsToText{grid.get()}), "items on a text column are refused");

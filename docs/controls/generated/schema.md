@@ -589,6 +589,80 @@ Properties beyond every control's: none.
 | `item_activated` | `std::string` |
 | `context_requested` | `ObjectContextRequest` |
 
+## `data_grid_view` (DataGridView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `edge` | edge |  |  |
+| `column_header_band` | face |  |  |
+| `row_header_band` | face |  |  |
+| `top_left_header` | face |  |  |
+| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
+| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
+| `scroll_corner` | face |  |  |
+| `editor` | well | `text_box` |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`, `read_only`.
+
+Item system `row`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `row_header` | face |  |  |
+| `row_header_label` | label |  |  |
+| `row_glyph` | glyph |  |  |
+| `row_rule` | divider |  |  |
+
+Item states: `selected`, `current`, `read_only`.
+
+Item system `cell`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `cell` | region |  |  |
+| `cell_selection` | selection |  |  |
+| `cell_content` | content |  |  |
+| `cell_check_well` | well | `check_box` |  |
+| `cell_check_indicator` | indicator |  |  |
+| `cell_button_face` | face | `button` |  |
+| `cell_button_label` | label |  |  |
+| `cell_drop_down` | actuator | `button` |  |
+| `cell_drop_down_glyph` | glyph |  |  |
+| `cell_vertical_rule` | divider |  |  |
+| `cell_horizontal_rule` | divider |  |  |
+| `cell_focus` | focus |  |  |
+
+Item states: `selected`, `current`, `read_only`, `invalid`, `checked`, `pressed`, `open`, `focus_visible`.
+
+Item system `column`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `column_header` | face |  |  |
+| `column_label` | label |  |  |
+| `sort_glyph` | glyph |  |  |
+| `column_divider` | divider |  |  |
+| `column_grip` | grip |  |  |
+
+Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `selection_changed` | none |
+| `current_cell_changed` | `std::optional<DataGridViewCellAddress>` |
+| `cell_begin_edit` | `DataGridViewCellCancelEvent`, by reference |
+| `cell_end_edit` | `DataGridViewCellEvent` |
+| `cell_validating` | `DataGridViewCellValidatingEvent`, by reference |
+| `cell_value_changed` | `DataGridViewCellEvent` |
+| `cell_content_click` | `DataGridViewCellEvent` |
+| `column_header_click` | `std::size_t` |
+| `column_width_changed` | `std::size_t` |
+
 ## `choice_group` (ChoiceGroup, control)
 
 | Part | Role | Reuses | Own states |

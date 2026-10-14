@@ -195,6 +195,17 @@
       "doc": "api/generated/gui_forms.CorrespondenceView.rst"
     },
     {
+      "id": "data_grid_view",
+      "type": "DataGridView",
+      "header": "gui_forms/controls/data_grid_view/data_grid_view.hpp",
+      "category": "Selection from a list",
+      "purpose": "Grid of text, check box, combo box and button columns over unbound, virtual or BindingSource rows, with cell or row selection, in-place editing and only visible rows realized.",
+      "winforms": "DataGridView",
+      "status": "provisional",
+      "gallery_page": "tree-and-object-views",
+      "doc": "api/generated/gui_forms.DataGridView.rst"
+    },
+    {
       "id": "choice_group",
       "type": "ChoiceGroup",
       "header": "gui_forms/controls/collections/choice_group.hpp",

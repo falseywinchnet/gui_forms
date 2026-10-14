@@ -17,6 +17,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 namespace gui_forms {
@@ -496,9 +497,13 @@ private:
     [[nodiscard]] BindingValue stored_value(std::size_t row, std::size_t column) const;
     bool store_value(std::size_t row, std::size_t column, const BindingValue& value);
     void validate_column(const DataGridViewColumn& column) const;
-    void validate_row(const DataGridViewRow& row, std::size_t replacing) const;
-    void prepare_row(DataGridViewRow& row);
-    [[nodiscard]] std::string generated_row_id();
+    using RowIdentities = std::unordered_set<std::string>;
+    [[nodiscard]] RowIdentities row_identities() const;
+    void validate_row(const DataGridViewRow& row, const RowIdentities& used) const;
+    // Fills an empty stable ID with a generated one not in `used`, adds it to
+    // `used`, and pads the cells to the column count.
+    void prepare_row(DataGridViewRow& row, RowIdentities& used);
+    [[nodiscard]] std::string generated_row_id(RowIdentities& used);
     void require_cell(std::size_t row, std::size_t column) const;
     void structure_changed();
     void reset_row_state();

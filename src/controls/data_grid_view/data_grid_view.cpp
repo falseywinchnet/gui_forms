@@ -59,6 +59,8 @@ bool value_less(const BindingValue& left, const BindingValue& right) {
         const double right_value = binding_value_to_number(right).value_or(0.0);
         return left_value < right_value;
     }
+    if (left_rank == 3) return std::get<std::string>(left) < std::get<std::string>(right);
+    // Other kinds compare by their text; they are rare in a sort column.
     const std::string left_text = binding_value_to_string(left);
     const std::string right_text = binding_value_to_string(right);
     return left_text < right_text;
@@ -412,38 +414,35 @@ void DataGridView::set_column_read_only(std::size_t column, bool read_only) {
 
 // -- rows --------------------------------------------------------------------
 
-std::string DataGridView::generated_row_id() {
+DataGridView::RowIdentities DataGridView::row_identities() const {
+    RowIdentities identities{};
+    identities.reserve(rows_.size());
+    for (const DataGridViewRow& row : rows_) identities.insert(row.stable_id);
+    return identities;
+}
+
+std::string DataGridView::generated_row_id(RowIdentities& used) {
     for (;;) {
         std::string candidate = "row." + std::to_string(next_row_number_);
         ++next_row_number_;
-        bool used = false;
-        for (const DataGridViewRow& row : rows_) {
-            if (row.stable_id == candidate) {
-                used = true;
-                break;
-            }
-        }
-        if (!used) return candidate;
+        if (used.insert(candidate).second) return candidate;
     }
 }
 
-void DataGridView::validate_row(const DataGridViewRow& row, std::size_t replacing) const {
+void DataGridView::validate_row(const DataGridViewRow& row, const RowIdentities& used) const {
     if (!validate_utf8(row.stable_id).valid() || !validate_utf8(row.header_text).valid()) {
         throw std::invalid_argument("DataGridView rows require valid UTF-8");
     }
     if (row.cells.size() > columns_.size()) {
         throw std::invalid_argument("DataGridView row has more values than columns");
     }
-    if (row.stable_id.empty()) return;
-    for (std::size_t index = 0; index < rows_.size(); ++index) {
-        if (index != replacing && rows_[index].stable_id == row.stable_id) {
-            throw std::invalid_argument("DataGridView row stable IDs must be unique");
-        }
+    if (!row.stable_id.empty() && used.count(row.stable_id) != 0U) {
+        throw std::invalid_argument("DataGridView row stable IDs must be unique");
     }
 }
 
-void DataGridView::prepare_row(DataGridViewRow& row) {
-    if (row.stable_id.empty()) row.stable_id = generated_row_id();
+void DataGridView::prepare_row(DataGridViewRow& row, RowIdentities& used) {
+    if (row.stable_id.empty()) row.stable_id = generated_row_id(used);
     row.cells.resize(columns_.size());
 }
 
@@ -459,8 +458,9 @@ void DataGridView::insert_row(std::size_t index, DataGridViewRow row) {
         throw std::logic_error("DataGridView rows are added only to unbound rows");
     }
     if (index > rows_.size()) throw std::out_of_range("DataGridView row insertion index is past the end");
-    validate_row(row, rows_.size());
-    prepare_row(row);
+    RowIdentities used = row_identities();
+    validate_row(row, used);
+    prepare_row(row, used);
     rows_.insert(rows_.begin() + static_cast<std::ptrdiff_t>(index), std::move(row));
     shift_rows_after_insert(index);
     structure_changed();
@@ -471,7 +471,7 @@ void DataGridView::set_rows(std::vector<DataGridViewRow> rows) {
     if (row_source_ != DataGridViewRowSource::unbound) {
         throw std::logic_error("DataGridView rows are set only on unbound rows");
     }
-    std::unordered_set<std::string> identities{};
+    RowIdentities identities{};
     for (const DataGridViewRow& row : rows) {
         if (!validate_utf8(row.stable_id).valid() || !validate_utf8(row.header_text).valid() ||
             row.cells.size() > columns_.size()) {
@@ -484,10 +484,7 @@ void DataGridView::set_rows(std::vector<DataGridViewRow> rows) {
     reset_row_state();
     rows_ = std::move(rows);
     // Generated IDs skip every ID the new rows already use.
-    for (DataGridViewRow& row : rows_) {
-        if (row.stable_id.empty()) row.stable_id = generated_row_id();
-        row.cells.resize(columns_.size());
-    }
+    for (DataGridViewRow& row : rows_) prepare_row(row, identities);
     structure_changed();
 }
 
@@ -530,10 +527,11 @@ void DataGridView::set_row_count(std::size_t count) {
     } else if (count < previous) {
         rows_.resize(count);
     } else {
+        RowIdentities used = row_identities();
         rows_.reserve(count);
         while (rows_.size() < count) {
             DataGridViewRow row;
-            prepare_row(row);
+            prepare_row(row, used);
             rows_.push_back(std::move(row));
         }
     }
@@ -598,6 +596,10 @@ void DataGridView::on_source_list_changed(const BindingListChange& change) {
     } else if (change.kind == BindingListChangeKind::reset) {
         if (editing_) cancel_edit();
         trim_rows(count);
+    } else {
+        // A changed field or position changes no geometry.
+        invalidate(Dirty::paint | Dirty::semantics);
+        return;
     }
     structure_changed();
 }
