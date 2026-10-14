@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <span>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 namespace gui_forms {
 namespace {
@@ -31,6 +34,24 @@ bool bounded_coordinate(Point point, MaterialCoordinateSpace space) noexcept {
 bool valid_material_border(const MaterialBorder& border) noexcept {
     return std::isfinite(border.width) && border.width > 0.0 &&
            border.width <= 64.0;
+}
+
+bool valid_material_shadow(const MaterialShadow& shadow) noexcept {
+    return finite(shadow.offset) && std::isfinite(shadow.blur_radius) &&
+           std::isfinite(shadow.spread) && shadow.blur_radius >= 0.0 &&
+           shadow.blur_radius <= 512.0 && std::abs(shadow.spread) <= 4096.0 &&
+           std::abs(shadow.offset.x) <= 4096.0 &&
+           std::abs(shadow.offset.y) <= 4096.0;
+}
+
+// An overlay shadow: at most SurfaceMaterial::maximum_shadows valid layers,
+// none of them inset (an overlay shadow falls outside its surface).
+bool valid_overlay_shadow(const std::vector<MaterialShadow>& layers) noexcept {
+    if (layers.size() > SurfaceMaterial::maximum_shadows) return false;
+    for (const MaterialShadow& shadow : layers) {
+        if (shadow.inset || !valid_material_shadow(shadow)) return false;
+    }
+    return true;
 }
 
 bool valid_material_keyline(const MaterialKeyline& keyline) noexcept {
@@ -439,13 +460,7 @@ bool valid_surface_material(const SurfaceMaterial& material) noexcept {
         if (*edge && !valid_material_border(**edge)) return false;
     }
     for (const MaterialShadow& shadow : material.shadows) {
-        if (!finite(shadow.offset) || !std::isfinite(shadow.blur_radius) ||
-            !std::isfinite(shadow.spread) || shadow.blur_radius < 0.0 ||
-            shadow.blur_radius > 512.0 || std::abs(shadow.spread) > 4096.0 ||
-            std::abs(shadow.offset.x) > 4096.0 ||
-            std::abs(shadow.offset.y) > 4096.0) {
-            return false;
-        }
+        if (!valid_material_shadow(shadow)) return false;
     }
     for (const MaterialKeyline& keyline : material.keylines) {
         if (!valid_material_keyline(keyline)) return false;
@@ -654,8 +669,13 @@ void paint_surface_material(Painter& painter, Rect bounds,
 }
 
 Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept {
+    const Insets result = box_shadow_visual_outsets(material.shadows);
+    return result;
+}
+
+Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept {
     Insets result{};
-    for (const MaterialShadow& shadow : material.shadows) {
+    for (const MaterialShadow& shadow : shadows) {
         if (shadow.inset) continue;
         const double extent = std::max(0.0, shadow.spread) +
                               shadow.blur_radius * 3.0;
@@ -690,11 +710,35 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
     if (definition.accent_ramp.empty() || definition.accent_ramp.size() > 256U) {
         throw std::invalid_argument("theme accent ramp must hold 1 to 256 colours");
     }
+    if (!valid_overlay_shadow(definition.overlay_shadow) ||
+        !valid_overlay_shadow(definition.high_contrast_overlay_shadow)) {
+        throw std::invalid_argument(
+            "theme overlay shadow must hold at most four valid outer layers");
+    }
     if (!valid_structure(definition.structure)) {
         throw std::invalid_argument(
             "theme structural tokens must be finite, ordered, and bounded");
     }
     return std::shared_ptr<const Theme>(new Theme(std::move(definition)));
+}
+
+std::string_view control_visual_role_name(ControlVisualRole role) noexcept {
+    switch (role) {
+    case ControlVisualRole::window: return "window";
+    case ControlVisualRole::panel: return "panel";
+    case ControlVisualRole::card: return "card";
+    case ControlVisualRole::button: return "button";
+    case ControlVisualRole::accent_button: return "accent_button";
+    case ControlVisualRole::command_button: return "command_button";
+    case ControlVisualRole::choice: return "choice";
+    case ControlVisualRole::editor: return "editor";
+    case ControlVisualRole::menu_item: return "menu_item";
+    case ControlVisualRole::selection: return "selection";
+    case ControlVisualRole::progress: return "progress";
+    case ControlVisualRole::tool_tip: return "tool_tip";
+    case ControlVisualRole::count: return {};
+    }
+    return {};
 }
 
 const ControlVisualRecipe& Theme::resolve(
@@ -774,6 +818,17 @@ ThemeDefinition windows_professional_theme_definition() {
         selected.glyph = Color::rgba(255, 255, 255);
         selected.muted_text = Color::rgba(255, 255, 255, 130);
     }
+    // Tooltips (owner decision RB-38): the face and edge ToolTip drew before
+    // it had a family, a pale yellow square plate with a grey line and
+    // near-black text. A tooltip takes no input, so its hot and pressed
+    // recipes are never reached.
+    result.roles[static_cast<std::size_t>(ControlVisualRole::tool_tip)] =
+        professional_role(Color::rgba(255, 255, 225),
+                          Color::rgba(255, 255, 225),
+                          Color::rgba(104, 111, 118),
+                          Color::rgba(24, 31, 38), 0.0);
+    result.overlay_shadow = provisional_overlay_shadow();
+    result.high_contrast_overlay_shadow.clear();
     return result;
 }
 

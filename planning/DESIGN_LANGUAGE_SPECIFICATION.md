@@ -883,7 +883,11 @@ and the semantic roles and node fields controls publish to accessibility.
 Their machine forms are `PartMark` (`gui_forms/theme/part_painting`),
 `AccentIndex` (`gui_forms/anatomy/types`) and `SemanticRole` and
 `SemanticNode` (`gui_forms/semantics/types`); the schema export lists the
-marks, values and roles under `vocabulary`.
+marks, values and roles under `vocabulary`, beside the recipe families a
+theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
+`panel`, `card`, `button`, `accent_button`, `command_button`, `choice`,
+`editor`, `menu_item`, `selection`, `progress` and, from RB-38 (§12.9),
+`tool_tip`).
 
 | Mark | What it shows | Used by |
 |---|---|---|
@@ -1356,16 +1360,22 @@ enum and the schema as §12.7 requires (§8.5):
 
 ### 12.9 Owner decisions, seventh round, 2026-10-14 (tooltips and help)
 
-From the ribbon interview's last note (stage RB, decisions 37 to 41):
+From the ribbon interview's last note (stage RB, decisions 37 to 43):
 
 - **Overlay shadow (RB-37).** An engine input: a soft shadow offset down
   and right from the one upper-left light (§3), cast by surfaces that
   really overlap content: tooltips, popups, menus and the minimized
   ribbon's popup. It is the "real layering" case of the shadow rule, not
-  decoration. The `shadow` part role paints it.
+  decoration. The `shadow` part role paints it. The theme carries it
+  (`ThemeDefinition::overlay_shadow`); the provisional starting value is
+  two layers, a soft one offset (2, 4) with a 10-unit blur at 25 % and a
+  close one offset (0.5, 1) with a 3-unit blur at 22 %, both in the dark
+  slate `#141E2A` of the material shadows, and none in high contrast,
+  where the overlay's edge separates it.
 - **Tooltip family (RB-38).** A `tool_tip` visual family beside `card` and
   `menu_item`, so a theme gives tooltips their own face and edge; plain and
-  enhanced tooltips use it.
+  enhanced tooltips use it. The default theme's recipe keeps the plain
+  tooltip's earlier face (pale yellow, square, grey edge).
 - **Help (RB-39, RB-41).** Focused help stays (F1, with a showing
   tooltip's topic first). In addition, programs always offer a question
   mark in the upper right corner that opens a tooltip when clicked: at the

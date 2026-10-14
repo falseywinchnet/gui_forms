@@ -76,6 +76,8 @@ public:
         for mark in ("dialog_launcher", "more", "overflow", "customize"):
             self.assertIn(mark, vocabulary["marks"])
         self.assertIn("accent_index", vocabulary["values"])
+        for family in ("card", "menu_item", "tool_tip"):
+            self.assertIn(family, vocabulary["families"])
         self.assertIn("split_button", vocabulary["semantic_roles"])
         self.assertIn("menu_button", vocabulary["semantic_roles"])
         findings = cs.validate({"types": schema["types"]}, cr.load_registry(), cs.scan_classes())

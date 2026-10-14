@@ -14,7 +14,6 @@ namespace {
 // tooltip is about 318 units wide with an 8-unit margin and a 32-unit image
 // beside the description.
 constexpr double margin = 8.0;
-constexpr double shadow_offset = 3.0;
 constexpr double image_side = 32.0;
 constexpr double image_gap = 8.0;
 constexpr double shortcut_gap = 6.0;
@@ -138,10 +137,10 @@ RibbonToolTipLayout layout_ribbon_tool_tip(const Control& measurer, const Ribbon
     }
     const double width = std::min(face_width, used + inner * 2.0);
     result.face = {0.0, 0.0, width, y};
-    result.shadow = {shadow_offset * scale, shadow_offset * scale, width, y};
+    result.shadow = result.face;
     if (!result.help_rule.empty()) result.help_rule.width = width - inner * 2.0;
     if (!result.help_line.empty()) result.help_line.width = width - inner * 2.0;
-    result.size = {width + shadow_offset * scale, y + shadow_offset * scale};
+    result.size = {width, y};
     return result;
 }
 
@@ -154,7 +153,7 @@ RibbonToolTipBubble::RibbonToolTipBubble(StableId stable_id, RibbonToolTipBubble
 
 void RibbonToolTipBubble::on_paint(Painter& painter, Rect) {
     PartPaint part;
-    part.family = ControlVisualRole::card;
+    part.family = ControlVisualRole::tool_tip;
     part.role = PartRole::shadow;
     part.bounds = layout_.shadow;
     paint_part(painter, *this, part);
@@ -205,6 +204,11 @@ void RibbonToolTipBubble::on_paint(Painter& painter, Rect) {
         part.text = content_.help_line;
         paint_part(painter, *this, part);
     }
+}
+
+Insets RibbonToolTipBubble::visual_outsets() const noexcept {
+    const Insets result = overlay_shadow_outsets(*this);
+    return result;
 }
 
 bool RibbonToolTipBubble::hit_test_local(Point) const {

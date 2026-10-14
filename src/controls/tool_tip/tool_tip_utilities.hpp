@@ -8,6 +8,9 @@
 
 namespace gui_forms::tool_tip_detail {
 
+// The bubble's face for `text`: margins of 7 units left and right and 4
+// above and below around a label 3 units wider and 1 taller than the
+// estimated text block. The overlay shadow falls outside the face.
 [[nodiscard]] inline Size tool_tip_size(std::string_view text,
                                         double maximum_text_width) noexcept {
     constexpr double advance = 6.8;
@@ -32,8 +35,8 @@ namespace gui_forms::tool_tip_detail {
                      std::ceil(unwrapped / maximum_text_width)) -
                  1U;
     }
-    return {text_width + 20.0,
-            static_cast<double>(lines) * line_height + 12.0};
+    return {text_width + 17.0,
+            static_cast<double>(lines) * line_height + 9.0};
 }
 
 } // namespace gui_forms::tool_tip_detail

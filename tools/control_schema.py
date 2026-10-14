@@ -204,9 +204,10 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
                         "or the order differs)")
     vocabulary: object = schema.get("vocabulary")
     if not isinstance(vocabulary, dict):
-        findings.append("the schema has no vocabulary (part roles, states, marks, values, semantic roles)")
+        findings.append("the schema has no vocabulary (part roles, states, marks, values, families, "
+                        "semantic roles)")
     else:
-        for key in ("part_roles", "states", "marks", "values", "semantic_roles"):
+        for key in ("part_roles", "states", "marks", "values", "families", "semantic_roles"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
                 findings.append(f"vocabulary: {key} is missing or empty")
@@ -311,6 +312,7 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("")
         titles: list[tuple[str, str]] = [("part_roles", "Part roles"), ("states", "States"),
                                          ("marks", "Marks"), ("values", "Values"),
+                                         ("families", "Recipe families"),
                                          ("semantic_roles", "Semantic roles")]
         for key, title in titles:
             names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]
