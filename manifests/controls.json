@@ -646,6 +646,17 @@
       "doc": "api/generated/gui_forms.ToolStrip.rst"
     },
     {
+      "id": "ribbon_gallery",
+      "type": "RibbonGallery",
+      "header": "gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon gallery of image items in categories, in the ribbon with scroll and more buttons or as a drop-down popup, with live preview through a GalleryCommand and only visible rows realized.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonGallery.rst"
+    },
+    {
       "id": "status_strip",
       "type": "StatusStrip",
       "header": "gui_forms/controls/status_strip/status_strip.hpp",
@@ -721,6 +732,17 @@
       "status": "stable",
       "gallery_page": "commands-and-menus",
       "doc": "api/generated/gui_forms.Command.rst"
+    },
+    {
+      "id": "gallery_command",
+      "type": "GalleryCommand",
+      "header": "gui_forms/commands/gallery_command/gallery_command.hpp",
+      "category": "Menus and commands",
+      "purpose": "Value command of a gallery: shares identity and state with a Command, carries the chosen item, and raises preview and cancel-preview events.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.GalleryCommand.rst"
     },
     {
       "id": "anchored_popup_layer",

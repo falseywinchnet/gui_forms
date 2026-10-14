@@ -1855,6 +1855,51 @@ Properties beyond every control's: none.
 | `item_clicked` | `ToolStripItemClick` |
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 
+## `ribbon_gallery` (RibbonGallery, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `item_viewport` | region |  |  |
+| `scroll_up` | actuator | `button` | hot, pressed, disabled |
+| `scroll_up_glyph` | glyph |  | hot, pressed, disabled |
+| `scroll_down` | actuator | `button` | hot, pressed, disabled |
+| `scroll_down_glyph` | glyph |  | hot, pressed, disabled |
+| `more_button` | actuator | `button` | hot, pressed, open |
+| `more_glyph` | glyph |  | open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `gallery_item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_selection` | selection |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `current`, `disabled`, `focus_visible`.
+
+Item system `gallery_category`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `category_caption` | caption |  |  |
+| `category_divider` | divider |  |  |
+
+Item states: none.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `selection_changed` | `std::optional<std::string>` |
+| `popup_open_changed` | `bool` |
+
 ## `status_strip` (StatusStrip, control)
 
 | Part | Role | Reuses | Own states |
@@ -2035,6 +2080,14 @@ Properties beyond every control's: none.
 |---|---|
 | `state_changed` | `CommandState` |
 | `invoked` | `CommandInvocation` |
+
+## `gallery_command` (GalleryCommand, component)
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `std::optional<std::string>` |
+| `preview_requested` | `GalleryPreview` |
+| `preview_cancelled` | `GalleryPreview` |
 
 ## `anchored_popup_layer` (AnchoredPopupLayer, control)
 

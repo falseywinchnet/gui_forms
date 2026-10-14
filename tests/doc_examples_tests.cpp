@@ -1339,6 +1339,15 @@ void example() {
 }
 }  // namespace doc_example_FontDialog_1
 
+namespace doc_example_GalleryCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> styles = std::make_shared<gf::Command>("doc.styles", "Styles");
+    std::shared_ptr<gf::GalleryCommand> gallery = std::make_shared<gf::GalleryCommand>(styles);
+    (*gallery).preview("style.heading", "doc.gallery");   // preview_requested
+    (*gallery).commit("style.heading", "doc.gallery");    // value_changed, then styles' invoked
+}
+}  // namespace doc_example_GalleryCommand_1
+
 namespace doc_example_GroupBox_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> mode =
@@ -2320,6 +2329,21 @@ void example() {
     (*ribbon).set_tabs({std::move(home)});
 }
 }  // namespace doc_example_Ribbon_1
+
+namespace doc_example_RibbonGallery_1 {
+void example() {
+    std::shared_ptr<gf::Command> styles = std::make_shared<gf::Command>("doc.styles", "Styles");
+    std::shared_ptr<gf::GalleryCommand> command = std::make_shared<gf::GalleryCommand>(styles);
+    std::shared_ptr<gf::RibbonGallery> gallery =
+        gf::make_control<gf::RibbonGallery>(gf::StableId("doc.styles.gallery"));
+    (*gallery).set_items({{"headings", "Headings"}},
+                         {{"style.title", "Title", {}, "headings"},
+                          {"style.heading", "Heading 1", {}, "headings"}});
+    (*gallery).set_column_range(2U, 6U);
+    (*gallery).set_columns(4U);
+    (*gallery).set_command(command);
+}
+}  // namespace doc_example_RibbonGallery_1
 
 namespace doc_example_ScaledGroupBox_1 {
 void example() {
@@ -3348,6 +3372,7 @@ int main() {
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
+    failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
     failures += run("GroupBox example 2", &doc_example_GroupBox_2::example);
     failures += run("HScrollBar example 1", &doc_example_HScrollBar_1::example);
@@ -3396,6 +3421,7 @@ int main() {
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
     failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
+    failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);
     failures += run("ScrollBar example 1", &doc_example_ScrollBar_1::example);
