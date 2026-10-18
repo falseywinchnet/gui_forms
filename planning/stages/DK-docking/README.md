@@ -188,6 +188,18 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     relation and a tab-list orientation field (with stage A); tree roles
     deferred; a custom item state `pinned`; tabs paint as `menu_item`
     until T4; no new marks for the navigation pane.
+41. **The look (T1 to T8):** the VS 2005 period in house colours; quiet
+    tiles; a translucent tint for the area highlight; a pale tinted
+    active caption with an accent line and Plan Paint tool tabs below the
+    stack; a sliding flyout with the overlay shadow; a drawn caption for
+    a one-stack floating window, the host's title bar for more; graphite
+    seams with a grip; drag proximity lights only the hovered pane.
+42. **The PageView look (PT1 to PT8):** strip tabs in Plan Paint's stack,
+    document tabs notched (slanted, VS 2005; to be confirmed); an open
+    seam; a plated close glyph, the pin replacing close on pinned tabs; a
+    dot for `modified`; pinned tabs icon-only, expanding on hover; a count
+    on the overflow button; navigation-pane rows in Plan Paint's tab
+    material; side tabs read bottom to top.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

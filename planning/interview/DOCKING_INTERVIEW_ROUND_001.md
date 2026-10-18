@@ -514,3 +514,54 @@ its recommendation. The owner, verbatim:
 
 Every word question of the round is now answered. The taste questions
 (DK T1 to T8, PageView PT1 to PT8) follow on an HTML look-and-feel page.
+
+## Part 15. Taste, 2026-10-17
+
+Asked on the published look-and-feel page
+(https://claude.ai/artifact/YYGbZoWDipuGFwHxeU8Dqk; source
+`planning/stages/DK-docking/docking_look_studies_source.html`), every
+option drawn in the default theme with an ID. The owner, verbatim:
+
+> t1-2. t2-4.  t3-1. t4-3. t5-1. t6-3. t7-1. t8-3.PT-1: tabs take plan paint. documents take something else, as indicated previously with notched. PT2-1. pt3-2. pt4-1. pt4-2: icon, expand on hover.  pt6-3. pt7-3. pt8-1.
+
+- **GIVEN T1-2.** Docking starts from the VS 2005 period, in house colours:
+  a pale blue-grey chassis, a coloured active caption (T4 refines it),
+  slanted document tabs.
+- **GIVEN T2-4.** Quiet tiles: smaller, at reduced strength, fading in
+  over about 100 ms; only the lit tile at full strength.
+- **GIVEN T3-1.** The area highlight is a translucent blue tint with a
+  1-unit edge (the working assumption kept).
+- **GIVEN T4-3.** The active caption is a pale blue tint with a 2-unit
+  accent line on top; tool tabs at the bottom of a stack are a small
+  Plan Paint tab stack hanging below the content.
+- **GIVEN T5-1.** The auto-hide flyout slides out over about 180 ms and
+  casts the RB-37 overlay shadow.
+- **GIVEN T6-3.** A floating window with one stack has a drawn caption (the
+  stack's caption is the window's); with two or more stacks it uses the
+  host's title bar. The page's float, dock and maximize marks stand as
+  the J7 proposal.
+- **GIVEN T7-1.** Seams are File Manager's graphite seam, 3 units, with a
+  grip of dots.
+- **GIVEN T8-3.** Drag proximity: only the pane under the pointer regains
+  emphasis (its identity key lights); the window's caption does not
+  change.
+- **GIVEN PT1 (split).** Strip tabs take Plan Paint's tab stack; document
+  tabs take a different shape, "as indicated previously with notched".
+  Recorded reading, to be confirmed: the notched, slanted document tab of
+  the VS 2005 period drawn in T1-2, which the owner also chose; no record
+  in the repository uses the word.
+- **GIVEN PT2-1.** The selected tab joins its page by an open seam.
+- **GIVEN PT3-2.** The close glyph gets a hover plate; on pinned tabs the
+  pin replaces close.
+- **GIVEN PT4-1.** `modified` shows as a large dot in the close slot;
+  close replaces it while the tab is hot.
+- **GIVEN PT5 ("pt4-2").** Recorded reading: the second "pt4" is PT5,
+  pinned tabs. Pinned tabs are compressed to their icon (PT5-2) and
+  expand to full width on hover.
+- **GIVEN PT6-3.** The overflow button shows the count of hidden pages and
+  a down arrow; hidden pages are italic in the list.
+- **GIVEN PT7-3.** The navigation pane's large buttons are rows in Plan
+  Paint's tab material, stacked; the selected page near-white; a
+  rail-blue grip.
+- **GIVEN PT8-1.** Rotated side-tab labels read bottom to top on the left
+  edge.
