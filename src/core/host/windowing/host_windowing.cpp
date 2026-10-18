@@ -65,6 +65,39 @@ Rect follow_work_area(const std::vector<HostMonitor>& monitors, Rect target_oute
     const std::size_t nearest = nearest_monitor(monitors, target_center);
     return monitors[nearest].work_area;
 }
+
+// Where the follow policy puts one following window.
+struct FollowPlacement final {
+    // The client rectangle to request.
+    Rect content{};
+    // Whether keeping the window on its screen's work area moved it.
+    bool clamped{};
+};
+
+// The placement of a follower whose frame is `frame` when the primary
+// window's client origin is `main_origin`: its client area keeps `offset`
+// from that origin, its decorations stay as `frame` has them and its size
+// does not change. With monitors (`monitors` not empty), the outer frame is
+// then moved the least distance into the work area of the screen it lands
+// on (follow_work_area, from `main_outer` for the primary window's screen).
+FollowPlacement follow_placement(const HostWindowFrame& frame, Point main_origin, Point offset,
+                                 const std::vector<HostMonitor>& monitors, Rect main_outer) noexcept {
+    // The decorations left of and above the client area.
+    const double left = frame.content.x - frame.outer.x;
+    const double top = frame.content.y - frame.outer.y;
+    const Point target{main_origin.x + offset.x, main_origin.y + offset.y};
+    const Rect target_outer{target.x - left, target.y - top, frame.outer.width, frame.outer.height};
+    Rect placed_outer = target_outer;
+    if (!monitors.empty()) {
+        const Rect work = follow_work_area(monitors, target_outer, main_outer);
+        placed_outer = clamp_to_work_area(target_outer, work);
+    }
+    FollowPlacement placement;
+    placement.content = {placed_outer.x + left, placed_outer.y + top, frame.content.width,
+                         frame.content.height};
+    placement.clamped = !(placed_outer == target_outer);
+    return placement;
+}
 } // namespace
 
 HostWindowKindTraits host_window_kind_traits(HostWindowKind kind) noexcept {
@@ -310,6 +343,23 @@ void HostWindowing::shutdown() noexcept {
     windows_.clear();
 }
 
+bool HostWindowing::admission_valid(const HostWindowDescription& description) const noexcept {
+    if (!valid_stable_id(description.stable_id) || find(description.stable_id).has_value()) return false;
+    const bool has_owner = description.owner.valid();
+    if (has_owner && record(description.owner) == nullptr) return false;
+    if (description.kind == HostWindowKind::primary) {
+        // One primary window, admitted first, without an owner.
+        const bool first_primary = !has_owner && !primary_.valid() && !snapshot_.started;
+        return first_primary;
+    }
+    if (!primary_.valid()) return false;
+    if (description.kind == HostWindowKind::standard && !has_owner) return false;
+    // A floating window is owned by the primary window itself.
+    const bool floating = host_window_kind_traits(description.kind).floating;
+    if (floating && description.owner != primary_) return false;
+    return true;
+}
+
 HostWindowAdmission HostWindowing::admit(const HostWindowDescription& description) {
     HostWindowAdmission result;
     if (std::this_thread::get_id() != ui_thread_) {
@@ -324,21 +374,14 @@ HostWindowAdmission HostWindowing::admit(const HostWindowDescription& descriptio
         result.status = reject(HostServiceError::unsupported);
         return result;
     }
-    const bool has_owner = description.owner.valid();
-    const bool primary = description.kind == HostWindowKind::primary;
-    bool valid = valid_stable_id(description.stable_id) && !find(description.stable_id).has_value();
-    if (has_owner && record(description.owner) == nullptr) valid = false;
-    if (primary && (has_owner || primary_.valid() || snapshot_.started)) valid = false;
-    if (!primary && !primary_.valid()) valid = false;
-    if (description.kind == HostWindowKind::standard && !has_owner) valid = false;
-    const bool floating = host_window_kind_traits(description.kind).floating;
-    if (floating && (!primary_.valid() || description.owner != primary_)) valid = false;
-    if (!valid) {
+    if (!admission_valid(description)) {
         result.status = reject(HostServiceError::invalid_argument);
         return result;
     }
-    if (windows_.size() >= maximum_windows ||
-        (floating && floating_window_count() >= maximum_floating_windows)) {
+    const bool primary = description.kind == HostWindowKind::primary;
+    const bool floating = host_window_kind_traits(description.kind).floating;
+    const bool floating_full = floating && floating_window_count() >= maximum_floating_windows;
+    if (windows_.size() >= maximum_windows || floating_full) {
         result.status = reject(HostServiceError::too_large);
         return result;
     }
@@ -512,43 +555,40 @@ void HostWindowing::follow_primary(WindowRecord& primary) {
         ++count;
     }
     if (count == 0U) return;
-    const HostMonitorResult monitors = query_monitors_impl();
-    const bool clamp = monitors.status.accepted() && !monitors.monitors.empty();
+    // The work areas to clamp to: none, so no clamping, when the platform
+    // cannot list its monitors.
+    HostMonitorResult monitors = query_monitors_impl();
+    if (!monitors.status.accepted()) monitors.monitors.clear();
     for (std::size_t index = 0U; index < count; ++index) {
         const HostWindowId follower_id = followers[index];
+        if (record(follower_id) == nullptr) continue;
+        // The follower's frame now; the native call may reach handlers that
+        // destroy it, so its record is looked up again afterwards.
+        const HostWindowFrameResult fresh = frame_impl(follower_id);
         WindowRecord* follower = record(follower_id);
         if (follower == nullptr) continue;
-        const HostWindowFrameResult fresh = frame_impl(follower_id);
-        follower = record(follower_id);
-        if (follower == nullptr) continue;
         const HostWindowFrame frame = fresh.status.accepted() ? fresh.frame : (*follower).frame;
-        // The decorations around the client area, kept as they are.
-        const double left = frame.content.x - frame.outer.x;
-        const double top = frame.content.y - frame.outer.y;
-        const Point target{main_origin.x + (*follower).offset.x, main_origin.y + (*follower).offset.y};
-        const Rect target_outer{target.x - left, target.y - top, frame.outer.width, frame.outer.height};
-        Rect placed_outer = target_outer;
-        if (clamp) {
-            const Rect work = follow_work_area(monitors.monitors, target_outer, main_frame.outer);
-            placed_outer = clamp_to_work_area(target_outer, work);
-        }
-        const Rect placed{placed_outer.x + left, placed_outer.y + top, frame.content.width,
-                          frame.content.height};
-        const Point placed_origin{placed.x, placed.y};
+        const FollowPlacement placement =
+            follow_placement(frame, main_origin, (*follower).offset, monitors.monitors, main_frame.outer);
+        const Point placed_origin{placement.content.x, placement.content.y};
         if (same_point(placed_origin, {frame.content.x, frame.content.y})) continue;
         // Remember the placement before asking for it: Win32 reports the
         // move before request_frame_impl returns.
-        for (std::size_t slot = (*follower).recent_targets.size() - 1U; slot > 0U; --slot) {
-            (*follower).recent_targets[slot] = (*follower).recent_targets[slot - 1U];
-        }
-        (*follower).recent_targets[0] = placed_origin;
-        if ((*follower).recent_target_count < (*follower).recent_targets.size()) {
-            ++(*follower).recent_target_count;
-        }
+        remember_policy_target(*follower, placed_origin);
         ++snapshot_.follow_moves;
-        if (!(placed_outer == target_outer)) ++snapshot_.clamped_follow_moves;
-        static_cast<void>(request_frame_impl(follower_id, placed));
+        if (placement.clamped) ++snapshot_.clamped_follow_moves;
+        static_cast<void>(request_frame_impl(follower_id, placement.content));
     }
+}
+
+void HostWindowing::remember_policy_target(WindowRecord& follower, Point origin) noexcept {
+    // Most recent first: every target moves one place back and the oldest of
+    // the recent_targets.size() falls out.
+    for (std::size_t slot = follower.recent_targets.size() - 1U; slot > 0U; --slot) {
+        follower.recent_targets[slot] = follower.recent_targets[slot - 1U];
+    }
+    follower.recent_targets[0] = origin;
+    if (follower.recent_target_count < follower.recent_targets.size()) ++follower.recent_target_count;
 }
 
 void HostWindowing::learn_offset(WindowRecord& follower) {

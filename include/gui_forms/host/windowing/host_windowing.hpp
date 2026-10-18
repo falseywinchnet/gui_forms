@@ -362,8 +362,15 @@ private:
 
     void apply_visibility(WindowRecord& entry);
     void apply_floating_visibility();
+    // Moves the primary window's followers after it moved (report_frame).
     void follow_primary(WindowRecord& primary);
+    // Records `origin` as the newest of the follower's policy placements.
+    static void remember_policy_target(WindowRecord& follower, Point origin) noexcept;
+    // Takes a follower's offset from a move of its own (report_frame).
     void learn_offset(WindowRecord& follower);
+    // The admission rules of admit(), without its thread, shutdown,
+    // capability and count checks.
+    [[nodiscard]] bool admission_valid(const HostWindowDescription& description) const noexcept;
 
     [[nodiscard]] HostServiceStatus validate_request(HostCapability capability) noexcept;
     [[nodiscard]] HostServiceStatus validate_window_request(HostCapability capability,
