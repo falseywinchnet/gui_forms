@@ -436,6 +436,7 @@ add_library(gui_forms_controls STATIC
     src/controls/binding_navigator/binding_navigator.cpp
     src/controls/ribbon/ribbon.cpp
     src/controls/status_strip/status_strip.cpp
+    src/controls/pages/page_strip/page_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
@@ -2409,6 +2410,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_page_strip_tests tests/page_strip_tests.cpp)
+    target_link_libraries(gui_forms_page_strip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_strip_tests COMMAND gui_forms_page_strip_tests)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
