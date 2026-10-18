@@ -537,7 +537,6 @@ private:
     void compute_layout(const LayoutKey& key) const;
     void measure_tabs() const;
     void apply_frozen_widths() const;
-    [[nodiscard]] double item_extent_scale() const noexcept;
     [[nodiscard]] std::size_t first_showing(std::size_t target, double area) const;
     void place_tabs(double start, double area) const;
     void place_visible(double start) const;
@@ -570,6 +569,7 @@ private:
     [[nodiscard]] Parts strip_parts() const;
 
     // -- states --
+    [[nodiscard]] static bool is_tab_zone(Zone zone) noexcept;
     [[nodiscard]] bool tab_hot(std::size_t position) const noexcept;
     [[nodiscard]] AnatomyStateSet tab_states(std::size_t position) const;
     [[nodiscard]] AnatomyStateSet slot_states(Zone zone, std::size_t position) const;

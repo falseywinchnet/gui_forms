@@ -58,7 +58,7 @@ std::uint64_t node_runtime_id(std::string_view id) noexcept {
 // A title shown with mnemonics off keeps every `&`; the page list's menu
 // parses markers, so each `&` is doubled for it.
 std::string literal_menu_text(std::string_view title) {
-    std::string text;
+    std::string text{};
     text.reserve(title.size());
     for (const char byte : title) {
         text.push_back(byte);
@@ -345,16 +345,11 @@ TextOrientation PageStrip::label_orientation() const noexcept {
     return TextOrientation::horizontal;
 }
 
-double PageStrip::item_extent_scale() const noexcept {
-    const double scale = effective_text_scale();
-    return scale;
-}
-
 PageStrip::LayoutKey PageStrip::current_key() const {
     const Rect surface = client_rectangle();
-    LayoutKey key;
+    LayoutKey key{};
     key.surface = Size{surface.width, surface.height};
-    key.scale = item_extent_scale();
+    key.scale = effective_text_scale();
     key.settings_revision = settings_revision_;
     key.scroll_revision = scroll_revision_;
     key.bound = pages_ != nullptr;
@@ -363,7 +358,7 @@ PageStrip::LayoutKey PageStrip::current_key() const {
         key.page_count = (*pages_).count();
     }
     key.expanded = key.page_count;
-    const bool on_tab = hot_.zone == Zone::tab || hot_.zone == Zone::tab_close || hot_.zone == Zone::tab_pin;
+    const bool on_tab = is_tab_zone(hot_.zone);
     if (key.bound && on_tab && hot_.position < key.page_count &&
         (*pages_).record_at(PagePosition{hot_.position}).pinned) {
         key.expanded = hot_.position;
@@ -382,7 +377,7 @@ const PageStrip::Layout& PageStrip::layout() const {
 // it unless it is the hot one; a pinned page without an image has nothing
 // smaller to show and keeps its label.
 void PageStrip::measure_tabs() const {
-    const double scale = item_extent_scale();
+    const double scale = effective_text_scale();
     const FontSpec font = effective_font(font_);
     const bool images = image_list_ && (*image_list_).is_alive();
     const double minimum = item_widths_.minimum * scale;
@@ -797,7 +792,7 @@ PageStrip::SlotContent PageStrip::slot_content(std::size_t position, bool hot) c
 // the content is on.
 PageStrip::ItemParts PageStrip::tab_parts_as(std::size_t position, bool hot) const {
     const Layout& placed = layout();
-    ItemParts parts;
+    ItemParts parts{};
     if (position >= placed.tabs.size()) return parts;
     const TabSlot& tab = placed.tabs[position];
     const Rect bounds = slid_bounds(position);
@@ -887,7 +882,7 @@ ControlVisualRole PageStrip::tab_family() const noexcept {
 
 // A button's glyph: a square centred in it, on whole units.
 Rect PageStrip::glyph_bounds(Rect button) const {
-    const double side = glyph_size * item_extent_scale();
+    const double side = glyph_size * effective_text_scale();
     if (button.width < side || button.height < side) return {};
     const Rect glyph{std::floor(button.x + (button.width - side) * 0.5),
                      std::floor(button.y + (button.height - side) * 0.5), side, side};
@@ -897,7 +892,7 @@ Rect PageStrip::glyph_bounds(Rect button) const {
 PageStrip::Parts PageStrip::strip_parts() const {
     const Layout& placed = layout();
     const Rect surface = client_rectangle();
-    Parts record;
+    Parts record{};
     record.region = PartGeometry::from_bounds(surface);
     record.rail = PartGeometry::from_bounds(placed.rail);
     record.scroll_back = PartGeometry::from_bounds(placed.scroll_back);
@@ -950,15 +945,21 @@ std::optional<std::size_t> PageStrip::keyboard_position() const {
     return position;
 }
 
+// A tab's own zones: its body, its close button and its pin.
+bool PageStrip::is_tab_zone(Zone zone) noexcept {
+    const bool tab = zone == Zone::tab || zone == Zone::tab_close || zone == Zone::tab_pin;
+    return tab;
+}
+
 // A tab is hot while the pointer is over it, its close button or its pin.
 bool PageStrip::tab_hot(std::size_t position) const noexcept {
-    const bool on_tab = hot_.zone == Zone::tab || hot_.zone == Zone::tab_close || hot_.zone == Zone::tab_pin;
+    const bool on_tab = is_tab_zone(hot_.zone);
     const bool result = on_tab && hot_.position == position;
     return result;
 }
 
 AnatomyStateSet PageStrip::tab_states(std::size_t position) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (tab_hot(position)) states.insert(AnatomyState::hot);
     if (pressed_.zone == Zone::tab && pressed_.position == position) states.insert(AnatomyState::pressed);
     if (drag_.phase == DragState::Phase::sliding && drag_.origin == position) states.insert(AnatomyState::captured);
@@ -979,7 +980,7 @@ AnatomyStateSet PageStrip::tab_states(std::size_t position) const {
 
 // The states of a tab's close button or pin: its own hot and pressed.
 AnatomyStateSet PageStrip::slot_states(Zone zone, std::size_t position) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     const Hit own{zone, position};
     if (hot_ == own) states.insert(AnatomyState::hot);
     if (pressed_ == own) states.insert(AnatomyState::pressed);
@@ -1001,7 +1002,7 @@ bool PageStrip::can_scroll_forward() const {
 }
 
 AnatomyStateSet PageStrip::button_states(Zone zone) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (hot_.zone == zone) states.insert(AnatomyState::hot);
     if (pressed_.zone == zone) states.insert(AnatomyState::pressed);
     bool available = effectively_enabled();
@@ -1018,7 +1019,7 @@ AnatomyStateSet PageStrip::button_states(Zone zone) const {
 // tab (a tab's label is the layout's string, borrowed for the call).
 void PageStrip::on_paint(Painter& painter, Rect) {
     const Layout& placed = layout();
-    PartPaint part;
+    PartPaint part{};
     part.font = effective_font(font_);
     part.family = ControlVisualRole::panel;
     part.role = PartRole::face;
@@ -1162,7 +1163,7 @@ void PageStrip::paint_tab(Painter& painter, PartPaint& part, std::size_t positio
 // -- input ---------------------------------------------------------------------
 
 PageStrip::Hit PageStrip::hit_at(Point window_point) const {
-    Hit hit;
+    Hit hit{};
     const Rect absolute = absolute_bounds();
     if (!absolute.contains(window_point)) return hit;
     const Point local{window_point.x - absolute.x, window_point.y - absolute.y};
@@ -1194,7 +1195,7 @@ PageStrip::Hit PageStrip::hit_at(Point window_point) const {
 
 std::optional<PageId> PageStrip::page_at(Point window_point) const {
     const Hit hit = hit_at(window_point);
-    const bool on_tab = hit.zone == Zone::tab || hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin;
+    const bool on_tab = is_tab_zone(hit.zone);
     if (!on_tab || pages_ == nullptr) return std::nullopt;
     const PageId page = (*pages_).record_at(PagePosition{hit.position}).id;
     return page;
@@ -1323,7 +1324,7 @@ bool PageStrip::overflowing() const {
 }
 
 std::vector<PageId> PageStrip::visible_pages() const {
-    std::vector<PageId> visible;
+    std::vector<PageId> visible{};
     const Layout& placed = layout();
     visible.reserve(placed.visible.size());
     for (const std::size_t position : placed.visible) {
@@ -1620,7 +1621,7 @@ void PageStrip::request_context_menu(std::size_t position, Point anchor, PageCon
 // A secondary press on a tab, released over the same tab, asks for its
 // context menu at the pointer; it selects nothing.
 void PageStrip::on_secondary_button(PointerEvent& event, Hit hit) {
-    const bool on_tab = hit.zone == Zone::tab || hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin;
+    const bool on_tab = is_tab_zone(hit.zone);
     if (event.action == PointerAction::down) {
         secondary_pressed_.reset();
         if (!on_tab || pages_ == nullptr) return;
@@ -1711,7 +1712,7 @@ void PageStrip::on_pointer_release(PointerEvent& event, Hit hit) {
 // closable (owner decision DK-38, interview P17); press and release on
 // different tabs do nothing.
 void PageStrip::on_middle_button(PointerEvent& event, Hit hit) {
-    const bool on_tab = hit.zone == Zone::tab || hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin;
+    const bool on_tab = is_tab_zone(hit.zone);
     if (event.action == PointerAction::down) {
         middle_pressed_.reset();
         if (!on_tab || pages_ == nullptr) return;
@@ -1750,9 +1751,11 @@ void PageStrip::on_pointer(PointerEvent& event) {
         // The wheel scrolls an overflowing strip (owner decision DK-37):
         // turned up or left towards the start.
         if (overflow_ != PageStripOverflow::scroll || !layout().overflow) return;
+        if (event.wheel_delta.y == 0.0 && event.wheel_delta.x == 0.0) return;
+        // A vertical turn decides when there is one; else a turn to the
+        // right scrolls towards the end and to the left towards the start.
         int direction = event.wheel_delta.y > 0.0 ? -1 : 1;
         if (event.wheel_delta.y == 0.0) direction = event.wheel_delta.x > 0.0 ? 1 : -1;
-        if (event.wheel_delta.y == 0.0 && event.wheel_delta.x == 0.0) return;
         static_cast<void>(scroll_by(direction));
         event.handled = true;
         return;
@@ -1929,7 +1932,7 @@ bool PageStrip::show_page_list(MenuOpenMode mode) {
     if (list_open_ && (*list_).is_open()) return true;
     prepare_list_commands();
     const std::size_t count = (*pages_).count();
-    std::vector<MenuItemSpec> rows;
+    std::vector<MenuItemSpec> rows{};
     rows.reserve(count);
     for (std::size_t position = 0; position < count; ++position) {
         const PageRecord& record = (*pages_).record_at(PagePosition{position});
@@ -2264,7 +2267,7 @@ void PageStrip::publish_part_geometry(std::span<PartGeometry> geometry) const {
 
 PageStrip::Parts PageStrip::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), page_strip_part_fields, published.parts(), record);
     return record;
 }
@@ -2294,12 +2297,12 @@ AnatomyStateSet PageStrip::realized_item_anatomy_states(std::size_t item) const 
 
 std::vector<PageStrip::Item> PageStrip::realized_items() const {
     const std::size_t count = realized_item_count();
-    std::vector<Item> records;
+    std::vector<Item> records{};
     records.reserve(count);
     for (std::size_t item = 0; item < count; ++item) {
         const PartGeometryBuffer published = published_realized_item_geometry(item);
         const std::size_t position = layout().visible[item];
-        Item record;
+        Item record{};
         record.position = PagePosition{position};
         record.page = (*pages_).record_at(record.position).id;
         record.stable_id = realized_item_stable_id(item);
