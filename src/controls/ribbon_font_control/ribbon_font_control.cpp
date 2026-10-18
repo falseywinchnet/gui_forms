@@ -248,7 +248,8 @@ Size RibbonFontControl::measure(Size available) {
 
 void RibbonFontControl::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    const Fields placed = fields({0.0, 0.0, final_bounds.width, final_bounds.height});
+    // In the bounds as arranged, as publish_part_geometry places them.
+    const Fields placed = fields(client_rectangle());
     if (family_ && is_current_layout_child(family_)) set_child_layout(family_, placed.family);
     if (size_ && is_current_layout_child(size_)) set_child_layout(size_, placed.size);
 }

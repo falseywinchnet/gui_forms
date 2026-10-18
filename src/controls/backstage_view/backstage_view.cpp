@@ -183,11 +183,12 @@ Size BackstageView::measure(Size available) {
     return available;
 }
 
+// The selected topic's page fills the page part; the other pages collapse.
+// The page comes from geometry(), the one function paint and the published
+// parts use, in the bounds as arranged.
 void BackstageView::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    const double scale = effective_text_scale();
-    const double column = std::min(final_bounds.width, column_width_ * scale);
-    const Rect page{column, 0.0, std::max(0.0, final_bounds.width - column), final_bounds.height};
+    const Rect page = geometry().page;
     for (std::size_t item = 0; item < items_.size(); ++item) {
         const Control::Ptr& control = items_[item].page;
         if (!control || !is_current_layout_child(control)) continue;
