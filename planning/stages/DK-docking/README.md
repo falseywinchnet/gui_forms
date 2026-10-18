@@ -134,6 +134,12 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
 28. **Pins on root-level items only:** a lone panel or a group carries the
     pin; tabbing a panel into another makes a group with a fresh,
     not-auto-hidden pin; panels inside a group have none.
+29. **Focus and command context (F1-1 to F5-1):** separate active panel
+    and active document; a command routing chain in the commands seam
+    (focused route, active panel, active document, main window); F6 per
+    window; the main window shows `secondary_participating` while a
+    floating tool window is key; clicking a floating tool window makes it
+    key.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

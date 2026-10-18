@@ -276,3 +276,25 @@ a workspace setting, E2-1, E3-1, E4-1). The owner, verbatim:
   not-auto-hidden state; the panels inside a group carry no pin of their
   own. Recorded reading: "root-level" means a top-level item of a dock
   site (a split's leaf), not a panel nested inside a group.
+
+## Part 7. Focus, activation and command context, 2026-10-17
+
+Asked as F1 to F5, each with its recommendation marked (F1-1, F2-1, F3-1,
+F4-1, F5-1; F5-2 named as the Mac palette behaviour that fits B5). The
+owner, verbatim:
+
+> accepted.
+
+- **GIVEN F1-1.** Two activation tracks: `active_panel` and
+  `active_document`.
+- **GIVEN F2-1.** A command routing chain (focused route, active panel,
+  active document, main window) in the commands seam, used by menus, the
+  ribbon, shortcuts and docking, so document commands work from a
+  floating tool window.
+- **GIVEN F3-1.** F6 cycles the regions of the key window only; other
+  windows' panels are reached with the panel switcher (Ctrl+Tab) or
+  Alt+F7.
+- **GIVEN F4-1.** While a floating tool window is key, the main window shows
+  `secondary_participating` (DDV-007-01).
+- **GIVEN F5-1.** Clicking a floating tool window activates it (it becomes
+  key); F2's routing keeps document commands working.
