@@ -2,6 +2,8 @@
 
 #include "gui_forms/window/update_scope/update_scope.hpp"
 
+#include "gui_forms/commands/command_route/command_route.hpp"
+
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
@@ -526,6 +528,29 @@ public:
     [[nodiscard]] AcceleratorToken register_accelerator(
         Component& owner, KeyGesture gesture, std::function<bool()> callback,
         AcceleratorOptions options = {});
+    // The command routing chain (owner decision DK-29; the order is in
+    // gui_forms/commands/command_route). Names the target of the active
+    // panel, active document or main window stage, or clears it with null.
+    // The window observes the target and never extends its life; a
+    // destroyed target drops out of the chain. The focused route has no
+    // single target (controls carry its targets): naming it throws
+    // std::invalid_argument and changes nothing.
+    void set_command_target(CommandRouteStage stage, const std::shared_ptr<CommandTarget>& target);
+    [[nodiscard]] std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const;
+    // Where the chain would run a command with this identity now, from the
+    // current focus and targets, without running it: outcome handled with
+    // the stage and target, or unhandled.
+    [[nodiscard]] CommandRouteResult resolve_command(std::string_view command_id) const;
+    // Offers `invocation` to the chain and runs the first handler for
+    // `invocation.command_id`, holding its target alive while it runs; the
+    // chain is read when the routing starts, so a handler that moves focus
+    // or names other targets changes only later routings. Exactly one
+    // handler runs, or none (unhandled; refused when nested deeper than
+    // maximum_command_route_depth inside handlers, counted per UI thread
+    // across windows). A handler may route other commands; an exception
+    // from a handler propagates to the caller. Command::execute_routed is
+    // the usual caller.
+    CommandRouteResult route_command(const CommandInvocation& invocation);
     [[nodiscard]] Control::Ptr pressed_control() const noexcept { return pressed_.lock(); }
 
     // During an active paint lease these return true when the input was
@@ -819,6 +844,9 @@ private:
     Event<const ControlAvailabilityChange&> control_availability_changed_;
     PopupList popups_;
     AcceleratorList accelerators_;
+    // The active panel's, active document's and main window's command
+    // targets, in that order; observed, never owned.
+    std::array<std::weak_ptr<CommandTarget>, 3> command_targets_{};
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;

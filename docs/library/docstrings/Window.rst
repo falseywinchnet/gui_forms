@@ -211,6 +211,25 @@ register_accelerator
     after the focused control declines a key, unless
     `AcceleratorOptions::before_focused_route` is set. The returned token,
     or disposing the owner, removes it.
+set_command_target
+    Names the `CommandTarget` of one stage of the command routing chain:
+    the active panel, the active document or the main window, or clears it
+    with null. The window only observes the target; once its owner
+    destroys it, it drops out of the chain. The focused route has no
+    single target, since controls carry its targets
+    (`Control::set_command_target`), and naming it throws
+    `std::invalid_argument`. `command_target(stage)` returns the named
+    target while it lives.
+resolve_command
+    Where the chain would run a command with a given identity now, without
+    running it: a `CommandRouteResult` whose outcome is handled, with the
+    stage and target name, or unhandled.
+route_command
+    Offers an invocation to the chain in order (the focused control and its
+    ancestors, the active panel, the active document, the main window) and
+    runs the first handler for its command identity. Exactly one handler
+    runs, or none; a routing nested more than eight deep inside handlers is
+    refused. `Command::execute_routed` is the usual caller.
 open_popup
     Shows a detached control as an overlay owned by another control, such as
     a menu or a drop-down, and returns a `PopupToken` that closes it. The

@@ -177,6 +177,8 @@ add_library(gui_forms_core STATIC
     src/core/control/stable_id/stable_id.cpp
     src/core/control/static_tree/control_factory/control_factory.cpp
     src/core/window/window.cpp
+    src/core/window/command_route/window_command_route.cpp
+    src/core/commands/command_route/command_route.cpp
 )
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
@@ -2442,6 +2444,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_docking_vocabulary_tests tests/docking_vocabulary_tests.cpp)
     target_link_libraries(gui_forms_docking_vocabulary_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_docking_vocabulary_tests COMMAND gui_forms_docking_vocabulary_tests)
+    add_executable(gui_forms_command_route_tests tests/command_route_tests.cpp)
+    target_link_libraries(gui_forms_command_route_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_command_route_tests COMMAND gui_forms_command_route_tests)
     add_executable(gui_forms_ribbon_tests tests/ribbon_tests.cpp)
     target_link_libraries(gui_forms_ribbon_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_tests COMMAND gui_forms_ribbon_tests)

@@ -689,7 +689,12 @@ struct ContextMenu::Impl final {
             static_cast<void>((*window).end_focus_scope(focus_scope));
         }
         focus_scope = {};
-        const bool executed = (*command).execute(source_id);
+        bool executed = false;
+        if (window != nullptr) {
+            executed = (*command).execute_routed(*window, source_id);
+        } else {
+            executed = (*command).execute(source_id);
+        }
         if (executed && owner.is_alive()) {
             MenuItemInvocation invocation{owner.stable_id_, item_id,
                                           command_id, source_id};

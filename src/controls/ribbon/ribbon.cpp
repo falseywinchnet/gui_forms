@@ -995,7 +995,11 @@ void Ribbon::click_command(CommandAddress address) {
         (*spec.command).set_checked(!(*spec.command).state().checked);
     }
     const Control::Ptr lifetime = shared_from_this();
-    static_cast<void>((*spec.command).execute(stable_id().value()));
+    if (window() != nullptr) {
+        static_cast<void>((*spec.command).execute_routed(*window(), stable_id().value()));
+    } else {
+        static_cast<void>((*spec.command).execute(stable_id().value()));
+    }
     if (!is_alive()) return;
     const RibbonCommandClick click{std::string(stable_id().value()), spec.stable_id};
     command_clicked_.emit(click);
