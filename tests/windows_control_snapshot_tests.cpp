@@ -32,10 +32,11 @@ void matches_direct_paint() {
     (*card).add_child(inner);
     (*root).add_child(card);
     const Size size{200.0, 120.0};
-    Window window(root, size);
-    window.perform_layout();
+    // Declared before the window that borrows it, so it outlives the window.
     host::DibPainter host_raster;
     require(host_raster.resize(size, 1.0), "the raster sizes");
+    Window window(root, size);
+    window.perform_layout();
     window.set_framebuffer_painter(&host_raster);
 
     // The window's own paint, into a framebuffer of the same raster.

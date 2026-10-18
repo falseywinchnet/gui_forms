@@ -31,11 +31,12 @@ void snapshots() {
     (*button).set_requested_bounds({8.0, 8.0, 60.0, 24.0});
     (*card).add_child(button);
     (*root).add_child(card);
+    // Declared before the window that borrows it, so it outlives the window.
+    test_support::FakeRaster raster(FramebufferChannelOrder::rgba);
     Window window(root, {200.0, 120.0});
     window.perform_layout();
     require(!window.snapshot_control(card, 1.0), "without a framebuffer painter there is no snapshot");
 
-    test_support::FakeRaster raster(FramebufferChannelOrder::rgba);
     window.set_framebuffer_painter(&raster);
     const std::uint64_t images = window.image_resources().snapshot().resource_count;
     const std::optional<ControlSnapshot> snapshot = window.snapshot_control(card, 0.5);
