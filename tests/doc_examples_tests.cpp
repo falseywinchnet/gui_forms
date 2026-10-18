@@ -2005,6 +2005,40 @@ void example() {
 }
 }  // namespace doc_example_PageStrip_1
 
+namespace doc_example_PageView_1 {
+struct Settings final : gf::Component {
+    std::shared_ptr<gf::PageView> view =
+        gf::make_control<gf::PageView>(gf::StableId("settings"));
+
+    void build() {
+        gf::on((*view).content_requested(), *this, &Settings::make_page);
+        gf::PageRecord general{};
+        general.id = gf::PageId{"general"};
+        general.title = "&General";
+        static_cast<void>((*view).add_page(
+            general, gf::make_control<gf::Label>(gf::StableId("general.text"), "General")));
+        gf::PageRecord advanced{};
+        advanced.id = gf::PageId{"advanced"};
+        advanced.title = "&Advanced";
+        static_cast<void>((*view).add_page(advanced, gf::Control::Ptr{}));
+    }
+
+    void make_page(const gf::PageContentRequest& request) {
+        static_cast<void>((*view).set_page_content(
+            request.page, gf::make_control<gf::Label>(gf::StableId("advanced.text"), "Advanced")));
+    }
+};
+
+void example() {
+    Settings settings{};
+    settings.build();
+    static_cast<void>((*settings.view).pages().select(
+        gf::PageId{"advanced"}, gf::PageSelectionCause::programmatic));
+    // The request ran: the advanced page now has its label.
+    static_cast<void>((*settings.view).page_content(gf::PageId{"advanced"}));
+}
+}  // namespace doc_example_PageView_1
+
 namespace doc_example_Panel_1 {
 void example() {
     std::shared_ptr<gf::Panel> shell = gf::make_control<gf::Panel>(gf::StableId("shell"));
@@ -3514,6 +3548,7 @@ int main() {
     failures += run("PageSet example 1", &doc_example_PageSet_1::example);
     failures += run("PageSet example 2", &doc_example_PageSet_2::example);
     failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
+    failures += run("PageView example 1", &doc_example_PageView_1::example);
     failures += run("Panel example 1", &doc_example_Panel_1::example);
     failures += run("Panel example 2", &doc_example_Panel_2::example);
     failures += run("PictureBox example 1", &doc_example_PictureBox_1::example);

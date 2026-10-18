@@ -53,6 +53,20 @@ void test_tabs_and_pages(gui_forms::Window& window) {
                 (*strip_status).text().find("About selected") != std::string::npos &&
                 (*strip).visible_pages().back().value == "strip.13",
             "selecting the gallery strip's last page scrolls it into view and reports it");
+
+    std::shared_ptr<gui_forms::PageView> view = std::dynamic_pointer_cast<PageView>(
+        window.find("gallery.tabs.view"));
+    std::shared_ptr<gui_forms::Label> view_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.tabs.view.status"));
+    require(view && view_status && (*view).pages().count() == 4U &&
+                (*view).page_content(PageId{"view.summary"}) &&
+                !(*view).page_content(PageId{"view.report"}),
+            "the gallery's PageView starts with two pages whose content comes late");
+    require(window.perform_semantic_action("gallery.tabs.view.strip.tab.view.report", SemanticAction::select) &&
+                (*view).page_content(PageId{"view.report"}) &&
+                (*(*view).page_content(PageId{"view.report"})).effectively_visible() &&
+                (*view_status).text().find("Created view.report") != std::string::npos,
+            "selecting a late page in the gallery's PageView creates and shows its content");
 }
 
 } // namespace gallery_pages_tests

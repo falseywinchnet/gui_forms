@@ -21,6 +21,7 @@ public:
         build_primary(page);
         build_variants(page);
         build_strip(page);
+        build_view(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
         on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
@@ -178,6 +179,54 @@ private:
         (*strip_group).add_at(strip_status_, {660.0, 42.0, 250.0, 24.0});
     }
 
+    // A PageView beside the TabControl: the same retained pages in the strip
+    // preset, two of them created only when first selected.
+    void build_view(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> view_group = group(
+            "gallery.tabs.view.group", "PageView · strip preset, focus memory and late content",
+            {930.0, 250.0});
+        (*page).add_at(view_group, {24.0, 766.0, 930.0, 250.0});
+        view_ = make_control<PageView>(StableId("gallery.tabs.view"));
+        (*view_group).add_at(view_, {20.0, 36.0, 600.0, 196.0});
+        on((*view_).content_requested(), *this, &TabsPage::on_view_content_requested);
+        std::shared_ptr<Label> summary = label(
+            "gallery.tabs.view.summary", "Ctrl+PageDown and Ctrl+Tab move between pages from inside one.",
+            11.0, 400, ink);
+        static_cast<void>((*view_).add_page(view_record("summary", "&Summary"), summary));
+        std::shared_ptr<Panel> details = make_control<Panel>(StableId("gallery.tabs.view.details"));
+        std::shared_ptr<TextBox> name = make_control<TextBox>(StableId("gallery.tabs.view.details.name"));
+        (*name).set_accessible_name("Name");
+        (*name).set_requested_bounds({16.0, 16.0, 240.0, 26.0});
+        (*details).add_child(name);
+        std::shared_ptr<TextBox> notes = make_control<TextBox>(StableId("gallery.tabs.view.details.notes"));
+        (*notes).set_accessible_name("Notes");
+        (*notes).set_requested_bounds({16.0, 52.0, 240.0, 26.0});
+        (*details).add_child(notes);
+        static_cast<void>((*view_).add_page(view_record("details", "&Details"), details));
+        static_cast<void>((*view_).add_page(view_record("report", "&Report"), Control::Ptr{}));
+        static_cast<void>((*view_).add_page(view_record("log", "&Log"), Control::Ptr{}));
+        view_status_ = label("gallery.tabs.view.status", "Report and Log are created on first selection",
+                             11.0, 600, green);
+        (*view_group).add_at(view_status_, {640.0, 40.0, 270.0, 44.0});
+    }
+
+    [[nodiscard]] static PageRecord view_record(std::string_view id, std::string_view title) {
+        PageRecord record{};
+        record.id = PageId{"view." + std::string(id)};
+        record.title = std::string(title);
+        return record;
+    }
+
+    // Late content (owner decision DK-16): made the first time its page is
+    // selected, and never asked for again.
+    void on_view_content_requested(const PageContentRequest& request) {
+        std::shared_ptr<Label> made = label(
+            "gallery.tabs.view.made." + request.page.value,
+            "Created when " + request.page.value + " was first selected.", 11.0, 400, ink);
+        static_cast<void>((*view_).set_page_content(request.page, made));
+        (*view_status_).set_text("Created " + request.page.value + " on its first selection");
+    }
+
     void on_strip_invoked(const PageInvocation& invocation) {
         const std::optional<PagePosition> found = strip_pages_.find(invocation.page);
         if (!found) return;
@@ -209,6 +258,8 @@ private:
     PageSet strip_pages_{};
     std::shared_ptr<PageStrip> strip_;
     std::shared_ptr<Label> strip_status_;
+    std::shared_ptr<PageView> view_;
+    std::shared_ptr<Label> view_status_;
     Value<bool> activity_visible_{true};
 };
 

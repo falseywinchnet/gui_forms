@@ -15,7 +15,7 @@ gui_forms::PageStrip
 
    A page strip shows the pages of a :cpp:class:`PageSet <gui_forms::PageSet>` as tabs, in the set's order, and
    shows and changes the set's selection. It has no content area of its own:
-   ``PageView`` puts one under a strip, and a docking workspace uses a strip alone
+   :cpp:class:`PageView <gui_forms::PageView>` puts one under a strip, and a docking workspace uses a strip alone
    for its auto-hide edges. Tabs are sized to their labels (or fixed, or sharing
    the row), and when they do not fit the strip shows scroll buttons and a list
    button at its end. The arrow keys move between tabs and select as they move,
@@ -135,6 +135,9 @@ gui_forms::PageStrip
 
       :cpp:class:`PageSet <gui_forms::PageSet>`
          The pages, their order and their selection.
+
+      :cpp:class:`PageView <gui_forms::PageView>`
+         A strip with the selected page's content below it.
 
       :cpp:class:`TabControl <gui_forms::TabControl>`
          The Windows Forms tab control.

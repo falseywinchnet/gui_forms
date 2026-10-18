@@ -31,6 +31,8 @@ Panels, group boxes, cards, tabs and expandable sections.
      - A set of pages shown one at a time, chosen from a row of tabs.
    * - :cpp:class:`PageStrip <gui_forms::PageStrip>`
      - The tab headers of a page set in one row, at the top or the bottom of their content.
+   * - :cpp:class:`PageView <gui_forms::PageView>`
+     - A row of tabs over the selected page's content: the strip preset of the page view family.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
      - One page of a tab control, with the caption shown on its tab.
 
@@ -47,6 +49,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    generated/gui_forms.UserControl
    generated/gui_forms.TabControl
    generated/gui_forms.PageStrip
+   generated/gui_forms.PageView
    generated/gui_forms.TabPage
 
 Related types
@@ -64,6 +67,10 @@ Related types
      - Stage T1 anatomy, as dot members: a face, the frame and the caption.
    * - :cpp:class:`PageCloseRequest <gui_forms::PageCloseRequest>`
      - A request to close a closable page.
+   * - :cpp:class:`PageContentRequest <gui_forms::PageContentRequest>`
+     - A selected page has no content yet (owner decision DK-16).
+   * - :cpp:class:`PageControlContent <gui_forms::PageControlContent>`
+     - The content of one page of a PageView: the application's control, shown in the view's content area while its page is selected.
    * - :cpp:class:`PageInvocation <gui_forms::PageInvocation>`
      - A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already).
    * - :cpp:class:`PageItemWidths <gui_forms::PageItemWidths>`
@@ -75,6 +82,8 @@ Related types
    * - :cpp:class:`PageStrip::ItemStates <gui_forms::PageStrip::ItemStates>`
      -  
    * - :cpp:class:`PageStrip::Parts <gui_forms::PageStrip::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`PageView::Parts <gui_forms::PageView::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
@@ -170,6 +179,36 @@ Related types
       Default: ``{PageCloseCause::semantic}``.
 
    .. cpp:member:: bool handled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageContentRequest final
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   A selected page has no content yet (owner decision DK-16). A handler supplies it with ``set_page_content`` (or the set's ``set_content``); a page left without content shows an empty content area and is not asked again.
+
+   .. cpp:member:: PageId page
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: PageControlContent final : public PageContent
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   The content of one page of a PageView: the application's control, shown in the view's content area while its page is selected. The set owns this record and the record holds the control; the view makes the control a child of the page's panel while the page is in the view's set, so ``take`` and ``put`` move a page's control between views with its state, and removing the page releases it.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit PageControlContent(Control::Ptr control)
+
+      Throws std::invalid_argument for a null control.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const Control::Ptr& control() const noexcept
 
 .. cpp:namespace:: gui_forms
 
@@ -292,6 +331,26 @@ Related types
    .. cpp:member:: PartGeometry list_button
 
    .. cpp:member:: PartGeometry list_glyph
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageView::Parts final
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry strip
+
+      The child strip's bounds.
+
+   .. cpp:member:: PartGeometry content
+
+      The selected page's content area.
 
    .. cpp:member:: PartGeometry focus
 
@@ -443,6 +502,16 @@ Enumerations
    .. cpp:enumerator:: top
 
    .. cpp:enumerator:: bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageViewCtrlTab
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   .. cpp:enumerator:: select_next
+
+   .. cpp:enumerator:: pass
 
 .. cpp:namespace:: gui_forms
 

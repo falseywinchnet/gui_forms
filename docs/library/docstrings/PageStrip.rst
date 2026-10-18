@@ -2,7 +2,7 @@ The tab headers of a page set in one row, at the top or the bottom of their cont
 
 A page strip shows the pages of a `PageSet` as tabs, in the set's order, and
 shows and changes the set's selection. It has no content area of its own:
-``PageView`` puts one under a strip, and a docking workspace uses a strip alone
+`PageView` puts one under a strip, and a docking workspace uses a strip alone
 for its auto-hide edges. Tabs are sized to their labels (or fixed, or sharing
 the row), and when they do not fit the strip shows scroll buttons and a list
 button at its end. The arrow keys move between tabs and select as they move,
@@ -97,6 +97,7 @@ tab_identity
 See Also
 --------
 PageSet : The pages, their order and their selection.
+PageView : A strip with the selected page's content below it.
 TabControl : The Windows Forms tab control.
 
 Notes

@@ -492,6 +492,17 @@
       "doc": "api/generated/gui_forms.PageStrip.rst"
     },
     {
+      "id": "page_view",
+      "type": "PageView",
+      "header": "gui_forms/controls/pages/page_view/page_view.hpp",
+      "category": "Grouping",
+      "purpose": "A PageStrip over the view's own PageSet with the selected page's control below it (the strip preset): per-page focus memory, late content requested on first selection, Ctrl+PageDown and a Ctrl+Tab policy for nesting and docking, optional F6 region, and tab panels linked from their tabs.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "tabs-and-pages",
+      "doc": "api/generated/gui_forms.PageView.rst"
+    },
+    {
       "id": "tab_page",
       "type": "TabPage",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp",

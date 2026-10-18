@@ -1503,6 +1503,23 @@ Properties beyond every control's: none.
 | `page_invoked` | `PageInvocation` |
 | `page_close_requested` | `PageCloseRequest`, by reference |
 
+## `page_view` (PageView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `strip` | region | `page_strip` |  |
+| `content` | well |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `content_requested` | `PageContentRequest` |
+
 ## `tab_page` (TabPage, control)
 
 | Part | Role | Reuses | Own states |

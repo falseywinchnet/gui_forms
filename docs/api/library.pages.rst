@@ -27,7 +27,7 @@ Related types
    :widths: 35 65
 
    * - :cpp:class:`PageContent <gui_forms::PageContent>`
-     - The content a presenter attaches to a page; for ``PageView``, the page's control subtree.
+     - The content a presenter attaches to a page; for :cpp:class:`PageView <gui_forms::PageView>`, the page's control subtree.
    * - :cpp:class:`PageId <gui_forms::PageId>`
      - A page's stable identity: the application's string, unique within one set (docking uses the panel's identity).
    * - :cpp:class:`PagePlacement <gui_forms::PagePlacement>`
@@ -59,7 +59,7 @@ Related types
 
    ``#include <gui_forms/pages/types/page_set_types.hpp>``
 
-   The content a presenter attaches to a page; for ``PageView``, the page's control subtree. The set owns the content of every page in it: ``take`` moves the content out with its record, ``put`` moves it in, and removing a page or destroying the set destroys it. A page may have no content until its presenter supplies it (late content). The derived type is the presenter's; the set only destroys it.
+   The content a presenter attaches to a page; for :cpp:class:`PageView <gui_forms::PageView>`, the page's control subtree. The set owns the content of every page in it: ``take`` moves the content out with its record, ``put`` moves it in, and removing a page or destroying the set destroys it. A page may have no content until its presenter supplies it (late content). The derived type is the presenter's; the set only destroys it.
 
 .. cpp:namespace:: gui_forms
 
