@@ -53,3 +53,18 @@ Recorded as:
   window's full-screen space. Hosts without such spaces need nothing.
 - **GIVEN B5-iv-1.** Floating panels stay above their own main window only,
   never above other applications' windows.
+
+### Note, 2026-10-17: two confirmations
+
+Asked: (1) that the hiding rule covers floating tool panels only, a
+document torn out into its own window staying visible; (2) that a panel
+moved with its main window stops at the edge of the screen it is on rather
+than going partly off-screen (offered as the default unless the owner
+objected). The owner, verbatim:
+
+> ok. next questions.
+
+- **GIVEN:** torn-out documents stay visible when the application is
+  inactive; only floating tool panels hide.
+- **GIVEN:** a floating panel carried by its main window is clamped to the
+  work area of the screen it is on.

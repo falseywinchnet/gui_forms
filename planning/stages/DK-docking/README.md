@@ -74,7 +74,8 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
    inactive (documents torn out into floating windows stay visible); they
    move with their main window, keeping their offset; in macOS full
    screen they join the main window's space; they stay above their own
-   main window only, never above other applications' windows.
+   main window only, never above other applications' windows. A panel
+   carried by its main window is clamped to its screen's work area.
 
 ## What exists today
 
