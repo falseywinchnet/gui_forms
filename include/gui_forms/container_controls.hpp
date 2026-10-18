@@ -14,3 +14,4 @@
 #include "gui_forms/controls/scrollable_control/container_control/split_container/splitter_panel/splitter_panel.hpp"
 #include "gui_forms/controls/scrollable_control/container_control/split_container/split_container.hpp"
 #include "gui_forms/controls/pages/page_strip/page_strip.hpp"
+#include "gui_forms/controls/pages/page_view/page_view.hpp"
