@@ -158,6 +158,8 @@ void click(Window& window, Point point) {
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, point}));
 }
 
+// Borrows from `nodes`: the pointer is valid while that vector lives. The
+// deleted overload refuses a temporary (house style section 5).
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == id) return &node;
@@ -166,6 +168,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 bool has_action(const SemanticNode& node, SemanticAction action) {
     for (const SemanticAction offered : node.actions) {
