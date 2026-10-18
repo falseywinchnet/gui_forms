@@ -327,6 +327,9 @@ private:
     void on_window_closed(DockSiteId site) noexcept;
     void on_window_frame(DockSiteId site, const HostWindowFrameEvent& event);
     void close_floating_site(DockSiteId site);
+    void forget_window(DockSiteId site) noexcept;
+    void realize_on_sites(const DockLayoutChange& change);
+    void release_sites() noexcept;
     // For DockSite's drags across windows: the window realizing a site, the
     // desktop position of the site's origin (none without window frames),
     // and the site topmost at a desktop point, `excluded` skipped (its own
