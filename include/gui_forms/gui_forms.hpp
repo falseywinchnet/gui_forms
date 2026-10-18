@@ -19,6 +19,7 @@
 #include "gui_forms/dirty.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/docking.hpp"
 #include "gui_forms/drawing.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"

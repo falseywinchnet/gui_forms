@@ -994,6 +994,92 @@ void example() {
 }
 }  // namespace doc_example_DateTimePicker_2
 
+namespace doc_example_DockEdit_1 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor solution;
+    solution.id = gf::DockPanelId("tools.solution");
+    layout.register_panel(solution);
+    gf::DockPanelDescriptor classes;
+    classes.id = gf::DockPanelId("tools.classes");
+    layout.register_panel(classes);
+
+    gf::DockTransaction start;
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.solution")));
+    layout.apply(start);
+    gf::DockNodeId stack = layout.locate(gf::DockPanelId("tools.solution")).stack;
+
+    gf::DockTransaction group;
+    group.edits.push_back(gf::DockEdit::dock_into(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.classes")), stack));
+    group.edits.push_back(gf::DockEdit::select(gf::DockPanelId("tools.solution")));
+    gf::DockTransactionResult result = layout.apply(group);   // both or neither
+    static_cast<void>(result);
+}
+}  // namespace doc_example_DockEdit_1
+
+namespace doc_example_DockLayout_1 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor solution;
+    solution.id = gf::DockPanelId("tools.solution");
+    solution.default_placement.side = gf::DockSide::left;
+    layout.register_panel(solution);
+    gf::DockPanelDescriptor readme;
+    readme.id = gf::DockPanelId("doc:readme");
+    readme.kind = gf::DockPanelKind::document;
+    layout.register_panel(readme);
+
+    gf::DockTransaction start;
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.solution")));
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("doc:readme")));
+    gf::DockTransactionResult shown = layout.apply(start);   // one change for both
+
+    gf::DockTransaction tear_off;
+    tear_off.edits.push_back(gf::DockEdit::float_subject(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.solution")),
+        gf::Rect{200.0, 120.0, 320.0, 480.0}, "DISPLAY1"));
+    gf::DockTransactionResult floated = layout.apply(tear_off);
+    std::string saved = layout.write_xml().text;
+    static_cast<void>(shown);
+    static_cast<void>(floated);
+    static_cast<void>(saved);
+}
+}  // namespace doc_example_DockLayout_1
+
+namespace doc_example_DockLayout_2 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor output;
+    output.id = gf::DockPanelId("tools.output");
+    output.allowed.floating = false;
+    layout.register_panel(output);
+    gf::DockTransaction show;
+    show.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.output")));
+    layout.apply(show);
+
+    gf::DockTransaction tear_off;
+    tear_off.edits.push_back(gf::DockEdit::float_subject(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.output")),
+        gf::Rect{0.0, 0.0, 300.0, 200.0}, ""));
+    gf::DockTransactionResult refused = layout.apply(tear_off);
+    bool panel_layer = refused.refusal.layer == gf::DockRefusalLayer::panel;   // true
+    static_cast<void>(panel_layer);
+}
+}  // namespace doc_example_DockLayout_2
+
+namespace doc_example_DockPanelDescriptor_1 {
+void example() {
+    gf::DockPanelDescriptor toolbox;
+    toolbox.id = gf::DockPanelId("tools.toolbox");
+    toolbox.allowed.floating = false;
+    toolbox.allowed.tabbed = false;
+    toolbox.minimum_size = gf::Size{180.0, 120.0};
+    toolbox.default_placement.side = gf::DockSide::left;
+    toolbox.default_placement.ratio = 0.2;
+}
+}  // namespace doc_example_DockPanelDescriptor_1
+
 namespace doc_example_DomainUpDown_1 {
 void example() {
     std::shared_ptr<gf::DomainUpDown> mode =
@@ -3574,6 +3660,10 @@ int main() {
     failures += run("DataGridView example 1", &doc_example_DataGridView_1::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
+    failures += run("DockEdit example 1", &doc_example_DockEdit_1::example);
+    failures += run("DockLayout example 1", &doc_example_DockLayout_1::example);
+    failures += run("DockLayout example 2", &doc_example_DockLayout_2::example);
+    failures += run("DockPanelDescriptor example 1", &doc_example_DockPanelDescriptor_1::example);
     failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);
     failures += run("DrawingSurface example 1", &doc_example_DrawingSurface_1::example);
     failures += run("DrawingSurface example 2", &doc_example_DrawingSurface_2::example);
