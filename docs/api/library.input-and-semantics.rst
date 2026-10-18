@@ -26,8 +26,16 @@ Types
      - DragLimits bounds payload bytes, path count, path length, and advertised format count before foreign drag data enters retained routing.
    * - :cpp:class:`DragTextData <gui_forms::DragTextData>`
      - DragTextData owns one validated UTF-8 text payload.
+   * - :cpp:class:`KeyBinding <gui_forms::KeyBinding>`
+     - The chords that invoke one command: at most two (Shift+F10 and the context-menu key).
+   * - :cpp:class:`KeyBindings <gui_forms::KeyBindings>`
+     - The keys of an application's named keyboard commands (owner decision DK-44, review R3): one object shared by every window of the application, floating windows included (Window::set_key_bindings), so a rebinding made in one window holds in all of them.
+   * - :cpp:class:`KeyChord <gui_forms::KeyChord>`
+     - One key with the exact modifiers held: Ctrl+F4 is {PhysicalKey::f4, Modifier::control}.
    * - :cpp:class:`KeyEvent <gui_forms::KeyEvent>`
      - KeyEvent carries logical/physical key identity, modifier and repeat state, key direction, and mutable handled state through preview/target/bubble routing.
+   * - :cpp:class:`KeyMap <gui_forms::KeyMap>`
+     - One binding per KeyCommand: a value, copied whole.
    * - :cpp:class:`PhysicalKey <gui_forms::PhysicalKey>`
      - PhysicalKey preserves host-independent scan position, extended-key state, and location for shortcut and compatibility logic.
    * - :cpp:class:`PointerEvent <gui_forms::PointerEvent>`
@@ -163,6 +171,83 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: KeyBinding final
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   The chords that invoke one command: at most two (Shift+F10 and the context-menu key). Either may be empty; a binding with both empty leaves the command without keys.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: bool matches(const KeyEvent& event) const noexcept
+
+   .. cpp:member:: KeyChord primary
+
+   .. cpp:member:: KeyChord secondary
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: KeyBindings final
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   The keys of an application's named keyboard commands (owner decision DK-44, review R3): one object shared by every window of the application, floating windows included (Window::set_key_bindings), so a rebinding made in one window holds in all of them. The host's defaults seed it once, when the first host session attaches (later sessions leave it as it is); the application's rebindings stay over them. Until a host seeds it, the defaults are the PC convention's. Execution: the UI thread of the windows sharing it; not synchronized.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: KeyBindings()
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const KeyMap& map() const noexcept
+
+      The defaults with the rebindings over them.
+
+   .. cpp:function:: const KeyMap& defaults() const noexcept
+
+      The host's defaults (the PC convention until seeded).
+
+   .. cpp:function:: bool seeded() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void rebind(KeyCommand command, KeyBinding binding)
+
+      Throws std::invalid_argument as KeyMap::set_binding does, binding nothing.
+
+   .. cpp:function:: void restore(KeyCommand command)
+
+      Returns a command to the default. Throws std::invalid_argument for a command outside the enumeration.
+
+   .. cpp:function:: bool seed(const KeyMap& defaults)
+
+      The host's defaults, taken the first time only; false, changing nothing, once seeded.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: KeyChord final
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   One key with the exact modifiers held: Ctrl+F4 is {PhysicalKey::f4, Modifier::control}. A chord whose key is 0 is no chord (an unused slot of a binding); it has no modifiers and matches no event.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool empty() const noexcept
+
+   .. cpp:member:: std::uint32_t physical_key
+
+   .. cpp:member:: Modifier modifiers
+
+      Default: ``{Modifier::none}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: KeyEvent
 
    ``#include <gui_forms/events/input_events/input_events.hpp>``
@@ -186,6 +271,29 @@ Types
    .. cpp:member:: bool repeat
 
    .. cpp:member:: bool handled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: KeyMap final
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   One binding per KeyCommand: a value, copied whole. A key event matches a command when it is a key-down (a repeat included) of one of the command's chords with exactly that chord's modifiers. Two commands may share a chord; the control asking decides which it means. A map made with no arguments leaves every command without keys.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: const KeyBinding& binding(KeyCommand command) const
+
+      Throws std::invalid_argument for a command outside the enumeration.
+
+   .. cpp:function:: bool matches(KeyCommand command, const KeyEvent& event) const noexcept
+
+      False for a command outside the enumeration.
+
+   .. cpp:function:: void set_binding(KeyCommand command, KeyBinding binding)
+
+      Throws std::invalid_argument for a command outside the enumeration, or a chord with modifier bits outside shift, control, alt and meta, or an empty chord with modifiers; the map is then unchanged.
 
 .. cpp:namespace:: gui_forms
 
@@ -427,6 +535,18 @@ Types
 
       Default: ``0x57U``.
 
+   .. cpp:member:: constexpr std::uint32_t context_menu
+
+      The context-menu key (HID "Keyboard Application"): VK_APPS on Windows, the Menu keysym on X11. Apple keyboards have none; the macOS host maps the virtual key code a PC keyboard's key reports there (0x6E). Default: ``0x65U``.
+
+   .. cpp:member:: constexpr std::uint32_t left_control
+
+      Default: ``0xE0U``.
+
+   .. cpp:member:: constexpr std::uint32_t right_control
+
+      Default: ``0xE4U``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PointerEvent
@@ -493,6 +613,10 @@ Types
 
    .. cpp:member:: bool has_popup
 
+   .. cpp:member:: std::string controlled_panel
+
+   .. cpp:member:: std::optional<SemanticOrientation> orientation
+
    .. cpp:member:: SemanticState states
 
       Default: ``{SemanticState::none}``.
@@ -538,6 +662,10 @@ Types
    .. cpp:member:: std::optional<std::size_t> set_size
 
    .. cpp:member:: bool has_popup
+
+   .. cpp:member:: std::string controlled_panel
+
+   .. cpp:member:: std::optional<SemanticOrientation> orientation
 
    .. cpp:member:: Rect bounds
 
@@ -645,6 +773,48 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: KeyCommand
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   .. cpp:enumerator:: close_document
+
+   .. cpp:enumerator:: next_tab
+
+   .. cpp:enumerator:: previous_tab
+
+   .. cpp:enumerator:: move_tab_later
+
+   .. cpp:enumerator:: move_tab_earlier
+
+   .. cpp:enumerator:: cycle_forward
+
+   .. cpp:enumerator:: cycle_backward
+
+   .. cpp:enumerator:: context_menu
+
+   .. cpp:enumerator:: next_document
+
+   .. cpp:enumerator:: previous_document
+
+   .. cpp:enumerator:: next_tool_panel
+
+   .. cpp:enumerator:: previous_tool_panel
+
+   .. cpp:enumerator:: position_menu
+
+   .. cpp:enumerator:: return_to_document
+
+   .. cpp:enumerator:: hide_tool_panel
+
+   .. cpp:enumerator:: maximize_document_area
+
+   .. cpp:enumerator:: move_panel
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: Modifier
 
    ``#include <gui_forms/events/input_events/input_events.hpp>``
@@ -714,6 +884,20 @@ Enumerations
    .. cpp:enumerator:: show_menu
 
    .. cpp:enumerator:: set_value
+
+   .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SemanticOrientation
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   .. cpp:enumerator:: horizontal
+
+   .. cpp:enumerator:: vertical
 
 .. cpp:namespace:: gui_forms
 
@@ -793,6 +977,10 @@ Enumerations
 
    .. cpp:enumerator:: menu_button
 
+   .. cpp:enumerator:: pane
+
+   .. cpp:enumerator:: tab_panel
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
@@ -842,6 +1030,22 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+.. cpp:function:: std::string_view key_command_name(KeyCommand command) noexcept
+
+   The registered (snake_case) name of a command, as the capability report lists it; "unknown" for a value outside the enumeration.
+
+.. cpp:function:: KeyMap pc_key_map()
+
+   The PC convention's map (see KeyCommand): what the Windows, X11 and headless hosts report, and what a window uses until a host reports its own.
+
+.. cpp:var:: constexpr std::size_t key_command_count
+
+   Value: ``static_cast<std::size_t>(KeyCommand::count)``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/semantics/types/semantic_types.hpp>``
 
 .. cpp:function:: constexpr bool has_semantic_state(SemanticState states, SemanticState requested) noexcept
@@ -850,6 +1054,12 @@ Functions, constants and aliases
 
 .. cpp:function:: const char* semantic_action_name(SemanticAction action) noexcept
 
+.. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
+
 .. cpp:var:: constexpr std::size_t semantic_role_count
 
    Value: ``static_cast<std::size_t>(SemanticRole::count)``.
+
+.. cpp:var:: constexpr std::size_t semantic_action_count
+
+   Value: ``static_cast<std::size_t>(SemanticAction::count)``.

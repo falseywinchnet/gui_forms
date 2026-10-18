@@ -132,6 +132,8 @@ gui_forms::RibbonGallery
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`width_for_columns <gui_forms::RibbonGallery::width_for_columns>`
+        - In the ribbon: the width, in logical units at the current text scale, the gallery measures at a given column count.
       * - :cpp:func:`scroll_to_line <gui_forms::RibbonGallery::scroll_to_line>`
         - Shows a line first; layout keeps the last page full.
       * - :cpp:func:`open_popup <gui_forms::RibbonGallery::open_popup>`
@@ -359,6 +361,12 @@ gui_forms::RibbonGallery
 
 
    .. rubric:: Methods
+
+   .. cpp:function:: double width_for_columns(std::size_t columns) const noexcept
+
+      In the ribbon: the width, in logical units at the current text scale, the
+      gallery measures at a given column count. A :cpp:class:`Ribbon <gui_forms::Ribbon>` holding the gallery
+      reads it for each column step of its reduction ladder.
 
    .. cpp:function:: void scroll_to_line(std::size_t line)
 

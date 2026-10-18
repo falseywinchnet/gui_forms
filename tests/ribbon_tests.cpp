@@ -107,12 +107,15 @@ std::shared_ptr<Ribbon> sample_ribbon(const Commands& commands) {
     return ribbon;
 }
 
+// A borrow into `items`, which must outlive it: temporaries are refused
+// (house style §5).
 const Ribbon::CommandItem* find_command(const std::vector<Ribbon::CommandItem>& items, std::string_view id) {
     for (const Ribbon::CommandItem& item : items) {
         if (item.stable_id == id) return &item;
     }
     return nullptr;
 }
+const Ribbon::CommandItem* find_command(std::vector<Ribbon::CommandItem>&& items, std::string_view id) = delete;
 
 Point centre(Rect bounds) {
     const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
@@ -206,20 +209,22 @@ void one_command_path() {
             "Down enters the command plane and Enter runs the first command");
     require(key(window, PhysicalKey::right) && key(window, PhysicalKey::space) && cuts == 1,
             "Right moves to the next command and Space runs it");
-    require((*find_command((*ribbon).realized_commands(), "cut")).states.focus_visible,
-            "the keyboard's command shows the focus cue");
+    const std::vector<Ribbon::CommandItem> focused = (*ribbon).realized_commands();
+    require((*find_command(focused, "cut")).states.focus_visible, "the keyboard's command shows the focus cue");
     require((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}) && cuts == 2,
             "the semantic press runs the command");
     require(key(window, PhysicalKey::c, Modifier::alt) && copies == 1, "a command's mnemonic runs it");
     require(clicks.size() == 5U, "every path reports the same click");
 
     require((*ribbon).on_semantic_child_action("ribbon.command.bold", SemanticAction::press, {}) &&
-                (*commands.bold).state().checked &&
-                (*find_command((*ribbon).realized_commands(), "bold")).states.checked,
-            "a toggle flips its command's checked state");
+                (*commands.bold).state().checked,
+            "a toggle's semantic press flips its command's checked state");
+    const std::vector<Ribbon::CommandItem> toggled = (*ribbon).realized_commands();
+    require((*find_command(toggled, "bold")).states.checked, "and the toggle shows checked");
     (*commands.cut).set_enabled(false);
     static_cast<void>((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}));
-    require(cuts == 2 && (*find_command((*ribbon).realized_commands(), "cut")).states.disabled,
+    const std::vector<Ribbon::CommandItem> disabled = (*ribbon).realized_commands();
+    require(cuts == 2 && (*find_command(disabled, "cut")).states.disabled,
             "a disabled command does not run and shows disabled");
 }
 
@@ -254,7 +259,8 @@ void state_repaints_only_its_command() {
     Window window(ribbon, {900.0, 112.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
-    const Rect cut = (*find_command((*ribbon).realized_commands(), "cut")).parts.command_face.bounds;
+    const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
+    const Rect cut = (*find_command(items, "cut")).parts.command_face.bounds;
     (*commands.cut).set_enabled(false);
     const DamageRegion damage = window.take_damage();
     const Rect bounds = damage.bounds();
@@ -324,10 +330,12 @@ void menus_and_launchers() {
     window.perform_layout();
     std::vector<std::string> launches;
     SubscriptionToken launched = (*ribbon).dialog_launcher_clicked().subscribe(RecordLaunch{&launches});
-    const Ribbon::CommandItem paste = *find_command((*ribbon).realized_commands(), "paste");
+    const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
+    const Ribbon::CommandItem paste = *find_command(items, "paste");
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
                                                centre(paste.parts.command_arrow.bounds)}));
-    require((*ribbon).menu_open() && (*find_command((*ribbon).realized_commands(), "paste")).states.open,
+    const std::vector<Ribbon::CommandItem> opened = (*ribbon).realized_commands();
+    require((*ribbon).menu_open() && (*find_command(opened, "paste")).states.open,
             "a split's arrow opens its menu over the ribbon");
     (*ribbon).close_menus();
     click(window, centre((*ribbon).parts().application_button.bounds));
@@ -358,7 +366,7 @@ void semantics_and_region() {
                 nodes[1].children[1].set_size == std::size_t{2U},
             "the tab row is a tab list with positioned tabs");
     const SemanticNode& plane = nodes[2];
-    require(plane.role == SemanticRole::group && plane.name == "Home" && plane.children.size() == 2U &&
+    require(plane.role == SemanticRole::tab_panel && plane.name == "Home" && plane.children.size() == 2U &&
                 plane.children[0].name == "Clipboard",
             "the command plane holds the selected tab's groups, named by caption");
     const SemanticNode& clipboard = plane.children[0];

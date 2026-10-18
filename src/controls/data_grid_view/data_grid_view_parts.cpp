@@ -941,7 +941,7 @@ std::vector<DataGridView::Column> DataGridView::realized_columns() const {
 namespace {
 
 // The events DataGridView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 9> data_grid_view_interactions{{
+constexpr std::array<InteractionDeclaration, 10> data_grid_view_interactions{{
     {.name = "selection_changed", .payload = "", .mutable_payload = false},
     {.name = "current_cell_changed", .payload = "std::optional<DataGridViewCellAddress>", .mutable_payload = false},
     {.name = "cell_begin_edit", .payload = "DataGridViewCellCancelEvent", .mutable_payload = true},
@@ -949,6 +949,7 @@ constexpr std::array<InteractionDeclaration, 9> data_grid_view_interactions{{
     {.name = "cell_validating", .payload = "DataGridViewCellValidatingEvent", .mutable_payload = true},
     {.name = "cell_value_changed", .payload = "DataGridViewCellEvent", .mutable_payload = false},
     {.name = "cell_content_click", .payload = "DataGridViewCellEvent", .mutable_payload = false},
+    {.name = "row_order_mode_changed", .payload = "DataGridViewRowOrderModeChange", .mutable_payload = false},
     {.name = "column_header_click", .payload = "std::size_t", .mutable_payload = false},
     {.name = "column_width_changed", .payload = "std::size_t", .mutable_payload = false},
 }};

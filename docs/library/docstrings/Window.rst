@@ -24,6 +24,14 @@ client_size
 image_limits
     Quotas for the window's image registry. The two-argument constructor
     uses the default quotas.
+resources
+    An `ApplicationResources` to share with other windows: one image
+    registry and one theme for all of them, so an `ImageId`, an `ImageList`
+    and the theme hold in each and a control subtree moved between them
+    keeps its images. The window takes the resources' current theme. Null
+    resources throw `std::invalid_argument`; resources made on another
+    thread throw `std::logic_error`. The other constructors make resources
+    of the window's own.
 
 Properties
 ----------
@@ -50,8 +58,13 @@ presentation_settings
     `presentation_changed`.
 theme
     The theme every control inherits unless it has its own override.
-    Setting it raises `theme_changed`; a null theme throws
+    Setting it sets the theme of every window sharing this window's
+    `resources` and raises `theme_changed` in each; a null theme throws
     `std::invalid_argument`.
+resources
+    The `ApplicationResources` this window uses, its own unless it was
+    constructed with shared ones. Pass it to another window's constructor to
+    share the image registry and the theme with that window.
 active : default ``true``
     Whether the window is the active top-level window. Controls paint their
     inactive state when it is false. Setting it raises `active_changed`.
@@ -87,6 +100,21 @@ invoke_required
     `begin_invoke` or `invoke` instead of touching the window directly.
 host_services
     The services of the attached native host, or null when none is attached.
+key_map
+    The keys of the named keyboard commands (`KeyCommand`), from the
+    window's `key_bindings`: the host's defaults with the application's
+    rebindings over them. Until a host seeds them, the defaults are the PC
+    convention (`pc_key_map`: Ctrl+F4 closes a document, Shift+F10 or the
+    context-menu key opens a context menu); the first host session seeds
+    them with its host's (`HostCapabilities::key_map`), so under the macOS
+    host Cmd+W closes a document. Controls ask it through
+    `Control::effective_key_map`.
+key_bindings
+    The window's `KeyBindings`, which an application shares among all its
+    windows (decision DK-44): `Application::run` gives every window the
+    application's one set, and a floating window takes its main window's.
+    A window made on its own has a set of its own. `set_key_bindings` shares
+    another set; a null set throws `std::invalid_argument`.
 needs_frame
     Whether painting is pending.
 occluded : default ``false``
@@ -126,6 +154,14 @@ pointer_capture_changed
     it.
 focus_scope_changed
     Raised when a focus scope opens or closes.
+focused_control_changed
+    Raised after `request_focus` moved focus to another control (or to
+    none), once the controls' own focus notifications ran, with the old and
+    new controls' runtime identities and the new one's stable identity. It is
+    not raised when focus is dropped because the focused control left the
+    window. A handler may request focus again; that move raises its own
+    event afterwards. A `DockSite` follows it to keep its workspace's active
+    panel.
 
 Methods
 -------
@@ -182,9 +218,33 @@ dispatch_pointer
 dispatch_key
     Delivers a key event and returns whether anything handled it: the
     focused control, an accelerator, a dialog key or Tab traversal.
+snapshot_control
+    A picture of a control and its descendants as last laid out: their
+    retained painting is replayed, every paint plane in order, into an
+    offscreen framebuffer of the host's own CPU raster at the given scale,
+    and the pixels are registered as one of the window's images
+    (premultiplied BGRA). Areas the subtree does not paint stay
+    transparent. Returns the image, its logical size, scale and pixel size,
+    or none without a framebuffer painter (headless windows), during a
+    paint, for a control of another window or not shown, or a scale outside
+    (0, 8]. It costs one replay of the subtree and one copy of its pixels;
+    the image lives until `release_control_snapshot` or the window's end.
+    The docking drag's stamp uses it.
+release_control_snapshot
+    Removes a snapshot's image; false when it is not there.
 dispatch_text
     Delivers text input to the focused control and returns whether it was
     handled.
+rebind_key_command
+    Binds a `KeyCommand` to a `KeyBinding` (up to two chords) in the
+    window's key bindings, so in every window sharing them, over the host's
+    default; an empty binding leaves the command without keys. The
+    rebinding is kept when a host attaches later. A
+    command outside the enumeration, or a chord with unknown modifier bits
+    or modifiers without a key, throws `std::invalid_argument` and binds
+    nothing.
+restore_key_command
+    Returns a command to the host's default.
 begin_invoke
     Queues a callback to run on the UI thread in a later dispatch turn and
     returns a `DispatchOperation`; it may be called from any thread. The
@@ -211,6 +271,30 @@ register_accelerator
     after the focused control declines a key, unless
     `AcceleratorOptions::before_focused_route` is set. The returned token,
     or disposing the owner, removes it.
+offer_accelerators
+    Offers a key press to the accelerators that wait for the focused route,
+    as a key the window's own route declined; true when one took it. A
+    floating docking window passes the keys it did not use to its main
+    window this way (stage DK phase D4), so shortcuts work from it.
+set_command_target
+    Names the `CommandTarget` of one stage of the command routing chain:
+    the active panel, the active document or the main window, or clears it
+    with null. The window only observes the target; once its owner
+    destroys it, it drops out of the chain. The focused route has no
+    single target, since controls carry its targets
+    (`Control::set_command_target`), and naming it throws
+    `std::invalid_argument`. `command_target(stage)` returns the named
+    target while it lives.
+resolve_command
+    Where the chain would run a command with a given identity now, without
+    running it: a `CommandRouteResult` whose outcome is handled, with the
+    stage and target name, or unhandled.
+route_command
+    Offers an invocation to the chain in order (the focused control and its
+    ancestors, the active panel, the active document, the main window) and
+    runs the first handler for its command identity. Exactly one handler
+    runs, or none; a routing nested more than eight deep inside handlers is
+    refused. `Command::execute_routed` is the usual caller.
 open_popup
     Shows a detached control as an overlay owned by another control, such as
     a menu or a drop-down, and returns a `PopupToken` that closes it. The

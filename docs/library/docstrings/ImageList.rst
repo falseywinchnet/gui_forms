@@ -12,8 +12,9 @@ format accepted; raw pixels can be registered with
 Parameters
 ----------
 window
-    The window whose image registry holds the images. The list belongs to it
-    for life and is used only on its UI thread.
+    The window whose image registry holds the images. The list belongs to
+    every window sharing that registry (`Window::resources`) and is used
+    only on their UI thread.
 image_size
     Logical size, in layout units, at which consumers draw the images; 16 by
     16 by default. Each side must be finite and from 1 to 512, or
@@ -22,8 +23,9 @@ image_size
 Properties
 ----------
 bound_window
-    The window the list belongs to, or null once that window has shut down or
-    the list has been disposed.
+    The window the list was created for, or null once that window has shut
+    down or the list has been disposed. A list whose window has shut down
+    keeps working while other windows still share its registry.
 image_size : default ``{16.0, 16.0}``
     Logical drawing size of every image, independent of its pixels: a 2x
     variant of a 16 by 16 icon is a 32-pixel image drawn at 16 units.
@@ -52,8 +54,10 @@ changed
 Methods
 -------
 belongs_to
-    Whether the list belongs to the given window. `Button`, `TreeView` and
-    `ObjectView` use it to reject a list that belongs to another window.
+    Whether the list's images are in the given window's registry: true for
+    the window it was created for and for every window sharing that
+    window's `ApplicationResources`. `Button`, `TreeView` and `ObjectView`
+    use it to reject a list whose images another window cannot show.
 add_png
     `add_png(key, encoded, density_scale = 1.0)` decodes a PNG into the
     window's registry and makes it the `normal` image of `key` at that
@@ -134,8 +138,8 @@ are borrowed and stay in the registry. `resolve` skips a variant whose image
 is no longer in the registry.
 
 Every member that changes the list must be called on the window's UI thread,
-and throws `std::logic_error` from another thread, after disposal and after
-the window has shut down. Dispose the list to release its images at a known
+and throws `std::logic_error` from another thread, after disposal and once
+no window uses its registry any more. Dispose the list to release its images at a known
 moment; disposal raises `changed` with `reset`. A list destroyed without
 disposal on the UI thread still releases its images, but raises no event.
 

@@ -23,6 +23,8 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
      - A view of many items, shown as a grid of icons or as rows with details columns.
    * - :cpp:class:`ListView <gui_forms::ListView>`
      - A list of items shown as details rows, a list, small icons or large icons.
+   * - :cpp:class:`TreeListView <gui_forms::TreeListView>`
+     - A tree with tabular columns: nodes in a hierarchy, each with cells beside it.
    * - :cpp:class:`CorrespondenceView <gui_forms::CorrespondenceView>`
      - A scrolling list of records whose rows expand to show the evidence behind them.
    * - :cpp:class:`DataGridView <gui_forms::DataGridView>`
@@ -41,6 +43,7 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
    generated/gui_forms.TreeView
    generated/gui_forms.ObjectView
    generated/gui_forms.ListView
+   generated/gui_forms.TreeListView
    generated/gui_forms.CorrespondenceView
    generated/gui_forms.DataGridView
    generated/gui_forms.ChoiceGroup
@@ -120,15 +123,25 @@ Related types
    * - :cpp:class:`DataGridViewCellValidatingEvent <gui_forms::DataGridViewCellValidatingEvent>`
      - Raised before an edited text cell commits, with the text as typed.
    * - :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
-     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID.
+     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and gives the order to the grid as row IDs (in full with set_virtual_rows and set_virtual_row_order, by change with insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand through a DataGridViewRowWindowSource); the grid asks for values by ID.
    * - :cpp:class:`DataGridViewColumn <gui_forms::DataGridViewColumn>`
      - One column.
    * - :cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>`
      - One unbound row.
    * - :cpp:class:`DataGridViewRowId <gui_forms::DataGridViewRowId>`
      - A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves.
+   * - :cpp:class:`DataGridViewRowOrder <gui_forms::DataGridViewRowOrder>`
+     - A virtual grid's row order (owner decision W-5), renderer-free: the IDs in presentation order in one of two modes.
+   * - :cpp:class:`DataGridViewRowOrderModeChange <gui_forms::DataGridViewRowOrderModeChange>`
+     -  
+   * - :cpp:class:`DataGridViewRowOrderStatistics <gui_forms::DataGridViewRowOrderStatistics>`
+     - Counters of the order's work since it was made, for diagnostics and the tests that measure each change's cost.
+   * - :cpp:class:`DataGridViewRowOrderThresholds <gui_forms::DataGridViewRowOrderThresholds>`
+     - The automatic policy's thresholds.
    * - :cpp:class:`DataGridViewRowPosition <gui_forms::DataGridViewRowPosition>`
      - A row's presentation position: its index in the grid's current row order, 0 at the top.
+   * - :cpp:class:`DataGridViewRowWindowSource <gui_forms::DataGridViewRowWindowSource>`
+     - The application side of a virtual grid's window mode (owner decision W-5): the application keeps the rows' order, and the grid asks for the IDs at the positions it shows (plus a margin) instead of holding the whole order.
    * - :cpp:class:`ItemCheckEvent <gui_forms::ItemCheckEvent>`
      - ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
    * - :cpp:class:`ListBox::Item <gui_forms::ListBox::Item>`
@@ -209,6 +222,42 @@ Related types
      - ObjectViewItem owns stable identity, primary/secondary text, icon/status metadata, and optional command data for one flat object row.
    * - :cpp:class:`TreeExpansionChange <gui_forms::TreeExpansionChange>`
      - TreeExpansionChange reports the exact node and resulting expanded state.
+   * - :cpp:class:`TreeListActivation <gui_forms::TreeListActivation>`
+     - A node activated by a double click, Enter, or the semantic press action.
+   * - :cpp:class:`TreeListColumn <gui_forms::TreeListColumn>`
+     - One column.
+   * - :cpp:class:`TreeListColumnMove <gui_forms::TreeListColumnMove>`
+     - A column moved to a new display position, by a header drag or move_column().
+   * - :cpp:class:`TreeListColumnWidthChange <gui_forms::TreeListColumnWidthChange>`
+     - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`TreeListExpansionChange <gui_forms::TreeListExpansionChange>`
+     - A node expanded or collapsed, by the user or the program.
+   * - :cpp:class:`TreeListNode <gui_forms::TreeListNode>`
+     - One node of the tree.
+   * - :cpp:class:`TreeListSelectionChange <gui_forms::TreeListSelectionChange>`
+     - A change of the selected node, after it happened.
+   * - :cpp:class:`TreeListSortChange <gui_forms::TreeListSortChange>`
+     - The sibling order after a header click, the semantic press on a header, or set_sort().
+   * - :cpp:class:`TreeListView::Cell <gui_forms::TreeListView::Cell>`
+     -  
+   * - :cpp:class:`TreeListView::CellParts <gui_forms::TreeListView::CellParts>`
+     - The "cell" item system: one visible cell past the tree column.
+   * - :cpp:class:`TreeListView::CellStates <gui_forms::TreeListView::CellStates>`
+     -  
+   * - :cpp:class:`TreeListView::Column <gui_forms::TreeListView::Column>`
+     -  
+   * - :cpp:class:`TreeListView::ColumnParts <gui_forms::TreeListView::ColumnParts>`
+     - The "column" item system, named as ObjectView's and ListView's: one visible column header.
+   * - :cpp:class:`TreeListView::ColumnStates <gui_forms::TreeListView::ColumnStates>`
+     -  
+   * - :cpp:class:`TreeListView::Parts <gui_forms::TreeListView::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`TreeListView::Row <gui_forms::TreeListView::Row>`
+     -  
+   * - :cpp:class:`TreeListView::RowParts <gui_forms::TreeListView::RowParts>`
+     - The "row" item system: one realized row.
+   * - :cpp:class:`TreeListView::RowStates <gui_forms::TreeListView::RowStates>`
+     -  
    * - :cpp:class:`TreeSelectionChange <gui_forms::TreeSelectionChange>`
      - TreeSelectionChange reports previous/current optional node identities and interaction source.
    * - :cpp:class:`TreeView::Item <gui_forms::TreeView::Item>`
@@ -816,7 +865,7 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID. It asks for the cells it shows, the current cell, and cells semantics or the application read through the grid; it never asks for any other row. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
+   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and gives the order to the grid as row IDs (in full with set_virtual_rows and set_virtual_row_order, by change with insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand through a DataGridViewRowWindowSource); the grid asks for values by ID. It asks for the cells it shows, the current cell, and cells semantics or the application read through the grid; it never asks for any other row. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
 
 
    .. rubric:: Extension points
@@ -893,7 +942,7 @@ Related types
 
 .. cpp:struct:: DataGridViewRowId final
 
-   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
 
    A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves. Unbound rows, virtual rows and BindingSource records each carry one. The selection, the current cell, an edit in progress and a pressed button cell are kept by it, so inserting, removing and sorting rows never moves them onto other rows. It is also the row's semantic stable ID, and a cell's is the row's, '.' and the column's name.
 
@@ -901,13 +950,211 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: DataGridViewRowOrder final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   A virtual grid's row order (owner decision W-5), renderer-free: the IDs in presentation order in one of two modes. Edit mode keeps every ID in chunks of at most 2 * chunk_capacity IDs, in order, with a Fenwick tree of the chunks' sizes and an ID-to-chunk index. Finding an ID's position or a position's ID costs O(log chunks + chunk_capacity); inserting or removing r rows at one place costs O(r + chunk_capacity + log chunks), plus O(chunks) when a chunk splits, merges or empties (at most once per chunk_capacity changes to one chunk); a move is a removal and an insertion. A reset builds everything, O(rows). Window mode holds the row count and the IDs of one window of positions, [window_first, window_first + window size), each with its position; prepare_window fetches a window from the source when the positions asked for are not all held, and any reported change discards it. An ID outside the window is asked of the source, one at a time. The order validates what the program reports in edit mode (IDs not empty, valid UTF-8, unique, and present when removed or moved) and throws std::invalid_argument, changing nothing; in window mode the source is trusted. Single UI thread.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: DataGridViewRowOrder()
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: DataGridViewRowOrderMode mode() const noexcept
+
+   .. cpp:function:: std::size_t count() const noexcept
+
+   .. cpp:function:: const DataGridViewRowOrderStatistics& statistics() const noexcept
+
+   .. cpp:function:: std::size_t window_first() const noexcept
+
+      Window mode: the positions held, [window_first(), window_end()).
+
+   .. cpp:function:: std::size_t window_end() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reset(std::span<const DataGridViewRowId> order)
+
+      Edit mode with this order. Throws std::invalid_argument, changing nothing, for an empty, repeated or invalid UTF-8 ID.
+
+   .. cpp:function:: void reset_to_window(std::shared_ptr<DataGridViewRowWindowSource> source)
+
+      Window mode over a source (not null; std::invalid_argument).
+
+   .. cpp:function:: bool switch_to_edit()
+
+      Switches to edit mode by asking the source for every ID; false, changing nothing, when the source gives an empty or repeated ID.
+
+   .. cpp:function:: void switch_to_window(std::shared_ptr<DataGridViewRowWindowSource> source)
+
+      Switches to window mode over a source; the held IDs are released.
+
+   .. cpp:function:: void clear() noexcept
+
+   .. cpp:function:: std::string id_at(std::size_t position) const
+
+      The ID at a position below count(), by value. In window mode a position outside the window is asked of the source.
+
+   .. cpp:function:: std::optional<std::size_t> position_of(std::string_view id) const
+
+      The position of an ID now, or none.
+
+   .. cpp:function:: std::optional<std::size_t> held_position(std::string_view id) const
+
+      Window mode: the position an ID had in the window held before the last reported change, or none. Edit mode: position_of.
+
+   .. cpp:function:: std::optional<std::string> held_id_at(std::size_t position) const
+
+      The ID at a position when it is held without asking the source (always in edit mode; inside the window in window mode), or none.
+
+   .. cpp:function:: bool contains(std::string_view id) const
+
+      Edit mode: whether an ID is in the order. Window mode: false.
+
+   .. cpp:function:: void prepare_window(std::size_t first, std::size_t end, std::size_t margin)
+
+      Window mode: makes the window hold [first, end) widened by ``margin`` rows on each side, asking the source only when it does not already. Edit mode: does nothing.
+
+   .. cpp:function:: void insert(std::size_t position, std::span<const DataGridViewRowId> ids)
+
+      Reported changes. The rows are already in their new places in the application's order. insert: the IDs now stand at [position, position + ids.size()); position is at most count(). move: the ID now stands at ``position``, below count(). Edit mode validates (see above); window mode forgets its window and asks the source for the new count.
+
+   .. cpp:function:: void remove(std::span<const DataGridViewRowId> ids)
+
+   .. cpp:function:: void move(std::string_view id, std::size_t position)
+
+   .. cpp:member:: constexpr std::size_t chunk_capacity
+
+      Default: ``256U``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderModeChange final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:member:: DataGridViewRowOrderMode old_mode
+
+      Default: ``{DataGridViewRowOrderMode::edit}``.
+
+   .. cpp:member:: DataGridViewRowOrderMode new_mode
+
+      Default: ``{DataGridViewRowOrderMode::edit}``.
+
+   .. cpp:member:: DataGridViewRowOrderSwitchReason reason
+
+      Default: ``{DataGridViewRowOrderSwitchReason::row_count}``.
+
+   .. cpp:member:: std::size_t row_count
+
+      The row count and this pass's reported changes when it switched.
+
+   .. cpp:member:: std::size_t changes
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderStatistics final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   Counters of the order's work since it was made, for diagnostics and the tests that measure each change's cost.
+
+   .. cpp:member:: std::uint64_t reported_changes
+
+      Rows reported inserted, removed or moved.
+
+   .. cpp:member:: std::uint64_t index_writes
+
+      ID-index entries written (edit mode).
+
+   .. cpp:member:: std::uint64_t slot_moves
+
+      IDs shifted within chunks (edit mode).
+
+   .. cpp:member:: std::uint64_t chunk_table_rebuilds
+
+      Rebuilds of the chunk table after a chunk split, merged or emptied; each costs the number of chunks.
+
+   .. cpp:member:: std::uint64_t full_builds
+
+      Whole-index builds: resets and switches to edit mode; each costs the number of rows.
+
+   .. cpp:member:: std::uint64_t window_requests
+
+      Window mode: the row_ids calls, the IDs they asked for, and the row_position calls.
+
+   .. cpp:member:: std::uint64_t ids_requested
+
+   .. cpp:member:: std::uint64_t position_queries
+
+   .. cpp:member:: std::uint64_t mode_switches
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderThresholds final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   The automatic policy's thresholds. The grid goes to window mode when the rows reach window_rows, or the reported changes since the last layout pass reach window_changes; it returns to edit mode when the rows are at most edit_rows and both the last pass's and this pass's changes are at most edit_changes. The gaps between the pairs keep it from switching back and forth. window_margin is how many rows past each end of the visible ones a window holds.
+
+   .. cpp:member:: std::size_t window_rows
+
+      Default: ``{250000}``.
+
+   .. cpp:member:: std::size_t edit_rows
+
+      Default: ``{100000}``.
+
+   .. cpp:member:: std::size_t window_changes
+
+      Default: ``{20000}``.
+
+   .. cpp:member:: std::size_t edit_changes
+
+      Default: ``{1000}``.
+
+   .. cpp:member:: std::size_t window_margin
+
+      Default: ``{64}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: DataGridViewRowPosition final
 
-   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
 
    A row's presentation position: its index in the grid's current row order, 0 at the top. A position is not an identity: inserting, removing or sorting rows changes which row holds it. row_id and row_position convert between the two.
 
    .. cpp:member:: std::size_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: DataGridViewRowWindowSource
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   The application side of a virtual grid's window mode (owner decision W-5): the application keeps the rows' order, and the grid asks for the IDs at the positions it shows (plus a margin) instead of holding the whole order. Calls arrive on the grid's UI thread; the source may not mutate the grid from inside one. IDs are not empty, valid UTF-8 and unique, as for set_virtual_rows.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual std::size_t row_count() const = 0
+
+      The number of rows in the current order.
+
+   .. cpp:function:: virtual void row_ids(DataGridViewRowPosition first, std::span<DataGridViewRowId> out) const = 0
+
+      Fills ``out`` with the IDs at positions [first, first + out.size()), which the grid keeps within row_count().
+
+   .. cpp:function:: virtual std::optional<DataGridViewRowPosition> row_position(const DataGridViewRowId& row) const = 0
+
+      The position of a row in the current order, or none when it is gone.
 
 .. cpp:namespace:: gui_forms
 
@@ -1558,6 +1805,294 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: TreeListActivation final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A node activated by a double click, Enter, or the semantic press action.
+
+   .. cpp:member:: std::string node_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumn final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   One column. ``stable_id`` is unique within the view and names the column in the published anatomy and semantics. ``width`` is in logical units at text scale 1. Column 0 is the tree column: it shows each node's ``text`` with the indentation and the expander, and it always stays first.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: double width
+
+      Default: ``{120.0}``.
+
+   .. cpp:member:: TreeListAlignment alignment
+
+      Default: ``{TreeListAlignment::left}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumnMove final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A column moved to a new display position, by a header drag or move_column(). Display position 0 always holds the tree column.
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::size_t display_position
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumnWidthChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListExpansionChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A node expanded or collapsed, by the user or the program.
+
+   .. cpp:member:: std::string node_id
+
+   .. cpp:member:: bool expanded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListNode final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   One node of the tree. Nodes are given in preorder with their depth, as TreeView's items are: a node's children follow it directly, one level deeper. ``text`` is shown in the tree column and ``cells[n]`` in column n + 1; cells past the last column are kept but not shown. A node with children can always be expanded; ``expandable`` shows the expander on a node whose children are not loaded yet. ``expanded`` is ignored on a node that cannot be expanded. ``image_key`` names an image in the image list; an empty or unknown key shows none.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::vector<std::string> cells
+
+   .. cpp:member:: std::size_t depth
+
+   .. cpp:member:: bool expandable
+
+   .. cpp:member:: bool expanded
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+   .. cpp:member:: std::string image_key
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListSelectionChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A change of the selected node, after it happened.
+
+   .. cpp:member:: std::optional<std::string> previous_id
+
+   .. cpp:member:: std::optional<std::string> current_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListSortChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The sibling order after a header click, the semantic press on a header, or set_sort().
+
+   .. cpp:member:: std::optional<std::size_t> column
+
+   .. cpp:member:: TreeListSortOrder order
+
+      Default: ``{TreeListSortOrder::none}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Cell final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: CellParts parts
+
+   .. cpp:member:: CellStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::CellParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "cell" item system: one visible cell past the tree column. Its identity is the node's ID, ".cell.", and the column's.
+
+   .. cpp:member:: PartGeometry cell
+
+   .. cpp:member:: PartGeometry cell_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::CellStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Column final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t display_position
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ColumnParts parts
+
+   .. cpp:member:: ColumnStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::ColumnParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "column" item system, named as ObjectView's and ListView's: one visible column header. Its identity is the view's stable ID, ".column.", and the column's ID.
+
+   .. cpp:member:: PartGeometry column_header
+
+   .. cpp:member:: PartGeometry column_label
+
+   .. cpp:member:: PartGeometry sort_glyph
+
+   .. cpp:member:: PartGeometry column_divider
+
+   .. cpp:member:: PartGeometry column_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::ColumnStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool sorted_ascending
+
+      Application-defined column states.
+
+   .. cpp:member:: bool sorted_descending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Parts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry vertical_scroll_bar
+
+   .. cpp:member:: PartGeometry horizontal_scroll_bar
+
+   .. cpp:member:: PartGeometry scroll_corner
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Row final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t row
+
+      The row's position among the rows, and the node's model index.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RowParts parts
+
+   .. cpp:member:: RowStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::RowParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "row" item system: one realized row. Its identity is the node's.
+
+   .. cpp:member:: PartGeometry row
+
+   .. cpp:member:: PartGeometry row_face
+
+   .. cpp:member:: PartGeometry expander
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry text
+
+   .. cpp:member:: PartGeometry row_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::RowStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TreeSelectionChange final
 
    ``#include <gui_forms/controls/panel/tree_view/tree_view.hpp>``
@@ -1671,6 +2206,28 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ComboBoxFilter
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: prefix
+
+   .. cpp:enumerator:: substring
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ComboBoxStyle
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: drop_down_list
+
+   .. cpp:enumerator:: drop_down
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: CorrespondenceExpansionReason
 
    ``#include <gui_forms/controls/panel/correspondence_view/correspondence_view.hpp>``
@@ -1708,6 +2265,42 @@ Enumerations
    .. cpp:enumerator:: combo_box
 
    .. cpp:enumerator:: button
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderMode
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: edit
+
+   .. cpp:enumerator:: window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderPolicy
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: edit
+
+   .. cpp:enumerator:: window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderSwitchReason
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: row_count
+
+   .. cpp:enumerator:: change_rate
+
+   .. cpp:enumerator:: policy
+
+   .. cpp:enumerator:: source
 
 .. cpp:namespace:: gui_forms
 
@@ -1860,3 +2453,27 @@ Enumerations
    .. cpp:enumerator:: icons
 
    .. cpp:enumerator:: details
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TreeListAlignment
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: right
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TreeListSortOrder
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: ascending
+
+   .. cpp:enumerator:: descending
