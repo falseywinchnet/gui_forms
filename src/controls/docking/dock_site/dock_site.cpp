@@ -1909,17 +1909,15 @@ bool DockSite::run_position_command(const DockPanelId& panel, DockPositionComman
     }
     if (command == DockPositionCommand::auto_hide) {
         // The whole stack goes to the window edge nearest it, keeping its
-        // extent across that edge (DK decision 27, E4-1).
+        // extent across that edge (DK decision 27, E4-1). Only the site
+        // realizing the stack knows where it stands; any other refuses.
         const StackSlot* const slot = slot_for(location.stack);
-        Rect bounds{};
-        DockSide edge = DockSide::left;
-        if (slot != nullptr) {
-            bounds = (*slot).bounds;
-            edge = (*slot).side_tabbed ? (*slot).edge : nearest_edge(bounds, tree_area_);
-        }
+        if (slot == nullptr) return false;
+        const Rect bounds = (*slot).bounds;
+        const DockSide edge = (*slot).side_tabbed ? (*slot).edge : nearest_edge(bounds, tree_area_);
         const bool across = edge == DockSide::left || edge == DockSide::right;
         double extent = across ? bounds.width : bounds.height;
-        if (!(extent > 0.0) || (slot != nullptr && (*slot).side_tabbed)) extent = flyout_default_extent(*slot);
+        if (!(extent > 0.0) || (*slot).side_tabbed) extent = flyout_default_extent(*slot);
         if (flyout_panel_ && flyout_stack_ == location.stack) close_flyout(DockFlyoutCause::pointer);
         DockTransaction transaction{};
         transaction.origin = DockEditOrigin::user;
