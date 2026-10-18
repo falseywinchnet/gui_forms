@@ -38,9 +38,9 @@ strip
 preset
     ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
     The document preset sets the strip's close buttons to
-    ``selected_and_hot``, its overflow to ``shrink_then_list`` and turns its
-    mnemonics off (document titles are data); these may be changed on the
-    strip afterwards.
+    ``selected_and_hot``, its overflow to ``shrink_then_list``, turns its
+    mnemonics off (document titles are data) and its live reorder on; these
+    may be changed on the strip afterwards.
 close_policy : default ``PageViewClosePolicy::remove_when_unhandled``
     What the view does with a close request that no handler of the strip's
     ``page_close_requested`` handled: remove the page, or, under

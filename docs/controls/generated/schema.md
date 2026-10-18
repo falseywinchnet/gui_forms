@@ -1481,6 +1481,7 @@ Properties beyond every control's: none.
 | `list_button` | actuator | `button` | hot, pressed, open |
 | `list_count` | label |  | hot, pressed, open |
 | `list_glyph` | glyph |  | hot, pressed, open |
+| `insertion_mark` | drop |  | drop_accepted |
 | `focus` | focus |  |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
@@ -1500,7 +1501,7 @@ Item system `page`:
 | `tab_seam` | seam |  |  |
 | `tab_focus` | focus |  |  |
 
-Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`. Application-defined: `pinned`, `modified`.
+Item states: `hot`, `pressed`, `captured`, `selected`, `disabled`, `focus_visible`. Application-defined: `pinned`, `modified`.
 
 Properties beyond every control's: none.
 
@@ -1509,6 +1510,9 @@ Properties beyond every control's: none.
 | `page_invoked` | `PageInvocation` |
 | `page_close_requested` | `PageCloseRequest`, by reference |
 | `page_pin_requested` | `PagePinRequest`, by reference |
+| `page_drag_started` | `PageDragStart`, by reference |
+| `page_context_menu_requested` | `PageContextMenuRequest`, by reference |
+| `page_double_clicked` | `PageDoubleClick` |
 
 ## `page_view` (PageView, control)
 

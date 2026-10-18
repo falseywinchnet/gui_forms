@@ -80,6 +80,7 @@ void test_tabs_and_pages(gui_forms::Window& window) {
                 !(*documents).pages().find(PageId{"doc.1"}) &&
                 (*documents_status).text().find("Closed page_view.cpp") != std::string::npos,
             "closing a gallery document removes it and reports the cause");
+    require((*(*documents).strip()).reorder_enabled(), "the gallery's documents reorder by dragging");
 
     std::shared_ptr<gui_forms::PageView> left = std::dynamic_pointer_cast<PageView>(
         window.find("gallery.tabs.side.left"));

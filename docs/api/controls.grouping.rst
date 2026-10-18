@@ -69,8 +69,14 @@ Related types
      - A request to close a closable page.
    * - :cpp:class:`PageContentRequest <gui_forms::PageContentRequest>`
      - A selected page has no content yet (owner decision DK-16).
+   * - :cpp:class:`PageContextMenuRequest <gui_forms::PageContextMenuRequest>`
+     - A request for a tab's context menu (PageView study I11).
    * - :cpp:class:`PageControlContent <gui_forms::PageControlContent>`
      - The content of one page of a PageView: the application's control, shown in the view's content area while its page is selected.
+   * - :cpp:class:`PageDoubleClick <gui_forms::PageDoubleClick>`
+     - The second press of a double click landed on a tab's body (not its close button or pin), after the press selected the page (PageView study I12).
+   * - :cpp:class:`PageDragStart <gui_forms::PageDragStart>`
+     - A press on a tab moved past the drag threshold (owner decision DK-39, PageView study I9).
    * - :cpp:class:`PageInvocation <gui_forms::PageInvocation>`
      - A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already).
    * - :cpp:class:`PageItemWidths <gui_forms::PageItemWidths>`
@@ -196,6 +202,24 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PageContextMenuRequest final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   A request for a tab's context menu (PageView study I11). The strip shows no menu of its own; a handler that shows one sets ``handled``. ``anchor`` is in window coordinates: the pointer, or for the keyboard the corner of the tab on the content's side where reading starts.
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: Point anchor
+
+   .. cpp:member:: PageContextMenuCause cause
+
+      Default: ``{PageContextMenuCause::pointer}``.
+
+   .. cpp:member:: bool handled
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: PageControlContent final : public PageContent
 
    ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
@@ -213,6 +237,32 @@ Related types
    .. rubric:: Properties
 
    .. cpp:function:: const Control::Ptr& control() const noexcept
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageDoubleClick final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   The second press of a double click landed on a tab's body (not its close button or pin), after the press selected the page (PageView study I12).
+
+   .. cpp:member:: PageId page
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageDragStart final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   A press on a tab moved past the drag threshold (owner decision DK-39, PageView study I9). An owner that takes the drag over (a docking workspace) sets ``claimed``: the strip then gives up the pointer capture, unless the owner has already taken it, and does nothing more with this press; it never reorders. Unclaimed, the strip reorders live when reordering is enabled. Both points are in window coordinates.
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: Point press_point
+
+   .. cpp:member:: Point pointer
+
+   .. cpp:member:: bool claimed
 
 .. cpp:namespace:: gui_forms
 
@@ -334,6 +384,10 @@ Related types
 
    .. cpp:member:: bool focus_visible
 
+   .. cpp:member:: bool captured
+
+      The tab is being dragged in a live reorder.
+
    .. cpp:member:: bool pinned
 
       The admitted custom states (DK-35, DK-40): the page is in the pinned group; its content has unsaved changes.
@@ -369,6 +423,10 @@ Related types
       The count of hidden pages on the list button (``shrink_then_list``).
 
    .. cpp:member:: PartGeometry list_glyph
+
+   .. cpp:member:: PartGeometry insertion_mark
+
+      The gap bar a claimant shows while dropping a page into the strip.
 
    .. cpp:member:: PartGeometry focus
 
@@ -543,6 +601,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PageContextMenuCause
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PageItemSizing
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
@@ -552,6 +620,20 @@ Enumerations
    .. cpp:enumerator:: fixed
 
    .. cpp:enumerator:: fill
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageStrip::DragState::Phase
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: idle
+
+   .. cpp:enumerator:: armed
+
+   .. cpp:enumerator:: sliding
+
+   .. cpp:enumerator:: claimed
 
 .. cpp:namespace:: gui_forms
 
@@ -645,6 +727,14 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+.. cpp:var:: constexpr double page_drag_threshold
+
+   How far a press on a tab must move, along either axis and in logical units, before it becomes a drag (owner decision DK-26). Value: ``4.0``.
 
 .. cpp:namespace:: gui_forms
 

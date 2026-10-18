@@ -220,7 +220,8 @@ private:
     void build_documents(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> documents_group = group(
             "gallery.tabs.documents.group",
-            "PageView · document preset: close, modified, pinned, shrink then list", {930.0, 200.0});
+            "PageView · document preset: close, modified, pinned, shrink then list, drag to reorder",
+            {930.0, 200.0});
         (*page).add_at(documents_group, {24.0, 1036.0, 930.0, 200.0});
         PageViewOptions options{};
         options.preset = PageViewPreset::document;
@@ -249,6 +250,25 @@ private:
                                   11.0, 600, green);
         (*documents_group).add_at(documents_status_, {640.0, 40.0, 270.0, 44.0});
         on((*(*documents_).strip()).page_close_requested(), *this, &TabsPage::on_document_close_requested);
+        on((*(*documents_).strip()).page_context_menu_requested(), *this, &TabsPage::on_document_context_menu);
+        on((*(*documents_).strip()).page_double_clicked(), *this, &TabsPage::on_document_double_clicked);
+    }
+
+    // The document strip shows no menu of its own: the page reports the
+    // request (a docking workspace shows its position menu here).
+    void on_document_context_menu(PageContextMenuRequest& request) {
+        (*documents_status_).set_text("Context menu asked for " + document_title(request.page));
+    }
+
+    void on_document_double_clicked(const PageDoubleClick& event) {
+        (*documents_status_).set_text("Double-clicked " + document_title(event.page) + " (docking floats it)");
+    }
+
+    [[nodiscard]] std::string document_title(const PageId& page) const {
+        const std::optional<PagePosition> found = (*documents_).pages().find(page);
+        if (!found) return page.value;
+        const std::string title = (*documents_).pages().record_at(*found).title;
+        return title;
     }
 
     // Two PageViews with side strips (owner decision DK-42): on the left
