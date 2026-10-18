@@ -474,7 +474,7 @@
       "type": "TabControl",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp",
       "category": "Grouping",
-      "purpose": "Owner of TabPage lifetime and selection with per-page focus restoration, four header alignments, three appearances, and virtual tab semantics.",
+      "purpose": "Owner of TabPage lifetime and selection with per-page focus restoration, tabs on an internal PageStrip (caption-sized, fill or fixed by size mode, scroll and list buttons when they overflow), four header alignments, three appearances, and virtual tab semantics.",
       "winforms": "TabControl",
       "status": "stable",
       "gallery_page": "tabs-and-pages",

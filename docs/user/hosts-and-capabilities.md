@@ -74,8 +74,10 @@ Application"): `VK_APPS` on Windows and the `Menu` keysym on X11. Apple
 keyboards have no such key; the macOS host maps the virtual key code a PC
 keyboard's key reports (0x6E), which has not been tested on a Mac.
 `PageStrip` and `PageView` use the tab commands, close and the context
-menu; `DockSite` uses docking's commands, the cycle commands (its
-navigator) and the context menu (a panel's position menu).
+menu; `TabControl` uses the tab and cycle commands and leaves close and the
+context menu to the controls around it; `DockSite` uses docking's
+commands, the cycle commands (its navigator) and the context menu (a
+panel's position menu).
 
 ## The three native hosts and the headless one
 

@@ -2585,6 +2585,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_tab_control_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tab_control_tests
              COMMAND gui_forms_tab_control_tests)
+    add_executable(gui_forms_tab_control_strip_tests tests/tab_control_strip_tests.cpp)
+    target_link_libraries(gui_forms_tab_control_strip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tab_control_strip_tests COMMAND gui_forms_tab_control_strip_tests)
 
     add_executable(gui_forms_focus_scope_tests
         tests/focus_scope_tests.cpp
