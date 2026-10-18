@@ -214,7 +214,7 @@ struct ContextMenu::Impl final {
             const FontSpec font = effective_font({FontRole::control, 11.0,
                                 static_cast<std::uint16_t>(
                                     item_.command_state.default_action ? 700 : 400),
-                                false, 0.12});
+                                item_.italic, 0.12});
             const double baseline = std::max(font.size,
                                               bounds.height * 0.5 + font.size * 0.35);
             painter.draw_text_utf8({30.0, baseline},

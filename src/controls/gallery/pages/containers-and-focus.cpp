@@ -4,7 +4,8 @@ namespace gui_forms::gallery::pages {
 
 // Owner of the Containers and Focus page: one SplitContainer whose seam is
 // dragged, keyed and collapsed, a base ContainerControl with descendant focus
-// authority, and a UserControl whose one-shot Loaded lifecycle is observed.
+// authority, a UserControl whose one-shot Loaded lifecycle is observed, and a
+// small docked workspace (DockWorkspace, DockSite, DockNavigator).
 // Every handler is a named member connected with gui_forms::on; the owner
 // lives in the Gallery's ComponentContainer for exactly the Gallery lifetime.
 class ContainersPage final : public gui_forms::Component {
@@ -22,6 +23,7 @@ public:
         build_split(page);
         build_base_container(page);
         build_user_control(page);
+        build_docking(page);
         on((*collapse_).clicked(), *this, &ContainersPage::on_collapse);
         on((*focus_splitter_).clicked(), *this, &ContainersPage::on_focus_splitter);
         on((*base_focus_).clicked(), *this, &ContainersPage::on_focus_descendant);
@@ -126,6 +128,106 @@ private:
         (*face).add_child(action);
     }
 
+    // A docked workspace: Toolbox and Classes tabbed on the left, Properties
+    // on the right, Output auto-hidden on the bottom edge, two documents in
+    // the document area. Panel
+    // controls are made by the page's factory the first time each panel is
+    // shown; the status line follows the two activation tracks. Beside it, a
+    // navigator on its own shows the Ctrl+Tab switcher's two lists.
+    void build_docking(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> docking = group(
+            "gallery.containers.docking.group",
+            "DockSite · seams, captions, F6 regions, Ctrl+Tab navigator, auto-hide, collapse by priority",
+            {930.0, 400.0});
+        (*page).add_at(docking, {24.0, 652.0, 930.0, 400.0});
+        workspace_ = std::make_unique<DockWorkspace>("gallery.containers.workspace");
+        const Delegate<DockPanelCreation&> factory =
+            Delegate<DockPanelCreation&>::bind<ContainersPage, &ContainersPage::make_panel>(*this);
+        constexpr std::array<std::string_view, 4> tool_ids{"toolbox", "classes", "properties", "output"};
+        constexpr std::array<std::string_view, 4> tool_titles{"Toolbox", "Classes", "Properties", "Output"};
+        constexpr std::array<DockSide, 4> tool_sides{DockSide::left, DockSide::left, DockSide::right,
+                                                     DockSide::bottom};
+        constexpr std::array<std::int32_t, 4> tool_priorities{2, 2, 1, 0};
+        for (std::size_t index = 0U; index < tool_ids.size(); ++index) {
+            DockPanelRegistration registration{};
+            registration.descriptor.id = DockPanelId(std::string(tool_ids[index]));
+            registration.descriptor.default_placement.side = tool_sides[index];
+            registration.descriptor.collapse_priority = tool_priorities[index];
+            registration.descriptor.minimum_size = {100.0, 60.0};
+            registration.descriptor.dock_as_document = index == 2U;
+            registration.title = std::string(tool_titles[index]);
+            registration.factory = factory;
+            static_cast<void>((*workspace_).register_panel(registration));
+        }
+        constexpr std::array<std::string_view, 2> document_ids{"form.cs", "program.cs"};
+        constexpr std::array<std::string_view, 2> document_titles{"Form.cs", "Program.cs"};
+        for (std::size_t index = 0U; index < document_ids.size(); ++index) {
+            DockPanelRegistration registration{};
+            registration.descriptor.id = DockPanelId(std::string(document_ids[index]));
+            registration.descriptor.kind = DockPanelKind::document;
+            registration.descriptor.minimum_size = {160.0, 80.0};
+            registration.title = std::string(document_titles[index]);
+            registration.factory = factory;
+            static_cast<void>((*workspace_).register_panel(registration));
+            static_cast<void>((*workspace_).show_panel(registration.descriptor.id));
+        }
+        static_cast<void>((*workspace_).show_panel(DockPanelId("toolbox")));
+        DockTransaction tabbed{};
+        const DockNodeId toolbox_stack = (*workspace_).layout().locate(DockPanelId("toolbox")).stack;
+        tabbed.edits.push_back(DockEdit::dock_into(DockSubject::of_panel(DockPanelId("classes")), toolbox_stack));
+        static_cast<void>((*workspace_).apply(tabbed));
+        static_cast<void>((*workspace_).show_panel(DockPanelId("properties")));
+        static_cast<void>((*workspace_).show_panel(DockPanelId("output")));
+        // Output is pinned out to the bottom edge: its side tab opens a
+        // flyout on hover or click.
+        DockTransaction pinned{};
+        const DockNodeId output_stack = (*workspace_).layout().locate(DockPanelId("output")).stack;
+        pinned.edits.push_back(DockEdit::auto_hide(DockSubject::of_stack(output_stack), DockSide::bottom, 120.0));
+        static_cast<void>((*workspace_).apply(pinned));
+        dock_site_ = make_control<DockSite>(StableId("gallery.containers.dock"), *workspace_);
+        (*dock_site_).set_accessible_name("Docked workspace specimen");
+        (*docking).add_at(dock_site_, {20.0, 36.0, 600.0, 344.0});
+        dock_status_ = label("gallery.containers.docking.status", "Active: none", 11.0, 600, green);
+        (*docking).add_at(dock_status_, {640.0, 36.0, 270.0, 44.0});
+        on((*workspace_).activation_changed(), *this, &ContainersPage::on_activation);
+        navigator_ = make_control<DockNavigator>(StableId("gallery.containers.navigator"));
+        std::vector<DockNavigatorEntry> tools{{DockPanelId("output"), "Output"},
+                                              {DockPanelId("properties"), "Properties"},
+                                              {DockPanelId("toolbox"), "Toolbox"}};
+        std::vector<DockNavigatorEntry> files{{DockPanelId("program.cs"), "Program.cs"},
+                                              {DockPanelId("form.cs"), "Form.cs"}};
+        (*navigator_).set_entries(std::move(tools), std::move(files));
+        static_cast<void>((*navigator_).step(1));
+        (*docking).add_at(navigator_, {640.0, 96.0, 270.0, 120.0});
+    }
+
+    // The page's factory: a panel's control, made the first time it shows.
+    void make_panel(DockPanelCreation& creation) {
+        const std::string title = (*workspace_).panel_title(creation.panel);
+        std::shared_ptr<Panel> content =
+            make_control<Panel>(StableId("gallery.containers.dock.content." + creation.panel.value));
+        std::shared_ptr<Label> copy = label("gallery.containers.dock.copy." + creation.panel.value,
+                                            title + " · made when first shown", 11.0, 400, ink);
+        (*copy).set_requested_bounds({8.0, 8.0, 240.0, 22.0});
+        (*content).add_child(copy);
+        std::shared_ptr<TextBox> field =
+            make_control<TextBox>(StableId("gallery.containers.dock.field." + creation.panel.value));
+        (*field).set_accessible_name(title);
+        (*field).set_requested_bounds({8.0, 36.0, 150.0, 24.0});
+        (*content).add_child(field);
+        creation.content = content;
+    }
+
+    void on_activation(const DockActivationChange&) {
+        std::string text = "Active: ";
+        const std::optional<DockPanelId>& panel = (*workspace_).active_panel();
+        text += panel ? (*workspace_).panel_title(*panel) : std::string("none");
+        text += " · document: ";
+        const std::optional<DockPanelId>& document = (*workspace_).active_document();
+        text += document ? (*workspace_).panel_title(*document) : std::string("none");
+        (*dock_status_).set_text(text);
+    }
+
     // Input-only: the user clicked. The collapse state itself lives in the
     // public SplitContainer, so the button text follows the container.
     void on_collapse() {
@@ -155,6 +257,12 @@ private:
     std::shared_ptr<Button> base_focus_;
     std::shared_ptr<UserControl> user_control_;
     std::shared_ptr<Label> user_status_;
+    // Destroying the workspace unbinds the site, so the control tree may
+    // outlive the page owner.
+    std::unique_ptr<DockWorkspace> workspace_;
+    std::shared_ptr<DockSite> dock_site_;
+    std::shared_ptr<Label> dock_status_;
+    std::shared_ptr<DockNavigator> navigator_;
 };
 
 void add_containers(const std::shared_ptr<Surface>& page,

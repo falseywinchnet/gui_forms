@@ -111,6 +111,18 @@ void test_tree_and_object_views(gui_forms::Window& window) {
                 (*status).text().find("Folder src collapsed") == 0U,
             "Left on an expanded tree row must collapse it and publish expansion_changed");
 
+    // TreeListView: the whole fixture with columns; pressing the Name header
+    // sorts every folder's children and the page reports it.
+    const std::shared_ptr<TreeListView> tree_list =
+        std::dynamic_pointer_cast<TreeListView>(window.find("gallery.tree.tree-list"));
+    require(tree_list && (*tree_list).nodes().size() == 15U && (*tree_list).row_count() == 9U &&
+                (*tree_list).row_node_id(0U) == "root",
+            "the TreeListView must show the fixture with root, src and controls expanded");
+    require((*tree_list).on_semantic_child_action("gallery.tree.tree-list.column.name", SemanticAction::press, {}) &&
+                (*tree_list).sort_column() == 0U && (*tree_list).row_node_id(1U) == "assets" &&
+                (*status).text().find("TreeListView siblings sorted by Name ascending") == 0U,
+            "pressing a TreeListView header must sort the siblings and report it");
+
     const std::string semantics = window.semantic_snapshot().to_json();
     require(semantics.find("gallery.tree.folders") != std::string::npos &&
                 semantics.find("\"role\":\"list_item\"") != std::string::npos &&

@@ -27,8 +27,9 @@ gui_forms::ImageList
    :Parameters:
 
       **window** : ``Window``
-         The window whose image registry holds the images. The list belongs to it
-         for life and is used only on its UI thread.
+         The window whose image registry holds the images. The list belongs to
+         every window sharing that registry (``Window::resources``) and is used
+         only on their UI thread.
 
       **image_size** : ``Size``, default ``{16.0, 16.0}``
          Logical size, in layout units, at which consumers draw the images; 16 by
@@ -38,8 +39,9 @@ gui_forms::ImageList
    :Properties:
 
       **bound_window** : ``Window*``, read-only
-         The window the list belongs to, or null once that window has shut down or
-         the list has been disposed.
+         The window the list was created for, or null once that window has shut
+         down or the list has been disposed. A list whose window has shut down
+         keeps working while other windows still share its registry.
 
       **image_size** : ``Size``, default ``{16.0, 16.0}``
          Logical drawing size of every image, independent of its pixels: a 2x
@@ -81,7 +83,7 @@ gui_forms::ImageList
       :widths: 35 65
 
       * - :cpp:func:`belongs_to <gui_forms::ImageList::belongs_to>`
-        - Whether the list belongs to the given window.
+        - Whether the list's images are in the given window's registry: true for the window it was created for and for every window sharing that window's :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>`.
       * - :cpp:func:`add_png <gui_forms::ImageList::add_png>`
         - ``add_png(key, encoded, density_scale = 1.0)`` decodes a PNG into the window's registry and makes it the ``normal`` image of ``key`` at that density.
       * - :cpp:func:`add_image <gui_forms::ImageList::add_image>`
@@ -134,8 +136,8 @@ gui_forms::ImageList
    is no longer in the registry.
 
    Every member that changes the list must be called on the window's UI thread,
-   and throws ``std::logic_error`` from another thread, after disposal and after
-   the window has shut down. Dispose the list to release its images at a known
+   and throws ``std::logic_error`` from another thread, after disposal and once
+   no window uses its registry any more. Dispose the list to release its images at a known
    moment; disposal raises :cpp:func:`changed <gui_forms::ImageList::changed>` with ``reset``. A list destroyed without
    disposal on the UI thread still releases its images, but raises no event.
 
@@ -186,8 +188,9 @@ gui_forms::ImageList
 
    .. cpp:function:: Window* bound_window() const noexcept
 
-      The window the list belongs to, or null once that window has shut down or
-      the list has been disposed.
+      The window the list was created for, or null once that window has shut
+      down or the list has been disposed. A list whose window has shut down
+      keeps working while other windows still share its registry.
 
    .. cpp:function:: Size image_size() const noexcept
 
@@ -238,8 +241,10 @@ gui_forms::ImageList
 
    .. cpp:function:: bool belongs_to(const Window& window) const noexcept
 
-      Whether the list belongs to the given window. :cpp:class:`Button <gui_forms::Button>`, :cpp:class:`TreeView <gui_forms::TreeView>` and
-      :cpp:class:`ObjectView <gui_forms::ObjectView>` use it to reject a list that belongs to another window.
+      Whether the list's images are in the given window's registry: true for
+      the window it was created for and for every window sharing that
+      window's :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>`. :cpp:class:`Button <gui_forms::Button>`, :cpp:class:`TreeView <gui_forms::TreeView>` and :cpp:class:`ObjectView <gui_forms::ObjectView>`
+      use it to reject a list whose images another window cannot show.
 
    .. cpp:function:: ImageLoadResult add_png(std::string key, std::span<const std::byte> encoded, double density_scale = 1.0)
 
