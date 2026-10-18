@@ -378,12 +378,6 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:enum-class:: PopupDismissReason
-
-   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
-
-.. cpp:namespace:: gui_forms
-
 .. cpp:enum-class:: TextBox::MultilineValidation
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
