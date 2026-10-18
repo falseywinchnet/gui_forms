@@ -24,6 +24,14 @@ client_size
 image_limits
     Quotas for the window's image registry. The two-argument constructor
     uses the default quotas.
+resources
+    An `ApplicationResources` to share with other windows: one image
+    registry and one theme for all of them, so an `ImageId`, an `ImageList`
+    and the theme hold in each and a control subtree moved between them
+    keeps its images. The window takes the resources' current theme. Null
+    resources throw `std::invalid_argument`; resources made on another
+    thread throw `std::logic_error`. The other constructors make resources
+    of the window's own.
 
 Properties
 ----------
@@ -50,8 +58,13 @@ presentation_settings
     `presentation_changed`.
 theme
     The theme every control inherits unless it has its own override.
-    Setting it raises `theme_changed`; a null theme throws
+    Setting it sets the theme of every window sharing this window's
+    `resources` and raises `theme_changed` in each; a null theme throws
     `std::invalid_argument`.
+resources
+    The `ApplicationResources` this window uses, its own unless it was
+    constructed with shared ones. Pass it to another window's constructor to
+    share the image registry and the theme with that window.
 active : default ``true``
     Whether the window is the active top-level window. Controls paint their
     inactive state when it is false. Setting it raises `active_changed`.

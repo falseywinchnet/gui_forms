@@ -13,15 +13,18 @@ gui_forms::Ribbon
 
    A ribbon: the File tab and core tabs over a command plane of groups.
 
-   A ribbon (stage RB, phase 1) shows a tab row that is always visible (the File
-   tab, then the core tabs) over the command plane of the selected tab. The plane
-   holds groups side by side, each with its commands, a caption beneath and,
-   when authored, a dialog launcher in the caption's corner. Commands are
-   :cpp:class:`RibbonCommandSpec <gui_forms::RibbonCommandSpec>` records bound to shared :cpp:class:`Command <gui_forms::Command>` objects: buttons,
-   toggles, split buttons and drop-down buttons at a large or small authored
-   size, and hosted combo boxes, numeric spinners, check boxes and text boxes,
-   which are real child controls the ribbon places. Every part is painted
-   through the by-role paint path.
+   A ribbon (stage RB, phases 1 and 2b) shows a tab row that is always visible
+   (the File tab, then the core tabs) over the command plane of the selected
+   tab. The plane holds groups side by side, each with its commands, a caption
+   beneath and, when authored, a dialog launcher in the caption's corner.
+   Commands are :cpp:class:`RibbonCommandSpec <gui_forms::RibbonCommandSpec>` records bound to shared :cpp:class:`Command <gui_forms::Command>` objects:
+   buttons, toggles, split buttons and drop-down buttons at a large or small
+   size, hosted combo boxes, numeric spinners, check boxes and text boxes, and
+   in-ribbon :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>` controls, which are real child controls the ribbon
+   places. As the ribbon narrows its groups shrink through their layouts in the
+   tab's reduction order, down to collapsed group buttons that open the group in
+   a popup, and below the narrowest layout the plane scrolls. Every part is
+   painted through the by-role paint path.
 
    *Status:* provisional.
 
@@ -43,7 +46,38 @@ gui_forms::Ribbon
          split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a kind that has none or a split or
          drop-down without one, an icon-only command that is not small or has no
          image, choices on a command that is not a combo box, a width outside 0
-         to 1024, an invalid menu, or more than the development bounds.
+         to 1024, an invalid menu, a gallery command without an in-ribbon gallery
+         (or with one used twice or owned elsewhere), two galleries in a group, an
+         invalid layout (a collapsed layout that is not last or in a group of one
+         command, sizes that grow, a size count other than the command count, rows
+         outside 1 to 3, an icon-only command made large), a reduction step naming
+         a group not on its tab or shrinking a group past its last layout or its
+         gallery past its minimum (owner decision 29), or more than the
+         development bounds. A refused definition leaves the previous tabs.
+
+      **ladder_step** : ``std::optional<std::size_t>``, read-only
+         The selected tab's ladder entry the plane shows, or none while it is
+         hidden or minimized.
+
+      **scrolling** : ``bool``, read-only
+         Whether even the narrowest entry is wider than the plane, so that the
+         plane scrolls.
+
+      **first_visible_group** : ``std::size_t``, read-only
+         The first group shown while the plane scrolls.
+
+      **document_minimum_height** : ``double``, default ``0``
+         The minimum height, in logical units, the document area under the ribbon
+         declares (owner decision 34); zero declares none.
+         :cpp:func:`set_document_minimum_height <gui_forms::Ribbon::set_document_minimum_height>` throws ``std::invalid_argument`` for a
+         negative or non-finite height.
+
+      **plane_hidden** : ``bool``, read-only
+         Whether the document-area rule hides the command plane now.
+
+      **scaling_counters** : ``RibbonScalingCounters``, read-only
+         :cpp:class:`RibbonScalingCounters <gui_forms::RibbonScalingCounters>`: ladders built, the last ladder's entries and
+         folded steps, ladder lookups and the ribbon's own text measurements.
 
       **selected_tab** : ``std::optional<std::size_t>``
          The selected tab, or none without tabs. :cpp:func:`set_selected_tab <gui_forms::Ribbon::set_selected_tab>` throws
@@ -62,6 +96,13 @@ gui_forms::Ribbon
       **menu_open** : ``bool``, read-only
          Whether the application menu or a command's menu is open.
 
+      **popup_group** : ``std::optional<std::string>``, read-only
+         The ID of the group whose popup is open, or none.
+
+      **group_popup** : ``Control::Ptr``, read-only
+         The popup's content control (null before the first popup); the popup's
+         parts are in its local coordinates.
+
       **focus_region** : ``bool``, default ``true``
          Whether the ribbon adds itself to its window's F6 regions when it is
          attached.
@@ -79,6 +120,12 @@ gui_forms::Ribbon
 
       **realized_commands** : ``std::vector<CommandItem>``, read-only
          The selected tab's commands, their parts and states.
+
+      **realized_popup_groups** : ``std::vector<Group>``, read-only
+         The open popup's group and its parts, or nothing.
+
+      **realized_popup_commands** : ``std::vector<CommandItem>``, read-only
+         The open popup's commands, their parts and states.
 
    :Events:
 
@@ -111,12 +158,20 @@ gui_forms::Ribbon
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`group_layouts <gui_forms::Ribbon::group_layouts>`
+        - A group's layouts, largest first: as authored, or generated.
+      * - :cpp:func:`reduction_ladder <gui_forms::Ribbon::reduction_ladder>`
+        - A tab's :cpp:class:`RibbonLadderEntry <gui_forms::RibbonLadderEntry>` list from the widest to the narrowest, built if needed.
       * - :cpp:func:`show_application_menu <gui_forms::Ribbon::show_application_menu>`
         - Opens the application menu over the ribbon, below the File tab.
       * - :cpp:func:`show_drop_down <gui_forms::Ribbon::show_drop_down>`
         - Opens a split or drop-down command's menu below it.
       * - :cpp:func:`close_menus <gui_forms::Ribbon::close_menus>`
         - Closes any open menu.
+      * - :cpp:func:`show_group_popup <gui_forms::Ribbon::show_group_popup>`
+        - Opens a collapsed group of the selected tab in a popup below the ribbon at its largest layout; its hosted controls move into the popup while it is open.
+      * - :cpp:func:`close_group_popup <gui_forms::Ribbon::close_group_popup>`
+        - Closes the group popup; focus returns to the group's button.
       * - :cpp:func:`combo_box <gui_forms::Ribbon::combo_box>`
         - The :cpp:class:`ComboBox <gui_forms::ComboBox>` a combo box command holds.
       * - :cpp:func:`numeric_up_down <gui_forms::Ribbon::numeric_up_down>`
@@ -149,19 +204,60 @@ gui_forms::Ribbon
    columns. Labels are shown at every size (decision 6); a small command with an
    image may be authored icon-only (decision 30). A large split's face is its
    icon, and its arrow is the label and glyph beneath; a small split's arrow is
-   the zone at its right end. Every group is shown at its largest size: groups
-   past the right edge are clipped until scaling arrives in phase 2.
+   the zone at its right end.
+
+   Scaling (the WPF/MFC model, owner decision 5). Each group has layouts
+   (:cpp:class:`RibbonGroupLayout <gui_forms::RibbonGroupLayout>`: a size, large, medium, small or collapsed, the image
+   size of each command and the small commands per column, 1 to 3). A group
+   that authors none gets generated layouts: its commands' own sizes, then, one
+   layout per step, the rightmost run of up to three large commands made small,
+   then collapsed, except a group of one command, which never shrinks. Labels
+   never drop (decision 6). A tab's reduction ladder starts with every group at
+   its largest layout and its gallery at its most columns; each step shrinks one
+   group, first in the tab's authored ``reduction_order``, then by WPF's cycle
+   (decision 32): from the rightmost group leftwards, one step per group,
+   wrapping, where a group with a gallery above its minimum gives up one column
+   (decision 8) before it changes layout. A step that does not narrow the tab is
+   folded into the next entry, so widths strictly decrease. The plane shows the
+   widest entry no wider than itself. Below the narrowest entry it scrolls at
+   any width (decision 35): scroll buttons at the ends move by one group, a
+   group that does not fit whole before the right button is not shown (the
+   first is clipped), and the keyboard's stop scrolls its group into view.
+
+   A collapsed group is one button the plane's height with the group's icon
+   (``RibbonGroupSpec::image``, else its first command image), its caption and a
+   chevron (decision 27). Pressing it, Enter, Space or Down opens the group at
+   its largest layout in a popup below the ribbon, casting the overlay shadow; a
+   command run there, its launcher, a press elsewhere or Escape closes it, and it
+   closes when the group grows back. In the popup the arrows and Tab move
+   through its commands.
+
+   The hide rule (decisions 28, 34 to 36). The height the ribbon's parent offers
+   it holds the ribbon and the document area beneath. The command plane, never
+   the tab row, hides when that area (with the plane shown) would be shorter
+   than :cpp:func:`document_minimum_height <gui_forms::Ribbon::document_minimum_height>`, or below zero when none is declared; a hidden
+   plane shows again once the area is at least the minimum plus
+   ``Ribbon::hide_hysteresis`` (8 units). Width never hides it.
+
+   Measured widths (labels, captions, tabs, galleries) are cached per tab and
+   rebuilt only when the tabs, a command's text or visibility, the font, the
+   text scale, the theme, the text provider or a gallery's column range or item
+   size change; a resize only looks up the ladder.
 
    The ribbon publishes ``region``, ``tab_rail``, ``application_button``,
-   ``application_label``, ``command_plane`` and ``focus``, and three item
-   systems: ``tab`` (``tab``, ``tab_label``, ``tab_focus``; hot, selected,
-   focus_visible), ``group`` (``group_region``, ``group_caption``,
-   ``group_divider``, ``group_launcher``, ``group_launcher_glyph``,
-   ``group_launcher_focus``) and ``command`` (``command_face``,
-   ``command_icon``, ``command_label``, ``command_arrow``,
+   ``application_label``, ``command_plane``, ``scroll_left``,
+   ``scroll_left_glyph``, ``scroll_right``, ``scroll_right_glyph`` and
+   ``focus``, and three item systems: ``tab`` (``tab``, ``tab_label``,
+   ``tab_focus``; hot, selected, focus_visible), ``group`` (``group_region``,
+   ``group_caption``, ``group_divider``, ``group_launcher``,
+   ``group_launcher_glyph``, ``group_launcher_focus`` and the collapsed
+   ``group_button``, ``group_button_icon``, ``group_button_label``,
+   ``group_button_glyph``, ``group_button_focus``) and ``command``
+   (``command_face``, ``command_icon``, ``command_label``, ``command_arrow``,
    ``command_arrow_glyph``, ``command_focus`` and the hosted
-   ``command_combo_box``, ``command_numeric_up_down``, ``command_check_box`` and
-   ``command_text_box``; hot, pressed, checked, open, disabled, focus_visible).
+   ``command_combo_box``, ``command_numeric_up_down``, ``command_check_box``,
+   ``command_text_box`` and ``command_gallery``; hot, pressed, checked, open,
+   disabled, focus_visible).
    Until the default theme (T4), command faces use the menu-item family (flat
    at rest), the plane and tab row the panel family and the File tab the
    accent-button family. A command whose enabled or checked state changes
@@ -183,16 +279,20 @@ gui_forms::Ribbon
    and, while shown, the command plane (a group named after the selected tab)
    with its groups, named by caption, and their commands: ``button``,
    ``split_button`` or ``menu_button``, with positions in their group and
-   has-popup, and each launcher as a button. Hosted controls describe
-   themselves as children of the ribbon.
+   has-popup, and each launcher as a button. A collapsed group is a
+   ``menu_button`` with a popup (expanded while open), and the scroll buttons are
+   buttons. Hosted controls describe themselves as children of the ribbon, or
+   of the popup while it is open.
 
-   Not yet: contextual tabs, adaptive scaling, galleries, the Quick Access
-   Toolbar, the minimized popup, enhanced tooltips, Backstage and the
-   application menu's recent-items pane (the File tab opens a :cpp:class:`ContextMenu <gui_forms::ContextMenu>`).
+   Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
+   Backstage, the application menu's recent-items pane (the File tab opens a
+   :cpp:class:`ContextMenu <gui_forms::ContextMenu>`), right-to-left mirroring of the cycle, two-line large labels
+   and ellipsized tab labels (decision 30 allows them; tabs past the row's end
+   are clipped).
 
    .. rubric:: Examples
 
-   A ribbon with one tab and one group:
+   A ribbon with one tab and one group that collapses first as it narrows:
 
    .. code-block:: cpp
 
@@ -200,9 +300,13 @@ gui_forms::Ribbon
       std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("main.ribbon"));
       gf::RibbonGroupSpec clipboard{.stable_id = "clipboard", .caption = "Clipboard", .dialog_launcher = true};
       clipboard.commands.push_back({.stable_id = "paste", .command = paste});
+      clipboard.commands.push_back({.stable_id = "copy", .size = gf::RibbonCommandSize::small, .command = paste});
+      clipboard.layouts = {{.size = gf::RibbonGroupSize::large}, {.size = gf::RibbonGroupSize::collapsed}};
       gf::RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
       home.groups.push_back(std::move(clipboard));
+      home.reduction_order = {{.group = "clipboard"}};
       (*ribbon).set_tabs({std::move(home)});
+      (*ribbon).set_document_minimum_height(120.0);
 
 
    .. rubric:: Construction
@@ -222,11 +326,52 @@ gui_forms::Ribbon
       split without a :cpp:class:`Command <gui_forms::Command>`, a menu on a kind that has none or a split or
       drop-down without one, an icon-only command that is not small or has no
       image, choices on a command that is not a combo box, a width outside 0
-      to 1024, an invalid menu, or more than the development bounds.
+      to 1024, an invalid menu, a gallery command without an in-ribbon gallery
+      (or with one used twice or owned elsewhere), two galleries in a group, an
+      invalid layout (a collapsed layout that is not last or in a group of one
+      command, sizes that grow, a size count other than the command count, rows
+      outside 1 to 3, an icon-only command made large), a reduction step naming
+      a group not on its tab or shrinking a group past its last layout or its
+      gallery past its minimum (owner decision 29), or more than the
+      development bounds. A refused definition leaves the previous tabs.
 
    .. cpp:function:: void set_tabs(std::vector<RibbonTabSpec> tabs)
 
       Sets :cpp:func:`tabs <gui_forms::Ribbon::tabs>`; see the property's description above.
+
+   .. cpp:function:: std::optional<std::size_t> ladder_step() const
+
+      The selected tab's ladder entry the plane shows, or none while it is
+      hidden or minimized.
+
+   .. cpp:function:: bool scrolling() const
+
+      Whether even the narrowest entry is wider than the plane, so that the
+      plane scrolls.
+
+   .. cpp:function:: std::size_t first_visible_group() const noexcept
+
+      The first group shown while the plane scrolls.
+
+   .. cpp:function:: double document_minimum_height() const noexcept
+
+      The minimum height, in logical units, the document area under the ribbon
+      declares (owner decision 34); zero declares none.
+      :cpp:func:`set_document_minimum_height <gui_forms::Ribbon::set_document_minimum_height>` throws ``std::invalid_argument`` for a
+      negative or non-finite height.
+
+   .. cpp:function:: void set_document_minimum_height(double height)
+
+      Sets :cpp:func:`document_minimum_height <gui_forms::Ribbon::document_minimum_height>`; see the property's description above.
+
+   .. cpp:function:: bool plane_hidden() const noexcept
+
+      Whether the document-area rule hides the command plane now.
+
+   .. cpp:function:: RibbonScalingCounters scaling_counters() const noexcept
+
+      :cpp:class:`RibbonScalingCounters <gui_forms::RibbonScalingCounters>`: ladders built, the last ladder's entries and
+      folded steps, ladder lookups and the ribbon's own text measurements.
 
    .. cpp:function:: std::optional<std::size_t> selected_tab() const noexcept
 
@@ -266,6 +411,15 @@ gui_forms::Ribbon
 
       Whether the application menu or a command's menu is open.
 
+   .. cpp:function:: std::optional<std::string> popup_group() const
+
+      The ID of the group whose popup is open, or none.
+
+   .. cpp:function:: Control::Ptr group_popup() const noexcept
+
+      The popup's content control (null before the first popup); the popup's
+      parts are in its local coordinates.
+
    .. cpp:function:: bool focus_region() const noexcept
 
       Whether the ribbon adds itself to its window's F6 regions when it is
@@ -296,6 +450,14 @@ gui_forms::Ribbon
    .. cpp:function:: std::vector<CommandItem> realized_commands() const
 
       The selected tab's commands, their parts and states.
+
+   .. cpp:function:: std::vector<Group> realized_popup_groups() const
+
+      The open popup's group and its parts, or nothing.
+
+   .. cpp:function:: std::vector<CommandItem> realized_popup_commands() const
+
+      The open popup's commands, their parts and states.
 
 
    .. rubric:: Events
@@ -328,6 +490,16 @@ gui_forms::Ribbon
 
    .. rubric:: Methods
 
+   .. cpp:function:: std::span<const RibbonGroupLayout> group_layouts(std::size_t tab, std::size_t group) const
+
+      A group's layouts, largest first: as authored, or generated. Throws
+      ``std::out_of_range`` for a tab or group past the end.
+
+   .. cpp:function:: std::vector<RibbonLadderEntry> reduction_ladder(std::size_t tab) const
+
+      A tab's :cpp:class:`RibbonLadderEntry <gui_forms::RibbonLadderEntry>` list from the widest to the narrowest, built
+      if needed. Throws ``std::out_of_range`` for a tab past the end.
+
    .. cpp:function:: bool show_application_menu(MenuOpenMode mode = MenuOpenMode::keyboard)
 
       Opens the application menu over the ribbon, below the File tab. Returns
@@ -341,6 +513,17 @@ gui_forms::Ribbon
    .. cpp:function:: void close_menus() noexcept
 
       Closes any open menu.
+
+   .. cpp:function:: bool show_group_popup(std::string_view group_id, MenuOpenMode mode = MenuOpenMode::keyboard)
+
+      Opens a collapsed group of the selected tab in a popup below the ribbon at
+      its largest layout; its hosted controls move into the popup while it is
+      open. Returns false for a group that is not collapsed or not on the
+      selected tab, or without a window.
+
+   .. cpp:function:: void close_group_popup() noexcept
+
+      Closes the group popup; focus returns to the group's button.
 
    .. cpp:function:: std::shared_ptr<ComboBox> combo_box(std::string_view command_id) const
 
@@ -364,6 +547,8 @@ gui_forms::Ribbon
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
 
    .. cpp:function:: void on_pointer(PointerEvent& event) override
+
+   .. cpp:function:: void on_pointer_preview(PointerEvent& event) override
 
    .. cpp:function:: void on_key(KeyEvent& event) override
 
@@ -426,3 +611,15 @@ gui_forms::Ribbon
    .. cpp:member:: constexpr std::size_t maximum_commands_per_group
 
       Default: ``64U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_layouts_per_group
+
+      Default: ``8U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_reduction_steps
+
+      Default: ``1024U``.
+
+   .. cpp:member:: constexpr double hide_hysteresis
+
+      How far, in logical units, the document area must clear its minimum before a hidden command plane shows again (owner decision 36). Default: ``8.0``.
