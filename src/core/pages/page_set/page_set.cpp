@@ -439,6 +439,25 @@ PageEditStatus PageSet::set_closable(const PageId& id, bool closable) {
     return PageEditStatus::applied;
 }
 
+PageEditStatus PageSet::set_modified(const PageId& id, bool modified) {
+    if (selecting_active_) {
+        return PageEditStatus::selecting_in_progress;
+    }
+    const std::optional<PagePosition> found = find(id);
+    if (!found.has_value()) {
+        return PageEditStatus::unknown_page;
+    }
+    PageRecord& record = entries_[(*found).value].record;
+    if (record.modified == modified) {
+        return PageEditStatus::unchanged;
+    }
+    record.modified = modified;
+    ++revision_;
+    note_pages(false, false, true, false);
+    publish_pending();
+    return PageEditStatus::applied;
+}
+
 PageEditStatus PageSet::set_content(const PageId& id,
                                     std::unique_ptr<PageContent>& content) {
     if (selecting_active_) {

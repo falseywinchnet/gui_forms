@@ -20,9 +20,11 @@ constexpr std::array<std::string_view, 0> anatomy_pending{
 // Registry entries that are not controls: nonvisual components and the
 // LiveSurface service type. They have no parts; a component that shows
 // something (a context menu, a tool tip) does so through an internal control.
-constexpr std::array<std::string_view, 16> nonvisual_entries{
+constexpr std::array<std::string_view, 19> nonvisual_entries{
     "command",
     "gallery_command",
+    "font_command",
+    "color_command",
     "context_menu",
     "tool_tip",
     "ribbon_tool_tip",
@@ -37,6 +39,7 @@ constexpr std::array<std::string_view, 16> nonvisual_entries{
     "binding_source",
     "binding_context",
     "live_surface",
+    "dock_workspace",
 };
 
 // True when every state a part publishes is one its declaration lists.

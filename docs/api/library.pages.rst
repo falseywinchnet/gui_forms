@@ -27,7 +27,7 @@ Related types
    :widths: 35 65
 
    * - :cpp:class:`PageContent <gui_forms::PageContent>`
-     - The content a presenter attaches to a page; for ``PageView``, the page's control subtree.
+     - The content a presenter attaches to a page; for :cpp:class:`PageView <gui_forms::PageView>`, the page's control subtree.
    * - :cpp:class:`PageId <gui_forms::PageId>`
      - A page's stable identity: the application's string, unique within one set (docking uses the panel's identity).
    * - :cpp:class:`PagePlacement <gui_forms::PagePlacement>`
@@ -59,7 +59,7 @@ Related types
 
    ``#include <gui_forms/pages/types/page_set_types.hpp>``
 
-   The content a presenter attaches to a page; for ``PageView``, the page's control subtree. The set owns the content of every page in it: ``take`` moves the content out with its record, ``put`` moves it in, and removing a page or destroying the set destroys it. A page may have no content until its presenter supplies it (late content). The derived type is the presenter's; the set only destroys it.
+   The content a presenter attaches to a page; for :cpp:class:`PageView <gui_forms::PageView>`, the page's control subtree. The set owns the content of every page in it: ``take`` moves the content out with its record, ``put`` moves it in, and removing a page or destroying the set destroys it. A page may have no content until its presenter supplies it (late content). The derived type is the presenter's; the set only destroys it.
 
 .. cpp:namespace:: gui_forms
 
@@ -123,6 +123,10 @@ Related types
    .. cpp:member:: bool pinned
 
       Kept in the pinned group at the front of the order. Refused unless the set was constructed with pinning enabled. Default: ``{false}``.
+
+   .. cpp:member:: bool modified
+
+      The page's content has unsaved changes (a document). Display only: the presenter shows it (the custom state ``modified``, owner decision DK-35) and the set attaches no meaning to it. Default: ``{false}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -194,7 +198,7 @@ Related types
 
    .. cpp:member:: bool records
 
-      A title, image key, closable or pinned flag changed.
+      A title, image key, closable, pinned or modified flag changed.
 
    .. cpp:member:: bool content
 

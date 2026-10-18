@@ -80,6 +80,9 @@ set_image_key
     Changes a page's image key.
 set_closable
     Changes whether a page shows its close affordance.
+set_modified
+    Changes a page's display-only ``modified`` flag (a document with unsaved
+    changes). The set attaches no meaning to it; a strip shows it as a dot.
 set_content
     Attaches content to a page that has none (late content).
 select

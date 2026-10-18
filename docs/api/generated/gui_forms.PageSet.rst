@@ -101,6 +101,8 @@ gui_forms::PageSet
         - Changes a page's image key.
       * - :cpp:func:`set_closable <gui_forms::PageSet::set_closable>`
         - Changes whether a page shows its close affordance.
+      * - :cpp:func:`set_modified <gui_forms::PageSet::set_modified>`
+        - Changes a page's display-only ``modified`` flag (a document with unsaved changes).
       * - :cpp:func:`set_content <gui_forms::PageSet::set_content>`
         - Attaches content to a page that has none (late content).
 
@@ -314,6 +316,11 @@ gui_forms::PageSet
    .. cpp:function:: PageEditStatus set_closable(const PageId& id, bool closable)
 
       Changes whether a page shows its close affordance.
+
+   .. cpp:function:: PageEditStatus set_modified(const PageId& id, bool modified)
+
+      Changes a page's display-only ``modified`` flag (a document with unsaved
+      changes). The set attaches no meaning to it; a strip shows it as a dot.
 
    .. cpp:function:: PageEditStatus set_content(const PageId& id, std::unique_ptr<PageContent>& content)
 

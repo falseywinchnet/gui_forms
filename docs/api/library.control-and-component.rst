@@ -454,6 +454,10 @@ Related types
 
       The accent the part is tinted with, or none (see AccentIndex).
 
+   .. cpp:member:: std::optional<Color> content_color
+
+      The colour the part shows as its content, or none: a colour swatch's sample (PartPaint::content_color; owner decision W-7).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PartGeometryBuffer final

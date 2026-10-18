@@ -25,7 +25,9 @@ namespace gui_forms {
 // When no target handles it, Command::execute_routed raises the command's
 // own `invoked` event, as Command::execute does, so a window with nothing
 // registered routes every command exactly as before the chain existed.
-// Menus, the ribbon, tool strips and shortcuts route their commands; a
+// Menus, the ribbon, tool strips, shortcuts, buttons bound to a command
+// (ButtonBase::bind, CommandBinding), gallery commits and the notification
+// area's menus route their commands (owner decision DK-47); a
 // docking workspace names the active panel and document. A floating window
 // names its main window's targets for the last three stages, so a document
 // command reaches the active document from there.

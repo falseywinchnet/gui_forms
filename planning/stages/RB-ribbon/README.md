@@ -221,6 +221,18 @@ From the docking interview (2026-10-17,
     `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
     own. Revises decision 12.
 
+From the owner's review of phase 2b (relayed by the coordinator, 2026-10):
+
+45. **The scroll buttons take 8 units of hysteresis**, as the hide rule does
+    (decision 36): they appear when the narrowest layout no longer fits and
+    disappear only when 8 more units are available.
+46. **The command plane expands and collapses for assistive technology
+    (R7).** Tabs expose selection and never invoke, so clicking the selected
+    tab to minimize is unreachable through accessibility. The command plane
+    publishes an expanded or collapsed state and expand and collapse actions
+    (mapped as the existing expand and collapse are), driving the same
+    minimize and restore as the pointer click, which keeps working.
+
 ## Gate
 
 The interview round is recorded, the decisions are in this brief, and the
