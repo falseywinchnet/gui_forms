@@ -37,7 +37,9 @@ struct Token final {
 // A text field that turns each accepted entry into a token: a removable
 // item with a stable identity, shown before the editor and wrapping onto
 // further lines. An entry is accepted by Enter, by a delimiter character,
-// or by accepting a completion of the editor's auto-complete. A
+// or by accepting a completion of the editor's auto-complete. With no entry
+// typed (nothing, or only spaces), Enter goes on to the containers and the
+// window's accept button (owner decision W-6). A
 // GUI.Forms-only control (Windows Forms has none).
 class TokenBox final : public Control {
 public:

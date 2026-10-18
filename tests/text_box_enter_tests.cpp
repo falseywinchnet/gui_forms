@@ -226,9 +226,13 @@ void composites_pass_enter_on() {
     std::shared_ptr<TokenBox> tokens = make_control<TokenBox>(StableId("enter.tokens"));
     Fixture token_fixture = make_fixture("enter.tokens", tokens);
     require((*token_fixture.window).request_focus((*tokens).editor()), "the token editor takes focus");
-    require((*(*tokens).editor()).accepts_enter(), "the TokenBox editor accepts Enter");
-    require(type(*token_fixture.window, "one") && press(*token_fixture.window, PhysicalKey::enter) &&
-                (*tokens).tokens().size() == 1U && (*token_fixture.watcher).seen.empty(),
+    require(!(*(*tokens).editor()).accepts_enter() && press(*token_fixture.window, PhysicalKey::enter) &&
+                (*token_fixture.watcher).seen.size() == 1U,
+            "an empty TokenBox passes Enter on (W decision 6)");
+    require(type(*token_fixture.window, "one") && (*(*tokens).editor()).accepts_enter(),
+            "with an entry the TokenBox editor accepts Enter");
+    require(press(*token_fixture.window, PhysicalKey::enter) &&
+                (*tokens).tokens().size() == 1U && (*token_fixture.watcher).seen.size() == 1U,
             "Enter in a TokenBox turns the text into a token and is consumed");
 }
 
