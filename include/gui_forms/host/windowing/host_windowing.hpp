@@ -121,7 +121,7 @@ struct HostWindowingSnapshot final {
 //
 // The base class owns the UI-thread check, capability gating, identities,
 // the bounds and validation, so every adapter applies the same rules; an
-// adapter implements the *_impl operations for its platform. A request a
+// adapter implements the `*_impl` operations for its platform. A request a
 // host cannot perform reports `unsupported` (HostCapability bits
 // runtime_windows, window_frames, screen_pointer, window_at_point and
 // window_ordering).
