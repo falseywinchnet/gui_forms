@@ -67,6 +67,10 @@ struct DockDropPane final {
 
 enum class DockDropTargetKind : std::uint8_t { pane, edge };
 
+// Whether a site offers the window's outer edges as global targets: the main
+// site does (D3-1); a floating site (phase D4) offers its panes only.
+enum class DockDropEdges : std::uint8_t { global, none };
+
 // One accepted target: what a drop there does (`edit`, one DockLayout edit
 // validated against the restrictions when the drag started) and the area
 // the subject would take (`highlight`, in the site's coordinates). For an
@@ -102,10 +106,11 @@ struct DockDropHit final {
 // The zone of `pane` a point selects from its position alone.
 [[nodiscard]] DockDropZone dock_zone_at(Rect pane, Point point) noexcept;
 
-// What a point hovers: the site's edge tiles and bands first, then the pane
-// containing it (a cross tile under the point, else its zone).
+// What a point hovers: the site's edge tiles and bands first (unless
+// `edges` is none), then the pane containing it (a cross tile under the
+// point, else its zone).
 [[nodiscard]] DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes,
-                                        double scale) noexcept;
+                                        double scale, DockDropEdges edges = DockDropEdges::global) noexcept;
 
 // The edit a target makes for `subject`: dock_into a stack or the empty
 // document area for the centre, dock_beside a pane for a side, dock_at_edge
@@ -117,12 +122,13 @@ struct DockDropHit final {
 // `panes` and the site's edges that `layout` accepts as a user edit
 // (DockLayout::check, so the three restriction layers and the user lock
 // decide): each pane's zones in DockDropZone order, panes in the order
-// given (the keyboard's Tab order), then the edges top, left, right,
-// bottom. The centre of `own_stack` (where a dragged panel came from) is
+// given (the keyboard's Tab order), then, unless `edges` is none, the edges
+// top, left, right, bottom. The centre of `own_stack` (where a dragged panel came from) is
 // left out: dropping a panel back into its own stack changes nothing. A side
 // a document stack refuses is tried beside its document area (DockDropPane).
 void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack,
-                            Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out);
+                            Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out,
+                            DockDropEdges edges = DockDropEdges::global);
 
 // The planned target a hit selects, as an index into `targets`, or none (a
 // refused zone, a gap inside the site, or outside it).

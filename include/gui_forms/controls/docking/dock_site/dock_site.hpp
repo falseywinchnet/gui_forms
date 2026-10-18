@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/application/window_frame_drag/window_frame_drag.hpp"
 #include "gui_forms/commands.hpp"
 #include "gui_forms/components/context_menu/context_menu.hpp"
 #include "gui_forms/control.hpp"
@@ -11,6 +12,7 @@
 #include "gui_forms/window.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -23,9 +25,13 @@
 namespace gui_forms {
 
 // The rows of a panel's position menu (owner decision DK-30; docking study
-// 5.7). Float waits for floating windows (phase D4) and Auto Hide for
-// auto-hide (phase D5); both are listed, disabled. Move starts the keyboard
-// move mode (phase D3, G3-1).
+// 5.7). Float floats the panel into a new floating window (phase D4; enabled
+// while the workspace has windows attached and the panel may float). Auto
+// Hide pins a root-level tool stack out to the nearest window edge; for an
+// auto-hidden panel Dock returns its stack to where it stood, for a floating
+// panel it docks the panel back where it was docked last
+// (DockWorkspace::dock_back). Move starts the keyboard move mode (phase D3,
+// G3-1).
 enum class DockPositionCommand : std::uint8_t {
     float_panel,
     dock,
@@ -43,46 +49,162 @@ enum class DockPositionCommand : std::uint8_t {
 // its old one. Input other than the drag's own is not taken while settling.
 enum class DockDragPhase : std::uint8_t { idle, armed, dragging, settling };
 
-// How a drag ended: dropped on a target (one layout transaction); Escape;
-// the pointer capture lost; the window deactivated; the layout changed
-// under it (by the program, so the drag never applies to a stale tree); or
-// released where nothing accepts it, which snaps back until floating
-// windows exist (D4-1; phase D4 floats instead).
-enum class DockDragEnd : std::uint8_t { dropped, escaped, capture_lost, deactivated, layout_changed, rejected };
+// How a drag ended: dropped on a target (one layout transaction, in this
+// site's window or another's); Escape; the pointer capture lost; the window
+// deactivated; the layout changed under it (by the program, so the drag
+// never applies to a stale tree); released where nothing accepts it, which
+// floats the subject into a new floating window where it may float
+// (`floated`, D4-1) and snaps it back otherwise (`rejected`).
+enum class DockDragEnd : std::uint8_t {
+    dropped,
+    escaped,
+    capture_lost,
+    deactivated,
+    layout_changed,
+    rejected,
+    floated,
+};
 
 struct DockDragOutcome final {
     DockDragEnd end{DockDragEnd::escaped};
     DockSubject subject{};
-    // The target dropped on, for `dropped`.
+    // The target dropped on, for `dropped`, in the coordinates of the site
+    // that showed it.
     std::optional<DockDropTarget> target{};
-    // The layout transaction's result, for `dropped`.
+    // The layout transaction's result, for `dropped` and `floated`.
     DockTransactionResult result{};
+    // For `dropped`: whether the target was in another site's window (a drag
+    // across windows, phase D4).
+    bool across_windows{};
+    // For `floated`: the new floating window's client area, in desktop
+    // logical units.
+    Rect frame{};
 };
 
-// The main window's part of a docking layout, in one window (stage DK phase
-// D2; owner decisions DK-18 to DK-23, DK-28 to DK-30, DK-41): binary splits
-// separated by seams, tool stacks with captions, and the one document area
-// with its document stacks, each stack a PageView over the stack's panels.
+// Why a flyout opened or closed (DockFlyoutChange; owner decision DK-27,
+// docking study 5.5).
+enum class DockFlyoutCause : std::uint8_t {
+    // Opening: the pointer rested on a side tab for the hover delay.
+    hover,
+    // Opening: a side tab was clicked. Closing: the caption's close or pin.
+    pointer,
+    // Opening: Enter or Space on a side tab, or the tab's accessibility
+    // action.
+    keyboard,
+    // open_flyout and close_flyout, or activating the panel.
+    programmatic,
+    // Closing: the pointer left a flyout that does not have focus, for the
+    // leave delay.
+    pointer_left,
+    // Closing: a press outside the flyout and the side strips (it goes on to
+    // what was pressed).
+    outside_press,
+    // Closing: focus left a flyout that had it.
+    focus_lost,
+    // Closing: Escape inside the flyout; focus returns to where it was.
+    escape,
+    // Closing: another side tab's flyout replaced it.
+    swapped,
+    // Closing: the layout changed so that the panel is no longer behind a
+    // side tab (docked back, hidden, closed, or its collapsed stack has room
+    // again).
+    layout,
+};
+
+// Raised after a flyout opened (open true) or closed.
+struct DockFlyoutChange final {
+    DockPanelId panel{};
+    bool open{};
+    DockFlyoutCause cause{DockFlyoutCause::programmatic};
+};
+
+// One site of a docking layout in one window (stage DK phase D2; owner
+// decisions DK-18 to DK-23, DK-28 to DK-30, DK-41): binary splits separated
+// by seams, tool stacks with captions and, in the main site, the one
+// document area with its document stacks, each stack a PageView over the
+// stack's panels. A site realizes either the main site (the first
+// constructor) or one floating site (the second; phase D4, normally made by
+// the workspace as the root of that site's floating window).
 //
 // The site borrows its workspace: the workspace must outlive it, or be
 // destroyed first, which unbinds the site (it then shows nothing). The site
-// realizes the main site's tree after every layout change: one PageView per
+// realizes its tree after every layout change (the workspace tells it):
+// one PageView per
 // stack (`<site id>.stack.<node id>`), reused while the stack keeps its node
 // identity, its pages the stack's panels in order with the stack's
 // selection; tool stacks show their tabs at the bottom only when they hold
 // two or more panels, document stacks at the top. A panel's content is its
 // workspace control, created when the panel is first shown selected (lazy
-// creation). Floating sites and auto-hidden stacks are not realized until
-// phases D4 and D5.
+// creation).
 //
+// A floating site (phase D4; owner decisions DK-1, DK-6 to DK-12, DK-41):
+// no document area, side strips, collapsing, maximizing or window-edge
+// targets; it shows nothing once its site leaves the layout. Its tool
+// stacks keep their drawn captions (the one-stack floating window's caption
+// of T6-3; the host's title bar stays too, since no host offers a frameless
+// owned window yet). A double-click on a floating caption docks the stack
+// back where its panel was docked last. While the site holds exactly one
+// tool stack, dragging its caption moves the window itself with the
+// framework's capture drag (WindowFrameDrag, decision 12) where the host
+// supports it, the targets of the window under the pointer showing as for
+// any drag; elsewhere the caption drags the stack as in the main site. Keys
+// a floating site's window does not take go to the main window's
+// accelerators.
+//
+// Drags across windows (phase D4; decision 41, T8-3): while the workspace
+// has windows attached, a drag follows the desktop pointer: the topmost
+// site under it (ApplicationWindows::window_at) shows the targets, tiles and
+// tint, only over its hovered pane (its window edges too when it is the
+// main site), and the stamp; the other sites show none. A release on a target
+// in another window applies that target's edit, as one user transaction
+// across the windows; a release where nothing accepts floats the subject
+// into a new floating window at the pointer, the panel's size, when it may
+// float (DockWorkspace::can_float), and snaps it back otherwise (the rejected
+// cue shows only then).
+//
+// Auto-hide (stage DK phase D5; owner decisions DK-27, DK-28, DK-41, DK-42):
+// each window edge holding auto-hidden panels shows a side strip, a PageStrip
+// (`<site id>.side.<edge>`) with one tab per panel, the auto-hidden stacks in
+// layout order and their panels in stack order; left and right strips turn
+// their labels (bottom to top on the left, top to bottom on the right). The
+// strips take their band from the site's edges, left and right the full
+// height and top and bottom between them; the tree is laid out in what
+// remains. A side tab opens its panel's flyout: an in-window overlay that
+// slides out from the strip over the tree in `flyout_slide_duration`
+// (linear until the motion of stage T2; at once under reduced motion),
+// casting the overlay shadow, holding the stack's caption (its pin unchecked
+// for an auto-hidden stack), the panel and a grip on its inner edge. The
+// flyout opens when the pointer rests on a tab for `flyout_hover_delay`
+// (unless the workspace's flyout_opening is click), at once on a click, or
+// on Enter or Space on a focused tab (each strip is a focus region; its
+// arrow keys move without opening). Opened by click, keyboard or program,
+// focus moves into the panel; opened by hover, focus stays where it was
+// until the user clicks inside. A flyout without focus closes
+// `flyout_leave_delay` after the pointer leaves it and its tab; one with
+// focus stays until focus leaves it. A press outside the flyout and the
+// strips closes it and goes on to what was pressed. Escape inside closes it
+// and returns focus to the control that had it before (not a side strip),
+// else to the active document. The grip resizes the flyout within the tree's
+// extent; the new extent lasts for the session (the layout is not edited).
+// Opening, resizing and closing a flyout never edit the layout: a group's
+// side tab shows that panel without changing the stack's selection.
+//
+// The pin of a root-level tool stack's caption auto-hides the whole stack
+// (E4-1) as one user transaction, onto the window edge nearest the stack,
+// with the stack's extent across that edge; the pin of a flyout of an
+// auto-hidden stack returns the stack to where it stood (DockEdit::unpin),
+// so a pin and an unpin with nothing between leave the layout exactly as it
+// was.
+//
+
 // Parts: seams (item system `seam`), 3 units, with a grip of dots, between
 // the two children of each split; a seam is dragged with the pointer or,
 // while the site has focus, moved with the arrow keys (Tab and Shift+Tab
 // step between seams), within both sides' minimums (DockLayout's solver).
 // Each tool stack has a caption (item system `stack`): the identity key,
 // the selected panel's title, the position menu, the pin (root-level items
-// only, owner decision DK-28: checked while docked, disabled until D5) and
-// close (which hides the panel). The caption of the stack holding the
+// only, owner decision DK-28: checked while docked; pressing it auto-hides
+// the stack) and close (which hides the panel). The caption of the stack holding the
 // active panel is `current`: the look (a pale tint with a 2-unit accent line
 // on top, decision DK-41) is the default theme's (T4); until then it paints
 // through paint_part with today's recipes.
@@ -90,18 +212,24 @@ struct DockDragOutcome final {
 // Shrinking: when the site is smaller than the tree's minimum, tool stacks
 // collapse in increasing collapse priority (the largest priority of their
 // panels; ties collapse the later stack in tree order first) until the rest
-// fits (owner decision DK-23). Until auto-hide exists (D5) a collapsed stack
-// is hidden in place: the layout model is unchanged and its panels keep
-// their places, and the stack returns when room returns. A stack whose
-// collapse would not reduce the shortfall is kept.
+// fits (owner decision DK-23). A collapsed stack goes behind side tabs on
+// the window edge nearest the place it would have in the tree, as if
+// auto-hidden, and opens in a flyout like one; the layout model is unchanged
+// (the stack stays docked, its flyout's pin checked: pressing it auto-hides
+// the stack for good), and the stack returns to the tree when room returns.
+// The side strips' bands are taken before the collapse is planned, so a
+// collapse that adds a strip is planned again with that band. A stack whose
+// collapse would not reduce the shortfall is kept. The maximized document
+// area hides the tool stacks in place, without side tabs.
 //
 // Keyboard (owner decision DK-30), while focus is in the site: F6 and
 // Shift+F6 move between the stacks (each a focus region of the window, in
-// tree order); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
+// tree order) and then the side strips (left, top, right, bottom); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
 // documents, Alt+F7 and Alt+Shift+F7 on the tool panels, and releasing the
 // modifier activates the current row; Ctrl+F6 and Ctrl+Shift+F6 activate the
-// next and previous document in tab order; Escape in a tool panel (unless
-// its content used it) returns to the active document, Shift+Escape hides
+// next and previous document in most-recently-used order (DK-46); Escape
+// in a tool panel (unless its content used it) returns to the active
+// document, Shift+Escape hides
 // the active tool panel; Ctrl+Shift+F12 toggles the maximized document area
 // (every tool stack hidden, as by collapsing, and restored); Alt+Hyphen,
 // Shift+F10 and the context-menu key open the active panel's position menu.
@@ -129,8 +257,9 @@ struct DockDragOutcome final {
 // start the subject leaves its place and the place closes up in one layout
 // pass of the site; the layout model is unchanged until the drop (docking
 // study 5.1, invariant 4), so Escape leaves it as it was. A miniature of the
-// panel (its caption or tab, label and content well, drawn by role) is
-// interpolated from the panel's rectangle down to a stamp about 100 units
+// panel (its caption strip by role over a picture of its view, taken with
+// Window::snapshot_control as the drag starts; the content well where the
+// window cannot snapshot) is interpolated from the panel's rectangle down to a stamp about 100 units
 // long over 220 ms and follows the pointer; at the drop it grows into the
 // panel's new place, on Escape back into its old one; reduced motion skips
 // the motion. Targets (DockDropTarget, planned when the drag starts and at
@@ -154,11 +283,19 @@ struct DockDragOutcome final {
 // the announcement (drag_announcement, also the site's semantic
 // description while a drag runs). Enter commits through the same
 // transaction as a drop; Escape cancels.
+// position as the value and increment, decrement and set_value. A side strip
+// is a tab list (vertical on the left and right) named "Auto-hidden panels";
+// an open flyout's stack is a `pane` named by its panel, with the caption's
+// buttons (the pin a check box, checked while the stack is docked).
 class DockSite : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
-    // Borrows `workspace` (see the lifetime rule above).
+    // Borrows `workspace` (see the lifetime rule above). Realizes the main
+    // site.
     DockSite(StableId stable_id, DockWorkspace& workspace);
+    // Realizes the floating site `floating_site` (phase D4). A second site
+    // made for the same floating site replaces the first in the workspace.
+    DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floating_site);
     ~DockSite() override;
     // Realizes the workspace's layout. make_control calls it; do not call it
     // yourself.
@@ -166,6 +303,10 @@ public:
 
     // The bound workspace, or null after release_workspace.
     [[nodiscard]] DockWorkspace* workspace() const noexcept { return workspace_; }
+    // Whether the site realizes a floating site, and which (none for the
+    // main site).
+    [[nodiscard]] bool floating() const noexcept { return !(floating_site_ == DockSiteId{}); }
+    [[nodiscard]] DockSiteId floating_site() const noexcept { return floating_site_; }
     // Unbinds the workspace: the site removes its stacks and shows nothing.
     void release_workspace() noexcept;
 
@@ -180,9 +321,10 @@ public:
     [[nodiscard]] bool document_area_maximized() const noexcept { return maximized_; }
     void set_document_area_maximized(bool maximized);
 
-    // The PageView realizing a stack of the main site, or null.
+    // The PageView realizing a stack of this site, or null.
     [[nodiscard]] std::shared_ptr<PageView> stack_view(DockNodeId stack) const;
-    // The realized stacks in tree order, collapsed ones included.
+    // The realized stacks in tree order, collapsed ones included, then the
+    // auto-hidden stacks in layout order.
     [[nodiscard]] std::vector<DockNodeId> realized_stacks() const;
     // The tool stacks hidden by shrinking or by the maximized document area,
     // after the last layout pass, in the order they collapsed.
@@ -223,21 +365,29 @@ public:
     // The open navigator, or null.
     [[nodiscard]] std::shared_ptr<DockNavigator> navigator() const noexcept;
 
-    // Activates the next (+1) or previous (-1) document in tab order after
-    // the active one, wrapping. False when there is no document.
+    // Activates a document by most-recently-used order (owner decision
+    // DK-46): +1 the document used before the active one, -1 the one used
+    // longest ago (documents never active come last, in tab order),
+    // wrapping. False when there is no document. Ctrl+F6 and Ctrl+Shift+F6
+    // step on along one order while their modifier is held.
     bool activate_relative_document(int direction);
 
     // -- dragging (phase D3) --
     [[nodiscard]] DockDragPhase drag_phase() const noexcept { return drag_.phase; }
     // The subject of the drag under way (armed or dragging), or none.
     [[nodiscard]] std::optional<DockSubject> drag_subject() const;
-    // While dragging: the planned targets in keyboard order, the panes they
-    // were planned over (the layout with the subject's place closed up),
-    // and the selected target, or none (between targets, over a refused
-    // zone, outside the site, or with Ctrl held).
+    // While dragging, or while this site shows another site's drag (the
+    // pointer over its window): the planned targets in keyboard order, the
+    // panes they were planned over (the layout with the subject's place
+    // closed up), and the selected target, or none (between targets, over a
+    // refused zone, outside the site, or with Ctrl held).
     [[nodiscard]] std::span<const DockDropTarget> drag_targets() const noexcept;
     [[nodiscard]] std::span<const DockDropPane> drag_panes() const noexcept;
     [[nodiscard]] std::optional<DockDropTarget> drag_target() const;
+    // Whether this site shows a drag that runs in another site (phase D4).
+    [[nodiscard]] bool showing_remote_drag() const noexcept { return drag_.guest; }
+    // While a floating window is moved by its caption (phase D4).
+    [[nodiscard]] bool moving_window() const noexcept { return window_move_.active; }
     // Whether Ctrl suppresses docking now (D6-1).
     [[nodiscard]] bool drag_suppressed() const noexcept { return drag_.suppressed; }
     // The stamp's rectangle in the site's coordinates while dragging or
@@ -252,15 +402,49 @@ public:
     // to 64.
     [[nodiscard]] double drag_threshold() const noexcept { return drag_threshold_; }
     void set_drag_threshold(double threshold);
-    // Starts the keyboard move mode for a panel docked in the main site, on
-    // the first planned target. False, starting nothing, for any other
-    // panel, while a drag runs, or when there is no target.
+    // Starts the keyboard move mode for a panel docked in this site, on the
+    // first planned target. False, starting nothing, for any other panel,
+    // while a drag runs, or when there is no target.
     bool begin_keyboard_move(const DockPanelId& panel);
     // Ends a drag as Escape does. False when none runs.
     bool cancel_drag();
     // Raised once when a drag that left the armed phase ends, after the
     // layout transaction of a drop.
     [[nodiscard]] Event<const DockDragOutcome&>& drag_ended() noexcept { return drag_ended_; }
+    // -- auto-hide (phase D5) --
+    // The pointer's rest on a side tab before its flyout opens, the leave
+    // delay before an unfocused flyout closes, and the slide's duration
+    // (owner decisions DK-27 and DK-41; docking study 5.5).
+    static constexpr std::chrono::milliseconds flyout_hover_delay{400};
+    static constexpr std::chrono::milliseconds flyout_leave_delay{500};
+    static constexpr std::chrono::milliseconds flyout_slide_duration{180};
+    // The side strip on an edge, or null while that edge has no side tabs.
+    [[nodiscard]] std::shared_ptr<PageStrip> side_strip(DockSide edge) const;
+    // The panels behind side tabs on an edge, in tab order: auto-hidden
+    // stacks', then collapsed stacks'.
+    [[nodiscard]] std::vector<DockPanelId> side_panels(DockSide edge) const;
+    // Opens the flyout of a panel behind a side tab (closing another
+    // flyout first, cause swapped). Focus moves into the panel unless the
+    // cause is hover. True when the flyout is open for the panel afterwards;
+    // false, changing nothing, for a panel behind no side tab or a detached
+    // site.
+    bool open_flyout(const DockPanelId& panel, DockFlyoutCause cause = DockFlyoutCause::programmatic);
+    void close_flyout(DockFlyoutCause cause = DockFlyoutCause::programmatic) noexcept;
+    [[nodiscard]] bool flyout_open() const noexcept { return flyout_panel_.has_value(); }
+    // The panel the flyout shows, or none.
+    [[nodiscard]] const std::optional<DockPanelId>& flyout_panel() const noexcept { return flyout_panel_; }
+    // How far the flyout has slid out, from 0 to 1 (1 while closed).
+    [[nodiscard]] double flyout_reveal() const noexcept { return flyout_progress_; }
+    // The open flyout's extent across its edge, in logical units, or 0.
+    [[nodiscard]] double flyout_extent() const;
+    // Sets the open flyout's extent, as its grip does, within the tree's
+    // extent; it lasts for the session. False when no flyout is open or the
+    // extent is not finite.
+    bool resize_flyout(double extent);
+    // The flyout's root control while it is open (an overlay of the window),
+    // or null.
+    [[nodiscard]] Control::Ptr flyout_control() const noexcept;
+    [[nodiscard]] Event<const DockFlyoutChange&>& flyout_changed() noexcept { return flyout_changed_; }
 
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
@@ -292,8 +476,19 @@ public:
         // a drop (drop_rejected).
         PartGeometry drag_stamp;
         PartGeometry drag_stamp_label;
+        // The panel's picture in the stamp, below its label, while the
+        // window can snapshot it (Window::snapshot_control); absent where it
+        // cannot, the content well standing in.
+        PartGeometry drag_stamp_image;
         PartGeometry drop_area;
         PartGeometry drop_cue;
+        // The open flyout, in the site's coordinates as it stands in its
+        // slide: its overlay shadow, its face and the grip on its inner edge
+        // (hot and captured as the pointer is on it or drags it). Absent
+        // while no flyout is open.
+        PartGeometry flyout_shadow;
+        PartGeometry flyout_face;
+        PartGeometry flyout_grip;
     };
     [[nodiscard]] Parts parts() const;
     // Item system seam: the bar between a split's two children and its grip.
@@ -365,9 +560,9 @@ public:
         TileParts parts;
         TileStates states;
     };
-    // The seams, then the stacks that are not collapsed, in tree order;
-    // then, while dragging, the tiles (the hovered pane's cross, then the
-    // edges).
+    // The seams, then the stacks that are not collapsed, in tree order, then
+    // the open flyout's stack (its caption in the site's coordinates); then,
+    // while dragging, the tiles (the hovered pane's cross, then the edges).
     [[nodiscard]] std::vector<Seam> realized_seams() const;
     [[nodiscard]] std::vector<Stack> realized_stack_items() const;
     [[nodiscard]] std::vector<Tile> realized_tiles() const;
@@ -391,9 +586,14 @@ private:
     friend class DockWorkspace;
     class StackView;
     class DragLayer;
+    class Flyout;
+    struct SlideTick;
+    struct HoverElapsed;
+    struct LeaveElapsed;
+    struct StaleFlyout;
 
-    // What the pointer or a press is on.
-    enum class Zone : std::uint8_t { none, seam, caption, menu, pin, close };
+    // What the pointer or a press is on; grip only in the flyout.
+    enum class Zone : std::uint8_t { none, seam, caption, menu, pin, close, grip };
     struct Hit final {
         Zone zone{Zone::none};
         // The seam's index for Zone::seam; the stack's index in stacks_ for
@@ -410,7 +610,12 @@ private:
         }
     };
     // One realized stack and its view. `collapsed` is the last layout pass's
-    // decision; `bounds` and `caption` are its rectangles there.
+    // decision (always set for an auto-hidden stack, which has no place in
+    // the tree); `bounds` and `caption` are its rectangles there, or, while
+    // the stack is in the flyout, the flyout's in the site's coordinates.
+    // `side_tabbed`: collapsed by shrinking, so behind side tabs on `edge`;
+    // an auto-hidden stack is always behind side tabs on its entry's edge.
+    // `in_flyout`: the view is the flyout's child, not the site's.
     struct StackSlot final {
         DockNodeId stack{};
         DockNodeKind kind{DockNodeKind::tool_stack};
@@ -418,8 +623,38 @@ private:
         // The selected panel's title, kept for painting the caption.
         std::string title{};
         bool collapsed{};
+        bool auto_hidden{};
+        bool side_tabbed{};
+        bool in_flyout{};
+        DockSide edge{DockSide::left};
         Rect bounds{};
         Rect caption{};
+    };
+    // One window edge's side tabs: the strip's own page set (owned here and
+    // released from the strip before it goes), the strip, its band in the
+    // site's coordinates (empty while the edge has no tabs) and the panels
+    // it shows, in order.
+    struct SideStrip final {
+        std::unique_ptr<PageSet> pages{};
+        std::shared_ptr<PageStrip> strip{};
+        Rect band{};
+        std::vector<DockPanelId> panels{};
+    };
+    // A flyout extent set by the grip, for the rest of the session.
+    struct FlyoutExtent final {
+        DockNodeId stack{};
+        double extent{};
+    };
+    // The open flyout's rectangles in the site's coordinates: `full` is the
+    // whole flyout where it stands in its slide (it starts under the strip
+    // and moves out), `revealed` the part past the strip's band, which is the
+    // popup's bounds; caption, content and grip lie inside `full`.
+    struct FlyoutGeometry final {
+        Rect full{};
+        Rect revealed{};
+        Rect caption{};
+        Rect content{};
+        Rect grip{};
     };
     // One seam from the last layout pass: the split, its axis, the bar and
     // its wider hit band, and what a move needs (the span shared by the two
@@ -491,6 +726,10 @@ private:
     void continue_seam_drag(Point local);
     bool set_seam_first(std::size_t seam, double first);
     bool handle_docking_key(KeyEvent& event);
+    void pass_key_to_main_window(KeyEvent& event);
+    void collect_document_steps(std::vector<DockPanelId>& out) const;
+    bool step_document(int direction, Modifier release);
+    void end_document_steps(const KeyEvent& event) noexcept;
     bool handle_seam_key(KeyEvent& event);
     [[nodiscard]] std::optional<DockPanelId> focused_panel() const;
     [[nodiscard]] bool focus_in_tool_stack() const;
@@ -518,6 +757,63 @@ private:
 
     [[nodiscard]] std::vector<SemanticNode> caption_nodes(const StackSlot& slot, std::size_t index) const;
     bool caption_action(std::size_t index, std::string_view stable_id, SemanticAction action);
+    void paint_caption(Painter& painter, const Control& surface, const StackSlot& slot, std::size_t index,
+                       Point offset) const;
+    // Runs a caption button of the stack at `index` (pin or close).
+    void press_caption_button(std::size_t index, Zone zone);
+
+    // -- auto-hide --
+    [[nodiscard]] SideStrip& side(DockSide edge) noexcept;
+    [[nodiscard]] const SideStrip& side(DockSide edge) const noexcept;
+    void ensure_side_strip(DockSide edge);
+    void release_side_strips() noexcept;
+    // Brings each edge's strip in line with the slots behind side tabs.
+    void sync_side_strips();
+    [[nodiscard]] double side_band_thickness() const;
+    // The tree's rectangle once the bands of the edges in `edges` (indexed
+    // by DockSide) are taken from `surface`, and each band.
+    [[nodiscard]] Rect tree_area(Size surface, const std::array<bool, 4>& edges,
+                                 std::array<Rect, 4>& bands) const;
+    // The edge nearest a rectangle inside the tree's rectangle.
+    [[nodiscard]] static DockSide nearest_edge(Rect bounds, Rect area) noexcept;
+    // Each collapsed tool stack's edge: where it would stand in the tree.
+    void assign_collapsed_edges(Rect area, std::span<const DockNodeId> collapsed);
+    [[nodiscard]] StackSlot* side_slot_of(const DockPanelId& panel);
+    [[nodiscard]] std::size_t flyout_slot_index() const noexcept;
+    [[nodiscard]] double flyout_default_extent(const StackSlot& slot) const;
+    [[nodiscard]] FlyoutGeometry flyout_geometry() const;
+    void place_flyout();
+    void focus_into_flyout();
+    [[nodiscard]] bool focus_in_flyout() const;
+    void restore_focus_from_flyout();
+    void on_side_tab_invoked(DockSide edge, const PageInvocation& invocation);
+    void on_root_pointer(const PointerEvent& event);
+    [[nodiscard]] bool side_tab_at(Point point, std::optional<DockPanelId>& tab) const;
+    void close_on_outside_press(const PointerEvent& event);
+    void on_flyout_pointer_preview(const PointerEvent& event);
+    void on_flyout_pointer(PointerEvent& event);
+    void on_flyout_key(KeyEvent& event);
+    void on_flyout_revoked();
+    void paint_flyout(Painter& painter, const Control& surface) const;
+    [[nodiscard]] Hit flyout_hit(Point local) const;
+    void start_hover(const DockPanelId& panel);
+    void stop_hover() noexcept;
+    void start_leave();
+    void slide_tick(FrameTime now);
+    void hover_elapsed(const DockPanelId& panel);
+    void leave_elapsed();
+    void stale_flyout_elapsed();
+    // Closes, once the layout pass is over, a flyout whose stack is no
+    // longer behind side tabs.
+    void schedule_stale_check();
+    // Takes the slot's view into the flyout or gives it back.
+    void move_view_to_flyout(StackSlot& slot);
+    void move_view_to_site(StackSlot& slot);
+    // Puts a view into the flyout (Flyout is complete only in
+    // dock_site_auto_hide.cpp).
+    void flyout_adopt(const Control::Ptr& view);
+    // Lets go of the flyout control, which stops reaching back.
+    void release_flyout_control() noexcept;
 
     // -- dragging (dock_site_drag.cpp) --
     // One tile as painted and published: where it is, which target it
@@ -571,7 +867,59 @@ private:
         Rect settle_to{};
         FrameTime settle_started{};
         std::string announcement{};
+        // The panel's picture, taken as the drag starts (the stamp's image;
+        // none where the window cannot snapshot), and released when the
+        // session ends (reset_drag) by the site that took it. Images are
+        // application-scope, so a guest shows the same image.
+        std::optional<ControlSnapshot> picture{};
+        // Phase D4. `guest`: this site shows another site's drag (no capture,
+        // no picture of its own, never ends it). `stamp_hidden`: no stamp (a
+        // window moved by its caption is its own picture). `may_float`: a
+        // release where nothing accepts floats the subject. `remote`: the
+        // site whose window is under the pointer, while that is another
+        // site, observed.
+        bool guest{};
+        bool stamp_hidden{};
+        bool may_float{};
+        std::weak_ptr<Control> remote{};
     };
+    // Ends the session: its picture's image is released (unless a guest's),
+    // then the session is cleared.
+    void reset_drag() noexcept;
+    // -- across windows (phase D4) --
+    // The desktop point of a point in this site, or none without frames.
+    [[nodiscard]] std::optional<Point> to_desktop(Point local) const;
+    // The site under the desktop pointer for a drag of this site (`excluded`
+    // skipped), or null; this site itself when the pointer is over it.
+    [[nodiscard]] DockSite* remote_site(Point desktop, const DockSite* excluded) const;
+    [[nodiscard]] DockSite* remote_guest() const noexcept;
+    // Shows, follows and stops showing another site's drag.
+    void show_guest_drag(const DragSession& source, Point local, Modifier modifiers);
+    void leave_guest_drag() noexcept;
+    // Moves the drag's targets to the site under `desktop` (another site,
+    // this one, or none).
+    void route_drag(Point desktop, Modifier modifiers, const DockSite* excluded);
+    // The floating frame for a subject released at `local`: the source's
+    // size, held where the pointer grabbed it.
+    [[nodiscard]] std::optional<Rect> float_frame_at(Point local) const;
+    // A floating site's caption drag that moves its window (WindowFrameDrag).
+    struct WindowMove final {
+        bool active{};
+        WindowFrameDrag drag{};
+        DockSubject subject{};
+        std::uint64_t pointer_id{1U};
+        Point grab{};
+        std::weak_ptr<Control> remote{};
+    };
+    [[nodiscard]] bool moves_window_by_caption() const;
+    bool begin_window_move(std::uint64_t pointer_id);
+    void continue_window_move(Modifier modifiers);
+    void end_window_move(bool cancelled);
+    void leave_window_move_guest() noexcept;
+    [[nodiscard]] static std::uint64_t now_nanoseconds() noexcept;
+    // The tree this site lays out: the main root or the floating site's root
+    // (none once that site left the layout).
+    [[nodiscard]] DockNodeId site_root() const;
 
     void create_drag_layer();
     // Whether a tab drag holds `panel` out of `stack`'s view.
@@ -601,6 +949,7 @@ private:
     [[nodiscard]] bool motion_reduced() const noexcept;
     [[nodiscard]] Rect stamp_at(FrameTime now) const;
     [[nodiscard]] Rect drag_label_bounds() const noexcept;
+    [[nodiscard]] Rect drag_image_bounds() const noexcept;
     [[nodiscard]] Rect drop_cue_bounds() const noexcept;
     [[nodiscard]] std::size_t tile_count() const noexcept;
     [[nodiscard]] TileSlot tile_at(std::size_t tile) const;
@@ -618,7 +967,9 @@ private:
     void on_window_active(bool active);
 
     DockWorkspace* workspace_{};
-    SubscriptionToken layout_token_{};
+    // The floating site realized (none: the main site).
+    DockSiteId floating_site_{};
+    WindowMove window_move_{};
     SubscriptionToken activation_token_{};
     SubscriptionToken focus_token_{};
     // The realized stacks in tree order.
@@ -679,9 +1030,59 @@ private:
     SubscriptionToken capture_token_{};
     SubscriptionToken active_token_{};
     double drag_threshold_{4.0};
-    // The stacks in tree order, reused by plan_drag_targets.
-    std::vector<DockNodeId> drag_order_{};
+    // A run of Ctrl+F6 steps: the order taken at its first press, the
+    // position reached and the modifier whose release ends it.
+    std::vector<DockPanelId> document_steps_{};
+    std::size_t document_step_{};
+    Modifier document_step_release_{Modifier::none};
+    bool document_stepping_{};
     Event<const DockDragOutcome&> drag_ended_{};
+
+    // Auto-hide: the side strips by DockSide, the tree's rectangle from the
+    // last layout pass, and the flyout. The flyout control is the window's
+    // overlay while open (flyout_token_) and observes the site, which
+    // releases it before letting it go.
+    std::array<SideStrip, 4> sides_{};
+    Rect tree_area_{};
+    std::shared_ptr<Flyout> flyout_{};
+    // The same control as a Control, for the sources that see Flyout only
+    // declared.
+    Control::Ptr flyout_root_{};
+    PopupToken flyout_token_{};
+    SubscriptionToken flyout_revoked_{};
+    std::optional<DockPanelId> flyout_panel_{};
+    DockNodeId flyout_stack_{};
+    double flyout_progress_{1.0};
+    FrameTime flyout_started_{};
+    FrameRequestToken slide_timer_{};
+    FrameRequestToken hover_timer_{};
+    DockPanelId hover_panel_{};
+    FrameRequestToken leave_timer_{};
+    FrameRequestToken stale_timer_{};
+    bool pointer_in_flyout_{};
+    bool flyout_focused_{};
+    bool flyout_closing_{};
+    // A side tab's press opened the flyout: the strip's focus that follows
+    // is sent on into it, until the release.
+    bool flyout_focus_pending_{};
+    // The position menu was opened from the flyout's caption: focus in it
+    // does not count as leaving the flyout.
+    bool menu_from_flyout_{};
+    // The grip drag: the extent and the pointer where it started.
+    bool grip_captured_{};
+    double grip_start_extent_{};
+    Point grip_origin_{};
+    // Kept for its storage: the tree arranged without collapsing, to find
+    // the edge of each collapsed stack.
+    std::vector<DockArrangedNode> arranged_scratch_{};
+    // The last control focused outside the flyout and the side strips, and
+    // the one focus returns to when the flyout closes with focus inside.
+    Control::WeakPtr focus_outside_{};
+    Control::WeakPtr return_focus_{};
+    std::vector<FlyoutExtent> flyout_extents_{};
+    SubscriptionToken root_pointer_{};
+    Window* observed_root_window_{};
+    Event<const DockFlyoutChange&> flyout_changed_{};
 };
 
 } // namespace gui_forms

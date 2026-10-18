@@ -376,6 +376,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DockFlyoutOpening
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   .. cpp:enumerator:: hover_or_click
+
+   .. cpp:enumerator:: click
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ErrorBlinkStyle
 
    ``#include <gui_forms/components/error_provider/error_provider.hpp>``

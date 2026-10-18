@@ -41,8 +41,12 @@ struct DockNodePlace final {
                                                      DockSiteId id) noexcept;
 [[nodiscard]] const DockAutoHideEntry* find_dock_auto_hidden(const DockLayoutState& state,
                                                              DockNodeId stack) noexcept;
+// The result borrows from `descriptors`; a temporary list is refused (house
+// style section 5).
 [[nodiscard]] const DockPanelDescriptor* find_dock_descriptor(
     const std::vector<DockPanelDescriptor>& descriptors, const DockPanelId& id) noexcept;
+const DockPanelDescriptor* find_dock_descriptor(std::vector<DockPanelDescriptor>&& descriptors,
+                                                const DockPanelId& id) = delete;
 
 [[nodiscard]] DockNodePlace dock_place_of(const DockLayoutState& state, DockNodeId node) noexcept;
 [[nodiscard]] DockPanelLocation locate_dock_panel(const DockLayoutState& state,
@@ -71,5 +75,13 @@ void erase_dock_record(DockLayoutState& state, const DockPanelId& id);
 void detach_dock_panel(DockLayoutState& state, const DockPanelId& panel);
 
 [[nodiscard]] DockInvariantResult check_dock_invariants(const DockLayoutState& state);
+
+// Kept unknown fields (DK decision 48). The entry for an owner, or null;
+// whether the owner's element is still in the layout; and dropping every
+// entry whose element is gone, appending their owners to `dropped`.
+[[nodiscard]] const DockUnknownFields* find_unknown_fields(const DockLayoutState& state,
+                                                          const DockUnknownOwner& owner) noexcept;
+[[nodiscard]] bool unknown_owner_exists(const DockLayoutState& state, const DockUnknownOwner& owner) noexcept;
+void prune_unknown_fields(DockLayoutState& state, std::vector<DockUnknownOwner>& dropped);
 
 } // namespace gui_forms::detail

@@ -147,6 +147,30 @@ struct HostClipboardFilesResult final {
     std::uint64_t generation{};
 };
 
+// Completion candidates a host may own (Windows Forms' AutoCompleteSource
+// values FileSystem to AllSystemSources). No host adapter supplies them yet.
+enum class HostAutoCompleteSource : std::uint8_t {
+    file_system,
+    file_system_directories,
+    history_list,
+    recently_used_list,
+    all_url,
+    all_system_sources,
+};
+
+// `prefix_utf8` is borrowed for the call. A host returns at most
+// `maximum_candidates` strings, each valid UTF-8, in its own order.
+struct HostAutoCompleteRequest final {
+    HostAutoCompleteSource source{HostAutoCompleteSource::file_system};
+    std::string_view prefix_utf8{};
+    std::size_t maximum_candidates{256U};
+};
+
+struct HostAutoCompleteResult final {
+    HostServiceStatus status;
+    std::vector<std::string> candidates_utf8;
+};
+
 enum class HostDialogOutcome : std::uint8_t {
     accepted,
     cancelled,

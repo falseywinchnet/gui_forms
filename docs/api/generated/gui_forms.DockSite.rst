@@ -17,9 +17,11 @@ gui_forms::DockSite
    of the layout becomes a seam between its two children; each tool stack
    becomes a captioned :cpp:class:`PageView <gui_forms::PageView>` with its tabs at the bottom when it holds two
    or more panels; the document area holds the document stacks, each a
-   :cpp:class:`PageView <gui_forms::PageView>` with its tabs on top. The site follows every layout change, and
-   the user's seam moves, tab choices and caption commands go back to the
-   layout as transactions. Use it as the main area of an application window.
+   :cpp:class:`PageView <gui_forms::PageView>` with its tabs on top. Auto-hidden stacks wait behind side tabs
+   on the window's edges and slide out in a flyout. The site follows every
+   layout change, and the user's seam moves, tab choices, pins and caption
+   commands go back to the layout as transactions. Use it as the main area of
+   an application window.
 
    *Status:* provisional.
 
@@ -29,8 +31,10 @@ gui_forms::DockSite
          Identity of the control, unique within its window. Each stack's view is
          ``<stable_id>.stack.<node id>``, its caption buttons
          ``<view id>.menu``, ``.pin`` and ``.close``, each seam
-         ``<stable_id>.seam.<split id>``, the navigator ``<stable_id>.navigator``
-         and the position menu ``<stable_id>.position_menu``.
+         ``<stable_id>.seam.<split id>``, the navigator ``<stable_id>.navigator``,
+         the position menu ``<stable_id>.position_menu``, each side strip
+         ``<stable_id>.side.left`` (``top``, ``right``, ``bottom``) and the
+         flyout ``<stable_id>.flyout``.
 
       **workspace** : ``DockWorkspace``
          The workspace to show, borrowed: it must outlive the site, or be
@@ -41,6 +45,12 @@ gui_forms::DockSite
       **workspace** : ``DockWorkspace*``, default the constructor's, read-only
          The bound workspace, or null after :cpp:func:`release_workspace <gui_forms::DockSite::release_workspace>`.
 
+      **floating** : ``bool``, default ``false``, read-only
+         Whether the site shows a floating site.
+
+      **floating_site** : ``DockSiteId``, default none, read-only
+         The floating site shown, or none for the main site.
+
       **keyboard_increment** : ``double``, default ``8``
          How far one arrow key moves a focused seam, in logical units, from 1 to
          256; outside that range throws ``std::out_of_range``.
@@ -50,7 +60,8 @@ gui_forms::DockSite
          (Ctrl+Shift+F12). Focus in a tool panel moves to the active document.
 
       **realized_stacks** : ``std::vector<DockNodeId>``, read-only
-         The stacks shown, collapsed ones included, in tree order.
+         The stacks shown, collapsed ones included, in tree order, then the
+         auto-hidden stacks in layout order.
 
       **collapsed_stacks** : ``std::vector<DockNodeId>``, read-only
          The tool stacks hidden by shrinking or by the maximized document area
@@ -92,6 +103,13 @@ gui_forms::DockSite
       **drag_target** : ``std::optional<DockDropTarget>``, default none, read-only
          The target a drop would use now.
 
+      **showing_remote_drag** : ``bool``, default ``false``, read-only
+         Whether the site shows a drag that runs in another site's window: the
+         pointer is over this window (phase D4).
+
+      **moving_window** : ``bool``, default ``false``, read-only
+         Whether a floating window is being moved by its caption.
+
       **drag_suppressed** : ``bool``, default ``false``, read-only
          Whether Ctrl suppresses docking.
 
@@ -106,6 +124,21 @@ gui_forms::DockSite
          How far, in logical units along either axis, a caption press moves
          before it drags; outside 1 to 64 throws ``std::out_of_range``.
 
+      **flyout_open** : ``bool``, read-only
+         Whether a flyout is open.
+
+      **flyout_panel** : ``std::optional<DockPanelId>``, default none, read-only
+         The panel the open flyout shows.
+
+      **flyout_reveal** : ``double``, default ``1``, read-only
+         How far the flyout has slid out, from 0 to 1; 1 while none is open.
+
+      **flyout_extent** : ``double``, default ``0``, read-only
+         The open flyout's extent across its edge, in logical units.
+
+      **flyout_control** : ``Control::Ptr``, default none, read-only
+         The open flyout's root control, an overlay of the window.
+
       **parts** : ``Parts``, read-only
 
       **realized_seams** : ``std::vector<Seam>``, read-only
@@ -113,7 +146,8 @@ gui_forms::DockSite
 
       **realized_stack_items** : ``std::vector<Stack>``, read-only
          The stacks shown after the last layout pass, with their parts and
-         states.
+         states, then the open flyout's stack with its caption in the site's
+         coordinates.
 
       **realized_tiles** : ``std::vector<Tile>``, read-only
          While dragging: the drop tiles shown, the hovered pane's five then the
@@ -124,8 +158,18 @@ gui_forms::DockSite
       **drag_ended** : ``Event<const DockDragOutcome&>``
          Raised once when a drag that started ends, with how it ended
          (:cpp:enum:`DockDragEnd <gui_forms::DockDragEnd>`: dropped, escaped, capture lost, deactivated, layout
-         changed, rejected), its subject and, for a drop, the target and the
-         transaction's result. Raised after a drop's transaction.
+         changed, rejected, floated), its subject and, for a drop, the target,
+         whether it was in another window, and the transaction's result; for a
+         float, the new window's client area. Raised after the transaction. A
+         floating window moved by its caption onto a target raises it too.
+
+      **flyout_changed** : ``Event<const DockFlyoutChange&>``
+         Raised after a flyout opened or closed, with the panel and the cause
+         (:cpp:enum:`DockFlyoutCause <gui_forms::DockFlyoutCause>`): hover, pointer, keyboard or programmatic when it
+         opens; pointer_left, outside_press, focus_lost, escape, swapped, layout,
+         pointer (its pin or close) or programmatic when it closes. Opened by
+         click or keyboard, focus is in the panel before it is raised; closing
+         with focus inside, focus has returned before it is raised.
 
    :Inherited:
 
@@ -160,11 +204,21 @@ gui_forms::DockSite
       * - :cpp:func:`close_navigator <gui_forms::DockSite::close_navigator>`
         - Closes the navigator without choosing.
       * - :cpp:func:`activate_relative_document <gui_forms::DockSite::activate_relative_document>`
-        - Activates the next or previous document in tab order, wrapping; false when there is no document.
+        - Activates a document by most-recently-used order (decision DK-46): the one used before the active document, or with -1 the one used longest ago (documents never active come last, in tab order), wrapping; false when there is no document.
       * - :cpp:func:`begin_keyboard_move <gui_forms::DockSite::begin_keyboard_move>`
         - Starts the keyboard move mode for a docked panel, on the first target; false for any other panel, while a drag runs, or with no target.
       * - :cpp:func:`cancel_drag <gui_forms::DockSite::cancel_drag>`
         - Ends a drag as Escape does; false when none runs.
+      * - :cpp:func:`side_strip <gui_forms::DockSite::side_strip>`
+        - The :cpp:class:`PageStrip <gui_forms::PageStrip>` showing an edge's side tabs, or null while the edge has none.
+      * - :cpp:func:`side_panels <gui_forms::DockSite::side_panels>`
+        - The panels behind side tabs on an edge, in tab order: the auto-hidden stacks', then the collapsed stacks'.
+      * - :cpp:func:`open_flyout <gui_forms::DockSite::open_flyout>`
+        - Opens the flyout of a panel behind a side tab, closing another first (cause ``swapped``); focus moves into the panel unless the cause is ``hover``.
+      * - :cpp:func:`close_flyout <gui_forms::DockSite::close_flyout>`
+        - Closes the open flyout with a cause (``programmatic`` by default).
+      * - :cpp:func:`resize_flyout <gui_forms::DockSite::resize_flyout>`
+        - Sets the open flyout's extent, as its grip does, within the tree's extent, for the rest of the session; false when no flyout is open or the extent is not finite.
       * - :cpp:func:`seam_identity <gui_forms::DockSite::seam_identity>`
         - The semantic identity of a split's seam.
       * - :cpp:func:`stack_identity <gui_forms::DockSite::stack_identity>`
@@ -190,18 +244,54 @@ gui_forms::DockSite
    key, the selected panel's title, the position menu button, the pin and
    close. The pin is shown on root-level items only (decision DK-28): every
    docked tool stack carries one, the tabs inside a stack none; it is checked
-   while the stack is docked and stays unavailable until auto-hide (phase D5).
+   while the stack is docked, and pressing it auto-hides the whole stack.
    Close hides the panel (its placeholder stays), or closes one that may not
    be hidden. The caption of the stack holding the active panel is
    ``current``; the default theme (T4) draws it as a pale tint with a 2-unit
    accent line on top, and until then today's recipes draw it.
 
-   The position menu lists Float and Auto Hide, both unavailable until phases
-   D4 and D5; Dock, checked while the panel stands in a tool stack and
-   available for a tool panel docked as a document (it returns to its default
-   side); Dock as Tabbed Document, for a tool panel whose descriptor allows it;
-   Hide; Close; and Move, the keyboard move mode. A document's menu lists
-   Float, Close and Move.
+   The position menu lists Float, available while the workspace has windows
+   attached and the panel may float (it floats where it floated last, else
+   where it stands); Dock, checked while the panel stands in a docked tool
+   stack, available for a tool panel docked as a document (it returns to its
+   default side), for an auto-hidden panel (its stack returns to where it
+   stood) and for a floating panel (it returns where it was docked last); Dock as
+   Tabbed Document, for a tool panel whose descriptor allows it; Auto Hide,
+   checked while the panel is auto-hidden and available for a root-level
+   docked tool stack; Hide; Close; and Move, the keyboard move mode. A
+   document's menu lists Float, Close and Move.
+
+   Auto-hide (phase D5; decisions DK-27, DK-28, DK-41, DK-42): the pin, or
+   Auto Hide, takes the whole stack (E4-1) out of the tree in one transaction
+   onto the window edge nearest it, keeping its extent across that edge. Each
+   edge holding auto-hidden panels shows a side strip, a :cpp:class:`PageStrip <gui_forms::PageStrip>` with one
+   tab per panel (the stacks in layout order, each stack's panels in its
+   order); left and right strips turn their labels, bottom to top on the left
+   and top to bottom on the right. The strips' bands come off the site's edges
+   (left and right the full height, top and bottom between them) and the tree
+   is laid out in what is left. A side tab opens its panel's flyout: an
+   overlay of the window (E3-1) that slides out from the strip over the tree
+   in 180 ms (``flyout_slide_duration``; plain interpolation until the motion
+   of stage T2, and at once under reduced motion), casts the overlay shadow,
+   and holds the stack's caption with an unchecked pin, the panel, and a grip
+   on its inner edge. The pointer resting on a tab opens it after 400 ms
+   (``flyout_hover_delay``), unless the workspace's ``flyout_opening`` is
+   ``click`` (E1-1); a click opens it at once; Enter or Space opens the
+   focused tab's (each strip is a focus region, and its arrows move without
+   opening). Opened by click, keyboard or program, focus moves into the panel;
+   opened by hover, focus stays where it was until the user clicks inside. A
+   flyout without focus closes 500 ms (``flyout_leave_delay``) after the
+   pointer leaves it and its tab; one with focus stays until focus leaves it
+   (focus on a side strip keeps it). A press outside the flyout and the strips
+   closes it and goes on to what was pressed (E2-1). Escape inside closes it
+   and returns focus to where it was before (never a side strip), else to the
+   active document; Shift+Escape hides its panel. Another tab swaps the
+   flyout. The grip resizes it within the tree's extent for the session; the
+   layout is not edited. Opening, swapping, resizing and closing never edit
+   the layout: a group's tab shows that panel without changing the stack's
+   selection. The flyout's pin returns the stack to where it stood
+   (``DockEdit::unpin``); a pin and an unpin with nothing between leave the
+   saved layout byte for byte as it was.
 
    Seams are 3 units with a grip of dots (decision DK-41). Dragging one, or
    moving it with the arrow keys along its split while the site has focus,
@@ -212,18 +302,26 @@ gui_forms::DockSite
    stacks collapse in increasing collapse priority (a stack's priority is its
    panels' largest; on equal priority the later stack in tree order goes
    first), each only if its collapse reduces the shortfall, until the rest
-   fits. Until auto-hide exists a collapsed stack is hidden in place: the
-   layout does not change, its panels keep their places and nothing is saved
-   differently, and the stack returns as soon as there is room. The maximized
-   document area hides every tool stack the same way.
+   fits. A collapsed stack goes behind side tabs on the window edge nearest the
+   place it would have in the tree and opens in a flyout like an auto-hidden
+   one, but the layout does not change: the stack stays docked (its flyout's
+   pin is checked; pressing it auto-hides the stack for good), nothing is saved
+   differently, and the stack returns to the tree as soon as there is room (an
+   open flyout of it then closes, cause ``layout``). The side strips' bands
+   are taken before the collapse is planned, and a collapse that needs a strip
+   on a further edge is planned again with that band. The maximized document
+   area hides every tool stack in place, without side tabs.
 
    Keyboard (decision DK-30), while focus is in the site: F6 and Shift+F6 move
-   between the stacks, which are the window's focus regions in tree order
-   (the program's other regions keep their places); Ctrl+Tab and
+   between the stacks and then the side strips, which are the window's focus
+   regions in that order (the program's other regions keep their places); Ctrl+Tab and
    Ctrl+Shift+Tab open the navigator on the documents and Alt+F7 and
    Alt+Shift+F7 on the tool panels, and releasing Ctrl or Alt activates the
-   current row; Ctrl+F6 and Ctrl+Shift+F6 activate the next and previous
-   document; Escape in a tool panel, when its content leaves it unhandled,
+   current row; Ctrl+F6 and Ctrl+Shift+F6 step through the documents in
+   most-recently-used order (decision DK-46): the first press takes the order
+   as it stands, each further press with Ctrl still held steps on along it,
+   and releasing Ctrl (or any other key, or a press) ends the run; Escape in a
+   tool panel, when its content leaves it unhandled,
    returns to the active document; Shift+Escape hides the active tool panel;
    Ctrl+Shift+F12 toggles the maximized document area; Alt+Hyphen, Shift+F10
    and the context-menu key open the active panel's position menu. A focused
@@ -235,8 +333,8 @@ gui_forms::DockSite
    ``context_menu``), so ``Window::rebind_key_command`` changes it and the
    navigator commits on the release of the new chord's Ctrl, Alt or Meta.
 
-   Activation: focus entering a stack (a click, Tab, F6, a tab chosen) makes
-   its selected panel the workspace's active panel; a press on a caption, or
+   Activation: focus entering a stack or a flyout (a click, Tab, F6, a tab
+   chosen) makes its panel the workspace's active panel; a press on a caption, or
    anywhere in a panel, activates it and moves focus to the control that last
    had focus there, else its first focusable control. When the panel holding
    focus is hidden, closed, moved or collapsed, focus goes to the active panel,
@@ -248,8 +346,9 @@ gui_forms::DockSite
    off when the pointer leaves the strip's band. At the start the subject
    leaves its place and the place closes up; the layout itself does not change
    until the drop, so Escape leaves it byte-identical. A miniature of the
-   panel (its caption strip, title and content well, drawn by role; not a
-   picture of its content) shrinks from the panel's rectangle to about 100
+   panel (its caption strip and title by role over a picture of the panel's
+   view, taken with ``Window::snapshot_control`` as the drag starts; the content
+   well stands in where the window cannot snapshot, as headless) shrinks from the panel's rectangle to about 100
    units over 220 ms and follows the pointer; at the end it grows into the
    panel's new place, or back into its old one. Over the pane under the
    pointer, and only that pane, a cross of five tiles appears (fading in over
@@ -261,10 +360,27 @@ gui_forms::DockSite
    edge's middle. Targets the restrictions (dock groups, allowed placements,
    the user lock) refuse are not offered and their tiles are disabled. Ctrl
    held suppresses docking. A release on a target applies one transaction
-   and activates the moved panel; a release elsewhere snaps back with a
-   rejected cue (floating arrives in phase D4). Escape, losing the pointer
-   capture, the window deactivating and a layout change by the program end a
-   drag with the layout unchanged.
+   and activates the moved panel; a release where nothing accepts floats the
+   subject into a new floating window at the pointer, at the panel's size,
+   when it may float (D4-1), and snaps it back otherwise, with a rejected cue
+   under the pointer shown only then. Escape, losing the pointer capture, the
+   window deactivating and a layout change by the program end a drag with the
+   layout unchanged.
+
+   Floating windows (phase D4; decisions DK-1, DK-6 to DK-12, DK-41): while
+   the workspace has windows attached, a drag follows the desktop pointer and
+   the topmost site under it shows the tiles, the tint and the stamp, over its
+   hovered pane only (decision 41, T8-3); the other sites show none. A
+   floating site has no document area, side strips, collapsing or window-edge
+   targets. Its tool stacks keep their drawn captions; the host's title bar
+   stays as well, since no host offers a frameless owned window yet. A
+   double-click on a floating caption docks the stack back. In a floating
+   window holding one tool stack, dragging the caption moves the window itself
+   with the framework's capture drag (:cpp:class:`WindowFrameDrag <gui_forms::WindowFrameDrag>`, decision 12; elsewhere
+   the caption drags the stack), while the window under the pointer shows its
+   targets; a release on one docks the stack there and the floating window
+   closes after the panel has appeared. Keys a floating window does not use go
+   to the main window's accelerators.
 
    The keyboard move mode (Move in the position menu, or the ``move_panel``
    key command, Ctrl+Alt+Shift+M): the arrows step through the current
@@ -273,28 +389,39 @@ gui_forms::DockSite
    previous pane and then the window's edges, over exactly the targets the
    pointer reaches. Enter drops; Escape cancels.
 
-   Not yet: floating sites (phase D4) and auto-hidden stacks (D5) are kept in
-   the layout but not shown; document tab close glyphs and the overflow list
-   arrive with the page view's document preset.
+   Not yet: a drawn caption in place of the host's title bar for a one-stack
+   floating window (no host offers frameless owned windows); a stamp outside
+   every window of the run (no drag image host service); a
+   flyout closes at once rather than sliding back; the grip's extent is not
+   saved with the layout; the strips leave no gap between groups; document tab
+   close glyphs and the overflow list arrive with the page view's document
+   preset.
 
    To accessibility the site is a group named "Docking workspace" (or its
    accessible name). Each stack is a ``pane`` named by its selected panel, or
    "Documents", holding its tab list, its tab panel and, for a tool stack, the
-   caption buttons: "Window position" (a ``menu_button``), "Pinned" (a checked
-   ``check_box``, unavailable) and "Close". Each seam is a ``split_pane`` whose
+   caption buttons: "Window position" (a ``menu_button``), "Pinned" (a
+   ``check_box``, checked while the stack is docked, whose press auto-hides or
+   docks it) and "Close". Each side strip is a tab list named "Auto-hidden
+   panels", vertical on the left and right; an open flyout's stack is a
+   ``pane`` named by its panel with the same caption buttons. Each seam is a ``split_pane`` whose
    value is its first side's extent, between the two sides' minimums, with
    focus, increment, decrement and set_value. A document tab's close action
    closes the document.
 
    Every part is drawn by the by-role paint path. The site's parts are
-   ``region``, ``document_area`` (the well behind the documents) and
-   ``focus``. The ``seam`` item system has ``seam_bar`` and ``seam_grip`` (the
+   ``region``, ``document_area`` (the well behind the documents), ``focus``,
+   and, while a flyout is open, ``flyout_shadow`` (the overlay shadow),
+   ``flyout_face`` and ``flyout_grip`` (the ``grip_dots`` mark, hot and
+   captured), in the site's coordinates where the flyout stands in its
+   slide. The ``seam`` item system has ``seam_bar`` and ``seam_grip`` (the
    ``grip_dots`` mark), with hot, captured, focus_visible and disabled. The
    ``stack`` item system has ``stack_area`` and, for a tool stack,
    ``caption``, ``caption_accent`` (present while current), ``caption_key``,
    ``caption_label``, ``caption_menu`` and ``caption_menu_glyph`` (a
    ``chevron_down``), ``caption_pin`` and ``caption_pin_glyph`` (the ``pin``
-   mark, checked), ``caption_close`` and ``caption_close_glyph``; its states
+   mark, checked while docked), ``caption_close`` and ``caption_close_glyph``;
+   its states
    are current and disabled, and the buttons carry their own hot, pressed,
    open, checked and disabled. While dragging, the site's ``drag_stamp``,
    ``drag_stamp_label``, ``drop_area`` (drop_accepted) and ``drop_cue``
@@ -342,6 +469,12 @@ gui_forms::DockSite
           (*site).set_document_area_maximized(true);
           window.perform_layout();
           // The Files stack is hidden; the document fills the site.
+          (*site).set_document_area_maximized(false);
+          static_cast<void>((*site).run_position_command(gf::DockPanelId("files"), gf::DockPositionCommand::auto_hide));
+          window.perform_layout();
+          // Files is behind a side tab on the left edge.
+          static_cast<void>((*site).open_flyout(gf::DockPanelId("files")));
+          // Its flyout slides out over the document, with focus inside.
       }
 
 
@@ -349,7 +482,11 @@ gui_forms::DockSite
 
    .. cpp:function:: DockSite(StableId stable_id, DockWorkspace& workspace)
 
-      Borrows :cpp:func:`workspace <gui_forms::DockSite::workspace>` (see the lifetime rule above).
+      Borrows :cpp:func:`workspace <gui_forms::DockSite::workspace>` (see the lifetime rule above). Realizes the main site.
+
+   .. cpp:function:: DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floating_site)
+
+      Realizes the floating site :cpp:func:`floating_site <gui_forms::DockSite::floating_site>` (phase D4). A second site made for the same floating site replaces the first in the workspace.
 
 
    .. rubric:: Properties
@@ -357,6 +494,14 @@ gui_forms::DockSite
    .. cpp:function:: DockWorkspace* workspace() const noexcept
 
       The bound workspace, or null after :cpp:func:`release_workspace <gui_forms::DockSite::release_workspace>`.
+
+   .. cpp:function:: bool floating() const noexcept
+
+      Whether the site shows a floating site.
+
+   .. cpp:function:: DockSiteId floating_site() const noexcept
+
+      The floating site shown, or none for the main site.
 
    .. cpp:function:: double keyboard_increment() const noexcept
 
@@ -378,7 +523,8 @@ gui_forms::DockSite
 
    .. cpp:function:: std::vector<DockNodeId> realized_stacks() const
 
-      The stacks shown, collapsed ones included, in tree order.
+      The stacks shown, collapsed ones included, in tree order, then the
+      auto-hidden stacks in layout order.
 
    .. cpp:function:: std::vector<DockNodeId> collapsed_stacks() const
 
@@ -431,6 +577,15 @@ gui_forms::DockSite
 
       The target a drop would use now.
 
+   .. cpp:function:: bool showing_remote_drag() const noexcept
+
+      Whether the site shows a drag that runs in another site's window: the
+      pointer is over this window (phase D4).
+
+   .. cpp:function:: bool moving_window() const noexcept
+
+      Whether a floating window is being moved by its caption.
+
    .. cpp:function:: bool drag_suppressed() const noexcept
 
       Whether Ctrl suppresses docking.
@@ -453,6 +608,26 @@ gui_forms::DockSite
 
       Sets :cpp:func:`drag_threshold <gui_forms::DockSite::drag_threshold>`; see the property's description above.
 
+   .. cpp:function:: bool flyout_open() const noexcept
+
+      Whether a flyout is open.
+
+   .. cpp:function:: const std::optional<DockPanelId>& flyout_panel() const noexcept
+
+      The panel the open flyout shows.
+
+   .. cpp:function:: double flyout_reveal() const noexcept
+
+      How far the flyout has slid out, from 0 to 1; 1 while none is open.
+
+   .. cpp:function:: double flyout_extent() const
+
+      The open flyout's extent across its edge, in logical units.
+
+   .. cpp:function:: Control::Ptr flyout_control() const noexcept
+
+      The open flyout's root control, an overlay of the window.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Seam> realized_seams() const
@@ -462,7 +637,8 @@ gui_forms::DockSite
    .. cpp:function:: std::vector<Stack> realized_stack_items() const
 
       The stacks shown after the last layout pass, with their parts and
-      states.
+      states, then the open flyout's stack with its caption in the site's
+      coordinates.
 
    .. cpp:function:: std::vector<Tile> realized_tiles() const
 
@@ -476,8 +652,19 @@ gui_forms::DockSite
 
       Raised once when a drag that started ends, with how it ended
       (:cpp:enum:`DockDragEnd <gui_forms::DockDragEnd>`: dropped, escaped, capture lost, deactivated, layout
-      changed, rejected), its subject and, for a drop, the target and the
-      transaction's result. Raised after a drop's transaction.
+      changed, rejected, floated), its subject and, for a drop, the target,
+      whether it was in another window, and the transaction's result; for a
+      float, the new window's client area. Raised after the transaction. A
+      floating window moved by its caption onto a target raises it too.
+
+   .. cpp:function:: Event<const DockFlyoutChange&>& flyout_changed() noexcept
+
+      Raised after a flyout opened or closed, with the panel and the cause
+      (:cpp:enum:`DockFlyoutCause <gui_forms::DockFlyoutCause>`): hover, pointer, keyboard or programmatic when it
+      opens; pointer_left, outside_press, focus_lost, escape, swapped, layout,
+      pointer (its pin or close) or programmatic when it closes. Opened by
+      click or keyboard, focus is in the panel before it is raised; closing
+      with focus inside, focus has returned before it is raised.
 
 
    .. rubric:: Methods
@@ -538,7 +725,9 @@ gui_forms::DockSite
 
    .. cpp:function:: bool activate_relative_document(int direction)
 
-      Activates the next or previous document in tab order, wrapping; false
+      Activates a document by most-recently-used order (decision DK-46): the
+      one used before the active document, or with -1 the one used longest
+      ago (documents never active come last, in tab order), wrapping; false
       when there is no document.
 
    .. cpp:function:: bool begin_keyboard_move(const DockPanelId& panel)
@@ -549,6 +738,33 @@ gui_forms::DockSite
    .. cpp:function:: bool cancel_drag()
 
       Ends a drag as Escape does; false when none runs.
+
+   .. cpp:function:: std::shared_ptr<PageStrip> side_strip(DockSide edge) const
+
+      The :cpp:class:`PageStrip <gui_forms::PageStrip>` showing an edge's side tabs, or null while the edge has
+      none.
+
+   .. cpp:function:: std::vector<DockPanelId> side_panels(DockSide edge) const
+
+      The panels behind side tabs on an edge, in tab order: the auto-hidden
+      stacks', then the collapsed stacks'.
+
+   .. cpp:function:: bool open_flyout(const DockPanelId& panel, DockFlyoutCause cause = DockFlyoutCause::programmatic)
+
+      Opens the flyout of a panel behind a side tab, closing another first
+      (cause ``swapped``); focus moves into the panel unless the cause is
+      ``hover``. False, changing nothing, for a panel behind no side tab or a
+      detached site.
+
+   .. cpp:function:: void close_flyout(DockFlyoutCause cause = DockFlyoutCause::programmatic) noexcept
+
+      Closes the open flyout with a cause (``programmatic`` by default).
+
+   .. cpp:function:: bool resize_flyout(double extent)
+
+      Sets the open flyout's extent, as its grip does, within the tree's
+      extent, for the rest of the session; false when no flyout is open or the
+      extent is not finite.
 
    .. cpp:function:: std::string seam_identity(DockNodeId split) const
 
@@ -624,3 +840,15 @@ gui_forms::DockSite
    .. cpp:member:: constexpr bool initialize_tree_after_construction
 
       Default: ``true``.
+
+   .. cpp:member:: constexpr std::chrono::milliseconds flyout_hover_delay
+
+      -- auto-hide (phase D5) -- The pointer's rest on a side tab before its flyout opens, the leave delay before an unfocused flyout closes, and the slide's duration (owner decisions DK-27 and DK-41; docking study 5.5). Default: ``{400}``.
+
+   .. cpp:member:: constexpr std::chrono::milliseconds flyout_leave_delay
+
+      Default: ``{500}``.
+
+   .. cpp:member:: constexpr std::chrono::milliseconds flyout_slide_duration
+
+      Default: ``{180}``.

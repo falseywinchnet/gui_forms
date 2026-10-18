@@ -103,8 +103,10 @@ bind
     `bind(Command&)` connects the control to a command, replacing any earlier
     command. The control's enabled state follows the command, a check box's
     checked state and a button's `selected` state follow a checkable
-    command, and each activation executes the command once. The command
-    runs as a `clicked` handler connected by `bind`, so handlers you
+    command, and each activation executes the command once, through the
+    window's command chain while the control has a window (decision DK-47:
+    a target on the chain takes it first; `Command::execute_routed`). The
+    command runs as a `clicked` handler connected by `bind`, so handlers you
     connected earlier run before it. The control borrows the command; a
     disposed command is never invoked. Binding a disposed command throws
     `std::invalid_argument`.

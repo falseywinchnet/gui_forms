@@ -25,7 +25,7 @@
 //   <dock_layout format application_version next_id>
 //     <main_site> [<window x y width height monitor maximized/>] NODE </main_site>
 //     <floating_site id x y width height monitor maximized> NODE </floating_site>  ...
-//     <auto_hidden edge extent neighbour side ratio> <tool_stack/> </auto_hidden>  ...
+//     <auto_hidden edge extent neighbour side ratio [split split_ratio]> <tool_stack/> </auto_hidden>  ...
 //     <panel_record id kind last> [<docked/>] [<floating/>] [<auto_hidden/>] </panel_record> ...
 //   </dock_layout>
 //
@@ -35,7 +35,13 @@
 //         <document_area id> [NODE] </document_area>
 //
 // Unknown elements and attributes (a newer format's additions) are reported
-// and dropped; panels found inside a dropped element become placeholders.
+// and kept (DK decision 48): attached to the known element they were found
+// on (DockLayoutState::unknown_fields) and written back there, the
+// attributes after the known ones and each child element after as many known
+// children as preceded it in the file. An unknown element that holds
+// <panel> references is the exception: it is dropped, and its panels become
+// placeholders, since the panels may later be placed where this format puts
+// them and must not appear twice.
 
 namespace gui_forms {
 
@@ -164,6 +170,61 @@ void add_frame(XmlElement& element, Rect frame) {
     return element;
 }
 
+[[nodiscard]] DockUnknownOwner owner_of(DockUnknownOwnerKind kind, std::uint32_t id = 0,
+                                        const DockPanelId& panel = DockPanelId{}) {
+    DockUnknownOwner owner{};
+    owner.kind = kind;
+    owner.id = id;
+    owner.panel = panel;
+    return owner;
+}
+
+// The element an owner names, in words, for a diagnostic.
+[[nodiscard]] std::string unknown_owner_text(const DockUnknownOwner& owner) {
+    switch (owner.kind) {
+    case DockUnknownOwnerKind::layout: return "dock_layout";
+    case DockUnknownOwnerKind::main_site: return "main_site";
+    case DockUnknownOwnerKind::window: return "main_site/window";
+    case DockUnknownOwnerKind::floating_site: return "floating_site " + std::to_string(owner.id);
+    case DockUnknownOwnerKind::auto_hidden: return "auto_hidden " + std::to_string(owner.id);
+    case DockUnknownOwnerKind::node: return "node " + std::to_string(owner.id);
+    case DockUnknownOwnerKind::panel: return "panel " + owner.panel.value;
+    case DockUnknownOwnerKind::panel_record: return "panel_record " + owner.panel.value;
+    case DockUnknownOwnerKind::docked_memory: return "panel_record " + owner.panel.value + "/docked";
+    case DockUnknownOwnerKind::floating_memory: return "panel_record " + owner.panel.value + "/floating";
+    case DockUnknownOwnerKind::auto_hidden_memory: return "panel_record " + owner.panel.value + "/auto_hidden";
+    }
+    return "?";
+}
+
+// Writes an element's kept unknown fields back: its unknown attributes after
+// the known ones (a name the writer now writes itself wins), and each unknown
+// child after as many known children as preceded it in the file.
+void add_unknown_fields(const DockLayoutState& state, const DockUnknownOwner& owner, XmlElement& element) {
+    const DockUnknownFields* fields = detail::find_unknown_fields(state, owner);
+    if (fields == nullptr) return;
+    for (const XmlAttribute& attribute : (*fields).attributes) {
+        if (element.find_attribute(attribute.name) != nullptr) continue;
+        element.attributes.push_back(attribute);
+    }
+    if ((*fields).children.empty()) return;
+    std::vector<XmlElement> known = std::move(element.children);
+    element.children.clear();
+    element.children.reserve(known.size() + (*fields).children.size());
+    std::size_t next = 0U;
+    for (std::size_t index = 0; index <= known.size(); ++index) {
+        while (next < (*fields).children.size() && (*fields).children[next].after_known <= index) {
+            element.children.push_back((*fields).children[next].element);
+            ++next;
+        }
+        if (index < known.size()) element.children.push_back(std::move(known[index]));
+    }
+    while (next < (*fields).children.size()) {
+        element.children.push_back((*fields).children[next].element);
+        ++next;
+    }
+}
+
 [[nodiscard]] XmlElement node_element(const DockLayoutState& state, DockNodeId id) {
     const DockNode& node = *detail::find_dock_node(state, id);
     XmlElement element{};
@@ -174,12 +235,14 @@ void add_frame(XmlElement& element, Rect frame) {
         add_double(element, "ratio", node.ratio);
         element.children.push_back(node_element(state, node.first));
         element.children.push_back(node_element(state, node.second));
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::node, node.id.value), element);
         return element;
     }
     if (node.kind == DockNodeKind::document_area) {
         element.name = "document_area";
         add_number(element, "id", node.id.value);
         if (!(node.first == DockNodeId{})) element.children.push_back(node_element(state, node.first));
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::node, node.id.value), element);
         return element;
     }
     element.name = node.kind == DockNodeKind::tool_stack ? "tool_stack" : "document_stack";
@@ -188,12 +251,14 @@ void add_frame(XmlElement& element, Rect frame) {
     for (const DockPanelId& panel : node.panels) {
         XmlElement panel_element = element_named("panel");
         add_attribute(panel_element, "id", panel.value);
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::panel, 0, panel), panel_element);
         element.children.push_back(std::move(panel_element));
     }
+    add_unknown_fields(state, owner_of(DockUnknownOwnerKind::node, node.id.value), element);
     return element;
 }
 
-[[nodiscard]] XmlElement record_element(const DockPanelRecord& record) {
+[[nodiscard]] XmlElement record_element(const DockLayoutState& state, const DockPanelRecord& record) {
     XmlElement element = element_named("panel_record");
     add_attribute(element, "id", record.id.value);
     add_attribute(element, "kind", kind_name(record.kind));
@@ -206,6 +271,7 @@ void add_frame(XmlElement& element, Rect frame) {
         add_number(docked, "neighbour", memory.neighbour.value);
         add_attribute(docked, "side", side_name(memory.side));
         add_double(docked, "ratio", memory.ratio);
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::docked_memory, 0, record.id), docked);
         element.children.push_back(std::move(docked));
     }
     if (record.floating.has_value()) {
@@ -214,6 +280,7 @@ void add_frame(XmlElement& element, Rect frame) {
         add_number(floating, "site", memory.site.value);
         add_frame(floating, memory.frame);
         add_attribute(floating, "monitor", memory.monitor_id);
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::floating_memory, 0, record.id), floating);
         element.children.push_back(std::move(floating));
     }
     if (record.auto_hidden.has_value()) {
@@ -222,8 +289,10 @@ void add_frame(XmlElement& element, Rect frame) {
         add_number(hidden, "stack", memory.stack.value);
         add_attribute(hidden, "edge", side_name(memory.edge));
         add_double(hidden, "extent", memory.extent);
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::auto_hidden_memory, 0, record.id), hidden);
         element.children.push_back(std::move(hidden));
     }
+    add_unknown_fields(state, owner_of(DockUnknownOwnerKind::panel_record, 0, record.id), element);
     return element;
 }
 
@@ -240,9 +309,11 @@ void add_frame(XmlElement& element, Rect frame) {
         add_frame(window_element, window.frame);
         add_attribute(window_element, "monitor", window.monitor_id);
         add_attribute(window_element, "maximized", boolean_name(window.maximized));
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::window), window_element);
         main_site.children.push_back(std::move(window_element));
     }
     main_site.children.push_back(node_element(state, state.main_root));
+    add_unknown_fields(state, owner_of(DockUnknownOwnerKind::main_site), main_site);
     root.children.push_back(std::move(main_site));
 
     for (const DockFloatingSite& site : state.floating_sites) {
@@ -252,6 +323,7 @@ void add_frame(XmlElement& element, Rect frame) {
         add_attribute(element, "monitor", site.monitor_id);
         add_attribute(element, "maximized", boolean_name(site.maximized));
         element.children.push_back(node_element(state, site.root));
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::floating_site, site.id.value), element);
         root.children.push_back(std::move(element));
     }
     for (const DockAutoHideEntry& entry : state.auto_hidden) {
@@ -261,10 +333,18 @@ void add_frame(XmlElement& element, Rect frame) {
         add_number(element, "neighbour", entry.neighbour.value);
         add_attribute(element, "side", side_name(entry.side));
         add_double(element, "ratio", entry.ratio);
+        // Written only when there is a split to recreate, so a layout without
+        // one keeps the form written before these attributes existed.
+        if (!(entry.split == DockNodeId{})) {
+            add_number(element, "split", entry.split.value);
+            add_double(element, "split_ratio", entry.split_ratio);
+        }
         element.children.push_back(node_element(state, entry.stack));
+        add_unknown_fields(state, owner_of(DockUnknownOwnerKind::auto_hidden, entry.stack.value), element);
         root.children.push_back(std::move(element));
     }
-    for (const DockPanelRecord& record : state.panels) root.children.push_back(record_element(record));
+    for (const DockPanelRecord& record : state.panels) root.children.push_back(record_element(state, record));
+    add_unknown_fields(state, owner_of(DockUnknownOwnerKind::layout), root);
     return root;
 }
 
@@ -300,7 +380,8 @@ public:
         : root_(root), diagnostics_(diagnostics) {}
 
     bool load() {
-        check_attributes(root_, {"format", "application_version", "next_id"});
+        const DockUnknownOwner layout = owner_of(DockUnknownOwnerKind::layout);
+        check_attributes(root_, {"format", "application_version", "next_id"}, layout);
         const XmlAttribute* application = root_.find_attribute("application_version");
         if (application != nullptr) {
             const std::optional<std::uint32_t> version = parse_unsigned((*application).value);
@@ -315,6 +396,7 @@ public:
             saved_next = *value;
         }
         bool main_seen = false;
+        std::size_t known = 0U;
         for (const XmlElement& child : root_.children) {
             bool read = true;
             if (child.name == "main_site") {
@@ -328,9 +410,11 @@ public:
             } else if (child.name == "panel_record") {
                 read = load_record(child);
             } else {
-                unknown_element("dock_layout", child);
+                unknown_element("dock_layout", child, layout, known);
+                continue;
             }
             if (!read) return false;
+            ++known;
         }
         if (!main_seen) return structure("dock_layout has no main site");
         const std::uint32_t after_largest = largest_id_ + 1U;
@@ -368,19 +452,50 @@ private:
         return false;
     }
 
-    void check_attributes(const XmlElement& element, std::initializer_list<std::string_view> known) {
+    // The kept unknown fields of an owner, added on first use.
+    DockUnknownFields& fields_of(const DockUnknownOwner& owner) {
+        for (DockUnknownFields& fields : state_.unknown_fields) {
+            if (fields.owner == owner) return fields;
+        }
+        DockUnknownFields fields{};
+        fields.owner = owner;
+        state_.unknown_fields.push_back(std::move(fields));
+        return state_.unknown_fields.back();
+    }
+
+    // Reports and keeps the attributes a known element has beyond `known`.
+    void check_attributes(const XmlElement& element, std::initializer_list<std::string_view> known,
+                          const DockUnknownOwner& owner) {
         for (const XmlAttribute& attribute : element.attributes) {
             const bool listed = std::find(known.begin(), known.end(), attribute.name) != known.end();
             if (listed) continue;
             report(DockRestoreDiagnosticKind::unknown_attribute, element.name + ": " + attribute.name);
+            fields_of(owner).attributes.push_back(attribute);
         }
     }
 
-    // Reports an unknown element and keeps every panel ID inside it, so
-    // those panels become placeholders instead of vanishing.
-    void unknown_element(std::string_view where, const XmlElement& element) {
+    [[nodiscard]] static bool holds_panels(const XmlElement& element) {
+        if (element.name == "panel") return true;
+        for (const XmlElement& child : element.children) {
+            if (holds_panels(child)) return true;
+        }
+        return false;
+    }
+
+    // Reports an unknown child element of `owner`'s element, found after
+    // `known_before` known children, and keeps it whole; one holding panel
+    // references is dropped instead and its panels become placeholders.
+    void unknown_element(std::string_view where, const XmlElement& element, const DockUnknownOwner& owner,
+                         std::size_t known_before) {
         report(DockRestoreDiagnosticKind::unknown_element, std::string(where) + "/" + element.name);
-        harvest_panels(element);
+        if (holds_panels(element)) {
+            harvest_panels(element);
+            return;
+        }
+        DockUnknownChild child{};
+        child.after_known = known_before;
+        child.element = element;
+        fields_of(owner).children.push_back(std::move(child));
     }
 
     void harvest_panels(const XmlElement& element) {
@@ -486,8 +601,9 @@ private:
         node = DockNodeId{};
         std::uint32_t id = 0;
         if (element.name == "split") {
-            check_attributes(element, {"id", "axis", "ratio"});
             if (!read_id(element, id)) return false;
+            const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
+            check_attributes(element, {"id", "axis", "ratio"}, owner);
             const XmlAttribute* axis = element.find_attribute("axis");
             const std::string axis_text = axis == nullptr ? std::string{} : (*axis).value;
             if (axis_text != "horizontal" && axis_text != "vertical") return invalid("split", "axis", axis_text);
@@ -495,7 +611,7 @@ private:
             if (!read_double(element, "ratio", ratio)) return false;
             if (!(ratio > 0.0 && ratio < 1.0)) return invalid("split", "ratio", format_double(ratio));
             std::vector<DockNodeId> children{};
-            if (!load_children(element, children)) return false;
+            if (!load_children(element, children, owner)) return false;
             if (children.size() > 2U) return structure("split " + std::to_string(id) + " has more than two children");
             if (children.size() < 2U) {
                 if (children.size() == 1U) node = children[0];
@@ -515,10 +631,11 @@ private:
             return true;
         }
         if (element.name == "document_area") {
-            check_attributes(element, {"id"});
             if (!read_id(element, id)) return false;
+            const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
+            check_attributes(element, {"id"}, owner);
             std::vector<DockNodeId> children{};
-            if (!load_children(element, children)) return false;
+            if (!load_children(element, children, owner)) return false;
             if (children.size() > 1U) return structure("the document area has more than one child");
             DockNode area{};
             area.id = DockNodeId{id};
@@ -531,8 +648,9 @@ private:
             node = DockNodeId{id};
             return true;
         }
-        check_attributes(element, {"id", "selected"});
         if (!read_id(element, id)) return false;
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
+        check_attributes(element, {"id", "selected"}, owner);
         std::uint32_t selected = 0;
         const XmlAttribute* selected_attribute = element.find_attribute("selected");
         if (selected_attribute != nullptr) {
@@ -543,19 +661,24 @@ private:
         DockNode stack{};
         stack.id = DockNodeId{id};
         stack.kind = element.name == "tool_stack" ? DockNodeKind::tool_stack : DockNodeKind::document_stack;
+        std::size_t known = 0U;
         for (const XmlElement& child : element.children) {
             if (child.name != "panel") {
-                unknown_element(element.name, child);
+                unknown_element(element.name, child, owner, known);
                 continue;
             }
-            check_attributes(child, {"id"});
             const XmlAttribute* panel_id = child.find_attribute("id");
             if (panel_id == nullptr || (*panel_id).value.empty()) return invalid("panel", "id", "");
             const DockPanelId panel((*panel_id).value);
+            ++known;
             if (seen(panel)) {
                 report(DockRestoreDiagnosticKind::duplicate_panel, panel.value);
                 continue;
             }
+            const DockUnknownOwner panel_owner = owner_of(DockUnknownOwnerKind::panel, 0, panel);
+            check_attributes(child, {"id"}, panel_owner);
+            // A <panel> has no known children: any it has are kept whole.
+            for (const XmlElement& nested : child.children) unknown_element("panel", nested, panel_owner, 0U);
             seen_panels_.push_back(panel);
             stack.panels.push_back(panel);
         }
@@ -571,15 +694,17 @@ private:
         return true;
     }
 
-    bool load_children(const XmlElement& element, std::vector<DockNodeId>& children) {
+    bool load_children(const XmlElement& element, std::vector<DockNodeId>& children, const DockUnknownOwner& owner) {
+        std::size_t known = 0U;
         for (const XmlElement& child : element.children) {
             if (!is_node_name(child.name)) {
-                unknown_element(element.name, child);
+                unknown_element(element.name, child, owner, known);
                 continue;
             }
             DockNodeId node{};
             if (!load_node(child, node)) return false;
             if (!(node == DockNodeId{})) children.push_back(node);
+            ++known;
         }
         return true;
     }
@@ -590,25 +715,31 @@ private:
     }
 
     bool load_main_site(const XmlElement& element) {
-        check_attributes(element, {});
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::main_site);
+        check_attributes(element, {}, owner);
         std::vector<DockNodeId> roots{};
+        std::size_t known = 0U;
         for (const XmlElement& child : element.children) {
             if (child.name == "window") {
-                check_attributes(child, {"x", "y", "width", "height", "monitor", "maximized"});
+                const DockUnknownOwner window_owner = owner_of(DockUnknownOwnerKind::window);
+                check_attributes(child, {"x", "y", "width", "height", "monitor", "maximized"}, window_owner);
+                for (const XmlElement& nested : child.children) unknown_element("window", nested, window_owner, 0U);
                 DockWindowFrame window{};
                 if (!read_frame(child, window.frame)) return false;
                 window.monitor_id = monitor_of(child);
                 if (!read_boolean(child, "maximized", window.maximized)) return false;
                 state_.main_window = std::move(window);
+                ++known;
                 continue;
             }
             if (!is_node_name(child.name)) {
-                unknown_element("main_site", child);
+                unknown_element("main_site", child, owner, known);
                 continue;
             }
             DockNodeId node{};
             if (!load_node(child, node)) return false;
             if (!(node == DockNodeId{})) roots.push_back(node);
+            ++known;
         }
         if (roots.size() != 1U) return structure("the main site does not hold exactly one root");
         state_.main_root = roots[0];
@@ -616,9 +747,10 @@ private:
     }
 
     bool load_floating_site(const XmlElement& element) {
-        check_attributes(element, {"id", "x", "y", "width", "height", "monitor", "maximized"});
         std::uint32_t id = 0;
         if (!read_id(element, id)) return false;
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::floating_site, id);
+        check_attributes(element, {"id", "x", "y", "width", "height", "monitor", "maximized"}, owner);
         DockFloatingSite site{};
         site.id = DockSiteId{id};
         if (!read_frame(element, site.frame)) return false;
@@ -630,7 +762,7 @@ private:
             return true;
         }
         std::vector<DockNodeId> roots{};
-        if (!load_children(element, roots)) return false;
+        if (!load_children(element, roots, owner)) return false;
         if (roots.size() > 1U) return structure("floating site " + std::to_string(id) + " has more than one root");
         if (roots.empty()) return true;
         const DockNode& root = *detail::find_dock_node(state_, roots[0]);
@@ -641,7 +773,19 @@ private:
     }
 
     bool load_auto_hidden(const XmlElement& element) {
-        check_attributes(element, {"edge", "extent", "neighbour", "side", "ratio"});
+        // The entry is known by its stack: the ID of its stack element, read
+        // ahead (an entry left without a stack is dropped, and its unknown
+        // fields with it).
+        std::uint32_t stack_id = 0;
+        for (const XmlElement& child : element.children) {
+            if (!is_node_name(child.name)) continue;
+            const XmlAttribute* id = child.find_attribute("id");
+            const std::optional<std::uint32_t> parsed = id == nullptr ? std::nullopt : parse_unsigned((*id).value);
+            if (parsed.has_value()) stack_id = *parsed;
+            break;
+        }
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::auto_hidden, stack_id);
+        check_attributes(element, {"edge", "extent", "neighbour", "side", "ratio", "split", "split_ratio"}, owner);
         DockAutoHideEntry entry{};
         if (!read_side(element, "edge", entry.edge)) return false;
         if (!read_double(element, "extent", entry.extent)) return false;
@@ -649,8 +793,16 @@ private:
         if (!read_node_reference(element, "neighbour", entry.neighbour)) return false;
         if (!read_side(element, "side", entry.side)) return false;
         if (!read_double(element, "ratio", entry.ratio)) return false;
+        // Optional: the split to recreate on unpinning.
+        if (element.find_attribute("split") != nullptr) {
+            if (!read_node_reference(element, "split", entry.split)) return false;
+            if (!read_double(element, "split_ratio", entry.split_ratio)) return false;
+            if (!(entry.split_ratio > 0.0 && entry.split_ratio < 1.0)) {
+                return invalid("auto_hidden", "split_ratio", format_double(entry.split_ratio));
+            }
+        }
         std::vector<DockNodeId> stacks{};
-        if (!load_children(element, stacks)) return false;
+        if (!load_children(element, stacks, owner)) return false;
         if (stacks.size() > 1U) return structure("an auto-hidden entry holds more than one stack");
         if (stacks.empty()) return true;
         const DockNode& stack = *detail::find_dock_node(state_, stacks[0]);
@@ -661,7 +813,6 @@ private:
     }
 
     bool load_record(const XmlElement& element) {
-        check_attributes(element, {"id", "kind", "last"});
         const XmlAttribute* id = element.find_attribute("id");
         if (id == nullptr || (*id).value.empty()) return invalid("panel_record", "id", "");
         DockPanelRecord record{};
@@ -670,6 +821,8 @@ private:
             report(DockRestoreDiagnosticKind::duplicate_panel, "panel_record " + record.id.value);
             return true;
         }
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::panel_record, 0, record.id);
+        check_attributes(element, {"id", "kind", "last"}, owner);
         const XmlAttribute* kind = element.find_attribute("kind");
         const std::optional<DockPanelKind> parsed_kind =
             kind == nullptr ? std::nullopt : parse_kind((*kind).value);
@@ -680,9 +833,22 @@ private:
             last == nullptr ? std::nullopt : parse_placement((*last).value);
         if (!parsed_last.has_value()) return invalid("panel_record", "last", last == nullptr ? "" : (*last).value);
         record.last_placement = *parsed_last;
+        std::size_t known = 0U;
         for (const XmlElement& child : element.children) {
+            const bool memory_element = child.name == "docked" || child.name == "floating" ||
+                                        child.name == "auto_hidden";
+            if (!memory_element) {
+                unknown_element("panel_record", child, owner, known);
+                continue;
+            }
+            ++known;
+            DockUnknownOwnerKind memory_kind = DockUnknownOwnerKind::docked_memory;
+            if (child.name == "floating") memory_kind = DockUnknownOwnerKind::floating_memory;
+            if (child.name == "auto_hidden") memory_kind = DockUnknownOwnerKind::auto_hidden_memory;
+            const DockUnknownOwner memory_owner = owner_of(memory_kind, 0, record.id);
+            for (const XmlElement& nested : child.children) unknown_element(child.name, nested, memory_owner, 0U);
             if (child.name == "docked") {
-                check_attributes(child, {"stack", "index", "neighbour", "side", "ratio"});
+                check_attributes(child, {"stack", "index", "neighbour", "side", "ratio"}, memory_owner);
                 DockDockedMemory memory{};
                 if (!read_node_reference(child, "stack", memory.stack)) return false;
                 const XmlAttribute* index = child.find_attribute("index");
@@ -695,7 +861,7 @@ private:
                 if (!read_double(child, "ratio", memory.ratio)) return false;
                 record.docked = memory;
             } else if (child.name == "floating") {
-                check_attributes(child, {"site", "x", "y", "width", "height", "monitor"});
+                check_attributes(child, {"site", "x", "y", "width", "height", "monitor"}, memory_owner);
                 DockFloatingMemory memory{};
                 DockNodeId site{};
                 if (!read_node_reference(child, "site", site)) return false;
@@ -703,15 +869,13 @@ private:
                 if (!read_frame(child, memory.frame)) return false;
                 memory.monitor_id = monitor_of(child);
                 record.floating = std::move(memory);
-            } else if (child.name == "auto_hidden") {
-                check_attributes(child, {"stack", "edge", "extent"});
+            } else {
+                check_attributes(child, {"stack", "edge", "extent"}, memory_owner);
                 DockAutoHideMemory memory{};
                 if (!read_node_reference(child, "stack", memory.stack)) return false;
                 if (!read_side(child, "edge", memory.edge)) return false;
                 if (!read_double(child, "extent", memory.extent)) return false;
                 record.auto_hidden = memory;
-            } else {
-                report(DockRestoreDiagnosticKind::unknown_element, "panel_record/" + child.name);
             }
         }
         detail::insert_dock_record(state_, std::move(record));
@@ -863,6 +1027,10 @@ bool rename_dock_panel(DockLayoutState& state, const DockPanelId& from, const Do
         detail::erase_dock_record(state, from);
         detail::insert_dock_record(state, std::move(renamed));
     }
+    // Kept unknown fields follow the panel.
+    for (DockUnknownFields& fields : state.unknown_fields) {
+        if (fields.owner.panel == from) fields.owner.panel = to;
+    }
     return true;
 }
 
@@ -981,8 +1149,15 @@ DockRestoreResult DockLayout::restore_xml(std::string_view xml, const DockRestor
         report(diagnostics, DockRestoreDiagnosticKind::structure_invalid, invariants.problem);
         return result;
     }
-    // 6. Apply as one change.
-    commit(std::move(state), DockEditOrigin::program, 0, true);
+    // 6. Unknown fields whose element the restore removed (a placeholder, a
+    // pruned stack) are not kept.
+    std::vector<DockUnknownOwner> dropped{};
+    detail::prune_unknown_fields(state, dropped);
+    for (const DockUnknownOwner& owner : dropped) {
+        report(diagnostics, DockRestoreDiagnosticKind::unknown_fields_dropped, unknown_owner_text(owner));
+    }
+    // 7. Apply as one change.
+    commit(std::move(state), DockEditOrigin::program, 0, true, false);
     result.status = DockRestoreStatus::restored;
     return result;
 }

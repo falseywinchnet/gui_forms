@@ -168,9 +168,10 @@ HostSession::HostSession(Window& window,
             Delegate<const HostModalTransition&>::bind<
                 HostSession, &HostSession::observe_modal_transition>(*this));
     }
-    // The host's keyboard-command defaults (owner decision DK-30, G5-1). The
-    // window keeps them after the session ends; a later session replaces
-    // them. The application's rebindings stay over them.
+    // The host's keyboard-command defaults (owner decisions DK-30, G5-1, and
+    // DK-44): they seed the window's bindings, shared with the application's
+    // other windows, unless an earlier session seeded them. The
+    // application's rebindings stay over them.
     window.install_host_key_map(snapshot_.capabilities.key_map);
 }
 

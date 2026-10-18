@@ -135,4 +135,41 @@ private:
 // own.
 [[nodiscard]] KeyMap pc_key_map();
 
+// The keys of an application's named keyboard commands (owner decision
+// DK-44, review R3): one object shared by every window of the application,
+// floating windows included (Window::set_key_bindings), so a rebinding made
+// in one window holds in all of them. The host's defaults seed it once,
+// when the first host session attaches (later sessions leave it as it is);
+// the application's rebindings stay over them. Until a host seeds it, the
+// defaults are the PC convention's.
+//
+// Execution: the UI thread of the windows sharing it; not synchronized.
+class KeyBindings final {
+public:
+    KeyBindings();
+    KeyBindings(const KeyBindings&) = delete;
+    KeyBindings& operator=(const KeyBindings&) = delete;
+
+    // The defaults with the rebindings over them.
+    [[nodiscard]] const KeyMap& map() const noexcept { return effective_; }
+    // The host's defaults (the PC convention until seeded).
+    [[nodiscard]] const KeyMap& defaults() const noexcept { return defaults_; }
+    [[nodiscard]] bool seeded() const noexcept { return seeded_; }
+    // Throws std::invalid_argument as KeyMap::set_binding does, binding
+    // nothing.
+    void rebind(KeyCommand command, KeyBinding binding);
+    // Returns a command to the default. Throws std::invalid_argument for a
+    // command outside the enumeration.
+    void restore(KeyCommand command);
+    // The host's defaults, taken the first time only; false, changing
+    // nothing, once seeded.
+    bool seed(const KeyMap& defaults);
+
+private:
+    KeyMap defaults_;
+    KeyMap effective_;
+    std::array<bool, key_command_count> rebound_{};
+    bool seeded_{};
+};
+
 } // namespace gui_forms

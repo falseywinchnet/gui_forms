@@ -43,15 +43,20 @@ void test_containers_and_focus(gui_forms::Window& window) {
                 (*collapse).text() == "Collapse navigation",
             "gallery SplitContainer must restore its retained allocation");
 
-    // The docked workspace: four stacks realized, only the shown panels'
-    // controls made, and focus in a panel activating it.
+    // The docked workspace: three stacks in the tree and Output auto-hidden
+    // behind a side tab on the bottom edge, only the shown panels' controls
+    // made, and focus in a panel activating it.
     std::shared_ptr<gui_forms::DockSite> site = std::dynamic_pointer_cast<DockSite>(
         window.find("gallery.containers.dock"));
     std::shared_ptr<gui_forms::Label> dock_status = std::dynamic_pointer_cast<Label>(
         window.find("gallery.containers.docking.status"));
     require(site && dock_status && (*site).workspace() != nullptr && (*site).realized_stacks().size() == 4U &&
-                (*site).realized_seams().size() == 3U,
-            "the gallery's docked workspace realizes four stacks and three seams");
+                (*site).realized_seams().size() == 2U,
+            "the gallery's docked workspace realizes four stacks and two seams");
+    require((*site).side_panels(DockSide::bottom).size() == 1U &&
+                (*site).side_panels(DockSide::bottom)[0].value == "output" &&
+                !window.find("gallery.containers.dock.content.output"),
+            "Output waits behind a side tab, not yet made");
     require(window.find("gallery.containers.dock.content.classes") &&
                 !window.find("gallery.containers.dock.content.toolbox") &&
                 !window.find("gallery.containers.dock.content.form.cs"),
