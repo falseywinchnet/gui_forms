@@ -35,6 +35,7 @@ public:
         build_container(body);
         build_ribbon(body);
         build_gallery(body);
+        build_scaling_ribbons(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -305,8 +306,8 @@ private:
     }
 
     // A RibbonGallery in the ribbon form, a drop-down gallery under a button,
-    // and the gallery value command they share, standalone until the ribbon
-    // (phase 1) can host them.
+    // and the gallery value command they share, standalone (the scaling
+    // specimens below host the same command's galleries in a Ribbon).
     void build_gallery(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> gallery_group = group(
             "gallery.commands.gallery", "RibbonGallery · value command, live preview, more button, drop-down form",
@@ -351,6 +352,82 @@ private:
         on((*styles_).preview_requested(), *this, &CommandsAndMenusPage::on_style_preview);
         on((*styles_).preview_cancelled(), *this, &CommandsAndMenusPage::on_style_cancel);
         on((*styles_).value_changed(), *this, &CommandsAndMenusPage::on_style_value);
+    }
+
+    // The Home tab of the scaling specimens: Document (two large commands
+    // and two small), Styles (an in-ribbon gallery of 2 to 5 columns, sharing
+    // the styles value command, beside a large button), View (two small
+    // commands and a hosted combo box) and Run (a single large split, which
+    // never collapses).
+    [[nodiscard]] std::vector<RibbonTabSpec> scaling_tabs(const std::string& prefix,
+                                                         const std::shared_ptr<RibbonGallery>& gallery) const {
+        RibbonTabSpec home{.stable_id = prefix + ".home", .text = "&Home"};
+        RibbonGroupSpec document{.stable_id = prefix + ".document", .caption = "Document", .dialog_launcher = true};
+        document.commands.push_back({.stable_id = prefix + ".new", .command = new_});
+        document.commands.push_back({.stable_id = prefix + ".save", .kind = RibbonCommandKind::split,
+                                     .command = save_, .drop_down = export_items(prefix + ".save.export")});
+        document.commands.push_back({.stable_id = prefix + ".delete", .size = RibbonCommandSize::small,
+                                     .command = delete_});
+        document.commands.push_back({.stable_id = prefix + ".wrap", .kind = RibbonCommandKind::toggle,
+                                     .size = RibbonCommandSize::small, .command = wrap_command_});
+        RibbonGroupSpec styles{.stable_id = prefix + ".styles", .caption = "Styles"};
+        styles.commands.push_back({.stable_id = prefix + ".gallery", .kind = RibbonCommandKind::gallery,
+                                   .text = "Styles", .gallery = gallery});
+        styles.commands.push_back({.stable_id = prefix + ".about", .command = about_});
+        RibbonGroupSpec view{.stable_id = prefix + ".view", .caption = "View"};
+        view.commands.push_back({.stable_id = prefix + ".icons", .size = RibbonCommandSize::small, .command = icons_});
+        view.commands.push_back({.stable_id = prefix + ".details", .size = RibbonCommandSize::small,
+                                 .command = details_});
+        view.commands.push_back({.stable_id = prefix + ".zoom", .kind = RibbonCommandKind::combo_box,
+                                 .text = "Zoom", .choices = {"50%", "100%", "200%"}, .width = 80.0});
+        RibbonGroupSpec run{.stable_id = prefix + ".run-group", .caption = "Run"};
+        run.commands.push_back({.stable_id = prefix + ".run", .kind = RibbonCommandKind::split, .command = run_,
+                                .drop_down = {item(prefix + ".run.verbose", run_options_[0]),
+                                              item(prefix + ".run.watch", run_options_[1])}});
+        home.groups.push_back(std::move(document));
+        home.groups.push_back(std::move(styles));
+        home.groups.push_back(std::move(view));
+        home.groups.push_back(std::move(run));
+        std::vector<RibbonTabSpec> tabs;
+        tabs.push_back(std::move(home));
+        return tabs;
+    }
+
+    [[nodiscard]] std::shared_ptr<RibbonGallery> scaling_gallery(const std::string& id) const {
+        std::shared_ptr<RibbonGallery> gallery = make_control<RibbonGallery>(StableId(id));
+        (*gallery).set_accessible_name("Styles");
+        (*gallery).set_item_size({56.0, 26.0});
+        (*gallery).set_show_labels(true);
+        (*gallery).set_visible_rows(1U);
+        (*gallery).set_column_range(2U, 5U);
+        (*gallery).set_columns(5U);
+        std::vector<RibbonGalleryItem> items;
+        const std::array<const char*, 6> names{"Title", "Heading", "Normal", "Compact", "Quote", "Strong"};
+        for (const char* name : names) items.push_back({std::string("style.") + name, name, {}, {}});
+        (*gallery).set_items({}, std::move(items));
+        (*gallery).set_command(styles_);
+        return gallery;
+    }
+
+    // Two Ribbons of the same tab at two widths (stage RB, phase 2b): the
+    // wider shows the ladder entry that fits (groups shrunk by the default
+    // cycle, the gallery giving up columns, collapsed groups as buttons that
+    // open the group in a popup); the narrower is below its narrowest entry
+    // and scrolls by whole groups.
+    void build_scaling_ribbons(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> scaling_group = group(
+            "gallery.commands.ribbon-scaling", "Ribbon · phase 2b: the same tab at 560 and 300 units wide",
+            {930.0, 160.0});
+        (*body).add_at(scaling_group, {24.0, 1402.0, 930.0, 160.0});
+        std::shared_ptr<Ribbon> wide = make_control<Ribbon>(StableId("gallery.commands.ribbon-scaling.wide"));
+        (*wide).set_accessible_name("Ribbon at 560 units");
+        (*wide).set_tabs(scaling_tabs("scaling.wide", scaling_gallery("gallery.commands.ribbon-scaling.styles-wide")));
+        (*scaling_group).add_at(wide, {22.0, 36.0, 560.0, 112.0});
+        std::shared_ptr<Ribbon> narrow = make_control<Ribbon>(StableId("gallery.commands.ribbon-scaling.narrow"));
+        (*narrow).set_accessible_name("Ribbon at 300 units");
+        (*narrow).set_tabs(
+            scaling_tabs("scaling.narrow", scaling_gallery("gallery.commands.ribbon-scaling.styles-narrow")));
+        (*scaling_group).add_at(narrow, {602.0, 36.0, 300.0, 112.0});
     }
 
     void on_styles_button(ButtonBase&) {

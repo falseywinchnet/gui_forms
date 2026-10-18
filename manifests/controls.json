@@ -727,7 +727,7 @@
       "type": "Ribbon",
       "header": "gui_forms/controls/ribbon/ribbon.hpp",
       "category": "Menus and commands",
-      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors, and minimizing by a click on the selected tab.",
+      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors and galleries, adaptive scaling by group layouts and a reduction order (collapsed groups open in a popup, scrolling below the narrowest layout), the document-area hide rule, and minimizing by a click on the selected tab.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "commands-and-menus",

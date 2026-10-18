@@ -2118,6 +2118,10 @@ Properties beyond every control's: none.
 | `application_button` | face | `button` | hot, pressed, open, focus_visible |
 | `application_label` | label |  | hot, pressed, open, focus_visible |
 | `command_plane` | face |  |  |
+| `scroll_left` | actuator | `button` | hot, pressed |
+| `scroll_left_glyph` | glyph |  | hot, pressed |
+| `scroll_right` | actuator | `button` | hot, pressed |
+| `scroll_right_glyph` | glyph |  | hot, pressed |
 | `focus` | focus |  |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
@@ -2142,6 +2146,11 @@ Item system `group`:
 | `group_launcher` | actuator | `button` | hot, pressed, focus_visible |
 | `group_launcher_glyph` | glyph |  | hot, pressed, focus_visible |
 | `group_launcher_focus` | focus |  | hot, pressed, focus_visible |
+| `group_button` | face | `button` | hot, pressed, open, focus_visible |
+| `group_button_icon` | icon |  | hot, pressed, open, focus_visible |
+| `group_button_label` | label |  | hot, pressed, open, focus_visible |
+| `group_button_glyph` | glyph |  | hot, pressed, open, focus_visible |
+| `group_button_focus` | focus |  | hot, pressed, open, focus_visible |
 
 Item states: none.
 
@@ -2159,6 +2168,7 @@ Item system `command`:
 | `command_numeric_up_down` | well | `numeric_up_down` |  |
 | `command_check_box` | indicator | `check_box` |  |
 | `command_text_box` | well | `text_box` |  |
+| `command_gallery` | well | `ribbon_gallery` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 

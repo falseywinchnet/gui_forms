@@ -1,14 +1,17 @@
 A ribbon: the File tab and core tabs over a command plane of groups.
 
-A ribbon (stage RB, phase 1) shows a tab row that is always visible (the File
-tab, then the core tabs) over the command plane of the selected tab. The plane
-holds groups side by side, each with its commands, a caption beneath and,
-when authored, a dialog launcher in the caption's corner. Commands are
-`RibbonCommandSpec` records bound to shared `Command` objects: buttons,
-toggles, split buttons and drop-down buttons at a large or small authored
-size, and hosted combo boxes, numeric spinners, check boxes and text boxes,
-which are real child controls the ribbon places. Every part is painted
-through the by-role paint path.
+A ribbon (stage RB, phases 1 and 2b) shows a tab row that is always visible
+(the File tab, then the core tabs) over the command plane of the selected
+tab. The plane holds groups side by side, each with its commands, a caption
+beneath and, when authored, a dialog launcher in the caption's corner.
+Commands are `RibbonCommandSpec` records bound to shared `Command` objects:
+buttons, toggles, split buttons and drop-down buttons at a large or small
+size, hosted combo boxes, numeric spinners, check boxes and text boxes, and
+in-ribbon `RibbonGallery` controls, which are real child controls the ribbon
+places. As the ribbon narrows its groups shrink through their layouts in the
+tab's reduction order, down to collapsed group buttons that open the group in
+a popup, and below the narrowest layout the plane scrolls. Every part is
+painted through the by-role paint path.
 
 Parameters
 ----------
@@ -28,12 +31,42 @@ tabs
     split without a `Command`, a menu on a kind that has none or a split or
     drop-down without one, an icon-only command that is not small or has no
     image, choices on a command that is not a combo box, a width outside 0
-    to 1024, an invalid menu, or more than the development bounds.
+    to 1024, an invalid menu, a gallery command without an in-ribbon gallery
+    (or with one used twice or owned elsewhere), two galleries in a group, an
+    invalid layout (a collapsed layout that is not last or in a group of one
+    command, sizes that grow, a size count other than the command count, rows
+    outside 1 to 3, an icon-only command made large), a reduction step naming
+    a group not on its tab or shrinking a group past its last layout or its
+    gallery past its minimum (owner decision 29), or more than the
+    development bounds. A refused definition leaves the previous tabs.
 selected_tab
     The selected tab, or none without tabs. `set_selected_tab` throws
     `std::out_of_range` for a tab past the end.
 minimized : default ``false``
     Whether the command plane is hidden, leaving the tab row.
+document_minimum_height : default ``0``
+    The minimum height, in logical units, the document area under the ribbon
+    declares (owner decision 34); zero declares none.
+    `set_document_minimum_height` throws `std::invalid_argument` for a
+    negative or non-finite height.
+plane_hidden
+    Whether the document-area rule hides the command plane now.
+ladder_step
+    The selected tab's ladder entry the plane shows, or none while it is
+    hidden or minimized.
+scrolling
+    Whether even the narrowest entry is wider than the plane, so that the
+    plane scrolls.
+first_visible_group
+    The first group shown while the plane scrolls.
+scaling_counters
+    `RibbonScalingCounters`: ladders built, the last ladder's entries and
+    folded steps, ladder lookups and the ribbon's own text measurements.
+popup_group
+    The ID of the group whose popup is open, or none.
+group_popup
+    The popup's content control (null before the first popup); the popup's
+    parts are in its local coordinates.
 application_text : default ``"File"``
     The File tab's text, with an optional mnemonic.
 application_menu
@@ -52,6 +85,10 @@ realized_groups
     The selected tab's groups and their parts.
 realized_commands
     The selected tab's commands, their parts and states.
+realized_popup_groups
+    The open popup's group and its parts, or nothing.
+realized_popup_commands
+    The open popup's commands, their parts and states.
 
 Events
 ------
@@ -79,6 +116,19 @@ show_drop_down
     another kind, a disabled command or one not on the selected tab.
 close_menus
     Closes any open menu.
+show_group_popup
+    Opens a collapsed group of the selected tab in a popup below the ribbon at
+    its largest layout; its hosted controls move into the popup while it is
+    open. Returns false for a group that is not collapsed or not on the
+    selected tab, or without a window.
+close_group_popup
+    Closes the group popup; focus returns to the group's button.
+group_layouts
+    A group's layouts, largest first: as authored, or generated. Throws
+    `std::out_of_range` for a tab or group past the end.
+reduction_ladder
+    A tab's `RibbonLadderEntry` list from the widest to the narrowest, built
+    if needed. Throws `std::out_of_range` for a tab past the end.
 combo_box
     The `ComboBox` a combo box command holds. `numeric_up_down`, `check_box`
     and `text_box` return the other hosted controls. Each throws
@@ -102,19 +152,60 @@ height; small and hosted commands take one of three rows, stacked in
 columns. Labels are shown at every size (decision 6); a small command with an
 image may be authored icon-only (decision 30). A large split's face is its
 icon, and its arrow is the label and glyph beneath; a small split's arrow is
-the zone at its right end. Every group is shown at its largest size: groups
-past the right edge are clipped until scaling arrives in phase 2.
+the zone at its right end.
+
+Scaling (the WPF/MFC model, owner decision 5). Each group has layouts
+(`RibbonGroupLayout`: a size, large, medium, small or collapsed, the image
+size of each command and the small commands per column, 1 to 3). A group
+that authors none gets generated layouts: its commands' own sizes, then, one
+layout per step, the rightmost run of up to three large commands made small,
+then collapsed, except a group of one command, which never shrinks. Labels
+never drop (decision 6). A tab's reduction ladder starts with every group at
+its largest layout and its gallery at its most columns; each step shrinks one
+group, first in the tab's authored `reduction_order`, then by WPF's cycle
+(decision 32): from the rightmost group leftwards, one step per group,
+wrapping, where a group with a gallery above its minimum gives up one column
+(decision 8) before it changes layout. A step that does not narrow the tab is
+folded into the next entry, so widths strictly decrease. The plane shows the
+widest entry no wider than itself. Below the narrowest entry it scrolls at
+any width (decision 35): scroll buttons at the ends move by one group, a
+group that does not fit whole before the right button is not shown (the
+first is clipped), and the keyboard's stop scrolls its group into view.
+
+A collapsed group is one button the plane's height with the group's icon
+(`RibbonGroupSpec::image`, else its first command image), its caption and a
+chevron (decision 27). Pressing it, Enter, Space or Down opens the group at
+its largest layout in a popup below the ribbon, casting the overlay shadow; a
+command run there, its launcher, a press elsewhere or Escape closes it, and it
+closes when the group grows back. In the popup the arrows and Tab move
+through its commands.
+
+The hide rule (decisions 28, 34 to 36). The height the ribbon's parent offers
+it holds the ribbon and the document area beneath. The command plane, never
+the tab row, hides when that area (with the plane shown) would be shorter
+than `document_minimum_height`, or below zero when none is declared; a hidden
+plane shows again once the area is at least the minimum plus
+`Ribbon::hide_hysteresis` (8 units). Width never hides it.
+
+Measured widths (labels, captions, tabs, galleries) are cached per tab and
+rebuilt only when the tabs, a command's text or visibility, the font, the
+text scale, the theme, the text provider or a gallery's column range or item
+size change; a resize only looks up the ladder.
 
 The ribbon publishes ``region``, ``tab_rail``, ``application_button``,
-``application_label``, ``command_plane`` and ``focus``, and three item
-systems: ``tab`` (``tab``, ``tab_label``, ``tab_focus``; hot, selected,
-focus_visible), ``group`` (``group_region``, ``group_caption``,
-``group_divider``, ``group_launcher``, ``group_launcher_glyph``,
-``group_launcher_focus``) and ``command`` (``command_face``,
-``command_icon``, ``command_label``, ``command_arrow``,
+``application_label``, ``command_plane``, ``scroll_left``,
+``scroll_left_glyph``, ``scroll_right``, ``scroll_right_glyph`` and
+``focus``, and three item systems: ``tab`` (``tab``, ``tab_label``,
+``tab_focus``; hot, selected, focus_visible), ``group`` (``group_region``,
+``group_caption``, ``group_divider``, ``group_launcher``,
+``group_launcher_glyph``, ``group_launcher_focus`` and the collapsed
+``group_button``, ``group_button_icon``, ``group_button_label``,
+``group_button_glyph``, ``group_button_focus``) and ``command``
+(``command_face``, ``command_icon``, ``command_label``, ``command_arrow``,
 ``command_arrow_glyph``, ``command_focus`` and the hosted
-``command_combo_box``, ``command_numeric_up_down``, ``command_check_box`` and
-``command_text_box``; hot, pressed, checked, open, disabled, focus_visible).
+``command_combo_box``, ``command_numeric_up_down``, ``command_check_box``,
+``command_text_box`` and ``command_gallery``; hot, pressed, checked, open,
+disabled, focus_visible).
 Until the default theme (T4), command faces use the menu-item family (flat
 at rest), the plane and tab row the panel family and the File tab the
 accent-button family. A command whose enabled or checked state changes
@@ -136,16 +227,20 @@ To accessibility the ribbon is a group holding the File tab (a
 and, while shown, the command plane (a group named after the selected tab)
 with its groups, named by caption, and their commands: `button`,
 `split_button` or `menu_button`, with positions in their group and
-has-popup, and each launcher as a button. Hosted controls describe
-themselves as children of the ribbon.
+has-popup, and each launcher as a button. A collapsed group is a
+`menu_button` with a popup (expanded while open), and the scroll buttons are
+buttons. Hosted controls describe themselves as children of the ribbon, or
+of the popup while it is open.
 
-Not yet: contextual tabs, adaptive scaling, galleries, the Quick Access
-Toolbar, the minimized popup, enhanced tooltips, Backstage and the
-application menu's recent-items pane (the File tab opens a `ContextMenu`).
+Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
+Backstage, the application menu's recent-items pane (the File tab opens a
+`ContextMenu`), right-to-left mirroring of the cycle, two-line large labels
+and ellipsized tab labels (decision 30 allows them; tabs past the row's end
+are clipped).
 
 Examples
 --------
-A ribbon with one tab and one group:
+A ribbon with one tab and one group that collapses first as it narrows:
 
 .. code-block:: cpp
 
@@ -153,6 +248,10 @@ A ribbon with one tab and one group:
    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("main.ribbon"));
    gf::RibbonGroupSpec clipboard{.stable_id = "clipboard", .caption = "Clipboard", .dialog_launcher = true};
    clipboard.commands.push_back({.stable_id = "paste", .command = paste});
+   clipboard.commands.push_back({.stable_id = "copy", .size = gf::RibbonCommandSize::small, .command = paste});
+   clipboard.layouts = {{.size = gf::RibbonGroupSize::large}, {.size = gf::RibbonGroupSize::collapsed}};
    gf::RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
    home.groups.push_back(std::move(clipboard));
+   home.reduction_order = {{.group = "clipboard"}};
    (*ribbon).set_tabs({std::move(home)});
+   (*ribbon).set_document_minimum_height(120.0);
