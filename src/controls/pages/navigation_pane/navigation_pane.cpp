@@ -239,7 +239,7 @@ NavigationPane::NavigationPane(StableId stable_id) : Control(std::move(stable_id
     set_paint_plane(PaintPlane::control);
     // The pane sizes itself: its width follows collapsing (measure).
     set_auto_size(true);
-    const std::string prefix(this->stable_id().value());
+    const std::string prefix((*this).stable_id().value());
     menu_ = std::make_unique<ContextMenu>(prefix + ".menu");
     menu_invoked_ = (*menu_).item_invoked().subscribe(
         *this, Delegate<const MenuItemInvocation&>::bind<NavigationPane, &NavigationPane::on_menu_item_invoked>(*this));
@@ -534,7 +534,7 @@ void NavigationPane::on_pages_changed(const PageSetChange& change) {
         hidden_ = std::move(kept);
     }
     if (change.membership || change.content) refresh_content();
-    if (change.records) (*host_).set_panel_name(selected_text());
+    if (change.records && host_) (*host_).set_panel_name(selected_text());
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     if ((change.membership || change.order) && !applying_state_) notify_state();
 }

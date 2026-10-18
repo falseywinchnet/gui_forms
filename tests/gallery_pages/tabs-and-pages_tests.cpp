@@ -67,6 +67,25 @@ void test_tabs_and_pages(gui_forms::Window& window) {
                 (*(*view).page_content(PageId{"view.report"})).effectively_visible() &&
                 (*view_status).text().find("Created view.report") != std::string::npos,
             "selecting a late page in the gallery's PageView creates and shows its content");
+
+    std::shared_ptr<gui_forms::NavigationPane> navigation = std::dynamic_pointer_cast<NavigationPane>(
+        window.find("gallery.tabs.navigation"));
+    std::shared_ptr<gui_forms::Label> navigation_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.tabs.navigation.status"));
+    require(navigation && navigation_status && (*navigation).pages().count() == 6U &&
+                (*navigation).page_hidden(PageId{"notes"}) && (*navigation).visible_button_count() == 4U,
+            "the gallery's NavigationPane shows four large buttons and hides Notes");
+    require(window.perform_semantic_action("gallery.tabs.navigation.tab.contacts", SemanticAction::select) &&
+                (*(*navigation).pages().selected_page()).value == "contacts" &&
+                (*window.find("gallery.tabs.navigation.content.contacts")).effectively_visible(),
+            "selecting a navigation page shows its control");
+    require(window.perform_semantic_action("gallery.tabs.navigation.collapse", SemanticAction::press) &&
+                (*navigation).collapsed() &&
+                (*navigation_status).text().find("Collapsed") != std::string::npos,
+            "collapsing the gallery's NavigationPane reports its state");
+    require(window.perform_semantic_action("gallery.tabs.navigation.collapse", SemanticAction::press) &&
+                !(*navigation).collapsed(),
+            "and it expands again");
 }
 
 } // namespace gallery_pages_tests

@@ -33,6 +33,8 @@ Panels, group boxes, cards, tabs and expandable sections.
      - The tab headers of a page set in one row, at the top or the bottom of their content.
    * - :cpp:class:`PageView <gui_forms::PageView>`
      - A row of tabs over the selected page's content: the strip preset of the page view family.
+   * - :cpp:class:`NavigationPane <gui_forms::NavigationPane>`
+     - An Outlook-style navigation pane: the selected page's content above a stack of large page buttons.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
      - One page of a tab control, with the caption shown on its tab.
 
@@ -50,6 +52,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    generated/gui_forms.TabControl
    generated/gui_forms.PageStrip
    generated/gui_forms.PageView
+   generated/gui_forms.NavigationPane
    generated/gui_forms.TabPage
 
 Related types
@@ -65,6 +68,22 @@ Related types
      - CardLayout defines validated logical padding, section gaps, and footer/header allocation used by Card measurement and arrangement.
    * - :cpp:class:`GroupBox::Parts <gui_forms::GroupBox::Parts>`
      - Stage T1 anatomy, as dot members: a face, the frame and the caption.
+   * - :cpp:class:`NavigationPane::Item <gui_forms::NavigationPane::Item>`
+     -  
+   * - :cpp:class:`NavigationPane::ItemStates <gui_forms::NavigationPane::ItemStates>`
+     -  
+   * - :cpp:class:`NavigationPane::PageButtonParts <gui_forms::NavigationPane::PageButtonParts>`
+     - Item system nav_page: a large button.
+   * - :cpp:class:`NavigationPane::PageIconParts <gui_forms::NavigationPane::PageIconParts>`
+     - Item system nav_overflow: an icon.
+   * - :cpp:class:`NavigationPane::Parts <gui_forms::NavigationPane::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`NavigationPaneOptionsRequest <gui_forms::NavigationPaneOptionsRequest>`
+     - "Navigation pane options..." was chosen from the configure menu.
+   * - :cpp:class:`NavigationPaneRestore <gui_forms::NavigationPaneRestore>`
+     - What applying a saved state found: identities the pane's set does not hold (a page the program no longer adds), which were skipped.
+   * - :cpp:class:`NavigationPaneState <gui_forms::NavigationPaneState>`
+     - The part of a navigation pane's state a program saves with its settings (owner decision DK-33: the framework never saves on its own).
    * - :cpp:class:`PageCloseRequest <gui_forms::PageCloseRequest>`
      - A request to close a closable page.
    * - :cpp:class:`PageContentRequest <gui_forms::PageContentRequest>`
@@ -163,6 +182,158 @@ Related types
    .. cpp:member:: PartGeometry edge
 
    .. cpp:member:: PartGeometry caption
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::Item final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   .. cpp:member:: NavigationPaneItemKind kind
+
+      Default: ``{NavigationPaneItemKind::large_button}``.
+
+   .. cpp:member:: PagePosition position
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: PageButtonParts button
+
+      The parts of the item's own system; the other record is absent.
+
+   .. cpp:member:: PageIconParts icon
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::ItemStates final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::PageButtonParts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Item system nav_page: a large button.
+
+   .. cpp:member:: PartGeometry nav_page_face
+
+   .. cpp:member:: PartGeometry nav_page_icon
+
+   .. cpp:member:: PartGeometry nav_page_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::PageIconParts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Item system nav_overflow: an icon. A page without an image shows the first character of its title in nav_overflow_label instead.
+
+   .. cpp:member:: PartGeometry nav_overflow_face
+
+   .. cpp:member:: PartGeometry nav_overflow_icon
+
+   .. cpp:member:: PartGeometry nav_overflow_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::Parts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's. The popup parts are in the pane's coordinates although the popup lies outside it, and are present only while it is open.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry header_icon
+
+   .. cpp:member:: PartGeometry header_label
+
+   .. cpp:member:: PartGeometry collapse_button
+
+   .. cpp:member:: PartGeometry collapse_glyph
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry grip_bar
+
+   .. cpp:member:: PartGeometry grip
+
+   .. cpp:member:: PartGeometry button_area
+
+   .. cpp:member:: PartGeometry overflow_area
+
+   .. cpp:member:: PartGeometry configure_button
+
+   .. cpp:member:: PartGeometry configure_glyph
+
+   .. cpp:member:: PartGeometry collapsed_bar
+
+   .. cpp:member:: PartGeometry collapsed_label
+
+   .. cpp:member:: PartGeometry popup_shadow
+
+   .. cpp:member:: PartGeometry popup_face
+
+   .. cpp:member:: PartGeometry popup_header
+
+   .. cpp:member:: PartGeometry popup_label
+
+   .. cpp:member:: PartGeometry popup_content
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneOptionsRequest final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   "Navigation pane options..." was chosen from the configure menu. The pane has no options dialog of its own (owner decision DK-39, question P30); the program shows its own.
+
+   .. cpp:member:: std::string pane_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneRestore final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   What applying a saved state found: identities the pane's set does not hold (a page the program no longer adds), which were skipped.
+
+   .. cpp:member:: std::size_t unknown_pages
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneState final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   The part of a navigation pane's state a program saves with its settings (owner decision DK-33: the framework never saves on its own). Pages are named by identity; ``page_order`` is the pane's page order and ``hidden_pages`` the pages the user hid from the buttons, in page order. ``button_count`` is the number of large buttons the user chose, which the pane shows as far as its height allows.
+
+   .. cpp:member:: bool collapsed
+
+   .. cpp:member:: std::size_t button_count
+
+   .. cpp:member:: std::vector<PageId> hidden_pages
+
+   .. cpp:member:: std::vector<PageId> page_order
 
 .. cpp:namespace:: gui_forms
 
@@ -458,6 +629,16 @@ Enumerations
    .. cpp:enumerator:: select_on_activation
 
    .. cpp:enumerator:: toggle_on_activation
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: NavigationPaneItemKind
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   .. cpp:enumerator:: large_button
+
+   .. cpp:enumerator:: icon
 
 .. cpp:namespace:: gui_forms
 

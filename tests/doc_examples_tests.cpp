@@ -1834,6 +1834,29 @@ void example() {
 }
 }  // namespace doc_example_MonthCalendar_1
 
+namespace doc_example_NavigationPane_1 {
+void example() {
+    std::shared_ptr<gf::NavigationPane> pane =
+        gf::make_control<gf::NavigationPane>(gf::StableId("areas"));
+    constexpr std::array<std::string_view, 3> areas{"mail", "calendar", "contacts"};
+    for (const std::string_view area : areas) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{std::string(area)};
+        record.title = std::string(area);
+        static_cast<void>((*pane).pages().insert(record, gf::PagePlacement::end_of_group()));
+        std::unique_ptr<gf::PageContent> content = std::make_unique<gf::PageControlContent>(
+            gf::make_control<gf::Label>(gf::StableId(std::string(area) + ".view"), std::string(area)));
+        static_cast<void>((*pane).pages().set_content(record.id, content));
+    }
+    gf::NavigationPaneState saved{};
+    saved.button_count = 2U;
+    saved.page_order = {gf::PageId{"calendar"}, gf::PageId{"mail"}, gf::PageId{"contacts"}};
+    const gf::NavigationPaneRestore restored = (*pane).apply_state(saved);
+    // Calendar now comes first; nothing in the saved state was unknown.
+    static_cast<void>(restored.unknown_pages);
+}
+}  // namespace doc_example_NavigationPane_1
+
 namespace doc_example_NotifyIcon_1 {
 void example() {
     std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
@@ -3540,6 +3563,7 @@ int main() {
     failures += run("MetricsView example 1", &doc_example_MetricsView_1::example);
     failures += run("MetricsView example 2", &doc_example_MetricsView_2::example);
     failures += run("MonthCalendar example 1", &doc_example_MonthCalendar_1::example);
+    failures += run("NavigationPane example 1", &doc_example_NavigationPane_1::example);
     failures += run("NotifyIcon example 1", &doc_example_NotifyIcon_1::example);
     failures += run("NumericUpDown example 1", &doc_example_NumericUpDown_1::example);
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
