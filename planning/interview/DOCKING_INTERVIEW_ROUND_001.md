@@ -324,3 +324,24 @@ verbatim:
 - **GIVEN G6-1.** Applications may rebind docking keys; they are commands.
 - **GIVEN G7-1.** A "maximize the document area" command hides and restores
   all tool panels, default Ctrl+Shift+F12.
+
+## Part 9. Documents, 2026-10-17
+
+Asked as H1 to H4, each with its recommendation marked (H1-1 with H1-2 as
+an application option; H2-1; H3-2, which also answers PageView P19 and
+differs from the docking study's own H3 recommendation; H4-3, which also
+answers PageView P11). The owner, verbatim:
+
+> accepted.
+
+- **GIVEN H1-1.** A cancellable, possibly asynchronous `closing` event per
+  document; close-all asks in sequence and stops at the first cancel. An
+  application may choose one combined prompt listing every dirty document
+  instead (H1-2).
+- **GIVEN H2-1.** The framework keeps most-recently-activated history (for
+  the navigator and for activation after a close); back and forward inside
+  documents is the application's.
+- **GIVEN H3-2 (and P19).** Pinned tabs are a `PageStrip` capability an
+  application switches on; no preview tab.
+- **GIVEN H4-3 (and P11).** Document tabs shrink first, then overflow into
+  a menu listing every document.

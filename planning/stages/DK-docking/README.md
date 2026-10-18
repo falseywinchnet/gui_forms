@@ -145,6 +145,11 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     keyboard move mode over the same targets as the pointer; host keymap
     defaults; rebindable commands; Ctrl+Shift+F12 maximizes the document
     area.
+31. **Documents (H1-1 to H4-3):** a cancellable, possibly asynchronous
+    `closing` per document, sequential close-all (a combined prompt as an
+    application option); activation history kept by the framework;
+    pinned tabs as an opt-in `PageStrip` capability, no preview tab (also
+    P19); tabs shrink, then overflow to a menu (also P11).
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
