@@ -34,7 +34,9 @@ pages
     The view's set: add, remove, move, select, take and put pages through it.
 strip
     The child strip that shows the tabs; its placement, sizing, activation,
-    overflow, close buttons and mnemonics are set on it.
+    overflow, close buttons and mnemonics are set on it. Hiding it (as a
+    docking tool stack with one panel does) gives the whole view to the
+    content.
 preset
     ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
     The document preset sets the strip's close buttons to
