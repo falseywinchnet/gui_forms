@@ -226,7 +226,7 @@ private:
     [[nodiscard]] DockTransactionResult run(const DockTransaction& transaction,
                                             DockLayoutState& scratch) const;
     void commit(DockLayoutState&& replacement, DockEditOrigin origin, std::size_t edit_count,
-                bool restored);
+                bool restored, bool frames_only);
 
     DockLayoutState state_{};
     std::vector<DockPanelDescriptor> descriptors_{};

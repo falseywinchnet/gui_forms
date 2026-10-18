@@ -24,6 +24,14 @@ client_size
 image_limits
     Quotas for the window's image registry. The two-argument constructor
     uses the default quotas.
+resources
+    An `ApplicationResources` to share with other windows: one image
+    registry and one theme for all of them, so an `ImageId`, an `ImageList`
+    and the theme hold in each and a control subtree moved between them
+    keeps its images. The window takes the resources' current theme. Null
+    resources throw `std::invalid_argument`; resources made on another
+    thread throw `std::logic_error`. The other constructors make resources
+    of the window's own.
 
 Properties
 ----------
@@ -50,8 +58,13 @@ presentation_settings
     `presentation_changed`.
 theme
     The theme every control inherits unless it has its own override.
-    Setting it raises `theme_changed`; a null theme throws
+    Setting it sets the theme of every window sharing this window's
+    `resources` and raises `theme_changed` in each; a null theme throws
     `std::invalid_argument`.
+resources
+    The `ApplicationResources` this window uses, its own unless it was
+    constructed with shared ones. Pass it to another window's constructor to
+    share the image registry and the theme with that window.
 active : default ``true``
     Whether the window is the active top-level window. Controls paint their
     inactive state when it is false. Setting it raises `active_changed`.
@@ -205,6 +218,20 @@ dispatch_pointer
 dispatch_key
     Delivers a key event and returns whether anything handled it: the
     focused control, an accelerator, a dialog key or Tab traversal.
+snapshot_control
+    A picture of a control and its descendants as last laid out: their
+    retained painting is replayed, every paint plane in order, into an
+    offscreen framebuffer of the host's own CPU raster at the given scale,
+    and the pixels are registered as one of the window's images
+    (premultiplied BGRA). Areas the subtree does not paint stay
+    transparent. Returns the image, its logical size, scale and pixel size,
+    or none without a framebuffer painter (headless windows), during a
+    paint, for a control of another window or not shown, or a scale outside
+    (0, 8]. It costs one replay of the subtree and one copy of its pixels;
+    the image lives until `release_control_snapshot` or the window's end.
+    The docking drag's stamp uses it.
+release_control_snapshot
+    Removes a snapshot's image; false when it is not there.
 dispatch_text
     Delivers text input to the focused control and returns whether it was
     handled.
@@ -244,6 +271,11 @@ register_accelerator
     after the focused control declines a key, unless
     `AcceleratorOptions::before_focused_route` is set. The returned token,
     or disposing the owner, removes it.
+offer_accelerators
+    Offers a key press to the accelerators that wait for the focused route,
+    as a key the window's own route declined; true when one took it. A
+    floating docking window passes the keys it did not use to its main
+    window this way (stage DK phase D4), so shortcuts work from it.
 set_command_target
     Names the `CommandTarget` of one stage of the command routing chain:
     the active panel, the active document or the main window, or clears it

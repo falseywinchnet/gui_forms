@@ -190,11 +190,19 @@ Related types
 
    .. cpp:member:: std::optional<DockDropTarget> target
 
-      The target dropped on, for ``dropped``.
+      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
 
    .. cpp:member:: DockTransactionResult result
 
-      The layout transaction's result, for ``dropped``.
+      The layout transaction's result, for ``dropped`` and ``floated``.
+
+   .. cpp:member:: bool across_windows
+
+      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:member:: Rect frame
+
+      For ``floated``: the new floating window's client area, in desktop logical units.
 
 .. cpp:namespace:: gui_forms
 
@@ -319,6 +327,10 @@ Related types
       The drag layer (present only while dragging or settling): the stamp, its label, the tinted area the subject would take (drop_accepted) and the cue at the pointer where nothing accepts a drop (drop_rejected).
 
    .. cpp:member:: PartGeometry drag_stamp_label
+
+   .. cpp:member:: PartGeometry drag_stamp_image
+
+      The panel's picture in the stamp, below its label, while the window can snapshot it (Window::snapshot_control); absent where it cannot, the content well standing in.
 
    .. cpp:member:: PartGeometry drop_area
 
@@ -849,6 +861,8 @@ Enumerations
    .. cpp:enumerator:: layout_changed
 
    .. cpp:enumerator:: rejected
+
+   .. cpp:enumerator:: floated
 
 .. cpp:namespace:: gui_forms
 

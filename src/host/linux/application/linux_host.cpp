@@ -48,6 +48,26 @@ struct WindowTitle final {
     } catch (...) { return {HostServiceError::backend_failure}; }
   }
 };
+// True when the window manager has minimized the window
+// (_NET_WM_STATE_HIDDEN).
+bool window_state_hidden(NativeWindow& window) {
+  Atom type{};
+  int format{};
+  unsigned long count{}, remaining{};
+  unsigned char* data = nullptr;
+  bool hidden = false;
+  if (XGetWindowProperty(window.runtime.display, window.xid, window.runtime.atom("_NET_WM_STATE"),
+                         0, 64, False, XA_ATOM, &type, &format, &count, &remaining,
+                         &data) == Success && type == XA_ATOM && format == 32) {
+    const Atom hidden_atom = window.runtime.atom("_NET_WM_STATE_HIDDEN");
+    const Atom* atoms = reinterpret_cast<const Atom*>(data);
+    for (unsigned long index = 0; index < count; ++index) {
+      if (atoms[index] == hidden_atom) hidden = true;
+    }
+  }
+  if (data != nullptr) XFree(data);
+  return hidden;
+}
 // True when the window manager holds the window full screen or maximized
 // (_NET_WM_STATE); a size request would fight it.
 bool window_state_fixed(NativeWindow& window) {
@@ -576,14 +596,38 @@ Atom Runtime::atom(const char *name) const {
   return XInternAtom(display, name, False);
 }
 std::shared_ptr<NativeWindow> Runtime::add(LinuxApplicationWindow entry,
-                                           ::Window owner) {
+                                           ::Window owner,
+                                           HostWindowId window_id,
+                                           bool initial) {
   const std::shared_ptr<NativeWindow> window =
       std::make_shared<NativeWindow>(*this, std::move(entry));
+  (*window).window_id = window_id;
+  (*window).initial = initial;
   windows.push_back(window);
   if (owner != 0)
     XSetTransientForHint(display, (*window).xid, owner);
   (*window).attach();
   return window;
+}
+void Runtime::report_activation() {
+  if (!windowing)
+    return;
+  bool any = false;
+  for (std::size_t i = 0; i < windows.size(); ++i)
+    if (!(*windows[i]).closed && (*windows[i]).focused)
+      any = true;
+  if (any)
+    ever_focused = true;
+  if (ever_focused)
+    (*windowing).report_application_active(any);
+}
+void Runtime::reclaim() {
+  for (std::size_t i = windows.size(); i > 0; --i) {
+    const NativeWindow &window = *windows[i - 1];
+    if (window.initial || !window.closed)
+      continue;
+    windows.erase(windows.begin() + static_cast<std::ptrdiff_t>(i - 1));
+  }
 }
 NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
     : runtime(host), entry(std::move(source)),
@@ -641,6 +685,20 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
   wm.flags = InputHint;
   wm.input = True;
   XSetWMHints(runtime.display, xid, &wm);
+  utility = entry.tool_window || entry.floating != HostWindowFloating::none;
+  if (utility) {
+    // Set while unmapped, so the window manager reads them when it first
+    // manages the window (EWMH: clients set _NET_WM_STATE directly before
+    // mapping).
+    const Atom type = runtime.atom("_NET_WM_WINDOW_TYPE_UTILITY");
+    XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_WINDOW_TYPE"),
+                    XA_ATOM, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char *>(&type), 1);
+    const Atom skip = runtime.atom("_NET_WM_STATE_SKIP_TASKBAR");
+    XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_STATE"),
+                    XA_ATOM, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char *>(&skip), 1);
+  }
   gc = XCreateGC(runtime.display, xid, 0, nullptr);
   if (runtime.input_method != nullptr)
     input = XCreateIC(runtime.input_method, XNInputStyle,
@@ -717,6 +775,14 @@ void NativeWindow::action(ActionKind kind) {
   }
   if (kind == ActionKind::show) {
     visible = true;
+    if (utility) {
+      // A window manager removes _NET_WM_STATE when a window is withdrawn;
+      // restate skip-taskbar before every map.
+      const Atom skip = runtime.atom("_NET_WM_STATE_SKIP_TASKBAR");
+      XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_STATE"),
+                      XA_ATOM, 32, PropModeReplace,
+                      reinterpret_cast<const unsigned char *>(&skip), 1);
+    }
     XMapRaised(runtime.display, xid);
     damage.add({0, 0, size.width, size.height});
   }
@@ -800,6 +866,8 @@ void NativeWindow::close(HostCloseReason reason, bool force) {
       return;
     if (entry.options.hide_on_close) {
       action(ActionKind::hide);
+      if (runtime.windowing)
+        (*runtime.windowing).report_hidden_on_close(window_id);
       return;
     }
   }
@@ -814,6 +882,10 @@ void NativeWindow::close(HostCloseReason reason, bool force) {
   if (entry.options.print_metrics_on_close)
     std::cout << "{\"window\":" << (*entry.model).metrics_snapshot().to_json()
               << ",\"host\":" << (*session).snapshot().to_json() << "}\n";
+  // Retired before the closed callback, so the callback may open a
+  // replacement under the same stable id.
+  if (runtime.windowing)
+    (*runtime.windowing).retire(window_id);
   if (entry.options.closed)
     entry.options.closed();
 }
@@ -835,6 +907,10 @@ void NativeWindow::event(XEvent &event) {
       static_cast<void>(dispatch(HostResizeEvent{size}));
       damage.add({0, 0, size.width, size.height});
     }
+    // Moves arrive here too: ICCCM 4.1.5 has a reparenting window manager
+    // send a synthetic ConfigureNotify when it moves the frame.
+    if (runtime.windowing)
+      (*runtime.windowing).report_native_frame(*this);
     return;
   }
   if (event.type == MapNotify || event.type == UnmapNotify) {
@@ -849,7 +925,19 @@ void NativeWindow::event(XEvent &event) {
     close(HostCloseReason::user);
     return;
   }
+  if (event.type == PropertyNotify &&
+      event.xproperty.atom == runtime.atom("_NET_WM_STATE")) {
+    // Minimized (iconified) windows carry _NET_WM_STATE_HIDDEN (EWMH).
+    if (runtime.windowing)
+      (*runtime.windowing)
+          .report_minimized(window_id, window_state_hidden(*this));
+    return;
+  }
   if (event.type == FocusIn || event.type == FocusOut) {
+    // Focus moved by a pointer or keyboard grab is not activation.
+    if (event.xfocus.mode == NotifyNormal ||
+        event.xfocus.mode == NotifyWhileGrabbed)
+      focused = event.type == FocusIn;
     if (event.type == FocusOut)
       pressed_keys.fill(false);
     if (input != nullptr) {
@@ -1305,6 +1393,68 @@ void Runtime::step(int maximum_wait) {
 HostDialogResult NativeWindow::dialog(const HostDialogRequest &request) {
   return retained_dialog(*this, request);
 }
+HostWindowFrame NativeWindow::frame() const {
+  HostWindowFrame result;
+  int x{}, y{};
+  ::Window child{};
+  if (!XTranslateCoordinates(runtime.display, xid,
+                             DefaultRootWindow(runtime.display), 0, 0, &x, &y,
+                             &child))
+    return result;
+  result.content = {static_cast<double>(x), static_cast<double>(y), size.width,
+                    size.height};
+  result.outer = result.content;
+  // _NET_FRAME_EXTENTS: left, right, top, bottom, in pixels (EWMH).
+  Atom type{};
+  int format{};
+  unsigned long count{}, remaining{};
+  unsigned char *data = nullptr;
+  if (XGetWindowProperty(runtime.display, xid,
+                         runtime.atom("_NET_FRAME_EXTENTS"), 0, 4, False,
+                         XA_CARDINAL, &type, &format, &count, &remaining,
+                         &data) == Success &&
+      type == XA_CARDINAL && format == 32 && count == 4 && data != nullptr) {
+    // Format-32 properties arrive as an array of long (Xlib).
+    const long *extents = reinterpret_cast<const long *>(data);
+    const double left = static_cast<double>(extents[0]);
+    const double right = static_cast<double>(extents[1]);
+    const double top = static_cast<double>(extents[2]);
+    const double bottom = static_cast<double>(extents[3]);
+    result.outer = {result.content.x - left, result.content.y - top,
+                    result.content.width + left + right,
+                    result.content.height + top + bottom};
+    result.outer_measured = true;
+  }
+  if (data != nullptr)
+    XFree(data);
+  return result;
+}
+HostServiceStatus NativeWindow::request_frame(Rect content) {
+  if (closed)
+    return {HostServiceError::after_shutdown};
+  if (content.width < entry.options.minimum_size.width ||
+      content.height < entry.options.minimum_size.height)
+    return {HostServiceError::invalid_argument};
+  if (fallback_fullscreen || window_state_fixed(*this))
+    return {HostServiceError::unsupported};
+  // Static gravity: the requested position is the client area's own, so
+  // the window manager places its frame around it (ICCCM 4.1.2.3).
+  XSizeHints hints{};
+  hints.flags = PMinSize | USPosition | USSize | PWinGravity;
+  hints.x = static_cast<int>(std::lround(content.x));
+  hints.y = static_cast<int>(std::lround(content.y));
+  hints.width = static_cast<int>(std::lround(content.width));
+  hints.height = static_cast<int>(std::lround(content.height));
+  hints.min_width = static_cast<int>(entry.options.minimum_size.width);
+  hints.min_height = static_cast<int>(entry.options.minimum_size.height);
+  hints.win_gravity = StaticGravity;
+  XSetWMNormalHints(runtime.display, xid, &hints);
+  XMoveResizeWindow(runtime.display, xid, hints.x, hints.y,
+                    static_cast<unsigned>(hints.width),
+                    static_cast<unsigned>(hints.height));
+  XFlush(runtime.display);
+  return {};
+}
 } // namespace gui_forms::host::linux_detail
 namespace gui_forms::host {
 HostCapabilities linux_capabilities() {
@@ -1316,27 +1466,59 @@ HostCapabilities linux_capabilities() {
               HostCapability::pointer_capture | HostCapability::cursor |
               HostCapability::clipboard | HostCapability::clipboard_images |
               HostCapability::dialogs | HostCapability::sound_cues |
-              HostCapability::typed_drag_destination,
+              HostCapability::typed_drag_destination |
+              HostCapability::runtime_windows | HostCapability::window_frames |
+              HostCapability::screen_pointer | HostCapability::window_at_point |
+              HostCapability::window_ordering,
           // X11 desktops follow the PC keyboard convention.
           pc_key_map()};
 }
-int run_linux_application(std::vector<LinuxApplicationWindow> windows) {
+int run_linux_application(std::vector<LinuxApplicationWindow> windows,
+                          LinuxApplicationOptions application) {
+  const std::shared_ptr<linux_detail::RunOpenState> open_state =
+      std::make_shared<linux_detail::RunOpenState>();
   try {
     linux_detail::Runtime runtime;
-    for (std::size_t i = 0; i < windows.size(); ++i)
-      static_cast<void>(runtime.add(std::move(windows[i])));
-    for (std::size_t i = 0; i < runtime.windows.size(); ++i) {
-      linux_detail::NativeWindow &window = *runtime.windows[i];
-      for (std::size_t j = 0; j < runtime.windows.size(); ++j)
-        if (window.entry.owner_id == (*runtime.windows[j]).entry.stable_id)
-          XSetTransientForHint(runtime.display, window.xid,
-                               (*runtime.windows[j]).xid);
+    runtime.windowing = std::make_unique<linux_detail::X11Windowing>(runtime);
+    // Ends the windowing on every exit from here, before ~Runtime closes the
+    // remaining windows: the program's handles stop reaching it first.
+    const linux_detail::WindowingEndGuard end_guard{
+        open_state.get(), &application, runtime.windowing.get()};
+    (*open_state).windowing = runtime.windowing.get();
+    if (application.windowing_ready)
+      application.windowing_ready(*runtime.windowing,
+                                  linux_detail::RunOpen{open_state});
+    // Owners first; a cycle or an unknown owner leaves windows unopened.
+    std::vector<bool> opened(windows.size(), false);
+    std::size_t remaining = windows.size();
+    bool progress = true;
+    while (remaining > 0 && progress) {
+      progress = false;
+      for (std::size_t i = 0; i < windows.size(); ++i) {
+        if (opened[i])
+          continue;
+        if (!windows[i].owner_id.empty() &&
+            !(*runtime.windowing).find(windows[i].owner_id).has_value())
+          continue;
+        const HostWindowAdmission admission =
+            (*runtime.windowing).open(std::move(windows[i]), false);
+        if (!admission.status.accepted())
+          return 2;
+        opened[i] = true;
+        --remaining;
+        progress = true;
+      }
     }
+    if (remaining > 0)
+      return 2;
+    (*runtime.windowing).mark_started();
     for (std::size_t i = 0; i < runtime.windows.size(); ++i)
       (*runtime.windows[i]).ready();
     bool primary_open = true;
     while (primary_open) {
       runtime.step();
+      runtime.report_activation();
+      runtime.reclaim();
       primary_open = false;
       for (std::size_t i = 0; i < runtime.windows.size(); ++i) {
         const linux_detail::NativeWindow &window = *runtime.windows[i];

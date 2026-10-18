@@ -13,6 +13,19 @@ active
     Whether the window is ready and not yet closed, as seen from the calling
     thread. It is false on any other thread than the one that called
     `Application::run`.
+id
+    The window's `HostWindowId` in this run: assigned in opening order and
+    never reused, so it identifies the window in frame reports and in
+    `ApplicationWindows::window_at`. Invalid before `ready`, after the
+    window closes, and for a host without application windowing.
+windows
+    The run's `ApplicationWindows`, for opening and destroying windows
+    while the application runs and for the pointer and the window under a
+    desktop point. Inactive when this handle is inactive.
+frame
+    The window's frame in desktop logical units: the client area and, where
+    the host measures it, the outer frame with its decorations. A host
+    without window frames returns `HostServiceError::unsupported`.
 
 Methods
 -------
@@ -45,10 +58,22 @@ request_client_size
     `Window::client_size` afterwards rather than assuming the request's size.
     `Window::resize` is the host's side of this and does not resize the native
     window.
+request_frame
+    Asks the host to place the window's client area at a rectangle in
+    desktop logical units: the position and the size together. The size
+    follows the rules of `request_client_size`; each origin coordinate must
+    be within plus or minus 1000000. The new frame arrives through the
+    `frame_changed` callback, on Windows before the request returns and on
+    X11 with a later event, and a window manager may adjust it.
+bring_to_front
+    Orders the window above the run's other windows without activating it.
+    It never moves the window above other applications' windows, and owned
+    windows stay above their owners.
 
 See Also
 --------
 ApplicationWindowOptions : Delivers the handle through its `ready` callback.
+ApplicationWindows : The run's windowing, reached through `windows`.
 Application : Runs the windows the handles refer to.
 HostServiceStatus : The result of each request.
 

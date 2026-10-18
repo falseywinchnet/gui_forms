@@ -89,7 +89,7 @@ DockTransactionResult DockLayout::run(const DockTransaction& transaction, DockLa
 }
 
 void DockLayout::commit(DockLayoutState&& replacement, DockEditOrigin origin, std::size_t edit_count,
-                        bool restored) {
+                        bool restored, bool frames_only) {
     state_ = std::move(replacement);
     ++generation_;
     DockLayoutChange change{};
@@ -97,6 +97,7 @@ void DockLayout::commit(DockLayoutState&& replacement, DockEditOrigin origin, st
     change.origin = origin;
     change.edit_count = edit_count;
     change.restored = restored;
+    change.frames_only = frames_only;
     // Emitted after the commit: a handler sees the new layout and may apply
     // a further transaction, which publishes its own change.
     changed_.emit(change);
@@ -114,7 +115,11 @@ DockTransactionResult DockLayout::apply(const DockTransaction& transaction) {
     if (!result.applied) return result;
     // Unknown fields of elements the transaction removed go with them.
     detail::prune_unknown_fields(scratch, result.dropped_unknown_fields);
-    commit(std::move(scratch), transaction.origin, transaction.edits.size(), false);
+    bool frames_only = true;
+    for (const DockEdit& edit : transaction.edits) {
+        if (edit.kind != DockEditKind::set_floating_frame) frames_only = false;
+    }
+    commit(std::move(scratch), transaction.origin, transaction.edits.size(), false, frames_only);
     result.generation = generation_;
     return result;
 }

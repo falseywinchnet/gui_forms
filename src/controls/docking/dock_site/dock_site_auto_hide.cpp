@@ -814,7 +814,7 @@ void DockSite::on_flyout_pointer(PointerEvent& event) {
     }
     if (drag_.phase == DockDragPhase::armed && event.action == PointerAction::up &&
         event.button == PointerButton::primary) {
-        drag_ = DragSession{};
+        reset_drag();
     }
     if (event.action == PointerAction::move || event.action == PointerAction::enter) {
         if (grip_captured_) {

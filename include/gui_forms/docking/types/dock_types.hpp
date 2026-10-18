@@ -561,6 +561,10 @@ struct DockLayoutChange final {
     std::size_t edit_count{};
     // True for the change published by a restore.
     bool restored{false};
+    // True when every edit was set_floating_frame: a floating window moved
+    // or resized and no site's tree changed (phase D4), so realizing
+    // controls need not rebuild.
+    bool frames_only{false};
 };
 
 // One node's rectangle from DockLayout::arrange.

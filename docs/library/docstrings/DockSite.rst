@@ -23,11 +23,24 @@ stable_id
 workspace
     The workspace to show, borrowed: it must outlive the site, or be
     destroyed first, which unbinds the site.
+floating_site : default none
+    The floating site to show (phase D4) instead of the main site. The
+    workspace makes these sites itself, as the roots of its floating
+    windows; a second site for the same floating site replaces the first.
 
 Properties
 ----------
 workspace : default the constructor's
     The bound workspace, or null after `release_workspace`.
+floating : default ``false``
+    Whether the site shows a floating site.
+floating_site : default none
+    The floating site shown, or none for the main site.
+showing_remote_drag : default ``false``
+    Whether the site shows a drag that runs in another site's window: the
+    pointer is over this window (phase D4).
+moving_window : default ``false``
+    Whether a floating window is being moved by its caption.
 keyboard_increment : default ``8``
     How far one arrow key moves a focused seam, in logical units, from 1 to
     256; outside that range throws `std::out_of_range`.
@@ -108,8 +121,10 @@ flyout_changed
 drag_ended
     Raised once when a drag that started ends, with how it ended
     (`DockDragEnd`: dropped, escaped, capture lost, deactivated, layout
-    changed, rejected), its subject and, for a drop, the target and the
-    transaction's result. Raised after a drop's transaction.
+    changed, rejected, floated), its subject and, for a drop, the target,
+    whether it was in another window, and the transaction's result; for a
+    float, the new window's client area. Raised after the transaction. A
+    floating window moved by its caption onto a target raises it too.
 
 Methods
 -------
@@ -196,10 +211,12 @@ be hidden. The caption of the stack holding the active panel is
 ``current``; the default theme (T4) draws it as a pale tint with a 2-unit
 accent line on top, and until then today's recipes draw it.
 
-The position menu lists Float, unavailable until floating windows (phase
-D4); Dock, checked while the panel stands in a docked tool stack, available
-for a tool panel docked as a document (it returns to its default side) and
-for an auto-hidden panel (its stack returns to where it stood); Dock as
+The position menu lists Float, available while the workspace has windows
+attached and the panel may float (it floats where it floated last, else
+where it stands); Dock, checked while the panel stands in a docked tool
+stack, available for a tool panel docked as a document (it returns to its
+default side), for an auto-hidden panel (its stack returns to where it
+stood) and for a floating panel (it returns where it was docked last); Dock as
 Tabbed Document, for a tool panel whose descriptor allows it; Auto Hide,
 checked while the panel is auto-hidden and available for a root-level
 docked tool stack; Hide; Close; and Move, the keyboard move mode. A
@@ -290,8 +307,9 @@ once; a document tab first slides along its strip (reordering) and tears
 off when the pointer leaves the strip's band. At the start the subject
 leaves its place and the place closes up; the layout itself does not change
 until the drop, so Escape leaves it byte-identical. A miniature of the
-panel (its caption strip, title and content well, drawn by role; not a
-picture of its content) shrinks from the panel's rectangle to about 100
+panel (its caption strip and title by role over a picture of the panel's
+view, taken with `Window::snapshot_control` as the drag starts; the content
+well stands in where the window cannot snapshot, as headless) shrinks from the panel's rectangle to about 100
 units over 220 ms and follows the pointer; at the end it grows into the
 panel's new place, or back into its old one. Over the pane under the
 pointer, and only that pane, a cross of five tiles appears (fading in over
@@ -303,10 +321,27 @@ The window's edges are global targets throughout, with a tile at each
 edge's middle. Targets the restrictions (dock groups, allowed placements,
 the user lock) refuse are not offered and their tiles are disabled. Ctrl
 held suppresses docking. A release on a target applies one transaction
-and activates the moved panel; a release elsewhere snaps back with a
-rejected cue (floating arrives in phase D4). Escape, losing the pointer
-capture, the window deactivating and a layout change by the program end a
-drag with the layout unchanged.
+and activates the moved panel; a release where nothing accepts floats the
+subject into a new floating window at the pointer, at the panel's size,
+when it may float (D4-1), and snaps it back otherwise, with a rejected cue
+under the pointer shown only then. Escape, losing the pointer capture, the
+window deactivating and a layout change by the program end a drag with the
+layout unchanged.
+
+Floating windows (phase D4; decisions DK-1, DK-6 to DK-12, DK-41): while
+the workspace has windows attached, a drag follows the desktop pointer and
+the topmost site under it shows the tiles, the tint and the stamp, over its
+hovered pane only (decision 41, T8-3); the other sites show none. A
+floating site has no document area, side strips, collapsing or window-edge
+targets. Its tool stacks keep their drawn captions; the host's title bar
+stays as well, since no host offers a frameless owned window yet. A
+double-click on a floating caption docks the stack back. In a floating
+window holding one tool stack, dragging the caption moves the window itself
+with the framework's capture drag (`WindowFrameDrag`, decision 12; elsewhere
+the caption drags the stack), while the window under the pointer shows its
+targets; a release on one docks the stack there and the floating window
+closes after the panel has appeared. Keys a floating window does not use go
+to the main window's accelerators.
 
 The keyboard move mode (Move in the position menu, or the ``move_panel``
 key command, Ctrl+Alt+Shift+M): the arrows step through the current
@@ -315,7 +350,9 @@ along top, centre and bottom; Tab and Shift+Tab move to the next and
 previous pane and then the window's edges, over exactly the targets the
 pointer reaches. Enter drops; Escape cancels.
 
-Not yet: floating sites (phase D4) are kept in the layout but not shown; a
+Not yet: a drawn caption in place of the host's title bar for a one-stack
+floating window (no host offers frameless owned windows); a stamp outside
+every window of the run (no drag image host service); a
 flyout closes at once rather than sliding back; the grip's extent is not
 saved with the layout; the strips leave no gap between groups; document tab
 close glyphs and the overflow list arrive with the page view's document
