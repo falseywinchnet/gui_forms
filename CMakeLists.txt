@@ -140,6 +140,10 @@ add_library(gui_forms_core STATIC
     src/core/semantics/snapshot/semantic_snapshot.cpp
     src/core/anatomy/types/anatomy_types.cpp
     src/core/schema/types/schema_types.cpp
+    src/core/xml/types/xml_types.cpp
+    src/core/xml/xml_characters/xml_characters.cpp
+    src/core/xml/xml_reader/xml_reader.cpp
+    src/core/xml/xml_writer/xml_writer.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -2257,6 +2261,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_document_view_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_document_view_tests COMMAND gui_forms_document_view_tests)
 
+    add_executable(gui_forms_xml_tests tests/xml_tests.cpp)
+    target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
+
     add_executable(gui_forms_grapheme_conformance_tests
         tests/grapheme_conformance_tests.cpp
     )
@@ -3188,6 +3196,40 @@ if(GUI_FORMS_BUILD_FUZZERS)
             -fno-omit-frame-pointer
         )
         target_link_options(gui_forms_png_registry_fuzz PRIVATE
+            -fsanitize=address,undefined
+        )
+    endif()
+
+    # The layout XML reader (DK decision 43), built from its own sources so
+    # the sanitizers cover exactly the reader and writer.
+    add_executable(gui_forms_xml_reader_fuzz
+        fuzz/xml_reader_fuzz.cpp
+        src/core/xml/types/xml_types.cpp
+        src/core/xml/xml_characters/xml_characters.cpp
+        src/core/xml/xml_reader/xml_reader.cpp
+        src/core/xml/xml_writer/xml_writer.cpp
+    )
+    target_include_directories(gui_forms_xml_reader_fuzz PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_compile_features(gui_forms_xml_reader_fuzz PRIVATE cxx_std_20)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+        )
+    else()
+        target_compile_definitions(gui_forms_xml_reader_fuzz PRIVATE
+            GUI_FORMS_FUZZ_STANDALONE=1
+        )
+        target_compile_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_xml_reader_fuzz PRIVATE
             -fsanitize=address,undefined
         )
     endif()

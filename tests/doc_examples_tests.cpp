@@ -3480,6 +3480,58 @@ void example() {
 }
 }  // namespace doc_example_Worker_2
 
+namespace doc_example_XmlElement_1 {
+void example() {
+    gf::XmlReadResult read = gf::read_xml(
+        "<layout format=\"2\"><panel id=\"tools.output\"/></layout>");
+    if (!read) {
+        return;   // read.error, read.position.line and read.position.column say why
+    }
+    const gf::XmlAttribute* format = read.root.find_attribute("format");   // "2"
+    std::size_t panels = read.root.children.size();                       // 1
+    gf::XmlWriteResult written = gf::write_xml(read.root);
+    // written.text:
+    // <?xml version="1.0" encoding="UTF-8"?>
+    // <layout format="2">
+    //   <panel id="tools.output"/>
+    // </layout>
+    static_cast<void>(format);
+    static_cast<void>(panels);
+}
+}  // namespace doc_example_XmlElement_1
+
+namespace doc_example_XmlElement_2 {
+void example() {
+    gf::XmlElement root;
+    root.name = "settings";
+    root.attributes.push_back(gf::XmlAttribute{.name = "theme", .value = "a & b"});
+    gf::XmlElement note;
+    note.name = "note";
+    note.text = "x < y";
+    root.children.push_back(note);
+    gf::XmlWriteResult written = gf::write_xml(root);   // escapes & and <
+
+    gf::XmlElement mixed = root;
+    mixed.text = "text beside a child";
+    gf::XmlWriteResult refused = gf::write_xml(mixed);
+    bool is_mixed = refused.error == gf::XmlError::mixed_content;   // true
+    static_cast<void>(written);
+    static_cast<void>(is_mixed);
+}
+}  // namespace doc_example_XmlElement_2
+
+namespace doc_example_XmlLimits_1 {
+void example() {
+    gf::XmlLimits limits;
+    limits.maximum_depth = 2;
+    gf::XmlReadResult shallow = gf::read_xml("<a><b/></a>", limits);        // accepted
+    gf::XmlReadResult deep = gf::read_xml("<a><b><c/></b></a>", limits);   // refused
+    bool refused = deep.error == gf::XmlError::depth_exceeded;              // true
+    static_cast<void>(shallow);
+    static_cast<void>(refused);
+}
+}  // namespace doc_example_XmlLimits_1
+
 namespace {
 
 int run(const char* name, void (*example)()) {
@@ -3664,5 +3716,8 @@ int main() {
     failures += run("Window example 2", &doc_example_Window_2::example);
     failures += run("Worker example 1", &doc_example_Worker_1::example);
     failures += run("Worker example 2", &doc_example_Worker_2::example);
+    failures += run("XmlElement example 1", &doc_example_XmlElement_1::example);
+    failures += run("XmlElement example 2", &doc_example_XmlElement_2::example);
+    failures += run("XmlLimits example 1", &doc_example_XmlLimits_1::example);
     return failures == 0 ? 0 : 1;
 }
