@@ -539,13 +539,16 @@ void RibbonColorPicker::palette_pointer(PointerEvent& event) {
 // and last; Escape reaches the layer, which closes the palette.
 void RibbonColorPicker::palette_key(KeyEvent& event) {
     if (event.action != KeyAction::down || !palette_open_) return;
+    // Automatic is always an entry, so `all` is never empty. The keyboard's
+    // entry can lie past the end when the recent colours shrank while the
+    // palette was open; it then counts as the last entry.
     const std::vector<Cell> all = cells();
-    const std::size_t current = focus_entry_.value_or(0U);
+    const std::size_t current = std::min(focus_entry_.value_or(0U), all.size() - 1U);
     const std::uint32_t key = event.physical_key;
     std::optional<std::size_t> next{};
     if (key == PhysicalKey::enter || key == PhysicalKey::space) {
         event.handled = true;
-        commit(all[std::min(current, all.size() - 1U)].color);
+        commit(all[current].color);
         return;
     }
     if (key == PhysicalKey::right) next = std::min(current + 1U, all.size() - 1U);

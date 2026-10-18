@@ -491,6 +491,31 @@ void backstage() {
     require(threw && (*view).items().size() == 4U, "a topic without a page is refused");
 }
 
+// The palette's keyboard entry outlives the entries when the recent colours
+// are cleared while the palette is open; the arrows then move from the last
+// entry that remains.
+void color_palette_shrinks_while_open() {
+    std::shared_ptr<ColorCommand> command = std::make_shared<ColorCommand>(std::make_shared<Command>("ink", "Ink"));
+    static_cast<void>((*command).commit(Color::rgba(1, 2, 3), "test"));
+    static_cast<void>((*command).commit(Color::rgba(4, 5, 6), "test"));
+    std::shared_ptr<RibbonColorPicker> picker = make_control<RibbonColorPicker>(StableId("shrinking"));
+    (*picker).set_command(command);
+    Window window(picker, {300.0, 300.0});
+    window.perform_layout();
+    require(window.request_focus(picker), "the picker takes focus");
+    press_key(window, PhysicalKey::down);
+    press_key(window, PhysicalKey::end);
+    require((*picker).palette_open() && (*picker).realized_entries().size() == 13U &&
+                (*picker).realized_entries()[12].states.focus_visible,
+            "End puts the keyboard on the last recent colour");
+    (*command).clear_recent_colors();
+    press_key(window, PhysicalKey::up);
+    const std::vector<RibbonColorPicker::PaletteEntry> entries = (*picker).realized_entries();
+    require(entries.size() == 11U && entries[0].states.focus_visible,
+            "Up from past the remaining entries moves from the last one, to Automatic above the palette row");
+    (*picker).close_palette();
+}
+
 // A control whose maximum size is narrower than the bounds its parent offers
 // is arranged at its maximum width: its child controls sit on its published
 // parts, which paint and hit testing use.
@@ -524,6 +549,7 @@ int main() {
     recent_pane();
     backstage();
     arranged_within_maximum_size();
+    color_palette_shrinks_while_open();
     std::cout << "Ribbon file area: value commands, font control, colour picker, hosting, recent pane and Backstage "
                  "passed\n";
     return 0;
