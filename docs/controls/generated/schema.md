@@ -807,6 +807,7 @@ Properties beyond every control's: none.
 | `cell_validating` | `DataGridViewCellValidatingEvent`, by reference |
 | `cell_value_changed` | `DataGridViewCellEvent` |
 | `cell_content_click` | `DataGridViewCellEvent` |
+| `row_order_mode_changed` | `DataGridViewRowOrderModeChange` |
 | `column_header_click` | `std::size_t` |
 | `column_width_changed` | `std::size_t` |
 

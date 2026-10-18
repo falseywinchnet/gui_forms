@@ -135,7 +135,10 @@ from it. Record under `results/`.
    (`DataGridViewCellValueProvider::cell_value(row, column)` in
    `data_grid_view.hpp`); it moves onto stable row IDs, and row numbers
    become presentation positions only. The control is provisional, so the
-   change is allowed.
+   change is allowed. Done 2026-10-17 for `DataGridView`: the provider
+   answers by `DataGridViewRowId`, the application publishes the row order
+   as IDs, and every row source keeps selection, the current cell and edits
+   by ID (matrix row 52 records the tests).
 
 ## Advanced candidates, 2026-10-14
 
