@@ -439,6 +439,7 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
     src/controls/ribbon/ribbon.cpp
+    src/controls/ribbon/ribbon_contextual.cpp
     src/controls/ribbon/ribbon_group_popup.cpp
     src/controls/ribbon/ribbon_scaling.cpp
     src/controls/status_strip/status_strip.cpp
@@ -2462,6 +2463,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_scaling_tests tests/ribbon_scaling_tests.cpp)
     target_link_libraries(gui_forms_ribbon_scaling_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_scaling_tests COMMAND gui_forms_ribbon_scaling_tests)
+    add_executable(gui_forms_ribbon_contextual_tests tests/ribbon_contextual_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_contextual_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_contextual_tests COMMAND gui_forms_ribbon_contextual_tests)
     add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)

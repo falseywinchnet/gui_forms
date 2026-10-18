@@ -149,8 +149,10 @@ Related types
      - A parse never fails as a whole: a malformed known entry is reported and its built-in default kept, as the configuration contract (§7) asks.
    * - :cpp:class:`RibbonTabChange <gui_forms::RibbonTabChange>`
      - The selected tab after it changed.
+   * - :cpp:class:`RibbonTabSetSpec <gui_forms::RibbonTabSetSpec>`
+     - A contextual tab set (stage RB, phase 5): tabs that show while the application makes the set available, such as while a picture is selected.
    * - :cpp:class:`RibbonTabSpec <gui_forms::RibbonTabSpec>`
-     - A core tab.
+     - A tab.
    * - :cpp:class:`StatusStrip::Parts <gui_forms::StatusStrip::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's, and its items are ToolStrip's "item" system.
    * - :cpp:class:`ToolStrip::Item <gui_forms::ToolStrip::Item>`
@@ -809,7 +811,7 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner. ``image`` is the icon of the group's collapsed button (none: the first command image). ``layouts`` are its size definitions, largest first; empty layouts are generated (Ribbon::group_layouts).
+   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner. ``image`` is the icon of the group's collapsed button (none: the first command image). ``layouts`` are its size definitions, largest first; empty layouts are generated (Ribbon::group_layouts). ``modes`` are the application modes it shows in.
 
    .. cpp:member:: std::string stable_id
 
@@ -822,6 +824,10 @@ Related types
    .. cpp:member:: ImageId image
 
    .. cpp:member:: std::vector<RibbonGroupLayout> layouts
+
+   .. cpp:member:: std::uint32_t modes
+
+      Default: ``{ribbon_all_modes}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -943,11 +949,23 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RibbonTabSetSpec final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A contextual tab set (stage RB, phase 5): tabs that show while the application makes the set available, such as while a picture is selected. A shown set is marked by a tint from the theme's accent ramp on its tabs and on the command plane of its selected tab (owner decisions 14, 22, 25), with no captioned band; ``caption`` ("Picture Tools") names the set to accessibility.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string caption
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RibbonTabSpec final
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A core tab. ``text`` may carry a mnemonic ("&Home"). ``reduction_order`` is the order in which its groups shrink as the ribbon narrows; after it (or without it) every group that can still shrink does so one step at a time, right to left, repeating (WPF's cycle, decision 32).
+   A tab. ``text`` may carry a mnemonic ("&Home"). ``reduction_order`` is the order in which its groups shrink as the ribbon narrows; after it (or without it) every group that can still shrink does so one step at a time, right to left, repeating (WPF's cycle, decision 32). ``tab_set`` names the contextual tab set the tab belongs to (empty: a core tab); ``modes`` are the application modes it shows in.
 
    .. cpp:member:: std::string stable_id
 
@@ -956,6 +974,12 @@ Related types
    .. cpp:member:: std::vector<RibbonGroupSpec> groups
 
    .. cpp:member:: std::vector<RibbonReductionStep> reduction_order
+
+   .. cpp:member:: std::string tab_set
+
+   .. cpp:member:: std::uint32_t modes
+
+      Default: ``{ribbon_all_modes}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1342,6 +1366,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RibbonTabSetAvailability
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: not_available
+
+   .. cpp:enumerator:: available
+
+   .. cpp:enumerator:: active
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ToolStripItemDisplay
 
    ``#include <gui_forms/controls/tool_strip/tool_strip.hpp>``
@@ -1438,3 +1474,11 @@ Functions, constants and aliases
    The toolbar's part of the state, and its application to a toolbar. ``minimized`` is the Ribbon's, which applies it. Command IDs the toolbar does not declare survive apply and capture (the toolbar keeps them, inert); unrecognized entries are not the toolbar's, so capture returns none and a caller that keeps them copies them from the state it loaded. Applying sets the toolbar's shown commands and placement, emitting placement_changed when the placement changes.
 
 .. cpp:function:: void apply_ribbon_state(QuickAccessToolbar& toolbar, const RibbonState& state)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+.. cpp:var:: constexpr std::uint32_t ribbon_all_modes
+
+   The application modes a tab or group belongs to (stage RB, phase 5; owner decision 14, F2-1, after the Windows Ribbon Framework's application modes): one bit per mode, 32 modes. A tab or group shows while it shares a bit with Ribbon::application_modes. Every mode by default. Value: ``0xFFFFFFFFU``.

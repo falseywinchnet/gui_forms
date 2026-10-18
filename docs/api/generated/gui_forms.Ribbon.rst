@@ -38,8 +38,11 @@ gui_forms::Ribbon
    :Properties:
 
       **tabs** : ``std::span<const RibbonTabSpec>``
-         The core tabs, each with its groups and their commands. :cpp:func:`set_tabs <gui_forms::Ribbon::set_tabs>`
-         replaces them, keeps the selection on a tab with the same ID, keeps a
+         The tabs, each with its groups and their commands: the core tabs, then
+         the contextual tabs, each set's together in the sets' order.
+         ``set_tabs(tabs, sets)`` replaces them and the tab sets, keeps each set's
+         availability by ID, keeps the selection on a shown tab with the same ID
+         (else the first core tab shown), keeps a
          hosted control while a command of the same ID and kind remains, and
          throws ``std::invalid_argument`` for an empty or repeated ID (one namespace
          across tabs, groups and commands), invalid UTF-8, a button, toggle or
@@ -55,13 +58,22 @@ gui_forms::Ribbon
          gallery past its minimum (owner decision 29), or more than the
          development bounds. A refused definition leaves the previous tabs.
 
+      **tab_sets** : ``std::span<const RibbonTabSetSpec>``, read-only
+         The contextual tab sets (:cpp:class:`RibbonTabSetSpec <gui_forms::RibbonTabSetSpec>`: ID and caption).
+
+      **application_modes** : ``std::uint32_t``, default ``1``
+         The application modes shown, one bit per mode. Tabs and groups whose
+         ``modes`` share a bit with it show. :cpp:func:`set_application_modes <gui_forms::Ribbon::set_application_modes>` throws
+         ``std::invalid_argument`` for zero.
+
       **ladder_step** : ``std::optional<std::size_t>``, read-only
          The selected tab's ladder entry the plane shows, or none while it is
          hidden or minimized.
 
       **scrolling** : ``bool``, read-only
-         Whether even the narrowest entry is wider than the plane, so that the
-         plane scrolls.
+         Whether the plane scrolls: from when even the narrowest entry is wider
+         than the plane until the plane is ``Ribbon::scroll_hysteresis`` (8 units)
+         wider than that entry (owner decision 45).
 
       **first_visible_group** : ``std::size_t``, read-only
          The first group shown while the plane scrolls.
@@ -80,8 +92,9 @@ gui_forms::Ribbon
          folded steps, ladder lookups and the ribbon's own text measurements.
 
       **selected_tab** : ``std::optional<std::size_t>``
-         The selected tab, or none without tabs. :cpp:func:`set_selected_tab <gui_forms::Ribbon::set_selected_tab>` throws
-         ``std::out_of_range`` for a tab past the end.
+         The selected tab, or none while no tab shows. :cpp:func:`set_selected_tab <gui_forms::Ribbon::set_selected_tab>` throws
+         ``std::out_of_range`` for a tab past the end and ``std::invalid_argument``
+         for a tab not shown.
 
       **minimized** : ``bool``, default ``false``
          Whether the command plane is hidden, leaving the tab row.
@@ -158,6 +171,12 @@ gui_forms::Ribbon
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`tab_set_availability <gui_forms::Ribbon::tab_set_availability>`
+        - A set's :cpp:enum:`RibbonTabSetAvailability <gui_forms::RibbonTabSetAvailability>`.
+      * - :cpp:func:`tab_set_accent <gui_forms::Ribbon::tab_set_accent>`
+        - The :cpp:class:`AccentIndex <gui_forms::AccentIndex>` a shown set is tinted with, or none while it is hidden.
+      * - :cpp:func:`tab_shown <gui_forms::Ribbon::tab_shown>`
+        - Whether a tab shows now, by its modes and its set's availability.
       * - :cpp:func:`group_layouts <gui_forms::Ribbon::group_layouts>`
         - A group's layouts, largest first: as authored, or generated.
       * - :cpp:func:`reduction_ladder <gui_forms::Ribbon::reduction_ladder>`
@@ -179,6 +198,8 @@ gui_forms::Ribbon
       * - :cpp:func:`check_box <gui_forms::Ribbon::check_box>`
         -  
       * - :cpp:func:`text_box <gui_forms::Ribbon::text_box>`
+        -  
+      * - :cpp:func:`set_tab_set_availability <gui_forms::Ribbon::set_tab_set_availability>`
         -  
 
    .. seealso::
@@ -220,7 +241,9 @@ gui_forms::Ribbon
    (decision 8) before it changes layout. A step that does not narrow the tab is
    folded into the next entry, so widths strictly decrease. The plane shows the
    widest entry no wider than itself. Below the narrowest entry it scrolls at
-   any width (decision 35): scroll buttons at the ends move by one group, a
+   any width (decision 35), and it keeps scrolling until it is 8 units wider
+   than that entry (decision 45; in that band the right button covers the last
+   group): scroll buttons at the ends move by one group, a
    group that does not fit whole before the right button is not shown (the
    first is clipped), and the keyboard's stop scrolls its group into view.
 
@@ -275,7 +298,9 @@ gui_forms::Ribbon
    itself to its window's F6 regions.
 
    To accessibility the ribbon is a group holding the File tab (a
-   ``menu_button`` with a popup), the tab row (a ``tab_group`` of positioned tabs)
+   ``menu_button`` with a popup), the tab row (a ``tab_group`` of the shown tabs:
+   core tabs positioned among the core tabs, a contextual tab among its set's,
+   described by the set's caption)
    and, while shown, the command plane (a group named after the selected tab)
    with its groups, named by caption, and their commands: ``button``,
    ``split_button`` or ``menu_button``, with positions in their group and
@@ -284,7 +309,27 @@ gui_forms::Ribbon
    buttons. Hosted controls describe themselves as children of the ribbon, or
    of the popup while it is open.
 
-   Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
+   Contextual tab sets (owner decisions 14, 22 and 25). A tab whose
+   ``tab_set`` names a set shows while the application makes the set available
+   or active (for example while a picture is selected); the ribbon never infers
+   it. A shown set is marked by a tint on its tabs' faces and on the command
+   plane of its selected tab, from the theme's accent ramp: each ``tab`` part and
+   the ``command_plane`` part carry the set's :cpp:class:`AccentIndex <gui_forms::AccentIndex>`. There is no captioned
+   band over the set (T4-2). A newly shown set takes an accent no other shown
+   set has, keeping its previous one when that is free. The built-in selection
+   rules (F3-1): a set becoming active selects the set's tab the user chose
+   last, else its first tab; becoming available changes no selection; a set
+   leaving while one of its tabs is selected selects the core tab chosen last,
+   else the first core tab shown. The remembered set tab is forgotten when the
+   user chooses a core tab or another set's tab.
+
+   Application modes (F2-1, after the Windows Ribbon Framework). Every tab and
+   group belongs to the modes in its ``modes`` bit set (every mode by default),
+   and shows while one of them is in :cpp:func:`application_modes <gui_forms::Ribbon::application_modes>`. A mode switch
+   replaces the tabs shown at once; a selected tab that no longer shows gives
+   way as above, and groups that leave take no room and no ladder steps.
+
+   Not yet: the Quick Access Toolbar, the minimized popup,
    Backstage, the application menu's recent-items pane (the File tab opens a
    :cpp:class:`ContextMenu <gui_forms::ContextMenu>`), right-to-left mirroring of the cycle, two-line large labels
    and ellipsized tab labels (decision 30 allows them; tabs past the row's end
@@ -318,8 +363,11 @@ gui_forms::Ribbon
 
    .. cpp:function:: std::span<const RibbonTabSpec> tabs() const noexcept
 
-      The core tabs, each with its groups and their commands. :cpp:func:`set_tabs <gui_forms::Ribbon::set_tabs>`
-      replaces them, keeps the selection on a tab with the same ID, keeps a
+      The tabs, each with its groups and their commands: the core tabs, then
+      the contextual tabs, each set's together in the sets' order.
+      ``set_tabs(tabs, sets)`` replaces them and the tab sets, keeps each set's
+      availability by ID, keeps the selection on a shown tab with the same ID
+      (else the first core tab shown), keeps a
       hosted control while a command of the same ID and kind remains, and
       throws ``std::invalid_argument`` for an empty or repeated ID (one namespace
       across tabs, groups and commands), invalid UTF-8, a button, toggle or
@@ -335,9 +383,23 @@ gui_forms::Ribbon
       gallery past its minimum (owner decision 29), or more than the
       development bounds. A refused definition leaves the previous tabs.
 
-   .. cpp:function:: void set_tabs(std::vector<RibbonTabSpec> tabs)
+   .. cpp:function:: void set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets = {})
 
       Sets :cpp:func:`tabs <gui_forms::Ribbon::tabs>`; see the property's description above.
+
+   .. cpp:function:: std::span<const RibbonTabSetSpec> tab_sets() const noexcept
+
+      The contextual tab sets (:cpp:class:`RibbonTabSetSpec <gui_forms::RibbonTabSetSpec>`: ID and caption).
+
+   .. cpp:function:: std::uint32_t application_modes() const noexcept
+
+      The application modes shown, one bit per mode. Tabs and groups whose
+      ``modes`` share a bit with it show. :cpp:func:`set_application_modes <gui_forms::Ribbon::set_application_modes>` throws
+      ``std::invalid_argument`` for zero.
+
+   .. cpp:function:: void set_application_modes(std::uint32_t modes)
+
+      Sets :cpp:func:`application_modes <gui_forms::Ribbon::application_modes>`; see the property's description above.
 
    .. cpp:function:: std::optional<std::size_t> ladder_step() const
 
@@ -346,8 +408,9 @@ gui_forms::Ribbon
 
    .. cpp:function:: bool scrolling() const
 
-      Whether even the narrowest entry is wider than the plane, so that the
-      plane scrolls.
+      Whether the plane scrolls: from when even the narrowest entry is wider
+      than the plane until the plane is ``Ribbon::scroll_hysteresis`` (8 units)
+      wider than that entry (owner decision 45).
 
    .. cpp:function:: std::size_t first_visible_group() const noexcept
 
@@ -375,8 +438,9 @@ gui_forms::Ribbon
 
    .. cpp:function:: std::optional<std::size_t> selected_tab() const noexcept
 
-      The selected tab, or none without tabs. :cpp:func:`set_selected_tab <gui_forms::Ribbon::set_selected_tab>` throws
-      ``std::out_of_range`` for a tab past the end.
+      The selected tab, or none while no tab shows. :cpp:func:`set_selected_tab <gui_forms::Ribbon::set_selected_tab>` throws
+      ``std::out_of_range`` for a tab past the end and ``std::invalid_argument``
+      for a tab not shown.
 
    .. cpp:function:: void set_selected_tab(std::size_t tab)
 
@@ -490,6 +554,22 @@ gui_forms::Ribbon
 
    .. rubric:: Methods
 
+   .. cpp:function:: RibbonTabSetAvailability tab_set_availability(std::string_view set_id) const
+
+      A set's :cpp:enum:`RibbonTabSetAvailability <gui_forms::RibbonTabSetAvailability>`. :cpp:func:`set_tab_set_availability <gui_forms::Ribbon::set_tab_set_availability>` changes it
+      and applies the selection rules (see Notes). Both throw
+      ``std::out_of_range`` for an unknown set.
+
+   .. cpp:function:: std::optional<AccentIndex> tab_set_accent(std::string_view set_id) const
+
+      The :cpp:class:`AccentIndex <gui_forms::AccentIndex>` a shown set is tinted with, or none while it is hidden.
+      Throws ``std::out_of_range`` for an unknown set.
+
+   .. cpp:function:: bool tab_shown(std::size_t tab) const
+
+      Whether a tab shows now, by its modes and its set's availability. Throws
+      ``std::out_of_range`` for a tab past the end.
+
    .. cpp:function:: std::span<const RibbonGroupLayout> group_layouts(std::size_t tab, std::size_t group) const
 
       A group's layouts, largest first: as authored, or generated. Throws
@@ -536,6 +616,8 @@ gui_forms::Ribbon
    .. cpp:function:: std::shared_ptr<CheckBox> check_box(std::string_view command_id) const
 
    .. cpp:function:: std::shared_ptr<TextBox> text_box(std::string_view command_id) const
+
+   .. cpp:function:: void set_tab_set_availability(std::string_view set_id, RibbonTabSetAvailability availability)
 
 
    .. rubric:: Extension points
@@ -623,3 +705,7 @@ gui_forms::Ribbon
    .. cpp:member:: constexpr double hide_hysteresis
 
       How far, in logical units, the document area must clear its minimum before a hidden command plane shows again (owner decision 36). Default: ``8.0``.
+
+   .. cpp:member:: constexpr double scroll_hysteresis
+
+      How far, in logical units, the plane must clear the narrowest ladder entry before scrolling ends (owner decision 45). Default: ``8.0``.

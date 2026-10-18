@@ -101,11 +101,18 @@ struct RibbonGroupLayout final {
     std::size_t rows{3U};
 };
 
+// The application modes a tab or group belongs to (stage RB, phase 5; owner
+// decision 14, F2-1, after the Windows Ribbon Framework's application modes):
+// one bit per mode, 32 modes. A tab or group shows while it shares a bit with
+// Ribbon::application_modes. Every mode by default.
+inline constexpr std::uint32_t ribbon_all_modes = 0xFFFFFFFFU;
+
 // A group of commands on a tab, with a caption beneath and, when
 // `dialog_launcher` is set, a launcher button in the caption's corner.
 // `image` is the icon of the group's collapsed button (none: the first
 // command image). `layouts` are its size definitions, largest first; empty
-// layouts are generated (Ribbon::group_layouts).
+// layouts are generated (Ribbon::group_layouts). `modes` are the
+// application modes it shows in.
 struct RibbonGroupSpec final {
     std::string stable_id{};
     std::string caption{};
@@ -113,6 +120,7 @@ struct RibbonGroupSpec final {
     std::vector<RibbonCommandSpec> commands{};
     ImageId image{};
     std::vector<RibbonGroupLayout> layouts{};
+    std::uint32_t modes{ribbon_all_modes};
 };
 
 // One authored step of a tab's reduction order (owner decisions 5, 29):
@@ -124,16 +132,35 @@ struct RibbonReductionStep final {
     RibbonReductionKind kind{RibbonReductionKind::layout};
 };
 
-// A core tab. `text` may carry a mnemonic ("&Home"). `reduction_order` is
-// the order in which its groups shrink as the ribbon narrows; after it (or
+// A tab. `text` may carry a mnemonic ("&Home"). `reduction_order` is the
+// order in which its groups shrink as the ribbon narrows; after it (or
 // without it) every group that can still shrink does so one step at a time,
-// right to left, repeating (WPF's cycle, decision 32).
+// right to left, repeating (WPF's cycle, decision 32). `tab_set` names the
+// contextual tab set the tab belongs to (empty: a core tab); `modes` are the
+// application modes it shows in.
 struct RibbonTabSpec final {
     std::string stable_id{};
     std::string text{};
     std::vector<RibbonGroupSpec> groups{};
     std::vector<RibbonReductionStep> reduction_order{};
+    std::string tab_set{};
+    std::uint32_t modes{ribbon_all_modes};
 };
+
+// A contextual tab set (stage RB, phase 5): tabs that show while the
+// application makes the set available, such as while a picture is selected.
+// A shown set is marked by a tint from the theme's accent ramp on its tabs
+// and on the command plane of its selected tab (owner decisions 14, 22, 25),
+// with no captioned band; `caption` ("Picture Tools") names the set to
+// accessibility.
+struct RibbonTabSetSpec final {
+    std::string stable_id{};
+    std::string caption{};
+};
+
+// A tab set's availability, as the application sets it (the Windows Ribbon
+// Framework's three states): not shown; shown; shown and its tab selected.
+enum class RibbonTabSetAvailability : std::uint8_t { not_available, available, active };
 
 // One group's place in a ladder entry: its layout (an index into
 // Ribbon::group_layouts), that layout's size, and its gallery's column count
@@ -215,8 +242,12 @@ struct RibbonTabChange final {
 // 35). The plane, never the tab row, hides when the document area under the
 // ribbon would fall below the minimum it declares (decisions 28, 34, 36).
 //
-// Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
-// Backstage, right-to-left mirroring and two-line large labels.
+// Contextual tab sets and application modes (phase 5): sets show and hide by
+// the application's availability calls, tinted from the theme's accent ramp,
+// with the built-in selection rules; modes choose the tabs and groups shown.
+//
+// Not yet: the Quick Access Toolbar, the minimized popup, Backstage,
+// right-to-left mirroring and two-line large labels.
 class Ribbon final : public Control {
 public:
     // Development bounds, not measured capacity.
@@ -228,6 +259,9 @@ public:
     // How far, in logical units, the document area must clear its minimum
     // before a hidden command plane shows again (owner decision 36).
     static constexpr double hide_hysteresis = 8.0;
+    // How far, in logical units, the plane must clear the narrowest ladder
+    // entry before scrolling ends (owner decision 45).
+    static constexpr double scroll_hysteresis = 8.0;
 
     explicit Ribbon(StableId stable_id);
     ~Ribbon() override;
@@ -247,7 +281,36 @@ public:
     // the command count, rows outside 1 to 3), a reduction step naming a
     // group not on its tab, shrinking a group past its last layout or its
     // gallery past its minimum (owner decision 29), or more than the bounds.
-    void set_tabs(std::vector<RibbonTabSpec> tabs);
+    //
+    // Contextual tabs follow the core tabs: `sets` declares the tab sets, and
+    // each set's tabs come after every core tab, together, in the sets'
+    // order. Throws std::invalid_argument, too, for a tab naming an
+    // undeclared set, a set without tabs, tabs out of that order, a set ID
+    // that is not unique in the ribbon's ID namespace, or zero modes. Sets
+    // keep their availability across a set_tabs by ID.
+    void set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets = {});
+    [[nodiscard]] std::span<const RibbonTabSetSpec> tab_sets() const noexcept { return tab_sets_; }
+    // A set's availability. Making a set active selects the tab of the set
+    // last chosen by the user, if any, else its first tab; making it
+    // available only shows it; making it not available while one of its
+    // tabs is selected selects the core tab chosen last, else the first core
+    // tab shown (owner decision 14, F3-1). Throws std::out_of_range for an
+    // unknown set.
+    [[nodiscard]] RibbonTabSetAvailability tab_set_availability(std::string_view set_id) const;
+    void set_tab_set_availability(std::string_view set_id, RibbonTabSetAvailability availability);
+    // The accent a shown set is tinted with, or none while it is hidden.
+    // A newly shown set takes an index no other shown set has, keeping its
+    // previous one when it can. Throws std::out_of_range for an unknown set.
+    [[nodiscard]] std::optional<AccentIndex> tab_set_accent(std::string_view set_id) const;
+    // The application modes now shown (one bit per mode; mode 0 by default).
+    // Changing them shows the tabs and groups that share a bit; a selected
+    // tab that no longer shows gives way as a set's tab does. Throws
+    // std::invalid_argument for zero.
+    [[nodiscard]] std::uint32_t application_modes() const noexcept { return application_modes_; }
+    void set_application_modes(std::uint32_t modes);
+    // Whether a tab shows on the tab row now (its modes, and its set's
+    // availability). Throws std::out_of_range for a tab past the end.
+    [[nodiscard]] bool tab_shown(std::size_t tab) const;
     // A group's layouts, largest first: as authored, or generated when none
     // were (each step makes the rightmost run of up to three large commands
     // small, then the group collapses unless it holds one command). Throws
@@ -259,8 +322,10 @@ public:
     // The ladder entry the command plane shows, or none while it is hidden,
     // minimized or there is no tab.
     [[nodiscard]] std::optional<std::size_t> ladder_step() const;
-    // Whether even the narrowest entry is wider than the plane, so that
-    // scroll buttons show (owner decision 35), and the first group shown.
+    // Whether the plane scrolls (owner decision 35): it starts when even the
+    // narrowest entry is wider than the plane and ends only once the plane is
+    // scroll_hysteresis wider than that entry (decision 45). The first group
+    // shown while it scrolls.
     [[nodiscard]] bool scrolling() const;
     [[nodiscard]] std::size_t first_visible_group() const noexcept { return first_group_; }
     // The document area's declared minimum height in logical units (owner
@@ -277,7 +342,8 @@ public:
     [[nodiscard]] RibbonScalingCounters scaling_counters() const noexcept { return counters_; }
 
     [[nodiscard]] std::optional<std::size_t> selected_tab() const noexcept { return selected_tab_; }
-    // Throws std::out_of_range for a tab past the end.
+    // Throws std::out_of_range for a tab past the end and
+    // std::invalid_argument for a tab not shown.
     void set_selected_tab(std::size_t tab);
     // Whether the command plane is hidden, leaving the tab row.
     [[nodiscard]] bool minimized() const noexcept { return minimized_; }
@@ -598,6 +664,32 @@ private:
         std::vector<double> tabs;
     };
 
+    // -- contextual sets and modes (ribbon_contextual.cpp) ---------------------
+    // One set's state: its availability, the accent it shows with (and the
+    // one it showed with last, kept while hidden), the set tab the user chose
+    // last (until a core tab or another set's tab is chosen; RIBBON_STUDY.md
+    // §5.4), and its tabs' range in tabs_.
+    struct TabSetState final {
+        RibbonTabSetAvailability availability{RibbonTabSetAvailability::not_available};
+        std::optional<AccentIndex> accent{};
+        std::optional<AccentIndex> last_accent{};
+        std::optional<std::size_t> remembered_tab{};
+        std::size_t first_tab{};
+        std::size_t tab_count{};
+    };
+    // Who changed the selection: the user (or the application on the user's
+    // behalf, set_selected_tab), whose choices the selection rules remember,
+    // or a selection rule, whose choices they do not.
+    enum class SelectionCause : std::uint8_t { user, rule };
+    [[nodiscard]] bool shown(std::size_t tab) const noexcept;
+    [[nodiscard]] bool group_shown(std::size_t tab, std::size_t group) const noexcept;
+    [[nodiscard]] std::optional<std::size_t> find_tab_set(std::string_view set_id) const noexcept;
+    [[nodiscard]] std::optional<AccentIndex> tab_accent(std::size_t tab) const noexcept;
+    [[nodiscard]] std::optional<std::size_t> fallback_tab() const noexcept;
+    [[nodiscard]] std::size_t position_among_shown(std::size_t tab, std::size_t& count) const noexcept;
+    void refresh_accents();
+    void tabs_shown_changed();
+
     // A realized item located: a tab, a group or a command of the selected
     // tab, or nothing past the end.
     struct RealizedItem final {
@@ -660,7 +752,7 @@ private:
     [[nodiscard]] std::vector<Group> groups_of(const Layout& placed) const;
     [[nodiscard]] std::vector<CommandItem> commands_of(const Layout& placed) const;
 
-    void select_tab(std::size_t tab);
+    void select_tab(std::size_t tab, SelectionCause cause = SelectionCause::user);
     void click_tab(std::size_t tab);
     void click_command(CommandAddress address);
     void launch(std::size_t group);
@@ -697,6 +789,13 @@ private:
     // Every group's layouts, authored or generated, indexed [tab][group].
     std::vector<std::vector<std::vector<RibbonGroupLayout>>> layouts_{};
     std::optional<std::size_t> selected_tab_{};
+    // Contextual sets and modes: the sets, their states, each tab's set (none
+    // for a core tab), the modes shown, and the core tab chosen last.
+    std::vector<RibbonTabSetSpec> tab_sets_{};
+    std::vector<TabSetState> set_states_{};
+    std::vector<std::optional<std::size_t>> tab_set_of_{};
+    std::uint32_t application_modes_{1U};
+    std::optional<std::size_t> last_core_tab_{};
     bool minimized_{};
     std::string application_text_{"File"};
     std::vector<MenuItemSpec> application_menu_{};
@@ -727,6 +826,8 @@ private:
     mutable std::vector<Rect> scratch_commands_{};
     mutable RibbonScalingCounters counters_{};
     std::size_t first_group_{};
+    // Whether the plane scrolls, latched by arrange with scroll_hysteresis.
+    bool scroll_latched_{};
     double document_minimum_height_{};
     bool plane_hidden_{};
 

@@ -115,10 +115,46 @@ void Ribbon::set_focus_region(bool region) {
 
 // -- model ---------------------------------------------------------------------
 
-void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs) {
+void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets) {
     require_mutable();
     if (tabs.size() > maximum_tabs) throw std::invalid_argument("Ribbon has more tabs than maximum_tabs");
     std::unordered_set<std::string> identities{};
+    for (const RibbonTabSetSpec& set : sets) {
+        if (set.stable_id.empty() || !validate_utf8(set.stable_id).valid() || !validate_utf8(set.caption).valid() ||
+            !identities.insert(set.stable_id).second) {
+            throw std::invalid_argument("Ribbon tab sets require unique stable IDs and valid UTF-8");
+        }
+    }
+    // Each tab's set, in order: core tabs first, then each set's tabs
+    // together, in the sets' order.
+    std::vector<std::optional<std::size_t>> tab_set_of(tabs.size());
+    std::vector<std::size_t> set_tab_counts(sets.size(), 0U);
+    std::optional<std::size_t> current_set{};
+    for (std::size_t tab_index = 0; tab_index < tabs.size(); ++tab_index) {
+        const RibbonTabSpec& tab = tabs[tab_index];
+        if (tab.modes == 0U) throw std::invalid_argument("Ribbon tabs need at least one application mode");
+        if (tab.tab_set.empty()) {
+            if (current_set) throw std::invalid_argument("Ribbon core tabs come before every contextual tab");
+            continue;
+        }
+        std::optional<std::size_t> set{};
+        for (std::size_t candidate = 0; candidate < sets.size(); ++candidate) {
+            if (sets[candidate].stable_id == tab.tab_set) set = candidate;
+        }
+        if (!set) throw std::invalid_argument("Ribbon tab names an undeclared tab set");
+        if (current_set && *set < *current_set) {
+            throw std::invalid_argument("Ribbon contextual tabs come together, in their sets' order");
+        }
+        if (current_set != set && set_tab_counts[*set] != 0U) {
+            throw std::invalid_argument("Ribbon contextual tabs come together, in their sets' order");
+        }
+        current_set = set;
+        ++set_tab_counts[*set];
+        tab_set_of[tab_index] = set;
+    }
+    for (const std::size_t count : set_tab_counts) {
+        if (count == 0U) throw std::invalid_argument("Ribbon tab set has no tabs");
+    }
     std::unordered_set<const RibbonGallery*> galleries{};
     // Every group's layouts, validated or generated before anything changes.
     std::vector<std::vector<std::vector<RibbonGroupLayout>>> prepared(tabs.size());
@@ -140,6 +176,7 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs) {
             if (group.commands.size() > maximum_commands_per_group) {
                 throw std::invalid_argument("Ribbon group has more commands than maximum_commands_per_group");
             }
+            if (group.modes == 0U) throw std::invalid_argument("Ribbon groups need at least one application mode");
             std::size_t group_galleries = 0U;
             for (const RibbonCommandSpec& command : group.commands) {
                 if (command.stable_id.empty() || !validate_utf8(command.stable_id).valid() ||
@@ -216,7 +253,25 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs) {
     const std::optional<std::size_t> old_selection = selected_tab_;
     std::string selected_id;
     if (old_selection) selected_id = tabs_[*old_selection].stable_id;
+    // Sets keep their availability and last accent by ID.
+    std::vector<TabSetState> states(sets.size());
+    for (std::size_t set = 0; set < sets.size(); ++set) {
+        for (std::size_t old = 0; old < tab_sets_.size(); ++old) {
+            if (tab_sets_[old].stable_id != sets[set].stable_id) continue;
+            states[set].availability = set_states_[old].availability;
+            states[set].last_accent = set_states_[old].accent ? set_states_[old].accent : set_states_[old].last_accent;
+        }
+    }
+    for (std::size_t tab = 0; tab < tab_set_of.size(); ++tab) {
+        if (!tab_set_of[tab]) continue;
+        TabSetState& state = states[*tab_set_of[tab]];
+        if (state.tab_count == 0U) state.first_tab = tab;
+        ++state.tab_count;
+    }
     tabs_ = std::move(tabs);
+    tab_sets_ = std::move(sets);
+    set_states_ = std::move(states);
+    tab_set_of_ = std::move(tab_set_of);
     layouts_ = std::move(prepared);
     records_.clear();
     records_.resize(tabs_.size());
@@ -267,11 +322,14 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs) {
     for (const Control::Ptr& old : previous_galleries) {
         if (old && (*old).parent().get() == this) static_cast<void>(remove_child((*old).runtime_id()));
     }
+    refresh_accents();
     selected_tab_.reset();
+    last_core_tab_.reset();
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
-        if (tabs_[tab].stable_id == selected_id) selected_tab_ = tab;
+        if (tabs_[tab].stable_id == selected_id && shown(tab)) selected_tab_ = tab;
     }
-    if (!selected_tab_ && !tabs_.empty()) selected_tab_ = 0U;
+    if (!selected_tab_) selected_tab_ = fallback_tab();
+    if (selected_tab_ && !tab_set_of_[*selected_tab_]) last_core_tab_ = selected_tab_;
     scaling_.assign(tabs_.size(), TabScaling{});
     ++content_generation_;
     first_group_ = 0U;
@@ -340,11 +398,25 @@ std::shared_ptr<TextBox> Ribbon::text_box(std::string_view command_id) const {
 void Ribbon::set_selected_tab(std::size_t tab) {
     require_mutable();
     if (tab >= tabs_.size()) throw std::out_of_range("Ribbon tab index is past the end");
+    if (!shown(tab)) throw std::invalid_argument("Ribbon tab is not shown");
     select_tab(tab);
 }
 
-void Ribbon::select_tab(std::size_t tab) {
+// Selects a shown tab. The user's choices are remembered for the selection
+// rules: a set's tab until a core tab or another set's tab is chosen, and
+// the core tab chosen last.
+void Ribbon::select_tab(std::size_t tab, SelectionCause cause) {
+    const std::optional<std::size_t> set = tab_set_of_[tab];
+    if (cause == SelectionCause::user) {
+        for (std::size_t other = 0; other < set_states_.size(); ++other) {
+            if (!set || other != *set) set_states_[other].remembered_tab.reset();
+        }
+        if (set) set_states_[*set].remembered_tab = tab;
+    }
+    if (!set) last_core_tab_ = tab;
     if (selected_tab_ == tab) return;
+    // Another tab has its own ladder; arrange latches scrolling afresh.
+    scroll_latched_ = false;
     close_menus();
     close_group_popup();
     selected_tab_ = tab;
@@ -539,6 +611,14 @@ Size Ribbon::measure(Size available) {
 
 void Ribbon::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
+    // Scrolling starts below the narrowest entry and ends only
+    // scroll_hysteresis above it (owner decision 45).
+    bool latched = false;
+    if (selected_tab_ && !minimized_ && !plane_hidden_ && !tabs_[*selected_tab_].groups.empty()) {
+        const double narrowest = tab_scaling(*selected_tab_).ladder.back().width;
+        latched = scroll_latched_ ? final_bounds.width < narrowest + scroll_hysteresis : final_bounds.width < narrowest;
+    }
+    scroll_latched_ = latched;
     const Rect client{0.0, 0.0, final_bounds.width, final_bounds.height};
     Layout placed = layout_for(client);
     if (!placed.scrolling) first_group_ = 0U;
@@ -585,6 +665,8 @@ Ribbon::TabParts Ribbon::tab_parts(const Layout& placed, std::size_t tab) const 
     const double padding = tab_padding * effective_text_scale();
     TabParts parts;
     parts.tab = PartGeometry::from_bounds(bounds);
+    // A contextual tab's face carries its set's tint (owner decision 25).
+    if (parts.tab.present) parts.tab.accent = tab_accent(tab);
     parts.tab_label = PartGeometry::from_bounds(
         {bounds.x + padding, bounds.y, std::max(0.0, bounds.width - padding * 2.0), bounds.height});
     parts.tab_focus = PartGeometry::from_bounds(bounds);
@@ -771,6 +853,7 @@ Ribbon::Parts Ribbon::control_parts(const Layout& placed) const {
     record.application_button.states = application;
     record.application_label.states = application;
     record.command_plane = PartGeometry::from_bounds(placed.plane);
+    if (record.command_plane.present && selected_tab_) record.command_plane.accent = tab_accent(*selected_tab_);
     const double glyph = arrow_glyph * scale;
     record.scroll_left = PartGeometry::from_bounds(placed.scroll_left);
     record.scroll_left_glyph = PartGeometry::from_bounds(centred_square(placed.scroll_left, glyph));
@@ -862,11 +945,14 @@ void Ribbon::on_paint(Painter& painter, Rect) {
     // family) until T4 draws the tab stack.
     part.family = ControlVisualRole::menu_item;
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (!shown(tab)) continue;
         const TabParts parts = tab_parts(placed, tab);
         part.states = tab_states(tab);
         part.role = PartRole::face;
         part.bounds = parts.tab.bounds;
+        part.accent = parts.tab.accent;
         paint_part(painter, *this, part);
+        part.accent.reset();
         const std::string label = parse_mnemonic_text(tabs_[tab].text).display_text;
         part.role = PartRole::label;
         part.bounds = parts.tab_label.bounds;
@@ -883,7 +969,9 @@ void Ribbon::on_paint(Painter& painter, Rect) {
     part.family = ControlVisualRole::panel;
     part.role = PartRole::face;
     part.bounds = placed.plane;
+    part.accent = own.command_plane.accent;
     paint_part(painter, *this, part);
+    part.accent.reset();
     painter.save();
     painter.clip_rect(placed.groups_area);
     paint_groups(painter, placed);
@@ -1298,10 +1386,13 @@ void Ribbon::popup_pointer(PointerEvent& event, Rect panel) {
 std::vector<Ribbon::Stop> Ribbon::stops_for(const Layout& placed) const {
     std::vector<Stop> result;
     result.push_back(Stop{StopKind::application, 0U, {}});
-    for (std::size_t tab = 0; tab < tabs_.size(); ++tab) result.push_back(Stop{StopKind::tab, tab, {}});
+    for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (shown(tab)) result.push_back(Stop{StopKind::tab, tab, {}});
+    }
     if (minimized_ || plane_hidden_ || !selected_tab_ || placed.plane.empty()) return result;
     const std::vector<RibbonGroupSpec>& groups = tabs_[*selected_tab_].groups;
     for (std::size_t group = 0; group < groups.size(); ++group) {
+        if (!group_shown(*selected_tab_, group)) continue;
         if (group_collapsed(placed, group)) {
             result.push_back(Stop{StopKind::group_button, group, {}});
             continue;
@@ -1402,7 +1493,10 @@ void Ribbon::on_key(KeyEvent& event) {
     }
     const Stop current = all[position];
     const bool in_row = current.kind == StopKind::application || current.kind == StopKind::tab;
-    const std::size_t row_count = tabs_.size() + 1U;
+    std::size_t row_count = 0U;
+    for (const Stop& stop : all) {
+        if (stop.kind == StopKind::application || stop.kind == StopKind::tab) ++row_count;
+    }
     const std::uint32_t key = event.physical_key;
     const bool shift = has_modifier(event.modifiers, Modifier::shift);
     if (key == PhysicalKey::tab) {
@@ -1519,8 +1613,8 @@ void Ribbon::popup_focus_changed(bool focused) {
 
 bool Ribbon::mnemonic_matches(char32_t character) const noexcept {
     if (is_mnemonic(character, application_text_)) return true;
-    for (const RibbonTabSpec& tab : tabs_) {
-        if (is_mnemonic(character, tab.text)) return true;
+    for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (shown(tab) && is_mnemonic(character, tabs_[tab].text)) return true;
     }
     if (minimized_ || plane_hidden_ || !selected_tab_) return false;
     for (const RibbonGroupSpec& group : tabs_[*selected_tab_].groups) {
@@ -1539,7 +1633,7 @@ bool Ribbon::process_mnemonic_self(char32_t character) {
         return true;
     }
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
-        if (!is_mnemonic(character, tabs_[tab].text)) continue;
+        if (!shown(tab) || !is_mnemonic(character, tabs_[tab].text)) continue;
         select_tab(tab);
         if (minimized_) set_minimized(false);
         return true;
@@ -1915,12 +2009,18 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     row.bounds = to_window(absolute, placed.tab_rail);
     row.states = base;
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (!shown(tab)) continue;
+        // Core tabs count their place among the core tabs shown, and a
+        // contextual tab among its set's; its set's caption describes it.
+        std::size_t count = 0U;
+        const std::size_t position = position_among_shown(tab, count);
         SemanticNode node{};
         node.stable_id = node_identity(ribbon_id, "tab", tabs_[tab].stable_id);
         node.role = SemanticRole::tab;
         node.name = parse_mnemonic_text(tabs_[tab].text).display_text;
-        node.position_in_set = tab + 1U;
-        node.set_size = tabs_.size();
+        if (tab_set_of_[tab]) node.description = tab_sets_[*tab_set_of_[tab]].caption;
+        node.position_in_set = position;
+        node.set_size = count;
         node.bounds = to_window(absolute, placed.tabs[tab]);
         node.states = base | SemanticState::focusable;
         if (selected_tab_ == tab) node.states |= SemanticState::selected;
@@ -2000,6 +2100,7 @@ bool Ribbon::on_semantic_child_action(std::string_view id, SemanticAction action
     const std::string_view tab_id = node_suffix(id, ribbon_id, "tab");
     for (std::size_t tab = 0; tab < tabs_.size() && !tab_id.empty(); ++tab) {
         if (tabs_[tab].stable_id != tab_id) continue;
+        if (!shown(tab)) return false;
         if (action == SemanticAction::press) {
             click_tab(tab);
             return true;
@@ -2225,6 +2326,7 @@ std::vector<Ribbon::RealizedItem> Ribbon::realized_list(const Layout& placed) co
     std::vector<RealizedItem> list;
     list.reserve(tabs_.size());
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (!shown(tab)) continue;
         RealizedItem item;
         item.kind = RealizedItem::Kind::tab;
         item.index = tab;
@@ -2310,6 +2412,7 @@ std::vector<Ribbon::Tab> Ribbon::realized_tabs() const {
     std::vector<Tab> records;
     records.reserve(tabs_.size());
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (!shown(tab)) continue;
         Tab record;
         record.index = tab;
         record.stable_id = tabs_[tab].stable_id;

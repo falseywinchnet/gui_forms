@@ -23,8 +23,11 @@ stable_id
 Properties
 ----------
 tabs
-    The core tabs, each with its groups and their commands. `set_tabs`
-    replaces them, keeps the selection on a tab with the same ID, keeps a
+    The tabs, each with its groups and their commands: the core tabs, then
+    the contextual tabs, each set's together in the sets' order.
+    `set_tabs(tabs, sets)` replaces them and the tab sets, keeps each set's
+    availability by ID, keeps the selection on a shown tab with the same ID
+    (else the first core tab shown), keeps a
     hosted control while a command of the same ID and kind remains, and
     throws `std::invalid_argument` for an empty or repeated ID (one namespace
     across tabs, groups and commands), invalid UTF-8, a button, toggle or
@@ -40,8 +43,15 @@ tabs
     gallery past its minimum (owner decision 29), or more than the
     development bounds. A refused definition leaves the previous tabs.
 selected_tab
-    The selected tab, or none without tabs. `set_selected_tab` throws
-    `std::out_of_range` for a tab past the end.
+    The selected tab, or none while no tab shows. `set_selected_tab` throws
+    `std::out_of_range` for a tab past the end and `std::invalid_argument`
+    for a tab not shown.
+tab_sets
+    The contextual tab sets (`RibbonTabSetSpec`: ID and caption).
+application_modes : default ``1``
+    The application modes shown, one bit per mode. Tabs and groups whose
+    `modes` share a bit with it show. `set_application_modes` throws
+    `std::invalid_argument` for zero.
 minimized : default ``false``
     Whether the command plane is hidden, leaving the tab row.
 document_minimum_height : default ``0``
@@ -55,8 +65,9 @@ ladder_step
     The selected tab's ladder entry the plane shows, or none while it is
     hidden or minimized.
 scrolling
-    Whether even the narrowest entry is wider than the plane, so that the
-    plane scrolls.
+    Whether the plane scrolls: from when even the narrowest entry is wider
+    than the plane until the plane is `Ribbon::scroll_hysteresis` (8 units)
+    wider than that entry (owner decision 45).
 first_visible_group
     The first group shown while the plane scrolls.
 scaling_counters
@@ -129,6 +140,16 @@ group_layouts
 reduction_ladder
     A tab's `RibbonLadderEntry` list from the widest to the narrowest, built
     if needed. Throws `std::out_of_range` for a tab past the end.
+tab_set_availability
+    A set's `RibbonTabSetAvailability`. `set_tab_set_availability` changes it
+    and applies the selection rules (see Notes). Both throw
+    `std::out_of_range` for an unknown set.
+tab_set_accent
+    The `AccentIndex` a shown set is tinted with, or none while it is hidden.
+    Throws `std::out_of_range` for an unknown set.
+tab_shown
+    Whether a tab shows now, by its modes and its set's availability. Throws
+    `std::out_of_range` for a tab past the end.
 combo_box
     The `ComboBox` a combo box command holds. `numeric_up_down`, `check_box`
     and `text_box` return the other hosted controls. Each throws
@@ -168,7 +189,9 @@ wrapping, where a group with a gallery above its minimum gives up one column
 (decision 8) before it changes layout. A step that does not narrow the tab is
 folded into the next entry, so widths strictly decrease. The plane shows the
 widest entry no wider than itself. Below the narrowest entry it scrolls at
-any width (decision 35): scroll buttons at the ends move by one group, a
+any width (decision 35), and it keeps scrolling until it is 8 units wider
+than that entry (decision 45; in that band the right button covers the last
+group): scroll buttons at the ends move by one group, a
 group that does not fit whole before the right button is not shown (the
 first is clipped), and the keyboard's stop scrolls its group into view.
 
@@ -223,7 +246,9 @@ command texts (``&Home``) open, select or activate them. The ribbon adds
 itself to its window's F6 regions.
 
 To accessibility the ribbon is a group holding the File tab (a
-`menu_button` with a popup), the tab row (a `tab_group` of positioned tabs)
+`menu_button` with a popup), the tab row (a `tab_group` of the shown tabs:
+core tabs positioned among the core tabs, a contextual tab among its set's,
+described by the set's caption)
 and, while shown, the command plane (a group named after the selected tab)
 with its groups, named by caption, and their commands: `button`,
 `split_button` or `menu_button`, with positions in their group and
@@ -232,7 +257,27 @@ has-popup, and each launcher as a button. A collapsed group is a
 buttons. Hosted controls describe themselves as children of the ribbon, or
 of the popup while it is open.
 
-Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
+Contextual tab sets (owner decisions 14, 22 and 25). A tab whose
+`tab_set` names a set shows while the application makes the set available
+or active (for example while a picture is selected); the ribbon never infers
+it. A shown set is marked by a tint on its tabs' faces and on the command
+plane of its selected tab, from the theme's accent ramp: each `tab` part and
+the `command_plane` part carry the set's `AccentIndex`. There is no captioned
+band over the set (T4-2). A newly shown set takes an accent no other shown
+set has, keeping its previous one when that is free. The built-in selection
+rules (F3-1): a set becoming active selects the set's tab the user chose
+last, else its first tab; becoming available changes no selection; a set
+leaving while one of its tabs is selected selects the core tab chosen last,
+else the first core tab shown. The remembered set tab is forgotten when the
+user chooses a core tab or another set's tab.
+
+Application modes (F2-1, after the Windows Ribbon Framework). Every tab and
+group belongs to the modes in its `modes` bit set (every mode by default),
+and shows while one of them is in `application_modes`. A mode switch
+replaces the tabs shown at once; a selected tab that no longer shows gives
+way as above, and groups that leave take no room and no ladder steps.
+
+Not yet: the Quick Access Toolbar, the minimized popup,
 Backstage, the application menu's recent-items pane (the File tab opens a
 `ContextMenu`), right-to-left mirroring of the cycle, two-line large labels
 and ellipsized tab labels (decision 30 allows them; tabs past the row's end

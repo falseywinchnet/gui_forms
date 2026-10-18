@@ -221,6 +221,12 @@ From the docking interview (2026-10-17,
     `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
     own. Revises decision 12.
 
+From the owner's review of phase 2b (relayed by the coordinator, 2026-10):
+
+45. **The scroll buttons take 8 units of hysteresis**, as the hide rule does
+    (decision 36): they appear when the narrowest layout no longer fits and
+    disappear only when 8 more units are available.
+
 ## Gate
 
 The interview round is recorded, the decisions are in this brief, and the

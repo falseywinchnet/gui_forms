@@ -492,12 +492,14 @@ private:
         (*frame_group).add_at(frame, {22.0, 36.0, 880.0, 176.0});
     }
 
-    // A Ribbon over the same Commands (stage RB, phase 1): Home with a
+    // A Ribbon over the same Commands (stage RB, phases 1 and 5): Home with a
     // launcher, a large split, small commands and a toggle; Insert with
-    // hosted controls; the File tab's application menu.
+    // hosted controls; the File tab's application menu; and a contextual
+    // Picture Tools set (Format), made available so that its tint shows on
+    // the tab and, when selected, on the plane.
     void build_ribbon(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> ribbon_group = group(
-            "gallery.commands.ribbon", "Ribbon · phase 1: tabs, groups, launchers, hosted controls", {930.0, 160.0});
+            "gallery.commands.ribbon", "Ribbon · phases 1 and 5: tabs, groups, launchers, hosted controls, a contextual set", {930.0, 160.0});
         (*body).add_at(ribbon_group, {24.0, 1068.0, 930.0, 160.0});
         std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("gallery.commands.ribbon.bar"));
         (*ribbon).set_accessible_name("Document ribbon");
@@ -535,9 +537,17 @@ private:
         find.commands.push_back({.stable_id = "ribbon.case", .kind = RibbonCommandKind::check_box,
                                  .text = "Match case"});
         insert.groups.push_back(std::move(find));
+        RibbonTabSpec format{.stable_id = "ribbon.format", .text = "Format", .tab_set = "ribbon.picture"};
+        RibbonGroupSpec arrange{.stable_id = "ribbon.arrange", .caption = "Arrange"};
+        arrange.commands.push_back({.stable_id = "ribbon.format.about", .command = about_});
+        arrange.commands.push_back({.stable_id = "ribbon.format.delete", .size = RibbonCommandSize::small,
+                                    .command = delete_});
+        format.groups.push_back(std::move(arrange));
         tabs.push_back(std::move(home));
         tabs.push_back(std::move(insert));
-        (*ribbon).set_tabs(std::move(tabs));
+        tabs.push_back(std::move(format));
+        (*ribbon).set_tabs(std::move(tabs), {{"ribbon.picture", "Picture Tools"}});
+        (*ribbon).set_tab_set_availability("ribbon.picture", RibbonTabSetAvailability::available);
         (*ribbon).set_application_menu({item("ribbon.file.new", new_), item("ribbon.file.save", save_),
                                         separator("ribbon.file.separator"), item("ribbon.file.about", about_)});
         on((*ribbon).dialog_launcher_clicked(), *this, &CommandsAndMenusPage::on_ribbon_launcher);
