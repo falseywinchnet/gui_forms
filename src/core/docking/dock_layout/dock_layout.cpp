@@ -112,6 +112,8 @@ DockTransactionResult DockLayout::apply(const DockTransaction& transaction) {
     DockLayoutState scratch = state_;
     DockTransactionResult result = run(transaction, scratch);
     if (!result.applied) return result;
+    // Unknown fields of elements the transaction removed go with them.
+    detail::prune_unknown_fields(scratch, result.dropped_unknown_fields);
     commit(std::move(scratch), transaction.origin, transaction.edits.size(), false);
     result.generation = generation_;
     return result;

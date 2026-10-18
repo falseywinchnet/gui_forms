@@ -72,4 +72,12 @@ void detach_dock_panel(DockLayoutState& state, const DockPanelId& panel);
 
 [[nodiscard]] DockInvariantResult check_dock_invariants(const DockLayoutState& state);
 
+// Kept unknown fields (DK decision 48). The entry for an owner, or null;
+// whether the owner's element is still in the layout; and dropping every
+// entry whose element is gone, appending their owners to `dropped`.
+[[nodiscard]] const DockUnknownFields* find_unknown_fields(const DockLayoutState& state,
+                                                          const DockUnknownOwner& owner) noexcept;
+[[nodiscard]] bool unknown_owner_exists(const DockLayoutState& state, const DockUnknownOwner& owner) noexcept;
+void prune_unknown_fields(DockLayoutState& state, std::vector<DockUnknownOwner>& dropped);
+
 } // namespace gui_forms::detail

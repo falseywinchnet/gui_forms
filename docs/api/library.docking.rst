@@ -106,6 +106,12 @@ Related types
      - Primitive edits applied together: validated first, then applied all or nothing, publishing one change (DOCKING_STUDY.md section 5.3).
    * - :cpp:class:`DockTransactionResult <gui_forms::DockTransactionResult>`
      -  
+   * - :cpp:class:`DockUnknownChild <gui_forms::DockUnknownChild>`
+     - One unknown child element, whole, and how many of its parent's known children came before it in the file; it is written back after that many known children (or last, when there are fewer now).
+   * - :cpp:class:`DockUnknownFields <gui_forms::DockUnknownFields>`
+     - The unknown attributes (in file order; written after the known ones) and child elements of one known element.
+   * - :cpp:class:`DockUnknownOwner <gui_forms::DockUnknownOwner>`
+     -  
    * - :cpp:class:`DockVisiblePanel <gui_forms::DockVisiblePanel>`
      - A panel in a stack, as the realizing controls need it: lazy creation builds only panels that are selected in a docked or floating stack, and the rest on first show (DK decision 34).
    * - :cpp:class:`DockWindowFrame <gui_forms::DockWindowFrame>`
@@ -520,6 +526,10 @@ Related types
 
       The application's own layout version, saved with the layout. Default: ``{0}``.
 
+   .. cpp:member:: std::vector<DockUnknownFields> unknown_fields
+
+      Fields of a newer format this framework does not know, kept from a restore and written back (DK decision 48), one entry per element that had any, in file order. An edit that removes an element drops its entry (DockTransactionResult::diagnostics).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: DockLayoutUpgradeHook final
@@ -852,6 +862,54 @@ Related types
 
       The layout's generation after the transaction.
 
+   .. cpp:member:: std::vector<DockUnknownOwner> dropped_unknown_fields
+
+      The elements whose kept unknown fields (DockLayoutState::unknown_fields) the transaction dropped because it removed the element (a node pruned, a panel hidden, a memory replaced by none); empty almost always.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownChild final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   One unknown child element, whole, and how many of its parent's known children came before it in the file; it is written back after that many known children (or last, when there are fewer now).
+
+   .. cpp:member:: std::size_t after_known
+
+   .. cpp:member:: XmlElement element
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownFields final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   The unknown attributes (in file order; written after the known ones) and child elements of one known element.
+
+   .. cpp:member:: DockUnknownOwner owner
+
+   .. cpp:member:: std::vector<XmlAttribute> attributes
+
+   .. cpp:member:: std::vector<DockUnknownChild> children
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownOwner final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   .. cpp:member:: DockUnknownOwnerKind kind
+
+      Default: ``{DockUnknownOwnerKind::layout}``.
+
+   .. cpp:member:: std::uint32_t id
+
+      floating_site: the site's ID; auto_hidden: its stack's; node: the node's; otherwise zero.
+
+   .. cpp:member:: DockPanelId panel
+
+      panel, panel_record and the memories: the panel; otherwise empty.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: DockVisiblePanel final
@@ -1133,6 +1191,8 @@ Enumerations
 
    .. cpp:enumerator:: structure_invalid
 
+   .. cpp:enumerator:: unknown_fields_dropped
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: DockRestoreStatus
@@ -1166,6 +1226,34 @@ Enumerations
    .. cpp:enumerator:: panel
 
    .. cpp:enumerator:: stack
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockUnknownOwnerKind
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   .. cpp:enumerator:: layout
+
+   .. cpp:enumerator:: main_site
+
+   .. cpp:enumerator:: window
+
+   .. cpp:enumerator:: floating_site
+
+   .. cpp:enumerator:: auto_hidden
+
+   .. cpp:enumerator:: node
+
+   .. cpp:enumerator:: panel
+
+   .. cpp:enumerator:: panel_record
+
+   .. cpp:enumerator:: docked_memory
+
+   .. cpp:enumerator:: floating_memory
+
+   .. cpp:enumerator:: auto_hidden_memory
 
 .. cpp:namespace:: gui_forms
 
