@@ -53,6 +53,8 @@ Related types
      -  
    * - :cpp:class:`TextEdit <gui_forms::TextEdit>`
      - One user edit, offered to the edit filter before the TextBox changes anything: replace [start, end) of text() with ``replacement``.
+   * - :cpp:class:`TextMatchRange <gui_forms::TextMatchRange>`
+     - The part of a text that matched a pattern: ``length`` bytes from byte ``offset``, both on scalar boundaries of the text.
    * - :cpp:class:`TextSelection <gui_forms::TextSelection>`
      - TextSelection is TextBox's normalized byte-boundary selection value.
 
@@ -256,6 +258,18 @@ Related types
    .. cpp:member:: Utf8Offset rewritten_caret
 
       A byte offset in rewritten_text; moved forward to a grapheme boundary.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TextMatchRange final
+
+   ``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+   The part of a text that matched a pattern: ``length`` bytes from byte ``offset``, both on scalar boundaries of the text. A zero length is no match. Suggestion and drop-down lists highlight it.
+
+   .. cpp:member:: std::size_t offset
+
+   .. cpp:member:: std::size_t length
 
 .. cpp:namespace:: gui_forms
 

@@ -632,6 +632,21 @@ void example() {
 }
 }  // namespace doc_example_ComboBox_3
 
+namespace doc_example_ComboBox_4 {
+void example() {
+    std::shared_ptr<gf::ComboBox> station =
+        gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+    (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+    (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+    gf::Window window(station, gf::Size{240.0, 200.0});
+    window.request_focus((*station).editor());
+    window.dispatch_text(gf::TextInputEvent{"hb"});
+    // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+    // (*station).drop_down_items() is {0, 1, 3}.
+}
+}  // namespace doc_example_ComboBox_4
+
 namespace doc_example_Command_1 {
 struct Document final : gf::Component {
     gf::Command save{"file.save", "Save"};
@@ -3435,6 +3450,7 @@ int main() {
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
     failures += run("ComboBox example 2", &doc_example_ComboBox_2::example);
     failures += run("ComboBox example 3", &doc_example_ComboBox_3::example);
+    failures += run("ComboBox example 4", &doc_example_ComboBox_4::example);
     failures += run("Command example 1", &doc_example_Command_1::example);
     failures += run("Command example 2", &doc_example_Command_2::example);
     failures += run("CommandBar example 1", &doc_example_CommandBar_1::example);

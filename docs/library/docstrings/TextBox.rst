@@ -230,8 +230,9 @@ candidate that starts with the typed text, selected, so the next character
 replaces it; the typed text keeps its own case. Deleting, pasting, typing
 before the end and input-method composition never append, and nothing is
 appended past `maximum_length`. In `suggest` and `suggest_append` mode a
-list of the matching candidates opens under the box; it never takes the
-focus, so typing goes on in the box, and it closes when nothing matches.
+list of the matching candidates opens under the box, each with the typed
+prefix highlighted; it never takes the focus, so typing goes on in the box,
+and it closes when nothing matches.
 Matching is by prefix and ignores the case of ASCII letters unless
 `auto_complete_case_sensitive` is set.
 

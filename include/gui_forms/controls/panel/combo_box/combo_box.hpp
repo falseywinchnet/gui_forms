@@ -22,6 +22,13 @@ enum class ComboBoxStyle : std::uint8_t {
     drop_down,       // the field is a TextBox: any text, or an item from the list
 };
 
+// How a drop_down-style ComboBox's list follows what the user types.
+enum class ComboBoxFilter : std::uint8_t {
+    none,       // the list shows every item
+    prefix,     // the list shows the items that start with the typed text
+    substring,  // the list shows the items that contain the typed text
+};
+
 class ComboBox final : public Panel {
 public:
     explicit ComboBox(StableId stable_id);
@@ -71,6 +78,19 @@ public:
     void set_text(std::string text);
     // The field's TextBox in the drop_down style, and null otherwise.
     [[nodiscard]] std::shared_ptr<TextBox> editor() const noexcept { return editor_; }
+
+    // Searching: in the drop_down style, typing opens the list showing only
+    // the items that match the typed text (ignoring ASCII case), with the
+    // matched text highlighted. While a filter is set the editor does not
+    // auto-complete. The setting is kept in the drop_down_list style and
+    // acts there once the style is drop_down. Changing it closes the list.
+    [[nodiscard]] ComboBoxFilter drop_down_filter() const noexcept { return drop_down_filter_; }
+    void set_drop_down_filter(ComboBoxFilter filter);
+    // The items the open list shows, as indices into items(), in row order;
+    // empty while the list is closed. Rows keep their item's identity: a
+    // row's semantic ID ends in its item's index, and the selection is
+    // always an index into items().
+    [[nodiscard]] std::span<const std::size_t> drop_down_items() const noexcept { return rows_; }
 
     // Auto-complete for the drop_down style's editor, as Windows Forms'
     // AutoCompleteMode, AutoCompleteSource and AutoCompleteCustomSource.
@@ -156,7 +176,22 @@ private:
     void reset_text_property();
     [[nodiscard]] bool should_serialize_text_property() const noexcept;
     void popup_selection_changed(const ListSelectionChange& change);
-    void open_drop_down();
+    // Opens the list on the items matching `pattern` (every item for an
+    // empty pattern or no filter); nothing opens when none match.
+    void open_drop_down(std::string_view pattern);
+    // Fills rows_ and row_matches_ for `pattern`.
+    void compute_rows(std::string_view pattern);
+    // Shows rows_ in the open list, with their matches and the selected
+    // item's row, and sizes the drop_down style's list to them.
+    void show_rows();
+    // Recomputes the open list's rows after the items or the typed text
+    // changed; closes the list when nothing matches.
+    void refresh_open_rows(std::string_view pattern);
+    [[nodiscard]] std::optional<std::size_t> row_of_item(std::optional<std::size_t> item) const noexcept;
+    [[nodiscard]] double drop_down_height(std::size_t rows) const;
+    // Up or Down through the open list's rows; from no selection, either
+    // goes to the first row.
+    bool step_row(std::uint32_t key);
     void close_drop_down();
     void commit_popup_selection(std::size_t index);
     void on_popup_revoked();
@@ -200,6 +235,14 @@ private:
     bool synchronizing_text_{};
     // Set while this control moves the open list's row itself.
     bool synchronizing_list_{};
+    // Set while set_text gives the editor its text: that is not typing.
+    bool programmatic_text_{};
+    ComboBoxFilter drop_down_filter_{ComboBoxFilter::none};
+    // The open list's rows (indices into items_), the matched text of each
+    // row while filtering, and the typed text they were computed for.
+    std::vector<std::size_t> rows_;
+    std::vector<TextMatchRange> row_matches_;
+    std::string filter_pattern_;
     AutoCompleteMode auto_complete_mode_{AutoCompleteMode::none};
     AutoCompleteSource auto_complete_source_{AutoCompleteSource::none};
     std::shared_ptr<AutoCompleteStringCollection> auto_complete_custom_source_;
