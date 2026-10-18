@@ -168,7 +168,7 @@ DockNavigator::Layout DockNavigator::layout_for(Size surface) const {
     const double heading = heading_height * scale;
     const double top = inset + heading + heading_gap * scale;
     const double rows = std::max(0.0, surface.height - top - inset);
-    Layout placed;
+    Layout placed{};
     placed.face = {0.0, 0.0, surface.width, surface.height};
     placed.tool_heading = {inset, inset, column, heading};
     placed.document_heading = {inset + column + column_gap * scale, inset, column, heading};
@@ -183,6 +183,12 @@ Rect DockNavigator::row_bounds(const Layout& placed, DockNavigatorList list, std
     const double y = column.y + static_cast<double>(index) * placed.row_height;
     const Rect bounds{column.x, y, column.width, placed.row_height};
     return bounds;
+}
+
+Rect DockNavigator::entry_label_bounds(Rect row) const {
+    const double inset = label_inset * effective_text_scale();
+    const Rect label{row.x + inset, row.y, std::max(0.0, row.width - inset * 2.0), row.height};
+    return label;
 }
 
 Size DockNavigator::measure(Size) {
@@ -202,7 +208,7 @@ void DockNavigator::arrange(Rect final_bounds) {
 // -- states --------------------------------------------------------------------
 
 AnatomyStateSet DockNavigator::row_states(DockNavigatorList list, std::size_t index) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (hot_ && (*hot_).list == list && (*hot_).index == index) states.insert(AnatomyState::hot);
     if (current_ && list_ == list && *current_ == index) states.insert(AnatomyState::selected);
     return states;
@@ -215,7 +221,7 @@ AnatomyStateSet DockNavigator::row_states(DockNavigatorList list, std::size_t in
 void DockNavigator::on_paint(Painter& painter, Rect) {
     const Rect surface = client_rectangle();
     const Layout placed = layout_for(Size{surface.width, surface.height});
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     part.role = PartRole::face;
     part.bounds = placed.face;
@@ -231,7 +237,6 @@ void DockNavigator::on_paint(Painter& painter, Rect) {
     part.font = row_font();
     part.family = ControlVisualRole::menu_item;
     const std::array<DockNavigatorList, 2> lists{DockNavigatorList::tools, DockNavigatorList::documents};
-    const double inset = label_inset * effective_text_scale();
     for (const DockNavigatorList list : lists) {
         const std::vector<DockNavigatorEntry>& held = list_entries(list);
         for (std::size_t index = 0; index < held.size(); ++index) {
@@ -242,7 +247,7 @@ void DockNavigator::on_paint(Painter& painter, Rect) {
             part.text = {};
             paint_part(painter, *this, part);
             part.role = PartRole::label;
-            part.bounds = {row.x + inset, row.y, std::max(0.0, row.width - inset * 2.0), row.height};
+            part.bounds = entry_label_bounds(row);
             part.text = held[index].title;
             paint_part(painter, *this, part);
         }
@@ -471,7 +476,7 @@ const ControlAnatomy& DockNavigator::anatomy() const noexcept {
 void DockNavigator::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect surface = client_rectangle();
     const Layout placed = layout_for(Size{surface.width, surface.height});
-    Parts record;
+    Parts record{};
     record.region = PartGeometry::from_bounds(surface);
     record.face = PartGeometry::from_bounds(placed.face);
     record.tool_heading = PartGeometry::from_bounds(placed.tool_heading);
@@ -482,7 +487,7 @@ void DockNavigator::publish_part_geometry(std::span<PartGeometry> geometry) cons
 
 DockNavigator::Parts DockNavigator::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), navigator_part_fields, published.parts(), record);
     return record;
 }
@@ -523,21 +528,19 @@ void DockNavigator::publish_realized_item_geometry(std::size_t item, std::span<P
     const Rect surface = client_rectangle();
     const Layout placed = layout_for(Size{surface.width, surface.height});
     const Rect bounds = row_bounds(placed, row.list, row.index);
-    const double inset = label_inset * effective_text_scale();
-    ItemParts record;
+    ItemParts record{};
     record.entry_face = PartGeometry::from_bounds(bounds);
-    record.entry_label = PartGeometry::from_bounds(
-        {bounds.x + inset, bounds.y, std::max(0.0, bounds.width - inset * 2.0), bounds.height});
+    record.entry_label = PartGeometry::from_bounds(entry_label_bounds(bounds));
     write_declared_parts(entry_parts, entry_part_fields, record, geometry);
 }
 
 std::vector<DockNavigator::Item> DockNavigator::realized_items() const {
-    std::vector<Item> items;
+    std::vector<Item> items{};
     const std::size_t count = realized_item_count();
     items.reserve(count);
     for (std::size_t item = 0; item < count; ++item) {
         const Row row = realized_row(item);
-        Item record;
+        Item record{};
         record.list = row.list;
         record.index = row.index;
         record.panel = list_entries(row.list)[row.index].panel;
