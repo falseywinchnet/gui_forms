@@ -118,6 +118,15 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "prepared-text, text-mask and document-view services.",
           ("text", "text_shaping", "typography", "prepared_text", "text_mask",
            "document_view")),
+    Group("docking", "Docking",
+          "The renderer-free docking layout model: binary splits, tool and "
+          "document stacks, floating sites, auto-hide, placeholders, "
+          "restrictions, transactions and saved layouts.",
+          ("docking",)),
+    Group("xml", "XML documents",
+          "The bounded first-party XML reader and writer that GUI.Forms uses "
+          "for its own files, such as saved docking layouts.",
+          ("xml",)),
     Group("images-and-resources", "Images and resources",
           "The window-owned image registry and its PNG resource records.",
           ("resources",)),
