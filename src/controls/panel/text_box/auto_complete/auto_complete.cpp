@@ -15,14 +15,19 @@ unsigned char folded(unsigned char byte) noexcept {
 }
 
 // Whether `pattern` occurs in `candidate` at byte `offset`; the caller has
-// checked that it fits.
+// checked that it fits. The comparison is chosen once: exact bytes, or
+// bytes with ASCII letters folded.
 bool matches_at(std::string_view candidate, std::size_t offset, std::string_view pattern,
                 bool case_sensitive) noexcept {
+    const std::string_view window = candidate.substr(offset, pattern.size());
+    if (case_sensitive) {
+        const bool result = window == pattern;
+        return result;
+    }
     for (std::size_t index = 0U; index < pattern.size(); ++index) {
-        const unsigned char left = static_cast<unsigned char>(candidate[offset + index]);
+        const unsigned char left = static_cast<unsigned char>(window[index]);
         const unsigned char right = static_cast<unsigned char>(pattern[index]);
-        const bool equal = case_sensitive ? left == right : folded(left) == folded(right);
-        if (!equal) return false;
+        if (folded(left) != folded(right)) return false;
     }
     return true;
 }
