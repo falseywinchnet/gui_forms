@@ -60,6 +60,8 @@ const NavigationPane::Item* find_item(const std::vector<NavigationPane::Item>& i
     }
     return nullptr;
 }
+// Borrows from `items` as find_node does; temporaries are refused.
+const NavigationPane::Item* find_item(std::vector<NavigationPane::Item>&& items, std::string_view page) = delete;
 
 void click(Window& window, Point point) {
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, point}));
@@ -321,8 +323,9 @@ void hidden_pages_and_menu() {
             "a page with a button is not listed");
     require(window.perform_semantic_action((*row).stable_id, SemanticAction::press), "the hidden page's row is chosen");
     window.perform_layout();
+    const std::vector<NavigationPane::Item> shown_items = pane.realized_items();
     require(!pane.configure_menu_open() && !pane.page_hidden(PageId{"calendar"}) &&
-                (*pane.pages().selected_page()).value == "calendar" && find_item(pane.realized_items(), "calendar"),
+                (*pane.pages().selected_page()).value == "calendar" && find_item(shown_items, "calendar"),
             "choosing a hidden page shows it again and selects it");
 
     require(pane.show_configure_menu(), "the configure menu opens again");
