@@ -127,6 +127,13 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     resulting shape in blue on black, the selected one lit; the
     window's outer edges are always global targets (D3-1). No drop
     straight to auto-hide (D2a-1).
+27. **Auto-hide (E1-1, E2-1, E3-1, E4-1):** flyouts open on hover after a
+    delay and on click (click-only as a setting); an outside click closes
+    the flyout and passes through; the flyout is an in-window overlay; the
+    pin auto-hides the whole group.
+28. **Pins on root-level items only:** a lone panel or a group carries the
+    pin; tabbing a panel into another makes a group with a fresh,
+    not-auto-hidden pin; panels inside a group have none.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

@@ -256,3 +256,23 @@ which was closer to what the owner had seen. The owner, verbatim:
   resulting shape in blue on black, the one the pointer's position selects
   lit. The area highlight stays as a working assumption until the taste
   mockups (T2, T3).
+
+## Part 6. Auto-hide, 2026-10-17
+
+Asked as E1 to E4, each with its recommendation marked (E1-1 with E1-2 as
+a workspace setting, E2-1, E3-1, E4-1). The owner, verbatim:
+
+> accepted. pin buttons can live on panels or groups. dragging a panel onto another panel naturally makes a group, and the group inherits a fresh non-autohide pin. so only root-level panels or groups get a pin.
+
+- **GIVEN E1-1.** A side tab's flyout opens on hover after a delay and on
+  click; click-only is a workspace setting.
+- **GIVEN E2-1.** A click outside an open flyout closes it and passes
+  through to what was clicked.
+- **GIVEN E3-1.** The flyout is an in-window overlay, not a native window.
+- **GIVEN E4-1.** The pin auto-hides the whole group.
+- **GIVEN, pins.** Pin buttons live on root-level dock items only: a panel
+  standing alone, or a group. Dropping a panel onto another panel (tab
+  into) makes a group, and the new group gets a fresh pin in the
+  not-auto-hidden state; the panels inside a group carry no pin of their
+  own. Recorded reading: "root-level" means a top-level item of a dock
+  site (a split's leaf), not a panel nested inside a group.
