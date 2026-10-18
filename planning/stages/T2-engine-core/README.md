@@ -1,8 +1,9 @@
 # Stage T2: engine core
 
 Release: 0.3 Themeable. Depends on: T1 (anatomy and schema). Unblocks T3,
-T4, T5, C. Status 2026-10-13: not started; ready, since T1's gate is recorded
-(`results/2026-10-13-t1-anatomy-gate`). T1 hands T2 hit regions derived from
+T4, T5, C. Status 2026-10-18: started; the phased build plan
+([`PLAN.md`](PLAN.md)) is proposed and awaits the owner's acceptance. T1's
+gate is recorded (`results/2026-10-13-t1-anatomy-gate`). T1 hands T2 hit regions derived from
 part geometry and text published as layout slots (T1 brief, "Hand-off").
 Authority:
 `planning/FORWARD_PROGRAMME.md` §4 T2.
