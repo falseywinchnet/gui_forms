@@ -2112,6 +2112,10 @@ Related types
 
    .. cpp:function:: const WindowFrameDragStatistics& statistics() const noexcept
 
+   .. cpp:function:: Point requested_origin() const noexcept
+
+      The content origin, in desktop logical units, of the latest frame the drag requested (where the window began, before the first request). The forensic probe compares it with the host's frame reports.
+
 
    .. rubric:: Methods
 

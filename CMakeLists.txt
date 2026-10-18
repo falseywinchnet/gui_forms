@@ -2037,6 +2037,11 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_cursor_image_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_cursor_images COMMAND gui_forms_cursor_image_tests)
 
+    add_executable(gui_forms_frame_drag_analysis_tests
+        tests/frame_drag_analysis_tests.cpp
+        tests/frame_drag_probe/frame_drag_analysis.cpp)
+    add_test(NAME gui_forms_frame_drag_analysis_tests COMMAND gui_forms_frame_drag_analysis_tests)
+
     add_executable(gui_forms_application_contract_tests tests/application_contract_tests.cpp)
     target_link_libraries(gui_forms_application_contract_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_application_contract_tests COMMAND gui_forms_application_contract_tests)
@@ -2045,10 +2050,44 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
         add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
-        # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
-        # puts windows on the desktop, so it is built but never run by ctest.
-        add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
-        target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
+        # Stage DK decision 49, the forensic frame-drag probe
+        # (results/2026-10-18-dk-w0-capture-drag/). It moves the cursor and
+        # presses the primary button on its own windows, so it is built but
+        # never run by ctest. Its host seam (src/host/probe/) is linked into
+        # the probe only, never into a GUI.Forms library.
+        set(GUI_FORMS_PROBE_INPUT_SOURCE "")
+        if(APPLE)
+            set(GUI_FORMS_PROBE_INPUT_SOURCE src/host/macos/probe/macos_probe_input.cpp)
+        elseif(WIN32)
+            set(GUI_FORMS_PROBE_INPUT_SOURCE src/host/windows/probe/windows_probe_input.cpp)
+        elseif(GUI_FORMS_ENABLE_LINUX_HOST)
+            set(GUI_FORMS_PROBE_INPUT_SOURCE src/host/linux/probe/x11_probe_input.cpp)
+        endif()
+        if(GUI_FORMS_PROBE_INPUT_SOURCE)
+            add_executable(gui_forms_frame_drag_probe
+                tests/frame_drag_probe/frame_drag_probe.cpp
+                tests/frame_drag_probe/frame_drag_analysis.cpp
+                src/host/probe/probe_input.cpp
+                ${GUI_FORMS_PROBE_INPUT_SOURCE})
+            target_include_directories(gui_forms_frame_drag_probe PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/host)
+            target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
+            if(APPLE)
+                target_link_libraries(gui_forms_frame_drag_probe PRIVATE
+                    "-framework ApplicationServices" "-framework CoreVideo")
+            elseif(WIN32)
+                target_compile_definitions(gui_forms_frame_drag_probe PRIVATE
+                    WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+                target_link_libraries(gui_forms_frame_drag_probe PRIVATE dwmapi user32)
+            else()
+                target_link_libraries(gui_forms_frame_drag_probe PRIVATE X11::X11)
+                # XTest injection when libXtst is installed; in-process otherwise.
+                if(TARGET X11::Xtst)
+                    target_link_libraries(gui_forms_frame_drag_probe PRIVATE X11::Xtst)
+                    target_compile_definitions(gui_forms_frame_drag_probe PRIVATE GUI_FORMS_PROBE_HAS_XTEST=1)
+                endif()
+            endif()
+        endif()
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)
         add_executable(gui_forms_linux_host_tests tests/linux_host_tests.cpp)

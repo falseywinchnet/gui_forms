@@ -2,7 +2,7 @@
 
 Date: 2026-10-18. Stage: DK, phase W0 (`planning/stages/DK-docking/PLAN.md`),
 decisions 9 and 12. Status: headless trace recorded; the native measurement
-on each host is a documented step, not yet run.
+on each host is the forensic probe below, not yet run on a real desktop.
 
 ## What is measured
 
@@ -40,33 +40,79 @@ once at the end.
 The headless host reports a frame synchronously, so 60 Hz there is the
 pointer's rate, not a host's. It proves the bookkeeping, not smoothness.
 
-## Native measurement (to do, with the owner's permission)
+## Native measurement: the forensic probe (decision 49)
 
-The probe puts two windows on the desktop, so it is built but never run by
-ctest, and was not run on this machine: the brief allows a native
-measurement here only with the owner's permission.
+The owner works remotely and the only local machine is a Mac, so no
+measurement depends on a person watching (decision 49, interview part 16).
+`gui_forms_frame_drag_probe` replaced the human-watched probe. It drives
+`WindowFrameDrag` with synthetic pointer input, records every step and
+writes a machine-readable verdict. It opens two windows, moves the cursor
+and presses the primary button on its own window, so it is built but never
+run by ctest; it was not run on the Windows development machine.
 
 ```text
-# scripted: 120 frame requests at the 16 ms timer cadence; one JSON line
-gui_forms_frame_drag_probe
-# manual: drag the "Drag me" window's body with the mouse; one JSON line per
-# drag; close the main window to finish
-gui_forms_frame_drag_probe --manual
+gui_forms_frame_drag_probe [--out DIR] [--input auto|os|in-process]
 ```
 
-Each line reads `{"probe":"frame_drag","mode":...,"platform":...,
-"pointer_moves":...,"frame_requests":...,"frame_reports":...,"refused":...,
-"duration_s":...,"pointer_hz":...,"frames_hz":...,"keeps_up":...}`. To fill
-in per host, for both modes (manual: three drags, slow, medium, fast):
+- **Input.** `os` posts input through the operating system: Windows
+  `SendInput`, macOS `CGEventPost` (needs the Accessibility permission),
+  X11 XTest (linked when libXtst is installed). `in-process` warps the cursor
+  (`SetCursorPos`, `CGWarpMouseCursorPosition`, `XWarpPointer`) and hands
+  the pointer events to the window model itself, skipping the OS input
+  path; the model ignores the events the host delivers. `auto` (the
+  default) uses `os` where the host allows it. Every result names the path
+  and the API used, and why OS injection was not used.
+- **Calibration.** The probe warps the cursor and reads
+  `ApplicationWindows::pointer_position` to map native pointer coordinates
+  to desktop logical units; it assumes nothing about scaling.
+- **Runs.** Three drags along a circle of radius 100 units: `slow` (90
+  steps of 3 units every 16 ms), `medium` (120 of 6 every 8 ms) and `fast`
+  (150 of 12 every 4 ms). In-process steps follow the UI timer, so their
+  real rate is the timer's.
+- **Per step it records** the input's time and position, when the move
+  reached the window model, when `WindowFrameDrag::move` requested the
+  frame and the content origin it asked for (`requested_origin`), and every
+  frame the host reported, through `frame_changed`, with its time and
+  position (Windows `WM_MOVE`, sent from `WM_WINDOWPOSCHANGED`; macOS
+  `windowDidMove`; X11 `ConfigureNotify`). On Windows each report also carries DWM's refresh
+  counter and latest vertical blank (`DwmGetCompositionTimingInfo`). macOS
+  gives the nominal refresh period (`CVDisplayLink`, used only as a clock;
+  no GPU presentation timestamp is read). X11 gives none, and 60 Hz is
+  assumed and marked as assumed.
+- **It computes** latency percentiles (request to frame, input to request,
+  input to frame: p50, p95, p99, max), requests reported exactly, coalesced
+  into a later report or never reported, reports at positions nobody asked
+  for, missed refreshes (refreshes that passed while a request waited, from
+  DWM's counter where it can, from the period otherwise), position error
+  (each report against the latest target, and the final one), and
+  `WindowFrameDragStatistics::keeps_up`, the verdict that decides the
+  native-loop fallback.
+- **It writes** `frame-drag-<platform>-<input>-<profile>.json` for each run
+  and `summary.md` into `--out` (default `frame-drag-results`), closes its
+  windows and exits 0 when every run kept up, 1 when one did not, and 2
+  when a run could not be measured (the press never arrived, the host
+  refused the drag, a 120-second deadline passed).
+- `gui_forms_frame_drag_analysis_tests` (ctest, headless) checks the
+  analysis: matching, coalescing, missed refreshes, percentiles and the
+  JSON writer.
 
-| Host | Scripted frames_hz | Manual frames_hz (slow / medium / fast) | keeps_up | Fallback needed |
+A frame report shows that the host accepted the position, not that a
+refresh displayed it; the DWM counter is the nearest the probe gets to a
+presentation timestamp. CI runs the probe without blocking on the macOS
+and Linux (Xvfb with Openbox) native jobs and uploads the JSON
+(`frame-drag-probe-<platform>`); a CI runner is not an owner's desktop,
+so those numbers say whether the probe works and how a virtual display
+behaves, not how a real one feels.
+
+| Host | Input | slow / medium / fast frames_hz | keeps_up | Fallback needed |
 |---|---|---|---|---|
-| Windows (Win32) | not measured | not measured | | |
-| macOS (AppKit) | not measured | not measured | | |
-| X11 (Xorg) | not measured | not measured | | |
-| X11 under XWayland | not measured | not measured | | |
+| Windows (Win32) | not measured | | | |
+| macOS (AppKit) | not measured | | | |
+| X11 (Xorg) | not measured | | | |
+| X11 under XWayland | not measured | | | |
 
 The plan asks for XWayland to be measured, not assumed: the same probe, run
 under XWayland on GNOME (Mutter) and KDE (KWin), also shows whether the
-compositor honours client positions (a `frames_hz` near zero, or windows
-that do not move, means it does not).
+compositor honours client positions (`foreign_reports`, an unchanged
+position, or a `final` position error near the whole path means it does
+not).

@@ -78,6 +78,10 @@ public:
 
     [[nodiscard]] bool active() const noexcept { return active_; }
     [[nodiscard]] const WindowFrameDragStatistics& statistics() const noexcept { return statistics_; }
+    // The content origin, in desktop logical units, of the latest frame the
+    // drag requested (where the window began, before the first request).
+    // The forensic probe compares it with the host's frame reports.
+    [[nodiscard]] Point requested_origin() const noexcept { return last_target_; }
 
 private:
     struct FrameCounter final {

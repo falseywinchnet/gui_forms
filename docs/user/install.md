@@ -41,7 +41,8 @@ Linux (Ubuntu 24.04)
 : Add the `llvm-toolchain-noble-22` repository from apt.llvm.org, then
   install `clang-22 cmake ninja-build ccache generate-ninja pkg-config
   libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev
-  libatk1.0-dev libatk-bridge2.0-dev`. Put `/usr/lib/llvm-22/bin` first on
+  libatk1.0-dev libatk-bridge2.0-dev` (and `libxtst-dev` for the forensic
+  frame-drag probe's XTest input; without it the probe runs in-process). Put `/usr/lib/llvm-22/bin` first on
   `PATH`.
 
 Windows
