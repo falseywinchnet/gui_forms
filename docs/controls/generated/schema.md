@@ -26,7 +26,7 @@ States: `normal`, `hot`, `pressed`, `captured`, `focused`, `focus_visible`, `pre
 
 Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`.
 
-Values: `accent_index`.
+Values: `accent_index`, `content_color`.
 
 Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
 
@@ -1941,6 +1941,7 @@ Properties beyond every control's: none.
 | `face` | face | `button` | hot, pressed, disabled, open |
 | `icon` | icon |  | hot, pressed, disabled, open |
 | `color_bar` | well |  |  |
+| `color_sample` | fill |  |  |
 | `arrow` | actuator | `button` | hot, pressed, disabled, open |
 | `arrow_glyph` | glyph |  | hot, pressed, disabled, open |
 | `focus` | focus |  |  |
@@ -1952,7 +1953,8 @@ Item system `palette_entry`:
 | Part | Role | Reuses | Own states |
 |---|---|---|---|
 | `entry_face` | face |  | hot, selected, focus_visible |
-| `entry_sample` | well |  | hot, selected, focus_visible |
+| `entry_well` | well |  | hot, selected, focus_visible |
+| `entry_sample` | fill |  | hot, selected, focus_visible |
 | `entry_label` | label |  | hot, selected, focus_visible |
 | `entry_focus` | focus |  | hot, selected, focus_visible |
 

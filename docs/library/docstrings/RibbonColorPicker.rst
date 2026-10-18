@@ -69,18 +69,20 @@ the nearest entry of the row above or below), Home and End go to the ends,
 Enter, Space or a click commits and closes, and Escape or a click away
 closes without a choice; focus returns to the picker.
 
-The picker publishes ``region``, ``face``, ``icon``, ``color_bar``,
-``arrow``, ``arrow_glyph`` and ``focus``, and declares the
-``palette_entry`` item system (``entry_face``, ``entry_sample``,
-``entry_label``, ``entry_focus``; hot, selected, focus_visible) whose entries
-the open palette shows. To accessibility it is a `split_button` whose value
+The picker publishes ``region``, ``face``, ``icon``, ``color_bar`` (a well),
+``color_sample`` (a fill inside it carrying the value as its content colour,
+absent for Automatic), ``arrow``, ``arrow_glyph`` and ``focus``, and declares
+the ``palette_entry`` item system (``entry_face``, ``entry_well``,
+``entry_sample`` (a fill carrying the entry's colour; none for Automatic),
+``entry_label``, ``entry_focus``; hot, selected, focus_visible) whose
+entries the open palette shows. To accessibility it is a `split_button` whose value
 is the colour (``"#C00000"``, or ``"Automatic"``); the palette's entries are
 positioned buttons, the current one selected.
 
-Vocabulary gap: no part role or paint field carries a content colour, so the
-colour samples themselves (the bar and the palette's entries) are drawn by
-the painter inside wells drawn by role; every other part goes through the
-by-role paint path.
+Every part paints by role. The colour samples are fills with a content
+colour (owner decision W-7; design language §8.5): drawn as given, also in
+high contrast, where their wells keep them outlined, and at 45 % opacity
+while the picker is disabled.
 
 Not yet: theme colour shades, a "More colours" dialog and live preview.
 

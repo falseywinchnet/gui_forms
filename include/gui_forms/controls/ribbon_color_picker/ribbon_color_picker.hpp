@@ -94,6 +94,7 @@ public:
         PartGeometry face;
         PartGeometry icon;
         PartGeometry color_bar;
+        PartGeometry color_sample;
         PartGeometry arrow;
         PartGeometry arrow_glyph;
         PartGeometry focus;
@@ -104,6 +105,7 @@ public:
     // then the palette, then the recent colours.
     struct PaletteEntryParts final {
         PartGeometry entry_face;
+        PartGeometry entry_well;
         PartGeometry entry_sample;
         PartGeometry entry_label;
         PartGeometry entry_focus;
@@ -138,6 +140,7 @@ private:
         Rect face{};
         Rect icon{};
         Rect bar{};
+        Rect sample{};
         Rect arrow{};
         Rect glyph{};
     };

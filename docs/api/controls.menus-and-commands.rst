@@ -766,6 +766,8 @@ Related types
 
    .. cpp:member:: PartGeometry entry_face
 
+   .. cpp:member:: PartGeometry entry_well
+
    .. cpp:member:: PartGeometry entry_sample
 
    .. cpp:member:: PartGeometry entry_label
@@ -799,6 +801,8 @@ Related types
    .. cpp:member:: PartGeometry icon
 
    .. cpp:member:: PartGeometry color_bar
+
+   .. cpp:member:: PartGeometry color_sample
 
    .. cpp:member:: PartGeometry arrow
 
