@@ -2088,6 +2088,19 @@ if(GUI_FORMS_BUILD_TESTS)
                 endif()
             endif()
         endif()
+        # Stage DK decision 50, native verification on the owner's Mac and a
+        # Lima VM (tools/native_verification/): one host behaviour per run,
+        # on the probe's own windows. Built here so CI compiles them; never
+        # run by ctest.
+        if(APPLE)
+            add_executable(gui_forms_macos_behaviour_probe src/host/macos/probe/macos_behaviour_probe.mm)
+            target_compile_options(gui_forms_macos_behaviour_probe PRIVATE -fobjc-arc)
+            target_link_libraries(gui_forms_macos_behaviour_probe PRIVATE gui_forms_application
+                "-framework AppKit" "-framework Carbon" "-framework ApplicationServices")
+        elseif(GUI_FORMS_ENABLE_LINUX_HOST)
+            add_executable(gui_forms_x11_behaviour_probe src/host/linux/probe/x11_behaviour_probe.cpp)
+            target_link_libraries(gui_forms_x11_behaviour_probe PRIVATE gui_forms_application X11::X11)
+        endif()
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)
         add_executable(gui_forms_linux_host_tests tests/linux_host_tests.cpp)
