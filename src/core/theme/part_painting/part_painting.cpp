@@ -355,6 +355,24 @@ Insets overlay_shadow_outsets(const Control& control) noexcept {
     return result;
 }
 
+namespace {
+
+// A fill part's content colour (owner decision W-7): flat, in the part's
+// shape, as given; a disabled part's at 45 % of its opacity, as a disabled
+// icon is drawn.
+void paint_content_color(Painter& painter, const PartPaint& part, Color color, bool disabled) {
+    Color shown = color;
+    if (disabled) shown.alpha = static_cast<std::uint8_t>(std::lround(static_cast<double>(color.alpha) * 0.45));
+    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : 0.0;
+    if (radius > 0.0) {
+        painter.fill_rounded_rect(part.bounds, radius, shown);
+        return;
+    }
+    painter.fill_rect(part.bounds, shown);
+}
+
+} // namespace
+
 void paint_part(Painter& painter, const Control& control, const PartPaint& part) {
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
@@ -386,10 +404,16 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
     case PartRole::sheen:
     case PartRole::count:
         return;
+    case PartRole::fill:
+        if (part.content_color) {
+            paint_content_color(painter, part, *part.content_color, disabled);
+            return;
+        }
+        paint_surface(painter, part, recipe);
+        return;
     case PartRole::face:
     case PartRole::well:
     case PartRole::track:
-    case PartRole::fill:
     case PartRole::thumb:
     case PartRole::actuator:
     case PartRole::chip:

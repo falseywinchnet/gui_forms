@@ -439,6 +439,10 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
     src/controls/ribbon/ribbon.cpp
+    src/controls/ribbon/ribbon_contextual.cpp
+    src/controls/ribbon/ribbon_application_menu.cpp
+    src/controls/ribbon/ribbon_file_area.cpp
+    src/controls/backstage_view/backstage_view.cpp
     src/controls/ribbon/ribbon_group_popup.cpp
     src/controls/ribbon/ribbon_scaling.cpp
     src/controls/status_strip/status_strip.cpp
@@ -448,7 +452,11 @@ add_library(gui_forms_controls STATIC
     src/controls/notify_icon/notify_icon.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
+    src/controls/ribbon_font_control/ribbon_font_control.cpp
+    src/controls/ribbon_color_picker/ribbon_color_picker.cpp
     src/controls/commands/gallery_command/gallery_command.cpp
+    src/controls/commands/font_command/font_command.cpp
+    src/controls/commands/color_command/color_command.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -2464,6 +2472,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_scaling_tests tests/ribbon_scaling_tests.cpp)
     target_link_libraries(gui_forms_ribbon_scaling_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_scaling_tests COMMAND gui_forms_ribbon_scaling_tests)
+    add_executable(gui_forms_ribbon_contextual_tests tests/ribbon_contextual_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_contextual_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_contextual_tests COMMAND gui_forms_ribbon_contextual_tests)
+    add_executable(gui_forms_ribbon_file_area_tests tests/ribbon_file_area_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_file_area_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_file_area_tests COMMAND gui_forms_ribbon_file_area_tests)
     add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
