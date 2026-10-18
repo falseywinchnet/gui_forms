@@ -53,7 +53,7 @@ ACTION_NAMES: frozenset[str] = frozenset({
 })
 ACTION_PREFIXES: tuple[str, ...] = (
     "request_", "toggle_", "perform_", "begin_", "end_", "dispatch_", "emit_", "notify_",
-    "acquire_",
+    "acquire_", "bring_",
 )
 
 

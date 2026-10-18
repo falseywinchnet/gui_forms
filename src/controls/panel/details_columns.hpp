@@ -9,8 +9,9 @@
 #include <string>
 #include <string_view>
 
-// Pieces shared by the details views of ObjectView and ListView: the layout
-// of one column header and the elision of cell text. Both controls publish
+// Pieces shared by the details views of ObjectView, ListView and
+// TreeListView: the layout of one column header, the order of a column sort
+// and the elision of cell text. Both controls publish
 // their column headers as a "column" item system with the same part names;
 // this is the one geometry function for those parts.
 namespace gui_forms::details_detail {
@@ -57,6 +58,25 @@ inline ColumnHeaderGeometry column_header_geometry(Rect cell, Rect clip, bool so
     result.divider = Rect::intersection(divider, visible_cell);
     result.grip = Rect::intersection(grip, clip);
     return result;
+}
+
+// The order of a column sort: ASCII case folded, then byte order, so
+// "apple" and "Apple" keep a fixed order.
+inline unsigned char folded_byte(unsigned char byte) noexcept {
+    const bool upper = byte >= 'A' && byte <= 'Z';
+    const unsigned char result = upper ? static_cast<unsigned char>(byte - 'A' + 'a') : byte;
+    return result;
+}
+
+inline bool folded_text_less(std::string_view left, std::string_view right) noexcept {
+    const std::size_t shared = std::min(left.size(), right.size());
+    for (std::size_t index = 0; index < shared; ++index) {
+        const unsigned char a = folded_byte(static_cast<unsigned char>(left[index]));
+        const unsigned char b = folded_byte(static_cast<unsigned char>(right[index]));
+        if (a != b) return a < b;
+    }
+    if (left.size() != right.size()) return left.size() < right.size();
+    return left < right;
 }
 
 // Writes `text` into `out`, cut at a grapheme boundary and ended with an

@@ -135,6 +135,11 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+// Borrows from `nodes`: the pointer is valid while that vector lives.
+// semantic_snapshot() returns a new snapshot, so a pointer into the roots of
+// a temporary would dangle after the statement; the deleted overload refuses
+// one.
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 bool has_part(const ItemSystemDeclaration& system, std::string_view name, PartRole role) {
     for (const PartDeclaration& part : system.parts) {
@@ -266,7 +271,8 @@ void close_slot_and_modified_dot() {
             "close replaces the dot while the tab is hot");
     require(near(replaced.parts.tab.bounds.width, second.parts.tab.bounds.width),
             "the dot and the button share the reserved slot: the width does not change");
-    const SemanticNode* const node = find_node(window.semantic_snapshot().roots, "strip.tab.p1");
+    const SemanticSnapshot node_snapshot = window.semantic_snapshot();
+    const SemanticNode* const node = find_node(node_snapshot.roots, "strip.tab.p1");
     require(node != nullptr && (*node).description == "modified", "a modified tab's description says so");
 }
 
@@ -431,7 +437,8 @@ void pinned_tabs() {
                 expanded.parts.tab_pin.present && !expanded.parts.tab_close.present,
             "a hot pinned tab expands to its full width, its pin replacing close");
     require(item_of(strip, "d2").parts.tab.bounds.x > d2_before, "the tabs after an expanded pinned tab move along");
-    const SemanticNode* const node = find_node(window.semantic_snapshot().roots, "docs.strip.tab.pin0");
+    const SemanticSnapshot node_snapshot = window.semantic_snapshot();
+    const SemanticNode* const node = find_node(node_snapshot.roots, "docs.strip.tab.pin0");
     require(node != nullptr && (*node).description == "pinned", "a pinned tab's description says so");
 
     std::vector<PagePinRequest> requests;
@@ -462,7 +469,8 @@ void pinned_tabs() {
     static_cast<void>(window.dispatch_key(key(PhysicalKey::page_down, Modifier::control | Modifier::shift)));
     require(order(pages) == "pin0 pin1 d3 d4 d2", "the last page does not move past the end");
     require(pages.set_modified(PageId{"pin1"}, true) == PageEditStatus::applied, "a pinned page is modified");
-    const SemanticNode* const both = find_node(window.semantic_snapshot().roots, "docs.strip.tab.pin1");
+    const SemanticSnapshot both_snapshot = window.semantic_snapshot();
+    const SemanticNode* const both = find_node(both_snapshot.roots, "docs.strip.tab.pin1");
     require(both != nullptr && (*both).description == "pinned, modified", "the description names both");
 }
 
@@ -601,7 +609,8 @@ void mnemonics_off_in_documents() {
             "documents are added");
     Window window(view, {600.0, 200.0});
     window.perform_layout();
-    const SemanticNode* const node = find_node(window.semantic_snapshot().roots, "docs.strip.tab.save");
+    const SemanticSnapshot node_snapshot = window.semantic_snapshot();
+    const SemanticNode* const node = find_node(node_snapshot.roots, "docs.strip.tab.save");
     require(node != nullptr && (*node).name == "&Save notes.txt", "a document's title is shown as written");
     select((*view).pages(), "other");
     static_cast<void>(window.dispatch_key(key(PhysicalKey::s, Modifier::alt)));

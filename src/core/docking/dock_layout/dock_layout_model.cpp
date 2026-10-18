@@ -345,6 +345,58 @@ private:
 
 } // namespace
 
+const DockUnknownFields* find_unknown_fields(const DockLayoutState& state, const DockUnknownOwner& owner) noexcept {
+    for (const DockUnknownFields& fields : state.unknown_fields) {
+        if (fields.owner == owner) return &fields;
+    }
+    return nullptr;
+}
+
+bool unknown_owner_exists(const DockLayoutState& state, const DockUnknownOwner& owner) noexcept {
+    const DockPanelRecord* record = nullptr;
+    switch (owner.kind) {
+    case DockUnknownOwnerKind::layout:
+    case DockUnknownOwnerKind::main_site:
+        return true;
+    case DockUnknownOwnerKind::window:
+        return state.main_window.has_value();
+    case DockUnknownOwnerKind::floating_site:
+        return find_dock_site(state, DockSiteId{owner.id}) != nullptr;
+    case DockUnknownOwnerKind::auto_hidden:
+        return find_dock_auto_hidden(state, DockNodeId{owner.id}) != nullptr;
+    case DockUnknownOwnerKind::node:
+        return find_dock_node(state, DockNodeId{owner.id}) != nullptr &&
+               dock_place_of(state, DockNodeId{owner.id}).region != DockRegion::detached;
+    case DockUnknownOwnerKind::panel:
+        return !(locate_dock_panel(state, owner.panel).stack == DockNodeId{});
+    case DockUnknownOwnerKind::panel_record:
+        return find_dock_record(state, owner.panel) != nullptr;
+    case DockUnknownOwnerKind::docked_memory:
+        record = find_dock_record(state, owner.panel);
+        return record != nullptr && (*record).docked.has_value();
+    case DockUnknownOwnerKind::floating_memory:
+        record = find_dock_record(state, owner.panel);
+        return record != nullptr && (*record).floating.has_value();
+    case DockUnknownOwnerKind::auto_hidden_memory:
+        record = find_dock_record(state, owner.panel);
+        return record != nullptr && (*record).auto_hidden.has_value();
+    }
+    return false;
+}
+
+void prune_unknown_fields(DockLayoutState& state, std::vector<DockUnknownOwner>& dropped) {
+    std::size_t kept = 0U;
+    for (std::size_t index = 0; index < state.unknown_fields.size(); ++index) {
+        if (!unknown_owner_exists(state, state.unknown_fields[index].owner)) {
+            dropped.push_back(state.unknown_fields[index].owner);
+            continue;
+        }
+        if (kept != index) state.unknown_fields[kept] = std::move(state.unknown_fields[index]);
+        ++kept;
+    }
+    state.unknown_fields.resize(kept);
+}
+
 DockInvariantResult check_dock_invariants(const DockLayoutState& state) {
     InvariantCheck check(state);
     DockInvariantResult result = check.run();

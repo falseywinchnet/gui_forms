@@ -40,6 +40,11 @@ Point centre(Rect bounds) {
     return point;
 }
 
+// The finders return pointers that borrow from the vector they search, so
+// the vector must outlive them: realized_stack_items() and
+// semantic_snapshot() return new values, and a pointer into a temporary
+// dangles at the end of the statement. The deleted rvalue overloads refuse
+// temporaries.
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view stable_id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == stable_id) return &node;
@@ -47,6 +52,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticRole role, std::string_view name) {
     for (const SemanticNode& node : nodes) {
@@ -55,6 +61,7 @@ const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticR
     }
     return nullptr;
 }
+const SemanticNode* find_named(std::vector<SemanticNode>&& nodes, SemanticRole role, std::string_view name) = delete;
 
 bool key(Window& window, std::uint32_t physical_key, Modifier modifiers = Modifier::none) {
     KeyEvent event{KeyAction::down, physical_key};
@@ -213,6 +220,7 @@ const DockSite::Stack* find_stack(const std::vector<DockSite::Stack>& stacks, Do
     }
     return nullptr;
 }
+const DockSite::Stack* find_stack(std::vector<DockSite::Stack>&& stacks, DockNodeId stack) = delete;
 
 Control::Ptr content_edit(Window& window, std::string_view panel) {
     const Control::Ptr edit = window.find("content." + std::string(panel) + ".edit");
@@ -237,9 +245,9 @@ void anatomy_and_parts() {
     DockWorkspace& workspace = *(*fixture).workspace;
     const ControlAnatomy& anatomy = site.anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "dock_site" &&
-                anatomy.item_systems.size() == 2U && anatomy.item_systems[0].name == "seam" &&
-                anatomy.item_systems[1].name == "stack",
-            "DockSite publishes a valid anatomy with its seam and stack item systems");
+                anatomy.item_systems.size() == 3U && anatomy.item_systems[0].name == "seam" &&
+                anatomy.item_systems[1].name == "stack" && anatomy.item_systems[2].name == "drop_tile",
+            "DockSite publishes a valid anatomy with its seam, stack and drop tile item systems");
     const DockNavigator navigator(StableId("lone"));
     require(validate_control_anatomy(navigator.anatomy()).defect == AnatomyDefect::none &&
                 navigator.anatomy().control_id == "dock_navigator",
@@ -270,9 +278,9 @@ void anatomy_and_parts() {
                 near(caption.caption_key.bounds.width, 7.0) && near(caption.caption_menu.bounds.width, 16.0) &&
                 caption.caption_pin.present && caption.caption_close.present &&
                 caption.caption_pin.states.contains(AnatomyState::checked) &&
-                caption.caption_pin.states.contains(AnatomyState::disabled) &&
+                !caption.caption_pin.states.contains(AnatomyState::disabled) &&
                 caption.caption_pin_glyph.states.contains(AnatomyState::checked),
-            "a tool stack's caption carries the key, the label and three buttons, the pin checked and disabled");
+            "a tool stack's caption carries the key, the label and three buttons, the pin checked and enabled");
     require(caption.caption_menu.bounds.x < caption.caption_pin.bounds.x &&
                 caption.caption_pin.bounds.x < caption.caption_close.bounds.x &&
                 near(caption.caption_close.bounds.x + 16.0 + 3.0,
@@ -486,7 +494,15 @@ void collapse_by_priority() {
     window.perform_layout();
     collapsed = site.collapsed_stacks();
     require(collapsed.size() == 3U, "at the smallest only the documents remain");
-    require(site.parts().document_area.bounds.width > 199.0, "the documents take the whole width");
+    // The collapsed stacks wait behind side tabs (phase D5), whose bands the
+    // documents leave free.
+    double bands = 0.0;
+    for (const DockSide edge : {DockSide::left, DockSide::right}) {
+        const std::shared_ptr<PageStrip> strip = site.side_strip(edge);
+        if (strip) bands += (*strip).absolute_bounds().width;
+    }
+    require(bands > 0.0 && site.parts().document_area.bounds.width + bands > 199.0,
+            "the documents take the whole width between the side strips");
     window.resize({800.0, 500.0});
     window.perform_layout();
     require(site.collapsed_stacks().empty() &&
@@ -674,11 +690,11 @@ void regions_and_escape_keys() {
     require(key(window, PhysicalKey::f6, Modifier::shift) && active_is(workspace, "output", "doc.second"),
             "Shift+F6 goes back");
 
-    // Escape in a tool panel returns to the active document, unless the
-    // content uses it (a text box does).
-    require(!key(window, PhysicalKey::escape) || active_is(workspace, "output", "doc.second"),
-            "a text box keeps its Escape");
-    require(active_is(workspace, "output", "doc.second"), "the text box's Escape leaves Output active");
+    // Escape in a tool panel returns to the active document, from a text box
+    // too: a text box passes on an Escape it has nothing to cancel (W
+    // decision 6, #140).
+    require(key(window, PhysicalKey::escape) && active_is(workspace, "doc.second", "doc.second"),
+            "Escape from a tool panel's text box returns to the active document");
     require(window.request_focus(window.find("content.output.action")), "Output's button takes focus");
     require(key(window, PhysicalKey::escape) && active_is(workspace, "doc.second", "doc.second") &&
                 (*window.focused_control()).stable_id().value() == "content.doc.second.edit",
@@ -707,6 +723,38 @@ void regions_and_escape_keys() {
             "Ctrl+Shift+F6 goes back");
 }
 
+// The docking keys are the window's named keyboard commands (decision DK-30,
+// G6-1): a rebinding moves them, and the navigator commits on the release of
+// the rebound chord's modifier.
+void rebound_docking_keys() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockWorkspace& workspace = *(*fixture).workspace;
+    DockSite& site = *(*fixture).site;
+    Window& window = *(*fixture).window;
+    require(workspace.activate_panel(DockPanelId("doc.first")) && workspace.activate_panel(DockPanelId("doc.second")),
+            "the documents activate in turn");
+    window.rebind_key_command(KeyCommand::next_document, {{PhysicalKey::f8, Modifier::control}, {}});
+    require(!key(window, PhysicalKey::f6, Modifier::control) && active_is(workspace, "doc.second", "doc.second"),
+            "Ctrl+F6 does nothing once next_document is rebound");
+    require(key(window, PhysicalKey::f8, Modifier::control) && active_is(workspace, "doc.first", "doc.first"),
+            "the rebound chord activates the next document");
+    window.rebind_key_command(KeyCommand::cycle_forward, {{PhysicalKey::q, Modifier::alt}, {}});
+    require(key(window, PhysicalKey::q, Modifier::alt) && site.navigator_open() &&
+                (*site.navigator()).release_modifier() == Modifier::alt,
+            "a rebound cycle_forward opens the navigator, committed by releasing Alt");
+    require(key_up(window, PhysicalKey::q, Modifier::none) && !site.navigator_open() &&
+                active_is(workspace, "doc.second", "doc.second"),
+            "releasing Alt activates the current row");
+    window.rebind_key_command(KeyCommand::position_menu, {});
+    window.rebind_key_command(KeyCommand::context_menu, {{PhysicalKey::m, Modifier::control | Modifier::shift}, {}});
+    static_cast<void>(key(window, PhysicalKey::minus, Modifier::alt));
+    require(!site.position_menu_open(),
+            "an unbound position_menu leaves Alt+Hyphen alone");
+    require(key(window, PhysicalKey::m, Modifier::control | Modifier::shift) && site.position_menu_open(),
+            "the rebound context_menu opens the position menu");
+    site.close_position_menu();
+}
+
 // -- the position menu and the caption buttons ---------------------------------
 
 void position_menu() {
@@ -716,12 +764,12 @@ void position_menu() {
     Window& window = *(*fixture).window;
     const DockPanelId properties("properties");
     require(!site.position_command_enabled(properties, DockPositionCommand::float_panel) &&
-                !site.position_command_enabled(properties, DockPositionCommand::auto_hide) &&
+                site.position_command_enabled(properties, DockPositionCommand::auto_hide) &&
                 !site.position_command_enabled(properties, DockPositionCommand::dock) &&
                 site.position_command_enabled(properties, DockPositionCommand::dock_as_document) &&
                 site.position_command_enabled(properties, DockPositionCommand::hide) &&
                 site.position_command_enabled(properties, DockPositionCommand::close),
-            "a docked tool panel may dock as a document, hide or close; Float and Auto Hide wait");
+            "a docked tool panel may auto-hide, dock as a document, hide or close; Float waits");
     require(!site.position_command_enabled(DockPanelId("output"), DockPositionCommand::dock_as_document),
             "a panel without dock-as-document may not join the documents");
     // Alt+Hyphen opens the active panel's menu.
@@ -752,11 +800,12 @@ void position_menu() {
     site.close_position_menu();
     require(key(window, PhysicalKey::f10, Modifier::shift) && site.position_menu_open(), "Shift+F10 opens it");
     site.close_position_menu();
-    require(key(window, PhysicalKey::application) && site.position_menu_open(), "the context-menu key opens it");
+    require(key(window, PhysicalKey::context_menu) && site.position_menu_open(), "the context-menu key opens it");
     site.close_position_menu();
     // The caption's close button hides the panel.
     window.perform_layout();
-    const DockSite::Stack* output = find_stack(site.realized_stack_items(), stack_of(workspace, "output"));
+    const std::vector<DockSite::Stack> caption_stacks = site.realized_stack_items();
+    const DockSite::Stack* output = find_stack(caption_stacks, stack_of(workspace, "output"));
     require(output != nullptr && (*output).parts.caption_close.present, "Output's caption has a close button");
     const Rect absolute = site.absolute_bounds();
     const Rect close = (*output).parts.caption_close.bounds;
@@ -898,6 +947,7 @@ int main() {
     activation_and_commands();
     navigator_order_and_keys();
     regions_and_escape_keys();
+    rebound_docking_keys();
     position_menu();
     semantic_snapshot();
     lifetime_and_refusals();

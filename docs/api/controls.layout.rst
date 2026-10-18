@@ -59,6 +59,10 @@ Related types
      - One direct child command group.
    * - :cpp:class:`CommandOverflowSnapshot <gui_forms::CommandOverflowSnapshot>`
      -  
+   * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
+     -  
+   * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
+     - Raised after a flyout opened (open true) or closed.
    * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
      -  
    * - :cpp:class:`DockNavigator::ItemParts <gui_forms::DockNavigator::ItemParts>`
@@ -84,6 +88,12 @@ Related types
    * - :cpp:class:`DockSite::StackParts <gui_forms::DockSite::StackParts>`
      - Item system stack: a stack's area and, for a tool stack, its caption and the caption's parts (absent for a document stack).
    * - :cpp:class:`DockSite::StackStates <gui_forms::DockSite::StackStates>`
+     -  
+   * - :cpp:class:`DockSite::Tile <gui_forms::DockSite::Tile>`
+     -  
+   * - :cpp:class:`DockSite::TileParts <gui_forms::DockSite::TileParts>`
+     - Item system drop_tile: a target tile and its dock-shape glyph, over the hovered pane (five) and at the window's edges (four), while dragging.
+   * - :cpp:class:`DockSite::TileStates <gui_forms::DockSite::TileStates>`
      -  
    * - :cpp:class:`MasterDetailLayout <gui_forms::MasterDetailLayout>`
      - MasterDetailLayout defines bounded navigation width and inter-pane gap for deterministic responsive projection.
@@ -165,6 +175,50 @@ Related types
    .. cpp:member:: std::uint64_t committed_revision
 
    .. cpp:member:: std::vector<CommandOverflowGroupResult> groups
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDragOutcome final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockDragEnd end
+
+      Default: ``{DockDragEnd::escaped}``.
+
+   .. cpp:member:: DockSubject subject
+
+   .. cpp:member:: std::optional<DockDropTarget> target
+
+      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
+
+   .. cpp:member:: DockTransactionResult result
+
+      The layout transaction's result, for ``dropped`` and ``floated``.
+
+   .. cpp:member:: bool across_windows
+
+      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:member:: Rect frame
+
+      For ``floated``: the new floating window's client area, in desktop logical units.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockFlyoutChange final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Raised after a flyout opened (open true) or closed.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: DockFlyoutCause cause
+
+      Default: ``{DockFlyoutCause::programmatic}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -267,6 +321,28 @@ Related types
       The document area's rectangle, its well showing while it is empty.
 
    .. cpp:member:: PartGeometry focus
+
+   .. cpp:member:: PartGeometry drag_stamp
+
+      The drag layer (present only while dragging or settling): the stamp, its label, the tinted area the subject would take (drop_accepted) and the cue at the pointer where nothing accepts a drop (drop_rejected).
+
+   .. cpp:member:: PartGeometry drag_stamp_label
+
+   .. cpp:member:: PartGeometry drag_stamp_image
+
+      The panel's picture in the stamp, below its label, while the window can snapshot it (Window::snapshot_control); absent where it cannot, the content well standing in.
+
+   .. cpp:member:: PartGeometry drop_area
+
+   .. cpp:member:: PartGeometry drop_cue
+
+   .. cpp:member:: PartGeometry flyout_shadow
+
+      The open flyout, in the site's coordinates as it stands in its slide: its overlay shadow, its face and the grip on its inner edge (hot and captured as the pointer is on it or drags it). Absent while no flyout is open.
+
+   .. cpp:member:: PartGeometry flyout_face
+
+   .. cpp:member:: PartGeometry flyout_grip
 
 .. cpp:namespace:: gui_forms
 
@@ -375,6 +451,52 @@ Related types
       The stack holds the active panel.
 
    .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::Tile final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockDropTargetKind kind
+
+      Default: ``{DockDropTargetKind::pane}``.
+
+   .. cpp:member:: DockNodeId pane
+
+   .. cpp:member:: DockDropZone zone
+
+      Default: ``{DockDropZone::center}``.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: TileParts parts
+
+   .. cpp:member:: TileStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::TileParts final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Item system drop_tile: a target tile and its dock-shape glyph, over the hovered pane (five) and at the window's edges (four), while dragging. ``selected`` is the lit tile; ``disabled`` a choice the restrictions refuse; ``expanding`` while the cross fades in.
+
+   .. cpp:member:: PartGeometry tile
+
+   .. cpp:member:: PartGeometry tile_glyph
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::TileStates final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool expanding
 
 .. cpp:namespace:: gui_forms
 
@@ -724,6 +846,66 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DockDragEnd
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: dropped
+
+   .. cpp:enumerator:: escaped
+
+   .. cpp:enumerator:: capture_lost
+
+   .. cpp:enumerator:: deactivated
+
+   .. cpp:enumerator:: layout_changed
+
+   .. cpp:enumerator:: rejected
+
+   .. cpp:enumerator:: floated
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockDragPhase
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: idle
+
+   .. cpp:enumerator:: armed
+
+   .. cpp:enumerator:: dragging
+
+   .. cpp:enumerator:: settling
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockFlyoutCause
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: hover
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: programmatic
+
+   .. cpp:enumerator:: pointer_left
+
+   .. cpp:enumerator:: outside_press
+
+   .. cpp:enumerator:: focus_lost
+
+   .. cpp:enumerator:: escape
+
+   .. cpp:enumerator:: swapped
+
+   .. cpp:enumerator:: layout
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: DockNavigatorList
 
    ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
@@ -749,6 +931,8 @@ Enumerations
    .. cpp:enumerator:: hide
 
    .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: move
 
 .. cpp:namespace:: gui_forms
 

@@ -1,0 +1,90 @@
+#include "gui_forms/host/windowing/desktop_coordinates.hpp"
+
+#include <algorithm>
+#include <cmath>
+
+namespace gui_forms {
+namespace {
+// Squared distance from `point` to the closed rectangle `frame`; zero inside.
+double distance_squared(Rect frame, Point point) noexcept {
+    const double nearest_x = std::clamp(point.x, frame.x, frame.x + frame.width);
+    const double nearest_y = std::clamp(point.y, frame.y, frame.y + frame.height);
+    const double dx = point.x - nearest_x;
+    const double dy = point.y - nearest_y;
+    const double result = dx * dx + dy * dy;
+    return result;
+}
+
+double usable_scale(double scale) noexcept {
+    const bool valid = std::isfinite(scale) && scale > 0.0;
+    const double result = valid ? scale : 1.0;
+    return result;
+}
+} // namespace
+
+HostMonitor logical_monitor(const HostMonitor& device) noexcept {
+    const double scale = usable_scale(device.scale);
+    HostMonitor result = device;
+    result.frame.width = device.frame.width / scale;
+    result.frame.height = device.frame.height / scale;
+    result.work_area.x = device.frame.x + (device.work_area.x - device.frame.x) / scale;
+    result.work_area.y = device.frame.y + (device.work_area.y - device.frame.y) / scale;
+    result.work_area.width = device.work_area.width / scale;
+    result.work_area.height = device.work_area.height / scale;
+    return result;
+}
+
+std::size_t nearest_monitor(std::span<const HostMonitor> monitors, Point point) noexcept {
+    std::size_t best = 0U;
+    double best_distance = 0.0;
+    for (std::size_t index = 0U; index < monitors.size(); ++index) {
+        const double distance = distance_squared(monitors[index].frame, point);
+        if (index == 0U || distance < best_distance) {
+            best = index;
+            best_distance = distance;
+        }
+        if (distance == 0.0 && monitors[index].frame.contains(point)) {
+            best = index;
+            break;
+        }
+    }
+    return best;
+}
+
+Point desktop_logical_point(std::span<const HostMonitor> device_monitors,
+                            Point device_point) noexcept {
+    if (device_monitors.empty()) return device_point;
+    const std::size_t index = nearest_monitor(device_monitors, device_point);
+    const HostMonitor& monitor = device_monitors[index];
+    const double scale = usable_scale(monitor.scale);
+    const Point result{monitor.frame.x + (device_point.x - monitor.frame.x) / scale,
+                       monitor.frame.y + (device_point.y - monitor.frame.y) / scale};
+    return result;
+}
+
+Point desktop_device_point(std::span<const HostMonitor> device_monitors,
+                           Point logical_point, double& scale) noexcept {
+    scale = 1.0;
+    if (device_monitors.empty()) return logical_point;
+    std::size_t best = 0U;
+    double best_distance = 0.0;
+    for (std::size_t index = 0U; index < device_monitors.size(); ++index) {
+        const HostMonitor logical = logical_monitor(device_monitors[index]);
+        const double distance = distance_squared(logical.frame, logical_point);
+        if (index == 0U || distance < best_distance) {
+            best = index;
+            best_distance = distance;
+        }
+        if (logical.frame.contains(logical_point)) {
+            best = index;
+            break;
+        }
+    }
+    const HostMonitor& monitor = device_monitors[best];
+    scale = usable_scale(monitor.scale);
+    const Point result{monitor.frame.x + (logical_point.x - monitor.frame.x) * scale,
+                       monitor.frame.y + (logical_point.y - monitor.frame.y) * scale};
+    return result;
+}
+
+} // namespace gui_forms

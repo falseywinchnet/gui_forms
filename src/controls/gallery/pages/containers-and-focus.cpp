@@ -129,14 +129,16 @@ private:
     }
 
     // A docked workspace: Toolbox and Classes tabbed on the left, Properties
-    // on the right, Output below, two documents in the document area. Panel
+    // on the right, Output auto-hidden on the bottom edge, two documents in
+    // the document area. Panel
     // controls are made by the page's factory the first time each panel is
     // shown; the status line follows the two activation tracks. Beside it, a
     // navigator on its own shows the Ctrl+Tab switcher's two lists.
     void build_docking(const std::shared_ptr<Surface>& page) {
         std::shared_ptr<LayoutGroup> docking = group(
             "gallery.containers.docking.group",
-            "DockSite · seams, captions, F6 regions, Ctrl+Tab navigator, collapse by priority", {930.0, 400.0});
+            "DockSite · seams, captions, F6 regions, Ctrl+Tab navigator, auto-hide, collapse by priority",
+            {930.0, 400.0});
         (*page).add_at(docking, {24.0, 652.0, 930.0, 400.0});
         workspace_ = std::make_unique<DockWorkspace>("gallery.containers.workspace");
         const Delegate<DockPanelCreation&> factory =
@@ -176,6 +178,12 @@ private:
         static_cast<void>((*workspace_).apply(tabbed));
         static_cast<void>((*workspace_).show_panel(DockPanelId("properties")));
         static_cast<void>((*workspace_).show_panel(DockPanelId("output")));
+        // Output is pinned out to the bottom edge: its side tab opens a
+        // flyout on hover or click.
+        DockTransaction pinned{};
+        const DockNodeId output_stack = (*workspace_).layout().locate(DockPanelId("output")).stack;
+        pinned.edits.push_back(DockEdit::auto_hide(DockSubject::of_stack(output_stack), DockSide::bottom, 120.0));
+        static_cast<void>((*workspace_).apply(pinned));
         dock_site_ = make_control<DockSite>(StableId("gallery.containers.dock"), *workspace_);
         (*dock_site_).set_accessible_name("Docked workspace specimen");
         (*docking).add_at(dock_site_, {20.0, 36.0, 600.0, 344.0});

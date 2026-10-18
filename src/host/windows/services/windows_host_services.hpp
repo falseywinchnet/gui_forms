@@ -175,7 +175,7 @@ protected:
         HostClipboardTextResult result;
         result.generation = static_cast<std::uint64_t>(GetClipboardSequenceNumber());
         if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) return result;
-        if (!OpenClipboard(owner_)) {
+        if (!gui_forms::host::detail::open_clipboard_with_retry(owner_)) {
             result.status.error = HostServiceError::backend_failure;
             return result;
         }
@@ -197,7 +197,7 @@ protected:
     HostServiceStatus write_clipboard_text_impl(std::string_view text) override {
         const std::wstring wide = wide_from_utf8(text);
         if (!text.empty() && wide.empty()) return {HostServiceError::invalid_utf8};
-        if (!OpenClipboard(owner_)) return {HostServiceError::backend_failure};
+        if (!gui_forms::host::detail::open_clipboard_with_retry(owner_)) return {HostServiceError::backend_failure};
         if (!EmptyClipboard()) {
             CloseClipboard();
             return {HostServiceError::backend_failure};
@@ -228,7 +228,7 @@ protected:
     HostClipboardFilesResult read_clipboard_files_impl() override {
         HostClipboardFilesResult result;
         if (!IsClipboardFormatAvailable(CF_HDROP)) return result;
-        if (!OpenClipboard(owner_)) {
+        if (!gui_forms::host::detail::open_clipboard_with_retry(owner_)) {
             result.status.error = HostServiceError::backend_failure;
             return result;
         }

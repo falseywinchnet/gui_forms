@@ -67,6 +67,17 @@ private:
         (*density).set_items({"Compact", "Comfortable", "Spacious", "Touch"});
         (*density).set_placeholder_text("Choose density");
         (*combo_group).add_at(density, {348.0, 42.0, 250.0, 36.0});
+        // A searchable field: typing narrows the list to the items that
+        // contain the text, with the matched text highlighted.
+        search_ = make_control<ComboBox>(StableId("gallery.collections.combo.search"));
+        (*search_).set_accessible_name("Find a station");
+        (*search_).set_items({"Amsterdam Centraal", "Antwerpen-Centraal", "Basel SBB", "Berlin Hauptbahnhof",
+                              "Bruxelles-Midi", "Frankfurt (Main) Hbf", "Hamburg Hbf", "Köln Hbf",
+                              "London St Pancras", "Lyon Part-Dieu", "Milano Centrale", "Paris Gare du Nord",
+                              "Rotterdam Centraal", "Wien Hauptbahnhof", "Zürich HB"});
+        (*search_).set_drop_down_style(ComboBoxStyle::drop_down);
+        (*search_).set_drop_down_filter(ComboBoxFilter::substring);
+        (*combo_group).add_at(search_, {622.0, 42.0, 284.0, 36.0});
         status_ = label("gallery.collections.status",
                         "Popup overlays are root-attached, owner-revoked, and focus-contained.",
                         11.0, 600, green);
@@ -74,6 +85,13 @@ private:
         on((*profile_).selected_index_changed(), *this,
            &CollectionsAndPopupsPage::on_profile_committed);
         on((*density).drop_down_changed(), *this, &CollectionsAndPopupsPage::on_density_popup);
+        on((*search_).drop_down_changed(), *this, &CollectionsAndPopupsPage::on_search_popup);
+    }
+
+    void on_search_popup(const bool open) {
+        (*status_).set_text(open ? "Stations matching \"" + std::string((*search_).text()) + "\": " +
+                                       std::to_string((*search_).drop_down_items().size())
+                                 : "Station search closed · the editor kept the focus");
     }
 
     void on_location_selected(const ListSelectionChange& change) {
@@ -106,6 +124,7 @@ private:
     std::shared_ptr<ListBox> single_;
     std::shared_ptr<ListBox> multi_;
     std::shared_ptr<ComboBox> profile_;
+    std::shared_ptr<ComboBox> search_;
     std::shared_ptr<Label> status_;
 };
 
