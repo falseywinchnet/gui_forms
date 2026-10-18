@@ -459,6 +459,8 @@ SemanticDescriptor TabControl::semantic_descriptor() const {
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     if (const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock()) descriptor.value = (*selected).text();
+    const bool row = alignment_ == TabAlignment::top || alignment_ == TabAlignment::bottom;
+    descriptor.orientation = row ? SemanticOrientation::horizontal : SemanticOrientation::vertical;
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
     return descriptor;
@@ -482,8 +484,10 @@ std::vector<SemanticNode> TabControl::semantic_virtual_children() const {
         if (effectively_enabled()) node.states |= SemanticState::enabled;
         node.states |= SemanticState::visible | SemanticState::focusable;
         if (live[index] == selected) node.states |= SemanticState::selected;
-        node.actions = {SemanticAction::focus, SemanticAction::select,
-                        SemanticAction::press};
+        // The page is the tab's panel (owner decision DK-40). Tabs publish
+        // select, not press (DK-35); a press sent anyway still selects.
+        node.controlled_panel = std::string((*live[index]).stable_id().value());
+        node.actions = {SemanticAction::focus, SemanticAction::select};
         nodes.push_back(std::move(node));
     }
     return nodes;

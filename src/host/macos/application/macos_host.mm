@@ -88,6 +88,7 @@ using gui_forms::PointerButton;
 using gui_forms::PointerEvent;
 using gui_forms::SemanticAction;
 using gui_forms::SemanticNode;
+using gui_forms::SemanticOrientation;
 using gui_forms::SemanticRole;
 using gui_forms::SemanticState;
 using GFRect = gui_forms::Rect;
@@ -766,6 +767,10 @@ NSString* native_accessibility_role(SemanticRole role) {
     // split button is a button; a menu button is AppKit's menu button.
     case SemanticRole::split_button: return NSAccessibilityButtonRole;
     case SemanticRole::menu_button: return NSAccessibilityMenuButtonRole;
+    // AppKit has no pane or tab-panel role: both are groups, a tab panel
+    // with the AXTabPanel subrole (accessibilitySubrole).
+    case SemanticRole::pane: return NSAccessibilityGroupRole;
+    case SemanticRole::tab_panel: return NSAccessibilityGroupRole;
     case SemanticRole::generic: return NSAccessibilityGroupRole;
     case SemanticRole::count: return NSAccessibilityGroupRole;
     }
@@ -902,6 +907,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (BOOL)performSemanticAction:(SemanticAction)action
                      stableId:(NSString*)stableId
                         value:(NSString*)value;
+- (id)semanticAccessibilityElementForStableId:(NSString*)stableId;
 @end
 
 @implementation GUIFormsDisplayTarget
@@ -1002,6 +1008,42 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (BOOL)isAccessibilityProtectedContent {
     return gui_forms::has_semantic_state(
         _node.states, SemanticState::protected_content);
+}
+// AppKit declares no constant for the tab-panel subrole; WebKit publishes
+// ARIA tab panels with this one.
+- (NSString*)accessibilitySubrole {
+    if (_node.role == SemanticRole::tab_panel) return @"AXTabPanel";
+    return [super accessibilitySubrole];
+}
+// A tab list's orientation.
+- (NSAccessibilityOrientation)accessibilityOrientation {
+    if (!_node.orientation) return NSAccessibilityOrientationUnknown;
+    if (*_node.orientation == SemanticOrientation::horizontal) return NSAccessibilityOrientationHorizontal;
+    return NSAccessibilityOrientationVertical;
+}
+// The tab-to-panel relation as AppKit's linked elements: the panel's element
+// when the window publishes the panel.
+- (NSArray*)accessibilityLinkedUIElements {
+    if (_owner == nil || _node.controlled_panel.empty()) return nil;
+    id panel = [_owner semanticAccessibilityElementForStableId:native_string(_node.controlled_panel)];
+    if (panel == nil) return nil;
+    return @[ panel ];
+}
+// The close action has no AppKit action name; it is a custom action named
+// "Close".
+- (BOOL)performSemanticClose {
+    if (_owner == nil || !semantic_has_action(_node, SemanticAction::close)) return NO;
+    return [_owner performSemanticAction:SemanticAction::close
+                                 stableId:native_string(_node.stable_id)
+                                    value:nil];
+}
+- (NSArray<NSAccessibilityCustomAction*>*)accessibilityCustomActions {
+    if (!semantic_has_action(_node, SemanticAction::close)) return nil;
+    NSAccessibilityCustomAction* close =
+        [[NSAccessibilityCustomAction alloc] initWithName:@"Close"
+                                                   target:self
+                                                 selector:@selector(performSemanticClose)];
+    return @[ close ];
 }
 - (id)accessibilityValue {
     if (_node.role == SemanticRole::check_box ||
@@ -1500,6 +1542,13 @@ private:
     const NSRect local = NSMakeRect(bounds.x, bounds.y, bounds.width, bounds.height);
     const NSRect inWindow = [self convertRect:local toView:nil];
     return [self.window convertRectToScreen:inWindow];
+}
+
+// The element of the current semantic tree with this stable identity, or
+// nil; read by the tab-to-panel relation.
+- (id)semanticAccessibilityElementForStableId:(NSString*)stableId {
+    if (stableId == nil || _semanticAccessibilityElements == nil) return nil;
+    return _semanticAccessibilityElements[stableId];
 }
 
 - (BOOL)performSemanticAction:(SemanticAction)action

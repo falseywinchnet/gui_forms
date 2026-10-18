@@ -56,6 +56,10 @@ AtkRole native_role(SemanticRole role) {
     // builds against; a push button with the has-popup state says the same.
     case SemanticRole::split_button: return ATK_ROLE_PUSH_BUTTON;
     case SemanticRole::menu_button: return ATK_ROLE_PUSH_BUTTON;
+    // A tool panel is a panel; a tab's content is a scroll pane, as GTK and
+    // the ARIA core mapping publish a tab panel on ATK.
+    case SemanticRole::pane: return ATK_ROLE_PANEL;
+    case SemanticRole::tab_panel: return ATK_ROLE_SCROLL_PANE;
     default: return ATK_ROLE_PANEL;
     }
 }
@@ -97,7 +101,24 @@ AtkStateSet* states(AtkObject* object) {
         atk_state_set_add_state(result, ATK_STATE_EDITABLE);
     }
     if (value.node.has_popup) { atk_state_set_add_state(result, ATK_STATE_HAS_POPUP); }
+    // A tab list's orientation as ATK's horizontal or vertical state.
+    if (value.node.orientation) {
+        const bool row = *value.node.orientation == SemanticOrientation::horizontal;
+        atk_state_set_add_state(result, row ? ATK_STATE_HORIZONTAL : ATK_STATE_VERTICAL);
+    }
     return result;
+}
+AtkObject* panel_object(const NodeData& value);
+// The tab-to-panel relation as ATK's controller-for relation, to the panel's
+// object when the window publishes the panel. A new set per call; the
+// caller releases it.
+AtkRelationSet* relations(AtkObject* object) {
+    AtkRelationSet* set = atk_relation_set_new();
+    const NodeData& value = data(object);
+    if (!value.live || value.node.controlled_panel.empty()) { return set; }
+    AtkObject* panel = panel_object(value);
+    if (panel != nullptr) { atk_relation_set_add_relation_by_type(set, ATK_RELATION_CONTROLLER_FOR, panel); }
+    return set;
 }
 // Position in set and set size as the object attributes "posinset" and
 // "setsize", which AT-SPI clients read.
@@ -120,7 +141,7 @@ void class_init(gpointer raw, gpointer) {
     object.get_name = name; object.get_description = description; object.get_parent = parent;
     object.get_index_in_parent = index_in_parent; object.get_n_children = child_count;
     object.ref_child = child_at; object.get_role = role; object.ref_state_set = states;
-    object.get_attributes = attributes;
+    object.get_attributes = attributes; object.ref_relation_set = relations;
     (*G_OBJECT_CLASS(raw)).finalize = finalize;
 }
 void instance_init(GTypeInstance* instance, gpointer) {
@@ -268,6 +289,16 @@ struct LinuxAccessibility::Impl {
     }
 };
 namespace {
+// The live object whose node has the stable identity `value` names as its
+// panel, or none.
+AtkObject* panel_object(const NodeData& value) {
+    if (value.owner == nullptr) { return nullptr; }
+    for (const std::pair<const std::uint64_t, AtkObject*>& entry : (*value.owner).objects) {
+        const NodeData& candidate = data(entry.second);
+        if (candidate.live && candidate.node.stable_id == value.node.controlled_panel) { return entry.second; }
+    }
+    return nullptr;
+}
 gboolean perform(gpointer object, SemanticAction action, const std::string& value) {
     NodeData& node = data(object);
     if (!node.live || !node.owner || !(*node.owner).model) { return false; }

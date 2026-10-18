@@ -227,6 +227,19 @@ struct CustomStateDeclaration final {
     std::string_view name;
 };
 
+// Custom states admitted to the vocabulary (design language §8.5; owner
+// decisions DK-35 and DK-40, §12.10) for the items that need them: a
+// document tab whose content has unsaved changes (`modified`, which the
+// theme shows; there is no mark for it) and a tab pinned to the front of
+// its strip (`pinned`). They stay custom states, declared by the item
+// systems that use them, not standard AnatomyStates: a control lists these
+// declarations among its item system's custom states instead of spelling
+// its own, so every control and theme means one thing by each name.
+inline constexpr CustomStateDeclaration modified_custom_state{.name = "modified"};
+inline constexpr CustomStateDeclaration pinned_custom_state{.name = "pinned"};
+inline constexpr std::array<CustomStateDeclaration, 2> admitted_custom_states{
+    {modified_custom_state, pinned_custom_state}};
+
 // One kind of repeated item a control paints (owner decision 5): a list
 // row, a tree node, a details-view column header. `name` is the system's
 // registered name in the schema ("item", "column"). Item part names are

@@ -112,8 +112,10 @@ void append_name_list(std::string& out, std::span<const std::string_view> names)
 }
 
 // The atom vocabulary (design language 8.5 and 12.7): every part role,
-// state, mark, value type, recipe family and semantic role, in enum order.
-// `none` is the absence of a mark, not a mark, and is left out.
+// state, admitted custom state, mark, value type, recipe family, semantic
+// role, semantic action and semantic node field, in enum order. `none` is
+// the absence of a mark, not a mark, and is left out. Values and node fields
+// have no enum; they are listed here in the order they were admitted.
 void append_vocabulary(std::string& out) {
     std::vector<std::string_view> names;
     out += "  \"vocabulary\": {\n";
@@ -132,6 +134,13 @@ void append_vocabulary(std::string& out) {
     append_name_list(out, names);
     out += ",\n";
     names.clear();
+    for (std::size_t index = 0; index < admitted_custom_states.size(); ++index) {
+        names.push_back(admitted_custom_states[index].name);
+    }
+    append_key(out, "    ", "custom_states");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
     for (std::size_t index = 1; index < part_mark_count; ++index) {
         names.push_back(part_mark_name(static_cast<PartMark>(index)));
     }
@@ -140,6 +149,8 @@ void append_vocabulary(std::string& out) {
     out += ",\n";
     names.clear();
     names.push_back("accent_index");
+    names.push_back("text_orientation");
+    names.push_back("dock_region");
     append_key(out, "    ", "values");
     append_name_list(out, names);
     out += ",\n";
@@ -155,6 +166,22 @@ void append_vocabulary(std::string& out) {
         names.push_back(semantic_role_name(static_cast<SemanticRole>(index)));
     }
     append_key(out, "    ", "semantic_roles");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    for (std::size_t index = 0; index < semantic_action_count; ++index) {
+        names.push_back(semantic_action_name(static_cast<SemanticAction>(index)));
+    }
+    append_key(out, "    ", "semantic_actions");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    names.push_back("position_in_set");
+    names.push_back("set_size");
+    names.push_back("has_popup");
+    names.push_back("controlled_panel");
+    names.push_back("orientation");
+    append_key(out, "    ", "semantic_fields");
     append_name_list(out, names);
     out += "\n  },\n";
 }

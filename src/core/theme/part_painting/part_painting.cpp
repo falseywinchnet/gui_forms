@@ -209,6 +209,90 @@ void paint_customize(Painter& painter, Rect box, Color ink) {
     painter.draw_line(middle, {middle.x + half, middle.y - half * 0.75}, ink, 1.5);
 }
 
+// One point of the pin mark, given in the upright pin's frame as fractions
+// of `square` (`across` from the left, `down` from the top). Upright, the
+// pin stands needle down; lying, the same pin is turned a quarter so that
+// the needle points left. Points land on half units so one-unit strokes
+// stay crisp.
+Point pin_point(Rect square, bool upright, double across, double down) noexcept {
+    const double side = square.width;
+    double x = square.x + across * side;
+    double y = square.y + down * side;
+    if (!upright) {
+        x = square.x + (1.0 - down) * side;
+        y = square.y + across * side;
+    }
+    const Point point{std::floor(x) + 0.5, std::floor(y) + 0.5};
+    return point;
+}
+
+// A pushpin: a barrel (three sides of a small block), a collar across its
+// open end and a needle beyond the collar. Pinned stands it upright, needle
+// down, as a docked panel's caption shows it; unpinned lays it on its side
+// with the needle pointing left (owner decision DK-35, J1).
+void paint_pin(Painter& painter, Rect box, bool pinned, Color ink) {
+    const Rect square = square_in(box);
+    if (square.width < 6.0) return;
+    const Point barrel_top_left = pin_point(square, pinned, 0.3, 0.05);
+    const Point barrel_top_right = pin_point(square, pinned, 0.7, 0.05);
+    const Point barrel_bottom_left = pin_point(square, pinned, 0.3, 0.5);
+    const Point barrel_bottom_right = pin_point(square, pinned, 0.7, 0.5);
+    painter.draw_line(barrel_top_left, barrel_top_right, ink, 1.0);
+    painter.draw_line(barrel_top_left, barrel_bottom_left, ink, 1.0);
+    painter.draw_line(barrel_top_right, barrel_bottom_right, ink, 1.0);
+    const Point collar_start = pin_point(square, pinned, 0.1, 0.5);
+    const Point collar_end = pin_point(square, pinned, 0.9, 0.5);
+    painter.draw_line(collar_start, collar_end, ink, 1.0);
+    const Point needle_start = pin_point(square, pinned, 0.5, 0.5);
+    const Point needle_end = pin_point(square, pinned, 0.5, 0.95);
+    painter.draw_line(needle_start, needle_end, ink, 1.0);
+}
+
+// A docking target's shape (owner decision DK-35, J2): a small window, its
+// caption a two-unit bar along the top and its other three edges one-unit
+// strokes, with the region a drop there gives the panel filled inside it,
+// one unit clear of the edges: a half of the interior for a side, or the
+// middle half of it each way for tab_into.
+void paint_dock_shape(Painter& painter, Rect box, DockShapeRegion region, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 8.0) return;
+    painter.fill_rect({square.x, square.y, side, 2.0}, ink);
+    const double left = square.x + 0.5;
+    const double right = square.x + side - 0.5;
+    const double bottom = square.y + side - 0.5;
+    painter.draw_line({left, square.y + 2.0}, {left, bottom}, ink, 1.0);
+    painter.draw_line({right, square.y + 2.0}, {right, bottom}, ink, 1.0);
+    painter.draw_line({left, bottom}, {right, bottom}, ink, 1.0);
+    const Rect interior{square.x + 2.0, square.y + 3.0, side - 4.0, side - 5.0};
+    const double half_width = std::floor(interior.width * 0.5);
+    const double half_height = std::floor(interior.height * 0.5);
+    Rect filled = interior;
+    switch (region) {
+    case DockShapeRegion::top:
+        filled.height = half_height;
+        break;
+    case DockShapeRegion::bottom:
+        filled.y = interior.y + interior.height - half_height;
+        filled.height = half_height;
+        break;
+    case DockShapeRegion::left:
+        filled.width = half_width;
+        break;
+    case DockShapeRegion::right:
+        filled.x = interior.x + interior.width - half_width;
+        filled.width = half_width;
+        break;
+    case DockShapeRegion::tab_into:
+        filled.x = interior.x + std::floor(interior.width * 0.25);
+        filled.y = interior.y + std::floor(interior.height * 0.25);
+        filled.width = half_width;
+        filled.height = half_height;
+        break;
+    }
+    painter.fill_rect(filled, ink);
+}
+
 void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe) {
     const Rect box = part.bounds;
     const Color ink = recipe.glyph;
@@ -284,26 +368,51 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
     case PartMark::customize:
         paint_customize(painter, box, ink);
         return;
+    case PartMark::pin:
+        paint_pin(painter, box, part.states.contains(AnatomyState::checked), ink);
+        return;
+    case PartMark::dock_shape:
+        paint_dock_shape(painter, box, part.dock_region, ink);
+        return;
     }
 }
 
-// Text centred vertically in the part's bounds, aligned along it, clipped to
-// it. The origin is the baseline, as Painter::draw_text_utf8 takes it.
+// One line of text in the part's bounds, its line box centred across the
+// reading direction and the run aligned along it, clipped to the bounds.
+// The origin is the start of the baseline, as Painter::draw_text_utf8 and
+// draw_turned_text_utf8 take it. A turned run reads along the bounds'
+// height with the glyph tops towards the left (bottom_to_top) or the right
+// (top_to_bottom), so its line box is centred across the width.
 void paint_text(Painter& painter, const PartPaint& part, Color color) {
     if (part.text.empty()) return;
     const Size measured = painter.measure_text_utf8(part.text, part.font);
     const double line_height = std::max(measured.height, part.font.size * 1.2);
-    double x = part.bounds.x;
+    const double ascent = std::max(part.font.size, line_height * 0.82);
+    const bool turned = part.orientation != TextOrientation::horizontal;
+    const double run_extent = turned ? part.bounds.height : part.bounds.width;
+    const double cross_extent = turned ? part.bounds.width : part.bounds.height;
+    // Distances along the reading direction from the end reading starts at,
+    // and across it from the edge the glyph tops face.
+    double along = 0.0;
     if (part.alignment == PartTextAlignment::center) {
-        x += (part.bounds.width - measured.width) * 0.5;
+        along = (run_extent - measured.width) * 0.5;
     } else if (part.alignment == PartTextAlignment::end) {
-        x += part.bounds.width - measured.width;
+        along = run_extent - measured.width;
     }
-    const double top = part.bounds.y + (part.bounds.height - line_height) * 0.5;
-    const double baseline = top + std::max(part.font.size, line_height * 0.82);
+    const double line_top = (cross_extent - line_height) * 0.5;
+    Point origin{part.bounds.x + along, part.bounds.y + line_top + ascent};
+    if (part.orientation == TextOrientation::bottom_to_top) {
+        origin = {part.bounds.x + line_top + ascent, part.bounds.y + part.bounds.height - along};
+    } else if (part.orientation == TextOrientation::top_to_bottom) {
+        origin = {part.bounds.x + part.bounds.width - line_top - ascent, part.bounds.y + along};
+    }
     painter.save();
     painter.clip_rect(part.bounds);
-    painter.draw_text_utf8({x, baseline}, part.text, part.font, color);
+    if (turned) {
+        painter.draw_turned_text_utf8(origin, part.text, part.font, color, part.orientation);
+    } else {
+        painter.draw_text_utf8(origin, part.text, part.font, color);
+    }
     painter.restore();
 }
 
@@ -343,6 +452,8 @@ std::string_view part_mark_name(PartMark mark) noexcept {
     case PartMark::more: return "more";
     case PartMark::overflow: return "overflow";
     case PartMark::customize: return "customize";
+    case PartMark::pin: return "pin";
+    case PartMark::dock_shape: return "dock_shape";
     case PartMark::count: return {};
     }
     return {};

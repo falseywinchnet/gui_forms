@@ -878,16 +878,19 @@ activation behaviour stays platform-owned (DDV-007-01).
 ### 8.5 Marks, values and semantic roles
 
 Besides part roles (§8.1) and states (§8.4), the atom vocabulary (§12.7)
-names the marks a glyph or indicator part shows, the values a part carries,
-and the semantic roles and node fields controls publish to accessibility.
-Their machine forms are `PartMark` (`gui_forms/theme/part_painting`),
-`AccentIndex` (`gui_forms/anatomy/types`) and `SemanticRole` and
-`SemanticNode` (`gui_forms/semantics/types`); the schema export lists the
-marks, values and roles under `vocabulary`, beside the recipe families a
-theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
-`panel`, `card`, `button`, `accent_button`, `command_button`, `choice`,
-`editor`, `menu_item`, `selection`, `progress` and, from RB-38 (§12.9),
-`tool_tip`).
+names the custom states admitted for shared use, the marks a glyph or
+indicator part shows, the values a part carries, and the semantic roles,
+actions and node fields controls publish to accessibility. Their machine
+forms are `admitted_custom_states` and `AccentIndex`
+(`gui_forms/anatomy/types`), `PartMark`, `DockShapeRegion` and the
+`PartPaint` fields (`gui_forms/theme/part_painting`), `TextOrientation`
+(`gui_forms/types/paint_types`), and `SemanticRole`, `SemanticAction` and
+`SemanticNode` (`gui_forms/semantics/types`); the schema export lists them
+under `vocabulary` (`custom_states`, `marks`, `values`, `semantic_roles`,
+`semantic_actions`, `semantic_fields`), beside the recipe families a theme
+supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`, `panel`,
+`card`, `button`, `accent_button`, `command_button`, `choice`, `editor`,
+`menu_item`, `selection`, `progress` and, from RB-38 (§12.9), `tool_tip`).
 
 | Mark | What it shows | Used by |
 |---|---|---|
@@ -900,10 +903,32 @@ theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
 | more | a bar over a solid down arrow | a gallery's "more" button |
 | overflow | a double chevron | a strip's overflow button (`ToolStrip` adopts it), a Quick Access Toolbar's overflow |
 | customize | a short bar over an open down chevron | a Quick Access Toolbar's customize button |
+| pin | a pushpin (a barrel, a collar across its open end, a needle): upright, needle down, when the part is `checked` (pinned); on its side, needle pointing left, otherwise (unpinned) | a docked panel's or group's pin; a pinned tab's pin (§12.10) |
+| dock_shape | a small window, its caption a two-unit bar, with the region a drop gives the panel filled: the top, bottom, left or right half, or the middle for `tab_into` (the `dock_region` value) | a docking target's tiles (§12.10) |
 
 Marks are drawn in one restrained style: one- or 1.5-unit strokes or solid
 fills in the recipe's glyph colour, inside the part's bounds, nothing drawn
 when the part is too small to read.
+
+**Admitted custom states.** `modified` (a document tab whose content has
+unsaved changes; the theme shows it, decision 42 as a dot in the close
+slot, and there is no mark for it) and `pinned` (a tab pinned to the front
+of its strip). They stay custom states, not §8.4 states: an item system that
+needs them declares these shared declarations among its custom states, so
+every control and theme means one thing by each name.
+
+**Text orientation.** A value carried by a part with text: `horizontal`,
+`bottom_to_top` (the line reads up the part, the tops of the glyphs facing
+left, as a left side tab) or `top_to_bottom` (reading down, the tops
+facing right). A turned label lies along the part's height with its line
+centred across the width, and its alignment runs from the end reading
+starts at. The painter draws the line turned a quarter about its origin
+(`Painter::draw_turned_text_utf8`), unhinted as every rotated run is; the
+recording, Windows and Skia painters turn it, and a minimal painter draws it
+unturned.
+
+**Dock region.** The value the `dock_shape` mark is drawn for: `top`,
+`bottom`, `left`, `right` or `tab_into`.
 
 **Accent index.** A value, not a state: a part's position in the theme's
 accent ramp, the ordered colours a theme offers for telling sets of items
@@ -925,6 +950,21 @@ popup. Each host maps them as far as its accessibility API allows: MSAA
 no position in a set; AppKit (macOS) has a menu-button role and an index
 but no split-button role or set size; ATK (Linux) has a has-popup state and
 the `posinset` and `setsize` object attributes.
+
+From 2026-10-17 (§12.10) `pane` (a tool panel or another F6 region) and
+`tab_panel` (the content a tab shows) are admitted, with the action `close`
+(a document tab's or a panel's close) and two node fields: on a tab, the
+stable identity of the tab panel it shows (`controlled_panel`, the
+tab-to-panel relation), and on a tab list, whether its tabs run in a row or
+a column (`orientation`). Tabs publish `select` and no longer `press`. The
+hosts map them so: MSAA has a pane role and, for a tab panel, the property
+page role, but no relation, orientation or second action (UIA, stage A,
+carries them); AppKit publishes both roles as groups, a tab panel with the
+`AXTabPanel` subrole, the relation as linked elements, the orientation, and
+close as a custom action named "Close"; ATK publishes a pane as a panel and
+a tab panel as a scroll pane (as GTK does), the relation as
+controller-for, the orientation as the horizontal or vertical state, and
+close as an action named "close".
 
 ## 9. Motion, effects and sound
 
@@ -1383,6 +1423,38 @@ From the ribbon interview's last note (stage RB, decisions 37 to 43):
   right of the client area over the content (RB-42). Its tooltip is the
   program's help card for the whole window (RB-43). A possible
   whole-screen help overlay is open.
+
+### 12.10 Owner decisions, eighth round, 2026-10-17 (docking and PageView)
+
+From the docking interview (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`;
+stage DK, decisions 35 and 40), admitted to the vocabulary together with the
+enums and the schema as §12.7 requires (§8.5), in phase V0 of the docking
+plan:
+
+- **Marks (DK-35, questions J1 and J2).** `pin`, drawn pinned under the
+  `checked` state and unpinned otherwise; and one `dock_shape` mark with
+  the resulting region (top, bottom, left, right, tab into) as a parameter
+  (`PartPaint::dock_region`), drawn as a small window outline with that
+  region filled, for the docking tiles. Float, dock and maximize marks wait
+  for taste T6 (J7). No new part roles (J8): guides and tiles use `face`,
+  `glyph` and `drop`; previews use `drop` with `drop_accepted` and
+  `drop_rejected`.
+- **Custom item states (DK-35 J3, DK-40 P35.8).** `modified`, shown by the
+  theme with no mark, and `pinned`; no `preview` state.
+- **Text orientation (DK-35 J4).** A text-orientation parameter in
+  `PartPaint` for vertical side-tab labels and the collapsed navigation
+  pane's caption.
+- **Semantics (DK-35 J5 and J6, DK-40 P35.4 and P35.5).** The roles `pane`
+  (tool panels and F6 regions) and `tab_panel` (page content), the action
+  `close`, a tab-to-panel relation field and a tab-list orientation field,
+  each mapped on MSAA, AX and ATK (§8.5) and to be verified with stage A.
+  Tabs stop publishing `press`: `TabControl`'s and the ribbon's tabs
+  publish `select`, their pages and the ribbon's command plane are tab
+  panels, and a selected tab names its panel. Tree roles are deferred to
+  stage A (P35.7).
+- **Families (DK-40 P35.9).** Tabs paint with the `menu_item` family until
+  T4 adds the tab stack's drawing; no new marks for the navigation pane
+  (P35.11).
 
 ## Appendix A. Anti-models
 
