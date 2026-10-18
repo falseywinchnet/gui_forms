@@ -1,4 +1,4 @@
-A row of tabs over the selected page's content: the strip preset of the page view family.
+A row of tabs over the selected page's content, in the strip or the document preset.
 
 A page view owns a `PageSet` and shows it through a child `PageStrip`, with
 the selected page's control in the content area below (or, with the strip at
@@ -7,7 +7,10 @@ application supplies, either when it adds the page or later, the first time
 the page is selected. The view remembers which control had focus in each
 page, and Ctrl+PageDown and Ctrl+PageUp move between pages from anywhere
 inside it. Use it where a `TabControl` would serve but pages are named by
-identity, created lazily, nested, or moved between views.
+identity, created lazily, nested, or moved between views. The document
+preset is for open documents: close buttons, a dot for unsaved changes,
+optional pinned tabs, tabs that shrink and then overflow into a list, and
+Ctrl+F4 to close.
 
 Parameters
 ----------
@@ -16,17 +19,32 @@ stable_id
     as ``<stable_id>.strip`` and each page's panel as
     ``<stable_id>.panel.<page id>``.
 options
-    The options of the view's set: the selection fallback after the selected
-    page leaves (the next page, else the previous, by default), whether pages
-    may be pinned, and the capacity.
+    Either the options of the view's set (the strip preset: the selection
+    fallback after the selected page leaves, the next page, else the previous,
+    by default; whether pages may be pinned; the capacity), or a
+    `PageViewOptions` naming the preset, whether pages may be pinned and the
+    capacity; the preset then chooses the fallback (strip: neighbour;
+    document: the most recently active page). An invalid preset throws
+    `std::invalid_argument`.
 
 Properties
 ----------
 pages
     The view's set: add, remove, move, select, take and put pages through it.
 strip
-    The child strip that shows the tabs; its placement, sizing, activation
-    and mnemonics are set on it.
+    The child strip that shows the tabs; its placement, sizing, activation,
+    overflow, close buttons and mnemonics are set on it.
+preset
+    ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
+    The document preset sets the strip's close buttons to
+    ``selected_and_hot``, its overflow to ``shrink_then_list`` and turns its
+    mnemonics off (document titles are data); these may be changed on the
+    strip afterwards.
+close_policy : default ``PageViewClosePolicy::remove_when_unhandled``
+    What the view does with a close request that no handler of the strip's
+    ``page_close_requested`` handled: remove the page, or, under
+    ``request_only`` (for an owner that decides, such as a docking
+    workspace), nothing.
 ctrl_tab : default ``PageViewCtrlTab::select_next``
     What Ctrl+Tab and Ctrl+Shift+Tab do while focus is inside the view:
     select the next or previous page, or pass the key on, as a view inside a
@@ -88,6 +106,15 @@ page added to an empty set is selected at once, subscribe to
 Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab are taken in the bubble phase, so
 when views are nested the innermost view around the focus answers first; a
 view whose `ctrl_tab` is ``pass`` leaves Ctrl+Tab to the views around it.
+Ctrl+F4 (close the selected closable page) and Ctrl+Shift+PageDown and
+Ctrl+Shift+PageUp (move it within its group) are taken the same way.
+
+Closing a page: the strip raises one ``page_close_requested`` per cause (the
+close button, a middle click, Ctrl+F4, the accessibility action). A handler
+that acts, or refuses (a document whose save prompt was cancelled), sets
+``handled``; otherwise the close policy applies. When the selected page is
+removed, the set selects another by its fallback: in the document preset
+the most recently active page.
 
 To accessibility the strip is the tab list and the selected page's panel is
 its ``tab_panel``, named by the tab and linked from it (the tab's controlled
@@ -100,6 +127,27 @@ paint path; its parts are ``region``, ``strip`` (composed from
 
 Examples
 --------
+Open documents, closed with Ctrl+F4 or a middle click:
+
+.. code-block:: cpp
+
+   gf::PageViewOptions options{};
+   options.preset = gf::PageViewPreset::document;
+   std::shared_ptr<gf::PageView> documents =
+       gf::make_control<gf::PageView>(gf::StableId("documents"), options);
+   const std::array<std::string_view, 3> names{"notes.txt", "plan.md", "main.cpp"};
+   for (const std::string_view name : names) {
+       gf::PageRecord record{};
+       record.id = gf::PageId{std::string(name)};
+       record.title = std::string(name);
+       record.closable = true;
+       static_cast<void>((*documents).add_page(record, gf::Control::Ptr{}));
+   }
+   static_cast<void>((*documents).pages().set_modified(gf::PageId{"plan.md"}, true));
+   static_cast<void>((*(*documents).strip()).request_close(gf::PageId{"notes.txt"},
+                                                         gf::PageCloseCause::keyboard));
+   // Nobody handled the request, so the view removed notes.txt.
+
 Settings pages, the last one built only when it is first shown:
 
 .. code-block:: cpp

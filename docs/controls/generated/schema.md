@@ -1479,6 +1479,7 @@ Properties beyond every control's: none.
 | `scroll_forward` | actuator | `button` | hot, pressed, disabled |
 | `scroll_forward_glyph` | glyph |  | hot, pressed, disabled |
 | `list_button` | actuator | `button` | hot, pressed, open |
+| `list_count` | label |  | hot, pressed, open |
 | `list_glyph` | glyph |  | hot, pressed, open |
 | `focus` | focus |  |  |
 
@@ -1491,10 +1492,15 @@ Item system `page`:
 | `tab` | face |  |  |
 | `tab_icon` | icon |  |  |
 | `tab_label` | label |  |  |
+| `tab_modified` | glyph |  |  |
+| `tab_close` | actuator | `button` | hot, pressed |
+| `tab_close_glyph` | glyph |  | hot, pressed |
+| `tab_pin` | actuator | `button` | hot, pressed, checked |
+| `tab_pin_glyph` | glyph |  | hot, pressed, checked |
 | `tab_seam` | seam |  |  |
 | `tab_focus` | focus |  |  |
 
-Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`. Application-defined: `pinned`.
+Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`. Application-defined: `pinned`, `modified`.
 
 Properties beyond every control's: none.
 
@@ -1502,6 +1508,7 @@ Properties beyond every control's: none.
 |---|---|
 | `page_invoked` | `PageInvocation` |
 | `page_close_requested` | `PageCloseRequest`, by reference |
+| `page_pin_requested` | `PagePinRequest`, by reference |
 
 ## `page_view` (PageView, control)
 

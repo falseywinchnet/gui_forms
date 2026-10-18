@@ -67,6 +67,19 @@ void test_tabs_and_pages(gui_forms::Window& window) {
                 (*(*view).page_content(PageId{"view.report"})).effectively_visible() &&
                 (*view_status).text().find("Created view.report") != std::string::npos,
             "selecting a late page in the gallery's PageView creates and shows its content");
+
+    std::shared_ptr<gui_forms::PageView> documents = std::dynamic_pointer_cast<PageView>(
+        window.find("gallery.tabs.documents"));
+    std::shared_ptr<gui_forms::Label> documents_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.tabs.documents.status"));
+    require(documents && documents_status && (*documents).preset() == PageViewPreset::document &&
+                (*documents).pages().count() == 10U && (*documents).pages().pinned_count() == 1U &&
+                (*(*documents).strip()).overflowing() && (*(*documents).strip()).parts().list_count.present,
+            "the gallery's document view holds ten documents, one pinned, overflowing into the counted list");
+    require(window.perform_semantic_action("gallery.tabs.documents.strip.tab.doc.1", SemanticAction::close) &&
+                !(*documents).pages().find(PageId{"doc.1"}) &&
+                (*documents_status).text().find("Closed page_view.cpp") != std::string::npos,
+            "closing a gallery document removes it and reports the cause");
 }
 
 } // namespace gallery_pages_tests

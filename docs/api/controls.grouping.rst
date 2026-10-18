@@ -32,7 +32,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    * - :cpp:class:`PageStrip <gui_forms::PageStrip>`
      - The tab headers of a page set in one row, at the top or the bottom of their content.
    * - :cpp:class:`PageView <gui_forms::PageView>`
-     - A row of tabs over the selected page's content: the strip preset of the page view family.
+     - A row of tabs over the selected page's content, in the strip or the document preset.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
      - One page of a tab control, with the caption shown on its tab.
 
@@ -75,6 +75,8 @@ Related types
      - A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already).
    * - :cpp:class:`PageItemWidths <gui_forms::PageItemWidths>`
      - Tab widths in logical units at text scale 1.
+   * - :cpp:class:`PagePinRequest <gui_forms::PagePinRequest>`
+     - A request to pin or unpin a page: a click on a pinned tab's pin glyph asks to unpin it.
    * - :cpp:class:`PageStrip::Item <gui_forms::PageStrip::Item>`
      -  
    * - :cpp:class:`PageStrip::ItemParts <gui_forms::PageStrip::ItemParts>`
@@ -85,6 +87,8 @@ Related types
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`PageView::Parts <gui_forms::PageView::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`PageViewOptions <gui_forms::PageViewOptions>`
+     -  
    * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
    * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
@@ -170,7 +174,7 @@ Related types
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
-   A request to close a closable page. The strip never removes a page itself: whoever owns the set decides (owner decision DK-38). A handler that acts on the request sets ``handled``.
+   A request to close a closable page. The strip never removes a page itself: whoever owns the set decides (owner decision DK-38). A handler that acts on the request, or refuses it (a document that asks to save and is cancelled), sets ``handled``. A PageView whose close policy is ``remove_when_unhandled`` removes the page after the handlers when none set it; a docking owner only requests.
 
    .. cpp:member:: PageId page
 
@@ -250,6 +254,20 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PagePinRequest final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   A request to pin or unpin a page: a click on a pinned tab's pin glyph asks to unpin it. When no handler sets ``handled``, the strip applies it to the set (PageSet::set_pinned).
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: bool pinned
+
+   .. cpp:member:: bool handled
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PageStrip::Item final
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
@@ -272,13 +290,27 @@ Related types
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
-   Item part names start with tab: an item part may not repeat one of the strip's own part names. Phase P4 adds the close and pin actuators and the modified mark in the space after the label.
+   Item part names start with tab: an item part may not repeat one of the strip's own part names. The close button, the pin and the modified dot share one slot after the label; at most one of them is present.
 
    .. cpp:member:: PartGeometry tab
 
    .. cpp:member:: PartGeometry tab_icon
 
    .. cpp:member:: PartGeometry tab_label
+
+   .. cpp:member:: PartGeometry tab_modified
+
+      The dot of a modified page, while its close button is not shown.
+
+   .. cpp:member:: PartGeometry tab_close
+
+   .. cpp:member:: PartGeometry tab_close_glyph
+
+   .. cpp:member:: PartGeometry tab_pin
+
+      A pinned tab's pin, shown in place of the close button while the tab is expanded.
+
+   .. cpp:member:: PartGeometry tab_pin_glyph
 
    .. cpp:member:: PartGeometry tab_seam
 
@@ -304,7 +336,9 @@ Related types
 
    .. cpp:member:: bool pinned
 
-      The admitted custom state (DK-40): the page is in the pinned group.
+      The admitted custom states (DK-35, DK-40): the page is in the pinned group; its content has unsaved changes.
+
+   .. cpp:member:: bool modified
 
 .. cpp:namespace:: gui_forms
 
@@ -330,6 +364,10 @@ Related types
 
    .. cpp:member:: PartGeometry list_button
 
+   .. cpp:member:: PartGeometry list_count
+
+      The count of hidden pages on the list button (``shrink_then_list``).
+
    .. cpp:member:: PartGeometry list_glyph
 
    .. cpp:member:: PartGeometry focus
@@ -353,6 +391,24 @@ Related types
       The selected page's content area.
 
    .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageViewOptions final
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   .. cpp:member:: PageViewPreset preset
+
+      Default: ``{PageViewPreset::strip}``.
+
+   .. cpp:member:: bool pinning_enabled
+
+      Pinned tabs (owner decision DK-31) are opt-in. Default: ``{false}``.
+
+   .. cpp:member:: std::size_t capacity
+
+      As PageSetOptions::capacity. Default: ``{PageSetLimits::default_capacity}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -461,11 +517,25 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PageCloseButtons
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: selected_and_hot
+
+   .. cpp:enumerator:: all
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PageCloseCause
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
    .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: middle_button
 
    .. cpp:enumerator:: keyboard
 
@@ -495,6 +565,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PageStripOverflow
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: scroll
+
+   .. cpp:enumerator:: shrink_then_list
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PageStripPlacement
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
@@ -505,6 +585,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PageViewClosePolicy
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   .. cpp:enumerator:: remove_when_unhandled
+
+   .. cpp:enumerator:: request_only
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PageViewCtrlTab
 
    ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
@@ -512,6 +602,16 @@ Enumerations
    .. cpp:enumerator:: select_next
 
    .. cpp:enumerator:: pass
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageViewPreset
+
+   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+   .. cpp:enumerator:: strip
+
+   .. cpp:enumerator:: document
 
 .. cpp:namespace:: gui_forms
 
@@ -538,3 +638,14 @@ Enumerations
    .. cpp:enumerator:: buttons
 
    .. cpp:enumerator:: flat_buttons
+
+Functions, constants and aliases
+--------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
+
+.. cpp:function:: PageSetOptions page_set_options(const PageViewOptions& options) noexcept
+
+   The set options a view's options give: pinning and capacity as stated, and the preset's selection after a close (strip: neighbour; document: most recent, owner decision DK-37).

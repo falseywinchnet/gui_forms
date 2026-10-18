@@ -2006,6 +2006,27 @@ void example() {
 }  // namespace doc_example_PageStrip_1
 
 namespace doc_example_PageView_1 {
+void example() {
+    gf::PageViewOptions options{};
+    options.preset = gf::PageViewPreset::document;
+    std::shared_ptr<gf::PageView> documents =
+        gf::make_control<gf::PageView>(gf::StableId("documents"), options);
+    const std::array<std::string_view, 3> names{"notes.txt", "plan.md", "main.cpp"};
+    for (const std::string_view name : names) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{std::string(name)};
+        record.title = std::string(name);
+        record.closable = true;
+        static_cast<void>((*documents).add_page(record, gf::Control::Ptr{}));
+    }
+    static_cast<void>((*documents).pages().set_modified(gf::PageId{"plan.md"}, true));
+    static_cast<void>((*(*documents).strip()).request_close(gf::PageId{"notes.txt"},
+                                                          gf::PageCloseCause::keyboard));
+    // Nobody handled the request, so the view removed notes.txt.
+}
+}  // namespace doc_example_PageView_1
+
+namespace doc_example_PageView_2 {
 struct Settings final : gf::Component {
     std::shared_ptr<gf::PageView> view =
         gf::make_control<gf::PageView>(gf::StableId("settings"));
@@ -2037,7 +2058,7 @@ void example() {
     // The request ran: the advanced page now has its label.
     static_cast<void>((*settings.view).page_content(gf::PageId{"advanced"}));
 }
-}  // namespace doc_example_PageView_1
+}  // namespace doc_example_PageView_2
 
 namespace doc_example_Panel_1 {
 void example() {
@@ -3549,6 +3570,7 @@ int main() {
     failures += run("PageSet example 2", &doc_example_PageSet_2::example);
     failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
     failures += run("PageView example 1", &doc_example_PageView_1::example);
+    failures += run("PageView example 2", &doc_example_PageView_2::example);
     failures += run("Panel example 1", &doc_example_Panel_1::example);
     failures += run("Panel example 2", &doc_example_Panel_2::example);
     failures += run("PictureBox example 1", &doc_example_PictureBox_1::example);

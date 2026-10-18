@@ -231,6 +231,10 @@ Related types
 
    .. cpp:member:: std::vector<MenuItemSpec> children
 
+   .. cpp:member:: bool italic
+
+      The row's text is set in the italic style. A presentational bridge: no anatomy state names why a row is set apart (PageStrip's list sets the pages it does not show in italic, owner decision DK-42, PT6).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: MenuStrip::Item final

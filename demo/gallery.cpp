@@ -201,6 +201,14 @@ void install_page_fixtures(Window& window) {
             (*button).set_text_image_relation(TextImageRelation::image_before_text);
             (*button).set_image_gap(6.0);
         }
+        // The document PageView's pinned page collapses to this icon.
+        if (const std::shared_ptr<gui_forms::PageView> documents = std::dynamic_pointer_cast<PageView>(
+                window.find("gallery.tabs.documents"))) {
+            std::shared_ptr<gui_forms::ImageList> document_icons =
+                std::make_shared<ImageList>(window, Size{16.0, 16.0});
+            (*document_icons).add_image("folder", icon_normal.image);
+            (*(*documents).strip()).set_image_list(std::move(document_icons));
+        }
     }
     const std::vector<std::byte> patch_pixels = make_nine_patch_surface();
     const ImageLoadResult patch = window.load_bgra32_premultiplied(

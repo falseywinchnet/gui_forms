@@ -3015,6 +3015,7 @@
         {"name": "scroll_forward", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed", "disabled"]},
         {"name": "scroll_forward_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed", "disabled"]},
         {"name": "list_button", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed", "open"]},
+        {"name": "list_count", "role": "label", "composed_from": null, "states": ["hot", "pressed", "open"]},
         {"name": "list_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed", "open"]},
         {"name": "focus", "role": "focus", "composed_from": null, "states": []}
       ],
@@ -3027,11 +3028,16 @@
             {"name": "tab", "role": "face", "composed_from": null, "states": []},
             {"name": "tab_icon", "role": "icon", "composed_from": null, "states": []},
             {"name": "tab_label", "role": "label", "composed_from": null, "states": []},
+            {"name": "tab_modified", "role": "glyph", "composed_from": null, "states": []},
+            {"name": "tab_close", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed"]},
+            {"name": "tab_close_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed"]},
+            {"name": "tab_pin", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed", "checked"]},
+            {"name": "tab_pin_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed", "checked"]},
             {"name": "tab_seam", "role": "seam", "composed_from": null, "states": []},
             {"name": "tab_focus", "role": "focus", "composed_from": null, "states": []}
           ],
           "states": ["hot", "pressed", "selected", "disabled", "focus_visible"],
-          "custom_states": ["pinned"]
+          "custom_states": ["pinned", "modified"]
         }
       ],
       "properties": [
@@ -3071,7 +3077,8 @@
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
         {"name": "page_invoked", "payload": "PageInvocation", "mutable_payload": false},
-        {"name": "page_close_requested", "payload": "PageCloseRequest", "mutable_payload": true}
+        {"name": "page_close_requested", "payload": "PageCloseRequest", "mutable_payload": true},
+        {"name": "page_pin_requested", "payload": "PagePinRequest", "mutable_payload": true}
       ]
     },
     {

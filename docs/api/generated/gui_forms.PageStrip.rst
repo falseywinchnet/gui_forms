@@ -17,9 +17,12 @@ gui_forms::PageStrip
    shows and changes the set's selection. It has no content area of its own:
    :cpp:class:`PageView <gui_forms::PageView>` puts one under a strip, and a docking workspace uses a strip alone
    for its auto-hide edges. Tabs are sized to their labels (or fixed, or sharing
-   the row), and when they do not fit the strip shows scroll buttons and a list
-   button at its end. The arrow keys move between tabs and select as they move,
-   unless the strip is set to manual selection.
+   the row). When they do not fit, a strip shows scroll buttons and a list
+   button at its end; a document strip instead shrinks its tabs towards a
+   minimum width and then hides the last ones behind a list button that shows
+   how many are hidden. The arrow keys move between tabs and select as they
+   move, unless the strip is set to manual selection. Document strips also show
+   close buttons, a dot for modified pages and icon-only pinned tabs.
 
    *Status:* provisional.
 
@@ -58,6 +61,21 @@ gui_forms::PageStrip
          (automatic) or only move the keyboard's position, Space or Enter then
          selecting it (manual, for pages that are slow to show).
 
+      **overflow** : ``PageStripOverflow``, default ``PageStripOverflow::scroll``
+         What the strip does when its tabs do not fit. ``scroll``: scroll back,
+         scroll forward and list buttons at the end, the tabs keeping their
+         widths. ``shrink_then_list``: the ordinary tabs shrink towards the
+         minimum width, the widest first; when even that does not fit, the tabs
+         from the end of the order that do not fit are hidden behind a list
+         button showing their count and a down arrow. Pinned tabs never shrink
+         and are never hidden.
+
+      **close_buttons** : ``PageCloseButtons``, default ``PageCloseButtons::none``
+         Which closable tabs show their close button: ``none``,
+         ``selected_and_hot`` (the selected tab and the tab under the pointer) or
+         ``all``. Unless ``none``, space for the button is reserved after the
+         label of every closable tab, so widths do not change when it appears.
+
       **mnemonics_enabled** : ``bool``, default ``true``
          Whether ``&`` in a title marks a mnemonic: Alt and the letter select the
          page and focus its tab, and the marker is not shown. When off, titles are
@@ -73,21 +91,32 @@ gui_forms::PageStrip
          another window.
 
       **overflowing** : ``bool``, read-only
-         Whether the tabs do not all fit, so the scroll and list buttons show.
+         Whether the tabs do not all fit, so the scroll and list buttons (under
+         ``shrink_then_list``, the list button) show.
 
       **visible_pages** : ``std::vector<PageId>``, read-only
-         The pages whose tabs are laid out, in order.
+         The pages whose tabs are laid out, in the order they are shown.
+
+      **hidden_count** : ``std::size_t``, read-only
+         How many pages have no tab laid out.
 
       **focused_page** : ``std::optional<PageId>``, read-only
          The page the keyboard is on while the strip has focus, or none.
 
+      **widths_frozen** : ``bool``, read-only
+         Whether tab widths are frozen after a close by the pointer.
+
       **page_list_open** : ``bool``, read-only
          Whether the page list is open.
+
+      **page_list_items** : ``std::vector<MenuItemSpec>``, read-only
+         The list's rows while it is open, one per page in order; the rows of
+         pages without a tab are italic.
 
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
-         The tabs laid out (not those scrolled out of view), in order.
+         The tabs laid out (not those scrolled out of view or hidden), in the order they are shown.
 
    :Events:
 
@@ -98,9 +127,17 @@ gui_forms::PageStrip
          selection, nor when a handler of the set's ``selecting`` cancelled.
 
       **page_close_requested** : ``Event<PageCloseRequest&>``
-         Raised when a closable page's close is asked for; in this phase only the
-         accessibility ``close`` action asks. The strip never removes the page:
-         the set's owner decides, and sets ``handled`` when it acts.
+         Raised once when a closable page's close is asked for: by its close
+         button (cause ``pointer``), a middle click released over the tab it
+         pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
+         or the accessibility ``close`` action (``semantic``). The strip never
+         removes the page: the set's owner decides, and sets ``handled`` when it
+         acts or refuses. A :cpp:class:`PageView <gui_forms::PageView>` removes a page nobody handled unless its
+         close policy is ``request_only``.
+
+      **page_pin_requested** : ``Event<PagePinRequest&>``
+         Raised when a pinned tab's pin is clicked, asking to unpin the page. When
+         no handler sets ``handled`` the strip unpins it in the set.
 
    :Inherited:
 
@@ -128,6 +165,10 @@ gui_forms::PageStrip
         - Closes the page list.
       * - :cpp:func:`select_relative <gui_forms::PageStrip::select_relative>`
         - Selects the next (+1) or previous (-1) page, wrapping, and raises :cpp:func:`page_invoked <gui_forms::PageStrip::page_invoked>`.
+      * - :cpp:func:`move_selected <gui_forms::PageStrip::move_selected>`
+        - Moves the selected page one place later (+1) or earlier (-1) within its group, the pinned pages or the ordinary ones; false at the group's end.
+      * - :cpp:func:`request_close <gui_forms::PageStrip::request_close>`
+        - Raises :cpp:func:`page_close_requested <gui_forms::PageStrip::page_close_requested>` for a closable page with the given cause; true when the request was handled (by a handler, or by the owning view's removal).
       * - :cpp:func:`tab_identity <gui_forms::PageStrip::tab_identity>`
         - The accessibility identity of a page's tab.
 
@@ -148,30 +189,58 @@ gui_forms::PageStrip
    a resize or a change of setting scrolls the selected tab (under manual
    selection, the keyboard's tab) into view. The scroll buttons and the mouse
    wheel scroll by one whole tab and may move the selected tab out of view until
-   the next of those. A page chosen from the list is selected and scrolled into
-   view; its place in the order does not change.
+   the next of those. Under ``scroll`` a page chosen from the list is selected and
+   scrolled into view; its place in the order does not change. Under
+   ``shrink_then_list`` a hidden page chosen from the list takes the last
+   visible position: the strip selects it and moves it there in one
+   :cpp:class:`PageSet <gui_forms::PageSet>` batch, so the set publishes one change of each kind, the pages
+   before that position keep their places and the pinned boundary holds. A
+   cancelled selection moves nothing. A hidden page selected any other way (a
+   key, a program) is shown in the last place without being moved.
+
+   Document features. A closable tab shows its close button by the
+   :cpp:func:`close_buttons <gui_forms::PageStrip::close_buttons>` rule, with a plate while the pointer is on it; pressing it
+   selects nothing and the request is raised on the release over the same
+   button. A modified page shows a dot in the close button's place, replaced by
+   the close button while the tab is hot. After a close by the pointer (the
+   button or a middle click) the remaining tabs keep their widths until the
+   pointer leaves the strip, so the next tab's close button arrives under the
+   pointer; a resize or a setting also thaws them. A pinned page with an image
+   shows only its icon until the pointer is over it, then its full width with
+   its pin in the close button's place; a pinned page without an image keeps
+   its label. Ctrl+F4 asks to close the selected page; Delete closes nothing.
 
    A press on a tab selects first and then focuses the strip. The order of
    events is the set's ``selecting``, its ``selected_page_changed``, then
    :cpp:func:`page_invoked <gui_forms::PageStrip::page_invoked>`; a cancelled selection raises nothing more and leaves the
    keyboard's tab where it was. Ctrl+PageDown and Ctrl+PageUp select the next
-   and previous page while the strip has focus.
+   and previous page while the strip has focus, and Ctrl+Shift+PageDown and
+   Ctrl+Shift+PageUp move the selected page within its group. The macOS
+   Command+W is not bound: the framework has no host keymap defaults yet.
 
    Every page is published to accessibility as a tab of the strip's tab list
    (role ``tab_group``, horizontal): those scrolled out of view are published
    without bounds and without the visible state, so every tab can be reached.
    Tabs carry their position in the set and offer ``select``, and ``close`` when
-   the page is closable; they never offer ``press``. While the strip overflows,
-   its scroll buttons and its list button (a ``menu_button`` with a popup)
-   follow the tabs.
+   the page is closable; they never offer ``press``. Until accessibility gains
+   states for them, a tab's description reads ``pinned``, ``modified`` or
+   ``pinned, modified``. While the strip overflows, its scroll buttons (under
+   ``scroll``) and its list button (a ``menu_button`` with a popup; under
+   ``shrink_then_list`` its description gives the hidden count) follow the
+   tabs.
 
    The tabs are the ``page`` item system: each tab has the parts ``tab``,
-   ``tab_icon``, ``tab_label``, ``tab_seam`` (the selected tab only) and
-   ``tab_focus``, the states hot, pressed, selected, disabled and focus-visible,
-   and the custom state ``pinned``. They are painted through the by-role paint
-   path with the menu-item family, flat at rest, until the default theme draws
-   the tab stack. Painting reads a layout cached between changes and allocates
-   nothing per tab.
+   ``tab_icon``, ``tab_label``, ``tab_modified`` (the dot, drawn with the
+   ``radio_dot`` mark), ``tab_close`` and ``tab_close_glyph`` (states hot and
+   pressed), ``tab_pin`` and ``tab_pin_glyph`` (hot, pressed, and checked for
+   the pinned drawing), ``tab_seam`` (the selected tab only) and ``tab_focus``;
+   at most one of the dot, the close button and the pin is present. Tabs have
+   the states hot, pressed, selected, disabled and focus-visible, and the
+   custom states ``pinned`` and ``modified``. The list button's count is the
+   part ``list_count``. They are painted through the by-role paint path with
+   the menu-item family, flat at rest, until the default theme draws the tab
+   stack and the notched document tab. Painting reads a layout cached between
+   changes and allocates nothing per tab.
 
    .. rubric:: Examples
 
@@ -246,6 +315,31 @@ gui_forms::PageStrip
 
       Sets :cpp:func:`activation <gui_forms::PageStrip::activation>`; see the property's description above.
 
+   .. cpp:function:: PageStripOverflow overflow() const noexcept
+
+      What the strip does when its tabs do not fit. ``scroll``: scroll back,
+      scroll forward and list buttons at the end, the tabs keeping their
+      widths. ``shrink_then_list``: the ordinary tabs shrink towards the
+      minimum width, the widest first; when even that does not fit, the tabs
+      from the end of the order that do not fit are hidden behind a list
+      button showing their count and a down arrow. Pinned tabs never shrink
+      and are never hidden.
+
+   .. cpp:function:: void set_overflow(PageStripOverflow overflow)
+
+      Sets :cpp:func:`overflow <gui_forms::PageStrip::overflow>`; see the property's description above.
+
+   .. cpp:function:: PageCloseButtons close_buttons() const noexcept
+
+      Which closable tabs show their close button: ``none``,
+      ``selected_and_hot`` (the selected tab and the tab under the pointer) or
+      ``all``. Unless ``none``, space for the button is reserved after the
+      label of every closable tab, so widths do not change when it appears.
+
+   .. cpp:function:: void set_close_buttons(PageCloseButtons buttons)
+
+      Sets :cpp:func:`close_buttons <gui_forms::PageStrip::close_buttons>`; see the property's description above.
+
    .. cpp:function:: bool mnemonics_enabled() const noexcept
 
       Whether ``&`` in a title marks a mnemonic: Alt and the letter select the
@@ -277,25 +371,39 @@ gui_forms::PageStrip
 
    .. cpp:function:: bool overflowing() const
 
-      Whether the tabs do not all fit, so the scroll and list buttons show.
+      Whether the tabs do not all fit, so the scroll and list buttons (under
+      ``shrink_then_list``, the list button) show.
 
    .. cpp:function:: std::vector<PageId> visible_pages() const
 
-      The pages whose tabs are laid out, in order.
+      The pages whose tabs are laid out, in the order they are shown.
+
+   .. cpp:function:: std::size_t hidden_count() const
+
+      How many pages have no tab laid out.
 
    .. cpp:function:: std::optional<PageId> focused_page() const
 
       The page the keyboard is on while the strip has focus, or none.
 
+   .. cpp:function:: bool widths_frozen() const noexcept
+
+      Whether tab widths are frozen after a close by the pointer.
+
    .. cpp:function:: bool page_list_open() const noexcept
 
       Whether the page list is open.
+
+   .. cpp:function:: std::vector<MenuItemSpec> page_list_items() const
+
+      The list's rows while it is open, one per page in order; the rows of
+      pages without a tab are italic.
 
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
 
-      The tabs laid out (not those scrolled out of view), in order.
+      The tabs laid out (not those scrolled out of view or hidden), in the order they are shown.
 
 
    .. rubric:: Events
@@ -309,9 +417,18 @@ gui_forms::PageStrip
 
    .. cpp:function:: Event<PageCloseRequest&>& page_close_requested() noexcept
 
-      Raised when a closable page's close is asked for; in this phase only the
-      accessibility ``close`` action asks. The strip never removes the page:
-      the set's owner decides, and sets ``handled`` when it acts.
+      Raised once when a closable page's close is asked for: by its close
+      button (cause ``pointer``), a middle click released over the tab it
+      pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
+      or the accessibility ``close`` action (``semantic``). The strip never
+      removes the page: the set's owner decides, and sets ``handled`` when it
+      acts or refuses. A :cpp:class:`PageView <gui_forms::PageView>` removes a page nobody handled unless its
+      close policy is ``request_only``.
+
+   .. cpp:function:: Event<PagePinRequest&>& page_pin_requested() noexcept
+
+      Raised when a pinned tab's pin is clicked, asking to unpin the page. When
+      no handler sets ``handled`` the strip unpins it in the set.
 
 
    .. rubric:: Methods
@@ -352,6 +469,18 @@ gui_forms::PageStrip
       Selects the next (+1) or previous (-1) page, wrapping, and raises
       :cpp:func:`page_invoked <gui_forms::PageStrip::page_invoked>`.
 
+   .. cpp:function:: bool move_selected(int direction)
+
+      Moves the selected page one place later (+1) or earlier (-1) within its
+      group, the pinned pages or the ordinary ones; false at the group's end.
+      Ctrl+Shift+PageDown and Ctrl+Shift+PageUp call it.
+
+   .. cpp:function:: bool request_close(const PageId& page, PageCloseCause cause)
+
+      Raises :cpp:func:`page_close_requested <gui_forms::PageStrip::page_close_requested>` for a closable page with the given cause;
+      true when the request was handled (by a handler, or by the owning view's
+      removal). A page that is not in the set or not closable raises nothing.
+
    .. cpp:function:: std::string tab_identity(const PageId& page) const
 
       The accessibility identity of a page's tab.
@@ -390,6 +519,12 @@ gui_forms::PageStrip
       *Protected.*
 
       The stable identity of the tab_panel node a page's tab controls, or empty (owner decision DK-40). A strip alone shows no panels; PageView's strip names the panel of a page that has content.
+
+   .. cpp:function:: virtual void close_unhandled(PageCloseRequest& request)
+
+      *Protected.*
+
+      Called by :cpp:func:`request_close <gui_forms::PageStrip::request_close>` after the handlers when none set ``handled``. A strip alone does nothing; PageView's strip applies the view's close policy and sets ``handled`` when it removed the page.
 
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
 

@@ -22,6 +22,7 @@ public:
         build_variants(page);
         build_strip(page);
         build_view(page);
+        build_documents(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
         on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
@@ -210,6 +211,58 @@ private:
         (*view_group).add_at(view_status_, {640.0, 40.0, 270.0, 44.0});
     }
 
+    // A PageView in the document preset: closable documents with close
+    // buttons on the selected and hot tabs, one pinned page and one
+    // modified, shrinking and then overflowing into the count-and-arrow
+    // list. The demo gives the strip an image list so the pinned page
+    // collapses to its icon; without one it keeps its label.
+    void build_documents(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> documents_group = group(
+            "gallery.tabs.documents.group",
+            "PageView · document preset: close, modified, pinned, shrink then list", {930.0, 200.0});
+        (*page).add_at(documents_group, {24.0, 1036.0, 930.0, 200.0});
+        PageViewOptions options{};
+        options.preset = PageViewPreset::document;
+        options.pinning_enabled = true;
+        documents_ = make_control<PageView>(StableId("gallery.tabs.documents"), options);
+        (*documents_).set_accessible_name("Open documents");
+        PageItemWidths widths{};
+        widths.minimum = 80.0;
+        (*(*documents_).strip()).set_item_widths(widths);
+        (*documents_group).add_at(documents_, {20.0, 36.0, 600.0, 146.0});
+        for (std::size_t index = 0U; index < document_titles.size(); ++index) {
+            PageRecord record{};
+            record.id = PageId{"doc." + std::to_string(index)};
+            record.title = std::string(document_titles[index]);
+            record.closable = true;
+            record.pinned = index == 0U;
+            record.modified = index == 2U;
+            record.image_key = "folder";
+            std::shared_ptr<Label> body = label(
+                "gallery.tabs.documents.body." + std::to_string(index),
+                std::string(document_titles[index]) + " · middle-click or Ctrl+F4 closes it", 11.0, 400, ink);
+            static_cast<void>((*documents_).add_page(record, body));
+        }
+        static_cast<void>((*documents_).pages().select(PageId{"doc.1"}, PageSelectionCause::programmatic));
+        documents_status_ = label("gallery.tabs.documents.status", "Close a document to see its cause",
+                                  11.0, 600, green);
+        (*documents_group).add_at(documents_status_, {640.0, 40.0, 270.0, 44.0});
+        on((*(*documents_).strip()).page_close_requested(), *this, &TabsPage::on_document_close_requested);
+    }
+
+    // The view removes the page after this handler, which leaves the
+    // request unhandled.
+    void on_document_close_requested(PageCloseRequest& request) {
+        const std::optional<PagePosition> found = (*documents_).pages().find(request.page);
+        if (!found) return;
+        const std::string title = (*documents_).pages().record_at(*found).title;
+        std::string_view cause = "close button";
+        if (request.cause == PageCloseCause::middle_button) cause = "middle click";
+        if (request.cause == PageCloseCause::keyboard) cause = "Ctrl+F4";
+        if (request.cause == PageCloseCause::semantic) cause = "accessibility";
+        (*documents_status_).set_text("Closed " + title + " · " + std::string(cause));
+    }
+
     [[nodiscard]] static PageRecord view_record(std::string_view id, std::string_view title) {
         PageRecord record{};
         record.id = PageId{"view." + std::string(id)};
@@ -248,6 +301,10 @@ private:
             : "Activity · keep visible off · bound Value<bool> changed");
     }
 
+    static constexpr std::array<std::string_view, 10> document_titles{
+        "README.md",        "page_view.cpp",  "page_strip.cpp", "page_set.cpp",   "page_view.hpp",
+        "page_strip.hpp",   "CMakeLists.txt", "PLAN.md",        "README.rst",     "tests.cpp"};
+
     static constexpr std::array<std::string_view, 14> strip_titles{
         "Overview", "Activity", "Security", "Diagnostics", "Network", "Storage", "Accounts",
         "Notifications", "Display", "Sound", "Keyboard", "Accessibility", "Updates", "About"};
@@ -260,6 +317,8 @@ private:
     std::shared_ptr<Label> strip_status_;
     std::shared_ptr<PageView> view_;
     std::shared_ptr<Label> view_status_;
+    std::shared_ptr<PageView> documents_;
+    std::shared_ptr<Label> documents_status_;
     Value<bool> activity_visible_{true};
 };
 
