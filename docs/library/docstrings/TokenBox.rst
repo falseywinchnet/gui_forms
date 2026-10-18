@@ -4,6 +4,8 @@ A token box shows its tokens first to last, wrapping onto further lines,
 with an `editor` text box after the last. The user types an entry and ends
 it with Enter or a delimiter character, or accepts a completion of the
 editor's auto-complete; the entry becomes a token and the editor empties.
+With no entry typed (nothing, or only spaces), Enter is not the box's: it
+goes on to the window's accept button.
 Each token has a close glyph that removes it, and the keyboard can select
 and remove tokens without leaving the editor. Use it for lists of short
 values such as recipients, tags or keywords. It is a GUI.Forms-only control;

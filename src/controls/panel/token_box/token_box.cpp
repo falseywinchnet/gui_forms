@@ -79,8 +79,10 @@ void TokenBox::initialize_control_tree() {
     (*editor_).set_border_style(BorderStyle::none);
     (*editor_).set_font(font_);
     (*editor_).set_auto_complete_anchor(shared_from_this());
-    // Enter turns the typed text into a token (editor_committed).
-    (*editor_).set_accepts_enter(true);
+    // Enter turns the typed text into a token (editor_committed); with
+    // nothing typed it goes on to the window's accept button (W decision 6),
+    // so the editor accepts Enter only while it holds an entry.
+    (*editor_).set_accepts_enter(false);
     add_child(editor_);
     editor_commit_ = (*editor_).committed().subscribe(*this,
         Delegate<const std::string&>::bind<TokenBox, &TokenBox::editor_committed>(*this));
@@ -251,6 +253,9 @@ void TokenBox::editor_completion_accepted(const std::string& text) {
 }
 
 void TokenBox::editor_text_changed(const std::string& text) {
+    // An entry of only spaces would make no token: Enter passes on then too.
+    const bool entry = !trimmed(text).empty();
+    if ((*editor_).accepts_enter() != entry) (*editor_).set_accepts_enter(entry);
     if (synchronizing_) return;
     // Typing goes back to the editor from a selected token.
     if (selected_) {

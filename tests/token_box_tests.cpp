@@ -144,6 +144,42 @@ void tokens_and_identity() {
     require(threw, "a token box has no list items to complete from");
 }
 
+struct CountClicks final {
+    std::size_t* count{};
+    void operator()(ButtonBase&) const { ++(*count); }
+};
+
+// An empty token box passes Enter on to the window's accept button; an
+// entry takes it (owner decision W-6).
+void empty_entry_passes_enter_on() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("tokens.dialog"));
+    std::shared_ptr<TokenBox> box = make_control<TokenBox>(StableId("tokens.dialog.box"));
+    std::shared_ptr<Button> accept = make_control<Button>(StableId("tokens.dialog.accept"), "OK");
+    (*box).set_requested_bounds({10.0, 10.0, 300.0, 60.0});
+    (*accept).set_requested_bounds({10.0, 90.0, 80.0, 28.0});
+    (*accept).set_dialog_result(DialogResult::ok);
+    (*root).add_child(box);
+    (*root).add_child(accept);
+    Window window(root, {400.0, 160.0});
+    window.perform_layout();
+    std::size_t clicks = 0U;
+    SubscriptionToken click_token = (*accept).clicked().subscribe(CountClicks{&clicks});
+    window.set_accept_button(accept);
+    require(window.request_focus((*box).editor()), "the editor takes focus");
+    require(press(window, PhysicalKey::enter) && clicks == 1U && window.dialog_result() == DialogResult::ok &&
+                (*box).tokens().empty(),
+            "Enter in an empty token box reaches the accept button");
+    window.set_dialog_result(DialogResult::none);
+    require(type(window, "   ") && press(window, PhysicalKey::enter) && clicks == 2U && (*box).tokens().empty(),
+            "an entry of only spaces passes Enter on too");
+    window.set_dialog_result(DialogResult::none);
+    (*(*box).editor()).set_text("");
+    require(type(window, "tag") && press(window, PhysicalKey::enter) && clicks == 2U &&
+                (*box).tokens().size() == 1U && window.dialog_result() == DialogResult::none,
+            "with an entry, Enter makes a token and the dialog stays");
+    require(press(window, PhysicalKey::enter) && clicks == 3U, "emptied again, Enter goes on");
+}
+
 void entries_become_tokens() {
     Fixture fixture = make_fixture("tokens.entries");
     Window& window = *fixture.window;
@@ -154,7 +190,8 @@ void entries_become_tokens() {
     require(type(window, "alpha") && press(window, PhysicalKey::enter) && texts_are(box, {"alpha"}) &&
                 editor.text().empty() && trace.size() == 1U,
             "Enter turns the typed entry into a token and empties the editor");
-    require(press(window, PhysicalKey::enter) && box.tokens().size() == 1U, "Enter on an empty entry adds nothing");
+    require(!press(window, PhysicalKey::enter) && box.tokens().size() == 1U,
+            "Enter on an empty entry adds nothing and is not taken (W decision 6)");
     require(type(window, "beta,gam") && texts_are(box, {"alpha", "beta"}) && editor.text() == "gam",
             "a delimiter ends an entry; the text after it stays in the editor");
     require(type(window, "ma;") && texts_are(box, {"alpha", "beta", "gamma"}) && editor.text().empty(),
@@ -337,6 +374,7 @@ void auto_complete_makes_tokens() {
 int main() {
     tokens_and_identity();
     entries_become_tokens();
+    empty_entry_passes_enter_on();
     keyboard_over_tokens();
     pointer_and_parts();
     wrapping_layout();
