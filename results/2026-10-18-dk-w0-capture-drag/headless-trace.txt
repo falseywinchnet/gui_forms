@@ -1,0 +1,52 @@
+transaction trace:
+create id=3 stable=float.2 content=918,100,200x300
+open id=3 kind=floating_tool owner=1 visible=0 runtime=1
+show id=3
+destroy id=2
+drag: pointer 62.5 Hz, frames 60.4839 Hz, requests 30, reports 30
+drag trace:
+frame id=2 content=922,102,200x300
+frame id=2 content=926,104,200x300
+frame id=2 content=930,106,200x300
+frame id=2 content=934,108,200x300
+frame id=2 content=938,110,200x300
+frame id=2 content=942,112,200x300
+frame id=2 content=946,114,200x300
+frame id=2 content=950,116,200x300
+frame id=2 content=954,118,200x300
+frame id=2 content=958,120,200x300
+frame id=2 content=962,122,200x300
+frame id=2 content=966,124,200x300
+frame id=2 content=970,126,200x300
+frame id=2 content=974,128,200x300
+frame id=2 content=978,130,200x300
+frame id=2 content=982,132,200x300
+frame id=2 content=986,134,200x300
+frame id=2 content=990,136,200x300
+frame id=2 content=994,138,200x300
+frame id=2 content=998,140,200x300
+frame id=2 content=1002,142,200x300
+frame id=2 content=1006,144,200x300
+frame id=2 content=1010,146,200x300
+frame id=2 content=1014,148,200x300
+frame id=2 content=1018,150,200x300
+frame id=2 content=1022,152,200x300
+frame id=2 content=1026,154,200x300
+frame id=2 content=1030,156,200x300
+frame id=2 content=1034,158,200x300
+frame id=2 content=1038,160,200x300
+user-frame id=1 content=150,100,800x600
+frame id=2 content=1088,160,200x300
+frame id=2 content=1288,260,200x300
+frame id=2 content=1088,160,200x300
+frame id=2 content=1089,160,200x300
+frame id=2 content=1090,160,200x300
+frame id=2 content=1091,160,200x300
+frame id=2 content=1092,160,200x300
+frame id=2 content=1093,160,200x300
+frame id=2 content=1094,160,200x300
+frame id=2 content=1095,160,200x300
+frame id=2 content=1096,160,200x300
+frame id=2 content=1097,160,200x300
+frame id=2 content=1098,160,200x300
+gui_forms_workspace_transaction_tests: all tests passed

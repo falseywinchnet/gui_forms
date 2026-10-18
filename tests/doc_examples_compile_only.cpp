@@ -102,6 +102,45 @@ void example() {
 }
 }  // namespace doc_example_ApplicationWindowOptions_1
 
+namespace doc_example_ApplicationWindows_1 {
+// compile only
+struct OpenPalette final {
+    void operator()(gf::Window&, gf::ApplicationWindowHandle main) const {
+        const gf::ApplicationWindows windows = main.windows();
+        if (!windows.capabilities().supports(gf::HostCapability::runtime_windows)) return;
+        gf::ApplicationWindow palette;
+        palette.stable_id = "palette";
+        palette.owner_id = "main";
+        palette.tool_window = true;
+        palette.model = std::make_unique<gf::Window>(
+            gf::make_control<gf::Panel>(gf::StableId("palette.root")), gf::Size{240.0, 320.0});
+        palette.options.title = "Palette";
+        palette.options.initial_size = {240.0, 320.0};
+        palette.options.initially_visible = false;
+        const gf::ApplicationWindowOpenResult opened = windows.open_window(std::move(palette));
+        if (!opened.status.accepted()) return;
+        const gf::HostWindowFrameResult frame = main.frame();
+        if (frame.status.accepted()) {
+            const gf::Rect beside{frame.frame.content.right() + 16.0, frame.frame.content.y,
+                                  240.0, 320.0};
+            static_cast<void>(opened.window.request_frame(beside));
+        }
+        static_cast<void>(opened.window.show());
+    }
+};
+
+void example() {
+    gf::ApplicationWindowOptions options;
+    options.title = "Editor";
+    options.ready = OpenPalette{};
+    gf::ApplicationResult result = gf::Application::run(
+        std::make_unique<gf::Window>(gf::make_control<gf::Panel>(gf::StableId("editor")),
+                                     gf::Size{640.0, 480.0}),
+        std::move(options));
+    static_cast<void>(result);
+}
+}  // namespace doc_example_ApplicationWindows_1
+
 namespace doc_example_DropDownButton_2 {
 // compile only
 struct ExportButton final : gf::Component {

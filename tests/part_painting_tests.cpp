@@ -295,6 +295,68 @@ void theme_without_overlay_shadow() {
             "a theme's overlay shadow must hold at most four outer layers");
 }
 
+// A content colour (owner decision W-7): a fill part paints it flat in its
+// shape, in place of the recipe's material, at 45 % opacity when disabled
+// and as given in high contrast; every other role ignores it.
+void content_colors(const Control& control) {
+    const Color sample = Color::rgba(192, 0, 0);
+    PartPaint fill;
+    fill.role = PartRole::fill;
+    fill.family = ControlVisualRole::menu_item;
+    fill.bounds = {4.0, 4.0, 12.0, 12.0};
+    fill.content_color = sample;
+    RecordingPainter flat;
+    paint_part(flat, control, fill);
+    require(flat.operations.size() == 1U && flat.operations[0].kind == "fill" &&
+                flat.operations[0].bounds == fill.bounds && flat.operations[0].color == sample,
+            "a fill with a content colour is that colour, flat, and nothing else");
+    fill.corner_radius = 2.0;
+    RecordingPainter rounded;
+    paint_part(rounded, control, fill);
+    require(rounded.operations.size() == 1U && rounded.operations[0].kind == "fill_rounded" &&
+                rounded.operations[0].color == sample,
+            "a corner radius shapes the content colour");
+    fill.corner_radius.reset();
+    fill.states.insert(AnatomyState::disabled);
+    RecordingPainter disabled;
+    paint_part(disabled, control, fill);
+    require(disabled.operations.size() == 1U && disabled.operations[0].color.red == 192 &&
+                disabled.operations[0].color.alpha == 115,
+            "a disabled part's content colour is drawn at 45 % of its opacity");
+    fill.states = {};
+    const Theme& theme = control.effective_theme();
+    ControlVisualContext contrast = part_visual_context(control, fill.states);
+    contrast.high_contrast = true;
+    RecordingPainter high;
+    paint_part_from_recipe(high, fill, theme.resolve(fill.family, contrast), contrast);
+    require(high.operations.size() == 1U && high.operations[0].color == sample,
+            "high contrast draws the content colour as given: it is data, as an image is");
+    const PartRole others[] = {PartRole::face, PartRole::well, PartRole::label, PartRole::glyph};
+    for (const PartRole role : others) {
+        PartPaint plain;
+        plain.role = role;
+        plain.family = ControlVisualRole::menu_item;
+        plain.bounds = {0.0, 0.0, 40.0, 20.0};
+        plain.text = "Text";
+        RecordingPainter without;
+        paint_part(without, control, plain);
+        plain.content_color = sample;
+        RecordingPainter with;
+        paint_part(with, control, plain);
+        bool same = with.operations.size() == without.operations.size();
+        for (std::size_t index = 0; same && index < with.operations.size(); ++index) {
+            same = with.operations[index].kind == without.operations[index].kind &&
+                   with.operations[index].color == without.operations[index].color;
+        }
+        require(same, "roles other than fill ignore a content colour");
+    }
+    PartGeometry first = PartGeometry::from_bounds({0.0, 0.0, 10.0, 10.0});
+    PartGeometry second = first;
+    second.content_color = sample;
+    require(!(first == second) && second.content_color == sample,
+            "a part's geometry record carries its content colour");
+}
+
 // Every family has a registered name, and the tooltip family has its own
 // recipe (owner decision RB-38) apart from the card it borrowed before.
 void families() {
@@ -326,8 +388,9 @@ int main() {
     state_context(*control);
     overlay_shadow(*control);
     theme_without_overlay_shadow();
+    content_colors(*control);
     families();
-    std::cout << "by-role paint path: silent roles, surfaces, cues, marks, text, states, overlay shadow "
-                 "and families passed\n";
+    std::cout << "by-role paint path: silent roles, surfaces, cues, marks, text, states, overlay shadow, "
+                 "content colours and families passed\n";
     return 0;
 }

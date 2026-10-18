@@ -26,7 +26,7 @@ std::string json_escape(const std::string& text) {
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 23> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 28> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -50,6 +50,11 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::notification_area, "notification_area"},
         {HostCapability::notification_area_messages, "notification_area_messages"},
         {HostCapability::notification_area_menus, "notification_area_menus"},
+        {HostCapability::runtime_windows, "runtime_windows"},
+        {HostCapability::window_frames, "window_frames"},
+        {HostCapability::screen_pointer, "screen_pointer"},
+        {HostCapability::window_at_point, "window_at_point"},
+        {HostCapability::window_ordering, "window_ordering"},
     }};
     std::ostringstream output;
     output << "{\"protocol_version\":" << protocol_version

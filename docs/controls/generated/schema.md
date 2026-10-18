@@ -26,7 +26,7 @@ States: `normal`, `hot`, `pressed`, `captured`, `focused`, `focus_visible`, `pre
 
 Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`.
 
-Values: `accent_index`.
+Values: `accent_index`, `content_color`.
 
 Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
 
@@ -623,6 +623,65 @@ Properties beyond every control's: none.
 | `item_checked` | `ListViewItemCheck` |
 | `column_click` | `ListViewColumnClick` |
 | `column_width_changed` | `ListViewColumnWidthChange` |
+
+## `tree_list_view` (TreeListView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `header` | face |  |  |
+| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
+| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `row`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `row` | region |  |  |
+| `row_face` | face |  |  |
+| `expander` | disclosure |  |  |
+| `icon` | icon |  |  |
+| `text` | content |  |  |
+| `row_focus` | focus |  |  |
+
+Item states: `selected`, `hot`, `current`, `open`, `closed`, `disabled`, `focus_visible`.
+
+Item system `cell`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `cell` | region |  |  |
+| `cell_text` | content |  |  |
+
+Item states: `selected`, `disabled`.
+
+Item system `column`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `column_header` | face |  |  |
+| `column_label` | label |  |  |
+| `sort_glyph` | glyph |  |  |
+| `column_divider` | divider |  |  |
+| `column_grip` | grip |  |  |
+
+Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `selection_changed` | `TreeListSelectionChange` |
+| `expansion_changed` | `TreeListExpansionChange` |
+| `item_activated` | `TreeListActivation` |
+| `sort_changed` | `TreeListSortChange` |
+| `column_width_changed` | `TreeListColumnWidthChange` |
+| `column_moved` | `TreeListColumnMove` |
 
 ## `correspondence_view` (CorrespondenceView, control)
 
@@ -1891,6 +1950,85 @@ Properties beyond every control's: none.
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 | `item_focus_changed` | `ToolStripItemFocus` |
 
+## `ribbon_font_control` (RibbonFontControl, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `family_field` | well | `combo_box` |  |
+| `size_field` | well | `combo_box` |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `FontChoice` |
+
+## `ribbon_color_picker` (RibbonColorPicker, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face | `button` | hot, pressed, disabled, open |
+| `icon` | icon |  | hot, pressed, disabled, open |
+| `color_bar` | well |  |  |
+| `color_sample` | fill |  |  |
+| `arrow` | actuator | `button` | hot, pressed, disabled, open |
+| `arrow_glyph` | glyph |  | hot, pressed, disabled, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`.
+
+Item system `palette_entry`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `entry_face` | face |  | hot, selected, focus_visible |
+| `entry_well` | well |  | hot, selected, focus_visible |
+| `entry_sample` | fill |  | hot, selected, focus_visible |
+| `entry_label` | label |  | hot, selected, focus_visible |
+| `entry_focus` | focus |  | hot, selected, focus_visible |
+
+Item states: `hot`, `selected`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `std::optional<Color>` |
+| `palette_open_changed` | `bool` |
+
+## `backstage_view` (BackstageView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `column` | face |  |  |
+| `page` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `backstage_item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `topic_changed` | `BackstageTopicChange` |
+| `close_requested` | none |
+
 ## `ribbon_gallery` (RibbonGallery, control)
 
 | Part | Role | Reuses | Own states |
@@ -2092,6 +2230,10 @@ Properties beyond every control's: none.
 | `application_button` | face | `button` | hot, pressed, open, focus_visible |
 | `application_label` | label |  | hot, pressed, open, focus_visible |
 | `command_plane` | face |  |  |
+| `scroll_left` | actuator | `button` | hot, pressed |
+| `scroll_left_glyph` | glyph |  | hot, pressed |
+| `scroll_right` | actuator | `button` | hot, pressed |
+| `scroll_right_glyph` | glyph |  | hot, pressed |
 | `focus` | focus |  |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
@@ -2116,6 +2258,11 @@ Item system `group`:
 | `group_launcher` | actuator | `button` | hot, pressed, focus_visible |
 | `group_launcher_glyph` | glyph |  | hot, pressed, focus_visible |
 | `group_launcher_focus` | focus |  | hot, pressed, focus_visible |
+| `group_button` | face | `button` | hot, pressed, open, focus_visible |
+| `group_button_icon` | icon |  | hot, pressed, open, focus_visible |
+| `group_button_label` | label |  | hot, pressed, open, focus_visible |
+| `group_button_glyph` | glyph |  | hot, pressed, open, focus_visible |
+| `group_button_focus` | focus |  | hot, pressed, open, focus_visible |
 
 Item states: none.
 
@@ -2133,6 +2280,9 @@ Item system `command`:
 | `command_numeric_up_down` | well | `numeric_up_down` |  |
 | `command_check_box` | indicator | `check_box` |  |
 | `command_text_box` | well | `text_box` |  |
+| `command_gallery` | well | `ribbon_gallery` |  |
+| `command_font_control` | well | `ribbon_font_control` |  |
+| `command_color_picker` | actuator | `ribbon_color_picker` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 
@@ -2146,6 +2296,8 @@ Properties beyond every control's: none.
 | `selected_tab_changed` | `RibbonTabChange` |
 | `minimized_changed` | `bool` |
 | `application_menu_item_invoked` | `MenuItemInvocation` |
+| `recent_item_invoked` | `RibbonRecentItemInvocation` |
+| `backstage_open_changed` | `bool` |
 
 ## `context_menu` (ContextMenu, component)
 
@@ -2160,6 +2312,18 @@ Properties beyond every control's: none.
 |---|---|
 | `state_changed` | `CommandState` |
 | `invoked` | `CommandInvocation` |
+
+## `font_command` (FontCommand, component)
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `FontChoice` |
+
+## `color_command` (ColorCommand, component)
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `std::optional<Color>` |
 
 ## `gallery_command` (GalleryCommand, component)
 

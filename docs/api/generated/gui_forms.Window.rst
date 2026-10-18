@@ -62,11 +62,17 @@ gui_forms::Window
 
       **theme** : ``Theme``
          The theme every control inherits unless it has its own override.
-         Setting it raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>`; a null theme throws
+         Setting it sets the theme of every window sharing this window's
+         :cpp:func:`resources <gui_forms::Window::resources>` and raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>` in each; a null theme throws
          ``std::invalid_argument``.
 
       **theme_ptr** : ``std::shared_ptr<const Theme>``, read-only
          Returns shared ownership of the active immutable theme.
+
+      **resources** : ``std::shared_ptr<ApplicationResources>``, read-only
+         The :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>` this window uses, its own unless it was
+         constructed with shared ones. Pass it to another window's constructor to
+         share the image registry and the theme with that window.
 
       **active** : ``bool``, default ``true``
          Whether the window is the active top-level window. Controls paint their
@@ -223,6 +229,8 @@ gui_forms::Window
       * - :cpp:func:`create_framebuffer <gui_forms::Window::create_framebuffer>`
         -  
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
+        -  
+      * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
       * - :cpp:func:`begin_update <gui_forms::Window::begin_update>`
         - Opens an update scope and returns its :cpp:class:`UpdateScope <gui_forms::UpdateScope>` token.
@@ -472,6 +480,10 @@ gui_forms::Window
 
       Uses explicit per-window image quotas. The two-argument constructor retains the normal defaults; large-document consumers choose a budget.
 
+   .. cpp:function:: Window(Control::Ptr root, Size client_size, std::shared_ptr<ApplicationResources> resources)
+
+      Shares an application's image registry and theme with every other Window constructed with the same resources (stage DK decision 8): an ImageId, an ImageList and the theme hold in all of them, so a control subtree moved between them keeps its images. Null resources are std::invalid_argument; resources made on another thread are std::logic_error. The window takes the resources' current theme.
+
 
    .. rubric:: Properties
 
@@ -516,7 +528,8 @@ gui_forms::Window
    .. cpp:function:: const Theme& theme() const noexcept
 
       The theme every control inherits unless it has its own override.
-      Setting it raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>`; a null theme throws
+      Setting it sets the theme of every window sharing this window's
+      :cpp:func:`resources <gui_forms::Window::resources>` and raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>` in each; a null theme throws
       ``std::invalid_argument``.
 
    .. cpp:function:: void set_theme(std::shared_ptr<const Theme> theme)
@@ -524,6 +537,12 @@ gui_forms::Window
       Sets :cpp:func:`theme <gui_forms::Window::theme>`; see the property's description above.
 
    .. cpp:function:: std::shared_ptr<const Theme> theme_ptr() const noexcept
+
+   .. cpp:function:: std::shared_ptr<ApplicationResources> resources() const noexcept
+
+      The :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>` this window uses, its own unless it was
+      constructed with shared ones. Pass it to another window's constructor to
+      share the image registry and the theme with that window.
 
    .. cpp:function:: bool active() const noexcept
 
@@ -726,6 +745,8 @@ gui_forms::Window
    .. cpp:function:: std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
 
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
+
+   .. cpp:function:: bool shares_resources_with(const Window& other) const noexcept
 
    .. cpp:function:: UpdateScope begin_update()
 
