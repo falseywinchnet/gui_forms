@@ -218,16 +218,17 @@ public:
     }
 
 private:
-    DockInvariantResult broken(std::string problem) {
-        result_.valid = false;
-        result_.problem = std::move(problem);
-        return result_;
-    }
-
+    // Records the first broken rule; `fail` answers the checks below,
+    // `broken` the result run() returns.
     bool fail(std::string problem) {
         result_.valid = false;
         result_.problem = std::move(problem);
         return false;
+    }
+
+    DockInvariantResult broken(std::string problem) {
+        static_cast<void>(fail(std::move(problem)));
+        return result_;
     }
 
     bool check_tables() {

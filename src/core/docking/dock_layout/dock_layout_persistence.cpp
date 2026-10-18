@@ -371,9 +371,18 @@ void migrate_format_1(XmlElement& element) {
 
 // Reading --------------------------------------------------------------
 
+void report(std::vector<DockRestoreDiagnostic>& diagnostics, DockRestoreDiagnosticKind kind, std::string detail) {
+    DockRestoreDiagnostic diagnostic{};
+    diagnostic.kind = kind;
+    diagnostic.detail = std::move(detail);
+    diagnostics.push_back(std::move(diagnostic));
+}
+
 // Builds a state from a parsed document. Required values that are missing
 // or invalid fail the whole load (the layout then keeps what it held);
-// unknown elements and attributes are reported and dropped.
+// unknown elements and attributes are reported and kept with the element
+// they were found on (DK decision 48; see unknown_element for the one
+// exception).
 class DockLayoutLoader final {
 public:
     DockLayoutLoader(const XmlElement& root, std::vector<DockRestoreDiagnostic>& diagnostics)
@@ -430,10 +439,7 @@ public:
 
 private:
     void report(DockRestoreDiagnosticKind kind, std::string detail) {
-        DockRestoreDiagnostic diagnostic{};
-        diagnostic.kind = kind;
-        diagnostic.detail = std::move(detail);
-        diagnostics_.push_back(std::move(diagnostic));
+        ::gui_forms::report(diagnostics_, kind, std::move(detail));
     }
 
     bool invalid(std::string_view where, std::string_view attribute, std::string_view value) {
@@ -594,60 +600,79 @@ private:
         return node;
     }
 
-    // Reads one node and its subtree; node is none when it was dropped (an
-    // empty stack, or a split left with nothing). A split left with one
-    // child is replaced by it.
+    // Reads one node and its subtree (element names a node: is_node_name);
+    // node is none when it was dropped (an empty stack, or a split left with
+    // nothing). A split left with one child is replaced by it.
     bool load_node(const XmlElement& element, DockNodeId& node) {
         node = DockNodeId{};
-        std::uint32_t id = 0;
         if (element.name == "split") {
-            if (!read_id(element, id)) return false;
-            const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
-            check_attributes(element, {"id", "axis", "ratio"}, owner);
-            const XmlAttribute* axis = element.find_attribute("axis");
-            const std::string axis_text = axis == nullptr ? std::string{} : (*axis).value;
-            if (axis_text != "horizontal" && axis_text != "vertical") return invalid("split", "axis", axis_text);
-            double ratio = 0.5;
-            if (!read_double(element, "ratio", ratio)) return false;
-            if (!(ratio > 0.0 && ratio < 1.0)) return invalid("split", "ratio", format_double(ratio));
-            std::vector<DockNodeId> children{};
-            if (!load_children(element, children, owner)) return false;
-            if (children.size() > 2U) return structure("split " + std::to_string(id) + " has more than two children");
-            if (children.size() < 2U) {
-                if (children.size() == 1U) node = children[0];
-                return true;
-            }
-            DockNode split{};
-            split.id = DockNodeId{id};
-            split.kind = DockNodeKind::split;
-            split.axis = axis_text == "horizontal" ? DockAxis::horizontal : DockAxis::vertical;
-            split.ratio = ratio;
-            split.first = children[0];
-            split.second = children[1];
-            set_parent(children[0], split.id);
-            set_parent(children[1], split.id);
-            detail::insert_dock_node(state_, std::move(split));
-            node = DockNodeId{id};
-            return true;
+            const bool split = load_split(element, node);
+            return split;
         }
         if (element.name == "document_area") {
-            if (!read_id(element, id)) return false;
-            const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
-            check_attributes(element, {"id"}, owner);
-            std::vector<DockNodeId> children{};
-            if (!load_children(element, children, owner)) return false;
-            if (children.size() > 1U) return structure("the document area has more than one child");
-            DockNode area{};
-            area.id = DockNodeId{id};
-            area.kind = DockNodeKind::document_area;
-            if (children.size() == 1U) {
-                area.first = children[0];
-                set_parent(children[0], area.id);
-            }
-            detail::insert_dock_node(state_, std::move(area));
-            node = DockNodeId{id};
+            const bool area = load_document_area(element, node);
+            return area;
+        }
+        const bool stack = load_stack(element, node);
+        return stack;
+    }
+
+    bool load_split(const XmlElement& element, DockNodeId& node) {
+        std::uint32_t id = 0;
+        if (!read_id(element, id)) return false;
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
+        check_attributes(element, {"id", "axis", "ratio"}, owner);
+        const XmlAttribute* axis = element.find_attribute("axis");
+        const std::string axis_text = axis == nullptr ? std::string{} : (*axis).value;
+        if (axis_text != "horizontal" && axis_text != "vertical") return invalid("split", "axis", axis_text);
+        double ratio = 0.5;
+        if (!read_double(element, "ratio", ratio)) return false;
+        if (!(ratio > 0.0 && ratio < 1.0)) return invalid("split", "ratio", format_double(ratio));
+        std::vector<DockNodeId> children{};
+        if (!load_children(element, children, owner)) return false;
+        if (children.size() > 2U) return structure("split " + std::to_string(id) + " has more than two children");
+        if (children.size() < 2U) {
+            if (children.size() == 1U) node = children[0];
             return true;
         }
+        DockNode split{};
+        split.id = DockNodeId{id};
+        split.kind = DockNodeKind::split;
+        split.axis = axis_text == "horizontal" ? DockAxis::horizontal : DockAxis::vertical;
+        split.ratio = ratio;
+        split.first = children[0];
+        split.second = children[1];
+        set_parent(children[0], split.id);
+        set_parent(children[1], split.id);
+        detail::insert_dock_node(state_, std::move(split));
+        node = DockNodeId{id};
+        return true;
+    }
+
+    bool load_document_area(const XmlElement& element, DockNodeId& node) {
+        std::uint32_t id = 0;
+        if (!read_id(element, id)) return false;
+        const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
+        check_attributes(element, {"id"}, owner);
+        std::vector<DockNodeId> children{};
+        if (!load_children(element, children, owner)) return false;
+        if (children.size() > 1U) return structure("the document area has more than one child");
+        DockNode area{};
+        area.id = DockNodeId{id};
+        area.kind = DockNodeKind::document_area;
+        if (children.size() == 1U) {
+            area.first = children[0];
+            set_parent(children[0], area.id);
+        }
+        detail::insert_dock_node(state_, std::move(area));
+        node = DockNodeId{id};
+        return true;
+    }
+
+    // A <tool_stack> or <document_stack>: its panels in order, a panel seen
+    // before in the file reported and skipped; an empty stack is dropped.
+    bool load_stack(const XmlElement& element, DockNodeId& node) {
+        std::uint32_t id = 0;
         if (!read_id(element, id)) return false;
         const DockUnknownOwner owner = owner_of(DockUnknownOwnerKind::node, id);
         check_attributes(element, {"id", "selected"}, owner);
@@ -922,13 +947,6 @@ private:
     const Rect shared = Rect::intersection(left, right);
     const double area = shared.area();
     return area;
-}
-
-void report(std::vector<DockRestoreDiagnostic>& diagnostics, DockRestoreDiagnosticKind kind, std::string detail) {
-    DockRestoreDiagnostic diagnostic{};
-    diagnostic.kind = kind;
-    diagnostic.detail = std::move(detail);
-    diagnostics.push_back(std::move(diagnostic));
 }
 
 // Applies the monitor fallback to one saved frame and reports what moved.
