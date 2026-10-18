@@ -17,6 +17,10 @@ namespace gui_forms::dock_site_detail {
 // The PageStrip's preferred height at text scale 1.
 inline constexpr double strip_preferred_height = 26.0;
 
+// A seam is 3 logical units whatever the text scale (owner decision DK-41,
+// T7-1).
+inline constexpr double seam_bar_thickness = 3.0;
+
 // Virtual semantic children carry a runtime ID derived from their stable ID,
 // in the high half so it never meets a control's own runtime ID.
 inline std::uint64_t node_runtime_id(std::string_view id) noexcept {

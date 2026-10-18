@@ -17,9 +17,8 @@
 namespace gui_forms {
 namespace {
 
-// Geometry in logical units. Seams are 3 units whatever the text scale
-// (owner decision DK-41, T7-1); the caption scales with the text.
-constexpr double seam_bar_thickness = 3.0;
+// Geometry in logical units; the caption scales with the text, the seams
+// (dock_site_detail::seam_bar_thickness) do not.
 // The seam's hit band reaches this far past the bar on each side.
 constexpr double seam_hit_extension = 3.0;
 // The grip's length along the bar.
@@ -53,6 +52,7 @@ using dock_site_detail::first_focusable;
 using dock_site_detail::focus_candidate;
 using dock_site_detail::moved;
 using dock_site_detail::node_runtime_id;
+using dock_site_detail::seam_bar_thickness;
 using dock_site_detail::strip_extent;
 using dock_site_detail::to_window;
 
@@ -826,10 +826,6 @@ void DockSite::move_view_to_site(StackSlot& slot) {
 
 // -- layout --------------------------------------------------------------------
 
-double DockSite::seam_thickness() const {
-    return seam_bar_thickness;
-}
-
 double DockSite::caption_height() const {
     const double height = caption_strip_height * effective_text_scale();
     return height;
@@ -885,11 +881,11 @@ DockSite::Extent DockSite::extent_of(DockNodeId node_id, std::span<const DockNod
     if (!second.present) return first;
     extent.present = true;
     if ((*node).axis == DockAxis::horizontal) {
-        extent.minimum.width = first.minimum.width + seam_thickness() + second.minimum.width;
+        extent.minimum.width = first.minimum.width + seam_bar_thickness + second.minimum.width;
         extent.minimum.height = std::max(first.minimum.height, second.minimum.height);
     } else {
         extent.minimum.width = std::max(first.minimum.width, second.minimum.width);
-        extent.minimum.height = first.minimum.height + seam_thickness() + second.minimum.height;
+        extent.minimum.height = first.minimum.height + seam_bar_thickness + second.minimum.height;
     }
     return extent;
 }
@@ -983,7 +979,7 @@ void DockSite::place(DockNodeId node_id, Rect bounds, std::span<const DockNodeId
     }
     const bool horizontal = (*node).axis == DockAxis::horizontal;
     const double extent = horizontal ? bounds.width : bounds.height;
-    const double seam = seam_thickness();
+    const double seam = seam_bar_thickness;
     const double span = std::max(0.0, extent - seam);
     const double first_minimum = horizontal ? first.minimum.width : first.minimum.height;
     const double second_minimum = horizontal ? second.minimum.width : second.minimum.height;
@@ -1143,7 +1139,7 @@ void DockSite::arrange(Rect final_bounds) {
 
 DockSite::CaptionGeometry DockSite::caption_geometry(Rect caption, bool pin) const {
     const double scale = effective_text_scale();
-    CaptionGeometry placed;
+    CaptionGeometry placed{};
     placed.caption = caption;
     placed.accent = {caption.x, caption.y, caption.width, std::min(caption.height, accent_height * scale)};
     const double key = key_side * scale;
@@ -1195,7 +1191,7 @@ bool DockSite::pin_shown(const StackSlot& slot) const {
 }
 
 AnatomyStateSet DockSite::seam_states(std::size_t seam) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (hot_.zone == Zone::seam && hot_.index == seam) states.insert(AnatomyState::hot);
     if (seam_captured_ && drag_seam_ == seam) states.insert(AnatomyState::captured);
     if (focus_cue() && keyboard_seam_ == seam) states.insert(AnatomyState::focus_visible);
@@ -1204,14 +1200,14 @@ AnatomyStateSet DockSite::seam_states(std::size_t seam) const {
 }
 
 AnatomyStateSet DockSite::stack_states(const StackSlot& slot) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (stack_current(slot)) states.insert(AnatomyState::current);
     if (!effectively_enabled()) states.insert(AnatomyState::disabled);
     return states;
 }
 
 AnatomyStateSet DockSite::button_states(std::size_t stack, Zone zone) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (hot_.zone == zone && hot_.index == stack) states.insert(AnatomyState::hot);
     if (pressed_.zone == zone && pressed_.index == stack) states.insert(AnatomyState::pressed);
     bool available = effectively_enabled();
@@ -1245,7 +1241,7 @@ FontSpec DockSite::caption_font() const {
 // Paints from the last layout pass and the slots' cached titles: no
 // allocation per seam or caption.
 void DockSite::on_paint(Painter& painter, Rect) {
-    PartPaint part;
+    PartPaint part{};
     part.font = caption_font();
     part.family = ControlVisualRole::panel;
     part.role = PartRole::well;
@@ -1277,7 +1273,7 @@ void DockSite::paint_caption(Painter& painter, const Control& surface, const Sta
                              Point offset) const {
     const CaptionGeometry placed = caption_geometry(slot.caption, pin_shown(slot));
     const AnatomyStateSet states = stack_states(slot);
-    PartPaint part;
+    PartPaint part{};
     part.font = caption_font();
     // The caption strip and, while current, its accent line: the pale tint
     // and the line are the default theme's (T4, decision DK-41); today's
@@ -1326,7 +1322,7 @@ void DockSite::paint_caption(Painter& painter, const Control& surface, const Sta
 // -- input ---------------------------------------------------------------------
 
 DockSite::Hit DockSite::hit_at(Point local) const {
-    Hit hit;
+    Hit hit{};
     for (std::size_t seam = 0; seam < seams_.size(); ++seam) {
         if (!seams_[seam].hit.contains(local)) continue;
         hit.zone = Zone::seam;
@@ -2264,7 +2260,7 @@ bool DockSite::on_semantic_child_action(std::string_view stable_id, SemanticActi
 }
 
 // A tool stack's caption buttons, as children of its pane: the position
-// menu, the pin (checked while docked; unavailable until D5) and close.
+// menu, the pin (root-level stacks only; checked while docked) and close.
 std::vector<SemanticNode> DockSite::caption_nodes(const StackSlot& slot, std::size_t index) const {
     std::vector<SemanticNode> nodes{};
     const bool shown = !slot.collapsed || slot.in_flyout;
@@ -2484,7 +2480,7 @@ constexpr ControlAnatomy site_anatomy{
 
 // Only the states a part declares are published with it.
 AnatomyStateSet declared_only(AnatomyStateSet states, std::span<const AnatomyState> declared) noexcept {
-    AnatomyStateSet kept;
+    AnatomyStateSet kept{};
     for (const AnatomyState state : declared) {
         if (states.contains(state)) kept.insert(state);
     }
@@ -2505,7 +2501,7 @@ const ControlAnatomy& DockSite::anatomy() const noexcept {
 
 void DockSite::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect surface = client_rectangle();
-    Parts record;
+    Parts record{};
     record.region = PartGeometry::from_bounds(surface);
     record.document_area = PartGeometry::from_bounds(document_area_);
     record.focus = PartGeometry::from_bounds(surface);
@@ -2529,7 +2525,7 @@ void DockSite::publish_part_geometry(std::span<PartGeometry> geometry) const {
         const FlyoutGeometry placed = flyout_geometry();
         record.flyout_shadow = PartGeometry::from_bounds(placed.full);
         record.flyout_face = PartGeometry::from_bounds(placed.full);
-        AnatomyStateSet grip;
+        AnatomyStateSet grip{};
         if (hot_.zone == Zone::grip) grip.insert(AnatomyState::hot);
         if (grip_captured_) grip.insert(AnatomyState::captured);
         record.flyout_grip = with_states(placed.grip, grip, flyout_grip_states);
@@ -2539,14 +2535,14 @@ void DockSite::publish_part_geometry(std::span<PartGeometry> geometry) const {
 
 DockSite::Parts DockSite::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), site_part_fields, published.parts(), record);
     return record;
 }
 
 DockSite::SeamParts DockSite::seam_parts(std::size_t seam) const {
     const SeamSlot& slot = seams_[seam];
-    SeamParts record;
+    SeamParts record{};
     record.seam_bar = PartGeometry::from_bounds(slot.bar);
     const bool horizontal = slot.axis == DockAxis::horizontal;
     const double length = std::min(seam_grip_length, horizontal ? slot.bar.height : slot.bar.width);
@@ -2556,7 +2552,7 @@ DockSite::SeamParts DockSite::seam_parts(std::size_t seam) const {
 }
 
 DockSite::StackParts DockSite::stack_parts(const StackSlot& slot, std::size_t index) const {
-    StackParts record;
+    StackParts record{};
     record.stack_area = PartGeometry::from_bounds(slot.bounds);
     if (slot.kind != DockNodeKind::tool_stack || slot.caption.empty()) return record;
     const CaptionGeometry placed = caption_geometry(slot.caption, pin_shown(slot));
@@ -2642,7 +2638,7 @@ void DockSite::publish_realized_item_geometry(std::size_t item, std::span<PartGe
     const std::size_t first_tile = seams_.size() + visible_stack_count();
     if (item >= first_tile) {
         const TileSlot tile = tile_at(item - first_tile);
-        TileParts record;
+        TileParts record{};
         record.tile = PartGeometry::from_bounds(tile.bounds);
         record.tile_glyph = PartGeometry::from_bounds(tile_glyph_bounds(tile.bounds));
         write_declared_parts(tile_parts_declared, tile_part_fields, record, geometry);
@@ -2657,7 +2653,7 @@ std::vector<DockSite::Seam> DockSite::realized_seams() const {
     std::vector<Seam> seams{};
     seams.reserve(seams_.size());
     for (std::size_t seam = 0; seam < seams_.size(); ++seam) {
-        Seam record;
+        Seam record{};
         record.split = seams_[seam].split;
         record.axis = seams_[seam].axis;
         record.stable_id = seam_identity(record.split);
@@ -2676,7 +2672,7 @@ std::vector<DockSite::Tile> DockSite::realized_tiles() const {
     const std::size_t first_tile = seams_.size() + visible_stack_count();
     for (std::size_t index = 0; index < count; ++index) {
         const TileSlot slot = tile_at(index);
-        Tile record;
+        Tile record{};
         record.kind = slot.kind;
         record.pane = slot.pane;
         record.zone = slot.zone;
@@ -2696,7 +2692,7 @@ std::vector<DockSite::Stack> DockSite::realized_stack_items() const {
     for (std::size_t ordinal = 0; ordinal < count; ++ordinal) {
         const std::size_t index = visible_stack_at(ordinal);
         const StackSlot& slot = stacks_[index];
-        Stack record;
+        Stack record{};
         record.stack = slot.stack;
         record.kind = slot.kind;
         record.panel = selected_panel(slot).value_or(DockPanelId{});
@@ -2707,6 +2703,21 @@ std::vector<DockSite::Stack> DockSite::realized_stack_items() const {
         stacks.push_back(std::move(record));
     }
     return stacks;
+}
+
+namespace {
+
+// The events DockSite adds to those of Control, in declaration order.
+constexpr std::array<InteractionDeclaration, 2> site_interactions{{
+    {.name = "drag_ended", .payload = "DockDragOutcome", .mutable_payload = false},
+    {.name = "flyout_changed", .payload = "DockFlyoutChange", .mutable_payload = false},
+}};
+
+} // namespace
+
+void DockSite::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
+    Control::append_interactions(interactions);
+    interactions.insert(interactions.end(), site_interactions.begin(), site_interactions.end());
 }
 
 } // namespace gui_forms

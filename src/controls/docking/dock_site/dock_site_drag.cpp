@@ -82,6 +82,21 @@ constexpr std::array<DockDropZone, dock_drop_zone_count> cross_order{
 constexpr std::array<DockDropZone, 4> edge_order{DockDropZone::top, DockDropZone::left, DockDropZone::right,
                                                  DockDropZone::bottom};
 
+// The keyboard move mode's arrows within a pane: each steps `toward` its
+// side; from the opposite side (`away`) it stops at the centre first.
+struct ZoneStep final {
+    std::uint32_t key{};
+    DockDropZone toward{DockDropZone::center};
+    DockDropZone away{DockDropZone::center};
+};
+
+constexpr std::array<ZoneStep, 4> zone_steps{{
+    {PhysicalKey::left, DockDropZone::left, DockDropZone::right},
+    {PhysicalKey::right, DockDropZone::right, DockDropZone::left},
+    {PhysicalKey::up, DockDropZone::top, DockDropZone::bottom},
+    {PhysicalKey::down, DockDropZone::bottom, DockDropZone::top},
+}};
+
 Rect site_surface(const Control& site) noexcept {
     const Rect client = site.client_rectangle();
     const Rect surface{0.0, 0.0, client.width, client.height};
@@ -730,7 +745,7 @@ DockSite::TileSlot DockSite::tile_at(std::size_t tile) const {
 }
 
 AnatomyStateSet DockSite::tile_states(const TileSlot& tile) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (tile.lit) states.insert(AnatomyState::selected);
     if (tile.refused) states.insert(AnatomyState::disabled);
     if (tile.kind == DockDropTargetKind::pane && drag_.tiles_fading) states.insert(AnatomyState::expanding);
@@ -780,7 +795,7 @@ Rect DockSite::drop_cue_bounds() const noexcept {
 // pane's cross, then the edges), the cue. The stamp's text shrinks with it.
 void DockSite::paint_drag_layer(Painter& painter) {
     if (drag_.phase != DockDragPhase::dragging && drag_.phase != DockDragPhase::settling) return;
-    PartPaint part;
+    PartPaint part{};
     const std::optional<DockDropTarget> target = drag_target();
     if (target) {
         part.family = ControlVisualRole::panel;
@@ -986,45 +1001,24 @@ void DockSite::step_keyboard_target(int direction) {
 }
 
 // Within the current pane: Left and Right along left, centre, right; Up and
-// Down along top, centre, bottom; a refused zone is passed over.
+// Down along top, centre, bottom (zone_steps); the wanted zones are tried in
+// order, so a refused centre is passed over.
 void DockSite::step_keyboard_zone(std::uint32_t key) {
     const std::optional<DockDropTarget> current = drag_target();
     if (!current || (*current).kind != DockDropTargetKind::pane) return;
     const DockDropZone zone = (*current).zone;
     std::array<DockDropZone, 2> wanted{zone, zone};
     std::size_t count = 0U;
-    if (key == PhysicalKey::left) {
-        if (zone == DockDropZone::right) {
-            wanted = {DockDropZone::center, DockDropZone::left};
+    for (const ZoneStep& step : zone_steps) {
+        if (step.key != key) continue;
+        if (zone == step.away) {
+            wanted = {DockDropZone::center, step.toward};
             count = 2U;
-        } else if (zone != DockDropZone::left) {
-            wanted[0] = DockDropZone::left;
+        } else if (zone != step.toward) {
+            wanted[0] = step.toward;
             count = 1U;
         }
-    } else if (key == PhysicalKey::right) {
-        if (zone == DockDropZone::left) {
-            wanted = {DockDropZone::center, DockDropZone::right};
-            count = 2U;
-        } else if (zone != DockDropZone::right) {
-            wanted[0] = DockDropZone::right;
-            count = 1U;
-        }
-    } else if (key == PhysicalKey::up) {
-        if (zone == DockDropZone::bottom) {
-            wanted = {DockDropZone::center, DockDropZone::top};
-            count = 2U;
-        } else if (zone != DockDropZone::top) {
-            wanted[0] = DockDropZone::top;
-            count = 1U;
-        }
-    } else if (key == PhysicalKey::down) {
-        if (zone == DockDropZone::top) {
-            wanted = {DockDropZone::center, DockDropZone::bottom};
-            count = 2U;
-        } else if (zone != DockDropZone::bottom) {
-            wanted[0] = DockDropZone::bottom;
-            count = 1U;
-        }
+        break;
     }
     for (std::size_t choice = 0; choice < count; ++choice) {
         for (std::size_t index = 0; index < drag_.targets.size(); ++index) {

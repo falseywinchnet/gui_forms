@@ -128,12 +128,11 @@ struct DockFlyoutChange final {
 //
 // The site borrows its workspace: the workspace must outlive it, or be
 // destroyed first, which unbinds the site (it then shows nothing). The site
-// realizes its tree after every layout change (the workspace tells it):
-// one PageView per
-// stack (`<site id>.stack.<node id>`), reused while the stack keeps its node
-// identity, its pages the stack's panels in order with the stack's
-// selection; tool stacks show their tabs at the bottom only when they hold
-// two or more panels, document stacks at the top. A panel's content is its
+// realizes its tree after every layout change (the workspace tells it): one
+// PageView per stack (`<site id>.stack.<node id>`), reused while the stack
+// keeps its node identity, its pages the stack's panels in order with the
+// stack's selection; tool stacks show their tabs at the bottom only when
+// they hold two or more panels, document stacks at the top. A panel's content is its
 // workspace control, created when the panel is first shown selected (lazy
 // creation).
 //
@@ -196,7 +195,6 @@ struct DockFlyoutChange final {
 // so a pin and an unpin with nothing between leave the layout exactly as it
 // was.
 //
-
 // Parts: seams (item system `seam`), 3 units, with a grip of dots, between
 // the two children of each split; a seam is dragged with the pointer or,
 // while the site has focus, moved with the arrow keys (Tab and Shift+Tab
@@ -224,8 +222,8 @@ struct DockFlyoutChange final {
 //
 // Keyboard (owner decision DK-30), while focus is in the site: F6 and
 // Shift+F6 move between the stacks (each a focus region of the window, in
-// tree order) and then the side strips (left, top, right, bottom); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
-// documents, Alt+F7 and Alt+Shift+F7 on the tool panels, and releasing the
+// tree order) and then the side strips (left, top, right, bottom); Ctrl+Tab
+// and Ctrl+Shift+Tab open the navigator on the documents, Alt+F7 and Alt+Shift+F7 on the tool panels, and releasing the
 // modifier activates the current row; Ctrl+F6 and Ctrl+Shift+F6 activate the
 // next and previous document in most-recently-used order (DK-46); Escape
 // in a tool panel (unless its content used it) returns to the active
@@ -246,7 +244,10 @@ struct DockFlyoutChange final {
 // Semantics: each stack is a `pane` named by its selected panel (the
 // document stacks "Documents"), holding the PageView's tab list and tab
 // panel and its caption buttons; each seam is a `split_pane` with its
-// position as the value and increment, decrement and set_value.
+// position as the value and increment, decrement and set_value. A side strip
+// is a tab list (vertical on the left and right) named "Auto-hidden panels";
+// an open flyout's stack is a `pane` named by its panel, with the caption's
+// buttons (the pin a check box, checked while the stack is docked).
 //
 // Dragging (phase D3; owner decisions DK-24 to DK-26, DK-30, DK-41): a press
 // on a caption that moves the drag threshold (4 units, D5-1) drags the whole
@@ -283,10 +284,6 @@ struct DockFlyoutChange final {
 // the announcement (drag_announcement, also the site's semantic
 // description while a drag runs). Enter commits through the same
 // transaction as a drop; Escape cancels.
-// position as the value and increment, decrement and set_value. A side strip
-// is a tab list (vertical on the left and right) named "Auto-hidden panels";
-// an open flyout's stack is a `pane` named by its panel, with the caption's
-// buttons (the pin a check box, checked while the stack is docked).
 class DockSite : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -715,7 +712,6 @@ private:
     [[nodiscard]] std::vector<DockNodeId> plan_collapse(Size available) const;
     void place(DockNodeId node, Rect bounds, std::span<const DockNodeId> collapsed);
     [[nodiscard]] CaptionGeometry caption_geometry(Rect caption, bool pin) const;
-    [[nodiscard]] double seam_thickness() const;
     [[nodiscard]] bool seams_moved() const noexcept;
     [[nodiscard]] double caption_height() const;
 
@@ -765,6 +761,9 @@ private:
     // -- auto-hide --
     [[nodiscard]] SideStrip& side(DockSide edge) noexcept;
     [[nodiscard]] const SideStrip& side(DockSide edge) const noexcept;
+    // Fills `out` (cleared first) with the panels behind side tabs on an
+    // edge, in tab order (see side_panels).
+    void collect_side_panels(DockSide edge, std::vector<DockPanelId>& out) const;
     void ensure_side_strip(DockSide edge);
     void release_side_strips() noexcept;
     // Brings each edge's strip in line with the slots behind side tabs.
