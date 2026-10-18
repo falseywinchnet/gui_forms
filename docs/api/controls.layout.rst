@@ -61,6 +61,8 @@ Related types
      -  
    * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
      -  
+   * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
+     - Raised after a flyout opened (open true) or closed.
    * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
      -  
    * - :cpp:class:`DockNavigator::ItemParts <gui_forms::DockNavigator::ItemParts>`
@@ -188,11 +190,35 @@ Related types
 
    .. cpp:member:: std::optional<DockDropTarget> target
 
-      The target dropped on, for ``dropped``.
+      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
 
    .. cpp:member:: DockTransactionResult result
 
-      The layout transaction's result, for ``dropped``.
+      The layout transaction's result, for ``dropped`` and ``floated``.
+
+   .. cpp:member:: bool across_windows
+
+      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:member:: Rect frame
+
+      For ``floated``: the new floating window's client area, in desktop logical units.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockFlyoutChange final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Raised after a flyout opened (open true) or closed.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: DockFlyoutCause cause
+
+      Default: ``{DockFlyoutCause::programmatic}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -302,9 +328,21 @@ Related types
 
    .. cpp:member:: PartGeometry drag_stamp_label
 
+   .. cpp:member:: PartGeometry drag_stamp_image
+
+      The panel's picture in the stamp, below its label, while the window can snapshot it (Window::snapshot_control); absent where it cannot, the content well standing in.
+
    .. cpp:member:: PartGeometry drop_area
 
    .. cpp:member:: PartGeometry drop_cue
+
+   .. cpp:member:: PartGeometry flyout_shadow
+
+      The open flyout, in the site's coordinates as it stands in its slide: its overlay shadow, its face and the grip on its inner edge (hot and captured as the pointer is on it or drags it). Absent while no flyout is open.
+
+   .. cpp:member:: PartGeometry flyout_face
+
+   .. cpp:member:: PartGeometry flyout_grip
 
 .. cpp:namespace:: gui_forms
 
@@ -824,6 +862,8 @@ Enumerations
 
    .. cpp:enumerator:: rejected
 
+   .. cpp:enumerator:: floated
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: DockDragPhase
@@ -837,6 +877,32 @@ Enumerations
    .. cpp:enumerator:: dragging
 
    .. cpp:enumerator:: settling
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockFlyoutCause
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: hover
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: programmatic
+
+   .. cpp:enumerator:: pointer_left
+
+   .. cpp:enumerator:: outside_press
+
+   .. cpp:enumerator:: focus_lost
+
+   .. cpp:enumerator:: escape
+
+   .. cpp:enumerator:: swapped
+
+   .. cpp:enumerator:: layout
 
 .. cpp:namespace:: gui_forms
 

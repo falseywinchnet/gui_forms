@@ -57,6 +57,11 @@ The fields, with their defaults:
     `cancel` to keep it open. If the callback throws, the close goes ahead.
 `closed`
     Called once after the window has closed.
+`frame_changed`
+    Called on the UI thread for every native move or resize of the window
+    once it is ready, with its frame in desktop logical units (see
+    `ApplicationWindowHandle::frame`). The client size also reaches the
+    model through the host's resize event.
 
 The empty callbacks are simply not called. If any callback throws, the run
 ends with `ApplicationError::callback_failure`; see `Application`.

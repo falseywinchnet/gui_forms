@@ -381,6 +381,8 @@ HostDialogResult retained_dialog(NativeWindow &owner,
     state.name =
         make_control<TextBox>(StableId("host.dialog.color"), value.str());
     (*state.name).set_bounds({20, 58, 520, 34});
+    // Enter in the field accepts through EnterName.
+    (*state.name).set_accepts_enter(true);
     (*state.root).add_child(state.name);
     state.status = label(state, "host.dialog.status", "", {20, 102, 520, 58});
     state.accept_button =
@@ -414,6 +416,8 @@ HostDialogResult retained_dialog(NativeWindow &owner,
     }
     state.location = make_control<TextBox>(StableId("host.dialog.location"));
     (*state.location).set_bounds({16, 16, 550, 32});
+    // Enter in the location goes there (EnterPath).
+    (*state.location).set_accepts_enter(true);
     (*state.root).add_child(state.location);
     static_cast<void>(
         state.button("host.dialog.go", "Go", {578, 16, 56, 32}, 3));
@@ -428,6 +432,8 @@ HostDialogResult retained_dialog(NativeWindow &owner,
     state.name =
         make_control<TextBox>(StableId("host.dialog.filename"), suggested);
     (*state.name).set_bounds({16, 410, 688, 32});
+    // Enter in the file name accepts through EnterName.
+    (*state.name).set_accepts_enter(true);
     (*state.root).add_child(state.name);
     state.filter = make_control<ComboBox>(StableId("host.dialog.filter"));
     (*state.filter).set_bounds({16, 452, 340, 30});

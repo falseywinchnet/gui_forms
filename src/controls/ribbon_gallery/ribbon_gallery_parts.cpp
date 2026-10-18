@@ -197,6 +197,14 @@ void RibbonGallery::scroll_into_view(std::size_t position) {
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+double RibbonGallery::width_for_columns(std::size_t columns) const noexcept {
+    const double scale = effective_text_scale();
+    const double cell_width = item_size_.width * scale;
+    const double chrome_width = (scroll_column_width + viewport_inset * 2.0) * scale;
+    const double width = static_cast<double>(columns) * cell_width + chrome_width;
+    return width;
+}
+
 Size RibbonGallery::measure(Size available) {
     const double scale = effective_text_scale();
     const double cell_width = item_size_.width * scale;
@@ -206,7 +214,7 @@ Size RibbonGallery::measure(Size available) {
     double width = 0.0;
     double height = 0.0;
     if (form_ == RibbonGalleryForm::in_ribbon) {
-        width = static_cast<double>(columns_) * cell_width + chrome_width;
+        width = width_for_columns(columns_);
         height = static_cast<double>(visible_rows_) * cell_height + chrome_height;
     } else {
         // The drop-down shows its rows of items, plus the captions among
