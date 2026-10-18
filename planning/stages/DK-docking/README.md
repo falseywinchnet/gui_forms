@@ -1,8 +1,8 @@
 # Stage DK: docking and windowing (study, interview, decisions, plan)
 
 Release: not yet placed on the public roadmap; the plan this stage produces
-proposes where. Depends on: nothing to start. Status 2026-10-14: study written;
-interview next. Authority: this brief, until the owner's decisions are recorded.
+proposes where. Depends on: nothing to start. Status 2026-10-17: studies written;
+interview round 001 in progress. Authority: this brief, until the owner's decisions are recorded.
 
 Read [the shared brief](../README.md) first.
 
@@ -64,6 +64,17 @@ stacks, document area and auto-hide strips reuse it rather than growing
 their own tab control, so it is studied here and its questions form the
 tab section of this stage's interview. Its study is
 `PAGEVIEW_STUDY.md` beside the docking study.
+
+## Decisions
+
+From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
+
+1. **Floating panels follow the Mac convention, portably (B5).** One rule
+   on every host: floating tool panels hide while the application is
+   inactive (documents torn out into floating windows stay visible); they
+   move with their main window, keeping their offset; in macOS full
+   screen they join the main window's space; they stay above their own
+   main window only, never above other applications' windows.
 
 ## What exists today
 
