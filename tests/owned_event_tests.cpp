@@ -90,6 +90,26 @@ public:
     FaultScope(const FaultScope&) = delete;
     FaultScope& operator=(const FaultScope&) = delete;
 };
+
+// Whether live_allocations balances over a region. A Windows DLL does not
+// see this executable's replacement operator new, so a block that the C++
+// runtime DLL allocates and this executable frees decrements the count
+// without having incremented it. Ordinary builds keep those calls balanced
+// within the region; under AddressSanitizer on Windows they do not (each
+// short-lived Button frees 24 blocks that libc++.dll allocated, the strings
+// of its property registrations among them), so the balance assertion is
+// skipped there and the subscription assertions remain. This hides no leak
+// finding: LeakSanitizer is not available on Windows, and normal builds
+// still run the assertion.
+#if defined(_WIN32) && defined(__has_feature)
+#if __has_feature(address_sanitizer)
+constexpr bool balance_is_observable = false;
+#else
+constexpr bool balance_is_observable = true;
+#endif
+#else
+constexpr bool balance_is_observable = true;
+#endif
 } // namespace owned_event_allocation_probe
 
 // Replacement allocation is confined to this executable. Raw addresses are
@@ -524,8 +544,10 @@ void test_short_lived_publishers_release_owner_storage() {
                 "publisher destruction must immediately unlink its owner token");
     }
     require(total == 1000, "all short-lived buttons must invoke their handler");
-    require(owned_event_allocation_probe::live_allocations == before,
-            "publisher destruction must release all registration allocations");
+    if (owned_event_allocation_probe::balance_is_observable) {
+        require(owned_event_allocation_probe::live_allocations == before,
+                "publisher destruction must release all registration allocations");
+    }
 }
 
 class BoundOwner final : public gf::Component {
