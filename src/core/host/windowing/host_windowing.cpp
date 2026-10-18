@@ -23,7 +23,7 @@ bool valid_frame_request(Rect content) noexcept {
     return valid;
 }
 
-bool valid_desktop_point(Point point) noexcept {
+bool valid_desktop_point(DesktopLogicalPoint point) noexcept {
     const double bound = HostWindowing::maximum_desktop_coordinate;
     const bool valid = std::isfinite(point.x) && std::isfinite(point.y) &&
         std::fabs(point.x) <= bound && std::fabs(point.y) <= bound;
@@ -62,7 +62,8 @@ Rect follow_work_area(const std::vector<HostMonitor>& monitors, Rect target_oute
     for (std::size_t index = 0U; index < monitors.size(); ++index) {
         if (monitors[index].work_area.contains(primary_center)) return monitors[index].work_area;
     }
-    const std::size_t nearest = nearest_monitor(monitors, target_center);
+    const DesktopLogicalPoint target_desktop{target_center.x, target_center.y};
+    const std::size_t nearest = nearest_logical_monitor(monitors, target_desktop);
     return monitors[nearest].work_area;
 }
 
@@ -248,7 +249,7 @@ HostScreenPointResult HostWindowing::pointer_position() {
     return result;
 }
 
-HostWindowAtResult HostWindowing::window_at(Point point) {
+HostWindowAtResult HostWindowing::window_at(DesktopLogicalPoint point) {
     HostWindowAtResult result;
     result.status = validate_request(HostCapability::window_at_point);
     if (!result.status.accepted()) return result;

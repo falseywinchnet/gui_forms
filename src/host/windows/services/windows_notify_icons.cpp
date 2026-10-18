@@ -176,14 +176,14 @@ void WindowsNotifyIcons::handle_callback(WPARAM, LPARAM l_parameter) {
     sink_(published);
 }
 
-WindowsNotifyIcons::Icon* WindowsNotifyIcons::find(std::uint64_t icon_id) noexcept {
+WindowsNotifyIcons::Icon* WindowsNotifyIcons::find(HostTrayIconId icon_id) noexcept {
     for (Icon& icon : icons_) {
         if (icon.id == icon_id) return &icon;
     }
     return nullptr;
 }
 
-std::optional<UINT> WindowsNotifyIcons::shell_id(std::uint64_t icon_id) const noexcept {
+std::optional<UINT> WindowsNotifyIcons::shell_id(HostTrayIconId icon_id) const noexcept {
     for (const Icon& icon : icons_) {
         if (icon.id == icon_id) return icon.shell_id;
     }
@@ -219,7 +219,7 @@ bool WindowsNotifyIcons::show(const Icon& icon) noexcept {
     return true;
 }
 
-HostServiceStatus WindowsNotifyIcons::add(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus WindowsNotifyIcons::add(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     if (!ensure_window()) return {HostServiceError::backend_failure};
     Icon icon;
     icon.id = icon_id;
@@ -238,7 +238,7 @@ HostServiceStatus WindowsNotifyIcons::add(std::uint64_t icon_id, const HostTrayI
     return {};
 }
 
-HostServiceStatus WindowsNotifyIcons::update(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus WindowsNotifyIcons::update(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     Icon* const icon = find(icon_id);
     if (icon == nullptr) return {HostServiceError::backend_failure};
     HICON replacement = create_notify_icon_handle(request.images, GetSystemMetrics(SM_CXSMICON));
@@ -259,7 +259,7 @@ HostServiceStatus WindowsNotifyIcons::update(std::uint64_t icon_id, const HostTr
     return {};
 }
 
-void WindowsNotifyIcons::remove(std::uint64_t icon_id) noexcept {
+void WindowsNotifyIcons::remove(HostTrayIconId icon_id) noexcept {
     for (std::size_t index = 0; index < icons_.size(); ++index) {
         if (icons_[index].id != icon_id) continue;
         NOTIFYICONDATAW data = base_data(window_, icons_[index].shell_id);
@@ -270,7 +270,7 @@ void WindowsNotifyIcons::remove(std::uint64_t icon_id) noexcept {
     }
 }
 
-HostServiceStatus WindowsNotifyIcons::notify(std::uint64_t icon_id, const HostTrayNotificationRequest& request) {
+HostServiceStatus WindowsNotifyIcons::notify(HostTrayIconId icon_id, const HostTrayNotificationRequest& request) {
     Icon* const icon = find(icon_id);
     if (icon == nullptr) return {HostServiceError::backend_failure};
     NOTIFYICONDATAW data = base_data(window_, (*icon).shell_id);
@@ -292,7 +292,7 @@ HostServiceStatus WindowsNotifyIcons::notify(std::uint64_t icon_id, const HostTr
     return {};
 }
 
-HostTrayMenuResult WindowsNotifyIcons::show_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request) {
+HostTrayMenuResult WindowsNotifyIcons::show_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request) {
     HostTrayMenuResult result;
     if (find(icon_id) == nullptr || window_ == nullptr) {
         result.status = {HostServiceError::backend_failure};

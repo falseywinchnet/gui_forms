@@ -169,7 +169,7 @@ protected:
     HostWindowFrameResult frame_impl(HostWindowId window) override;
     HostServiceStatus request_frame_impl(HostWindowId window, Rect content) override;
     HostScreenPointResult pointer_position_impl() override;
-    HostWindowAtResult window_at_impl(Point point) override;
+    HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
     HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     HostServiceStatus destroy_window_impl(HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
@@ -195,15 +195,15 @@ HostWindowFrame native_window_frame(HWND window) {
     if (!GetClientRect(window, &client) || !ClientToScreen(window, &origin)) return frame;
     const std::vector<HostMonitor> monitors = device_monitors();
     const double scale = query_scale(window);
-    const Point content_origin = desktop_logical_point(
-        monitors, {static_cast<double>(origin.x), static_cast<double>(origin.y)});
+    const DesktopLogicalPoint content_origin = desktop_logical_point(
+        monitors, DesktopDevicePoint{static_cast<double>(origin.x), static_cast<double>(origin.y)});
     frame.content = {content_origin.x, content_origin.y,
                      static_cast<double>(client.right - client.left) / scale,
                      static_cast<double>(client.bottom - client.top) / scale};
     RECT outer{};
     if (visible_window_bounds(window, outer)) {
-        const Point outer_origin = desktop_logical_point(
-            monitors, {static_cast<double>(outer.left), static_cast<double>(outer.top)});
+        const DesktopLogicalPoint outer_origin = desktop_logical_point(
+            monitors, DesktopDevicePoint{static_cast<double>(outer.left), static_cast<double>(outer.top)});
         frame.outer = {outer_origin.x, outer_origin.y,
                        static_cast<double>(outer.right - outer.left) / scale,
                        static_cast<double>(outer.bottom - outer.top) / scale};
@@ -406,7 +406,8 @@ HostServiceStatus WindowsApplicationRun::request_frame_impl(HostWindowId window,
     if (state.frame_fixed()) return {HostServiceError::unsupported};
     const std::vector<HostMonitor> monitors = device_monitors();
     double target_scale = 1.0;
-    const Point device_origin = desktop_device_point(monitors, {content.x, content.y}, target_scale);
+    const DesktopDevicePoint device_origin =
+        desktop_device_point(monitors, DesktopLogicalPoint{content.x, content.y}, target_scale);
     RECT frame{0, 0, static_cast<LONG>(std::lround(content.width * target_scale)),
                static_cast<LONG>(std::lround(content.height * target_scale))};
     adjust_client_frame(frame, static_cast<DWORD>(GetWindowLongPtrW(native_window, GWL_STYLE)),
@@ -433,15 +434,15 @@ HostScreenPointResult WindowsApplicationRun::pointer_position_impl() {
     }
     const std::vector<HostMonitor> monitors = device_monitors();
     result.position = desktop_logical_point(
-        monitors, {static_cast<double>(device.x), static_cast<double>(device.y)});
+        monitors, DesktopDevicePoint{static_cast<double>(device.x), static_cast<double>(device.y)});
     return result;
 }
 
-HostWindowAtResult WindowsApplicationRun::window_at_impl(Point point) {
+HostWindowAtResult WindowsApplicationRun::window_at_impl(DesktopLogicalPoint point) {
     HostWindowAtResult result;
     const std::vector<HostMonitor> monitors = device_monitors();
     double scale = 1.0;
-    const Point device = desktop_device_point(monitors, point, scale);
+    const DesktopDevicePoint device = desktop_device_point(monitors, point, scale);
     const POINT native_point{static_cast<LONG>(std::lround(device.x)),
                              static_cast<LONG>(std::lround(device.y))};
     // WindowFromPoint skips hidden and disabled windows; its result may be a

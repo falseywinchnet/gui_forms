@@ -2,6 +2,7 @@
 
 #include "gui_forms/event.hpp"
 #include "gui_forms/host/types/host_types.hpp"
+#include "gui_forms/host/windowing/desktop_coordinates.hpp"
 
 #include <array>
 #include <cstddef>
@@ -139,7 +140,7 @@ struct HostWindowFrameEvent final {
 
 struct HostScreenPointResult final {
     HostServiceStatus status{};
-    Point position{};
+    DesktopLogicalPoint position{};
 };
 
 // An accepted result whose `window` is invalid means no window of this run
@@ -231,7 +232,7 @@ public:
     [[nodiscard]] HostScreenPointResult pointer_position();
     // The run's window that is topmost at `point` (desktop logical units),
     // counting native decorations where the host can.
-    [[nodiscard]] HostWindowAtResult window_at(Point point);
+    [[nodiscard]] HostWindowAtResult window_at(DesktopLogicalPoint point);
     // Orders `window` above every other window of this run, never above
     // other applications' windows, without activating it. Owned windows
     // stay above their owners as each platform keeps them.
@@ -320,7 +321,7 @@ protected:
     [[nodiscard]] virtual HostScreenPointResult pointer_position_impl() = 0;
     // May return any native result; the base accepts only a live identity
     // or an invalid one.
-    [[nodiscard]] virtual HostWindowAtResult window_at_impl(Point point) = 0;
+    [[nodiscard]] virtual HostWindowAtResult window_at_impl(DesktopLogicalPoint point) = 0;
     [[nodiscard]] virtual HostServiceStatus bring_to_front_impl(HostWindowId window) = 0;
     // Must close the native window, run its closed notification and call
     // retire() before returning accepted.
