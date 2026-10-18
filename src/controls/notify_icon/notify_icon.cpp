@@ -169,9 +169,10 @@ HostServiceStatus NotifyIcon::show_balloon_tip(std::string title, std::string te
     notification.title = std::move(title);
     notification.text = std::move(text);
     notification.icon = icon;
+    // At most ten minutes; zero or less is the host's default.
     const long long milliseconds = timeout.count();
-    notification.timeout_milliseconds =
-        milliseconds <= 0 ? 0U : static_cast<std::uint32_t>(std::min<long long>(milliseconds, 600000));
+    const long long bounded = std::clamp<long long>(milliseconds, 0, 600000);
+    notification.timeout_milliseconds = static_cast<std::uint32_t>(bounded);
     status_ = (*services).show_tray_notification(icon_id_, notification);
     return status_;
 }
