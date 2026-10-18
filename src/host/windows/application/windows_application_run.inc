@@ -61,8 +61,8 @@ std::vector<HostMonitor> device_monitors() {
 using DwmGetWindowAttributeFunction = decltype(&::DwmGetWindowAttribute);
 
 // The visible window bounds without the invisible resize borders Windows 10
-// and later add around a sizable window (DWMWA_EXTENDED_FRAME_BOUNDS, 9),
-// read through dwmapi.dll when it is present; else GetWindowRect.
+// and later add around a sizable window (DWMWA_EXTENDED_FRAME_BOUNDS), read
+// through dwmapi.dll when it is present; else GetWindowRect.
 DwmGetWindowAttributeFunction load_dwm_get_window_attribute() noexcept {
     HMODULE library = LoadLibraryW(L"dwmapi.dll");
     if (library == nullptr) return nullptr;
@@ -73,13 +73,51 @@ DwmGetWindowAttributeFunction load_dwm_get_window_attribute() noexcept {
 
 bool visible_window_bounds(HWND window, RECT& bounds) noexcept {
     static const DwmGetWindowAttributeFunction get_attribute = load_dwm_get_window_attribute();
-    constexpr DWORD extended_frame_bounds = 9U;
+    constexpr DWORD extended_frame_bounds = DWMWA_EXTENDED_FRAME_BOUNDS;
     if (get_attribute != nullptr &&
         SUCCEEDED(get_attribute(window, extended_frame_bounds, &bounds, sizeof(bounds)))) {
         return true;
     }
     const bool measured = GetWindowRect(window, &bounds) != FALSE;
     return measured;
+}
+
+// The Win32 window styles of one window.
+struct WindowsWindowStyles final {
+    DWORD style{};
+    DWORD extended{};
+};
+
+// The styles for a window of `kind` with `options`: a popup window has a
+// border only; otherwise an overlapped window, without its minimize box
+// when the window is not minimizable, and a tool window takes the tool
+// caption. Floating windows (decision 10) are owned by the primary window,
+// which already keeps them off the taskbar, above the owner only and hidden
+// while it is minimized; they minimize with it, never on their own, so they
+// have no minimize box, and a floating tool takes the tool caption without
+// a maximize box.
+WindowsWindowStyles windows_window_styles(HostWindowKind kind, bool tool_window,
+                                          const WindowsHostOptions& options) noexcept {
+    WindowsWindowStyles styles;
+    if (kind == HostWindowKind::floating_tool) {
+        styles.style = WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        styles.extended = WS_EX_TOOLWINDOW;
+        return styles;
+    }
+    if (kind == HostWindowKind::floating_document) {
+        styles.style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
+        styles.extended = 0;
+        return styles;
+    }
+    if (options.popup_window) {
+        styles.style = WS_POPUP | WS_BORDER;
+    } else if (options.minimizable) {
+        styles.style = WS_OVERLAPPEDWINDOW;
+    } else {
+        styles.style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
+    }
+    styles.extended = tool_window ? WS_EX_TOOLWINDOW : 0;
+    return styles;
 }
 
 class WindowsApplicationRun final : public HostWindowing {
@@ -245,22 +283,9 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
     const bool close_after_launch = entry.options.close_after_launch_for_testing;
     window_slot.state = std::make_unique<WindowsHostState>(std::move(entry.model), std::move(host_options));
     (*window_slot.state).attach_run(*this, id);
-    DWORD style = entry.options.popup_window
-        ? (WS_POPUP | WS_BORDER)
-        : (entry.options.minimizable ? WS_OVERLAPPEDWINDOW
-                                     : (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
-    DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
-    // Floating windows (decision 10) are owned by the primary window, which
-    // already keeps them off the taskbar, above the owner only and hidden
-    // while it is minimized; they minimize with it, not on their own. A
-    // floating tool takes the tool caption.
-    if (kind == HostWindowKind::floating_tool) {
-        style = WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-        ex_style = WS_EX_TOOLWINDOW;
-    } else if (kind == HostWindowKind::floating_document) {
-        style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
-        ex_style = 0;
-    }
+    const WindowsWindowStyles styles = windows_window_styles(kind, entry.tool_window, entry.options);
+    const DWORD style = styles.style;
+    const DWORD ex_style = styles.extended;
     const double initial_scale = query_scale(owner);
     const Size initial_size = entry.options.capture_size.has_value()
         ? *entry.options.capture_size : entry.options.initial_size;
