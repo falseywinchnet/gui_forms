@@ -25,7 +25,7 @@
 //   <dock_layout format application_version next_id>
 //     <main_site> [<window x y width height monitor maximized/>] NODE </main_site>
 //     <floating_site id x y width height monitor maximized> NODE </floating_site>  ...
-//     <auto_hidden edge extent neighbour side ratio> <tool_stack/> </auto_hidden>  ...
+//     <auto_hidden edge extent neighbour side ratio [split split_ratio]> <tool_stack/> </auto_hidden>  ...
 //     <panel_record id kind last> [<docked/>] [<floating/>] [<auto_hidden/>] </panel_record> ...
 //   </dock_layout>
 //
@@ -261,6 +261,12 @@ void add_frame(XmlElement& element, Rect frame) {
         add_number(element, "neighbour", entry.neighbour.value);
         add_attribute(element, "side", side_name(entry.side));
         add_double(element, "ratio", entry.ratio);
+        // Written only when there is a split to recreate, so a layout without
+        // one keeps the form written before these attributes existed.
+        if (!(entry.split == DockNodeId{})) {
+            add_number(element, "split", entry.split.value);
+            add_double(element, "split_ratio", entry.split_ratio);
+        }
         element.children.push_back(node_element(state, entry.stack));
         root.children.push_back(std::move(element));
     }
@@ -641,7 +647,7 @@ private:
     }
 
     bool load_auto_hidden(const XmlElement& element) {
-        check_attributes(element, {"edge", "extent", "neighbour", "side", "ratio"});
+        check_attributes(element, {"edge", "extent", "neighbour", "side", "ratio", "split", "split_ratio"});
         DockAutoHideEntry entry{};
         if (!read_side(element, "edge", entry.edge)) return false;
         if (!read_double(element, "extent", entry.extent)) return false;
@@ -649,6 +655,14 @@ private:
         if (!read_node_reference(element, "neighbour", entry.neighbour)) return false;
         if (!read_side(element, "side", entry.side)) return false;
         if (!read_double(element, "ratio", entry.ratio)) return false;
+        // Optional: the split to recreate on unpinning.
+        if (element.find_attribute("split") != nullptr) {
+            if (!read_node_reference(element, "split", entry.split)) return false;
+            if (!read_double(element, "split_ratio", entry.split_ratio)) return false;
+            if (!(entry.split_ratio > 0.0 && entry.split_ratio < 1.0)) {
+                return invalid("auto_hidden", "split_ratio", format_double(entry.split_ratio));
+            }
+        }
         std::vector<DockNodeId> stacks{};
         if (!load_children(element, stacks)) return false;
         if (stacks.size() > 1U) return structure("an auto-hidden entry holds more than one stack");

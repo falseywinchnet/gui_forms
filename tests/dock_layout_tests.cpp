@@ -572,6 +572,41 @@ void test_pins() {
                     "unpinning a docked stack");
 }
 
+// Pinning out and unpinning are inverse edits (DockAutoHideEntry): with
+// nothing between, every stack in the standard layout comes back to the
+// state it left, the split's identity and ratio included, and the saved
+// layout is byte for byte the same; an auto-hidden layout saves and
+// restores the split to recreate.
+void test_pin_round_trip_exact() {
+    DockLayout layout{};
+    register_standard(layout);
+    show_standard(layout);
+    require(static_cast<bool>(apply_one(layout, DockEdit::set_ratio(DockNodeId{3}, 0.1))),
+            "a ratio that 1 - (1 - r) does not give back exactly");
+    const std::array<std::string_view, 3> tools{"tools.solution", "tools.properties", "tools.output"};
+    for (const std::string_view tool : tools) {
+        const DockLayoutState before = layout.state();
+        const std::string saved = layout.write_xml().text;
+        const DockNodeId stack = layout.locate(panel(tool)).stack;
+        require(static_cast<bool>(apply_one(layout, DockEdit::auto_hide(DockSubject::of_stack(stack), DockSide::left))),
+                "the stack pins out");
+        const std::string pinned = layout.write_xml().text;
+        require(pinned.find(" split=\"") != std::string::npos && pinned.find(" split_ratio=\"") != std::string::npos,
+                "the saved auto-hide entry names the split to recreate");
+        DockLayout restored{};
+        register_standard(restored);
+        const DockRestoreResult result = restored.restore_xml(pinned, DockRestoreOptions{});
+        require(result.status == DockRestoreStatus::restored && restored.write_xml().text == pinned,
+                "an auto-hidden layout restores and writes again the same");
+        require(static_cast<bool>(apply_one(restored, DockEdit::unpin(stack))) && restored.write_xml().text == saved,
+                "unpinning the restored layout gives the layout before the pin");
+        require(static_cast<bool>(apply_one(layout, DockEdit::unpin(stack))), "the stack docks back");
+        require(layout.state() == before && layout.write_xml().text == saved,
+                "pin then unpin leaves the layout exactly as it was");
+    }
+    require(static_cast<bool>(layout.check_invariants()), "valid after the round trips");
+}
+
 void test_transactions() {
     DockLayout layout{};
     register_standard(layout);
@@ -1185,6 +1220,7 @@ int main() {
     test_restrictions();
     test_floating_limit();
     test_pins();
+    test_pin_round_trip_exact();
     test_transactions();
     test_split_solver_and_arrange();
     test_monitor_fallback();

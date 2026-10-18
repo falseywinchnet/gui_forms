@@ -271,21 +271,33 @@ struct DockFloatingSite final {
 
 // A tool stack pinned out to an edge of the main site (auto-hide). The stack
 // keeps its node ID while it is out, so unpinning returns the same stack.
+// Pinning out and unpinning are inverse edits: unpinning beside the same
+// neighbour recreates the split the stack stood in with its old identity and
+// ratio, and neither edit writes the panels' remembered places, so a pin
+// followed by an unpin leaves the layout exactly as it was.
 struct DockAutoHideEntry final {
     DockNodeId stack{};
     DockSide edge{DockSide::left};
     // The flyout's extent, in logical units.
     double extent{240.0};
-    // Where the stack stood before it was pinned out.
+    // Where the stack stood before it was pinned out: the node beside it,
+    // which side of that node, and the stack's share of their split.
     DockNodeId neighbour{};
     DockSide side{DockSide::left};
     double ratio{0.25};
+    // The split the stack stood in (removed while the stack is out) and that
+    // split's own ratio (its first child's share); none when the stack stood
+    // alone, for example in a restored layout written before these were
+    // saved.
+    DockNodeId split{};
+    double split_ratio{0.5};
 
     friend bool operator==(const DockAutoHideEntry& left,
                            const DockAutoHideEntry& right) noexcept {
         return left.stack == right.stack && left.edge == right.edge &&
                left.extent == right.extent && left.neighbour == right.neighbour &&
-               left.side == right.side && left.ratio == right.ratio;
+               left.side == right.side && left.ratio == right.ratio &&
+               left.split == right.split && left.split_ratio == right.split_ratio;
     }
 };
 
