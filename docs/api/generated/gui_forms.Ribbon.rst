@@ -301,7 +301,7 @@ gui_forms::Ribbon
    ``menu_button`` with a popup), the tab row (a ``tab_group`` of the shown tabs:
    core tabs positioned among the core tabs, a contextual tab among its set's,
    described by the set's caption)
-   and, while shown, the command plane (a group named after the selected tab)
+   and the command plane (a group named after the selected tab, expanded while shown and collapsed while minimized or hidden; its expand and collapse actions restore and minimize it as a click on the selected tab does, owner decision 46)
    with its groups, named by caption, and their commands: ``button``,
    ``split_button`` or ``menu_button``, with positions in their group and
    has-popup, and each launcher as a button. A collapsed group is a

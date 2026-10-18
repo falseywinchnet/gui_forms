@@ -2029,14 +2029,24 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
         row.children.push_back(std::move(node));
     }
     nodes.push_back(std::move(row));
-    if (placed.plane.empty() || !selected_tab_) return nodes;
+    if (!selected_tab_) return nodes;
 
+    // The command plane is published while minimized too, collapsed, so that
+    // assistive technology can restore it: tabs expose selection and never
+    // invoke, so clicking the selected tab is no path for them (owner
+    // decision 46). Expand and collapse drive the same minimize and restore.
     SemanticNode plane{};
     plane.stable_id = ribbon_id + ".command_plane";
     plane.role = SemanticRole::group;
     plane.name = parse_mnemonic_text(tabs_[*selected_tab_].text).display_text;
     plane.bounds = to_window(absolute, placed.plane);
     plane.states = base;
+    if (!placed.plane.empty()) plane.states |= SemanticState::expanded;
+    plane.actions = {minimized_ ? SemanticAction::expand : SemanticAction::collapse};
+    if (placed.plane.empty()) {
+        nodes.push_back(std::move(plane));
+        return nodes;
+    }
     if (!placed.scroll_left.empty()) {
         SemanticNode scroll{};
         scroll.stable_id = ribbon_id + ".scroll_left";
@@ -2092,6 +2102,11 @@ bool Ribbon::on_semantic_child_action(std::string_view id, SemanticAction action
             return false;
         }
         return show_application_menu();
+    }
+    if (id == ribbon_id + ".command_plane" && (action == SemanticAction::expand || action == SemanticAction::collapse)) {
+        if (!selected_tab_) return false;
+        set_minimized(action == SemanticAction::collapse);
+        return true;
     }
     if (action == SemanticAction::press && (id == ribbon_id + ".scroll_left" || id == ribbon_id + ".scroll_right")) {
         scroll_groups(id == ribbon_id + ".scroll_right");

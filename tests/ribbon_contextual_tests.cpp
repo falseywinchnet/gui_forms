@@ -82,12 +82,14 @@ std::vector<std::string> shown_tabs(const Ribbon& ribbon) {
     return ids;
 }
 
+// A borrow into `tabs`, which must outlive it: temporaries are refused.
 const Ribbon::Tab* realized(const std::vector<Ribbon::Tab>& tabs, std::string_view id) {
     for (const Ribbon::Tab& item : tabs) {
         if (item.stable_id == id) return &item;
     }
     return nullptr;
 }
+const Ribbon::Tab* realized(std::vector<Ribbon::Tab>&& tabs, std::string_view id) = delete;
 
 struct Fixture final {
     std::shared_ptr<Ribbon> ribbon;
@@ -104,7 +106,8 @@ Fixture make_fixture(Size size = {1200.0, 300.0}) {
 }
 
 void click_tab(Fixture& fixture, std::string_view id) {
-    const Ribbon::Tab* item = realized((*fixture.ribbon).realized_tabs(), id);
+    const std::vector<Ribbon::Tab> tabs = (*fixture.ribbon).realized_tabs();
+    const Ribbon::Tab* item = realized(tabs, id);
     require(item != nullptr, "the tab to click is shown");
     const Rect bounds = (*item).parts.tab.bounds;
     const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
@@ -292,6 +295,36 @@ void semantics_and_keyboard() {
     require(selected(ribbon) == "chart_tab", "and stops at the last shown tab");
 }
 
+// Owner decision 46: the command plane's expand and collapse actions
+// minimize and restore it, as a click on the selected tab does.
+void plane_expand_collapse() {
+    Fixture fixture = make_fixture();
+    Ribbon& ribbon = *fixture.ribbon;
+    std::vector<SemanticNode> nodes = ribbon.semantic_virtual_children();
+    require(nodes.size() == 3U && nodes[2].stable_id == "ribbon.command_plane" &&
+                has_semantic_state(nodes[2].states, SemanticState::expanded) &&
+                nodes[2].actions == std::vector<SemanticAction>{SemanticAction::collapse},
+            "the shown plane is expanded and offers collapse");
+    require(ribbon.on_semantic_child_action("ribbon.command_plane", SemanticAction::collapse, {}) &&
+                ribbon.minimized(),
+            "collapse minimizes the plane");
+    (*fixture.window).perform_layout();
+    nodes = ribbon.semantic_virtual_children();
+    require(nodes.size() == 3U && !has_semantic_state(nodes[2].states, SemanticState::expanded) &&
+                nodes[2].actions == std::vector<SemanticAction>{SemanticAction::expand} && nodes[2].children.empty(),
+            "the minimized plane stays published, collapsed, offering expand");
+    require(ribbon.on_semantic_child_action("ribbon.command_plane", SemanticAction::expand, {}) && !ribbon.minimized(),
+            "expand restores it");
+    (*fixture.window).perform_layout();
+    click_tab(fixture, "home");
+    require(ribbon.minimized(), "the pointer path still minimizes");
+    nodes = ribbon.semantic_virtual_children();
+    require(nodes[2].actions == std::vector<SemanticAction>{SemanticAction::expand},
+            "and the plane's state follows it");
+    click_tab(fixture, "home");
+    require(!ribbon.minimized(), "and restores");
+}
+
 void refusals() {
     std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("ribbon"));
     struct Case final {
@@ -388,6 +421,7 @@ int main() {
     accents();
     modes();
     semantics_and_keyboard();
+    plane_expand_collapse();
     refusals();
     scaling_with_contextual_tabs();
     std::cout << "Ribbon contextual tabs: availability and selection rules, accents, modes, semantics and keyboard, "

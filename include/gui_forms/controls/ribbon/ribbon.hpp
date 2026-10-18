@@ -731,6 +731,8 @@ private:
     [[nodiscard]] const RibbonGroupSpec* selected_group(std::size_t group) const noexcept;
     [[nodiscard]] const RibbonCommandSpec* selected_command(CommandAddress address) const noexcept;
     [[nodiscard]] const std::string& authored_text(const RibbonCommandSpec& command) const noexcept;
+    // A borrow of the argument: temporaries are refused (house style §5).
+    const std::string& authored_text(RibbonCommandSpec&& command) const = delete;
     [[nodiscard]] std::string command_text(const RibbonCommandSpec& command) const;
     [[nodiscard]] bool command_enabled(const RibbonCommandSpec& command) const;
     [[nodiscard]] bool command_visible(const RibbonCommandSpec& command) const;
