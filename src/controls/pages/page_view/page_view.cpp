@@ -123,6 +123,7 @@ void PageView::initialize_control_tree() {
         (*strip_).set_close_buttons(PageCloseButtons::selected_and_hot);
         (*strip_).set_overflow(PageStripOverflow::shrink_then_list);
         (*strip_).set_mnemonics_enabled(false);
+        (*strip_).set_reorder_enabled(true);
     }
     add_child(strip_);
 }

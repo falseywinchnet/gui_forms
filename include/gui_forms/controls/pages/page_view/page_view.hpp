@@ -40,10 +40,10 @@ enum class PageViewCtrlTab : std::uint8_t { select_next, pass };
 
 // The presentation a view starts from (owner decision DK-15). `strip`:
 // content-sized tabs, scroll and list overflow, mnemonics, no close buttons,
-// selection after a close by neighbour. `document` (DK-31, DK-38): close
-// buttons on the selected and hot tabs, shrink then list overflow, no
-// mnemonics (titles are data), selection after a close by most recent
-// activation. The navigation preset is phase P8's.
+// selection after a close by neighbour, no live reorder. `document` (DK-31,
+// DK-38, DK-39): close buttons on the selected and hot tabs, shrink then
+// list overflow, no mnemonics (titles are data), live reorder by dragging,
+// selection after a close by most recent activation. The navigation preset is phase P8's.
 enum class PageViewPreset : std::uint8_t { strip, document };
 
 // What a view does with a close request no handler took (owner decision
