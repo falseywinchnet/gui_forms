@@ -389,7 +389,9 @@
         {"name": "text_changed", "payload": "std::string", "mutable_payload": false},
         {"name": "selection_changed", "payload": "TextSelection", "mutable_payload": false},
         {"name": "committed", "payload": "std::string", "mutable_payload": false},
-        {"name": "cancelled", "payload": "", "mutable_payload": false}
+        {"name": "cancelled", "payload": "", "mutable_payload": false},
+        {"name": "auto_complete_open_changed", "payload": "bool", "mutable_payload": false},
+        {"name": "auto_complete_accepted", "payload": "std::string", "mutable_payload": false}
       ]
     },
     {
@@ -929,7 +931,8 @@
         {"name": "scroll", "payload": "ScrollEvent", "mutable_payload": true},
         {"name": "selected_index_changed", "payload": "std::optional<std::size_t>", "mutable_payload": false},
         {"name": "drop_down_changed", "payload": "bool", "mutable_payload": false},
-        {"name": "items_changed", "payload": "", "mutable_payload": false}
+        {"name": "items_changed", "payload": "", "mutable_payload": false},
+        {"name": "text_changed", "payload": "std::string", "mutable_payload": false}
       ]
     },
     {

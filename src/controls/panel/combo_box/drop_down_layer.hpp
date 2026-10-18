@@ -16,8 +16,9 @@ public:
     void on_key(KeyEvent& event) override;
     bool on_semantic_child_action(std::string_view id, SemanticAction action,
                                   std::string_view value) override;
-private:
+    // Matches the scroll bar to the rows after the owner moves the selection.
     void synchronize_scroll();
+private:
     void scroll_changed(double value);
     std::shared_ptr<ScrollBar> scrollbar_;
     SubscriptionToken scroll_subscription_;

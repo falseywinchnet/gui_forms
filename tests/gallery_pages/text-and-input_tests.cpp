@@ -70,6 +70,26 @@ void test_text_and_input(gui_forms::Window& window,
     require(!window.dispatch_text({"x"}) &&
                 (*masked_status).text().find("refused \"x\" at position 6") != std::string::npos,
             "a refused letter is reported with its position");
+
+    const std::shared_ptr<gui_forms::TextBox> city = std::dynamic_pointer_cast<TextBox>(
+        window.find("gallery.text.complete.city"));
+    const std::shared_ptr<gui_forms::ComboBox> band = std::dynamic_pointer_cast<ComboBox>(
+        window.find("gallery.text.complete.band"));
+    const std::shared_ptr<gui_forms::Label> complete_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.text.complete.status"));
+    require(city && band && complete_status && (*band).editor(), "the auto-complete specimens are on the page");
+    require(window.request_focus(city) && window.dispatch_text({"ed"}) && (*city).text() == "edinburgh" &&
+                (*city).auto_complete_open() && (*city).auto_complete_suggestions().size() == 2U,
+            "the city field appends the first match and suggests both");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::tab}) && (*city).text() == "edinburgh" &&
+                (*complete_status).text() == "Accepted \"edinburgh\"",
+            "Tab accepts the appended city and the page reports it");
+    require(window.request_focus((*band).editor()) && window.dispatch_text({"m"}) &&
+                (*(*band).editor()).auto_complete_suggestions().size() == 2U &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                (*band).text() == "Medium wave" && (*band).selected_index() == 1U,
+            "the band field suggests from its items and the accepted item is selected");
 }
 
 } // namespace gallery_pages_tests

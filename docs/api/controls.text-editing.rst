@@ -15,6 +15,8 @@ Text entry.
      - An editable text field: one line by default, or a plain-text document with ``multiline``.
    * - :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
      - A text box that takes input through a mask.
+   * - :cpp:class:`AutoCompleteStringCollection <gui_forms::AutoCompleteStringCollection>`
+     - An ordered list of completion candidates for a text box or combo box.
    * - :cpp:class:`MaskedTextProvider <gui_forms::MaskedTextProvider>`
      - A mask and the text assigned to it, without a control.
 
@@ -23,6 +25,7 @@ Text entry.
 
    generated/gui_forms.TextBox
    generated/gui_forms.MaskedTextBox
+   generated/gui_forms.AutoCompleteStringCollection
    generated/gui_forms.MaskedTextProvider
 
 Related types
@@ -293,6 +296,44 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: AutoCompleteMode
+
+   ``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: suggest
+
+   .. cpp:enumerator:: append
+
+   .. cpp:enumerator:: suggest_append
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: AutoCompleteSource
+
+   ``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: custom_source
+
+   .. cpp:enumerator:: list_items
+
+   .. cpp:enumerator:: file_system
+
+   .. cpp:enumerator:: file_system_directories
+
+   .. cpp:enumerator:: history_list
+
+   .. cpp:enumerator:: recently_used_list
+
+   .. cpp:enumerator:: all_url
+
+   .. cpp:enumerator:: all_system_sources
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MaskResultHint
 
    ``#include <gui_forms/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.hpp>``
@@ -337,6 +378,12 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PopupDismissReason
+
+   ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextBox::MultilineValidation
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
@@ -375,6 +422,16 @@ Enumerations
 
    .. cpp:enumerator:: rewrite
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TextMatchMode
+
+   ``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+   .. cpp:enumerator:: prefix
+
+   .. cpp:enumerator:: substring
+
 Functions, constants and aliases
 --------------------------------
 
@@ -387,3 +444,19 @@ Functions, constants and aliases
 .. cpp:type:: MaskPosition = TextUnitIndex<MaskPositionTag>
 
    A position in a mask: the index of one slot, editable or literal. Every slot shows as exactly one Unicode scalar in the display text, so a position is also the scalar index of its slot in display_text(). It is not a byte offset; display_offset converts.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+.. cpp:function:: std::optional<HostAutoCompleteSource> host_auto_complete_source(AutoCompleteSource source) noexcept
+
+   The host source an AutoCompleteSource names, or none for a source the control owns (none, custom_source, list_items).
+
+.. cpp:function:: std::optional<std::size_t> find_text_match(std::string_view candidate, std::string_view pattern, TextMatchMode mode, bool case_sensitive) noexcept
+
+   The byte offset in ``candidate`` of the first match of ``pattern``, or none. Bytes compare exactly, except that ASCII letters compare without case unless ``case_sensitive``; other characters (accented and non-Latin letters among them) compare exactly. Valid UTF-8 inputs therefore match at a scalar boundary and the match is pattern.size() bytes long. An empty pattern matches nothing.
+
+.. cpp:var:: constexpr std::size_t maximum_auto_complete_suggestions
+
+   The most candidates a suggestion list shows; later matches are dropped. Value: ``256U``.

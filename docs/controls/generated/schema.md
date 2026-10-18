@@ -183,6 +183,8 @@ Properties beyond every control's: `text` (text).
 | `selection_changed` | `TextSelection` |
 | `committed` | `std::string` |
 | `cancelled` | none |
+| `auto_complete_open_changed` | `bool` |
+| `auto_complete_accepted` | `std::string` |
 
 ## `masked_text_box` (MaskedTextBox, control)
 
@@ -430,6 +432,7 @@ Properties beyond every control's: `items` (collection), `selected_index` (signe
 | `selected_index_changed` | `std::optional<std::size_t>` |
 | `drop_down_changed` | `bool` |
 | `items_changed` | none |
+| `text_changed` | `std::string` |
 
 ## `tree_view` (TreeView, control)
 

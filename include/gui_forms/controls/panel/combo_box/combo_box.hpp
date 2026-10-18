@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/controls/panel/list_box/list_box.hpp"
+#include "gui_forms/controls/panel/text_box/text_box.hpp"
 #include "gui_forms/window.hpp"
 
 #include <cstddef>
@@ -14,9 +15,17 @@
 
 namespace gui_forms {
 
+// Whether a ComboBox's field takes text, as Windows Forms' ComboBoxStyle
+// (its Simple style, a list always shown under the field, is not offered).
+enum class ComboBoxStyle : std::uint8_t {
+    drop_down_list,  // the field shows the selected item and takes no text
+    drop_down,       // the field is a TextBox: any text, or an item from the list
+};
+
 class ComboBox final : public Panel {
 public:
     explicit ComboBox(StableId stable_id);
+    ~ComboBox() override;
 
     [[nodiscard]] std::span<const std::string> items() const noexcept {
         return items_;
@@ -47,6 +56,41 @@ public:
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
 
+    [[nodiscard]] ComboBoxStyle drop_down_style() const noexcept { return drop_down_style_; }
+    // Switching to drop_down creates the editor with the selected item's
+    // text; switching back removes it and keeps the selection. Either
+    // closes an open list.
+    void set_drop_down_style(ComboBoxStyle style);
+    // The field's text: the editor's in the drop_down style, the selected
+    // item's otherwise.
+    [[nodiscard]] std::string_view text() const noexcept;
+    // In the drop_down style, sets the editor's text and selects the item it
+    // equals (ignoring ASCII case), or clears the selection. In the
+    // drop_down_list style, selects the first item equal to `text`, or clears
+    // the selection. Invalid UTF-8 throws std::invalid_argument.
+    void set_text(std::string text);
+    // The field's TextBox in the drop_down style, and null otherwise.
+    [[nodiscard]] std::shared_ptr<TextBox> editor() const noexcept { return editor_; }
+
+    // Auto-complete for the drop_down style's editor, as Windows Forms'
+    // AutoCompleteMode, AutoCompleteSource and AutoCompleteCustomSource.
+    // list_items offers the items; custom_source the collection below; the
+    // host sources report unsupported (see TextBox). The settings are kept
+    // in the drop_down_list style, where nothing can be typed, and act when
+    // the style becomes drop_down.
+    [[nodiscard]] AutoCompleteMode auto_complete_mode() const noexcept { return auto_complete_mode_; }
+    void set_auto_complete_mode(AutoCompleteMode mode);
+    [[nodiscard]] AutoCompleteSource auto_complete_source() const noexcept {
+        return auto_complete_source_;
+    }
+    void set_auto_complete_source(AutoCompleteSource source);
+    // Never null; shared as TextBox's is. Null throws std::invalid_argument.
+    [[nodiscard]] const std::shared_ptr<AutoCompleteStringCollection>&
+    auto_complete_custom_source() const noexcept {
+        return auto_complete_custom_source_;
+    }
+    void set_auto_complete_custom_source(std::shared_ptr<AutoCompleteStringCollection> source);
+
     [[nodiscard]] Event<std::optional<std::size_t>>& selected_index_changed() noexcept {
         return selected_index_changed_;
     }
@@ -54,9 +98,15 @@ public:
         return drop_down_changed_;
     }
     [[nodiscard]] Event<>& items_changed() noexcept { return items_changed_; }
+    // Raised after text() changes, with the new text: in the drop_down
+    // style for every change of the editor's text, otherwise after the
+    // selection changes.
+    [[nodiscard]] Event<const std::string&>& text_changed() noexcept { return text_changed_; }
 
+    void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer(PointerEvent& event) override;
+    void on_key_preview(KeyEvent& event) override;
     void on_key(KeyEvent& event) override;
     void on_focus_changed(bool focused) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
@@ -110,6 +160,22 @@ private:
     void close_drop_down();
     void commit_popup_selection(std::size_t index);
     void on_popup_revoked();
+    void on_anchored_dismissal(PopupDismissReason reason);
+    // The drop_down style's editor: created, configured and removed with
+    // the style, observed through its text and focus events.
+    void create_editor();
+    void remove_editor();
+    void configure_editor_auto_complete();
+    void rebuild_list_items_source();
+    void editor_text_changed(const std::string& text);
+    void editor_focus_changed(bool focused);
+    // Selects the first item equal to the editor's text, ignoring ASCII case,
+    // or clears the selection; the text stays as typed.
+    void match_editor_text();
+    // Up, Down, Home or End: selects the previous, next, first or last
+    // item, counting from the first when nothing is selected. Returns false
+    // for another key or without items.
+    bool step_selection(std::uint32_t key);
 
     std::vector<std::string> items_;
     std::optional<std::size_t> selected_index_;
@@ -127,9 +193,22 @@ private:
     SubscriptionToken popup_activation_;
     SubscriptionToken popup_dismissal_;
     SubscriptionToken popup_revocation_;
+    ComboBoxStyle drop_down_style_{ComboBoxStyle::drop_down_list};
+    std::shared_ptr<TextBox> editor_;
+    SubscriptionToken editor_text_;
+    SubscriptionToken editor_focus_;
+    bool synchronizing_text_{};
+    // Set while this control moves the open list's row itself.
+    bool synchronizing_list_{};
+    AutoCompleteMode auto_complete_mode_{AutoCompleteMode::none};
+    AutoCompleteSource auto_complete_source_{AutoCompleteSource::none};
+    std::shared_ptr<AutoCompleteStringCollection> auto_complete_custom_source_;
+    // The items as candidates, for the list_items source; rebuilt with them.
+    std::shared_ptr<AutoCompleteStringCollection> list_items_source_;
     Event<std::optional<std::size_t>> selected_index_changed_;
     Event<bool> drop_down_changed_;
     Event<> items_changed_;
+    Event<const std::string&> text_changed_;
     bool closing_popup_{};
 };
 

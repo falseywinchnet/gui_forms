@@ -67,6 +67,21 @@ void example() {
 }
 }  // namespace doc_example_AnchoredPopupLayer_1
 
+namespace doc_example_AutoCompleteStringCollection_1 {
+void example() {
+    std::shared_ptr<gf::AutoCompleteStringCollection> towns =
+        std::make_shared<gf::AutoCompleteStringCollection>();
+    (*towns).add_range({"Dartmouth", "Dover", "Durham"});
+    std::shared_ptr<gf::TextBox> from =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.from"));
+    std::shared_ptr<gf::TextBox> to =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.to"));
+    (*from).set_auto_complete_custom_source(towns);
+    (*to).set_auto_complete_custom_source(towns);
+    (*towns).add("Derby");   // both fields offer it from now on
+}
+}  // namespace doc_example_AutoCompleteStringCollection_1
+
 namespace doc_example_BackgroundWorker_1 {
 struct Sums final {
     void work(gf::BackgroundWorkerTask& task) {
@@ -600,6 +615,22 @@ void example() {
     (*field.combo).set_items({"Compact", "Comfortable"});  // and now ""
 }
 }  // namespace doc_example_ComboBox_2
+
+namespace doc_example_ComboBox_3 {
+void example() {
+    std::shared_ptr<gf::ComboBox> band =
+        gf::make_control<gf::ComboBox>(gf::StableId("radio.band"));
+    (*band).set_items({"Long wave", "Medium wave", "Short wave"});
+    (*band).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*band).set_auto_complete_source(gf::AutoCompleteSource::list_items);
+    (*band).set_auto_complete_mode(gf::AutoCompleteMode::append);
+    gf::Window window(band, gf::Size{220.0, 30.0});
+    window.request_focus((*band).editor());
+    window.dispatch_text(gf::TextInputEvent{"m"});
+    // The field shows "medium wave" with "edium wave" selected, and the
+    // text equals the second item, so (*band).selected_index() is 1.
+}
+}  // namespace doc_example_ComboBox_3
 
 namespace doc_example_Command_1 {
 struct Document final : gf::Component {
@@ -2832,6 +2863,23 @@ void example() {
 }
 }  // namespace doc_example_TextBox_2
 
+namespace doc_example_TextBox_3 {
+void example() {
+    std::shared_ptr<gf::TextBox> city =
+        gf::make_control<gf::TextBox>(gf::StableId("address.city"));
+    (*(*city).auto_complete_custom_source()).add_range({"Calgary", "Cambridge", "Edmonton"});
+    (*city).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*city).set_auto_complete_mode(gf::AutoCompleteMode::suggest_append);
+    gf::Window window(city, gf::Size{240.0, 200.0});
+    window.request_focus(city);
+    window.dispatch_text(gf::TextInputEvent{"ca"});
+    // The box shows "calgary" with "lgary" selected, and the list offers
+    // Calgary and Cambridge.
+    window.dispatch_key(gf::KeyEvent{gf::KeyAction::down, gf::PhysicalKey::tab});
+    // Tab accepted the completion: the text is "calgary", the caret at its end.
+}
+}  // namespace doc_example_TextBox_3
+
 namespace doc_example_Timer_1 {
 struct Clock final : gf::Component {
     int ticks = 0;
@@ -3357,6 +3405,7 @@ int run(const char* name, void (*example)()) {
 int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
+    failures += run("AutoCompleteStringCollection example 1", &doc_example_AutoCompleteStringCollection_1::example);
     failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
@@ -3385,6 +3434,7 @@ int main() {
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
     failures += run("ComboBox example 2", &doc_example_ComboBox_2::example);
+    failures += run("ComboBox example 3", &doc_example_ComboBox_3::example);
     failures += run("Command example 1", &doc_example_Command_1::example);
     failures += run("Command example 2", &doc_example_Command_2::example);
     failures += run("CommandBar example 1", &doc_example_CommandBar_1::example);
@@ -3492,6 +3542,7 @@ int main() {
     failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
+    failures += run("TextBox example 3", &doc_example_TextBox_3::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
