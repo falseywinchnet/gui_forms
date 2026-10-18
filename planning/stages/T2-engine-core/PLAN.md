@@ -375,6 +375,7 @@ Tests:
 ## Notes for T4 (not questions)
 
 - **The bulge's shade field does not melt inside the bounds.** The rendering reference's shade ellipse is centred at (0.60, 0.64) with radii (0.50, 0.48), so it reaches 1.10 w and 1.12 h. At the middle of the bottom edge it is still at about 47 % of its peak. That matches "deepest at the lower right corner", but not §3.5's "melt back into the plane before the part's bounds". E1 implements the formula exactly, as the approved studies drew it. The specimen sheet settles which reading is right.
+- **The dithered bulge's deepest shaded step never appears with the default gains.** Sampled over the whole box, the tone of the reference fields runs from about −0.63 to +1.05 with lit, shade and crown gains of 1.0, 0.85 and 0.25. The third shaded step (`rgb(88, 122, 186)`) needs at least −0.68, so the light default shows three lit steps and only two shaded ones. The dark variant's gains (0.9, 1.0, 0.2) reach −0.80 and show all three. E1 implements the reference as written, and its tests record this. T4 may raise the shade gain if the owner wants the third step.
 - **Hover brightening is not part of E1's bulge primitives.** The studies use brightness 1.03–1.04 and saturation 1.15. This is a theme-level filter for E4 and E7.
 
 ## Gate
