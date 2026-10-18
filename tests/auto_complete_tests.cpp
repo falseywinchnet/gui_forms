@@ -457,6 +457,67 @@ void sources_and_refusals() {
     require(box.auto_complete_source_status().accepted(), "no source is not a failure");
 }
 
+// A host whose completion source answers with whatever the test gives it, to
+// pin how HostServices::query_auto_complete checks an adapter's answer.
+class CandidateServices final : public HostServices {
+public:
+    CandidateServices() : HostServices({HostCapabilities::current_protocol_version, "candidates", HostCapability::lifecycle}) {}
+    ~CandidateServices() override { shutdown(); }
+    std::vector<std::string> answer{};
+
+protected:
+    HostMonitorResult query_monitors_impl() override { return {{HostServiceError::unsupported}, {}}; }
+    HostServiceStatus set_cursor_impl(CursorKind) override { return {HostServiceError::unsupported}; }
+    HostServiceStatus set_pointer_capture_impl(bool, std::uint64_t) override { return {HostServiceError::unsupported}; }
+    HostClipboardTextResult read_clipboard_text_impl() override { return {}; }
+    HostServiceStatus write_clipboard_text_impl(std::string_view) override { return {HostServiceError::unsupported}; }
+    HostDialogResult show_dialog_impl(const HostDialogRequest&) override { return {}; }
+    HostServiceStatus play_sound_cue_impl(const HostSoundCueRequest&) override { return {HostServiceError::unsupported}; }
+    HostAutoCompleteResult query_auto_complete_impl(const HostAutoCompleteRequest&) override {
+        HostAutoCompleteResult result;
+        result.candidates_utf8 = answer;
+        return result;
+    }
+};
+
+// Characterization (house-style review of the window layer): an adapter's
+// accepted answer passes only with at most the request's maximum of
+// non-empty UTF-8 strings without NUL; anything else is backend_failure
+// with no candidates, and counts as a rejected request.
+void host_candidate_checks() {
+    CandidateServices services;
+    HostAutoCompleteRequest request{};
+    request.prefix_utf8 = "a";
+    request.maximum_candidates = 2U;
+    services.answer = {"alpha", "amber"};
+    const HostAutoCompleteResult accepted = services.query_auto_complete(request);
+    require(accepted.status.accepted() && accepted.candidates_utf8.size() == 2U &&
+                accepted.candidates_utf8[1] == "amber",
+            "valid host candidates are returned as given");
+    const std::uint64_t rejected_before = services.snapshot().rejected_requests;
+    services.answer = {"alpha", "amber", "apple"};
+    const HostAutoCompleteResult too_many = services.query_auto_complete(request);
+    require(too_many.status.error == HostServiceError::backend_failure && too_many.candidates_utf8.empty(),
+            "more candidates than the maximum are a backend failure with none returned");
+    services.answer = {"alpha", ""};
+    const HostAutoCompleteResult empty = services.query_auto_complete(request);
+    require(empty.status.error == HostServiceError::backend_failure && empty.candidates_utf8.empty(),
+            "an empty candidate is a backend failure");
+    services.answer = {std::string("al\0pha", 6U)};
+    const HostAutoCompleteResult nul = services.query_auto_complete(request);
+    require(nul.status.error == HostServiceError::backend_failure && nul.candidates_utf8.empty(),
+            "a candidate with NUL is a backend failure");
+    services.answer = {std::string("a\xFF", 2U)};
+    const HostAutoCompleteResult invalid = services.query_auto_complete(request);
+    require(invalid.status.error == HostServiceError::backend_failure && invalid.candidates_utf8.empty(),
+            "a candidate that is not UTF-8 is a backend failure");
+    require(services.snapshot().rejected_requests == rejected_before + 4U,
+            "each refused answer counts as one rejected request");
+    request.prefix_utf8 = std::string_view("\xFF", 1U);
+    const HostAutoCompleteResult bad_prefix = services.query_auto_complete(request);
+    require(bad_prefix.status.error == HostServiceError::invalid_utf8, "a prefix that is not UTF-8 is refused");
+}
+
 void inactive_boxes() {
     Fixture fixture = make_fixture("ac.inactive", AutoCompleteMode::suggest_append);
     Window& window = *fixture.window;
@@ -700,6 +761,7 @@ int main() {
     composition_is_never_completed();
     pointer_and_dismissal();
     sources_and_refusals();
+    host_candidate_checks();
     inactive_boxes();
     paste_suggests_without_appending();
     combo_drop_down_style();
