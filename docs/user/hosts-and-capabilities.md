@@ -185,6 +185,25 @@ windows meant to stay separate, behave as before (a `Button` still refuses
 an `ImageList` from a window that does not share its registry). The shared
 registry lives until its last window, or other holder, releases it.
 
+### Changing several windows at once, and dragging a window
+
+`WorkspaceTransaction` makes one coherent change across windows (stage DK
+decision 9): `include` holds an update scope on each window it changes,
+`open_window` creates windows hidden, `destroy_window`, `show_window` and
+`defer_notification` queue their work, and `commit` (or the destructor)
+lays out each window once, shows the new windows, then destroys the emptied
+ones, then runs the notifications once, in order. A panel moving between
+two windows is never invisible and observers see only the finished state.
+
+`WindowFrameDrag` is the framework's own capture drag of a window by a drawn
+caption (decision 12): every pointer move reads the desktop pointer and
+requests the window's frame, so other windows can follow the pointer, and
+`cancel` puts the window back. `WindowFrameDrag::mode_for` gives
+`native_move_loop` on a host without window frames, the desktop pointer or
+pointer capture; the caller then starts the platform's move loop from a
+drag region. The drag's statistics say whether the host kept up; per-host
+measurements belong in `results/2026-10-18-dk-w0-capture-drag/`.
+
 ### Floating windows
 
 `ApplicationWindow::floating` makes a window a floating tool panel

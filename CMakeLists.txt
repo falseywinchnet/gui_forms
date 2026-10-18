@@ -103,6 +103,8 @@ endif()
 
 add_library(gui_forms_core STATIC
     src/core/application/application.cpp
+    src/core/application/window_frame_drag.cpp
+    src/core/application/workspace_transaction.cpp
     src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
     src/core/binding/value/property_collection_value/property_collection_value.cpp
@@ -2040,6 +2042,10 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
         add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
+        # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
+        # puts windows on the desktop, so it is built but never run by ctest.
+        add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
+        target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)
         add_executable(gui_forms_linux_host_tests tests/linux_host_tests.cpp)
@@ -2650,6 +2656,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_shared_resources_tests tests/shared_resources_tests.cpp)
     target_link_libraries(gui_forms_shared_resources_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_shared_resources_tests COMMAND gui_forms_shared_resources_tests)
+    add_executable(gui_forms_workspace_transaction_tests tests/workspace_transaction_tests.cpp)
+    target_link_libraries(gui_forms_workspace_transaction_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_workspace_transaction_tests COMMAND gui_forms_workspace_transaction_tests)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}

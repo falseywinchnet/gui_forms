@@ -185,6 +185,10 @@ Related types
      -  
    * - :cpp:class:`WindowChromeRegionValidation <gui_forms::WindowChromeRegionValidation>`
      -  
+   * - :cpp:class:`WindowFrameDrag <gui_forms::WindowFrameDrag>`
+     - The framework's capture drag of one native window.
+   * - :cpp:class:`WindowFrameDragStatistics <gui_forms::WindowFrameDragStatistics>`
+     - What a drag achieved, for the per-host measurement (results/).
    * - :cpp:class:`WindowsApplicationOptions <gui_forms::host::WindowsApplicationOptions>`
      -  
    * - :cpp:class:`WindowsApplicationWindow <gui_forms::host::WindowsApplicationWindow>`
@@ -193,6 +197,10 @@ Related types
      - WindowsCompatibilityPaintEndpoint is a shared move-only façade over a RasterControl live surface, staging DC, generational writes, invalidation, submission, drain, and retirement.
    * - :cpp:class:`WindowsHostOptions <gui_forms::host::WindowsHostOptions>`
      - WindowsHostOptions declares initial Win32 title, client geometry, display scale, instance, show state, and run policy.
+   * - :cpp:class:`WorkspaceTransaction <gui_forms::WorkspaceTransaction>`
+     - One coherent change across several windows of a run (stage DK decision 9, docking study 5.3): a move that empties one window and fills another lays out each window once, never shows a half-moved state, and tells observers once, at the end.
+   * - :cpp:class:`WorkspaceTransactionResult <gui_forms::WorkspaceTransactionResult>`
+     -  
 
 .. cpp:namespace:: gui_forms
 
@@ -2084,6 +2092,91 @@ Related types
 
    .. cpp:member:: std::string stable_id
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: WindowFrameDrag final
+
+   ``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
+
+   The framework's capture drag of one native window. The caption control that owns the drag calls begin on pointer down (with the pointer captured), move on every pointer move, end on pointer up and cancel on Escape or capture loss. Positions come from the desktop pointer, not from the event's client position, because the window moves under the pointer. Every member runs on the run's UI thread. The drag holds a weak handle and a subscription to the run's frame reports; both end with the drag.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: WindowFrameDrag() noexcept = default
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool active() const noexcept
+
+   .. cpp:function:: const WindowFrameDragStatistics& statistics() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static WindowFrameDragMode mode_for(const HostCapabilities& capabilities) noexcept
+
+      framework_capture when the host reports window_frames, screen_pointer and pointer_capture; native_move_loop otherwise.
+
+   .. cpp:function:: HostServiceStatus begin(const ApplicationWindowHandle& window, std::uint64_t timestamp_nanoseconds)
+
+      Starts dragging ``window`` from the pointer's current desktop position. unsupported when mode_for gives native_move_loop (the caller then starts the native loop); invalid_argument while a drag is active.
+
+   .. cpp:function:: HostServiceStatus move(std::uint64_t timestamp_nanoseconds)
+
+      Requests the frame that keeps the pointer's grab offset. Moves that do not change the target request nothing.
+
+   .. cpp:function:: void end(std::uint64_t timestamp_nanoseconds) noexcept
+
+      Ends the drag where the window is.
+
+   .. cpp:function:: HostServiceStatus cancel(std::uint64_t timestamp_nanoseconds)
+
+      Ends the drag and asks for the frame the window had when it began.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: WindowFrameDragStatistics final
+
+   ``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
+
+   What a drag achieved, for the per-host measurement (results/). Timestamps are the caller's monotonic clock, in nanoseconds.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: double duration_seconds() const noexcept
+
+   .. cpp:function:: double achieved_rate_hz() const noexcept
+
+      Frame reports per second over the drag; 0 for a drag without duration.
+
+   .. cpp:function:: double pointer_rate_hz() const noexcept
+
+      Pointer moves per second over the drag.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: bool keeps_up(double minimum_rate_hz = 30.0) const noexcept
+
+      Whether the window kept up: it moved for at least 90% of the pointer moves, or at ``minimum_rate_hz`` or more when the pointer moved faster than that. A host that does not keep up uses the native move loop.
+
+   .. cpp:member:: std::uint64_t pointer_moves
+
+   .. cpp:member:: std::uint64_t frame_requests
+
+   .. cpp:member:: std::uint64_t refused_requests
+
+   .. cpp:member:: std::uint64_t frame_reports
+
+      Frame reports of the dragged window received during the drag.
+
+   .. cpp:member:: std::uint64_t first_timestamp_nanoseconds
+
+   .. cpp:member:: std::uint64_t last_timestamp_nanoseconds
+
 .. cpp:namespace:: gui_forms::host
 
 .. cpp:struct:: WindowsApplicationOptions final
@@ -2237,6 +2330,66 @@ Related types
    .. cpp:member:: std::function<void()> closed
 
    .. cpp:member:: std::function<void(std::string_view metrics_json, std::string_view host_json)> final_snapshot
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: WorkspaceTransaction final
+
+   ``#include <gui_forms/application/workspace_transaction/workspace_transaction.hpp>``
+
+   One coherent change across several windows of a run (stage DK decision 9, docking study 5.3): a move that empties one window and fills another lays out each window once, never shows a half-moved state, and tells observers once, at the end. While the transaction is open, every included window holds an update scope, so its layout waits; windows opened through the transaction are created hidden and included; shows, destructions and notifications are queued. commit() then runs, in this order: 1. close the update scopes, in inclusion order: each window lays out once; 2. show the windows queued for showing (opened visible, or show_window), without activating them; 3. destroy the windows queued for destruction, so a panel moving between two windows is never invisible; 4. run the queued notifications once each, in the order queued. A notification that changes windows starts a transaction of its own. The destructor commits a transaction left open. Every member runs on the run's UI thread. The transaction borrows the included Window models; a window destroyed through the transaction is destroyed only after its scope closed, and the hosts release a model no earlier than the end of the turn in which its window closed.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit WorkspaceTransaction(ApplicationWindows windows)
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: bool open() const noexcept
+
+   .. cpp:function:: void include(Window& window)
+
+      Defers ``window``'s layout to the commit. Including a window twice changes nothing. std::logic_error after commit.
+
+   .. cpp:function:: ApplicationWindowOpenResult open_window(ApplicationWindow&& entry)
+
+      Opens a window, hidden, and includes its model. It is shown at the commit when ``entry.options.initially_visible`` was true. The refusals are ApplicationWindows::open_window's.
+
+   .. cpp:function:: HostServiceStatus show_window(const ApplicationWindowHandle& window)
+
+      Shows ``window`` at the commit, after every window has laid out.
+
+   .. cpp:function:: HostServiceStatus destroy_window(const ApplicationWindowHandle& window)
+
+      Destroys ``window`` at the commit, after the windows to show are shown. The refusals are ApplicationWindows::destroy_window's, met at commit.
+
+   .. cpp:function:: void defer_notification(std::function<void()> notification)
+
+      Runs ``notification`` once at the commit, after the windows are shown and destroyed. std::invalid_argument for an empty callable.
+
+   .. cpp:function:: WorkspaceTransactionResult commit()
+
+      Carries out the transaction. A second commit returns an empty result.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: WorkspaceTransactionResult final
+
+   ``#include <gui_forms/application/workspace_transaction/workspace_transaction.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+      The first refusal met while committing; the commit still carries out every later step.
+
+   .. cpp:member:: std::size_t windows_laid_out
+
+   .. cpp:member:: std::size_t windows_shown
+
+   .. cpp:member:: std::size_t windows_destroyed
+
+   .. cpp:member:: std::size_t notifications
 
 Enumerations
 ------------
@@ -2629,8 +2782,24 @@ Enumerations
 
    .. cpp:enumerator:: unresolved_id
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: WindowFrameDragMode
+
+   ``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
+
+   .. cpp:enumerator:: framework_capture
+
+   .. cpp:enumerator:: native_move_loop
+
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/application/window_frame_drag/window_frame_drag.hpp>``
+
+.. cpp:function:: const char* window_frame_drag_mode_name(WindowFrameDragMode mode) noexcept
 
 .. cpp:namespace:: gui_forms
 
