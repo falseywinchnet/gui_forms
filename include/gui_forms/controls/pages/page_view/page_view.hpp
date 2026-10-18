@@ -32,18 +32,19 @@ private:
     Control::Ptr control_;
 };
 
-// What Ctrl+Tab and Ctrl+Shift+Tab do while focus is inside the view (owner
-// decisions DK-30 and DK-38): select the next or previous page (a view on
-// its own), or pass the key on (a view inside docking, whose navigator
-// takes it). Ctrl+PageDown and Ctrl+PageUp select in every view.
+// What Ctrl+Tab and Ctrl+Shift+Tab (the cycle_forward and cycle_backward key
+// commands) do while focus is inside the view (owner decisions DK-30 and
+// DK-38): select the next or previous page (a view on its own), or pass the
+// key on (a view inside docking, whose navigator takes it). Ctrl+PageDown and
+// Ctrl+PageUp select in every view.
 enum class PageViewCtrlTab : std::uint8_t { select_next, pass };
 
 // The presentation a view starts from (owner decision DK-15). `strip`:
 // content-sized tabs, scroll and list overflow, mnemonics, no close buttons,
-// selection after a close by neighbour. `document` (DK-31, DK-38): close
-// buttons on the selected and hot tabs, shrink then list overflow, no
-// mnemonics (titles are data), selection after a close by most recent
-// activation. The navigation preset is phase P8's.
+// selection after a close by neighbour, no live reorder. `document` (DK-31,
+// DK-38, DK-39): close buttons on the selected and hot tabs, shrink then
+// list overflow, no mnemonics (titles are data), live reorder by dragging,
+// selection after a close by most recent activation. The navigation preset is phase P8's.
 enum class PageViewPreset : std::uint8_t { strip, document };
 
 // What a view does with a close request no handler took (owner decision
@@ -78,8 +79,9 @@ struct PageContentRequest final {
 // when the view is made; they may be changed on the strip afterwards.
 //
 // Closing (owner decision DK-38): the strip raises `page_close_requested`
-// for the close button, a middle click, Ctrl+F4 and the semantic close
-// action; Ctrl+F4 is handled anywhere inside the view, as Ctrl+PageDown is.
+// for the close button, a middle click, Ctrl+F4 (Cmd+W on macOS: the
+// close_document key command) and the semantic close action; the command
+// is handled anywhere inside the view, as Ctrl+PageDown is.
 // When no handler sets `handled`, the close policy decides. Removing the
 // selected page selects another by the set's fallback.
 //

@@ -439,6 +439,10 @@ public:
         std::string_view utf8, FontSpec effective) const;
     [[nodiscard]] double snap_text_baseline(double logical_baseline) const noexcept;
     [[nodiscard]] const Theme& effective_theme() const noexcept;
+    // The attached window's key map (Window::key_map), or the PC
+    // convention's while detached. A control asks it whether a key event is
+    // a named keyboard command instead of naming the keys itself.
+    [[nodiscard]] const KeyMap& effective_key_map() const noexcept;
     [[nodiscard]] std::shared_ptr<const Theme> theme_override() const noexcept {
         return theme_override_;
     }

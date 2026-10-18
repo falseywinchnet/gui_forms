@@ -87,6 +87,12 @@ gui_forms::PageStrip
          page and focus its tab, and the marker is not shown. When off, titles are
          shown exactly as written.
 
+      **reorder_enabled** : ``bool``, default ``false``
+         Whether an unclaimed drag of a tab reorders it live within its group:
+         the dragged tab follows the pointer and the tabs it passes slide aside.
+         :cpp:class:`PageView <gui_forms::PageView>`'s document preset turns it on. Turning it off ends a drag
+         under way with nothing moved.
+
       **font** : ``FontSpec``
          The tab label font.
 
@@ -119,6 +125,12 @@ gui_forms::PageStrip
          The list's rows while it is open, one per page in order; the rows of
          pages without a tab are italic.
 
+      **dragged_page** : ``std::optional<PageId>``, read-only
+         The page whose tab is being slid in a live reorder, or none.
+
+      **insertion_mark** : ``std::optional<PagePosition>``, read-only
+         The gap the insertion mark shows, or none.
+
       **parts** : ``Parts``, read-only
 
       **realized_items** : ``std::vector<Item>``, read-only
@@ -135,8 +147,9 @@ gui_forms::PageStrip
       **page_close_requested** : ``Event<PageCloseRequest&>``
          Raised once when a closable page's close is asked for: by its close
          button (cause ``pointer``), a middle click released over the tab it
-         pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
-         or the accessibility ``close`` action (``semantic``). The strip never
+         pressed (``middle_button``), Ctrl+F4 (Cmd+W on macOS) on the selected
+         page (``keyboard``) or the accessibility ``close`` action
+         (``semantic``). The strip never
          removes the page: the set's owner decides, and sets ``handled`` when it
          acts or refuses. A :cpp:class:`PageView <gui_forms::PageView>` removes a page nobody handled unless its
          close policy is ``request_only``.
@@ -144,6 +157,26 @@ gui_forms::PageStrip
       **page_pin_requested** : ``Event<PagePinRequest&>``
          Raised when a pinned tab's pin is clicked, asking to unpin the page. When
          no handler sets ``handled`` the strip unpins it in the set.
+
+      **page_drag_started** : ``Event<PageDragStart&>``
+         Raised once when a press on a tab moves 4 logical units or more along
+         either axis, with the page, the press point and the pointer (window
+         coordinates). An owner that takes the drag over, such as a docking
+         workspace, sets ``claimed``: the strip then releases the pointer capture
+         (unless the owner has already taken it) and does nothing more with the
+         press; it never reorders.
+
+      **page_context_menu_requested** : ``Event<PageContextMenuRequest&>``
+         Raised when a secondary click is released over the tab it pressed (at
+         the pointer, selecting nothing) or Shift+F10 or the context-menu key is
+         pressed on the keyboard's tab (at the tab's corner on the content's side
+         where reading starts).
+         The strip shows no menu of its own; a handler that shows one sets
+         ``handled``.
+
+      **page_double_clicked** : ``Event<const PageDoubleClick&>``
+         Raised on the second press of a double click on a tab's body, after the
+         press selected the page; never for its close button or pin.
 
    :Inherited:
 
@@ -175,6 +208,16 @@ gui_forms::PageStrip
         - Moves the selected page one place later (+1) or earlier (-1) within its group, the pinned pages or the ordinary ones; false at the group's end.
       * - :cpp:func:`request_close <gui_forms::PageStrip::request_close>`
         - Raises :cpp:func:`page_close_requested <gui_forms::PageStrip::page_close_requested>` for a closable page with the given cause; true when the request was handled (by a handler, or by the owning view's removal).
+      * - :cpp:func:`cancel_drag <gui_forms::PageStrip::cancel_drag>`
+        - Ends a live reorder with nothing moved, as Escape does; false when none is under way.
+      * - :cpp:func:`insertion_position_at <gui_forms::PageStrip::insertion_position_at>`
+        - The gap an ordinary page dropped at a point would take, as a position in the current order: before the first laid-out tab whose middle lies after the point, else after the last; never inside the pinned group; none outside the strip.
+      * - :cpp:func:`show_insertion_mark <gui_forms::PageStrip::show_insertion_mark>`
+        - Shows the insertion mark at a gap until it is cleared or the set's pages or order change; false, showing nothing, for a gap beyond the set or not between laid-out tabs.
+      * - :cpp:func:`clear_insertion_mark <gui_forms::PageStrip::clear_insertion_mark>`
+        - Removes the insertion mark.
+      * - :cpp:func:`tab_parts_of <gui_forms::PageStrip::tab_parts_of>`
+        - One page's tab parts, in the strip's coordinates and with their part states, as :cpp:func:`realized_items <gui_forms::PageStrip::realized_items>` publishes them; all absent when the page is not in the set or its tab is not laid out.
       * - :cpp:func:`tab_identity <gui_forms::PageStrip::tab_identity>`
         - The accessibility identity of a page's tab.
 
@@ -204,6 +247,17 @@ gui_forms::PageStrip
    cancelled selection moves nothing. A hidden page selected any other way (a
    key, a program) is shown in the last place without being moved.
 
+   Dragging. A press on a tab arms a drag; past the threshold the strip raises
+   :cpp:func:`page_drag_started <gui_forms::PageStrip::page_drag_started>`. A claimed drag belongs to the claimant. Otherwise,
+   with :cpp:func:`reorder_enabled <gui_forms::PageStrip::reorder_enabled>`, the tab follows the pointer within the visible run
+   of its group (the pinned tabs or the ordinary ones), carrying the tab state
+   ``captured``, and takes the place of the furthest tab of the group whose
+   middle its own middle has reached; the release moves the page there with
+   one :cpp:class:`PageSet <gui_forms::PageSet>` move, so a drag never crosses the pinned boundary. Escape,
+   the strip losing focus, turning reordering off, or a change to the set's
+   pages or order ends the drag with nothing moved. Under ``shrink_then_list``
+   the selected page shown after the front run does not slide.
+
    Document features. A closable tab shows its close button by the
    :cpp:func:`close_buttons <gui_forms::PageStrip::close_buttons>` rule, with a plate while the pointer is on it; pressing it
    selects nothing and the request is raised on the release over the same
@@ -214,15 +268,21 @@ gui_forms::PageStrip
    pointer; a resize or a setting also thaws them. A pinned page with an image
    shows only its icon until the pointer is over it, then its full width with
    its pin in the close button's place; a pinned page without an image keeps
-   its label. Ctrl+F4 asks to close the selected page; Delete closes nothing.
+   its label. Ctrl+F4 (Cmd+W on macOS) asks to close the selected page; Delete
+   closes nothing.
 
    A press on a tab selects first and then focuses the strip. The order of
    events is the set's ``selecting``, its ``selected_page_changed``, then
    :cpp:func:`page_invoked <gui_forms::PageStrip::page_invoked>`; a cancelled selection raises nothing more and leaves the
    keyboard's tab where it was. Ctrl+PageDown and Ctrl+PageUp select the next
    and previous page while the strip has focus, and Ctrl+Shift+PageDown and
-   Ctrl+Shift+PageUp move the selected page within its group. The macOS
-   Command+W is not bound: the framework has no host keymap defaults yet.
+   Ctrl+Shift+PageUp move the selected page within its group, and Shift+F10 or
+   the context-menu key asks for the keyboard's tab's context menu. These keys
+   are the window's named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`: ``close_document``,
+   ``next_tab``, ``previous_tab``, ``move_tab_later``, ``move_tab_earlier``,
+   ``context_menu``), so they follow the host's convention and an
+   application's ``Window::rebind_key_command``; the arrows, Home, End, Space,
+   Enter and Escape are the strip's own.
 
    Every page is published to accessibility as a tab of the strip's tab list
    (role ``tab_group``, horizontal, or vertical on a side strip): those scrolled out of view are published
@@ -241,9 +301,11 @@ gui_forms::PageStrip
    pressed), ``tab_pin`` and ``tab_pin_glyph`` (hot, pressed, and checked for
    the pinned drawing), ``tab_seam`` (the selected tab only) and ``tab_focus``;
    at most one of the dot, the close button and the pin is present. Tabs have
-   the states hot, pressed, selected, disabled and focus-visible, and the
-   custom states ``pinned`` and ``modified``. The list button's count is the
-   part ``list_count``. They are painted through the by-role paint path with
+   the states hot, pressed, captured (dragged), selected, disabled and
+   focus-visible, and the custom states ``pinned`` and ``modified``. The list
+   button's count is the part ``list_count``, and the gap bar shown by
+   :cpp:func:`show_insertion_mark <gui_forms::PageStrip::show_insertion_mark>` the part ``insertion_mark`` (role ``drop``, state
+   drop-accepted). They are painted through the by-role paint path with
    the menu-item family, flat at rest, until the default theme draws the tab
    stack and the notched document tab. Painting reads a layout cached between
    changes and allocates nothing per tab.
@@ -362,6 +424,17 @@ gui_forms::PageStrip
 
       Sets :cpp:func:`mnemonics_enabled <gui_forms::PageStrip::mnemonics_enabled>`; see the property's description above.
 
+   .. cpp:function:: bool reorder_enabled() const noexcept
+
+      Whether an unclaimed drag of a tab reorders it live within its group:
+      the dragged tab follows the pointer and the tabs it passes slide aside.
+      :cpp:class:`PageView <gui_forms::PageView>`'s document preset turns it on. Turning it off ends a drag
+      under way with nothing moved.
+
+   .. cpp:function:: void set_reorder_enabled(bool enabled)
+
+      Sets :cpp:func:`reorder_enabled <gui_forms::PageStrip::reorder_enabled>`; see the property's description above.
+
    .. cpp:function:: FontSpec font() const noexcept
 
       The tab label font.
@@ -411,6 +484,14 @@ gui_forms::PageStrip
       The list's rows while it is open, one per page in order; the rows of
       pages without a tab are italic.
 
+   .. cpp:function:: std::optional<PageId> dragged_page() const
+
+      The page whose tab is being slid in a live reorder, or none.
+
+   .. cpp:function:: std::optional<PagePosition> insertion_mark() const noexcept
+
+      The gap the insertion mark shows, or none.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Item> realized_items() const
@@ -431,8 +512,9 @@ gui_forms::PageStrip
 
       Raised once when a closable page's close is asked for: by its close
       button (cause ``pointer``), a middle click released over the tab it
-      pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
-      or the accessibility ``close`` action (``semantic``). The strip never
+      pressed (``middle_button``), Ctrl+F4 (Cmd+W on macOS) on the selected
+      page (``keyboard``) or the accessibility ``close`` action
+      (``semantic``). The strip never
       removes the page: the set's owner decides, and sets ``handled`` when it
       acts or refuses. A :cpp:class:`PageView <gui_forms::PageView>` removes a page nobody handled unless its
       close policy is ``request_only``.
@@ -441,6 +523,29 @@ gui_forms::PageStrip
 
       Raised when a pinned tab's pin is clicked, asking to unpin the page. When
       no handler sets ``handled`` the strip unpins it in the set.
+
+   .. cpp:function:: Event<PageDragStart&>& page_drag_started() noexcept
+
+      Raised once when a press on a tab moves 4 logical units or more along
+      either axis, with the page, the press point and the pointer (window
+      coordinates). An owner that takes the drag over, such as a docking
+      workspace, sets ``claimed``: the strip then releases the pointer capture
+      (unless the owner has already taken it) and does nothing more with the
+      press; it never reorders.
+
+   .. cpp:function:: Event<PageContextMenuRequest&>& page_context_menu_requested() noexcept
+
+      Raised when a secondary click is released over the tab it pressed (at
+      the pointer, selecting nothing) or Shift+F10 or the context-menu key is
+      pressed on the keyboard's tab (at the tab's corner on the content's side
+      where reading starts).
+      The strip shows no menu of its own; a handler that shows one sets
+      ``handled``.
+
+   .. cpp:function:: Event<const PageDoubleClick&>& page_double_clicked() noexcept
+
+      Raised on the second press of a double click on a tab's body, after the
+      press selected the page; never for its close button or pin.
 
 
    .. rubric:: Methods
@@ -493,6 +598,32 @@ gui_forms::PageStrip
       true when the request was handled (by a handler, or by the owning view's
       removal). A page that is not in the set or not closable raises nothing.
 
+   .. cpp:function:: bool cancel_drag()
+
+      Ends a live reorder with nothing moved, as Escape does; false when none
+      is under way.
+
+   .. cpp:function:: std::optional<PagePosition> insertion_position_at(Point window_point) const
+
+      The gap an ordinary page dropped at a point would take, as a position in
+      the current order: before the first laid-out tab whose middle lies after
+      the point, else after the last; never inside the pinned group; none
+      outside the strip.
+
+   .. cpp:function:: bool show_insertion_mark(PagePosition gap)
+
+      Shows the insertion mark at a gap until it is cleared or the set's pages
+      or order change; false, showing nothing, for a gap beyond the set or not
+      between laid-out tabs.
+
+   .. cpp:function:: void clear_insertion_mark() noexcept
+
+      Removes the insertion mark.
+
+   .. cpp:function:: ItemParts tab_parts_of(const PageId& page) const
+
+      One page's tab parts, in the strip's coordinates and with their part states, as :cpp:func:`realized_items <gui_forms::PageStrip::realized_items>` publishes them; all absent when the page is not in the set or its tab is not laid out. For an owner that publishes the tabs under its own anatomy (TabControl).
+
    .. cpp:function:: std::string tab_identity(const PageId& page) const
 
       The accessibility identity of a page's tab.
@@ -537,6 +668,12 @@ gui_forms::PageStrip
       *Protected.*
 
       Called by :cpp:func:`request_close <gui_forms::PageStrip::request_close>` after the handlers when none set ``handled``. A strip alone does nothing; PageView's strip applies the view's close policy and sets ``handled`` when it removed the page.
+
+   .. cpp:function:: virtual ControlVisualRole tab_family() const noexcept
+
+      *Protected.*
+
+      The recipe family the tabs and their buttons are painted in: ``menu_item`` (flat at rest) until stage T4 draws the tab stack. TabControl's strip answers its appearance (buttons, flat buttons).
 
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
 

@@ -73,8 +73,9 @@ struct PageInvocation final {
 };
 
 // Why a page's close was asked for: the close button (`pointer`), a middle
-// click released over the tab it pressed (`middle_button`), Ctrl+F4
-// (`keyboard`), or the accessibility close action (`semantic`).
+// click released over the tab it pressed (`middle_button`), the
+// close_document key command (`keyboard`: Ctrl+F4, Cmd+W on macOS), or the
+// accessibility close action (`semantic`).
 enum class PageCloseCause : std::uint8_t { pointer, middle_button, keyboard, semantic };
 
 // A request to close a closable page. The strip never removes a page itself:
@@ -96,6 +97,45 @@ struct PagePinRequest final {
     PageId page{};
     bool pinned{};
     bool handled{};
+};
+
+// How far a press on a tab must move, along either axis and in logical
+// units, before it becomes a drag (owner decision DK-26).
+inline constexpr double page_drag_threshold = 4.0;
+
+// A press on a tab moved past the drag threshold (owner decision DK-39,
+// PageView study I9). An owner that takes the drag over (a docking
+// workspace) sets `claimed`: the strip then gives up the pointer capture,
+// unless the owner has already taken it, and does nothing more with this
+// press; it never reorders. Unclaimed, the strip reorders live when
+// reordering is enabled. Both points are in window coordinates.
+struct PageDragStart final {
+    PageId page{};
+    Point press_point{};
+    Point pointer{};
+    bool claimed{};
+};
+
+// Why a tab's context menu was asked for: a secondary click released over
+// the tab it pressed (`pointer`), or the context_menu key command (Shift+F10
+// or the context-menu key) on the keyboard's tab (`keyboard`).
+enum class PageContextMenuCause : std::uint8_t { pointer, keyboard };
+
+// A request for a tab's context menu (PageView study I11). The strip shows
+// no menu of its own; a handler that shows one sets `handled`. `anchor` is
+// in window coordinates: the pointer, or for the keyboard the corner of the
+// tab on the content's side where reading starts.
+struct PageContextMenuRequest final {
+    PageId page{};
+    Point anchor{};
+    PageContextMenuCause cause{PageContextMenuCause::pointer};
+    bool handled{};
+};
+
+// The second press of a double click landed on a tab's body (not its close
+// button or pin), after the press selected the page (PageView study I12).
+struct PageDoubleClick final {
+    PageId page{};
 };
 
 // The headers of one PageSet in a single row (owner decisions DK-13, DK-17,
@@ -127,8 +167,8 @@ struct PagePinRequest final {
 //
 // Document features (owner decision DK-38, interview P16 to P26): a close
 // button on closable tabs (see PageCloseButtons) with a plate while hot; a
-// middle click released over the tab it pressed closes it; Ctrl+F4 closes the
-// selected closable page (Delete does not); every close is a
+// middle click released over the tab it pressed closes it; Ctrl+F4 (Cmd+W on
+// macOS) closes the selected closable page (Delete does not); every close is a
 // `page_close_requested`. A tab whose page is `modified` shows a dot in the
 // close button's place, replaced by the close button while the tab is hot.
 // After a close by the pointer the tabs keep their widths until the pointer
@@ -137,6 +177,24 @@ struct PagePinRequest final {
 // then their full width; their pin glyph replaces the close button and
 // asks to unpin. Ctrl+Shift+PageDown and Ctrl+Shift+PageUp move the
 // selected page within its group.
+//
+// Keys: the strip's commands are the window's named keyboard commands
+// (KeyCommand, owner decision DK-30), so a host's convention and an
+// application's rebinding reach it: close_document, next_tab and
+// previous_tab, move_tab_later and move_tab_earlier, context_menu. The
+// keys of moving between tabs (the arrows along the row, Home, End, Space
+// and Enter under manual activation) and Escape ending a drag are the
+// strip's own.
+//
+// Dragging (owner decision DK-39): a press on a tab that moves past
+// `page_drag_threshold` raises `page_drag_started`. A claimed drag belongs to
+// its claimant. Otherwise, while reordering is enabled, the dragged tab
+// follows the pointer within its group's visible run and the tabs it passes
+// slide aside; the release moves the page there with one PageSet::move, so a
+// drag never crosses the pinned boundary; Escape, the strip losing focus, or
+// a change to the set's order or pages ends it with nothing moved.
+// `insertion_position_at` and the insertion mark serve a claimant that drops
+// a page into the strip.
 //
 // Event order for a press on an unselected tab: the set's `selecting`, its
 // `selected_page_changed`, then `page_invoked`; then the strip takes focus.
@@ -175,6 +233,11 @@ public:
     // shown as written.
     [[nodiscard]] bool mnemonics_enabled() const noexcept { return mnemonics_enabled_; }
     void set_mnemonics_enabled(bool enabled);
+    // Whether an unclaimed drag reorders tabs live (owner decision DK-39):
+    // off by default, the strip preset; PageView's document preset turns it
+    // on.
+    [[nodiscard]] bool reorder_enabled() const noexcept { return reorder_enabled_; }
+    void set_reorder_enabled(bool enabled);
     [[nodiscard]] FontSpec font() const noexcept { return font_; }
     void set_font(FontSpec font);
     // The images a page's `image_key` names. Throws std::invalid_argument for
@@ -231,11 +294,36 @@ public:
     // which raises nothing, and when nobody handled it.
     bool request_close(const PageId& page, PageCloseCause cause);
 
+    // The page whose tab the strip is sliding in a live reorder, or none.
+    [[nodiscard]] std::optional<PageId> dragged_page() const;
+    // Ends a live reorder with nothing moved, as Escape does. False when none
+    // is under way.
+    bool cancel_drag();
+    // The gap an ordinary page dropped at `window_point` would take, as a
+    // position in the current order: the position of the first laid-out tab
+    // whose middle lies after the point, else one past the last laid-out
+    // tab; never inside the pinned group. None outside the strip. Under
+    // `shrink_then_list` the selected page shown after the front run counts
+    // for nothing.
+    [[nodiscard]] std::optional<PagePosition> insertion_position_at(Point window_point) const;
+    // Shows the insertion mark (the `insertion_mark` part) at a gap, until
+    // `clear_insertion_mark` or a change to the set's pages or order. False,
+    // showing nothing, when the gap is beyond the set or not between laid-out
+    // tabs.
+    bool show_insertion_mark(PagePosition gap);
+    void clear_insertion_mark() noexcept;
+    [[nodiscard]] std::optional<PagePosition> insertion_mark() const noexcept { return insertion_gap_; }
+
     [[nodiscard]] Event<const PageInvocation&>& page_invoked() noexcept { return page_invoked_; }
     [[nodiscard]] Event<PageCloseRequest&>& page_close_requested() noexcept {
         return page_close_requested_;
     }
     [[nodiscard]] Event<PagePinRequest&>& page_pin_requested() noexcept { return page_pin_requested_; }
+    [[nodiscard]] Event<PageDragStart&>& page_drag_started() noexcept { return page_drag_started_; }
+    [[nodiscard]] Event<PageContextMenuRequest&>& page_context_menu_requested() noexcept {
+        return page_context_menu_requested_;
+    }
+    [[nodiscard]] Event<const PageDoubleClick&>& page_double_clicked() noexcept { return page_double_clicked_; }
 
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
@@ -265,6 +353,8 @@ public:
         // The count of hidden pages on the list button (`shrink_then_list`).
         PartGeometry list_count;
         PartGeometry list_glyph;
+        // The gap bar a claimant shows while dropping a page into the strip.
+        PartGeometry insertion_mark;
         PartGeometry focus;
     };
     [[nodiscard]] Parts parts() const;
@@ -293,6 +383,8 @@ public:
         bool selected{};
         bool disabled{};
         bool focus_visible{};
+        // The tab is being dragged in a live reorder.
+        bool captured{};
         // The admitted custom states (DK-35, DK-40): the page is in the
         // pinned group; its content has unsaved changes.
         bool pinned{};
@@ -309,6 +401,11 @@ public:
     // The tabs laid out (not those scrolled out of view or hidden), in the
     // order they are shown.
     [[nodiscard]] std::vector<Item> realized_items() const;
+    // One page's tab parts, in the strip's coordinates and with their part
+    // states, as `realized_items` publishes them; all absent when the page is
+    // not in the set or its tab is not laid out. For an owner that publishes
+    // the tabs under its own anatomy (TabControl).
+    [[nodiscard]] ItemParts tab_parts_of(const PageId& page) const;
 
     // The semantic identity of a page's tab: `<strip id>.tab.<page id>`.
     [[nodiscard]] std::string tab_identity(const PageId& page) const;
@@ -322,6 +419,10 @@ protected:
     // A strip alone does nothing; PageView's strip applies the view's close
     // policy and sets `handled` when it removed the page.
     virtual void close_unhandled(PageCloseRequest& request);
+    // The recipe family the tabs and their buttons are painted in:
+    // `menu_item` (flat at rest) until stage T4 draws the tab stack.
+    // TabControl's strip answers its appearance (buttons, flat buttons).
+    [[nodiscard]] virtual ControlVisualRole tab_family() const noexcept;
 
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
@@ -499,6 +600,34 @@ private:
     void on_middle_button(PointerEvent& event, Hit hit);
     [[nodiscard]] std::optional<std::size_t> position_of_tab_identity(std::string_view identity) const;
 
+    // -- dragging --
+    // A live drag: armed by a press on a tab, then claimed by an owner or
+    // sliding the tab. `origin` is the page's position at the press;
+    // `destination` the position it would take; `grab` where along the row
+    // the pointer holds the tab, from its start; `shown_start` where along
+    // the row the dragged tab is drawn.
+    struct DragState final {
+        enum class Phase : std::uint8_t { idle, armed, sliding, claimed };
+        Phase phase{Phase::idle};
+        PageId page{};
+        std::size_t origin{};
+        std::size_t destination{};
+        Point press{};
+        double grab{};
+        double shown_start{};
+    };
+    void arm_drag(std::size_t position, Point press);
+    void on_drag_move(Point window_point);
+    void update_slide(double pointer);
+    [[nodiscard]] bool slidable(std::size_t position) const;
+    [[nodiscard]] Rect slid_bounds(std::size_t position) const;
+    [[nodiscard]] double main_length(Rect bounds) const noexcept;
+    [[nodiscard]] double local_main(Point window_point) const;
+    [[nodiscard]] Rect insertion_mark_bounds() const;
+    void request_context_menu(std::size_t position, Point anchor, PageContextMenuCause cause);
+    void on_secondary_button(PointerEvent& event, Hit hit);
+    void paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale);
+
     // -- page list --
     void prepare_list_commands();
     void on_list_item_invoked(const MenuItemInvocation& invocation);
@@ -517,6 +646,7 @@ private:
     PageStripOverflow overflow_{PageStripOverflow::scroll};
     PageCloseButtons close_buttons_{PageCloseButtons::none};
     bool mnemonics_enabled_{true};
+    bool reorder_enabled_{false};
     FontSpec font_{FontRole::control, 10.5, 400, false, 0.12};
     std::shared_ptr<ImageList> image_list_{};
 
@@ -538,6 +668,10 @@ private:
     Hit pressed_{};
     // The page a middle press went down on, for a close on its release.
     std::optional<PageId> middle_pressed_{};
+    // The page a secondary press went down on, for its context menu.
+    std::optional<PageId> secondary_pressed_{};
+    DragState drag_{};
+    std::optional<PagePosition> insertion_gap_{};
     bool focused_{};
     // The keyboard's page while focused; under automatic activation it is
     // the selected page.
@@ -557,6 +691,9 @@ private:
     Event<const PageInvocation&> page_invoked_{};
     Event<PageCloseRequest&> page_close_requested_{};
     Event<PagePinRequest&> page_pin_requested_{};
+    Event<PageDragStart&> page_drag_started_{};
+    Event<PageContextMenuRequest&> page_context_menu_requested_{};
+    Event<const PageDoubleClick&> page_double_clicked_{};
 };
 
 } // namespace gui_forms

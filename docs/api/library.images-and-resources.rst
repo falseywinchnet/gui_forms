@@ -14,6 +14,8 @@ Types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>`
+     - The image registry and the theme of an application (stage DK decision 8), shared by every Window constructed with it.
    * - :cpp:class:`ImageLoadResult <gui_forms::ImageLoadResult>`
      - ImageLoadResult couples a stable nonzero image identity to a closed registry error.
    * - :cpp:class:`ImageRegistry <gui_forms::ImageRegistry>`
@@ -28,6 +30,51 @@ Types
      - PngMetadata records validated IHDR shape plus overflow-checked row and decoded byte extents.
    * - :cpp:class:`PngValidationResult <gui_forms::PngValidationResult>`
      - PngValidationResult couples a closed error code to metadata that is authoritative only on success.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ApplicationResources final
+
+   ``#include <gui_forms/resources/application_resources/application_resources.hpp>``
+
+   The image registry and the theme of an application (stage DK decision 8), shared by every Window constructed with it. In those windows an ImageId names the same image, an ImageList belongs to all of them and a theme set on one is the theme of all, so a control subtree moved from one window to another keeps its images and its look. A Window constructed without one makes its own, so a single-window program behaves as before. Ownership: shared by the windows (and by anyone else holding it); the registry and its images live until the last holder releases it. Each Window registers itself while it lives and the list only observes them. Every member runs on the thread that constructed the object, which must be the windows' UI thread.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit ApplicationResources(ImageRegistryLimits limits = {})
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool check_access() const noexcept
+
+   .. cpp:function:: const ImageRegistry& images() const noexcept
+
+   .. cpp:function:: const Theme& theme() const noexcept
+
+   .. cpp:function:: void set_theme(std::shared_ptr<const Theme> theme)
+
+      Replaces the theme of every window sharing these resources; each remeasures and repaints, and publishes its theme_changed. The same as Window::set_theme on any of them. Null is invalid_argument.
+
+   .. cpp:function:: std::shared_ptr<const Theme> theme_ptr() const noexcept
+
+   .. cpp:function:: std::size_t window_count() const noexcept
+
+      The windows currently sharing these resources.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: ImageLoadResult load_png(std::span<const std::byte> encoded)
+
+      Image operations, on the UI thread (std::logic_error elsewhere). Loads change no window. A replacement or removal without a named consumer repaints every sharing window, since any of them may show the image.
+
+   .. cpp:function:: ImageLoadResult load_bgra32_premultiplied(std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes, std::span<const std::byte> pixels)
+
+   .. cpp:function:: ImageLoadResult replace_png(ImageId image, std::span<const std::byte> encoded)
+
+   .. cpp:function:: bool remove_image(ImageId image)
 
 .. cpp:namespace:: gui_forms
 

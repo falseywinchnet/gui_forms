@@ -98,7 +98,7 @@ controls but play the role of the Forms type.
 | `ButtonBase` | [`ButtonBase`](../api/generated/gui_forms.ButtonBase.rst) | stable | |
 | `CheckBox` | [`CheckBox`](../api/generated/gui_forms.CheckBox.rst) | stable | |
 | `CheckedListBox` | [`CheckedListBox`](../api/generated/gui_forms.CheckedListBox.rst) | stable | |
-| `ComboBox` | [`ComboBox`](../api/generated/gui_forms.ComboBox.rst) | stable | Not editable: the drop-down-list style only. |
+| `ComboBox` | [`ComboBox`](../api/generated/gui_forms.ComboBox.rst) | stable | The `DropDownList` and `DropDown` styles (not `Simple`); auto-complete from the items or a custom list. |
 | `Component` | [`Component`](../api/generated/gui_forms.Component.rst) | core | |
 | `ContainerControl` | [`ContainerControl`](../api/generated/gui_forms.ContainerControl.rst) | stable | |
 | `ContextMenuStrip` | [`ContextMenu`](../api/generated/gui_forms.ContextMenu.rst) | stable | Rows are bound to [`Command`](../api/generated/gui_forms.Command.rst) objects. |
@@ -129,7 +129,7 @@ controls but play the role of the Forms type.
 | `TabControl` | [`TabControl`](../api/generated/gui_forms.TabControl.rst) | stable | |
 | `TabPage` | [`TabPage`](../api/generated/gui_forms.TabPage.rst) | stable | |
 | `TableLayoutPanel` | [`TableLayoutPanel`](../api/generated/gui_forms.TableLayoutPanel.rst) | stable | |
-| `TextBox` | [`TextBox`](../api/generated/gui_forms.TextBox.rst) | stable | Single-line or multiline; password character. |
+| `TextBox` | [`TextBox`](../api/generated/gui_forms.TextBox.rst) | stable | Single-line or multiline; password character; auto-complete from a custom list (`AutoCompleteMode`, `AutoCompleteCustomSource`). |
 | `Timer` | [`Timer`](../api/generated/gui_forms.Timer.rst) | stable | |
 | `ToolStrip` | [`CommandBar`](../api/generated/gui_forms.CommandBar.rst) | provisional | A row of command buttons built from a replaceable item list. |
 | `ToolStripSplitButton` | [`DropDownButton`](../api/generated/gui_forms.DropDownButton.rst) | provisional | Whole-button or split drop-down. |
@@ -179,6 +179,6 @@ These Forms types have no GUI.Forms counterpart yet: `DataGridView`,
 `RichTextBox`, `MaskedTextBox`, `DomainUpDown`, `MonthCalendar` (the
 `DateTimePicker` calendar is part of that control), `StatusStrip`,
 `ToolStripContainer`, `BindingNavigator`, `NotifyIcon` and `FontDialog`.
-`ComboBox` has no editable style. Outbound drag and native menu-bar
+The host auto-complete sources (file system, history, URLs) report unsupported on every host. Outbound drag and native menu-bar
 publication are not available on any host. The [roadmap](../dev/roadmap)
 tracks what is in progress.

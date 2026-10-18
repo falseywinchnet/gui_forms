@@ -38,6 +38,20 @@ enum class HostCapability : std::uint64_t {
     notification_area_messages = 1ULL << 21U,
     // A native menu shown from a tray icon (show_tray_menu).
     notification_area_menus = 1ULL << 22U,
+    // Application-scope windowing (HostWindowing, stage DK decisions 6 and 7).
+    // Each is reported separately so a host that can do one and not another
+    // says so. Additive flags; no protocol version change.
+    // Owned windows opened and destroyed while the application runs.
+    runtime_windows = 1ULL << 23U,
+    // Window frames read and requested in desktop logical units, with a
+    // frame-changed report for every native move or resize.
+    window_frames = 1ULL << 24U,
+    // The pointer's position in desktop logical units, outside any window.
+    screen_pointer = 1ULL << 25U,
+    // Which of the application's windows is topmost at a desktop point.
+    window_at_point = 1ULL << 26U,
+    // Bringing one window to the front of the application's own windows.
+    window_ordering = 1ULL << 27U,
 };
 
 [[nodiscard]] constexpr HostCapability operator|(HostCapability left,

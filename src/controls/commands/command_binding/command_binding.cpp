@@ -1,4 +1,5 @@
 #include "gui_forms/commands/command_binding/command_binding.hpp"
+#include "gui_forms/window.hpp"
 
 #include <stdexcept>
 #include <utility>
@@ -9,10 +10,17 @@ namespace {
 struct ExecuteBoundCommand final {
     std::weak_ptr<Command> command;
 
+    // Through the button's window's command chain (owner decision DK-47); a
+    // detached button executes the command.
     void operator()(ButtonBase& source) const {
-        if (const std::shared_ptr<Command> retained = command.lock()) {
-            static_cast<void>((*retained).execute(source.stable_id().value()));
+        const std::shared_ptr<Command> retained = command.lock();
+        if (!retained) return;
+        Window* const window = source.attached_window();
+        if (window != nullptr) {
+            static_cast<void>((*retained).execute_routed(*window, source.stable_id().value()));
+            return;
         }
+        static_cast<void>((*retained).execute(source.stable_id().value()));
     }
 };
 

@@ -59,6 +59,11 @@ close_buttons : default ``PageCloseButtons::none``
     ``selected_and_hot`` (the selected tab and the tab under the pointer) or
     ``all``. Unless ``none``, space for the button is reserved after the
     label of every closable tab, so widths do not change when it appears.
+reorder_enabled : default ``false``
+    Whether an unclaimed drag of a tab reorders it live within its group:
+    the dragged tab follows the pointer and the tabs it passes slide aside.
+    `PageView`'s document preset turns it on. Turning it off ends a drag
+    under way with nothing moved.
 mnemonics_enabled : default ``true``
     Whether ``&`` in a title marks a mnemonic: Alt and the letter select the
     page and focus its tab, and the marker is not shown. When off, titles are
@@ -79,6 +84,10 @@ hidden_count
     How many pages have no tab laid out.
 widths_frozen
     Whether tab widths are frozen after a close by the pointer.
+dragged_page
+    The page whose tab is being slid in a live reorder, or none.
+insertion_mark
+    The gap the insertion mark shows, or none.
 focused_page
     The page the keyboard is on while the strip has focus, or none.
 page_list_open
@@ -97,14 +106,32 @@ page_invoked
 page_close_requested
     Raised once when a closable page's close is asked for: by its close
     button (cause ``pointer``), a middle click released over the tab it
-    pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
-    or the accessibility ``close`` action (``semantic``). The strip never
+    pressed (``middle_button``), Ctrl+F4 (Cmd+W on macOS) on the selected
+    page (``keyboard``) or the accessibility ``close`` action
+    (``semantic``). The strip never
     removes the page: the set's owner decides, and sets ``handled`` when it
     acts or refuses. A `PageView` removes a page nobody handled unless its
     close policy is ``request_only``.
 page_pin_requested
     Raised when a pinned tab's pin is clicked, asking to unpin the page. When
     no handler sets ``handled`` the strip unpins it in the set.
+page_drag_started
+    Raised once when a press on a tab moves 4 logical units or more along
+    either axis, with the page, the press point and the pointer (window
+    coordinates). An owner that takes the drag over, such as a docking
+    workspace, sets ``claimed``: the strip then releases the pointer capture
+    (unless the owner has already taken it) and does nothing more with the
+    press; it never reorders.
+page_context_menu_requested
+    Raised when a secondary click is released over the tab it pressed (at
+    the pointer, selecting nothing) or Shift+F10 or the context-menu key is
+    pressed on the keyboard's tab (at the tab's corner on the content's side
+    where reading starts).
+    The strip shows no menu of its own; a handler that shows one sets
+    ``handled``.
+page_double_clicked
+    Raised on the second press of a double click on a tab's body, after the
+    press selected the page; never for its close button or pin.
 
 Methods
 -------
@@ -132,6 +159,20 @@ move_selected
     Moves the selected page one place later (+1) or earlier (-1) within its
     group, the pinned pages or the ordinary ones; false at the group's end.
     Ctrl+Shift+PageDown and Ctrl+Shift+PageUp call it.
+cancel_drag
+    Ends a live reorder with nothing moved, as Escape does; false when none
+    is under way.
+insertion_position_at
+    The gap an ordinary page dropped at a point would take, as a position in
+    the current order: before the first laid-out tab whose middle lies after
+    the point, else after the last; never inside the pinned group; none
+    outside the strip.
+show_insertion_mark
+    Shows the insertion mark at a gap until it is cleared or the set's pages
+    or order change; false, showing nothing, for a gap beyond the set or not
+    between laid-out tabs.
+clear_insertion_mark
+    Removes the insertion mark.
 request_close
     Raises `page_close_requested` for a closable page with the given cause;
     true when the request was handled (by a handler, or by the owning view's
@@ -160,6 +201,17 @@ before that position keep their places and the pinned boundary holds. A
 cancelled selection moves nothing. A hidden page selected any other way (a
 key, a program) is shown in the last place without being moved.
 
+Dragging. A press on a tab arms a drag; past the threshold the strip raises
+`page_drag_started`. A claimed drag belongs to the claimant. Otherwise,
+with `reorder_enabled`, the tab follows the pointer within the visible run
+of its group (the pinned tabs or the ordinary ones), carrying the tab state
+``captured``, and takes the place of the furthest tab of the group whose
+middle its own middle has reached; the release moves the page there with
+one `PageSet` move, so a drag never crosses the pinned boundary. Escape,
+the strip losing focus, turning reordering off, or a change to the set's
+pages or order ends the drag with nothing moved. Under ``shrink_then_list``
+the selected page shown after the front run does not slide.
+
 Document features. A closable tab shows its close button by the
 `close_buttons` rule, with a plate while the pointer is on it; pressing it
 selects nothing and the request is raised on the release over the same
@@ -170,15 +222,21 @@ pointer leaves the strip, so the next tab's close button arrives under the
 pointer; a resize or a setting also thaws them. A pinned page with an image
 shows only its icon until the pointer is over it, then its full width with
 its pin in the close button's place; a pinned page without an image keeps
-its label. Ctrl+F4 asks to close the selected page; Delete closes nothing.
+its label. Ctrl+F4 (Cmd+W on macOS) asks to close the selected page; Delete
+closes nothing.
 
 A press on a tab selects first and then focuses the strip. The order of
 events is the set's ``selecting``, its ``selected_page_changed``, then
 `page_invoked`; a cancelled selection raises nothing more and leaves the
 keyboard's tab where it was. Ctrl+PageDown and Ctrl+PageUp select the next
 and previous page while the strip has focus, and Ctrl+Shift+PageDown and
-Ctrl+Shift+PageUp move the selected page within its group. The macOS
-Command+W is not bound: the framework has no host keymap defaults yet.
+Ctrl+Shift+PageUp move the selected page within its group, and Shift+F10 or
+the context-menu key asks for the keyboard's tab's context menu. These keys
+are the window's named keyboard commands (`KeyCommand`: ``close_document``,
+``next_tab``, ``previous_tab``, ``move_tab_later``, ``move_tab_earlier``,
+``context_menu``), so they follow the host's convention and an
+application's `Window::rebind_key_command`; the arrows, Home, End, Space,
+Enter and Escape are the strip's own.
 
 Every page is published to accessibility as a tab of the strip's tab list
 (role ``tab_group``, horizontal, or vertical on a side strip): those scrolled out of view are published
@@ -197,9 +255,11 @@ The tabs are the ``page`` item system: each tab has the parts ``tab``,
 pressed), ``tab_pin`` and ``tab_pin_glyph`` (hot, pressed, and checked for
 the pinned drawing), ``tab_seam`` (the selected tab only) and ``tab_focus``;
 at most one of the dot, the close button and the pin is present. Tabs have
-the states hot, pressed, selected, disabled and focus-visible, and the
-custom states ``pinned`` and ``modified``. The list button's count is the
-part ``list_count``. They are painted through the by-role paint path with
+the states hot, pressed, captured (dragged), selected, disabled and
+focus-visible, and the custom states ``pinned`` and ``modified``. The list
+button's count is the part ``list_count``, and the gap bar shown by
+`show_insertion_mark` the part ``insertion_mark`` (role ``drop``, state
+drop-accepted). They are painted through the by-role paint path with
 the menu-item family, flat at rest, until the default theme draws the tab
 stack and the notched document tab. Painting reads a layout cached between
 changes and allocates nothing per tab.

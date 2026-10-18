@@ -123,6 +123,7 @@ void PageView::initialize_control_tree() {
         (*strip_).set_close_buttons(PageCloseButtons::selected_and_hot);
         (*strip_).set_overflow(PageStripOverflow::shrink_then_list);
         (*strip_).set_mnemonics_enabled(false);
+        (*strip_).set_reorder_enabled(true);
     }
     add_child(strip_);
 }
@@ -347,7 +348,9 @@ void PageView::on_selection_changed(const PageSelectionChange& change) {
 
 PageView::Areas PageView::areas_for(Size surface) const {
     Areas areas;
-    if (!strip_) {
+    // A hidden strip (a docking tool stack holding one panel hides it)
+    // leaves the whole surface to the content.
+    if (!strip_ || !(*strip_).visible()) {
         areas.content = {0.0, 0.0, surface.width, surface.height};
         return areas;
     }
@@ -411,35 +414,35 @@ void PageView::on_paint(Painter& painter, Rect) {
 // -- keys ----------------------------------------------------------------------
 
 // The bubble phase reaches the innermost view around the focus first, so a
-// nested view handles these keys before the view around it. Ctrl+F4 closes
-// the selected closable page and Ctrl+Shift+PageDown and PageUp move it
-// within its group (owner decision DK-38). Delete is left to the focused
+// nested view handles these keys before the view around it. The keys are the
+// window's named commands (owner decision DK-30): close_document (Ctrl+F4,
+// Cmd+W on macOS) closes the selected closable page, move_tab_later and
+// move_tab_earlier (Ctrl+Shift+PageDown and PageUp) move it within its group,
+// next_tab and previous_tab (Ctrl+PageDown and PageUp) select (owner decision
+// DK-38), and cycle_forward and cycle_backward (Ctrl+Tab and Ctrl+Shift+Tab)
+// select under the select_next policy. Delete is left to the focused
 // control: it closes nothing.
 void PageView::on_key_bubble(KeyEvent& event) {
     if (event.handled || event.action != KeyAction::down || !strip_ || pages_.count() == 0U) return;
-    const bool page_key = event.physical_key == PhysicalKey::page_down || event.physical_key == PhysicalKey::page_up;
-    if (event.physical_key == PhysicalKey::f4 && event.modifiers == Modifier::control) {
+    const KeyMap& keys = effective_key_map();
+    if (keys.matches(KeyCommand::close_document, event)) {
         const std::optional<PageId> selected = pages_.selected_page();
         if (selected) static_cast<void>((*strip_).request_close(*selected, PageCloseCause::keyboard));
-        event.handled = true;
+    } else if (keys.matches(KeyCommand::move_tab_later, event)) {
+        static_cast<void>((*strip_).move_selected(1));
+    } else if (keys.matches(KeyCommand::move_tab_earlier, event)) {
+        static_cast<void>((*strip_).move_selected(-1));
+    } else if (keys.matches(KeyCommand::next_tab, event)) {
+        static_cast<void>((*strip_).select_relative(1, PageSelectionCause::keyboard));
+    } else if (keys.matches(KeyCommand::previous_tab, event)) {
+        static_cast<void>((*strip_).select_relative(-1, PageSelectionCause::keyboard));
+    } else if (ctrl_tab_ == PageViewCtrlTab::select_next && keys.matches(KeyCommand::cycle_forward, event)) {
+        static_cast<void>((*strip_).select_relative(1, PageSelectionCause::keyboard));
+    } else if (ctrl_tab_ == PageViewCtrlTab::select_next && keys.matches(KeyCommand::cycle_backward, event)) {
+        static_cast<void>((*strip_).select_relative(-1, PageSelectionCause::keyboard));
+    } else {
         return;
     }
-    if (page_key && event.modifiers == (Modifier::control | Modifier::shift)) {
-        static_cast<void>((*strip_).move_selected(event.physical_key == PhysicalKey::page_down ? 1 : -1));
-        event.handled = true;
-        return;
-    }
-    if (page_key && event.modifiers == Modifier::control) {
-        const int direction = event.physical_key == PhysicalKey::page_down ? 1 : -1;
-        static_cast<void>((*strip_).select_relative(direction, PageSelectionCause::keyboard));
-        event.handled = true;
-        return;
-    }
-    const bool tab_key = event.physical_key == PhysicalKey::tab;
-    const bool forward = event.modifiers == Modifier::control;
-    const bool backward = event.modifiers == (Modifier::control | Modifier::shift);
-    if (!tab_key || (!forward && !backward) || ctrl_tab_ != PageViewCtrlTab::select_next) return;
-    static_cast<void>((*strip_).select_relative(forward ? 1 : -1, PageSelectionCause::keyboard));
     event.handled = true;
 }
 

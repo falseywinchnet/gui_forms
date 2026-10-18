@@ -51,14 +51,16 @@ gui_forms::PageView
 
       **strip** : ``std::shared_ptr<PageStrip>``, read-only
          The child strip that shows the tabs; its placement, sizing, activation,
-         overflow, close buttons and mnemonics are set on it.
+         overflow, close buttons and mnemonics are set on it. Hiding it (as a
+         docking tool stack with one panel does) gives the whole view to the
+         content.
 
       **preset** : ``PageViewPreset``, read-only
          ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
          The document preset sets the strip's close buttons to
-         ``selected_and_hot``, its overflow to ``shrink_then_list`` and turns its
-         mnemonics off (document titles are data); these may be changed on the
-         strip afterwards.
+         ``selected_and_hot``, its overflow to ``shrink_then_list``, turns its
+         mnemonics off (document titles are data) and its live reorder on; these
+         may be changed on the strip afterwards.
 
       **close_policy** : ``PageViewClosePolicy``, default ``PageViewClosePolicy::remove_when_unhandled``
          What the view does with a close request that no handler of the strip's
@@ -142,8 +144,11 @@ gui_forms::PageView
    Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab are taken in the bubble phase, so
    when views are nested the innermost view around the focus answers first; a
    view whose :cpp:func:`ctrl_tab <gui_forms::PageView::ctrl_tab>` is ``pass`` leaves Ctrl+Tab to the views around it.
-   Ctrl+F4 (close the selected closable page) and Ctrl+Shift+PageDown and
-   Ctrl+Shift+PageUp (move it within its group) are taken the same way.
+   Ctrl+F4 (close the selected closable page; Cmd+W on macOS) and
+   Ctrl+Shift+PageDown and Ctrl+Shift+PageUp (move it within its group) are
+   taken the same way. All of these are the window's named keyboard commands
+   (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), so a host's convention and an application's rebinding reach
+   the view.
 
    Closing a page: the strip raises one ``page_close_requested`` per cause (the
    close button, a middle click, Ctrl+F4, the accessibility action). A handler
@@ -241,15 +246,17 @@ gui_forms::PageView
    .. cpp:function:: const std::shared_ptr<PageStrip>& strip() const noexcept
 
       The child strip that shows the tabs; its placement, sizing, activation,
-      overflow, close buttons and mnemonics are set on it.
+      overflow, close buttons and mnemonics are set on it. Hiding it (as a
+      docking tool stack with one panel does) gives the whole view to the
+      content.
 
    .. cpp:function:: PageViewPreset preset() const noexcept
 
       ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
       The document preset sets the strip's close buttons to
-      ``selected_and_hot``, its overflow to ``shrink_then_list`` and turns its
-      mnemonics off (document titles are data); these may be changed on the
-      strip afterwards.
+      ``selected_and_hot``, its overflow to ``shrink_then_list``, turns its
+      mnemonics off (document titles are data) and its live reorder on; these
+      may be changed on the strip afterwards.
 
    .. cpp:function:: PageViewClosePolicy close_policy() const noexcept
 
