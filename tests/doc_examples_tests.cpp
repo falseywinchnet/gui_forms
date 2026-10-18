@@ -3008,6 +3008,25 @@ void example() {
 }
 }  // namespace doc_example_TrackBar_2
 
+namespace doc_example_TreeListView_1 {
+void example() {
+    std::shared_ptr<gf::TreeListView> tree =
+        gf::make_control<gf::TreeListView>(gf::StableId("project"));
+    (*tree).set_columns({
+        {.stable_id = "name", .text = "Name", .width = 220.0},
+        {.stable_id = "size", .text = "Size", .width = 80.0,
+         .alignment = gf::TreeListAlignment::right},
+    });
+    (*tree).set_nodes({
+        {.stable_id = "src", .text = "src", .depth = 0U, .expanded = true},
+        {.stable_id = "main", .text = "main.cpp", .cells = {"4 KB"}, .depth = 1U},
+        {.stable_id = "app", .text = "app.cpp", .cells = {"9 KB"}, .depth = 1U},
+    });
+    (*tree).set_sort(std::size_t{0U}, gf::TreeListSortOrder::ascending);
+    // The rows are now src, app.cpp, main.cpp; the nodes keep their order.
+}
+}  // namespace doc_example_TreeListView_1
+
 namespace doc_example_TreeView_1 {
 void example() {
     std::shared_ptr<gf::TreeView> tree =
@@ -3501,6 +3520,7 @@ int main() {
     failures += run("ToolTip example 2", &doc_example_ToolTip_2::example);
     failures += run("TrackBar example 1", &doc_example_TrackBar_1::example);
     failures += run("TrackBar example 2", &doc_example_TrackBar_2::example);
+    failures += run("TreeListView example 1", &doc_example_TreeListView_1::example);
     failures += run("TreeView example 1", &doc_example_TreeView_1::example);
     failures += run("TreeView example 2", &doc_example_TreeView_2::example);
     failures += run("TypographySpecimen example 1", &doc_example_TypographySpecimen_1::example);

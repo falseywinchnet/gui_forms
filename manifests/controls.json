@@ -195,6 +195,17 @@
       "doc": "api/generated/gui_forms.ListView.rst"
     },
     {
+      "id": "tree_list_view",
+      "type": "TreeListView",
+      "header": "gui_forms/controls/panel/tree_list_view/tree_list_view.hpp",
+      "category": "Selection from a list",
+      "purpose": "Tree with tabular columns: nodes kept by stable ID, expand and collapse, sorting within siblings, resizable and movable columns, and only visible rows realized.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "tree-and-object-views",
+      "doc": "api/generated/gui_forms.TreeListView.rst"
+    },
+    {
       "id": "correspondence_view",
       "type": "CorrespondenceView",
       "header": "gui_forms/controls/panel/correspondence_view/correspondence_view.hpp",
