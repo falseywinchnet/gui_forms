@@ -39,6 +39,93 @@ HostServiceStatus request(const std::weak_ptr<detail::ApplicationWindowState>& w
 }
 }
 
+namespace detail {
+bool valid_window_entry(const ApplicationWindow& entry) {
+    const bool valid = entry.model && valid_text(entry.stable_id, 1024U, false) &&
+        valid_text(entry.owner_id, 1024U, true) &&
+        valid_text(entry.options.title, 65536U, true) &&
+        valid_size(entry.options.initial_size) && valid_size(entry.options.minimum_size) &&
+        entry.options.minimum_size.width <= entry.options.initial_size.width &&
+        entry.options.minimum_size.height <= entry.options.initial_size.height &&
+        entry.owner_id != entry.stable_id &&
+        (entry.floating == HostWindowFloating::none ||
+         (!entry.tool_window && !entry.owner_id.empty()));
+    return valid;
+}
+
+namespace {
+// Routes one HostWindowing frame report to the window's frame_changed.
+struct RunFrameRouter final {
+    std::weak_ptr<ApplicationRunState> run{};
+    void operator()(const HostWindowFrameEvent& event) const {
+        const std::shared_ptr<ApplicationRunState> state = run.lock();
+        if (!state || (*state).closed) return;
+        std::shared_ptr<ApplicationWindowState> target{};
+        for (std::size_t index = 0U; index < (*state).windows.size(); ++index) {
+            if ((*state).windows[index].id == event.window) {
+                target = (*state).windows[index].state.lock();
+                break;
+            }
+        }
+        if (!target || (*target).closed || !(*target).frame_changed) return;
+        // A handler may close this window; keep the callable alive through
+        // the call.
+        const std::function<void(const HostWindowFrameEvent&)> handler = (*target).frame_changed;
+        handler(event);
+    }
+};
+} // namespace
+
+void attach_run_windowing(
+    const std::shared_ptr<ApplicationRunState>& run, HostWindowing& windowing,
+    std::function<ApplicationWindowOpenResult(ApplicationWindow&&)> open_window) {
+    (*run).windowing = &windowing;
+    (*run).open_window = std::move(open_window);
+    (*run).windows.reserve(HostWindowing::maximum_windows);
+    (*run).frame_subscription = windowing.frame_changed().subscribe(RunFrameRouter{run});
+}
+
+void detach_run_windowing(ApplicationRunState& run) noexcept {
+    run.frame_subscription.disconnect();
+    run.closed = true;
+    run.windowing = nullptr;
+    run.open_window = {};
+    run.windows.clear();
+}
+
+void register_run_window(const std::shared_ptr<ApplicationWindowState>& state) {
+    const std::shared_ptr<ApplicationRunState> run = (*state).run.lock();
+    if (!run || (*run).closed || (*run).windowing == nullptr) return;
+    const std::optional<HostWindowId> id = (*(*run).windowing).find((*state).stable_id);
+    if (!id.has_value()) return;
+    (*state).id = *id;
+    for (std::size_t index = 0U; index < (*run).windows.size(); ++index) {
+        if ((*run).windows[index].id == *id) return;
+    }
+    // Bounded by the windowing table: at most maximum_windows identities are
+    // live, and closed windows are removed below.
+    (*run).windows.push_back({*id, state});
+}
+
+void PolicyVisibility::operator()() const {
+    const std::shared_ptr<ApplicationWindowState> target = state.lock();
+    if (!target || (*target).closed) return;
+    const std::shared_ptr<ApplicationRunState> run = (*target).run.lock();
+    if (!run || (*run).closed || (*run).windowing == nullptr) return;
+    static_cast<void>((*(*run).windowing).set_visible((*target).id, visible));
+}
+
+void unregister_run_window(ApplicationWindowState& state) noexcept {
+    const std::shared_ptr<ApplicationRunState> run = state.run.lock();
+    if (!run) return;
+    for (std::size_t index = 0U; index < (*run).windows.size(); ++index) {
+        if ((*run).windows[index].id != state.id) continue;
+        (*run).windows.erase((*run).windows.begin() + static_cast<std::ptrdiff_t>(index));
+        break;
+    }
+}
+} // namespace detail
+
 ApplicationWindowHandle::ApplicationWindowHandle(
     std::weak_ptr<detail::ApplicationWindowState> state) noexcept : state_(std::move(state)) {}
 
@@ -75,13 +162,7 @@ ApplicationResult Application::validate(const std::vector<ApplicationWindow>& wi
         const ApplicationWindow& entry = windows[index];
         ApplicationResult invalid{ApplicationError::invalid_argument};
         invalid.window_index = index;
-        if (!entry.model || !valid_text(entry.stable_id, 1024U, false) ||
-            !valid_text(entry.owner_id, 1024U, true) ||
-            !valid_text(entry.options.title, 65536U, true) ||
-            !valid_size(entry.options.initial_size) || !valid_size(entry.options.minimum_size) ||
-            entry.options.minimum_size.width > entry.options.initial_size.width ||
-            entry.options.minimum_size.height > entry.options.initial_size.height ||
-            entry.owner_id == entry.stable_id) return invalid;
+        if (!detail::valid_window_entry(entry)) return invalid;
         if (!(*entry.model).check_access()) {
             invalid.error = ApplicationError::wrong_thread;
             return invalid;
@@ -99,6 +180,9 @@ ApplicationResult Application::validate(const std::vector<ApplicationWindow>& wi
             std::size_t parent = 0U;
             while (parent < windows.size() && windows[parent].stable_id != owner) ++parent;
             if (parent == windows.size()) return invalid;
+            // A floating window is owned by the primary window itself.
+            const bool parent_primary = windows[parent].owner_id.empty() && !windows[parent].tool_window;
+            if (depth == 0U && entry.floating != HostWindowFloating::none && !parent_primary) return invalid;
             owner = windows[parent].owner_id;
         }
     }
@@ -134,5 +218,216 @@ HostServiceStatus ApplicationWindowHandle::request_client_size(const Size client
         const HostServiceStatus result = action(client_size);
         return result;
     } catch (...) { return {HostServiceError::backend_failure}; }
+}
+
+namespace {
+// The run's windowing when `state` is a ready, open window of a live run on
+// this thread; otherwise null, with the reason in `status`.
+HostWindowing* run_windowing(const std::shared_ptr<detail::ApplicationWindowState>& state,
+                             HostServiceStatus& status) {
+    status = {};
+    if (!state) { status.error = HostServiceError::after_shutdown; return nullptr; }
+    if ((*state).thread != std::this_thread::get_id()) {
+        status.error = HostServiceError::wrong_thread;
+        return nullptr;
+    }
+    if ((*state).closed) { status.error = HostServiceError::after_shutdown; return nullptr; }
+    if (!(*state).ready) { status.error = HostServiceError::backend_failure; return nullptr; }
+    const std::shared_ptr<detail::ApplicationRunState> run = (*state).run.lock();
+    if (run && (*run).closed) { status.error = HostServiceError::after_shutdown; return nullptr; }
+    if (!run || (*run).windowing == nullptr || !(*state).id.valid()) {
+        status.error = HostServiceError::unsupported;
+        return nullptr;
+    }
+    return (*run).windowing;
+}
+
+// The run when it is live and on this thread; otherwise empty, with the
+// reason in `status`.
+std::shared_ptr<detail::ApplicationRunState> live_run(
+    const std::weak_ptr<detail::ApplicationRunState>& weak, HostServiceStatus& status) {
+    status = {};
+    std::shared_ptr<detail::ApplicationRunState> run = weak.lock();
+    if (!run) { status.error = HostServiceError::after_shutdown; return {}; }
+    if ((*run).thread != std::this_thread::get_id()) {
+        status.error = HostServiceError::wrong_thread;
+        return {};
+    }
+    if ((*run).closed) { status.error = HostServiceError::after_shutdown; return {}; }
+    if ((*run).windowing == nullptr) { status.error = HostServiceError::unsupported; return {}; }
+    return run;
+}
+} // namespace
+
+HostWindowId ApplicationWindowHandle::id() const noexcept {
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    if (!state || (*state).closed || !(*state).ready) return {};
+    return (*state).id;
+}
+
+ApplicationWindows ApplicationWindowHandle::windows() const noexcept {
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    if (!state || (*state).closed) return {};
+    const std::shared_ptr<detail::ApplicationRunState> run = (*state).run.lock();
+    if (!run) return {};
+    const ApplicationWindows result = detail::ApplicationHandleAccess::make_windows(run);
+    return result;
+}
+
+HostWindowFrameResult ApplicationWindowHandle::frame() const {
+    HostWindowFrameResult result;
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    HostWindowing* windowing = run_windowing(state, result.status);
+    if (windowing == nullptr) return result;
+    try {
+        result = (*windowing).frame((*state).id);
+    } catch (...) {
+        result = {};
+        result.status.error = HostServiceError::backend_failure;
+    }
+    return result;
+}
+
+HostServiceStatus ApplicationWindowHandle::request_frame(const Rect content) const {
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    HostWindowing* windowing = run_windowing(state, status);
+    if (windowing == nullptr) return status;
+    try {
+        // A native request may report the new frame synchronously and its
+        // handlers may close this window; `state` is held through the call.
+        status = (*windowing).request_frame((*state).id, content);
+    } catch (...) { status.error = HostServiceError::backend_failure; }
+    return status;
+}
+
+HostServiceStatus ApplicationWindowHandle::bring_to_front() const {
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
+    HostWindowing* windowing = run_windowing(state, status);
+    if (windowing == nullptr) return status;
+    try {
+        status = (*windowing).bring_to_front((*state).id);
+    } catch (...) { status.error = HostServiceError::backend_failure; }
+    return status;
+}
+
+ApplicationWindows::ApplicationWindows(std::weak_ptr<detail::ApplicationRunState> run) noexcept
+    : run_(std::move(run)) {}
+
+bool ApplicationWindows::active() const noexcept {
+    const std::shared_ptr<detail::ApplicationRunState> run = run_.lock();
+    const bool result = run && (*run).thread == std::this_thread::get_id() &&
+        !(*run).closed && (*run).windowing != nullptr;
+    return result;
+}
+
+HostCapabilities ApplicationWindows::capabilities() const {
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, status);
+    if (!run) {
+        const HostCapabilities none{HostCapabilities::current_protocol_version, "none",
+                                    HostCapability::none};
+        return none;
+    }
+    const HostCapabilities result = (*(*run).windowing).capabilities();
+    return result;
+}
+
+ApplicationWindowOpenResult ApplicationWindows::open_window(ApplicationWindow&& window) const {
+    ApplicationWindowOpenResult result;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, result.status);
+    if (!run) return result;
+    if (!(*(*run).windowing).capabilities().supports(HostCapability::runtime_windows) ||
+        !(*run).open_window) {
+        result.status.error = HostServiceError::unsupported;
+        return result;
+    }
+    try {
+        // The open operation runs the new window's callbacks, which may
+        // change the run; keep the callable alive through the call.
+        const std::function<ApplicationWindowOpenResult(ApplicationWindow&&)> open =
+            (*run).open_window;
+        result = open(std::move(window));
+    } catch (...) {
+        result = {};
+        result.status.error = HostServiceError::backend_failure;
+    }
+    return result;
+}
+
+HostServiceStatus ApplicationWindows::destroy_window(const ApplicationWindowHandle& window) const {
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, status);
+    if (!run) return status;
+    const std::shared_ptr<detail::ApplicationWindowState> state =
+        detail::ApplicationHandleAccess::state(window);
+    if (!state || (*state).closed) return {HostServiceError::after_shutdown};
+    if ((*state).run.lock() != run || !(*state).id.valid()) {
+        return {HostServiceError::invalid_argument};
+    }
+    try {
+        status = (*(*run).windowing).destroy_window((*state).id);
+    } catch (...) { status.error = HostServiceError::backend_failure; }
+    return status;
+}
+
+HostScreenPointResult ApplicationWindows::pointer_position() const {
+    HostScreenPointResult result;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, result.status);
+    if (!run) return result;
+    try {
+        result = (*(*run).windowing).pointer_position();
+    } catch (...) {
+        result = {};
+        result.status.error = HostServiceError::backend_failure;
+    }
+    return result;
+}
+
+ApplicationWindowAtResult ApplicationWindows::window_at(const Point point) const {
+    ApplicationWindowAtResult result;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, result.status);
+    if (!run) return result;
+    HostWindowAtResult native;
+    try {
+        native = (*(*run).windowing).window_at(point);
+    } catch (...) {
+        native = {};
+        native.status.error = HostServiceError::backend_failure;
+    }
+    result.status = native.status;
+    if (!native.status.accepted() || !native.window.valid()) return result;
+    for (std::size_t index = 0U; index < (*run).windows.size(); ++index) {
+        if ((*run).windows[index].id != native.window) continue;
+        const std::shared_ptr<detail::ApplicationWindowState> state =
+            (*run).windows[index].state.lock();
+        if (!state || (*state).closed) break;
+        result.found = true;
+        result.window = detail::ApplicationHandleAccess::make(state);
+        break;
+    }
+    return result;
+}
+
+HostMonitorResult ApplicationWindows::monitors() const {
+    HostMonitorResult result;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, result.status);
+    if (!run) return result;
+    try {
+        result = (*(*run).windowing).query_monitors();
+    } catch (...) {
+        result = {};
+        result.status.error = HostServiceError::backend_failure;
+    }
+    return result;
+}
+
+std::size_t ApplicationWindows::window_count() const noexcept {
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, status);
+    if (!run) return 0U;
+    const std::size_t result = (*(*run).windowing).window_count();
+    return result;
 }
 } // namespace gui_forms

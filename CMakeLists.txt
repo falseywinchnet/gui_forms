@@ -103,6 +103,8 @@ endif()
 
 add_library(gui_forms_core STATIC
     src/core/application/application.cpp
+    src/core/application/window_frame_drag.cpp
+    src/core/application/workspace_transaction.cpp
     src/core/animation/animation_timeline/animation_timeline.cpp
     src/core/binding/value/binding_value.cpp
     src/core/binding/value/property_collection_value/property_collection_value.cpp
@@ -131,6 +133,7 @@ add_library(gui_forms_core STATIC
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
     src/core/window/inspection/window_visual_inspection.cpp
     src/core/resources/image_registry/image_registry.cpp
+    src/core/resources/application_resources/application_resources.cpp
     src/core/live_surface/buffer/live_surface_buffer.cpp
     src/core/live_surface/frame/live_surface_frame.cpp
     src/core/live_surface/surface/live_surface.cpp
@@ -152,6 +155,8 @@ add_library(gui_forms_core STATIC
     src/core/host/cursor_interaction/cursor_interaction.cpp
     src/core/types/cursor_image/cursor_image.cpp
     src/core/host/session/host_session.cpp
+    src/core/host/windowing/desktop_coordinates.cpp
+    src/core/host/windowing/host_windowing.cpp
     src/core/feedback/semantic_feedback/semantic_feedback.cpp
     src/core/display/chunk/display_chunk.cpp
     src/core/display/recording_painter/recording_painter.cpp
@@ -390,6 +395,7 @@ add_library(gui_forms_host_headless STATIC
     src/host/headless/capabilities/headless_capabilities.cpp
     src/host/headless/services/headless_host_services.cpp
     src/host/headless/session/headless_host.cpp
+    src/host/headless/application/headless_application.cpp
 )
 target_include_directories(gui_forms_host_headless PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/host/headless
@@ -414,6 +420,7 @@ add_library(gui_forms_controls STATIC
     src/controls/panel/tree_view/tree_view.cpp
     src/controls/panel/object_view/object_view.cpp
     src/controls/panel/list_view/list_view.cpp
+    src/controls/panel/tree_list_view/tree_list_view.cpp
     src/controls/panel/correspondence_view/correspondence_view.cpp
     src/controls/panel/card/card.cpp
     src/controls/panel/card/review_card/review_card.cpp
@@ -432,6 +439,8 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
     src/controls/ribbon/ribbon.cpp
+    src/controls/ribbon/ribbon_group_popup.cpp
+    src/controls/ribbon/ribbon_scaling.cpp
     src/controls/status_strip/status_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
@@ -1019,6 +1028,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     endif()
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
+        src/host/linux/application/x11_windowing.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
@@ -2036,6 +2046,10 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_application_native_tests PRIVATE gui_forms_application)
         add_test(NAME gui_forms_application_native_tests COMMAND gui_forms_application_native_tests)
         set_tests_properties(gui_forms_application_native_tests PROPERTIES TIMEOUT 30)
+        # Stage DK W0 measurement (results/2026-10-18-dk-w0-capture-drag/): it
+        # puts windows on the desktop, so it is built but never run by ctest.
+        add_executable(gui_forms_frame_drag_probe tests/frame_drag_probe.cpp)
+        target_link_libraries(gui_forms_frame_drag_probe PRIVATE gui_forms_application)
     endif()
     if(GUI_FORMS_ENABLE_LINUX_HOST)
         add_executable(gui_forms_linux_host_tests tests/linux_host_tests.cpp)
@@ -2403,6 +2417,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_tree_list_view_tests tests/tree_list_view_tests.cpp)
+    target_link_libraries(gui_forms_tree_list_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tree_list_view_tests COMMAND gui_forms_tree_list_view_tests)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
@@ -2446,6 +2463,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_tests tests/ribbon_tests.cpp)
     target_link_libraries(gui_forms_ribbon_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_tests COMMAND gui_forms_ribbon_tests)
+    add_executable(gui_forms_ribbon_scaling_tests tests/ribbon_scaling_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_scaling_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_scaling_tests COMMAND gui_forms_ribbon_scaling_tests)
     add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
@@ -2640,6 +2660,18 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_host_headless
     )
     add_test(NAME gui_forms_host_protocol_tests COMMAND gui_forms_host_protocol_tests)
+    add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
+    target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)
+    add_executable(gui_forms_floating_windows_tests tests/floating_windows_tests.cpp)
+    target_link_libraries(gui_forms_floating_windows_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_floating_windows_tests COMMAND gui_forms_floating_windows_tests)
+    add_executable(gui_forms_shared_resources_tests tests/shared_resources_tests.cpp)
+    target_link_libraries(gui_forms_shared_resources_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_shared_resources_tests COMMAND gui_forms_shared_resources_tests)
+    add_executable(gui_forms_workspace_transaction_tests tests/workspace_transaction_tests.cpp)
+    target_link_libraries(gui_forms_workspace_transaction_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_workspace_transaction_tests COMMAND gui_forms_workspace_transaction_tests)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}

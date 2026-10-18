@@ -591,6 +591,65 @@ Properties beyond every control's: none.
 | `column_click` | `ListViewColumnClick` |
 | `column_width_changed` | `ListViewColumnWidthChange` |
 
+## `tree_list_view` (TreeListView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `header` | face |  |  |
+| `vertical_scroll_bar` | track | `v_scroll_bar` |  |
+| `horizontal_scroll_bar` | track | `h_scroll_bar` |  |
+| `scroll_corner` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `row`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `row` | region |  |  |
+| `row_face` | face |  |  |
+| `expander` | disclosure |  |  |
+| `icon` | icon |  |  |
+| `text` | content |  |  |
+| `row_focus` | focus |  |  |
+
+Item states: `selected`, `hot`, `current`, `open`, `closed`, `disabled`, `focus_visible`.
+
+Item system `cell`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `cell` | region |  |  |
+| `cell_text` | content |  |  |
+
+Item states: `selected`, `disabled`.
+
+Item system `column`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `column_header` | face |  |  |
+| `column_label` | label |  |  |
+| `sort_glyph` | glyph |  |  |
+| `column_divider` | divider |  |  |
+| `column_grip` | grip |  |  |
+
+Item states: `hot`, `pressed`, `captured`. Application-defined: `sorted_ascending`, `sorted_descending`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `selection_changed` | `TreeListSelectionChange` |
+| `expansion_changed` | `TreeListExpansionChange` |
+| `item_activated` | `TreeListActivation` |
+| `sort_changed` | `TreeListSortChange` |
+| `column_width_changed` | `TreeListColumnWidthChange` |
+| `column_moved` | `TreeListColumnMove` |
+
 ## `correspondence_view` (CorrespondenceView, control)
 
 | Part | Role | Reuses | Own states |
@@ -2060,6 +2119,10 @@ Properties beyond every control's: none.
 | `application_button` | face | `button` | hot, pressed, open, focus_visible |
 | `application_label` | label |  | hot, pressed, open, focus_visible |
 | `command_plane` | face |  |  |
+| `scroll_left` | actuator | `button` | hot, pressed |
+| `scroll_left_glyph` | glyph |  | hot, pressed |
+| `scroll_right` | actuator | `button` | hot, pressed |
+| `scroll_right_glyph` | glyph |  | hot, pressed |
 | `focus` | focus |  |  |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
@@ -2084,6 +2147,11 @@ Item system `group`:
 | `group_launcher` | actuator | `button` | hot, pressed, focus_visible |
 | `group_launcher_glyph` | glyph |  | hot, pressed, focus_visible |
 | `group_launcher_focus` | focus |  | hot, pressed, focus_visible |
+| `group_button` | face | `button` | hot, pressed, open, focus_visible |
+| `group_button_icon` | icon |  | hot, pressed, open, focus_visible |
+| `group_button_label` | label |  | hot, pressed, open, focus_visible |
+| `group_button_glyph` | glyph |  | hot, pressed, open, focus_visible |
+| `group_button_focus` | focus |  | hot, pressed, open, focus_visible |
 
 Item states: none.
 
@@ -2101,6 +2169,7 @@ Item system `command`:
 | `command_numeric_up_down` | well | `numeric_up_down` |  |
 | `command_check_box` | indicator | `check_box` |  |
 | `command_text_box` | well | `text_box` |  |
+| `command_gallery` | well | `ribbon_gallery` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 

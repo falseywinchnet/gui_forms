@@ -129,8 +129,18 @@ Related types
      - One category: its items show together under the caption in the drop-down form.
    * - :cpp:class:`RibbonGalleryItem <gui_forms::RibbonGalleryItem>`
      - One item: an image with an optional label shown under it.
+   * - :cpp:class:`RibbonGroupLayout <gui_forms::RibbonGroupLayout>`
+     - One layout of a group (the WPF/MFC model, owner decision 5): the image size of each command and how many small commands stack in a column.
    * - :cpp:class:`RibbonGroupSpec <gui_forms::RibbonGroupSpec>`
      - A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner.
+   * - :cpp:class:`RibbonLadderEntry <gui_forms::RibbonLadderEntry>`
+     - One entry of a tab's reduction ladder: every group's state and the width, in logical units, the groups need side by side.
+   * - :cpp:class:`RibbonLadderGroupState <gui_forms::RibbonLadderGroupState>`
+     - One group's place in a ladder entry: its layout (an index into Ribbon::group_layouts), that layout's size, and its gallery's column count (zero without a gallery).
+   * - :cpp:class:`RibbonReductionStep <gui_forms::RibbonReductionStep>`
+     -  
+   * - :cpp:class:`RibbonScalingCounters <gui_forms::RibbonScalingCounters>`
+     - Structured scaling instrumentation (RIBBON_SCALING_STUDY.md §5.7).
    * - :cpp:class:`RibbonState <gui_forms::RibbonState>`
      - What a ribbon window keeps between sessions (owner decision RB-12, D4-1): the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized.
    * - :cpp:class:`RibbonStateDiagnostic <gui_forms::RibbonStateDiagnostic>`
@@ -433,6 +443,8 @@ Related types
 
    .. cpp:member:: PartGeometry command_text_box
 
+   .. cpp:member:: PartGeometry command_gallery
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: Ribbon::CommandStates final
@@ -461,6 +473,10 @@ Related types
 
    .. cpp:member:: std::string stable_id
 
+   .. cpp:member:: std::size_t layout
+
+   .. cpp:member:: bool collapsed
+
    .. cpp:member:: GroupParts parts
 
 .. cpp:namespace:: gui_forms
@@ -469,7 +485,7 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   The "group" item system: one group of the selected tab.
+   The "group" item system: one group of the selected tab. A collapsed group shows its button parts and no caption or launcher.
 
    .. cpp:member:: PartGeometry group_region
 
@@ -482,6 +498,16 @@ Related types
    .. cpp:member:: PartGeometry group_launcher_glyph
 
    .. cpp:member:: PartGeometry group_launcher_focus
+
+   .. cpp:member:: PartGeometry group_button
+
+   .. cpp:member:: PartGeometry group_button_icon
+
+   .. cpp:member:: PartGeometry group_button_label
+
+   .. cpp:member:: PartGeometry group_button_glyph
+
+   .. cpp:member:: PartGeometry group_button_focus
 
 .. cpp:namespace:: gui_forms
 
@@ -500,6 +526,14 @@ Related types
    .. cpp:member:: PartGeometry application_label
 
    .. cpp:member:: PartGeometry command_plane
+
+   .. cpp:member:: PartGeometry scroll_left
+
+   .. cpp:member:: PartGeometry scroll_left_glyph
+
+   .. cpp:member:: PartGeometry scroll_right
+
+   .. cpp:member:: PartGeometry scroll_right_glyph
 
    .. cpp:member:: PartGeometry focus
 
@@ -561,7 +595,7 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   One command record. ``stable_id`` is unique within the ribbon (across tabs, groups and commands) and names the command in events, semantics and the published anatomy. A button, toggle or split takes its text (when ``text`` is empty), enabled, visible and checked state from its required ``command``, and runs it on a click; a drop-down's command is optional. ``text`` may carry a mnemonic ("&Paste"). Labels are always shown (owner decision 6); a small command with an image may leave its label out (``show_label`` false: an authored icon-only command, decision 30). ``drop_down`` is the menu of a split or drop-down command. A hosted command's ``text`` is its control's accessible name (and a check box's caption); ``choices`` are a combo box's items and ``width`` its width in logical units (zero for the default).
+   One command record. ``stable_id`` is unique within the ribbon (across tabs, groups and commands) and names the command in events, semantics and the published anatomy. A button, toggle or split takes its text (when ``text`` is empty), enabled, visible and checked state from its required ``command``, and runs it on a click; a drop-down's command is optional. ``text`` may carry a mnemonic ("&Paste"). Labels are always shown (owner decision 6); a small command with an image may leave its label out (``show_label`` false: an authored icon-only command, decision 30). ``drop_down`` is the menu of a split or drop-down command. A hosted command's ``text`` is its control's accessible name (and a check box's caption); ``choices`` are a combo box's items and ``width`` its width in logical units (zero for the default). A gallery command's ``gallery`` is an in-ribbon RibbonGallery the application made and configured; the ribbon adds it as its child and sets its column count.
 
    .. cpp:member:: std::string stable_id
 
@@ -588,6 +622,8 @@ Related types
    .. cpp:member:: std::vector<std::string> choices
 
    .. cpp:member:: double width
+
+   .. cpp:member:: std::shared_ptr<RibbonGallery> gallery
 
 .. cpp:namespace:: gui_forms
 
@@ -751,11 +787,29 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RibbonGroupLayout final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   One layout of a group (the WPF/MFC model, owner decision 5): the image size of each command and how many small commands stack in a column. Labels never drop (decision 6), so a layout only changes image sizes and rows. ``command_sizes`` holds one size per command of the group, in command order, or is empty for the commands' own sizes (``RibbonCommandSpec::size``); entries for hosted and gallery commands are ignored. A collapsed layout has no sizes. ``rows`` (1 to 3) is the number of small and hosted commands per column.
+
+   .. cpp:member:: RibbonGroupSize size
+
+      Default: ``{RibbonGroupSize::large}``.
+
+   .. cpp:member:: std::vector<RibbonCommandSize> command_sizes
+
+   .. cpp:member:: std::size_t rows
+
+      Default: ``{3U}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RibbonGroupSpec final
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner.
+   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner. ``image`` is the icon of the group's collapsed button (none: the first command image). ``layouts`` are its size definitions, largest first; empty layouts are generated (Ribbon::group_layouts).
 
    .. cpp:member:: std::string stable_id
 
@@ -764,6 +818,68 @@ Related types
    .. cpp:member:: bool dialog_launcher
 
    .. cpp:member:: std::vector<RibbonCommandSpec> commands
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: std::vector<RibbonGroupLayout> layouts
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonLadderEntry final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   One entry of a tab's reduction ladder: every group's state and the width, in logical units, the groups need side by side. Entries run from the widest to the narrowest; widths strictly decrease.
+
+   .. cpp:member:: std::vector<RibbonLadderGroupState> groups
+
+   .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonLadderGroupState final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   One group's place in a ladder entry: its layout (an index into Ribbon::group_layouts), that layout's size, and its gallery's column count (zero without a gallery).
+
+   .. cpp:member:: std::size_t layout
+
+   .. cpp:member:: RibbonGroupSize size
+
+      Default: ``{RibbonGroupSize::large}``.
+
+   .. cpp:member:: std::size_t gallery_columns
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonReductionStep final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:member:: std::string group
+
+   .. cpp:member:: RibbonReductionKind kind
+
+      Default: ``{RibbonReductionKind::layout}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonScalingCounters final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   Structured scaling instrumentation (RIBBON_SCALING_STUDY.md §5.7). ``ladder_builds`` counts ladders built, ``ladder_entries`` and ``nonshrinking_steps`` describe the last one (a step that did not narrow the tab is folded into the next entry), ``ladder_lookups`` counts layouts that chose an entry, and ``text_measurements`` counts the ribbon's own text measurements (labels, captions and tabs, each measured once per cache).
+
+   .. cpp:member:: std::uint64_t ladder_builds
+
+   .. cpp:member:: std::uint64_t ladder_entries
+
+   .. cpp:member:: std::uint64_t nonshrinking_steps
+
+   .. cpp:member:: std::uint64_t ladder_lookups
+
+   .. cpp:member:: std::uint64_t text_measurements
 
 .. cpp:namespace:: gui_forms
 
@@ -831,13 +947,15 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A core tab. ``text`` may carry a mnemonic ("&Home").
+   A core tab. ``text`` may carry a mnemonic ("&Home"). ``reduction_order`` is the order in which its groups shrink as the ribbon narrows; after it (or without it) every group that can still shrink does so one step at a time, right to left, repeating (WPF's cycle, decision 32).
 
    .. cpp:member:: std::string stable_id
 
    .. cpp:member:: std::string text
 
    .. cpp:member:: std::vector<RibbonGroupSpec> groups
+
+   .. cpp:member:: std::vector<RibbonReductionStep> reduction_order
 
 .. cpp:namespace:: gui_forms
 
@@ -1116,6 +1234,12 @@ Enumerations
 
    .. cpp:enumerator:: launcher
 
+   .. cpp:enumerator:: group_button
+
+   .. cpp:enumerator:: scroll_left
+
+   .. cpp:enumerator:: scroll_right
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: Ribbon::RealizedItem::Kind
@@ -1152,6 +1276,8 @@ Enumerations
 
    .. cpp:enumerator:: text_box
 
+   .. cpp:enumerator:: gallery
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: RibbonCommandSize
@@ -1171,6 +1297,30 @@ Enumerations
    .. cpp:enumerator:: in_ribbon
 
    .. cpp:enumerator:: drop_down
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonGroupSize
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: large
+
+   .. cpp:enumerator:: medium
+
+   .. cpp:enumerator:: small
+
+   .. cpp:enumerator:: collapsed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonReductionKind
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: layout
+
+   .. cpp:enumerator:: gallery_column
 
 .. cpp:namespace:: gui_forms
 

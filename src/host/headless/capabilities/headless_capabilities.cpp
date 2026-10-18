@@ -24,6 +24,11 @@ HostCapabilities headless_capabilities() {
                 HostCapability::sound_cues |
                 HostCapability::notification_area |
                 HostCapability::notification_area_messages |
-                HostCapability::notification_area_menus};
+                HostCapability::notification_area_menus |
+                HostCapability::runtime_windows |
+                HostCapability::window_frames |
+                HostCapability::screen_pointer |
+                HostCapability::window_at_point |
+                HostCapability::window_ordering};
 }
 } // namespace gui_forms::host

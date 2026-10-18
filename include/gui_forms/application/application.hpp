@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/host/types/host_types.hpp"
+#include "gui_forms/host/windowing/host_windowing.hpp"
 #include "gui_forms/window.hpp"
 
 #include <cstddef>
@@ -15,8 +16,11 @@
 namespace gui_forms {
 namespace detail {
 struct ApplicationWindowState;
+struct ApplicationRunState;
 struct ApplicationHandleAccess;
 }
+
+class ApplicationWindows;
 
 enum class ApplicationError : std::uint8_t {
     none,
@@ -64,6 +68,22 @@ public:
     // it. Refused as unsupported while the window is full screen, maximized or
     // minimized.
     [[nodiscard]] HostServiceStatus request_client_size(Size client_size) const;
+    // The window's identity in this run; invalid before ready, after close
+    // and for a host without application windowing.
+    [[nodiscard]] HostWindowId id() const noexcept;
+    // The run's windowing (opening, destroying and finding windows). An
+    // inactive handle when this handle is inactive.
+    [[nodiscard]] ApplicationWindows windows() const noexcept;
+    // The window's frame in desktop logical units (HostWindowing::frame;
+    // capability window_frames).
+    [[nodiscard]] HostWindowFrameResult frame() const;
+    // Asks for a client rectangle in desktop logical units
+    // (HostWindowing::request_frame). As with request_client_size, the
+    // model and frame_changed follow only when the host reports the change.
+    [[nodiscard]] HostServiceStatus request_frame(Rect content) const;
+    // Orders the window above the run's other windows, never above other
+    // applications' windows, without activating it (window_ordering).
+    [[nodiscard]] HostServiceStatus bring_to_front() const;
 
 private:
     friend struct detail::ApplicationHandleAccess;
@@ -90,6 +110,11 @@ struct ApplicationWindowOptions final {
     std::function<void()> dispatch_pending{};
     std::function<void(HostCloseRequest&)> closing{};
     std::function<void()> closed{};
+    // Published on the UI thread for every native move or resize of this
+    // window once it is ready, in desktop logical units (capability
+    // window_frames). The client size also reaches the model through the
+    // host's resize event, as before.
+    std::function<void(const HostWindowFrameEvent&)> frame_changed{};
 };
 
 struct ApplicationWindow final {
@@ -98,6 +123,64 @@ struct ApplicationWindow final {
     std::unique_ptr<Window> model{};
     ApplicationWindowOptions options{};
     bool tool_window{};
+    // A floating window (stage DK decisions 1, 10 and 11): owned by the
+    // primary window (owner_id names it; tool_window stays false), no
+    // taskbar button, minimized with it, above it only, moved with it and
+    // clamped to the work area of the screen it lands on. A floating tool
+    // also hides while the application is inactive; a floating document
+    // does not. The policy decides when the window is on screen; show and
+    // hide on its handle say whether it is wanted. See HostWindowKindTraits.
+    HostWindowFloating floating{HostWindowFloating::none};
+};
+
+struct ApplicationWindowOpenResult final {
+    HostServiceStatus status{};
+    // Active once the window is ready; inactive when the open was refused.
+    ApplicationWindowHandle window{};
+};
+
+struct ApplicationWindowAtResult final {
+    HostServiceStatus status{};
+    // False when no window of the run is topmost at the point.
+    bool found{};
+    ApplicationWindowHandle window{};
+};
+
+/// A weak, thread-affine handle to the windowing of one running
+/// application (stage DK decisions 6 and 7). Obtained from
+/// ApplicationWindowHandle::windows(). Requests after the run ends return
+/// after_shutdown; requests from another thread return wrong_thread.
+class ApplicationWindows final {
+public:
+    ApplicationWindows() noexcept = default;
+    [[nodiscard]] bool active() const noexcept;
+    // The host's capabilities for this run; empty when inactive.
+    [[nodiscard]] HostCapabilities capabilities() const;
+    // Opens a window during the run (capability runtime_windows). The entry
+    // is validated as Application::validate validates one entry, and it must
+    // be owned by a live window of this run or be a tool window; at most
+    // Application::maximum_windows windows are live at once. A refusal found
+    // before the native request leaves `window` unchanged; once the native
+    // request starts the entry is consumed, as Application::run consumes its
+    // entries. The window's ready callback runs before this returns.
+    [[nodiscard]] ApplicationWindowOpenResult open_window(ApplicationWindow&& window) const;
+    // Closes and destroys a window this run opened, or an owned initial
+    // window, without asking its closing handler (HostWindowing::
+    // destroy_window). Its closed callback runs before this returns.
+    [[nodiscard]] HostServiceStatus destroy_window(const ApplicationWindowHandle& window) const;
+    // The pointer in desktop logical units (capability screen_pointer).
+    [[nodiscard]] HostScreenPointResult pointer_position() const;
+    // The run's topmost window at a desktop point (window_at_point).
+    [[nodiscard]] ApplicationWindowAtResult window_at(Point point) const;
+    // Monitors in desktop logical units (monitor_geometry).
+    [[nodiscard]] HostMonitorResult monitors() const;
+    // Live windows of the run, including any not yet ready.
+    [[nodiscard]] std::size_t window_count() const noexcept;
+
+private:
+    friend struct detail::ApplicationHandleAccess;
+    explicit ApplicationWindows(std::weak_ptr<detail::ApplicationRunState> run) noexcept;
+    std::weak_ptr<detail::ApplicationRunState> run_{};
 };
 
 /// Runs the selected native host through one portable C++ entry point.
