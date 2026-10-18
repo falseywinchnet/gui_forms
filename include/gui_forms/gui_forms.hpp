@@ -35,6 +35,7 @@
 #include "gui_forms/popup_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/metrics.hpp"
+#include "gui_forms/pages.hpp"
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/scrolling.hpp"

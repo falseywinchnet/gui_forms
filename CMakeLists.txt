@@ -123,6 +123,7 @@ add_library(gui_forms_core STATIC
     src/core/text/prepared/prepared_storage.cpp
     src/core/text/composite/text_composite.cpp
     src/core/document_view/document_view_state.cpp
+    src/core/pages/page_set/page_set.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
@@ -2158,6 +2159,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
+
+    add_executable(gui_forms_page_set_tests tests/page_set_tests.cpp)
+    target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
