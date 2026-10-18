@@ -46,7 +46,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | C | [Stable installed C ABI](C-c-abi/README.md) | 0.5 ABI candidate | T1, T2 | experimental ABI 0.26, not installed |
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
 | RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
-| DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): docking study written; `PageView` (matrix row 51) studied inside this stage; interview and decisions follow before any build |
+| DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): complete 2026-10-17: studies, interview round 001 (43 decisions, look studies published) and the plan, accepted by the owner; built in a DK window-layer stage (W0) and in W (`DK-docking/PLAN.md`) |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |

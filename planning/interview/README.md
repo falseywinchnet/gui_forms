@@ -14,6 +14,7 @@ own cross-references use that repository's layout.
 | `GUI_FORMS_ACCESSIBILITY_AND_TEXT_ROUND_001.md` | The first accessibility and text interview round |
 | `WINFORMS_CONTROL_INVENTORY.md` | The Windows Forms control inventory used by the completeness matrix |
 | `RIBBON_INTERVIEW_ROUND_001.md` | The ribbon framework round (stage RB), from 2026-10-14; not part of the 2026-08-10 copy |
+| `DOCKING_INTERVIEW_ROUND_001.md` | The docking and PageView round (stage DK), from 2026-10-17; not part of the 2026-08-10 copy |
 
 They are records: amend them by adding a dated note, not by rewriting earlier
 answers. Where a later decision record in `decisions/` or the current code

@@ -1,0 +1,2050 @@
+<title>Docking Look Studies</title>
+<style>
+@import url("https://fonts.googleapis.com/css2?family=Carlito:ital,wght@0,400;0,700;1,400&family=Cousine&display=swap");
+/* Layout: one reading column; a grounding panel of decisions; sixteen studies, each a note beside labelled option samples (and a live demo where motion matters); an answer sheet last. */
+:root {
+  --page: #eceff3; --page-fg: #1b2230; --page-muted: #586273; --page-rule: #d2d8e1; --page-card: #f9fafb; --page-accent: #3e61a3; --page-on-accent: #ffffff;
+  --page-chip-bg: #e1e8f4; --page-chip-edge: #b9c7de; --page-chip-fg: #23446f; --page-input: #ffffff; --page-input-edge: #b7c0cc; --page-focus: #2f5eb5;
+  --sample-bg: #dde3ea; --sample-edge: #cdd4de; --page-btn-top: #ffffff; --page-btn-bottom: #e8edf3;
+  --display: "Portsmouth Rapids", "Portsmouth", "Segoe UI", system-ui, sans-serif;
+  --body: "Carlito", "Calibri", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cousine", "Consolas", "Liberation Mono", ui-monospace, monospace;
+
+  /* House tokens: the GUI.Forms default theme (Pearl Ribbon toward Plan Paint's royale blue). The mock windows always show it. */
+  --ink: #153765; --muted: #5b6f8c; --group-ink: #485b70; --tab-ink: #23446f; --glyph: #23446f; --disabled-ink: #62799a; --white: #ffffff;
+  --paper: #ffffff; --ivory: #f4f4f5; --status: #edf2f8; --frame: #7f97bb; --frame-navy: #2a4775; --seam: #ccd3dc; --etch-light: rgba(255,255,255,.85);
+  --title-top: #f3f7fd; --title-bottom: #d9e6f7; --title-ink: #1f4378; --title2-top: #f6f6f7; --title2-bottom: #eaebed; --title2-ink: #8a94a3;
+  --cap-dot-top: #ffffff; --cap-dot-bottom: #c9dbf3; --cap-edge-dot: rgba(20,50,100,.4);
+  --rail: #93add0; --rail-edge: #7f9cc4; --tab-face: #9bb6da; --tab-face-hot: #acc6e7; --tab-face-on: #e8f2ff; --tab-face-pressed: #88a6cf;
+  --tab-wash: rgba(34,70,116,.15); --tab-wash-on: rgba(255,255,255,.57); --tab-wash-press: rgba(24,56,97,.22); --tab-top-line: rgba(255,255,255,.49);
+  --tab-edge-inner: #d1e0f5; --tab-edge-outer: #496c9f; --tab-shadow: rgba(24,56,97,.22); --tab-ink-on: #173f79;
+  --file-top: #528be0; --file-bottom: #173f88; --file-hi: rgba(255,255,255,.35);
+  --plane-top: #eef7ff; --plane-mid: #dbe9fc; --plane-bottom: #bcd3f4; --plane-foot: #c9dbf6; --divider: #a9c0e0;
+  --t-top: #d2e4fb; --t-bottom: #a3c1ec; --t-border: #6384b2; --h-top: #dae9fc; --h-bottom: #b1ccf2; --h-border: #355e96; --p-top: #98b5da; --p-bottom: #b5cceb;
+  --a-top: #ffedba; --a-bottom: #ffcf66; --a-border: #c49332;
+  --pill-hi: rgba(255,255,255,.9); --pill-lo: rgba(49,86,134,.53); --pill-contact: rgba(41,75,119,.33);
+  --focus: #143c74; --deep-edge: #7d93b3; --deep-shade: rgba(21,55,101,.22);
+  --sel: #d9e8fc; --sel-line: #5f86c2; --hover-row: rgba(217,232,252,.55);
+  --win-shadow-1: rgba(16,32,60,.22); --win-shadow-2: rgba(16,32,60,.28);
+  --ovl-1: rgba(20,30,42,.25); --ovl-2: rgba(20,30,42,.22); --e3-shadow: rgba(20,30,42,.26); --e5-1: rgba(20,30,42,.40); --e5-2: rgba(20,30,42,.53); --e5-rim: rgba(255,255,255,.55);
+  --graphite: #6f7782; --graphite-fleck: rgba(255,255,255,.06); --grip-dot: #d5dbe3; --grip-dot-hot: #ffffff; --gap-edge: #b9c4d3; --line-seam: #9fb0c6; --line-grip: #355e96;
+  --cap-top: #f4f7fa; --cap-bottom: #e6ebf2; --cap-edge: #c3cddb; --key-idle: #a9b8cc; --key-on: #2f6ad0; --key-sec: #8aa3c6;
+  --active-cap-top: #5c93e8; --active-cap-bottom: #2556ad; --active-tint: #dce9fc; --active-accent: #2d63bd; --accent-line: #2d63bd; --prox-ring: #2d63bd;
+  --vs05-chassis: #d6dfeb; --vs05-cap-top: #f4f7fb; --vs05-cap-bottom: #d9e2ee; --vs05-cap-edge: #a8b8cd; --vs05-tab: #e2e9f2;
+  --vs10-chassis: #2c3d5a; --vs10-fleck: rgba(255,255,255,.04); --vs10-cap: #4d6082; --vs10-cap-ink: #e3e9f3; --vs10-tab-hot: #5a7099;
+  --s03-rail: #e8edf4; --s03-div: #b6c2d2; --s03-line: #8fa3bf; --s03-page: #fbfcfd;
+  --menu-face: #ffffff; --menu-edge: #8ea4c4; --menu-hot: #dbe8fb; --menu-sep: #d5dce6;
+  --host-top: #f0f1f3; --host-bottom: #e3e5e8; --host-ink: #2b2e33; --host-edge: #b4b9c0;
+  --band-top: #f4f8fe; --band-mid: #dce8f9; --band-break: #c6d9f4; --band-bottom: #e3eefc; --band-edge: #9db3d3;
+  --band-hot-top: #fffbea; --band-hot-mid: #fff0c2; --band-hot-break: #ffe39a; --band-hot-bottom: #fff3cf;
+  --band-sel-top: #fff3cf; --band-sel-mid: #ffdf8c; --band-sel-break: #ffcf5c; --band-sel-bottom: #ffe7a6;
+  --code-kw: #2a55b8; --code-ty: #25807a; --code-st: #a3451f; --code-cm: #6f8a5f; --signal: #df6b65; --strip-bg: #dfe8f4;
+  --tile-bg: #0a0d12; --tile-rim: #2a3340; --tile-outline: #8796ab; --tile-shape: #2f6fd6; --tile-shape-lit: #6db0ff; --tile-lit-bg: #111b2b; --tile-lit-rim: #8fc0ff; --tile-plate: #141922; --tile-cast: rgba(10,16,26,.38);
+  --hl-tint: rgba(46,104,206,.22); --hl-edge: #2e68ce; --hl-hatch: #1f3f78; --cursor-fill: #0b0d10; --cursor-edge: #ffffff;
+  --ic-fold-a: #ffe7a1; --ic-fold-b: #f5c451; --ic-fold-c: #d99a1e; --ic-fold-back: #e9b44a; --ic-fold-line: #8a5a0c;
+  --ic-page-a: #ffffff; --ic-page-b: #dfe6f0; --ic-page-line: #5b6b85; --ic-blue-a: #8cc4ff; --ic-blue-b: #2a63c4; --ic-green-a: #9fe28a; --ic-green-b: #3b9a3a;
+  --ic-red-a: #ff8a7a; --ic-red-b: #c8322b; --ic-violet-a: #c9a4f2; --ic-violet-b: #7a4fc2; --ic-gold-a: #ffe08a; --ic-gold-b: #d99a1e;
+  --ic-console: #1d2a3a; --ic-steel-a: #e8eef6; --ic-steel-b: #8c9bb0; --ic-steel-line: #4d5b70; --ic-wood: #b07a3c; --ic-note: #fff1a8; --ic-note-line: #b89a2a;
+  --dz-lit-1: #ecf4fe; --dz-lit-2: #f6faff; --dz-lit-3: #ffffff; --dz-sh-1: #b0c6e8; --dz-sh-2: #84a2d4; --dz-sh-3: #587aba;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --page: #12161d; --page-fg: #e3e8ef; --page-muted: #9ba5b4; --page-rule: #29313d; --page-card: #1a2029; --page-accent: #8eaee6; --page-on-accent: #0f1520;
+    --page-chip-bg: #22304a; --page-chip-edge: #34476b; --page-chip-fg: #c9d9f5; --page-input: #0f1319; --page-input-edge: #3a4452; --page-focus: #9cbcf2;
+    --sample-bg: #252c36; --sample-edge: #323b47; --page-btn-top: #232a35; --page-btn-bottom: #1b212a; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --page: #12161d; --page-fg: #e3e8ef; --page-muted: #9ba5b4; --page-rule: #29313d; --page-card: #1a2029; --page-accent: #8eaee6; --page-on-accent: #0f1520;
+  --page-chip-bg: #22304a; --page-chip-edge: #34476b; --page-chip-fg: #c9d9f5; --page-input: #0f1319; --page-input-edge: #3a4452; --page-focus: #9cbcf2;
+  --sample-bg: #252c36; --sample-edge: #323b47; --page-btn-top: #232a35; --page-btn-bottom: #1b212a; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--page-fg); font-family: var(--body); font-size: 16px; line-height: 1.5; padding-inline: 16px; padding-block: 28px 64px; }
+.page { max-width: 1260px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; min-width: 0; }
+header, .part, .sheet, footer, .study > * { min-width: 0; }
+header { display: grid; gap: 12px; }
+.eyebrow { font-family: var(--display); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--page-muted); }
+h1 { font-family: var(--display); font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--display); font-size: 25px; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--display); font-size: 20px; line-height: 1.2; margin: 0; text-wrap: balance; }
+p { margin: 0; max-width: 72ch; }
+code { font-family: var(--mono); font-size: .86em; }
+a { color: var(--page-accent); }
+.lede { color: var(--page-muted); font-size: 18px; }
+.ground { background: var(--page-card); border: 1px solid var(--page-rule); border-radius: 6px; padding: 16px 18px; display: grid; gap: 8px; font-size: 15px; }
+.ground h3 { font-size: 15px; }
+.ground ul { margin: 0; padding-left: 20px; columns: 2 340px; column-gap: 32px; }
+@media (max-width: 760px) { .ground ul { columns: 1; } }
+.ground li { break-inside: avoid; margin-bottom: 4px; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--display); font-size: 13.5px; }
+.motion-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 15px; color: var(--page-muted); }
+:focus-visible { outline: 2px solid var(--page-focus); outline-offset: 2px; }
+.part { display: grid; gap: 30px; }
+.study { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 26px; align-items: start; padding-top: 22px; border-top: 1px solid var(--page-rule); scroll-margin-top: 12px; }
+.note { display: grid; gap: 10px; min-width: 0; }
+.note .tag { font-family: var(--display); font-size: 13px; color: var(--page-accent); letter-spacing: .04em; }
+.note p, .note li { font-size: 15px; }
+.note .decided { font-size: 14px; color: var(--page-muted); background: var(--page-card); border: 1px solid var(--page-rule); border-radius: 6px; padding: 9px 12px; }
+.note .decided b { color: var(--page-fg); font-family: var(--display); font-weight: 400; }
+.note ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 7px; }
+.note li b { font-family: var(--display); font-weight: 400; color: var(--page-accent); }
+.samples { display: grid; gap: 16px; min-width: 0; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.opts.wide { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+.opts.mid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.opts.one { grid-template-columns: minmax(0, 1fr); }
+figure.opt { margin: 0; display: grid; gap: 8px; min-width: 0; align-content: start; }
+figure.opt figcaption { font-size: 14px; color: var(--page-muted); }
+figure.opt figcaption b { font-family: var(--display); font-weight: 400; color: var(--page-fg); }
+.sample { background: var(--sample-bg); border: 1px solid var(--sample-edge); border-radius: 6px; padding: 14px; overflow-x: auto; min-width: 0; }
+.pick { font-family: var(--display); font-size: 12.5px; color: var(--page-chip-fg); background: var(--page-chip-bg); border: 1px solid var(--page-chip-edge); border-radius: 4px; padding: 1px 8px; cursor: pointer; margin-right: 4px; }
+.pick[aria-pressed="true"] { background: var(--page-accent); color: var(--page-on-accent); border-color: var(--page-accent); }
+.demo { display: grid; gap: 10px; background: var(--page-card); border: 1px solid var(--page-rule); border-radius: 6px; padding: 12px; min-width: 0; }
+.demo-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.demo-title { font-family: var(--display); font-size: 14px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.seg button, .pbtn { font-family: var(--display); font-size: 12.5px; color: var(--page-fg); background: linear-gradient(var(--page-btn-top), var(--page-btn-bottom)); border: 1px solid var(--page-input-edge); border-radius: 4px; padding: 2px 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--page-accent); color: var(--page-on-accent); border-color: var(--page-accent); }
+.demo-msg { font-size: 14px; color: var(--page-muted); min-height: 1.5em; }
+.scrollx { overflow-x: auto; overscroll-behavior-x: contain; padding: 4px 4px 10px; min-width: 0; }
+.fit { position: relative; overflow: hidden; width: 100%; }
+.fit-in { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.sheet { display: grid; gap: 18px; }
+.sheet-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.sheet fieldset { margin: 0; border: 1px solid var(--page-rule); border-radius: 6px; background: var(--page-card); padding: 8px 12px 10px; display: grid; gap: 4px; min-width: 0; }
+.sheet legend { font-family: var(--display); font-size: 14px; padding: 0 4px; }
+.sheet label { font-size: 14.5px; display: flex; gap: 6px; align-items: baseline; }
+.sheet label span { color: var(--page-muted); }
+.sheet label b { font-weight: 400; white-space: nowrap; }
+.sheet input[type="text"], .sheet textarea { font-family: var(--body); font-size: 14px; color: var(--page-fg); background: var(--page-input); border: 1px solid var(--page-input-edge); border-radius: 4px; padding: 3px 6px; width: 100%; }
+.sheet textarea { font-family: var(--mono); font-size: 13.5px; min-height: 64px; resize: vertical; }
+.sheet-out { display: grid; gap: 8px; }
+.sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+footer { color: var(--page-muted); font-size: 14px; border-top: 1px solid var(--page-rule); padding-top: 14px; display: grid; gap: 6px; }
+@media (max-width: 900px) { .study { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) { .opts, .opts.wide, .opts.mid { grid-template-columns: minmax(0, 1fr); } .sample { padding: 10px; } }
+
+/* ===== Mock windows (house look). Plates flat and tinted; depth is recess only (wells, work pane). ===== */
+.dk, .mock { position: relative; font-family: var(--body); font-size: 13px; color: var(--ink); line-height: 1.35; text-align: left; }
+.win { position: relative; background: var(--ivory); border: 1px solid var(--frame); box-shadow: 0 8px 24px var(--win-shadow-1), 0 1px 2px var(--win-shadow-2); }
+.titlebar { display: flex; align-items: center; gap: 8px; padding: 5px 10px; background: linear-gradient(var(--title-top), var(--title-bottom)); color: var(--title-ink); font-family: var(--display); font-size: 12.5px; border-bottom: 1px solid var(--rail-edge); }
+.titlebar .caps { margin-left: auto; display: flex; gap: 6px; }
+.titlebar .caps i { width: 11px; height: 11px; border-radius: 50%; background: linear-gradient(var(--cap-dot-top), var(--cap-dot-bottom)); box-shadow: 0 0 0 1px var(--cap-edge-dot); display: block; }
+.win.secondary .titlebar { background: linear-gradient(var(--title2-top), var(--title2-bottom)); color: var(--title2-ink); }
+.win.secondary .titlebar .caps i { opacity: .55; }
+.win.secondary .pane.current .pcap .key { background: var(--key-sec); }
+.win.secondary.prox-key .titlebar { background: linear-gradient(var(--title-top), var(--title-bottom)); color: var(--title-ink); }
+.win.secondary.prox-key .titlebar .caps i { opacity: 1; }
+.win.prox-ring { box-shadow: 0 0 0 2px var(--prox-ring), 0 8px 24px var(--win-shadow-1); }
+.rail { display: flex; align-items: flex-end; padding: 3px 0 0 4px; background: var(--rail); }
+.rail span { position: relative; font-family: var(--display); font-size: 12.5px; color: var(--tab-ink); padding: 4px 18px; border-radius: 4px 4px 0 0;
+  background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face);
+  box-shadow: inset 0 1px 0 var(--tab-top-line), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.rail span:nth-child(2) { z-index: 5; } .rail span:nth-child(3) { z-index: 4; } .rail span:nth-child(4) { z-index: 3; } .rail span:nth-child(5) { z-index: 2; }
+.rail .file { background: linear-gradient(var(--file-top), var(--file-bottom)); color: var(--white); padding: 4px 14px; z-index: 6; box-shadow: inset 0 1px 0 var(--file-hi), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.rail .on { z-index: 7 !important; color: var(--tab-ink-on); font-weight: 700; font-size: 13px; padding: 5px 20px 6px; margin-top: -3px;
+  background: linear-gradient(var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on);
+  box-shadow: inset 0 1px 0 var(--white), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.rail .on::after { content: ""; position: absolute; left: 0; right: 2px; bottom: -1px; height: 3px; background: var(--plane-top); }
+.ribbon { display: flex; align-items: stretch; padding: 5px 6px 0; background: linear-gradient(var(--plane-top) 0%, var(--plane-mid) 45%, var(--plane-bottom) 100%); border-bottom: 1px solid var(--rail-edge); box-shadow: inset 0 -1px 0 var(--plane-foot); }
+.grp { display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: 0 7px; }
+.grp + .grp { border-left: 1px solid; border-image: linear-gradient(transparent, var(--divider) 20%, var(--divider) 80%, transparent) 1; }
+.grp .cmds { display: flex; gap: 1px; align-items: start; }
+.grp .label { font-family: var(--display); font-size: 10.5px; color: var(--group-ink); padding: 2px 0 3px; }
+.ribbon .tile { font-family: var(--display); font-size: 11px; color: var(--ink); display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 50px; padding: 4px 6px 3px; background: var(--dither, transparent); image-rendering: pixelated; cursor: default; }
+.ribbon .tile:hover { filter: brightness(1.04) saturate(1.15); }
+.ribbon .tile:active { background: var(--dither-press, transparent); filter: none; }
+.ribbon .tile svg { width: 22px; height: 22px; }
+.wbody { display: flex; background: var(--ivory); }
+.sitewrap { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.site { position: relative; overflow: hidden; background-color: var(--graphite); background-image: repeating-linear-gradient(135deg, var(--graphite-fleck) 0 1px, transparent 1px 3px); }
+.status { display: flex; align-items: center; gap: 14px; padding: 3px 10px; background: var(--status); border-top: 1px solid var(--seam); font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+.status .chip { font-family: var(--display); font-size: 11px; padding: 0 9px; border-radius: 3px; background: linear-gradient(var(--t-top), var(--t-bottom)); border: 1px solid var(--t-border); box-shadow: inset 1px 1px 0 var(--pill-hi), inset -1px -1px 0 var(--pill-lo); }
+.status .grow { margin-left: auto; }
+
+/* Panes */
+.pane { position: absolute; display: flex; flex-direction: column; background: var(--ivory); overflow: hidden; }
+.pane.inflow { position: relative; flex: 1; }
+.pcap { flex: none; height: 21px; display: flex; align-items: center; gap: 6px; padding: 0 3px 0 7px; background: linear-gradient(var(--cap-top), var(--cap-bottom)); border-bottom: 1px solid var(--cap-edge); font-family: var(--display); font-size: 12px; color: var(--group-ink); cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.dk-dragging .pcap, .dk-dragging .ptab { cursor: grabbing; }
+.static .pcap, .static .ptab { cursor: default; }
+.pcap .key, .drawncap .key { width: 7px; height: 7px; border-radius: 1px; background: var(--key-idle); flex: none; }
+.pcap .pt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pbtns { display: flex; gap: 1px; margin-left: auto; }
+.pb { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 2px; color: var(--glyph); border: 1px solid transparent; cursor: default; }
+.pb svg { width: 9px; height: 9px; }
+.pb:hover { background: linear-gradient(var(--h-top), var(--h-bottom)); border-color: var(--h-border); }
+.pane.current .pcap .key, .drawncap .key.on { background: var(--key-on); }
+.pane.current .pcap { color: var(--ink); font-weight: 700; }
+.pane.prox-pane .pcap .key { background: var(--key-on); }
+.pane.prox-pane .pcap { color: var(--ink); font-weight: 700; }
+.pane.docs.prox-pane .dtabs { box-shadow: inset 0 -2px 0 var(--key-on); }
+.pbody { flex: 1; min-height: 0; overflow: hidden; padding: 4px 5px; }
+.ptabs { flex: none; display: flex; align-items: flex-start; padding: 0 4px 3px; border-top: 1px solid var(--seam); background: var(--ivory); }
+.ptab { position: relative; display: flex; align-items: center; gap: 4px; padding: 2px 8px 3px; font-size: 11.5px; color: var(--muted); border: 1px solid transparent; border-top: 0; border-radius: 0 0 3px 3px; margin-top: -1px; cursor: grab; touch-action: none; user-select: none; white-space: nowrap; }
+.ptab.on { background: var(--paper); border-color: var(--seam); color: var(--ink); }
+.ptab svg { width: 12px; height: 12px; flex: none; }
+.pane.docs { background: var(--tab-face-on); }
+.dtabs { flex: none; position: relative; display: flex; align-items: flex-end; height: 25px; padding: 3px 0 0 3px; background: var(--rail); }
+.dtab { position: relative; display: flex; align-items: center; gap: 5px; font-family: var(--display); font-size: 12px; color: var(--tab-ink); padding: 3px 4px 4px 10px; border-radius: 4px 4px 0 0; white-space: nowrap; cursor: default; user-select: none;
+  background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face);
+  box-shadow: inset 0 1px 0 var(--tab-top-line), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.dtab svg.ti { width: 13px; height: 13px; flex: none; }
+.dtab:hover:not(.on) { background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face-hot); }
+.dtab.on { z-index: 30 !important; color: var(--tab-ink-on); font-weight: 700; padding: 4px 5px 5px 11px; margin-top: -2px;
+  background: linear-gradient(var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on);
+  box-shadow: inset 0 1px 0 var(--white), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.dtab.on::after { content: ""; position: absolute; left: 0; right: 2px; bottom: -1px; height: 3px; background: var(--tab-face-on); }
+.dx { width: 14px; height: 14px; display: grid; place-items: center; border-radius: 2px; visibility: hidden; color: var(--glyph); flex: none; }
+.dx svg { width: 8px; height: 8px; }
+.dtab.on .dx, .dtab:hover .dx { visibility: visible; }
+.dx:hover { background: linear-gradient(var(--h-top), var(--h-bottom)); box-shadow: inset 0 0 0 1px var(--h-border); }
+.dover { margin-left: auto; align-self: center; width: 18px; height: 18px; margin-right: 3px; display: grid; place-items: center; color: var(--glyph); border-radius: 2px; }
+.dover svg { width: 9px; height: 9px; }
+.dbody { flex: 1; min-height: 0; padding: 4px; background: var(--tab-face-on); }
+.well { height: 100%; background: var(--paper); border: 1px solid var(--deep-edge); border-radius: 2px; box-shadow: inset 2px 2px 3px var(--deep-shade), inset 1px 1px 0 var(--deep-shade); overflow: hidden; padding: 6px 8px; }
+pre.code { margin: 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.5; color: var(--ink); white-space: pre; }
+.code .kw { color: var(--code-kw); } .code .ty { color: var(--code-ty); } .code .st { color: var(--code-st); } .code .cm { color: var(--code-cm); }
+.tree2 { display: grid; gap: 1px; font-size: 12px; }
+.tree2 div { display: flex; align-items: center; gap: 4px; padding: 1px 3px; border-radius: 2px; white-space: nowrap; }
+.tree2 svg { width: 14px; height: 14px; flex: none; }
+.tree2 .sel { background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line); }
+.tree2 .in1 { padding-left: 14px; } .tree2 .in2 { padding-left: 26px; }
+.pgrid { display: grid; grid-template-columns: auto 1fr; font-size: 11.5px; border: 1px solid var(--seam); background: var(--paper); }
+.pgrid span { padding: 1px 5px; border-bottom: 1px solid var(--seam); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pgrid span:nth-child(odd) { color: var(--muted); border-right: 1px solid var(--seam); background: var(--ivory); }
+.outwell { height: 100%; background: var(--paper); border: 1px solid var(--deep-edge); border-radius: 2px; box-shadow: inset 1px 1px 2px var(--deep-shade); padding: 3px 6px; font-family: var(--mono); font-size: 11px; line-height: 1.45; white-space: pre; overflow: hidden; color: var(--ink); }
+
+/* Seams */
+.seam { position: absolute; z-index: 3; display: grid; place-items: center; }
+.seam.sv { cursor: col-resize; } .seam.sh { cursor: row-resize; }
+.seam .grip { display: flex; gap: 2px; transition: transform 100ms ease, opacity 100ms ease; }
+.seam.sv .grip { flex-direction: column; }
+.seam .grip i { width: 1px; height: 1px; background: var(--grip-dot); }
+.seam:hover .grip { transform: scale(2); }
+.seam:hover .grip i { background: var(--grip-dot-hot); }
+.dk.seam-gap .site { background: var(--ivory); background-image: none; }
+.dk.seam-gap .pane { outline: 1px solid var(--gap-edge); outline-offset: -1px; }
+.dk.seam-gap .seam .grip { display: none; }
+.dk.seam-line .site { background: var(--line-seam); background-image: none; }
+.dk.seam-line .seam .grip { opacity: 0; }
+.dk.seam-line .seam:hover .grip { opacity: 1; transform: scale(1.7); }
+.dk.seam-line .seam .grip i { background: var(--line-grip); }
+@media (prefers-reduced-motion: reduce) { .seam .grip { transition: none; } }
+
+/* T1 looks */
+.look-vs05 .site { background: var(--vs05-chassis); background-image: none; }
+.look-vs05 .seam .grip, .look-vs10 .seam .grip { display: none; }
+.look-vs05 .pcap { background: linear-gradient(var(--vs05-cap-top), var(--vs05-cap-bottom)); border-bottom-color: var(--vs05-cap-edge); color: var(--ink); font-family: var(--body); font-size: 12px; }
+.look-vs05 .pcap .key, .look-vs10 .pcap .key { display: none; }
+.look-vs05 .pane.current .pcap { background: linear-gradient(var(--active-cap-top), var(--active-cap-bottom)); color: var(--white); border-bottom-color: var(--active-cap-bottom); }
+.look-vs05 .pane.current .pb { color: var(--white); }
+.look-vs05 .ptabs { background: var(--vs05-chassis); border-top-color: var(--vs05-cap-edge); }
+.look-vs05 .ptab.on { border-color: var(--vs05-cap-edge); }
+.look-vs05 .dtabs { background: var(--vs05-chassis); }
+.look-vs05 .dtab { box-shadow: none; background: var(--vs05-tab); clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%); padding-left: 16px; margin-right: -7px; border-radius: 0 3px 0 0; font-family: var(--body); }
+.look-vs05 .dtab.on { background: var(--paper); padding-left: 17px; }
+.look-vs05 .dtab.on::after { background: var(--paper); }
+.look-vs05 .dbody, .look-vs05 .pane.docs { background: var(--paper); }
+.look-vs05 .dbody { padding: 0; }
+.look-vs05 .dbody .well { border-color: var(--vs05-cap-edge); box-shadow: none; border-radius: 0; }
+.look-vs10 .site { background-color: var(--vs10-chassis); background-image: repeating-linear-gradient(45deg, var(--vs10-fleck) 0 1px, transparent 1px 4px); }
+.look-vs10 .pcap { background: var(--vs10-cap); color: var(--vs10-cap-ink); border-bottom: 0; font-family: var(--body); }
+.look-vs10 .pcap .pb { color: var(--vs10-cap-ink); }
+.look-vs10 .pane.current .pcap { background: linear-gradient(var(--a-top), var(--a-bottom)); color: var(--ink); }
+.look-vs10 .pane.current .pcap .pb { color: var(--ink); }
+.look-vs10 .ptabs { background: var(--vs10-chassis); border-top: 0; padding-bottom: 2px; }
+.look-vs10 .ptab { color: var(--vs10-cap-ink); }
+.look-vs10 .ptab.on { background: var(--ivory); color: var(--ink); border-color: transparent; }
+.look-vs10 .dtabs { background: var(--vs10-chassis); }
+.look-vs10 .dtab { background: transparent; box-shadow: none; color: var(--vs10-cap-ink); border-radius: 2px 2px 0 0; font-family: var(--body); }
+.look-vs10 .dtab:hover:not(.on) { background: var(--vs10-tab-hot); }
+.look-vs10 .dtab.on { background: linear-gradient(var(--a-top), var(--a-bottom)); color: var(--ink); box-shadow: none; }
+.look-vs10 .dtab.on::after { background: var(--a-bottom); }
+.look-vs10 .dover { color: var(--vs10-cap-ink); }
+.look-vs10 .pane.docs { background: var(--a-bottom); }
+.look-vs10 .dbody { background: var(--a-bottom); padding: 3px 0 0; }
+.look-vs10 .dbody .well { border-radius: 0; border-color: var(--a-border); }
+
+/* T4 caption variants (house look) */
+.cap-fill .pane.current .pcap { background: linear-gradient(var(--active-cap-top), var(--active-cap-bottom)); color: var(--white); border-bottom-color: var(--active-cap-bottom); }
+.cap-fill .pane.current .pcap .key { background: var(--white); }
+.cap-fill .pane.current .pcap .pb { color: var(--white); }
+.cap-tint .pane.current .pcap { background: var(--active-tint); box-shadow: inset 0 2px 0 var(--active-accent); color: var(--ink); }
+.cap-tint .ptabs { background: var(--rail); border-top: 0; padding: 0 0 3px 3px; }
+.cap-tint .ptab { margin-top: 0; border: 0; border-radius: 0 0 4px 4px; color: var(--tab-ink); padding: 2px 9px 4px;
+  background: linear-gradient(0deg, var(--tab-wash) 0%, transparent 72%), var(--tab-face);
+  box-shadow: inset 0 -1px 0 var(--tab-top-line), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px -1px 2px var(--tab-shadow); }
+.cap-tint .ptab.on { z-index: 4; color: var(--tab-ink-on); font-weight: 700; padding-bottom: 6px; background: linear-gradient(0deg, var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on); }
+.t4row { display: flex; flex-wrap: wrap; gap: 14px; }
+.t4box { display: grid; gap: 4px; width: 200px; }
+.t4box .site { border: 1px solid var(--frame); }
+.t4lbl { font-family: var(--display); font-size: 11.5px; color: var(--group-ink); }
+
+/* Drag layer: stamp, area highlight, tiles */
+.dk-layer { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+.dk-stamp { position: absolute; overflow: hidden; background: var(--ivory); outline: 1px solid var(--frame); box-shadow: 2px 4px 10px var(--ovl-1), .5px 1px 3px var(--ovl-2); }
+.dk-stamp > .pane { transform-origin: 0 0; }
+.dk-targets { position: absolute; inset: 0; }
+.dk-hl { position: absolute; display: none; }
+.dk-hl.on { display: block; }
+.hl-tint { background: var(--hl-tint); box-shadow: inset 0 0 0 1px var(--hl-edge); }
+.hl-hatch { border: 3px solid transparent; border-image: repeating-linear-gradient(45deg, var(--hl-hatch) 0 2px, transparent 2px 4px) 3; }
+.dk-cross, .dk-global { position: absolute; inset: 0; }
+.dk-plate-wrap { position: absolute; inset: 0; filter: drop-shadow(1px 2px 3px var(--tile-cast)); }
+.dk-plate { position: absolute; background: var(--tile-plate); }
+.dk-plate.dia { transform: rotate(45deg); border-radius: 6px; box-shadow: inset 0 0 0 1px var(--tile-rim); }
+.dk-tile { position: absolute; display: grid; place-items: center; background: var(--tile-bg); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--tile-rim); }
+.ts-sep .dk-tile, .ts-quiet .dk-tile, .dk-global .dk-tile { box-shadow: inset 0 0 0 1px var(--tile-rim), 1px 2px 4px var(--tile-cast); }
+.ts-cross .dk-tile { border-radius: 2px; }
+.dk-tile svg { width: 72%; height: 72%; }
+.dk-tile .ol { fill: none; stroke: var(--tile-outline); stroke-width: 1; }
+.dk-tile .sh { fill: var(--tile-shape); }
+.dk-tile.lit { background: var(--tile-lit-bg); box-shadow: inset 0 0 0 1px var(--tile-lit-rim), 1px 2px 4px var(--tile-cast); }
+.dk-tile.lit .sh { fill: var(--tile-shape-lit); }
+.dk-tile.lit .ol { stroke: var(--tile-lit-rim); }
+.dk-tile.off { opacity: .32; }
+.dk-tile.off .sh { fill: var(--tile-outline); }
+.ts-quiet { opacity: 0; transition: opacity 100ms ease; }
+.ts-quiet.in { opacity: 1; }
+.ts-quiet .dk-tile { opacity: .58; }
+.ts-quiet .dk-tile.lit { opacity: 1; }
+.dk-cue { position: absolute; display: none; place-items: center; width: 20px; height: 20px; border-radius: 3px; background: var(--menu-face); color: var(--glyph); box-shadow: 0 0 0 1px var(--menu-edge), 1px 2px 4px var(--ovl-1); }
+.dk-cue svg { width: 12px; height: 12px; }
+.dk-cursor { position: absolute; width: 13px; height: 19px; }
+.snap { width: 360px; height: 220px; }
+.snapwin { position: absolute; inset: 0; border: 1px solid var(--frame); background: var(--ivory); }
+
+/* Auto-hide strip, side tabs and flyout */
+.ahstrip { flex: none; width: 25px; background: var(--strip-bg); border-right: 1px solid var(--seam); display: flex; flex-direction: column; gap: 4px; padding: 6px 2px; }
+.ahstrip.empty { display: none; }
+.stab { display: flex; align-items: center; gap: 5px; font-family: var(--display); font-size: 11.5px; color: var(--tab-ink); padding: 8px 2px; border: 1px solid var(--t-border); border-radius: 3px; background: linear-gradient(90deg, var(--t-top), var(--t-bottom)); cursor: default; user-select: none; white-space: nowrap; writing-mode: vertical-rl; }
+.stab svg { width: 13px; height: 13px; flex: none; }
+.sdir-btt .stab { transform: rotate(180deg); }
+.sdir-btt .stab svg { transform: rotate(180deg); }
+.stab:hover, .stab.hot { background: linear-gradient(90deg, var(--h-top), var(--h-bottom)); border-color: var(--h-border); }
+.stab.open { background: var(--tab-face-on); border-color: var(--tab-edge-outer); color: var(--tab-ink-on); font-weight: 700; }
+.ahstrip.sdir-col { width: 58px; padding: 6px 3px; }
+.sdir-col .stab { writing-mode: horizontal-tb; flex-direction: column; gap: 2px; padding: 5px 2px 4px; font-size: 10.5px; text-align: center; }
+.sdir-col .stab svg { width: 16px; height: 16px; }
+.flyout { position: absolute; left: 0; top: 0; bottom: 0; width: 230px; z-index: 6; display: flex; visibility: hidden; background: var(--ivory); }
+.flyout .fgrip { flex: none; width: 4px; background-color: var(--graphite); cursor: col-resize; }
+.fly-rb37 { box-shadow: 2px 4px 10px var(--ovl-1), .5px 1px 3px var(--ovl-2); }
+.fly-e3 { box-shadow: 0 3px 8px var(--e3-shadow); }
+.film { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; max-width: 470px; }
+.frame { display: grid; gap: 3px; font-family: var(--display); font-size: 11px; color: var(--group-ink); }
+.fr-site { position: relative; width: 100%; aspect-ratio: 10 / 7; overflow: hidden; border: 1px solid var(--frame); background-color: var(--graphite); }
+.fr-strip { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; background: var(--strip-bg); display: grid; align-content: start; gap: 3px; padding: 4px 1px; }
+.fr-strip i { height: 18px; border: 1px solid var(--t-border); border-radius: 2px; background: var(--t-top); }
+.fr-strip i.on { background: var(--tab-face-on); border-color: var(--tab-edge-outer); }
+.fr-doc { position: absolute; left: 11px; right: 3px; top: 3px; bottom: 3px; background: var(--tab-face-on); }
+.fr-doc::before { content: ""; position: absolute; inset: 8px 3px 3px; background: var(--paper); border: 1px solid var(--deep-edge); }
+.fr-clip { position: absolute; left: 8px; top: 0; bottom: 0; right: 0; overflow: hidden; }
+.fr-fly { position: absolute; left: 0; top: 0; bottom: 0; width: 56%; background: var(--ivory); }
+.fr-fly b { display: block; height: 8px; background: linear-gradient(var(--cap-top), var(--cap-bottom)); border-bottom: 1px solid var(--cap-edge); }
+.fr-fly::after { content: ""; position: absolute; left: 4px; right: 8px; top: 13px; height: 34px; background: repeating-linear-gradient(var(--sel-line) 0 1px, transparent 1px 6px); opacity: .55; }
+
+/* Floating windows */
+.fwin { position: absolute; z-index: 10; background: var(--ivory); border: 1px solid var(--frame-navy); box-shadow: 0 16px 34px var(--e5-1), 0 2px 5px var(--e5-2), inset 0 0 0 1px var(--e5-rim); display: flex; flex-direction: column; width: 240px; }
+.fwin.static { position: relative; z-index: auto; }
+.fwin .site { margin: 0 1px 1px; }
+.hostbar { height: 23px; display: flex; align-items: center; padding: 0 3px 0 8px; background: linear-gradient(var(--host-top), var(--host-bottom)); color: var(--host-ink); font-family: system-ui, "Segoe UI", sans-serif; font-size: 11.5px; border-bottom: 1px solid var(--host-edge); }
+.hostbar .hx { margin-left: auto; width: 26px; height: 18px; display: grid; place-items: center; color: var(--host-ink); }
+.hostbar .hx svg { width: 9px; height: 9px; }
+.drawncap { height: 24px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 9px; background: linear-gradient(var(--title-top), var(--title-bottom)); color: var(--title-ink); font-family: var(--display); font-size: 12.5px; border-bottom: 1px solid var(--rail-edge); white-space: nowrap; }
+.drawncap.thin { height: 17px; font-size: 10.5px; gap: 4px; }
+.drawncap.thin .pb { width: 14px; height: 14px; }
+.drawncap .dt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fwin.secondary .drawncap { background: linear-gradient(var(--title2-top), var(--title2-bottom)); color: var(--title2-ink); }
+.t6row { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; padding: 4px 4px 34px; }
+.proxstage { width: 830px; height: 470px; }
+.marks { display: flex; flex-wrap: wrap; gap: 10px 16px; font-size: 13px; color: var(--page-muted); }
+.marks span { display: inline-flex; align-items: center; gap: 6px; }
+.marks svg { width: 16px; height: 16px; color: var(--page-fg); }
+
+/* PageView strips */
+.pt { display: grid; gap: 12px; }
+.cap2 { font-family: var(--display); font-size: 11.5px; color: var(--page-muted); margin-bottom: -6px; }
+.tabbox { display: grid; width: max-content; min-width: 100%; }
+.strip { position: relative; z-index: 1; display: flex; align-items: flex-end; padding: 4px 6px 0; background: var(--rail); min-width: max-content; }
+.strip .tb { position: relative; display: flex; align-items: center; gap: 5px; font-family: var(--display); font-size: 12.5px; color: var(--tab-ink); padding: 4px 12px 5px; white-space: nowrap; cursor: default; user-select: none; }
+.strip .tb svg.ti { width: 14px; height: 14px; flex: none; }
+.strip .tb.dis { color: var(--disabled-ink); }
+.strip.pp .tb { border-radius: 4px 4px 0 0; background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face);
+  box-shadow: inset 0 1px 0 var(--tab-top-line), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.strip.pp .tb.hot, .strip.pp.live .tb:hover:not(.on) { background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face-hot); }
+.strip.pp .tb.pr { background: linear-gradient(var(--tab-wash-press) 0%, transparent 85%), var(--tab-face-pressed); }
+.strip.pp .tb.on { z-index: 30 !important; color: var(--tab-ink-on); font-weight: 700; padding: 5px 14px 7px; margin-top: -3px;
+  background: linear-gradient(var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on);
+  box-shadow: inset 0 1px 0 var(--white), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px 1px 2px var(--tab-shadow); }
+.strip.pp .tb.on::after { content: ""; position: absolute; left: 0; right: 2px; bottom: -1px; height: 3px; background: var(--tab-face-on); }
+.strip.pp.bot { align-items: flex-start; padding: 0 6px 4px; }
+.strip.pp.bot .tb { border-radius: 0 0 4px 4px; background: linear-gradient(0deg, var(--tab-wash) 0%, transparent 72%), var(--tab-face);
+  box-shadow: inset 0 -1px 0 var(--tab-top-line), inset -1px 0 0 var(--tab-edge-outer), inset -2px 0 0 var(--tab-edge-inner), 2px 0 0 var(--tab-edge-outer), 3px -1px 2px var(--tab-shadow); }
+.strip.pp.bot .tb.hot { background: linear-gradient(0deg, var(--tab-wash) 0%, transparent 72%), var(--tab-face-hot); }
+.strip.pp.bot .tb.pr { background: linear-gradient(0deg, var(--tab-wash-press) 0%, transparent 85%), var(--tab-face-pressed); }
+.strip.pp.bot .tb.on { margin-top: 0; margin-bottom: -3px; padding: 7px 14px 5px; background: linear-gradient(0deg, var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on); }
+.strip.pp.bot .tb.on::after { top: -1px; bottom: auto; }
+.tpage { background: var(--tab-face-on); padding: 8px; display: grid; gap: 6px; }
+.tpage .well { height: 70px; padding: 5px 8px; }
+.pgrow { display: grid; grid-template-columns: 64px 1fr; gap: 8px; align-items: center; font-size: 12px; }
+.lbl2 { color: var(--muted); }
+.entry2 { background: var(--paper); border: 1px solid var(--deep-edge); border-radius: 2px; box-shadow: inset 2px 2px 2px var(--deep-shade); height: 22px; padding: 2px 6px; font-size: 12px; }
+.strip.s03 { background: var(--s03-rail); box-shadow: inset 0 -1px 0 var(--s03-line); padding: 4px 6px 0; }
+.strip.s03 .tb { color: var(--group-ink); padding: 3px 11px 5px; }
+.strip.s03 .tb + .tb::before { content: ""; position: absolute; left: 0; top: 5px; bottom: 6px; width: 1px; background: var(--s03-div); }
+.strip.s03 .tb.hot { color: var(--ink); background: var(--hover-row); }
+.strip.s03 .tb.pr { background: var(--sel); }
+.strip.s03 .tb.on { z-index: 3; background: var(--s03-page); color: var(--ink); font-weight: 700; box-shadow: inset 1px 0 0 var(--s03-line), inset -1px 0 0 var(--s03-line), inset 0 1px 0 var(--s03-line); }
+.strip.s03 .tb.on::before, .strip.s03 .tb.on + .tb::before { display: none; }
+.strip.s03.bot { align-items: flex-start; box-shadow: inset 0 1px 0 var(--s03-line); padding: 0 6px 4px; }
+.strip.s03.bot .tb.on { box-shadow: inset 1px 0 0 var(--s03-line), inset -1px 0 0 var(--s03-line), inset 0 -1px 0 var(--s03-line); }
+.tpage.pg-s03 { background: var(--s03-page); box-shadow: inset 1px 0 0 var(--s03-line), inset -1px 0 0 var(--s03-line), inset 0 -1px 0 var(--s03-line); }
+.tpage.pg-s03.bot { box-shadow: inset 1px 0 0 var(--s03-line), inset -1px 0 0 var(--s03-line), inset 0 1px 0 var(--s03-line); }
+.strip.cl { background: var(--ivory); padding: 5px 6px 0; }
+.strip.cl .tb { margin-right: 1px; border: 1px solid var(--t-border); border-bottom: 0; border-radius: 4px 4px 0 0; background: linear-gradient(var(--t-top), var(--t-bottom)); box-shadow: inset 1px 1px 0 var(--pill-hi); padding: 3px 11px; }
+.strip.cl .tb.hot { background: linear-gradient(var(--h-top), var(--h-bottom)); }
+.strip.cl .tb.pr { background: linear-gradient(var(--p-top), var(--p-bottom)); box-shadow: none; }
+.strip.cl .tb.on { z-index: 3; background: var(--ivory); color: var(--ink); font-weight: 700; padding: 5px 13px 5px; margin: -2px -1px -1px; box-shadow: inset 1px 1px 0 var(--pill-hi); }
+.strip.cl.bot { align-items: flex-start; padding: 0 6px 5px; }
+.strip.cl.bot .tb { border-top: 0; border-bottom: 1px solid var(--t-border); border-radius: 0 0 4px 4px; }
+.strip.cl.bot .tb.on { margin: -1px -1px -2px; }
+.tpage.pg-cl { background: var(--ivory); border: 1px solid var(--t-border); }
+.join-line .tb.on { margin-top: 0 !important; padding: 4px 12px 5px !important; }
+.join-line .tb.on::after { left: 9px !important; right: 11px !important; bottom: 1px !important; height: 3px; border-radius: 2px; background: var(--accent-line) !important; }
+.join-plate .tb.on { margin: 1px 3px 3px 1px !important; padding: 3px 12px !important; border-radius: 3px !important; color: var(--ink) !important; background: linear-gradient(var(--t-top), var(--t-bottom)) !important;
+  box-shadow: inset 0 0 0 1px var(--t-border), inset 1px 1px 0 2px var(--pill-hi), 0 1px 0 var(--pill-contact) !important; }
+.join-plate .tb.on::after { display: none; }
+.tpage.edge { box-shadow: inset 0 1px 0 var(--tab-edge-outer); }
+.strip.doc .tb { padding: 4px 5px 5px 10px; }
+.strip.doc .tb.on { padding: 5px 6px 7px 11px; }
+.strip .lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; }
+.strip .lbl.it { font-style: italic; }
+.strip .lbl.tint { box-shadow: inset 0 -2px 0 var(--signal); }
+.cx, .pinm { width: 14px; height: 14px; display: grid; place-items: center; border-radius: 2px; color: var(--glyph); flex: none; }
+.cx { visibility: hidden; }
+.cx svg, .pinm svg { width: 8px; height: 8px; }
+.pinm svg { width: 9px; height: 9px; }
+.tb.on .cx, .tb.hot .cx, .strip.live .tb:hover .cx, .cx.show { visibility: visible; }
+.cx.hp { background: linear-gradient(var(--h-top), var(--h-bottom)); box-shadow: inset 0 0 0 1px var(--h-border); }
+.cx.hb svg path { stroke-width: 2; }
+.cx.hb { color: var(--focus); }
+.strip.live .cx:hover { background: linear-gradient(var(--h-top), var(--h-bottom)); box-shadow: inset 0 0 0 1px var(--h-border); }
+.cx.dot svg { display: none; }
+.cx.dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--glyph); }
+.tb.icononly { padding-left: 8px !important; padding-right: 8px !important; }
+.tb.icononly .lbl, .tb.icononly .cx, .tb.icononly .pinm { display: none; }
+.tb.pinhover .pinm { visibility: hidden; }
+.tb.pinhover.hot .pinm { visibility: visible; }
+.pgap { width: 9px; flex: none; }
+.ovwrap { position: relative; }
+.ovwrap .strip { min-width: 0; overflow: hidden; }
+.ovwrap .tpage .well { height: 250px; }
+.ovmeasure { position: absolute !important; visibility: hidden; left: 0; top: 0; }
+.ovb { margin-left: auto; align-self: center; height: 19px; min-width: 20px; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 0 4px; margin-right: 0; border-radius: 2px; color: var(--glyph); font-family: var(--display); font-size: 11.5px; cursor: default; flex: none; }
+.ovb svg { width: 9px; height: 9px; }
+.ovb:hover, .ovb.open { background: linear-gradient(var(--h-top), var(--h-bottom)); box-shadow: inset 0 0 0 1px var(--h-border); }
+.menu { position: absolute; z-index: 20; background: var(--menu-face); border: 1px solid var(--menu-edge); box-shadow: 2px 4px 10px var(--ovl-1), .5px 1px 3px var(--ovl-2); padding: 3px 0; font-size: 12.5px; color: var(--ink); min-width: 170px; }
+.ovmenu { right: 6px; top: 28px; display: none; }
+.mi { display: flex; gap: 7px; align-items: center; padding: 2px 14px 2px 8px; white-space: nowrap; cursor: default; }
+.mi svg { width: 13px; height: 13px; flex: none; }
+.mi:hover, .mi.hot { background: var(--menu-hot); }
+.mi.hid { font-style: italic; }
+.mi.cur { font-weight: 700; }
+.mi .ck { width: 12px; flex: none; text-align: center; font-size: 11px; }
+.msep { height: 1px; background: var(--menu-sep); margin: 3px 6px; }
+.mhead { font-family: var(--display); font-size: 11px; color: var(--muted); padding: 2px 8px; }
+.ovctl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 14px; }
+.ovctl input[type="range"] { width: 220px; max-width: 100%; }
+
+/* Navigation pane */
+.pt7row { display: flex; gap: 14px; align-items: flex-start; }
+.nav { width: 210px; height: 380px; display: flex; flex-direction: column; background: var(--ivory); border: 1px solid var(--frame); flex: none; position: relative; }
+.nav-head { display: flex; align-items: center; font-family: var(--display); font-size: 15px; color: var(--ink); padding: 4px 6px 4px 9px; background: linear-gradient(var(--cap-top), var(--cap-bottom)); border-bottom: 1px solid var(--cap-edge); }
+.nav-head .pb { margin-left: auto; }
+.nav-content { flex: 1; min-height: 0; overflow: hidden; padding: 4px 5px; }
+.nav-grip { flex: none; height: 7px; display: flex; justify-content: center; align-items: center; gap: 2px; cursor: row-resize; }
+.nav-grip i { width: 2px; height: 2px; }
+.nav-btn { position: relative; height: 31px; display: flex; align-items: center; gap: 8px; padding: 0 9px; font-family: var(--display); font-size: 12.5px; color: var(--ink); flex: none; }
+.nav-btn svg { width: 22px; height: 22px; flex: none; }
+.nav-over { flex: none; height: 30px; display: flex; align-items: center; gap: 5px; padding: 0 6px; justify-content: flex-end; }
+.nav-over svg { width: 18px; height: 18px; }
+.nav-over .cfg { width: 14px; display: grid; place-items: center; color: var(--glyph); }
+.nav-over .cfg svg { width: 9px; height: 9px; }
+.nav-band .nav-grip { background-color: var(--graphite); } .nav-band .nav-grip i { background: var(--grip-dot); }
+.nav-band .nav-btn { background: linear-gradient(var(--band-top) 0%, var(--band-mid) 49%, var(--band-break) 50%, var(--band-bottom) 100%); border-top: 1px solid var(--band-edge); }
+.nav-band .nav-btn.hot { background: linear-gradient(var(--band-hot-top) 0%, var(--band-hot-mid) 49%, var(--band-hot-break) 50%, var(--band-hot-bottom) 100%); }
+.nav-band .nav-btn.on { background: linear-gradient(var(--band-sel-top) 0%, var(--band-sel-mid) 49%, var(--band-sel-break) 50%, var(--band-sel-bottom) 100%); font-weight: 700; }
+.nav-band .nav-over { background: linear-gradient(var(--band-top), var(--band-bottom)); border-top: 1px solid var(--band-edge); }
+.nav-flat .nav-grip { background: var(--ivory); border-top: 1px solid var(--seam); box-shadow: inset 0 1px 0 var(--etch-light); } .nav-flat .nav-grip i { background: var(--muted); }
+.nav-flat .nav-btn { border-top: 1px solid var(--seam); }
+.nav-flat .nav-btn.hot { background: var(--hover-row); }
+.nav-flat .nav-btn.on { background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line); font-weight: 700; }
+.nav-flat .nav-over { border-top: 1px solid var(--seam); }
+.nav-tabs .nav-grip { background: var(--rail); } .nav-tabs .nav-grip i { background: var(--tab-edge-inner); }
+.nav-tabs .nav-btn { color: var(--tab-ink); background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face); box-shadow: inset 0 1px 0 var(--tab-top-line), 0 2px 0 var(--tab-edge-outer), 1px 3px 2px var(--tab-shadow); margin-bottom: 2px; }
+.nav-tabs .nav-btn.hot { background: linear-gradient(var(--tab-wash) 0%, transparent 72%), var(--tab-face-hot); }
+.nav-tabs .nav-btn.on { color: var(--tab-ink-on); font-weight: 700; background: linear-gradient(var(--tab-wash-on) 0%, transparent 72%), var(--tab-face-on); box-shadow: inset 0 1px 0 var(--white), 0 2px 0 var(--tab-edge-outer), 1px 3px 2px var(--tab-shadow); }
+.nav-tabs .nav-over { background: var(--rail); }
+.navbar { width: 32px; height: 380px; display: flex; flex-direction: column; border: 1px solid var(--frame); background: var(--ivory); flex: none; }
+.navbar .nb-top { height: 25px; display: grid; place-items: center; color: var(--glyph); border-bottom: 1px solid var(--cap-edge); background: linear-gradient(var(--cap-top), var(--cap-bottom)); }
+.navbar .nb-top svg { width: 9px; height: 9px; }
+.navbar .nb-cap { flex: 1; writing-mode: vertical-rl; display: flex; align-items: center; padding: 10px 0; font-family: var(--display); font-size: 13px; color: var(--ink); }
+.navbar .nb-cap.btt { transform: rotate(180deg); }
+.navbar .nb-cap.open { background: var(--tab-face-on); box-shadow: inset 0 0 0 1px var(--tab-edge-outer); }
+.navbar .nb-ic { height: 29px; display: grid; place-items: center; flex: none; }
+.navbar .nb-ic svg { width: 18px; height: 18px; }
+.nav-band.navbar .nb-ic { background: linear-gradient(90deg, var(--band-top), var(--band-bottom)); border-top: 1px solid var(--band-edge); }
+.nav-band.navbar .nb-ic.on { background: linear-gradient(90deg, var(--band-sel-top), var(--band-sel-break)); }
+.nav-flat.navbar .nb-ic { border-top: 1px solid var(--seam); }
+.nav-flat.navbar .nb-ic.on { background: var(--sel); box-shadow: inset 0 0 0 1px var(--sel-line); }
+.nav-tabs.navbar .nb-ic { background: var(--tab-face); box-shadow: 0 1px 0 var(--tab-edge-outer); margin-bottom: 1px; }
+.nav-tabs.navbar .nb-ic.on { background: var(--tab-face-on); }
+.pt7dec { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.pt7dec .nav { height: 330px; }
+.cfgmenu { right: -150px; bottom: 26px; min-width: 190px; }
+.popwin { position: relative; display: flex; width: 330px; height: 330px; border: 1px solid var(--frame); background-color: var(--graphite); }
+.popwin .navbar { height: auto; border: 0; border-right: 1px solid var(--seam); }
+.popup { position: absolute; left: 32px; top: 6px; width: 200px; bottom: 34px; background: var(--ivory); border: 1px solid var(--menu-edge); box-shadow: 2px 4px 10px var(--ovl-1), .5px 1px 3px var(--ovl-2); display: flex; flex-direction: column; }
+.popup .nav-head { font-size: 13.5px; }
+.pt8row { display: flex; gap: 0; align-items: stretch; height: 250px; }
+.pt8row .ahstrip { border: 1px solid var(--frame); border-right: 1px solid var(--seam); }
+.pt8site { position: relative; width: 190px; background-color: var(--graphite); border: 1px solid var(--frame); border-left: 0; overflow: hidden; }
+.pt8fly { position: absolute; left: 0; top: 0; bottom: 0; width: 150px; background: var(--ivory); box-shadow: 2px 4px 10px var(--ovl-1), .5px 1px 3px var(--ovl-2); }
+.pt8fly .pcap { cursor: default; }
+.pt8row .navbar { height: auto; margin-left: 16px; }
+</style>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gFold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-fold-a)"/><stop offset=".55" style="stop-color:var(--ic-fold-b)"/><stop offset="1" style="stop-color:var(--ic-fold-c)"/></linearGradient>
+    <linearGradient id="gPage" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ic-page-a)"/><stop offset="1" style="stop-color:var(--ic-page-b)"/></linearGradient>
+    <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-blue-a)"/><stop offset="1" style="stop-color:var(--ic-blue-b)"/></linearGradient>
+    <linearGradient id="gGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-green-a)"/><stop offset="1" style="stop-color:var(--ic-green-b)"/></linearGradient>
+    <linearGradient id="gRed" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-red-a)"/><stop offset="1" style="stop-color:var(--ic-red-b)"/></linearGradient>
+    <linearGradient id="gViolet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-violet-a)"/><stop offset="1" style="stop-color:var(--ic-violet-b)"/></linearGradient>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic-gold-a)"/><stop offset="1" style="stop-color:var(--ic-gold-b)"/></linearGradient>
+    <linearGradient id="gSteel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style="stop-color:var(--ic-steel-a)"/><stop offset="1" style="stop-color:var(--ic-steel-b)"/></linearGradient>
+    <symbol id="icFolder" viewBox="0 0 16 16"><path d="M1.5 3.5h4.5l1.5 1.5h7v8.5h-13z" style="fill:var(--ic-fold-back);stroke:var(--ic-fold-line)" stroke-width=".8"/><path d="M1.5 6.5h13l-1 7h-11z" style="fill:url(#gFold);stroke:var(--ic-fold-line)" stroke-width=".8"/></symbol>
+    <symbol id="icCpp" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" style="fill:url(#gPage);stroke:var(--ic-page-line)" stroke-width=".8"/><path d="M9.5 1.5v3h3" style="fill:none;stroke:var(--ic-page-line)" stroke-width=".8"/><rect x="1.5" y="8" width="9" height="5.5" rx="1" style="fill:url(#gBlue)"/><path d="M3.2 10.7h2.4M4.4 9.5v2.4M6.6 10.7H9M7.8 9.5v2.4" style="stroke:var(--ic-page-a)" stroke-width=".9"/></symbol>
+    <symbol id="icHpp" viewBox="0 0 16 16"><path d="M3.5 1.5h6l3 3v10h-9z" style="fill:url(#gPage);stroke:var(--ic-page-line)" stroke-width=".8"/><path d="M9.5 1.5v3h3" style="fill:none;stroke:var(--ic-page-line)" stroke-width=".8"/><rect x="1.5" y="8" width="9" height="5.5" rx="1" style="fill:url(#gViolet)"/><path d="M3.6 9.2v3.4M3.6 10.8h2.4M6 10.4v2.2M7.8 10.7h1.8" style="fill:none;stroke:var(--ic-page-a)" stroke-width=".9"/></symbol>
+    <symbol id="icProps" viewBox="0 0 16 16"><rect x="2.5" y="1.5" width="11" height="13" style="fill:url(#gPage);stroke:var(--ic-page-line)" stroke-width=".8"/><rect x="4" y="3.5" width="3" height="3" style="fill:url(#gBlue)"/><path d="M8 5h4M4 8.5h8M4 10.5h8M4 12.5h5" style="stroke:var(--ic-page-line)" stroke-width=".8"/></symbol>
+    <symbol id="icOutput" viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5" style="fill:var(--ic-console);stroke:var(--ic-steel-line)" stroke-width=".8"/><path d="M3.8 6l2 1.6-2 1.6M7.2 9.6h4.4" style="fill:none;stroke:var(--ic-green-a)" stroke-width="1.1"/></symbol>
+    <symbol id="icOutline" viewBox="0 0 16 16"><rect x="2" y="2.5" width="6.5" height="2.6" rx=".6" style="fill:url(#gBlue)"/><rect x="6" y="6.8" width="8" height="2.6" rx=".6" style="fill:url(#gGreen)"/><rect x="6" y="11" width="6" height="2.6" rx=".6" style="fill:url(#gGold)"/><path d="M3.8 5.2v7.1H6M3.8 8.1H6" style="fill:none;stroke:var(--ic-steel-line)" stroke-width=".8"/></symbol>
+    <symbol id="icSearch" viewBox="0 0 16 16"><path d="M9.6 9.6l4.4 4.4" style="stroke:var(--ic-wood)" stroke-width="2.4" stroke-linecap="round"/><circle cx="6.5" cy="6.5" r="4.2" style="fill:url(#gBlue);stroke:var(--ic-steel-line)" stroke-width=".9"/><circle cx="5.4" cy="5.2" r="1.5" style="fill:var(--ic-page-a)" opacity=".7"/></symbol>
+    <symbol id="icBranch" viewBox="0 0 16 16"><path d="M4.5 3.5v9M4.5 9.5c0-3.5 7-2 7-5.5" style="fill:none;stroke:var(--ic-steel-line)" stroke-width="1.2"/><circle cx="4.5" cy="3" r="1.9" style="fill:url(#gGreen)"/><circle cx="4.5" cy="13" r="1.9" style="fill:url(#gGreen)"/><circle cx="11.5" cy="3.5" r="1.9" style="fill:url(#gViolet)"/></symbol>
+    <symbol id="icBug" viewBox="0 0 16 16"><path d="M4 7H1.5M4 10H1.5M12 7h2.5M12 10h2.5M6 4.4 5 2.3M10 4.4l1-2.1" style="fill:none;stroke:var(--ic-steel-line)" stroke-width=".9"/><ellipse cx="8" cy="9" rx="4" ry="5" style="fill:url(#gRed);stroke:var(--ic-red-b)" stroke-width=".7"/><path d="M8 4.4v9.2" style="stroke:var(--ic-red-b)" stroke-width=".8"/></symbol>
+    <symbol id="icFlask" viewBox="0 0 16 16"><path d="M6.4 1.5v4.6L2.4 13.6h11.2L9.6 6.1V1.5z" style="fill:var(--ic-page-a);stroke:var(--ic-steel-line)" stroke-width=".9"/><path d="M4.1 10.4h7.8l1.7 3.2H2.4z" style="fill:url(#gGreen)"/><path d="M5.4 1.5h5.2" style="stroke:var(--ic-steel-line)" stroke-width=".9"/></symbol>
+    <symbol id="icNote" viewBox="0 0 16 16"><path d="M2.5 2.5h11v8l-3 3h-8z" style="fill:var(--ic-note);stroke:var(--ic-note-line)" stroke-width=".8"/><path d="M4.5 5.5h7M4.5 8h7M4.5 10.5h4" style="stroke:var(--ic-note-line)" stroke-width=".8"/></symbol>
+    <symbol id="icPlug" viewBox="0 0 16 16"><path d="M2.5 5h3.2a1.6 1.6 0 1 1 3.2 0h3.2v3.2a1.6 1.6 0 1 1 0 3.2v3.1H2.5z" style="fill:url(#gBlue);stroke:var(--ic-blue-b)" stroke-width=".8"/></symbol>
+    <symbol id="rBuild" viewBox="0 0 24 24"><path d="M4.5 19.5l9-9" style="stroke:var(--ic-wood)" stroke-width="3.2" stroke-linecap="round"/><path d="M11 5.5l5-2.5 5 5-2.5 5-3-1-3.5-3.5z" style="fill:url(#gSteel);stroke:var(--ic-steel-line)" stroke-width="1"/></symbol>
+    <symbol id="rRun" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z" style="fill:url(#gGreen);stroke:var(--ic-green-b)" stroke-width="1" stroke-linejoin="round"/></symbol>
+    <symbol id="rFind" viewBox="0 0 24 24"><path d="M14.5 14.5l6 6" style="stroke:var(--ic-wood)" stroke-width="3.4" stroke-linecap="round"/><circle cx="10" cy="10" r="6.3" style="fill:url(#gBlue);stroke:var(--ic-steel-line)" stroke-width="1.1"/><circle cx="8.3" cy="8" r="2.2" style="fill:var(--ic-page-a)" opacity=".7"/></symbol>
+    <symbol id="rLayout" viewBox="0 0 24 24"><rect x="2.5" y="3.5" width="19" height="17" rx="1" style="fill:var(--ic-page-a);stroke:var(--ic-steel-line)" stroke-width="1"/><rect x="3.5" y="4.5" width="5.5" height="15" style="fill:url(#gBlue)"/><rect x="10" y="4.5" width="10.5" height="9.5" style="fill:url(#gGold)"/><rect x="10" y="15" width="10.5" height="4.5" style="fill:url(#gGreen)"/></symbol>
+  </defs>
+</svg>
+
+<div class="page">
+  <header>
+    <div class="eyebrow">GUI.Forms &middot; docking and PageView &middot; taste studies &middot; 2026-10-17</div>
+    <h1>Docking look studies</h1>
+    <p class="lede">The sixteen taste questions from the docking study (T1 to T8) and the PageView study (PT1 to PT8), each drawn in the default theme: Pearl Ribbon moved toward Plan Paint's royale blue. Pick one option per question, either with an option's ID chip or in the answer sheet at the end, and copy the line back.</p>
+    <div class="ground">
+      <h3>Already decided, and drawn here as given</h3>
+      <ul>
+        <li><b>Postage-stamp drag (D1).</b> At the start of a drag the panel disappears and its place closes up at once. A miniature animates from the panel's rectangle down to a stamp about 100 units long in about 220 ms and follows the pointer. At the drop it grows into the target; on Escape it grows back into its old place.</li>
+        <li><b>Position-sensitive targets (D2, D3).</b> A cross of five tiles (top, left, tab into, right, bottom) appears only over the pane under the pointer. Each tile draws the resulting shape in blue on black and the selected one is lit. The window's outer edges are always global targets. No drop straight into auto-hide.</li>
+        <li><b>Layout (C1, C2, C3).</b> Binary splits. One document area, always present. A tool panel tabs into documents only when its descriptor allows it, so the document area's centre tile is off in these demos.</li>
+        <li><b>Pins (E4).</b> Only root-level items carry a pin: a lone panel or a group. Tabbing one panel into another makes a group with a fresh, not-auto-hidden pin.</li>
+        <li><b>Auto-hide (E1 to E3).</b> A side tab's flyout opens on hover after a delay or on click, as an in-window overlay. An outside click closes it and passes through.</li>
+        <li><b>Floating (B5).</b> Floating tool panels belong to the main window, stay above it only, move with it, and hide while the application is inactive.</li>
+        <li><b>Document tabs (H4, P13, P16, P22, P28).</b> Tabs shrink, then overflow into a list of every document. A page chosen from the list takes the last visible position. Close buttons on the selected and hot tabs, with space reserved on every closable tab. No "+" button. Reordering slides live.</li>
+        <li><b>Vocabulary (J1 to J4).</b> A pin mark; one dock-shape mark for the tiles; <code>modified</code> is a custom item state the theme shows; side-tab labels may be vertical.</li>
+        <li><b>Navigation pane (P30, P31, P34).</b> Large buttons, a grip, an overflow icon strip and a configure menu; collapsed, a narrow bar with a vertical caption that opens the content in a popup.</li>
+      </ul>
+    </div>
+    <p>The mock windows always show the light default theme, even when this page is dark. They are browser sketches of construction and colour, not the engine's pixels. The demos use T1-1, T4-1 and T7-1 as their base so they read as one family with File Manager; change those answers and the base changes with them.</p>
+    <div class="motion-row"><input type="checkbox" id="motion-anyway"><label for="motion-anyway">Play demo motion even when the system asks for reduced motion</label><span id="motion-state"></span></div>
+    <nav class="toc" aria-label="Studies">
+      <a href="#study-T1">T1</a><a href="#study-T2">T2</a><a href="#study-T3">T3</a><a href="#study-T4">T4</a><a href="#study-T5">T5</a><a href="#study-T6">T6</a><a href="#study-T7">T7</a><a href="#study-T8">T8</a>
+      <a href="#study-PT1">PT1</a><a href="#study-PT2">PT2</a><a href="#study-PT3">PT3</a><a href="#study-PT4">PT4</a><a href="#study-PT5">PT5</a><a href="#study-PT6">PT6</a><a href="#study-PT7">PT7</a><a href="#study-PT8">PT8</a>
+      <a href="#answers">Answer sheet</a>
+    </nav>
+  </header>
+
+  <section class="part" aria-labelledby="docking-h">
+    <h2 id="docking-h">Docking</h2>
+
+    <article class="study" id="study-T1">
+      <div class="note">
+        <div class="tag">T1 &middot; docking study &sect;8</div>
+        <h3>Which docking look to start from</h3>
+        <p>Where the canonical docking systems differ, which family should docked panels start from? The drag and the targets behave the same in all three.</p>
+        <p class="decided"><b>Decided.</b> The ribbon follows Office 2010 and earlier (RB-10). Panes are flat, never raised. The study leans to the VS 2005 to 2010 period for the same reason.</p>
+        <ul>
+          <li><b>T1-1</b> House composite: Studio 2003 caption strips with a tiny identity key on the graphite chassis, as File Manager's panes (DNA-P04, DNA-P02), and Plan Paint's tab stack for documents.</li>
+          <li><b>T1-2</b> VS 2005 period in house colours: a pale blue-grey chassis, a blue gradient caption on the active tool panel, slanted document tabs.</li>
+          <li><b>T1-3</b> VS 2010 period in house colours: a navy chassis, gold for the active caption and the selected document. The dark structure is close to anti-model V101.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="ide" data-look="look-house cap-key seam-graphite"></div></div><figcaption><button type="button" class="pick" id="pick-T1-1" data-pick="T1-1">T1-1</button><b>House composite.</b> Captions as File Manager's panes; documents in Plan Paint's tab stack.</figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="ide" data-look="look-vs05"></div></div><figcaption><button type="button" class="pick" id="pick-T1-2" data-pick="T1-2">T1-2</button><b>VS 2005 period.</b> Pale chassis, coloured active caption, slanted document tabs.</figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="ide" data-look="look-vs10"></div></div><figcaption><button type="button" class="pick" id="pick-T1-3" data-pick="T1-3">T1-3</button><b>VS 2010 period.</b> Navy chassis, gold active caption and document tab.</figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T2">
+      <div class="note">
+        <div class="tag">T2 &middot; docking study &sect;8, D2 settled</div>
+        <h3>The look of the indicator tiles</h3>
+        <p>How should the decided tiles be drawn, and how quiet should they be? The owner rejected theatrical drag overlays for file drag and drop (DDV-007-06), so quietness is part of the question.</p>
+        <p class="decided"><b>Decided.</b> Five tiles in a cross, shown only over the pane under the pointer, each a black tile with the resulting shape in blue, the selected one lit; edge tiles for the window's outer edges (one dock-shape mark, J2).</p>
+        <ul>
+          <li><b>T2-1</b> Five separate tiles, no backplate.</li>
+          <li><b>T2-2</b> Five tiles joined on one cross-shaped backplate.</li>
+          <li><b>T2-3</b> Five tiles on a diamond backplate (the VS 2005 arrangement).</li>
+          <li><b>T2-4</b> Quiet: smaller tiles at reduced strength that fade in over 100 ms; only the lit tile is at full strength.</li>
+        </ul>
+        <p>The samples keep the translucent area highlight (the working assumption) so only the tiles differ. Tiles sit above the stamp so it never hides them.</p>
+      </div>
+      <div class="samples">
+        <div class="opts">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="sep" data-hl="tint" data-zone="right"></div></div><figcaption><button type="button" class="pick" id="pick-T2-1" data-pick="T2-1">T2-1</button><b>Separate tiles.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="cross" data-hl="tint" data-zone="right"></div></div><figcaption><button type="button" class="pick" id="pick-T2-2" data-pick="T2-2">T2-2</button><b>Cross backplate.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="diamond" data-hl="tint" data-zone="right"></div></div><figcaption><button type="button" class="pick" id="pick-T2-3" data-pick="T2-3">T2-3</button><b>Diamond backplate.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="quiet" data-hl="tint" data-zone="right"></div></div><figcaption><button type="button" class="pick" id="pick-T2-4" data-pick="T2-4">T2-4</button><b>Quiet tiles.</b></figcaption></figure>
+        </div>
+        <div class="demo" id="demo-T2">
+          <div class="demo-head"><span class="demo-title">Live: drag a panel by its caption, or one panel by its tab</span>
+            <span class="seg" role="group" aria-label="Tile style"><button type="button" id="demo-T2-1" data-set="tiles" data-val="sep" aria-pressed="true">T2-1</button><button type="button" id="demo-T2-2" data-set="tiles" data-val="cross" aria-pressed="false">T2-2</button><button type="button" id="demo-T2-3" data-set="tiles" data-val="diamond" aria-pressed="false">T2-3</button><button type="button" id="demo-T2-4" data-set="tiles" data-val="quiet" aria-pressed="false">T2-4</button></span>
+            <button type="button" class="pbtn" id="reset-T2" data-reset="1">Reset layout</button></div>
+          <div class="scrollx"><div class="dkhost" data-demo="dock" data-tiles="sep" data-hl="tint" style="min-width:640px"></div></div>
+          <p class="demo-msg" id="msg-T2" aria-live="polite">Escape puts the panel back. Ctrl held suppresses docking (D6-1).</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T3">
+      <div class="note">
+        <div class="tag">T3 &middot; docking study &sect;8, D2 working assumption</div>
+        <h3>The area highlight</h3>
+        <p>Position selects the target and the lit tile shows it. Should the area the panel would take also be marked?</p>
+        <p class="decided"><b>Decided.</b> The tiles and the lit tile. The area highlight is a working assumption until this answer.</p>
+        <ul>
+          <li><b>T3-1</b> A translucent blue tint with a 1-unit edge.</li>
+          <li><b>T3-2</b> A hatched outline with no fill, like the classic drag rectangle.</li>
+          <li><b>T3-3</b> None; the lit tile alone shows the result.</li>
+        </ul>
+        <p>The samples use T2-1 tiles and the "bottom" target.</p>
+      </div>
+      <div class="samples">
+        <div class="opts">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="sep" data-hl="tint" data-zone="bottom"></div></div><figcaption><button type="button" class="pick" id="pick-T3-1" data-pick="T3-1">T3-1</button><b>Translucent tint.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="sep" data-hl="hatch" data-zone="bottom"></div></div><figcaption><button type="button" class="pick" id="pick-T3-2" data-pick="T3-2">T3-2</button><b>Hatched outline.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="360" data-build="snap" data-tiles="sep" data-hl="none" data-zone="bottom"></div></div><figcaption><button type="button" class="pick" id="pick-T3-3" data-pick="T3-3">T3-3</button><b>None, tiles only.</b></figcaption></figure>
+        </div>
+        <div class="demo" id="demo-T3">
+          <div class="demo-head"><span class="demo-title">Live: move a panel slowly across the panes</span>
+            <span class="seg" role="group" aria-label="Area highlight"><button type="button" id="demo-T3-1" data-set="hl" data-val="tint" aria-pressed="true">T3-1</button><button type="button" id="demo-T3-2" data-set="hl" data-val="hatch" aria-pressed="false">T3-2</button><button type="button" id="demo-T3-3" data-set="hl" data-val="none" aria-pressed="false">T3-3</button></span>
+            <button type="button" class="pbtn" id="reset-T3" data-reset="1">Reset layout</button></div>
+          <div class="scrollx"><div class="dkhost" data-demo="dock" data-tiles="sep" data-hl="tint" style="min-width:640px"></div></div>
+          <p class="demo-msg" id="msg-T3" aria-live="polite">The edge bands of a pane split it; its centre tabs into it.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T4">
+      <div class="note">
+        <div class="tag">T4 &middot; docking study &sect;8</div>
+        <h3>Captions and tool tabs</h3>
+        <p>How does the active panel's caption differ from an inactive one, and how plain are the tool tabs at the bottom of a stack?</p>
+        <p class="decided"><b>Decided.</b> Captions are a Studio 2003 strip with a tiny identity key (DNA-P04) carrying position, pin and close. The pin sits only on root-level items. Tool tabs appear at the bottom when a stack holds two or more panels. The document tab shape is PT1.</p>
+        <ul>
+          <li><b>T4-1</b> Quiet: the identity key turns blue and the label darkens; bottom tabs are flat with a near-white plate for the selected one.</li>
+          <li><b>T4-2</b> Filled: the active caption is a royale-blue gradient with white text (VS's coloured caption); bottom tabs as T4-1.</li>
+          <li><b>T4-3</b> Tinted: a pale blue caption with a 2-unit accent line on top; bottom tabs are a small Plan Paint tab stack hanging below the content.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts mid">
+          <figure class="opt"><div class="sample" data-build="t4" data-cap="cap-key"></div><figcaption><button type="button" class="pick" id="pick-T4-1" data-pick="T4-1">T4-1</button><b>Quiet key.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="t4" data-cap="cap-fill"></div><figcaption><button type="button" class="pick" id="pick-T4-2" data-pick="T4-2">T4-2</button><b>Filled caption.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="t4" data-cap="cap-tint"></div><figcaption><button type="button" class="pick" id="pick-T4-3" data-pick="T4-3">T4-3</button><b>Tinted caption, tab-stack tool tabs.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T5">
+      <div class="note">
+        <div class="tag">T5 &middot; docking study &sect;8, E1 to E4 settled</div>
+        <h3>The auto-hide flyout</h3>
+        <p>Which shadow does the flyout cast, and does it slide out or simply appear?</p>
+        <p class="decided"><b>Decided.</b> Side tabs on the window edge; vertical labels are allowed (J4) and their reading direction is PT8. Hover for 400 ms or a click opens; leaving for 500 ms closes an unfocused flyout. The flyout is an in-window overlay; an outside click closes it and passes through. The pin auto-hides the whole group.</p>
+        <ul>
+          <li><b>T5-1</b> Slides out over 180 ms (smoothstep), with the RB-37 overlay shadow.</li>
+          <li><b>T5-2</b> Appears at once, with the RB-37 overlay shadow.</li>
+          <li><b>T5-3</b> Slides out, with the lighter E3 floating shadow.</li>
+          <li><b>T5-4</b> Appears at once, with the E3 shadow.</li>
+        </ul>
+        <p>Frames are 0, 60, 120 and 180 ms after the trigger.</p>
+      </div>
+      <div class="samples">
+        <div class="opts">
+          <figure class="opt"><div class="sample" data-build="film" data-motion="slide" data-shadow="rb37"></div><figcaption><button type="button" class="pick" id="pick-T5-1" data-pick="T5-1">T5-1</button><b>Slide, RB-37 shadow.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="film" data-motion="appear" data-shadow="rb37"></div><figcaption><button type="button" class="pick" id="pick-T5-2" data-pick="T5-2">T5-2</button><b>Appear, RB-37 shadow.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="film" data-motion="slide" data-shadow="e3"></div><figcaption><button type="button" class="pick" id="pick-T5-3" data-pick="T5-3">T5-3</button><b>Slide, E3 shadow.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="film" data-motion="appear" data-shadow="e3"></div><figcaption><button type="button" class="pick" id="pick-T5-4" data-pick="T5-4">T5-4</button><b>Appear, E3 shadow.</b></figcaption></figure>
+        </div>
+        <div class="demo" id="demo-T5">
+          <div class="demo-head"><span class="demo-title">Live: rest on a side tab, or click it; the pin docks the group back</span>
+            <span class="seg" role="group" aria-label="Flyout motion and shadow"><button type="button" id="demo-T5-1" data-set="t5" data-val="slide rb37" aria-pressed="true">T5-1</button><button type="button" id="demo-T5-2" data-set="t5" data-val="appear rb37" aria-pressed="false">T5-2</button><button type="button" id="demo-T5-3" data-set="t5" data-val="slide e3" aria-pressed="false">T5-3</button><button type="button" id="demo-T5-4" data-set="t5" data-val="appear e3" aria-pressed="false">T5-4</button></span>
+            <button type="button" class="pbtn" id="reset-T5" data-reset="1">Reset layout</button></div>
+          <div class="scrollx"><div class="dkhost" data-demo="autohide" style="min-width:640px"></div></div>
+          <p class="demo-msg" id="msg-T5" aria-live="polite">Explorer and Outline are auto-hidden as one group. This sketch has a left strip only.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T6">
+      <div class="note">
+        <div class="tag">T6 &middot; docking study &sect;8, with J7</div>
+        <h3>Floating window chrome</h3>
+        <p>Does a floating window use the host's title bar, or a caption GUI.Forms draws?</p>
+        <p class="decided"><b>Decided.</b> Floating windows are owned by the main window (no taskbar button), stay above it only and move with it. The framework moves them by its own capture drag on the caption (B7-1). One thin navy window keyline (DNA-F04) and the E5 window shadow either way. The float, dock and maximize marks are decided with this question (J7); the marks drawn here are proposals.</p>
+        <ul>
+          <li><b>T6-1</b> The host's title bar in its smallest utility style; each stack keeps its own caption below it.</li>
+          <li><b>T6-2</b> A drawn caption. With one stack, the stack's caption is the window's caption. With two, a thin drawn strip carries the window's marks above the stacks.</li>
+          <li><b>T6-3</b> Drawn with one stack, the host's title bar with two (VS's rule).</li>
+        </ul>
+        <p>The host bars are a neutral stand-in; each host draws its own.</p>
+        <div class="marks" aria-label="Proposed marks"><span data-mark="float"></span><span data-mark="dock"></span><span data-mark="max"></span></div>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="530" data-build="t6" data-mode="host"></div></div><figcaption><button type="button" class="pick" id="pick-T6-1" data-pick="T6-1">T6-1</button><b>Host title bar.</b> One stack, then two.</figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="530" data-build="t6" data-mode="drawn"></div></div><figcaption><button type="button" class="pick" id="pick-T6-2" data-pick="T6-2">T6-2</button><b>Drawn caption.</b> One stack, then two.</figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="530" data-build="t6" data-mode="hybrid"></div></div><figcaption><button type="button" class="pick" id="pick-T6-3" data-pick="T6-3">T6-3</button><b>Drawn for one stack, host for two.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T7">
+      <div class="note">
+        <div class="tag">T7 &middot; docking study &sect;8</div>
+        <h3>Seams between docked panes</h3>
+        <p>What separates two docked panes?</p>
+        <p class="decided"><b>Decided.</b> A seam is 3 units or thinner with a wider hit target (&sect;7.2). A collapse grip is flat at rest and grows with pointer proximity (DDV-007-04). File Manager's panes share their seams and captions with docking (K1-1).</p>
+        <ul>
+          <li><b>T7-1</b> File Manager's graphite seam, 3 units, with a grip of dots.</li>
+          <li><b>T7-2</b> Studio 2003's flat gap: near-white between keylined panes, no grip.</li>
+          <li><b>T7-3</b> A 1-unit blue-grey keyline; the grip shows on proximity.</li>
+        </ul>
+        <p>Hover a seam to see its grip.</p>
+      </div>
+      <div class="samples">
+        <div class="opts one">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="siteonly" data-look="seam-graphite"></div></div><figcaption><button type="button" class="pick" id="pick-T7-1" data-pick="T7-1">T7-1</button><b>Graphite seam.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="siteonly" data-look="seam-gap"></div></div><figcaption><button type="button" class="pick" id="pick-T7-2" data-pick="T7-2">T7-2</button><b>Flat gap.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="760" data-build="siteonly" data-look="seam-line"></div></div><figcaption><button type="button" class="pick" id="pick-T7-3" data-pick="T7-3">T7-3</button><b>Hairline keyline.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-T8">
+      <div class="note">
+        <div class="tag">T8 &middot; docking study &sect;8, DDV-007-01</div>
+        <h3>Drag proximity</h3>
+        <p>When a panel is dragged from a floating window over the main window, how does the main window show <code>drag_proximate</code>?</p>
+        <p class="decided"><b>Decided.</b> A window under a drag regains destination emphasis without taking focus. While a floating tool window is key the main window shows <code>secondary_participating</code> and never looks disabled.</p>
+        <ul>
+          <li><b>T8-1</b> The main window's caption returns to its key look while the stamp is over it.</li>
+          <li><b>T8-2</b> A 2-unit focus-blue ring around the window; its caption stays as it was.</li>
+          <li><b>T8-3</b> Only the pane under the pointer regains emphasis: its identity key lights.</li>
+          <li><b>T8-4</b> Nothing beyond the tiles.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="640" data-build="prox" data-prox="key"></div></div><figcaption><button type="button" class="pick" id="pick-T8-1" data-pick="T8-1">T8-1</button><b>Window key look.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="640" data-build="prox" data-prox="ring"></div></div><figcaption><button type="button" class="pick" id="pick-T8-2" data-pick="T8-2">T8-2</button><b>Frame ring.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="640" data-build="prox" data-prox="pane"></div></div><figcaption><button type="button" class="pick" id="pick-T8-3" data-pick="T8-3">T8-3</button><b>Hovered pane only.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="640" data-build="prox" data-prox="none"></div></div><figcaption><button type="button" class="pick" id="pick-T8-4" data-pick="T8-4">T8-4</button><b>Tiles only.</b></figcaption></figure>
+        </div>
+        <div class="demo" id="demo-T8">
+          <div class="demo-head"><span class="demo-title">Live: drag the Properties tab out of the floating window onto the main window</span>
+            <span class="seg" role="group" aria-label="Proximity look"><button type="button" id="demo-T8-1" data-set="prox" data-val="key" aria-pressed="true">T8-1</button><button type="button" id="demo-T8-2" data-set="prox" data-val="ring" aria-pressed="false">T8-2</button><button type="button" id="demo-T8-3" data-set="prox" data-val="pane" aria-pressed="false">T8-3</button><button type="button" id="demo-T8-4" data-set="prox" data-val="none" aria-pressed="false">T8-4</button></span>
+            <button type="button" class="pbtn" id="reset-T8" data-reset="1">Reset layout</button></div>
+          <div class="scrollx"><div class="dkhost" data-demo="prox"></div></div>
+          <p class="demo-msg" id="msg-T8" aria-live="polite">The floating window is key, so the main window is secondary. A drop where nothing accepts floats the panel (D4-1).</p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="part" aria-labelledby="pageview-h">
+    <h2 id="pageview-h">PageView</h2>
+
+    <article class="study" id="study-PT1">
+      <div class="note">
+        <div class="tag">PT1 &middot; PageView study &sect;7</div>
+        <h3>Tab shape</h3>
+        <p>Which shape do strip tabs and document tabs take, and do they share it?</p>
+        <p class="decided"><b>Decided.</b> One <code>PageStrip</code> draws every presentation (P1-1). Plan Paint's tab stack is the ribbon's; a tab is not a button, so no tab gets a bulge.</p>
+        <ul>
+          <li><b>PT1-1</b> Plan Paint's tab stack everywhere.</li>
+          <li><b>PT1-2</b> A quieter Studio 2003 strip everywhere.</li>
+          <li><b>PT1-3</b> Classic tabs joined to the page (today's <code>TabControl</code> seam), in house colours.</li>
+          <li><b>PT1-4</b> Plan Paint's stack for documents, Studio 2003 for strip tabs.</li>
+        </ul>
+        <p>Each strip: selected, hot, pressed, disabled, and a tab with an icon; on top, then on the bottom.</p>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample" data-build="pt1" data-kind="pp"></div><figcaption><button type="button" class="pick" id="pick-PT1-1" data-pick="PT1-1">PT1-1</button><b>Plan Paint stack.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt1" data-kind="s03"></div><figcaption><button type="button" class="pick" id="pick-PT1-2" data-pick="PT1-2">PT1-2</button><b>Studio 2003 strip.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt1" data-kind="cl"></div><figcaption><button type="button" class="pick" id="pick-PT1-3" data-pick="PT1-3">PT1-3</button><b>Classic joined tabs.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt1" data-kind="mixed"></div><figcaption><button type="button" class="pick" id="pick-PT1-4" data-pick="PT1-4">PT1-4</button><b>Stack for documents, strip elsewhere.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT2">
+      <div class="note">
+        <div class="tag">PT2 &middot; PageView study &sect;7</div>
+        <h3>How the selected tab joins its page</h3>
+        <p>Drawn on Plan Paint's stack so only the join differs. With PT1-2 or PT1-3 the same three joins apply to that shape.</p>
+        <ul>
+          <li><b>PT2-1</b> Open seam: the tab runs into the page with no edge (Plan Paint).</li>
+          <li><b>PT2-2</b> Accent underline: a royale-blue bar under the selected label; the page keeps its edge.</li>
+          <li><b>PT2-3</b> Plate: the selected tab is a closed plate on the rail. It reads close to a button, which the "a tab is not a button" lesson warns against.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts mid">
+          <figure class="opt"><div class="sample" data-build="pt2" data-join="open"></div><figcaption><button type="button" class="pick" id="pick-PT2-1" data-pick="PT2-1">PT2-1</button><b>Open seam.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt2" data-join="line"></div><figcaption><button type="button" class="pick" id="pick-PT2-2" data-pick="PT2-2">PT2-2</button><b>Accent underline.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt2" data-join="plate"></div><figcaption><button type="button" class="pick" id="pick-PT2-3" data-pick="PT2-3">PT2-3</button><b>Plate.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT3">
+      <div class="note">
+        <div class="tag">PT3 &middot; PageView study &sect;7</div>
+        <h3>Close and pin glyphs</h3>
+        <p>Does the close glyph get a hover plate, and on a pinned tab does the pin sit beside close or replace it?</p>
+        <p class="decided"><b>Decided.</b> Close at the trailing end on the selected and hot tabs, with space reserved on every closable tab (P16-1). Pinned tabs are an opt-in capability and come first (H3-2, P24-1). The pin mark is J1.</p>
+        <ul>
+          <li><b>PT3-1</b> A plate under the close glyph while the glyph itself is hot; pin beside close.</li>
+          <li><b>PT3-2</b> A hover plate; on pinned tabs the pin replaces close.</li>
+          <li><b>PT3-3</b> Bare: the glyph darkens on hover; pin beside close.</li>
+          <li><b>PT3-4</b> Bare; the pin replaces close.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample" data-build="pt3" data-cx="plate" data-pin="beside"></div><figcaption><button type="button" class="pick" id="pick-PT3-1" data-pick="PT3-1">PT3-1</button><b>Plate, pin beside.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt3" data-cx="plate" data-pin="replace"></div><figcaption><button type="button" class="pick" id="pick-PT3-2" data-pick="PT3-2">PT3-2</button><b>Plate, pin replaces.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt3" data-cx="bare" data-pin="beside"></div><figcaption><button type="button" class="pick" id="pick-PT3-3" data-pick="PT3-3">PT3-3</button><b>Bare, pin beside.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt3" data-cx="bare" data-pin="replace"></div><figcaption><button type="button" class="pick" id="pick-PT3-4" data-pick="PT3-4">PT3-4</button><b>Bare, pin replaces.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT4">
+      <div class="note">
+        <div class="tag">PT4 &middot; PageView study &sect;7</div>
+        <h3>Modified</h3>
+        <p>How does the theme show a page in the <code>modified</code> state?</p>
+        <p class="decided"><b>Decided.</b> <code>modified</code> is a custom item state shown by the theme, with no new mark (J3). In each sample main.cpp (selected), view.hpp (hot) and view.cpp are modified; app.cpp is not.</p>
+        <ul>
+          <li><b>PT4-1</b> A large dot in the close slot; close replaces it while the tab is hot.</li>
+          <li><b>PT4-2</b> An asterisk after the label.</li>
+          <li><b>PT4-3</b> An italic label.</li>
+          <li><b>PT4-4</b> A coral tint: a short coral bar under the label.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample" data-build="pt4" data-mod="dot"></div><figcaption><button type="button" class="pick" id="pick-PT4-1" data-pick="PT4-1">PT4-1</button><b>Dot in the close slot.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt4" data-mod="star"></div><figcaption><button type="button" class="pick" id="pick-PT4-2" data-pick="PT4-2">PT4-2</button><b>Asterisk.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt4" data-mod="italic"></div><figcaption><button type="button" class="pick" id="pick-PT4-3" data-pick="PT4-3">PT4-3</button><b>Italic label.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt4" data-mod="tint"></div><figcaption><button type="button" class="pick" id="pick-PT4-4" data-pick="PT4-4">PT4-4</button><b>Coral tint.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT5">
+      <div class="note">
+        <div class="tag">PT5 &middot; PageView study &sect;7</div>
+        <h3>Pinned tabs</h3>
+        <p>How do pinned tabs look in their group at the front? theme.hpp and main.cpp are pinned in each sample.</p>
+        <p class="decided"><b>Decided.</b> Pinned tabs are opt-in, first, and move only within their group (H3-2, P24-1). No preview tab.</p>
+        <ul>
+          <li><b>PT5-1</b> Full width with a pin glyph.</li>
+          <li><b>PT5-2</b> Compressed to the icon only. Close to the "icon-only strips" anti-model (M064).</li>
+          <li><b>PT5-3</b> Full width, no glyph at rest, a small gap after the group; the pin shows on hover.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts one">
+          <figure class="opt"><div class="sample" data-build="pt5" data-pinned="full"></div><figcaption><button type="button" class="pick" id="pick-PT5-1" data-pick="PT5-1">PT5-1</button><b>Full width with pin.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt5" data-pinned="icon"></div><figcaption><button type="button" class="pick" id="pick-PT5-2" data-pick="PT5-2">PT5-2</button><b>Icon only.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt5" data-pinned="gap"></div><figcaption><button type="button" class="pick" id="pick-PT5-3" data-pick="PT5-3">PT5-3</button><b>Full width, pin on hover.</b> The pointer rests on main.cpp.</figcaption></figure>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT6">
+      <div class="note">
+        <div class="tag">PT6 &middot; PageView study &sect;7</div>
+        <h3>Overflow button</h3>
+        <p>Which button opens the list of documents when the strip runs out of room?</p>
+        <p class="decided"><b>Decided.</b> Document tabs shrink, then overflow into a list of every document (H4-3). A page chosen from the list takes the last visible position, so the order at the front is kept (P13). The strip preset scrolls, with a list button (P11-1).</p>
+        <ul>
+          <li><b>PT6-1</b> The overflow double chevron (RB-20, as on <code>ToolStrip</code>).</li>
+          <li><b>PT6-2</b> A down arrow.</li>
+          <li><b>PT6-3</b> The count of hidden pages and a down arrow.</li>
+        </ul>
+        <p>In every list hidden pages are italic (as VS) and the selected page is bold; answer "other" with a note if you want no italic.</p>
+      </div>
+      <div class="samples">
+        <div class="opts wide">
+          <figure class="opt"><div class="sample"><div class="fit" data-w="520" data-build="pt6" data-ov="dchev"></div></div><figcaption><button type="button" class="pick" id="pick-PT6-1" data-pick="PT6-1">PT6-1</button><b>Double chevron.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="520" data-build="pt6" data-ov="down"></div></div><figcaption><button type="button" class="pick" id="pick-PT6-2" data-pick="PT6-2">PT6-2</button><b>Down arrow.</b></figcaption></figure>
+          <figure class="opt"><div class="sample"><div class="fit" data-w="520" data-build="pt6" data-ov="count"></div></div><figcaption><button type="button" class="pick" id="pick-PT6-3" data-pick="PT6-3">PT6-3</button><b>Count.</b></figcaption></figure>
+        </div>
+        <div class="demo" id="demo-PT6">
+          <div class="demo-head"><span class="demo-title">Live: narrow the strip, open the list, choose a hidden page</span>
+            <span class="seg" role="group" aria-label="Overflow button"><button type="button" id="demo-PT6-1" data-set="ov" data-val="dchev" aria-pressed="true">PT6-1</button><button type="button" id="demo-PT6-2" data-set="ov" data-val="down" aria-pressed="false">PT6-2</button><button type="button" id="demo-PT6-3" data-set="ov" data-val="count" aria-pressed="false">PT6-3</button></span></div>
+          <div class="ovctl"><label for="pt6-width">Strip width</label><input type="range" id="pt6-width" min="300" max="1500" step="10" value="900"><span id="pt6-width-out">900</span></div>
+          <div class="scrollx"><div class="dkhost" data-demo="overflow"></div></div>
+          <p class="demo-msg" id="msg-PT6" aria-live="polite">Twelve documents. Tabs shrink to a minimum width before any page moves to the list.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT7">
+      <div class="note">
+        <div class="tag">PT7 &middot; PageView study &sect;7</div>
+        <h3>The Outlook-style navigation pane</h3>
+        <p>Which material do the large buttons take, and what does the grip look like?</p>
+        <p class="decided"><b>Decided.</b> Header, content, grip, large buttons and an overflow icon strip; a configure menu (Show more, Show fewer, hidden pages) with an <code>options</code> event and no built-in dialog. Collapsed, a narrow bar with a vertical caption that opens the content in a popup (P30-1, P31-1). The buttons are tabs in a tab list (P34-1).</p>
+        <ul>
+          <li><b>PT7-1</b> Office 2007 to 2010 banded buttons; the selected page in gold bands; a graphite grip with dots.</li>
+          <li><b>PT7-2</b> Flat Studio 2003 rows; the selected page in the blue selection; an etched grip.</li>
+          <li><b>PT7-3</b> Rows in Plan Paint's tab material, stacked; the selected page near-white; a rail-blue grip.</li>
+        </ul>
+        <p>Each sample shows the expanded pane and the collapsed bar. The last figure shows the decided menu and popup. The collapsed caption's reading direction is PT8.</p>
+      </div>
+      <div class="samples">
+        <div class="opts mid">
+          <figure class="opt"><div class="sample" data-build="pt7" data-nav="band"></div><figcaption><button type="button" class="pick" id="pick-PT7-1" data-pick="PT7-1">PT7-1</button><b>Banded.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt7" data-nav="flat"></div><figcaption><button type="button" class="pick" id="pick-PT7-2" data-pick="PT7-2">PT7-2</button><b>Flat rows.</b></figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt7" data-nav="tabs"></div><figcaption><button type="button" class="pick" id="pick-PT7-3" data-pick="PT7-3">PT7-3</button><b>Tab-stack rows.</b></figcaption></figure>
+        </div>
+        <figure class="opt"><div class="sample" data-build="pt7dec"></div><figcaption><b>Decided, not asked.</b> The configure menu open over the overflow strip, and the collapsed bar with its popup open (flat rows used for both).</figcaption></figure>
+      </div>
+    </article>
+
+    <article class="study" id="study-PT8">
+      <div class="note">
+        <div class="tag">PT8 &middot; PageView study &sect;7, J4</div>
+        <h3>Side tab text</h3>
+        <p>On the left edge, which way do side-tab labels read?</p>
+        <p class="decided"><b>Decided.</b> Side tabs may have vertical labels (J4); the collapsed navigation pane's caption is vertical (P31-1). Each sample shows Explorer open, Search hot.</p>
+        <ul>
+          <li><b>PT8-1</b> Rotated, reading bottom to top (VS on the left edge).</li>
+          <li><b>PT8-2</b> Rotated, reading top to bottom.</li>
+          <li><b>PT8-3</b> Horizontal text in a wider column: the icon above a short label. The collapsed pane keeps a vertical caption; add a note for its direction.</li>
+        </ul>
+      </div>
+      <div class="samples">
+        <div class="opts mid">
+          <figure class="opt"><div class="sample" data-build="pt8" data-dir="btt"></div><figcaption><button type="button" class="pick" id="pick-PT8-1" data-pick="PT8-1">PT8-1</button><b>Bottom to top.</b> With the collapsed caption.</figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt8" data-dir="ttb"></div><figcaption><button type="button" class="pick" id="pick-PT8-2" data-pick="PT8-2">PT8-2</button><b>Top to bottom.</b> With the collapsed caption.</figcaption></figure>
+          <figure class="opt"><div class="sample" data-build="pt8" data-dir="col"></div><figcaption><button type="button" class="pick" id="pick-PT8-3" data-pick="PT8-3">PT8-3</button><b>Horizontal columns.</b></figcaption></figure>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="sheet" id="answers" aria-labelledby="answers-h">
+    <h2 id="answers-h">Answer sheet</h2>
+    <p>One pick per question. A note is optional; it is added to the line in brackets, and it is where "other" says what you want instead. Picks are remembered in this browser only.</p>
+    <div class="sheet-grid" id="sheet-grid"></div>
+    <div class="sheet-out">
+      <label for="answer-line" style="font-family: var(--display); font-size: 14px;">Your answers</label>
+      <textarea id="answer-line" readonly="readonly"></textarea>
+      <div class="sheet-actions"><button type="button" class="pbtn" id="copy-answers">Copy</button><button type="button" class="pbtn" id="clear-answers">Clear picks</button><span id="copy-status" aria-live="polite"></span></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Sources: <code>planning/stages/DK-docking/DOCKING_STUDY.md</code> &sect;8 (T1 to T8), <code>PAGEVIEW_STUDY.md</code> &sect;7 (PT1 to PT8), <code>planning/interview/DOCKING_INTERVIEW_ROUND_001.md</code>, the DK brief's decisions 1 to 40, <code>planning/DESIGN_LANGUAGE_SPECIFICATION.md</code> &sect;3.4, &sect;7.2, &sect;9.2, &sect;11, &sect;12.3 to &sect;12.9 and Appendix A, and the published default theme studies.</p>
+    <p>Display face: Portsmouth Rapids where installed, otherwise the fallback stack; body face Carlito and code face Cousine from Google Fonts.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var root = document.documentElement;
+  var reduceQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  var motionAnyway = false;
+  function motionOn() { return motionAnyway || !(reduceQuery && reduceQuery.matches); }
+  function smooth(t) { return t <= 0 ? 0 : (t >= 1 ? 1 : t * t * (3 - 2 * t)); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerpRect(a, b, t) { return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t), w: lerp(a.w, b.w, t), h: lerp(a.h, b.h, t) }; }
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function now() { return window.performance ? performance.now() : Date.now(); }
+  function make(tag, cls, html) { var e = document.createElement(tag); if (cls) { e.className = cls; } if (html != null) { e.innerHTML = html; } return e; }
+  function ic(id, cls) { return '<svg class="' + (cls || "ic") + '" aria-hidden="true"><use href="#' + id + '"/></svg>'; }
+  function place(e, r) { e.style.left = r.x + "px"; e.style.top = r.y + "px"; e.style.width = r.w + "px"; e.style.height = r.h + "px"; }
+  function inside(p, r, s) { var k = s || 0; return p.x >= r.x - k && p.x < r.x + r.w + k && p.y >= r.y - k && p.y < r.y + r.h + k; }
+  function offsetIn(el, anc) { var x = 0, y = 0, e = el; while (e && e !== anc) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; } return { x: x, y: y, w: el.offsetWidth, h: el.offsetHeight }; }
+
+  var MARKS = {
+    chev: '<path d="M2 3.6 5 6.6 8 3.6" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    close: '<path d="M2.6 2.6 7.4 7.4M7.4 2.6 2.6 7.4" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    pin: '<path d="M3.4 1.2h3.2v3.9H3.4zM1.8 5.1h6.4M5 5.1v3.9" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+    pinOff: '<path d="M8.8 3.4v3.2H4.9V3.4zM4.9 1.8v6.4M4.9 5H1" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+    overflow: '<path d="M2.4 1.8 5 4.4 7.6 1.8M2.4 5.4 5 8 7.6 5.4" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+    down: '<path d="M1.8 3.4h6.4L5 7z" fill="currentColor"/>',
+    left: '<path d="M6.4 2 3.4 5 6.4 8" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    right: '<path d="M3.6 2 6.6 5 3.6 8" fill="none" stroke="currentColor" stroke-width="1.4"/>',
+    max: '<path d="M2 2.5h6v5.5H2z" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M2 3.3h6" stroke="currentColor" stroke-width="1.6"/>',
+    dock: '<path d="M3.5 2h5v6h-5z" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M3.5 2h2.2v6H3.5z" fill="currentColor" opacity=".5"/><path d="M.5 5h3.4M2.3 3.4 3.9 5 2.3 6.6" fill="none" stroke="currentColor" stroke-width="1.1"/>',
+    float: '<path d="M1.5 4h4.5v4.5H1.5z" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M4 4V1.5h4.5V6H6" fill="none" stroke="currentColor" stroke-width="1.1"/>'
+  };
+  function mark(n) { return '<svg viewBox="0 0 10 10" aria-hidden="true">' + MARKS[n] + "</svg>"; }
+
+  var PANELS = {
+    explorer: { title: "Explorer", icon: "icFolder" }, outline: { title: "Outline", icon: "icOutline" },
+    props: { title: "Properties", icon: "icProps" }, output: { title: "Output", icon: "icOutput" },
+    main: { title: "main.cpp", icon: "icCpp" }, view: { title: "view.hpp", icon: "icHpp" }
+  };
+  var BODY = {
+    explorer: '<div class="tree2"><div>' + ic("icFolder") + 'gallery</div><div class="in1">' + ic("icFolder") + 'src</div><div class="in2 sel">' + ic("icCpp") + 'main.cpp</div><div class="in2">' + ic("icHpp") + 'view.hpp</div><div class="in2">' + ic("icCpp") + 'view.cpp</div><div class="in1">' + ic("icProps") + 'CMakeLists.txt</div></div>',
+    outline: '<div class="tree2"><div>' + ic("icOutline") + 'View</div><div class="in1">' + ic("icOutline") + 'View(Application&amp;)</div><div class="in1">' + ic("icOutline") + 'paint(PaintContext&amp;)</div><div class="in1">' + ic("icOutline") + 'layout()</div><div class="in1">' + ic("icOutline") + 'hit_test(Point)</div></div>',
+    props: '<div class="pgrid"><span>Name</span><span>main.cpp</span><span>Type</span><span>C++ source</span><span>Encoding</span><span>UTF-8</span><span>Line endings</span><span>LF</span><span>Size</span><span>4.2 KB</span><span>Read only</span><span>False</span></div>',
+    output: '<div class="outwell">Build started: gui_forms_gallery\n[1/4] Compiling main.cpp\n[2/4] Compiling view.cpp\n[3/4] Linking gui_forms_gallery\nBuild succeeded, 0 warnings</div>',
+    main: '<span class="cm">// gallery entry point</span>\n<span class="kw">#include</span> <span class="st">"view.hpp"</span>\n\n<span class="ty">int</span> main(<span class="ty">int</span> argc, <span class="ty">char</span>** argv)\n{\n    gui_forms::Application application;\n    View view(application);\n    <span class="kw">return</span> application.run();\n}',
+    view: '<span class="kw">#pragma once</span>\n\n<span class="kw">class</span> <span class="ty">View</span>\n{\n<span class="kw">public</span>:\n    <span class="kw">explicit</span> View(Application&amp; application);\n    <span class="ty">void</span> paint(PaintContext&amp; context);\n};'
+  };
+  function titles(ids) { return ids.map(function (id) { return PANELS[id].title; }).join(" and "); }
+
+  /* Layout tree: binary splits (C1-2); a leaf is a stack of panels or the one document area. */
+  function leaf(ids, sel) { return { k: "leaf", ids: ids, sel: sel || 0 }; }
+  function docs() { return { k: "leaf", ids: ["main", "view"], sel: 0, doc: true }; }
+  function hsplit(r, a, b) { return { k: "split", dir: "h", r: r, a: a, b: b }; }
+  function vsplit(r, a, b) { return { k: "split", dir: "v", r: r, a: a, b: b }; }
+  function mainTree() { return hsplit(0.22, leaf(["explorer", "outline"]), hsplit(0.74, vsplit(0.64, docs(), leaf(["output"])), leaf(["props"]))); }
+  function cloneTree(t) { return t ? JSON.parse(JSON.stringify(t)) : null; }
+  function removeIds(n, ids) {
+    if (!n) { return null; }
+    if (n.k === "leaf") {
+      if (n.doc) { return n; }
+      var keep = n.ids.filter(function (id) { return ids.indexOf(id) < 0; });
+      if (!keep.length) { return null; }
+      if (keep.length !== n.ids.length) { var s = n.ids[n.sel]; n.ids = keep; n.sel = Math.max(0, keep.indexOf(s)); }
+      return n;
+    }
+    var a = removeIds(n.a, ids), b = removeIds(n.b, ids);
+    if (!a) { return b; }
+    if (!b) { return a; }
+    n.a = a; n.b = b; return n;
+  }
+  function replaceNode(n, target, rep) {
+    if (n === target) { return rep; }
+    if (n.k === "split") { n.a = replaceNode(n.a, target, rep); n.b = replaceNode(n.b, target, rep); }
+    return n;
+  }
+  function layoutTree(n, x, y, w, h, S, out) {
+    if (n.k === "leaf") { out.leaves.push({ node: n, r: { x: x, y: y, w: w, h: h } }); return; }
+    var span, a;
+    if (n.dir === "h") {
+      span = w - S; a = clamp(Math.round(span * n.r), Math.min(56, span / 2), Math.max(span - 56, span / 2));
+      layoutTree(n.a, x, y, a, h, S, out); out.seams.push({ dir: "h", x: x + a, y: y, w: S, h: h }); layoutTree(n.b, x + a + S, y, span - a, h, S, out);
+    } else {
+      span = h - S; a = clamp(Math.round(span * n.r), Math.min(48, span / 2), Math.max(span - 48, span / 2));
+      layoutTree(n.a, x, y, w, a, S, out); out.seams.push({ dir: "v", x: x, y: y + a, w: w, h: S }); layoutTree(n.b, x, y + a + S, w, span - a, S, out);
+    }
+  }
+  function leafHTML(n, o) {
+    var h = "", i, id;
+    if (n.doc) {
+      h = '<div class="dtabs">';
+      for (i = 0; i < n.ids.length; i++) {
+        id = n.ids[i];
+        h += '<span class="dtab' + (i === n.sel ? " on" : "") + '" data-dtab="' + i + '" style="z-index:' + (20 - i) + '">' + ic(PANELS[id].icon, "ti") + '<span class="dl">' + PANELS[id].title + '</span><b class="dx" title="Close">' + mark("close") + "</b></span>";
+      }
+      return h + '<span class="dover" title="Documents">' + mark("chev") + '</span></div><div class="dbody"><div class="well"><pre class="code">' + BODY[n.ids[n.sel]] + "</pre></div></div>";
+    }
+    var sel = n.ids[n.sel];
+    if (!o.nocap) {
+      h += '<div class="pcap"><i class="key"></i><span class="pt">' + PANELS[sel].title + '</span><span class="pbtns"><b class="pb" title="Position">' + mark("chev") + "</b>";
+      if (!o.nopin) { h += '<b class="pb" data-act="pin" title="' + (o.pinOff ? "Dock (pin)" : "Auto-hide (pin)") + '">' + mark(o.pinOff ? "pinOff" : "pin") + "</b>"; }
+      h += '<b class="pb" title="Close">' + mark("close") + "</b></span></div>";
+    }
+    h += '<div class="pbody">' + BODY[sel] + "</div>";
+    if (n.ids.length > 1) {
+      h += '<div class="ptabs">';
+      for (i = 0; i < n.ids.length; i++) { id = n.ids[i]; h += '<span class="ptab' + (i === n.sel ? " on" : "") + '" data-tab="' + i + '" style="z-index:' + (10 - i) + '">' + ic(PANELS[id].icon) + PANELS[id].title + "</span>"; }
+      h += "</div>";
+    }
+    return h;
+  }
+  function paneFor(ids, sel, w, h, o) {
+    var d = make("div", "pane tool", leafHTML({ k: "leaf", ids: ids, sel: sel }, o || {}));
+    d.style.left = "0px"; d.style.top = "0px"; d.style.width = w + "px"; d.style.height = h + "px"; d.style.transformOrigin = "0 0";
+    return d;
+  }
+
+  function Site(el, tree, seamW, opts) { this.el = el; this.tree = tree; this.seamW = seamW; this.opts = opts || {}; this.leaves = []; this.active = null; this.win = null; this.main = false; }
+  Site.prototype.render = function () {
+    var el = this.el, i;
+    el.innerHTML = ""; this.leaves = [];
+    if (!this.tree) { return; }
+    var w = el.clientWidth, h = el.clientHeight;
+    if (!w || !h) { return; }
+    var out = { leaves: [], seams: [] };
+    layoutTree(this.tree, 0, 0, w, h, this.seamW, out);
+    var frag = document.createDocumentFragment();
+    for (i = 0; i < out.leaves.length; i++) {
+      var lf = out.leaves[i], n = lf.node;
+      var cur = !n.doc && this.active && n.ids[n.sel] === this.active;
+      var d = make("div", "pane " + (n.doc ? "docs" : "tool") + (cur ? " current" : ""), leafHTML(n, this.opts));
+      place(d, lf.r); d.setAttribute("data-leaf", String(i));
+      frag.appendChild(d);
+      this.leaves.push({ node: n, r: lf.r, el: d });
+    }
+    for (i = 0; i < out.seams.length; i++) {
+      var s = out.seams[i];
+      var sd = make("div", "seam " + (s.dir === "h" ? "sv" : "sh"), '<span class="grip"><i></i><i></i><i></i><i></i><i></i></span>');
+      if (s.dir === "h") { place(sd, { x: s.x - 3, y: s.y, w: s.w + 6, h: s.h }); } else { place(sd, { x: s.x, y: s.y - 3, w: s.w, h: s.h + 6 }); }
+      frag.appendChild(sd);
+    }
+    el.appendChild(frag);
+  };
+  function findLeaf(site, id) { for (var i = 0; i < site.leaves.length; i++) { if (site.leaves[i].node.ids.indexOf(id) >= 0) { return site.leaves[i]; } } return null; }
+  function seamFor(cls) { if (/seam-gap/.test(cls)) { return 5; } if (/seam-line/.test(cls)) { return 1; } if (/look-vs/.test(cls)) { return 4; } return 3; }
+
+  /* Ribbon tiles: the dithered bulge of the default theme, its ramp read from the page tokens. */
+  function hexRGB(v) { var s = (v || "").trim(); if (s.charAt(0) !== "#" || s.length < 7) { return null; } return [parseInt(s.substr(1, 2), 16), parseInt(s.substr(3, 2), 16), parseInt(s.substr(5, 2), 16)]; }
+  var dz = null;
+  function dzPalette() {
+    if (dz) { return dz; }
+    var cs = getComputedStyle(root);
+    dz = { lit: [1, 2, 3].map(function (k) { return hexRGB(cs.getPropertyValue("--dz-lit-" + k)); }), shaded: [1, 2, 3].map(function (k) { return hexRGB(cs.getPropertyValue("--dz-sh-" + k)); }) };
+    return dz;
+  }
+  var bayer = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+  function field(x, y, w, h, cx, cy, rx, ry) { var dx = (x - cx * w) / (rx * w), dy = (y - cy * h) / (ry * h); var t = Math.sqrt(dx * dx + dy * dy); return t >= 1 ? 0 : 1 - Math.pow(t, 2.2); }
+  function quantize(v, th) { var sc = Math.min(0.999, Math.max(0, v)) * 3; var st = Math.floor(sc); if (sc - st > th) { st += 1; } return st; }
+  var ditherCache = {};
+  function ditherImage(w, h, pressed) {
+    var key = w + "x" + h + (pressed ? "p" : "");
+    if (ditherCache[key]) { return ditherCache[key]; }
+    var pal = dzPalette();
+    var dpr = Math.max(1, Math.round(window.devicePixelRatio || 1));
+    var cv = document.createElement("canvas"); cv.width = w * dpr; cv.height = h * dpr;
+    var ctx = cv.getContext("2d");
+    if (!ctx) { return "none"; }
+    var lc = pressed ? [0.60, 0.64, 0.50, 0.48] : [0.42, 0.38, 0.48, 0.46];
+    var sc = pressed ? [0.40, 0.36, 0.48, 0.46] : [0.60, 0.64, 0.50, 0.48];
+    for (var y = 1; y < h; y += 2) {
+      for (var x = 1; x < w; x += 2) {
+        var th = (bayer[((y >> 1) & 3) * 4 + ((x >> 1) & 3)] + 0.5) / 16;
+        var tone = field(x, y, w, h, lc[0], lc[1], lc[2], lc[3]) + field(x, y, w, h, 0.5, 0.5, 0.5, 0.5) * 0.25 - field(x, y, w, h, sc[0], sc[1], sc[2], sc[3]) * 0.85;
+        var colour = null, step;
+        if (tone >= 0) { step = quantize(tone, th); if (step > 0) { colour = pal.lit[step - 1]; } }
+        else { step = quantize(-tone, th); if (step > 0) { colour = pal.shaded[step - 1]; } }
+        if (colour) { ctx.fillStyle = "rgb(" + colour[0] + "," + colour[1] + "," + colour[2] + ")"; ctx.fillRect(x * dpr, y * dpr, dpr, dpr); }
+      }
+    }
+    ditherCache[key] = "url(" + cv.toDataURL() + ") 0 0 / " + w + "px " + h + "px no-repeat";
+    return ditherCache[key];
+  }
+  var ditherRoots = [];
+  function dither(scope) {
+    if (ditherRoots.indexOf(scope) < 0) { ditherRoots.push(scope); }
+    scope.querySelectorAll(".ribbon .tile").forEach(function (t) {
+      var w = t.offsetWidth, h = t.offsetHeight;
+      if (!w || !h) { return; }
+      t.style.setProperty("--dither", ditherImage(w, h, false));
+      t.style.setProperty("--dither-press", ditherImage(w, h, true));
+    });
+  }
+
+  var RIBBON = '<div class="ribbon"><div class="grp"><div class="cmds"><span class="tile">' + ic("rBuild") + 'Build</span><span class="tile">' + ic("rRun") + 'Run</span></div><div class="label">Build</div></div>' +
+    '<div class="grp"><div class="cmds"><span class="tile">' + ic("rFind") + 'Find</span></div><div class="label">Search</div></div>' +
+    '<div class="grp"><div class="cmds"><span class="tile">' + ic("rLayout") + 'Layouts</span></div><div class="label">Window</div></div></div>';
+  function ideWindow(o) {
+    var win = make("div", "win" + (o.cls ? " " + o.cls : ""));
+    win.innerHTML = '<div class="titlebar"><span>' + (o.title || "Gallery workspace") + '</span><span class="caps"><i></i><i></i><i></i></span></div>' +
+      '<div class="rail"><span class="file">File</span><span class="on">Home</span><span>View</span><span>Build</span><span>Debug</span></div>' + RIBBON +
+      '<div class="wbody">' + (o.strip || "") + '<div class="sitewrap"><div class="site" style="height:' + (o.siteH || 300) + 'px"></div></div></div>' +
+      '<div class="status"><span>Ready</span><span>Ln 6, Col 12</span><span class="chip">UTF-8</span><span class="grow"></span><span>main.cpp</span></div>';
+    return win;
+  }
+
+  /* Target geometry, shared by the live demos and the static samples. */
+  var ZONES = ["top", "left", "center", "right", "bottom"], SIDES = ["top", "left", "right", "bottom"];
+  var TILE = { sep: [30, 6], cross: [28, 2], diamond: [28, 3], quiet: [24, 7] };
+  function crossGeom(r, style) {
+    var T = TILE[style][0], g = TILE[style][1];
+    var fit = Math.min(r.w, r.h) / (3 * T + 2 * g + 10);
+    if (fit < 1) { T = Math.max(12, Math.floor(T * fit)); g = Math.max(1, Math.floor(g * fit)); }
+    var cx = r.x + r.w / 2, cy = r.y + r.h / 2, hh = T / 2, st = T + g;
+    return { T: T, g: g, cx: cx, cy: cy, tiles: {
+      center: { x: cx - hh, y: cy - hh, w: T, h: T }, top: { x: cx - hh, y: cy - hh - st, w: T, h: T }, bottom: { x: cx - hh, y: cy - hh + st, w: T, h: T },
+      left: { x: cx - hh - st, y: cy - hh, w: T, h: T }, right: { x: cx - hh + st, y: cy - hh, w: T, h: T } } };
+  }
+  function globalGeom(sr, style) {
+    var T = style === "quiet" ? 18 : 22, m = 5;
+    return { T: T, tiles: {
+      top: { x: sr.x + sr.w / 2 - T / 2, y: sr.y + m, w: T, h: T }, bottom: { x: sr.x + sr.w / 2 - T / 2, y: sr.y + sr.h - m - T, w: T, h: T },
+      left: { x: sr.x + m, y: sr.y + sr.h / 2 - T / 2, w: T, h: T }, right: { x: sr.x + sr.w - m - T, y: sr.y + sr.h / 2 - T / 2, w: T, h: T } } };
+  }
+  function tileAt(tiles, keys, p) { for (var i = 0; i < keys.length; i++) { if (tiles[keys[i]] && inside(p, tiles[keys[i]], 1)) { return keys[i]; } } return null; }
+  function zoneAt(r, p) {
+    var u = (p.x - r.x) / r.w, v = (p.y - r.y) / r.h;
+    var d = { left: u, right: 1 - u, top: v, bottom: 1 - v }, best = "left";
+    SIDES.forEach(function (s) { if (d[s] < d[best]) { best = s; } });
+    return d[best] > 0.28 ? "center" : best;
+  }
+  function zoneRect(r, z) {
+    if (z === "top") { return { x: r.x, y: r.y, w: r.w, h: r.h / 2 }; }
+    if (z === "bottom") { return { x: r.x, y: r.y + r.h / 2, w: r.w, h: r.h / 2 }; }
+    if (z === "left") { return { x: r.x, y: r.y, w: r.w / 2, h: r.h }; }
+    if (z === "right") { return { x: r.x + r.w / 2, y: r.y, w: r.w / 2, h: r.h }; }
+    return { x: r.x, y: r.y, w: r.w, h: r.h };
+  }
+  function globalRect(sr, s) {
+    var f = 0.24;
+    if (s === "top") { return { x: sr.x, y: sr.y, w: sr.w, h: sr.h * f }; }
+    if (s === "bottom") { return { x: sr.x, y: sr.y + sr.h * (1 - f), w: sr.w, h: sr.h * f }; }
+    if (s === "left") { return { x: sr.x, y: sr.y, w: sr.w * f, h: sr.h }; }
+    return { x: sr.x + sr.w * (1 - f), y: sr.y, w: sr.w * f, h: sr.h };
+  }
+  function shapeSVG(zone, outer) {
+    var R = outer ? { top: [3, 4, 14, 3], bottom: [3, 13, 14, 3], left: [3, 4, 3, 12], right: [14, 4, 3, 12] }
+                  : { top: [3, 4, 14, 6], bottom: [3, 10, 14, 6], left: [3, 4, 7, 12], right: [10, 4, 7, 12], center: [3, 4, 14, 12] };
+    var a = R[zone], s = '<svg viewBox="0 0 20 20" aria-hidden="true">';
+    if (zone === "center") { s += '<rect class="sh" x="3" y="1.6" width="5.5" height="2.4"/>'; }
+    s += '<rect class="sh" x="' + a[0] + '" y="' + a[1] + '" width="' + a[2] + '" height="' + a[3] + '"/><rect class="ol" x="2.5" y="3.5" width="15" height="13"/>';
+    if (outer) { s += '<rect class="ol" x="1" y="2" width="18" height="16"/>'; }
+    return s + "</svg>";
+  }
+  function buildCross(geo, style, allowCenter) {
+    var wrap = make("div", "dk-cross ts-" + style), map = {};
+    var ext = 3 * geo.T + 2 * geo.g, pad = 4;
+    if (style === "cross") {
+      var E = ext + 2 * pad, A = geo.T + 2 * pad, o = (E - A) / 2;
+      var pw = make("div", "dk-plate-wrap"), pl = make("div", "dk-plate");
+      place(pl, { x: geo.cx - E / 2, y: geo.cy - E / 2, w: E, h: E });
+      pl.style.clipPath = "polygon(" + [[o, 0], [o + A, 0], [o + A, o], [E, o], [E, o + A], [o + A, o + A], [o + A, E], [o, E], [o, o + A], [0, o + A], [0, o], [o, o]].map(function (q) { return q[0] + "px " + q[1] + "px"; }).join(",") + ")";
+      pw.appendChild(pl); wrap.appendChild(pw);
+    } else if (style === "diamond") {
+      var side = (ext + 12) / Math.SQRT2;
+      var pw2 = make("div", "dk-plate-wrap"), dd = make("div", "dk-plate dia");
+      place(dd, { x: geo.cx - side / 2, y: geo.cy - side / 2, w: side, h: side }); pw2.appendChild(dd); wrap.appendChild(pw2);
+    }
+    ZONES.forEach(function (z) {
+      var t = make("div", "dk-tile" + (z === "center" && !allowCenter ? " off" : ""), shapeSVG(z, false));
+      place(t, geo.tiles[z]); wrap.appendChild(t); map[z] = t;
+    });
+    return { el: wrap, map: map };
+  }
+  function buildGlobal(geo, style) {
+    var wrap = make("div", "dk-global" + (style === "quiet" ? " ts-quiet" : "")), map = {};
+    SIDES.forEach(function (s) { var t = make("div", "dk-tile", shapeSVG(s, true)); place(t, geo.tiles[s]); wrap.appendChild(t); map[s] = t; });
+    return { el: wrap, map: map };
+  }
+  function lit(map, zone) { Object.keys(map).forEach(function (k) { map[k].classList.toggle("lit", k === zone); }); }
+  function fadeIn(el) {
+    if (!el.classList.contains("ts-quiet")) { return; }
+    if (!motionOn()) { el.classList.add("in"); return; }
+    requestAnimationFrame(function () { requestAnimationFrame(function () { el.classList.add("in"); }); });
+  }
+  function cursorAt(layer, x, y) {
+    var c = make("div", "", '<svg class="dk-cursor" viewBox="0 0 12 18" aria-hidden="true"><path d="M1 1v14l3.5-3.5 2.6 5.6 2.1-1-2.6-5.3H11z" style="fill:var(--cursor-fill);stroke:var(--cursor-edge)" stroke-width="1"/></svg>');
+    var s = c.firstChild; s.style.left = x + "px"; s.style.top = y + "px"; layer.appendChild(s);
+  }
+  function stampStatic(layer, ids, w, h, px, py, fx, fy) {
+    var s = 100 / Math.max(w, h), sw = w * s, sh = h * s;
+    var box = make("div", "dk-stamp"), src = paneFor(ids, 0, w, h);
+    src.style.transform = "scale(" + s + ")"; box.appendChild(src);
+    place(box, { x: px - fx * sw, y: py - fy * sh, w: sw, h: sh });
+    layer.insertBefore(box, layer.firstChild);
+  }
+  function growTo(box, from, el, to, done) {
+    var img = el.cloneNode(true);
+    img.style.left = "0px"; img.style.top = "0px"; img.style.width = to.w + "px"; img.style.height = to.h + "px"; img.style.transformOrigin = "0 0"; img.style.visibility = "visible";
+    box.innerHTML = ""; box.appendChild(img);
+    el.style.visibility = "hidden";
+    var dur = motionOn() ? 220 : 0, t0 = now(), finished = false;
+    function finish() { if (finished) { return; } finished = true; el.style.visibility = ""; box.remove(); if (done) { done(); } }
+    function step() {
+      if (finished) { return; }
+      var k = dur ? smooth((now() - t0) / dur) : 1, r = lerpRect(from, to, k);
+      place(box, r); img.style.transform = "scale(" + (r.w / to.w) + "," + (r.h / to.h) + ")";
+      if (k < 1) { requestAnimationFrame(step); } else { finish(); }
+    }
+    step();
+    if (dur) { setTimeout(finish, dur + 200); }
+  }
+
+  /* The drag controller: postage stamp (D1), position-sensitive targets (D2, D3), Escape (D1b-1), Ctrl (D6-1), float or snap back (D4-1). */
+  function Dock(o) {
+    var self = this;
+    this.stage = o.stage; this.layer = o.layer; this.sites = o.sites; this.cfg = o.cfg; this.msgEl = o.msg; this.floatSite = o.floatSite || null; this.hooks = o.hooks || {};
+    this.pending = null; this.st = null; this.lastP = { x: 0, y: 0 }; this.ctrl = false; this.keySite = o.keySite || this.sites[this.sites.length - 1];
+    this.stage.addEventListener("pointerdown", function (e) { self.down(e); });
+    this.stage.addEventListener("pointermove", function (e) { self.move(e); });
+    this.stage.addEventListener("pointerup", function (e) { self.up(e); });
+    this.stage.addEventListener("pointercancel", function () { self.cancel("cancel"); });
+    document.addEventListener("keydown", function (e) {
+      if (!self.st) { return; }
+      if (e.key === "Escape") { e.preventDefault(); self.cancel("escape"); }
+      else if (e.key === "Control") { self.ctrl = true; self.update(); }
+    });
+    document.addEventListener("keyup", function (e) { if (self.st && e.key === "Control") { self.ctrl = false; self.update(); } });
+  }
+  Dock.prototype.pt = function (e) { var r = this.stage.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  Dock.prototype.rectOf = function (el) { var a = this.stage.getBoundingClientRect(), b = el.getBoundingClientRect(); return { x: b.left - a.left, y: b.top - a.top, w: b.width, h: b.height }; };
+  Dock.prototype.siteOf = function (el) { for (var i = 0; i < this.sites.length; i++) { if (this.sites[i].el.contains(el)) { return this.sites[i]; } } return null; };
+  Dock.prototype.mainSite = function () { for (var i = 0; i < this.sites.length; i++) { if (this.sites[i].main) { return this.sites[i]; } } return null; };
+  Dock.prototype.say = function (t) { if (this.msgEl) { this.msgEl.textContent = t; } };
+  Dock.prototype.renderAll = function () {
+    var key = this.keySite, many = this.sites.length > 1;
+    this.sites.forEach(function (s) {
+      if (s.win && !s.main) { s.win.style.display = s.tree ? "" : "none"; }
+      s.render();
+      if (s.win && many) { s.win.classList.toggle("secondary", s !== key); }
+    });
+  };
+  Dock.prototype.setActive = function (site, id) {
+    this.sites.forEach(function (s) { s.active = s === site ? id : null; });
+    this.keySite = site; this.renderAll();
+  };
+  Dock.prototype.down = function (e) {
+    if (this.st || e.button !== 0) { return; }
+    var t = e.target;
+    if (!t.closest || t.closest(".seam")) { return; }
+    var paneEl = t.closest(".pane"); if (!paneEl) { return; }
+    var site = this.siteOf(paneEl); if (!site) { return; }
+    var entry = site.leaves[+paneEl.getAttribute("data-leaf")]; if (!entry) { return; }
+    var n = entry.node;
+    var pin = t.closest('.pb[data-act="pin"]');
+    if (pin && this.hooks.pin) { this.hooks.pin(site, n); return; }
+    if (t.closest(".pb, .dx, .dover")) { return; }
+    var tabEl = t.closest(".ptab"), dtabEl = t.closest(".dtab"), capEl = t.closest(".pcap");
+    if (dtabEl) { n.sel = +dtabEl.getAttribute("data-dtab"); this.keySite = site; this.renderAll(); return; }
+    if (n.doc) { this.keySite = site; this.renderAll(); return; }
+    if (!tabEl && !capEl) { this.setActive(site, n.ids[n.sel]); return; }
+    var p = this.pt(e), r = this.rectOf(paneEl);
+    var ti = tabEl ? +tabEl.getAttribute("data-tab") : -1;
+    this.pending = { site: site, leaf: n, ids: tabEl ? [n.ids[ti]] : n.ids.slice(), tab: ti, sel: n.sel, x0: p.x, y0: p.y, rect: r, fx: (p.x - r.x) / r.w, fy: (p.y - r.y) / r.h };
+    this.lastP = p;
+    try { this.stage.setPointerCapture(e.pointerId); } catch (err) { /* capture is a convenience */ }
+    e.preventDefault();
+  };
+  Dock.prototype.move = function (e) {
+    if (!this.pending && !this.st) { return; }
+    this.lastP = this.pt(e); this.ctrl = e.ctrlKey;
+    if (this.pending) {
+      var pd = this.pending;
+      if (Math.abs(this.lastP.x - pd.x0) + Math.abs(this.lastP.y - pd.y0) < 4) { return; }
+      this.start();
+    }
+    this.update();
+  };
+  Dock.prototype.start = function () {
+    var pd = this.pending; this.pending = null;
+    var snap = this.sites.map(function (s) { return { tree: cloneTree(s.tree), active: s.active }; });
+    var src = paneFor(pd.ids, pd.tab >= 0 ? 0 : pd.sel, pd.rect.w, pd.rect.h);
+    var keyBefore = this.keySite;
+    pd.site.tree = removeIds(pd.site.tree, pd.ids);
+    if (pd.ids.indexOf(pd.site.active) >= 0) { pd.site.active = null; }
+    this.renderAll();
+    var box = make("div", "dk-stamp"); box.appendChild(src); this.layer.appendChild(box);
+    var tl = make("div", "dk-targets"), hl = make("div", "dk-hl"); tl.appendChild(hl); this.layer.appendChild(tl);
+    var cue = make("div", "dk-cue", mark("float")); this.layer.appendChild(cue);
+    this.st = { pd: pd, snap: snap, keyBefore: keyBefore, box: box, src: src, s: 100 / Math.max(pd.rect.w, pd.rect.h), t0: now(), from: pd.rect, cur: pd.rect, tl: tl, hl: hl, cue: cue, srcWin: pd.site.win, cross: null, crossLeaf: null, global: null, gsr: null, proxWin: null, proxPane: null };
+    this.stage.classList.add("dk-dragging");
+    this.say("Dragging " + titles(pd.ids) + ". Its place closed up; Escape puts it back.");
+    var self = this;
+    function tick() { if (!self.st || self.st.box !== box) { return; } if (self.placeStamp()) { requestAnimationFrame(tick); } }
+    requestAnimationFrame(tick);
+  };
+  Dock.prototype.placeStamp = function () {
+    var st = this.st, p = this.lastP;
+    var w1 = st.from.w * st.s, h1 = st.from.h * st.s;
+    var k = motionOn() ? smooth((now() - st.t0) / 220) : 1;
+    var r = { x: lerp(st.from.x, p.x - st.pd.fx * w1, k), y: lerp(st.from.y, p.y - st.pd.fy * h1, k), w: lerp(st.from.w, w1, k), h: lerp(st.from.h, h1, k) };
+    st.cur = r; place(st.box, r); st.src.style.transform = "scale(" + (r.w / st.from.w) + ")";
+    st.cue.style.left = (p.x + 14) + "px"; st.cue.style.top = (p.y + 16) + "px";
+    return k < 1;
+  };
+  Dock.prototype.hit = function (p, ctrl) {
+    for (var i = 0; i < this.sites.length; i++) {
+      var s = this.sites[i];
+      if (!s.tree || !s.win || s.win.style.display === "none") { continue; }
+      if (!inside(p, this.rectOf(s.win))) { continue; }
+      if (ctrl) { return { kind: "none", site: s }; }
+      var sr = this.rectOf(s.el);
+      if (!inside(p, sr)) { return { kind: "none", site: s }; }
+      if (s.main) {
+        var gs = tileAt(globalGeom(sr, this.cfg.tiles).tiles, SIDES, p), band = 8;
+        if (!gs) { if (p.x < sr.x + band) { gs = "left"; } else if (p.x >= sr.x + sr.w - band) { gs = "right"; } else if (p.y < sr.y + band) { gs = "top"; } else if (p.y >= sr.y + sr.h - band) { gs = "bottom"; } }
+        if (gs) { return { kind: "global", site: s, side: gs, sr: sr }; }
+      }
+      for (var j = 0; j < s.leaves.length; j++) {
+        var lf = s.leaves[j], r = { x: sr.x + lf.r.x, y: sr.y + lf.r.y, w: lf.r.w, h: lf.r.h };
+        if (!inside(p, r)) { continue; }
+        var allowC = !lf.node.doc, geo = crossGeom(r, this.cfg.tiles);
+        var z = tileAt(geo.tiles, ZONES, p) || zoneAt(r, p);
+        if (z === "center" && !allowC) { z = null; }
+        return { kind: z ? "pane" : "reject", site: s, leaf: lf, rect: r, geo: geo, zone: z, allowCenter: allowC };
+      }
+      return { kind: "none", site: s };
+    }
+    return { kind: "none", site: null };
+  };
+  Dock.prototype.update = function () {
+    var st = this.st; if (!st) { return; }
+    this.placeStamp();
+    var t = this.hit(this.lastP, this.ctrl), cfg = this.cfg;
+    st.target = t;
+    var main = this.mainSite();
+    if (!st.global && main && main.tree) { st.gsr = this.rectOf(main.el); st.global = buildGlobal(globalGeom(st.gsr, cfg.tiles), cfg.tiles); st.tl.appendChild(st.global.el); fadeIn(st.global.el); }
+    var hr = null;
+    if (t.kind === "pane") { hr = zoneRect(t.rect, t.zone); }
+    if (t.kind === "global") { hr = globalRect(t.sr, t.side); }
+    if (hr && cfg.hl !== "none") { place(st.hl, hr); st.hl.className = "dk-hl on hl-" + cfg.hl; } else { st.hl.className = "dk-hl"; }
+    var ln = (t.kind === "pane" || t.kind === "reject") ? t.leaf.node : null;
+    if (st.crossLeaf !== ln) {
+      if (st.cross) { st.cross.el.remove(); }
+      st.cross = null; st.crossLeaf = ln;
+      if (ln) { st.cross = buildCross(t.geo, cfg.tiles, t.allowCenter); st.tl.appendChild(st.cross.el); fadeIn(st.cross.el); }
+    }
+    if (st.cross) { lit(st.cross.map, t.kind === "pane" ? t.zone : null); }
+    if (st.global) { lit(st.global.map, t.kind === "global" ? t.side : null); }
+    st.cue.style.display = (t.kind === "none" || t.kind === "reject") ? "grid" : "none";
+    var win = t.site && t.site.win && t.site.win !== st.srcWin ? t.site.win : null;
+    var pane = (cfg.prox === "pane" && win && t.leaf) ? t.leaf.el : null;
+    if (st.proxWin !== win || st.proxPane !== pane) {
+      this.clearProx();
+      st.proxWin = win; st.proxPane = pane;
+      if (win && cfg.prox === "key") { win.classList.add("prox-key"); }
+      if (win && cfg.prox === "ring") { win.classList.add("prox-ring"); }
+      if (pane) { pane.classList.add("prox-pane"); }
+    }
+  };
+  Dock.prototype.clearProx = function () {
+    var st = this.st; if (!st) { return; }
+    if (st.proxWin) { st.proxWin.classList.remove("prox-key", "prox-ring"); }
+    if (st.proxPane) { st.proxPane.classList.remove("prox-pane"); }
+    st.proxWin = null; st.proxPane = null;
+  };
+  Dock.prototype.end = function () { var st = this.st; this.clearProx(); st.tl.remove(); st.cue.remove(); this.stage.classList.remove("dk-dragging"); this.st = null; };
+  Dock.prototype.up = function (e) {
+    if (this.pending) {
+      var pd = this.pending; this.pending = null;
+      if (pd.tab >= 0) { pd.leaf.sel = pd.tab; }
+      this.setActive(pd.site, pd.leaf.ids[pd.leaf.sel]);
+      return;
+    }
+    if (!this.st) { return; }
+    this.lastP = this.pt(e);
+    this.commit(this.hit(this.lastP, e.ctrlKey));
+  };
+  Dock.prototype.commit = function (t) {
+    var st = this.st, ids = st.pd.ids, dest = null, what = "", p = this.lastP, fs = this.floatSite;
+    if (t.kind === "pane") {
+      var n = t.leaf.node;
+      if (t.zone === "center") {
+        what = n.ids.length > 1 ? "joined the " + titles(n.ids) + " group, which keeps its one pin" : "tabbed into " + PANELS[n.ids[0]].title + "; the new group gets one fresh, not-auto-hidden pin";
+        n.ids = n.ids.concat(ids); n.sel = n.ids.length - ids.length;
+      }
+      else {
+        var nl = leaf(ids.slice()), hz = t.zone === "left" || t.zone === "right", first = t.zone === "left" || t.zone === "top";
+        t.site.tree = replaceNode(t.site.tree, n, { k: "split", dir: hz ? "h" : "v", r: 0.5, a: first ? nl : n, b: first ? n : nl });
+        what = "split " + (n.doc ? "the document area" : PANELS[n.ids[n.sel]].title) + " on its " + t.zone + " side";
+      }
+      dest = t.site;
+    } else if (t.kind === "global") {
+      var gl = leaf(ids.slice()), s2 = t.site;
+      if (t.side === "left") { s2.tree = hsplit(0.24, gl, s2.tree); } else if (t.side === "right") { s2.tree = hsplit(0.76, s2.tree, gl); }
+      else if (t.side === "top") { s2.tree = vsplit(0.26, gl, s2.tree); } else { s2.tree = vsplit(0.72, s2.tree, gl); }
+      what = "docked along the window's " + t.side + " edge"; dest = s2;
+    } else if (fs && !fs.tree) {
+      fs.tree = leaf(ids.slice());
+      var fw = 240, fh = 230;
+      fs.win.style.left = clamp(p.x - 40, 0, this.stage.clientWidth - fw) + "px"; fs.win.style.top = clamp(p.y - 12, 0, this.stage.clientHeight - fh) + "px";
+      what = "floated where nothing accepted it (D4-1)"; dest = fs;
+    } else { this.cancel("nofloat"); return; }
+    this.sites.forEach(function (s) { s.active = s === dest ? ids[0] : null; });
+    this.keySite = dest;
+    var box = st.box, from = st.cur;
+    this.end(); this.renderAll();
+    var entry = findLeaf(dest, ids[0]);
+    this.say(titles(ids) + " " + what + ".");
+    if (entry) { growTo(box, from, entry.el, this.rectOf(entry.el)); } else { box.remove(); }
+  };
+  Dock.prototype.cancel = function (reason) {
+    if (this.pending) { this.pending = null; return; }
+    var st = this.st; if (!st) { return; }
+    var ids = st.pd.ids, box = st.box, from = st.cur;
+    this.sites.forEach(function (s, i) { s.tree = st.snap[i].tree; s.active = st.snap[i].active; });
+    this.keySite = st.keyBefore;
+    this.end(); this.renderAll();
+    var entry = findLeaf(st.pd.site, ids[0]);
+    if (reason === "escape") { this.say("Escape: " + titles(ids) + " grew back into its place."); }
+    else if (reason === "nofloat") { this.say(titles(ids) + " would float here (D4-1). This demo opens no new floating window, so it went back."); }
+    else { this.say(titles(ids) + " went back."); }
+    if (entry) { growTo(box, from, entry.el, this.rectOf(entry.el)); } else { box.remove(); }
+  };
+  Dock.prototype.set = function (key, val) { if (!this.st) { this.cfg[key] = val; } };
+
+  /* Static samples */
+  var fits = [];
+  function refit(f) {
+    var w = f.host.clientWidth; if (!w) { return; }
+    var s = Math.min(1, w / f.W);
+    f.inner.style.transform = "scale(" + s + ")";
+    f.host.style.height = Math.ceil(f.inner.offsetHeight * s) + "px";
+  }
+  function refitAll() { fits.forEach(refit); }
+  function staticIde(host, cls) {
+    var stage = make("div", "dk static " + cls); host.appendChild(stage);
+    var win = ideWindow({ title: "Gallery workspace", siteH: 290 }); stage.appendChild(win);
+    var site = new Site(win.querySelector(".site"), mainTree(), seamFor(cls)); site.active = "explorer"; site.render();
+    dither(win);
+  }
+  function siteOnly(host, cls) {
+    var stage = make("div", "dk static look-house cap-key " + cls, '<div class="snapwin"><div class="site" style="height:258px"></div></div>');
+    stage.style.height = "260px"; host.appendChild(stage);
+    var site = new Site(stage.querySelector(".site"), mainTree(), seamFor(cls)); site.active = "explorer"; site.render();
+  }
+  function snapTargets(host, tiles, hl, zone) {
+    var stage = make("div", "dk static look-house cap-key seam-graphite snap", '<div class="snapwin"><div class="site" style="height:218px"></div></div>');
+    host.appendChild(stage);
+    var siteEl = stage.querySelector(".site");
+    var site = new Site(siteEl, hsplit(0.64, docs(), leaf(["props"])), 3); site.active = "props"; site.render();
+    var layer = make("div", "dk-layer"); stage.appendChild(layer);
+    var sr = offsetIn(siteEl, stage), d = site.leaves[0], r = { x: sr.x + d.r.x, y: sr.y + d.r.y, w: d.r.w, h: d.r.h };
+    if (hl !== "none") { var h = make("div", "dk-hl on hl-" + hl); place(h, zoneRect(r, zone)); layer.appendChild(h); }
+    var g = buildGlobal(globalGeom(sr, tiles), tiles); g.el.classList.add("in"); layer.appendChild(g.el);
+    var geo = crossGeom(r, tiles), c = buildCross(geo, tiles, false); c.el.classList.add("in"); layer.appendChild(c.el); lit(c.map, zone);
+    var tt = geo.tiles[zone], px = tt.x + tt.w * 0.55, py = tt.y + tt.h * 0.6;
+    stampStatic(layer, ["output"], 300, 120, px, py, 0.08, 0.12);
+    cursorAt(layer, px, py);
+  }
+  function t4(host, cap) {
+    var row = make("div", "t4row dk static look-house seam-graphite " + cap); host.appendChild(row);
+    [true, false].forEach(function (act) {
+      var box = make("div", "t4box", '<div class="site" style="height:190px"></div><span class="t4lbl">' + (act ? "Active panel" : "Inactive") + "</span>");
+      row.appendChild(box);
+      var site = new Site(box.querySelector(".site"), leaf(["explorer", "outline"]), 3); site.active = act ? "explorer" : null; site.render();
+    });
+  }
+  function film(host, motion, shadow) {
+    var h = '<div class="mock film">';
+    [0, 60, 120, 180].forEach(function (ms) {
+      var k = ms === 0 ? 0 : (motion === "slide" ? smooth(ms / 180) : 1);
+      h += '<div class="frame"><div class="fr-site"><div class="fr-strip"><i class="on"></i><i></i></div><div class="fr-doc"></div><div class="fr-clip"><div class="fr-fly fly-' + shadow + '" style="transform:translateX(' + ((k - 1) * 115).toFixed(1) + '%);' + (k === 0 ? "visibility:hidden" : "") + '"><b></b></div></div></div><span>' + ms + " ms</span></div>";
+    });
+    host.innerHTML = h + "</div>";
+  }
+  function t6(host, mode) {
+    var row = make("div", "t6row dk static look-house cap-key seam-graphite"); host.appendChild(row);
+    [1, 2].forEach(function (n) {
+      var useHost = mode === "host" || (mode === "hybrid" && n === 2);
+      var chrome;
+      if (useHost) { chrome = '<div class="hostbar"><span>Properties</span><span class="hx">' + mark("close") + "</span></div>"; }
+      else if (n === 1) { chrome = '<div class="drawncap"><i class="key on"></i><span class="dt">Properties</span><span class="pbtns"><b class="pb" title="Position">' + mark("chev") + '</b><b class="pb" title="Dock">' + mark("dock") + '</b><b class="pb" title="Maximize">' + mark("max") + '</b><b class="pb" title="Close">' + mark("close") + "</b></span></div>"; }
+      else { chrome = '<div class="drawncap thin"><span class="dt">Properties, Output</span><span class="pbtns"><b class="pb" title="Dock">' + mark("dock") + '</b><b class="pb" title="Maximize">' + mark("max") + '</b><b class="pb" title="Close">' + mark("close") + "</b></span></div>"; }
+      var fw = make("div", "fwin static", chrome + '<div class="site" style="height:' + (n === 1 ? 170 : 240) + 'px"></div>');
+      row.appendChild(fw);
+      var site = new Site(fw.querySelector(".site"), n === 1 ? leaf(["props"]) : vsplit(0.5, leaf(["props"]), leaf(["output"])), 3, { nocap: !useHost && n === 1, nopin: true });
+      site.active = "props"; site.render();
+    });
+  }
+  function proxStage(host, live) {
+    var stage = make("div", "dk look-house cap-key seam-graphite proxstage" + (live ? "" : " static")); host.appendChild(stage);
+    var win = ideWindow({ title: "Gallery workspace", siteH: 290 }); win.style.width = "600px"; stage.appendChild(win);
+    var fw = make("div", "fwin", '<div class="drawncap thin"><span class="dt">Tool panels</span><span class="pbtns"><b class="pb" title="Dock">' + mark("dock") + '</b><b class="pb" title="Close">' + mark("close") + '</b></span></div><div class="site" style="height:200px"></div>');
+    fw.style.left = "566px"; fw.style.top = "150px"; stage.appendChild(fw);
+    var layer = make("div", "dk-layer"); stage.appendChild(layer);
+    var main = new Site(win.querySelector(".site"), hsplit(0.26, leaf(["explorer"]), vsplit(0.62, docs(), leaf(["output"]))), 3);
+    main.win = win; main.main = true;
+    var fl = new Site(fw.querySelector(".site"), leaf(live ? ["props", "outline"] : ["outline"]), 3, { nopin: true });
+    fl.win = fw; fl.active = live ? "props" : "outline";
+    main.render(); fl.render(); dither(win);
+    win.classList.add("secondary");
+    return { stage: stage, layer: layer, main: main, fl: fl, win: win, fw: fw };
+  }
+  function proxStatic(host, prox) {
+    var o = proxStage(host, false);
+    var out = findLeaf(o.main, "output"), sr = offsetIn(o.main.el, o.stage);
+    var r = { x: sr.x + out.r.x, y: sr.y + out.r.y, w: out.r.w, h: out.r.h };
+    var h = make("div", "dk-hl on hl-tint"); place(h, zoneRect(r, "right")); o.layer.appendChild(h);
+    var g = buildGlobal(globalGeom(sr, "sep"), "sep"); o.layer.appendChild(g.el);
+    var geo = crossGeom(r, "sep"), c = buildCross(geo, "sep", true); o.layer.appendChild(c.el); lit(c.map, "right");
+    var tt = geo.tiles.right, px = tt.x + tt.w * 0.55, py = tt.y + tt.h * 0.6;
+    stampStatic(o.layer, ["props"], 238, 200, px, py, 0.08, 0.06);
+    cursorAt(o.layer, px, py);
+    if (prox === "key") { o.win.classList.add("prox-key"); }
+    if (prox === "ring") { o.win.classList.add("prox-ring"); }
+    if (prox === "pane") { out.el.classList.add("prox-pane"); }
+  }
+
+  /* PageView samples */
+  function plainStrip(kind, bottom) {
+    var tabs = [["General", "on"], ["Layout", "hot"], ["Colours", "pr"], ["Advanced", "dis"], ["Files", "", "icFolder"]];
+    var s = '<div class="strip ' + kind + (bottom ? " bot" : "") + '">';
+    tabs.forEach(function (t, i) { s += '<span class="tb' + (t[1] ? " " + t[1] : "") + '" style="z-index:' + (20 - i) + '">' + (t[2] ? ic(t[2], "ti") : "") + t[0] + "</span>"; });
+    s += "</div>";
+    var page = '<div class="tpage pg-' + kind + (bottom ? " bot" : "") + '"><div class="pgrow"><span class="lbl2">Name</span><span class="entry2">gallery</span></div><div class="pgrow"><span class="lbl2">Theme</span><span class="entry2">Default</span></div></div>';
+    return '<div class="tabbox">' + (bottom ? page + s : s + page) + "</div>";
+  }
+  function docStrip(tabs, o) {
+    var opt = o || {}, h = '<div class="strip pp doc' + (opt.cls ? " " + opt.cls : "") + '">';
+    tabs.forEach(function (t, i) {
+      var inner = ic(t.icon, "ti") + '<span class="lbl' + (t.lc ? " " + t.lc : "") + '">' + t.label + (t.after || "") + "</span>";
+      if (t.pin) { inner += '<span class="pinm">' + mark("pin") + "</span>"; }
+      if (t.cx !== false) { inner += '<span class="cx' + (t.cx ? " " + t.cx : "") + '">' + mark("close") + "</span>"; }
+      h += '<span class="tb' + (t.s ? " " + t.s : "") + '" style="z-index:' + (20 - i) + '">' + inner + "</span>";
+      if (t.gapAfter) { h += '<span class="pgap"></span>'; }
+    });
+    h += "</div>";
+    if (opt.page !== false) { h += '<div class="tpage' + (opt.edge ? " edge" : "") + '"><div class="well"><pre class="code">' + BODY.main.split("\n").slice(0, 4).join("\n") + "</pre></div></div>"; }
+    return '<div class="tabbox">' + h + "</div>";
+  }
+  function pt1(host, kind) {
+    var h = '<div class="mock pt">';
+    if (kind === "mixed") {
+      h += '<div class="cap2">Documents</div>' + docStrip([{ label: "main.cpp", icon: "icCpp", s: "on" }, { label: "view.hpp", icon: "icHpp", s: "hot" }, { label: "app.cpp", icon: "icCpp" }]);
+      h += '<div class="cap2">Strip tabs</div>' + plainStrip("s03", false);
+    } else { h += plainStrip(kind, false) + plainStrip(kind, true); }
+    host.innerHTML = h + "</div>";
+  }
+  function pt2(host, join) {
+    var tabs = [{ label: "main.cpp", icon: "icCpp", s: "on" }, { label: "view.hpp", icon: "icHpp" }];
+    host.innerHTML = '<div class="mock pt">' + docStrip(tabs, { cls: "join-" + join, edge: join !== "open" }) + "</div>";
+  }
+  function pt3(host, cx, pin) {
+    var hot = cx === "plate" ? "hp" : "hb", beside = pin === "beside";
+    var a = [{ label: "theme.hpp", icon: "icHpp", s: "hot", pin: true, cx: beside ? "" : false, gapAfter: true }, { label: "main.cpp", icon: "icCpp", s: "on" }, { label: "view.hpp", icon: "icHpp" }];
+    var b = [{ label: "theme.hpp", icon: "icHpp", pin: true, cx: beside ? "" : false, gapAfter: true }, { label: "main.cpp", icon: "icCpp", s: "on" }, { label: "view.hpp", icon: "icHpp", s: "hot", cx: hot }];
+    host.innerHTML = '<div class="mock pt"><div class="cap2">Pointer on the pinned tab</div>' + docStrip(a, { page: false }) + '<div class="cap2">Pointer on view.hpp\'s close glyph</div>' + docStrip(b) + "</div>";
+  }
+  function pt4(host, mod) {
+    var tabs = [{ label: "main.cpp", icon: "icCpp", s: "on", m: true }, { label: "view.hpp", icon: "icHpp", s: "hot", m: true }, { label: "view.cpp", icon: "icCpp", m: true }, { label: "app.cpp", icon: "icCpp" }];
+    tabs.forEach(function (t) {
+      if (!t.m) { return; }
+      if (mod === "dot" && t.s !== "hot") { t.cx = "dot show"; }
+      if (mod === "star") { t.after = "*"; }
+      if (mod === "italic") { t.lc = "it"; }
+      if (mod === "tint") { t.lc = "tint"; }
+    });
+    host.innerHTML = '<div class="mock pt">' + docStrip(tabs) + "</div>";
+  }
+  function pt5(host, mode) {
+    var p1 = { label: "theme.hpp", icon: "icHpp", pin: true }, p2 = { label: "main.cpp", icon: "icCpp", pin: true, s: "on" };
+    if (mode === "icon") { p1.s = "icononly"; p2.s = "on icononly"; }
+    if (mode === "gap") { p1.s = "pinhover"; p2.s = "on hot pinhover"; p2.gapAfter = true; }
+    var tabs = [p1, p2, { label: "view.hpp", icon: "icHpp" }, { label: "view.cpp", icon: "icCpp" }, { label: "app.cpp", icon: "icCpp" }];
+    host.innerHTML = '<div class="mock pt">' + docStrip(tabs) + "</div>";
+  }
+  var NAVP = [["Explorer", "icFolder"], ["Search", "icSearch"], ["Source control", "icBranch"], ["Debug", "icBug"]];
+  var NAVO = [["Tests", "icFlask"], ["Notes", "icNote"], ["Extensions", "icPlug"]];
+  function navPane(style, menu) {
+    var h = '<div class="nav nav-' + style + '"><div class="nav-head">Explorer<b class="pb" title="Collapse">' + mark("left") + '</b></div><div class="nav-content">' + BODY.explorer + '</div><div class="nav-grip" title="Drag to show more or fewer buttons"><i></i><i></i><i></i><i></i><i></i></div>';
+    NAVP.forEach(function (p, i) { h += '<div class="nav-btn' + (i === 0 ? " on" : "") + (i === 2 ? " hot" : "") + '" style="z-index:' + (10 - i) + '">' + ic(p[1]) + "<span>" + p[0] + "</span></div>"; });
+    h += '<div class="nav-over">' + NAVO.map(function (o) { return '<span title="' + o[0] + '">' + ic(o[1]) + "</span>"; }).join("") + '<span class="cfg" title="Configure buttons">' + mark("chev") + "</span></div>";
+    return h + (menu || "") + "</div>";
+  }
+  function navBar(style, dir, open) {
+    var h = '<div class="navbar nav-' + style + '"><span class="nb-top" title="Expand">' + mark("right") + '</span><span class="nb-cap' + (dir === "btt" ? " btt" : "") + (open ? " open" : "") + '">Explorer</span>';
+    NAVP.forEach(function (p, i) { h += '<span class="nb-ic' + (i === 0 ? " on" : "") + '" title="' + p[0] + '">' + ic(p[1]) + "</span>"; });
+    return h + "</div>";
+  }
+  function pt7(host, style) { host.innerHTML = '<div class="mock pt7row">' + navPane(style) + navBar(style, "ttb") + "</div>"; }
+  function pt7dec(host) {
+    var menu = '<div class="menu cfgmenu"><div class="mi hot"><span class="ck"></span>Show more buttons</div><div class="mi"><span class="ck"></span>Show fewer buttons</div><div class="msep"></div><div class="mhead">Hidden pages</div><div class="mi"><span class="ck"></span>Bookmarks</div><div class="mi"><span class="ck"></span>Call stack</div><div class="msep"></div><div class="mi"><span class="ck"></span>Navigation pane options&hellip;</div></div>';
+    var pop = '<div class="popwin">' + navBar("flat", "ttb", true) + '<div class="popup"><div class="nav-head">Explorer</div><div class="nav-content">' + BODY.explorer + "</div></div></div>";
+    host.innerHTML = '<div class="mock pt7dec">' + navPane("flat", menu) + '<div style="width:150px"></div>' + pop + "</div>";
+  }
+  function pt8(host, dir) {
+    var tabs = [["Explorer", "icFolder", "open"], ["Outline", "icOutline", ""], ["Search", "icSearch", "hot"]];
+    var h = '<div class="mock pt8row"><div class="ahstrip sdir-' + dir + '">' + tabs.map(function (t) { return '<span class="stab ' + t[2] + '">' + ic(t[1]) + "<span>" + t[0] + "</span></span>"; }).join("") + "</div>";
+    h += '<div class="pt8site"><div class="pt8fly pane inflow" style="position:absolute"><div class="pcap"><i class="key"></i><span class="pt">Explorer</span><span class="pbtns"><b class="pb">' + mark("pinOff") + '</b><b class="pb">' + mark("close") + '</b></span></div><div class="pbody">' + BODY.explorer + "</div></div></div>";
+    if (dir !== "col") { h += navBar("flat", dir); }
+    host.innerHTML = h + "</div>";
+  }
+
+  /* PT6: shrink then overflow (H4-3); a page chosen from the list takes the last visible position (P13). */
+  var DOCS = ["main.cpp", "view.hpp", "view.cpp", "app.cpp", "app.hpp", "theme.cpp", "theme.hpp", "layout.cpp", "paint.cpp", "input.cpp", "dock.cpp", "page_set.hpp"];
+  function docIcon(n) { return /\.hpp$/.test(n) ? "icHpp" : "icCpp"; }
+  function DocOverflow(host, style, width, live, msg) {
+    var self = this;
+    this.style = style; this.width = width; this.live = live; this.msg = msg; this.order = DOCS.slice(); this.sel = "main.cpp"; this.open = !live; this.nat = null; this.nVis = DOCS.length;
+    host.innerHTML = '<div class="mock ovwrap"><div class="strip pp doc ov' + (live ? " live" : "") + '"></div><div class="tpage"><div class="well"><pre class="code"></pre></div></div><div class="menu ovmenu"></div><div class="strip pp doc ovmeasure" aria-hidden="true"></div></div>';
+    this.wrap = host.firstChild; this.strip = host.querySelector(".ov"); this.menu = host.querySelector(".ovmenu"); this.meas = host.querySelector(".ovmeasure"); this.code = host.querySelector("pre");
+    if (live) {
+      this.strip.addEventListener("click", function (e) {
+        var b = e.target.closest(".ovb"); if (b) { self.open = !self.open; self.render(); return; }
+        var t = e.target.closest(".tb"); if (t) { self.sel = t.getAttribute("data-doc"); self.open = false; self.render(); }
+      });
+      this.menu.addEventListener("click", function (e) { var m = e.target.closest(".mi"); if (m) { self.choose(m.getAttribute("data-doc")); } });
+      document.addEventListener("pointerdown", function (e) { if (self.open && !self.wrap.contains(e.target)) { self.open = false; self.render(); } });
+      document.addEventListener("keydown", function (e) { if (self.open && e.key === "Escape") { self.open = false; self.render(); } });
+    }
+    this.render();
+  }
+  DocOverflow.prototype.tab = function (name, w, z) {
+    return '<span class="tb' + (name === this.sel ? " on" : "") + '" data-doc="' + name + '" style="z-index:' + z + (w ? ";width:" + w + "px" : "") + '">' + ic(docIcon(name), "ti") + '<span class="lbl">' + name + '</span><span class="cx">' + mark("close") + "</span></span>";
+  };
+  DocOverflow.prototype.measure = function () {
+    var self = this, h = "";
+    DOCS.forEach(function (n, i) { h += self.tab(n, 0, 1); });
+    this.meas.innerHTML = h; this.nat = {};
+    this.meas.querySelectorAll(".tb").forEach(function (t) { self.nat[t.getAttribute("data-doc")] = t.offsetWidth + (t.classList.contains("on") ? 0 : 3); });
+    this.meas.innerHTML = "";
+  };
+  DocOverflow.prototype.render = function () {
+    var self = this;
+    if (!this.nat) { this.measure(); }
+    this.wrap.style.width = this.width + "px";
+    var names = this.order, n = names.length, minW = 100, btnW = this.style === "count" ? 44 : 26, avail = this.width - 12 - btnW - 6;
+    var sum = 0, widths = {}, vis = n, i;
+    names.forEach(function (k) { sum += self.nat[k]; });
+    if (sum > avail && n * minW <= avail) {
+      var lo = 0, hi = 1;
+      for (i = 0; i < 24; i++) { var mid = (lo + hi) / 2, s = 0; names.forEach(function (k) { s += Math.max(minW, self.nat[k] * mid); }); if (s > avail) { hi = mid; } else { lo = mid; } }
+      names.forEach(function (k) { widths[k] = Math.floor(Math.max(minW, self.nat[k] * lo)); });
+    } else if (sum > avail) {
+      var selW = Math.min(this.nat[this.sel] + 4, Math.floor(avail / 2));
+      vis = Math.max(1, 1 + Math.floor((avail - selW) / minW));
+      var si = names.indexOf(this.sel);
+      if (si >= vis) { names.splice(si, 1); names.splice(vis - 1, 0, this.sel); }
+      var each = vis > 1 ? Math.floor((avail - selW) / (vis - 1)) : avail;
+      for (i = 0; i < vis; i++) { widths[names[i]] = names[i] === this.sel ? (vis > 1 ? selW : avail) : each; }
+    }
+    this.nVis = vis;
+    var h = "";
+    for (i = 0; i < vis; i++) { h += this.tab(names[i], widths[names[i]] || 0, 40 - i); }
+    var hidden = n - vis, btn;
+    if (this.style === "dchev") { btn = mark("overflow"); } else if (this.style === "down") { btn = mark("down"); } else { btn = (hidden ? '<span class="cnt">' + hidden + "</span>" : "") + mark("down"); }
+    h += '<span class="ovb' + (this.open ? " open" : "") + '" role="button" aria-label="All documents" title="All documents">' + btn + "</span>";
+    this.strip.innerHTML = h;
+    var m = "";
+    names.forEach(function (k, j) { m += '<div class="mi' + (j >= vis ? " hid" : "") + (k === self.sel ? " cur" : "") + '" data-doc="' + k + '">' + ic(docIcon(k)) + k + "</div>"; });
+    this.menu.innerHTML = m; this.menu.style.display = this.open ? "block" : "none";
+    this.code.innerHTML = '<span class="cm">// ' + this.sel + "</span>\n" + BODY.main.split("\n").slice(1, 4).join("\n");
+  };
+  DocOverflow.prototype.choose = function (name) {
+    var idx = this.order.indexOf(name), text;
+    if (idx >= this.nVis) {
+      this.order.splice(idx, 1); this.order.splice(this.nVis - 1, 0, name);
+      text = name + " took the last visible position; " + this.order[this.nVis] + " moved to the list. The order at the front is unchanged.";
+    } else { text = name + " was already visible, so it was simply selected."; }
+    this.sel = name; this.open = false; this.render();
+    if (this.msg) { this.msg.textContent = text; }
+  };
+
+  /* T5: auto-hide strip and flyout (E1-1, E2-1, E3-1, E4-1). */
+  function AutoHide(o) {
+    var self = this;
+    this.o = o; this.mode = "slide"; this.shadow = "rb37"; this.group = ["explorer", "outline"]; this.groupSel = 0;
+    this.openId = null; this.focused = false; this.hoverT = 0; this.closeT = 0; this.k = 0; this.anim = 0;
+    this.fly = make("div", "flyout fly-rb37"); o.sitewrap.appendChild(this.fly);
+    this.fillStrip();
+    o.strip.addEventListener("pointerover", function (e) { var t = e.target.closest(".stab"); if (t) { self.hover(t.getAttribute("data-id")); } });
+    o.strip.addEventListener("pointerout", function (e) { var t = e.target.closest(".stab"); if (t && !t.contains(e.relatedTarget)) { clearTimeout(self.hoverT); if (self.openId && !self.focused) { self.scheduleClose(); } } });
+    o.strip.addEventListener("click", function (e) { var t = e.target.closest(".stab"); if (t) { self.open(t.getAttribute("data-id"), "click"); } });
+    this.fly.addEventListener("pointerenter", function () { clearTimeout(self.closeT); });
+    this.fly.addEventListener("pointerleave", function () { if (self.openId && !self.focused) { self.scheduleClose(); } });
+    this.fly.addEventListener("pointerdown", function (e) {
+      self.focused = true;
+      if (e.target.closest('.pb[data-act="pin"]')) { self.dockBack(); }
+    });
+    document.addEventListener("pointerdown", function (e) {
+      if (!self.openId) { return; }
+      if (self.fly.contains(e.target) || o.strip.contains(e.target)) { return; }
+      self.close("An outside click closed the flyout and passed through to what was clicked (E2-1).");
+    }, true);
+    document.addEventListener("keydown", function (e) { if (self.openId && e.key === "Escape") { self.close("Escape closed the flyout."); } });
+  }
+  AutoHide.prototype.say = function (t) { this.o.msg.textContent = t; };
+  AutoHide.prototype.fillStrip = function () {
+    var self = this, s = this.o.strip;
+    s.innerHTML = this.group.map(function (id) { return '<span class="stab" data-id="' + id + '">' + ic(PANELS[id].icon) + "<span>" + PANELS[id].title + "</span></span>"; }).join("");
+    s.classList.toggle("empty", !this.group.length);
+    s.querySelectorAll(".stab").forEach(function (t) { t.classList.toggle("open", t.getAttribute("data-id") === self.openId); });
+  };
+  AutoHide.prototype.hover = function (id) {
+    var self = this;
+    clearTimeout(this.closeT); clearTimeout(this.hoverT);
+    if (this.openId === id) { return; }
+    this.hoverT = setTimeout(function () { self.open(id, "hover"); }, 400);
+  };
+  AutoHide.prototype.scheduleClose = function () { var self = this; clearTimeout(this.closeT); this.closeT = setTimeout(function () { self.close("The pointer left for 500 ms, so the unfocused flyout closed."); }, 500); };
+  AutoHide.prototype.open = function (id, how) {
+    clearTimeout(this.hoverT); clearTimeout(this.closeT);
+    var swap = this.openId && this.openId !== id;
+    this.openId = id; this.focused = how === "click";
+    this.fly.innerHTML = "";
+    var p = make("div", "pane tool inflow" + (how === "click" ? " current" : ""), leafHTML(leaf([id]), { pinOff: true }));
+    this.fly.appendChild(p); this.fly.appendChild(make("div", "fgrip"));
+    this.fillStrip();
+    if (swap) { this.k = 1; this.paint(); } else { this.animate(1); }
+    this.say(PANELS[id].title + (swap ? " replaced the open flyout without animating the closing one." : (how === "click" ? " opened by click; focus moved into it, so it stays open." : " opened after resting 400 ms on its tab; focus stayed where it was.")));
+  };
+  AutoHide.prototype.close = function (text) {
+    clearTimeout(this.closeT); clearTimeout(this.hoverT);
+    if (!this.openId) { return; }
+    this.openId = null; this.focused = false; this.fillStrip(); this.animate(0);
+    if (text) { this.say(text); }
+  };
+  AutoHide.prototype.paint = function () {
+    var w = this.fly.offsetWidth || 230;
+    this.fly.style.visibility = this.k > 0 ? "visible" : "hidden";
+    this.fly.style.transform = "translateX(" + (-(1 - this.k) * (w + 16)) + "px)";
+  };
+  AutoHide.prototype.animate = function (target) {
+    var self = this, k0 = this.k, t0 = now(), dur = (this.mode === "slide" && motionOn()) ? 180 : 0, token = ++this.anim;
+    function step() {
+      if (token !== self.anim) { return; }
+      var f = dur ? smooth((now() - t0) / dur) : 1;
+      self.k = k0 + (target - k0) * f; self.paint();
+      if (f < 1) { requestAnimationFrame(step); }
+    }
+    step();
+    if (dur) { setTimeout(function () { if (token === self.anim) { self.k = target; self.paint(); } }, dur + 120); }
+  };
+  AutoHide.prototype.set = function (val) { var v = val.split(" "); this.mode = v[0]; this.shadow = v[1]; this.fly.className = "flyout fly-" + this.shadow; };
+  AutoHide.prototype.dockBack = function () {
+    var site = this.o.site;
+    this.anim++; this.k = 0; this.openId = null; this.focused = false; this.paint();
+    site.tree = hsplit(0.24, leaf(this.group.slice(), this.groupSel), site.tree);
+    this.group = []; this.fillStrip();
+    var self = this;
+    setTimeout(function () { self.o.dock.setActive(site, site.tree.a.ids[0]); }, 0);
+    this.say("The pin docked the whole group back on the left (E4-1).");
+  };
+  AutoHide.prototype.autoHide = function (site, n) {
+    if (n.doc) { return; }
+    if (this.group.length) { this.say("This sketch has room for one auto-hidden group; pin the other back first."); return; }
+    this.group = n.ids.slice(); this.groupSel = n.sel;
+    site.tree = removeIds(site.tree, n.ids);
+    this.fillStrip();
+    var self = this;
+    setTimeout(function () { self.o.dock.renderAll(); }, 0);
+    this.say(titles(this.group) + " auto-hidden as one group; the side tabs are on the left strip (this sketch has only a left strip).");
+  };
+
+  /* Live demo wiring */
+  function watchSize(el, fn) { if (window.ResizeObserver) { new ResizeObserver(fn).observe(el); } else { window.addEventListener("resize", fn); } }
+  function buildDockDemo(host, demo) {
+    var stage = make("div", "dk look-house cap-key seam-graphite"); host.appendChild(stage);
+    var win = ideWindow({ title: "Gallery workspace", siteH: 300 }); stage.appendChild(win);
+    var layer = make("div", "dk-layer"); stage.appendChild(layer);
+    var site = new Site(win.querySelector(".site"), mainTree(), 3); site.win = win; site.main = true; site.active = "explorer";
+    site.render(); dither(win);
+    var dock = new Dock({ stage: stage, layer: layer, sites: [site], cfg: { tiles: host.getAttribute("data-tiles") || "sep", hl: host.getAttribute("data-hl") || "tint", prox: "none" }, msg: demo.querySelector(".demo-msg") });
+    watchSize(site.el, function () { if (!dock.st) { site.render(); } });
+    return { set: function (k, v) { dock.set(k, v); }, reset: function () { if (dock.st) { return; } site.tree = mainTree(); dock.setActive(site, "explorer"); dock.say("Layout reset."); } };
+  }
+  function buildAutoDemo(host, demo) {
+    var stage = make("div", "dk look-house cap-key seam-graphite"); host.appendChild(stage);
+    var win = ideWindow({ title: "Gallery workspace", siteH: 300, strip: '<div class="ahstrip sdir-btt"></div>' }); stage.appendChild(win);
+    var layer = make("div", "dk-layer"); stage.appendChild(layer);
+    function tree() { return hsplit(0.74, vsplit(0.64, docs(), leaf(["output"])), leaf(["props"])); }
+    var site = new Site(win.querySelector(".site"), tree(), 3); site.win = win; site.main = true; site.active = "props";
+    site.render(); dither(win);
+    var msg = demo.querySelector(".demo-msg");
+    var ah = null;
+    var dock = new Dock({ stage: stage, layer: layer, sites: [site], cfg: { tiles: "sep", hl: "tint", prox: "none" }, msg: msg, hooks: { pin: function (s, n) { ah.autoHide(s, n); } } });
+    ah = new AutoHide({ strip: win.querySelector(".ahstrip"), sitewrap: win.querySelector(".sitewrap"), site: site, msg: msg, dock: dock });
+    watchSize(site.el, function () { if (!dock.st) { site.render(); } });
+    return { set: function (k, v) { ah.set(v); }, reset: function () { if (dock.st) { return; } ah.close(); ah.group = ["explorer", "outline"]; ah.fillStrip(); site.tree = tree(); dock.setActive(site, "props"); ah.say("Layout reset."); } };
+  }
+  function buildProxDemo(host, demo) {
+    var o = proxStage(host, true);
+    var dock = new Dock({ stage: o.stage, layer: o.layer, sites: [o.fl, o.main], floatSite: o.fl, keySite: o.fl, cfg: { tiles: "sep", hl: "tint", prox: "key" }, msg: demo.querySelector(".demo-msg") });
+    dock.renderAll();
+    watchSize(o.main.el, function () { if (!dock.st) { o.main.render(); } });
+    return { set: function (k, v) { dock.set(k, v); }, reset: function () {
+      if (dock.st) { return; }
+      o.main.tree = hsplit(0.26, leaf(["explorer"]), vsplit(0.62, docs(), leaf(["output"]))); o.fl.tree = leaf(["props", "outline"]);
+      o.fw.style.left = "566px"; o.fw.style.top = "150px";
+      dock.setActive(o.fl, "props"); dock.say("Layout reset.");
+    } };
+  }
+  function buildOverflowDemo(host, demo) {
+    var slider = document.getElementById("pt6-width"), out = document.getElementById("pt6-width-out");
+    var d = new DocOverflow(host, "dchev", +slider.value, true, demo.querySelector(".demo-msg"));
+    overflows.push(d);
+    slider.addEventListener("input", function () { d.width = +slider.value; out.textContent = slider.value; d.render(); });
+    return { set: function (k, v) { d.style = v; d.render(); }, reset: function () {} };
+  }
+  var overflows = [];
+
+  function build() {
+    document.querySelectorAll("[data-build]").forEach(function (host) {
+      var kind = host.getAttribute("data-build"), W = +host.getAttribute("data-w") || 0, target = host;
+      if (W) { target = make("div", "fit-in"); target.style.width = W + "px"; host.appendChild(target); fits.push({ host: host, inner: target, W: W }); }
+      try { buildOne(kind, host, target); } catch (err) { target.textContent = "This sample could not be drawn in this browser."; }
+    });
+    fits.forEach(function (f) { refit(f); watchSize(f.host, function () { refit(f); }); });
+    buildRest();
+  }
+  function buildOne(kind, host, target) {
+      if (kind === "ide") { staticIde(target, host.getAttribute("data-look")); }
+      else if (kind === "siteonly") { siteOnly(target, host.getAttribute("data-look")); }
+      else if (kind === "snap") { snapTargets(target, host.getAttribute("data-tiles"), host.getAttribute("data-hl"), host.getAttribute("data-zone")); }
+      else if (kind === "t4") { t4(target, host.getAttribute("data-cap")); }
+      else if (kind === "film") { film(target, host.getAttribute("data-motion"), host.getAttribute("data-shadow")); }
+      else if (kind === "t6") { t6(target, host.getAttribute("data-mode")); }
+      else if (kind === "prox") { proxStatic(target, host.getAttribute("data-prox")); }
+      else if (kind === "pt1") { pt1(target, host.getAttribute("data-kind")); }
+      else if (kind === "pt2") { pt2(target, host.getAttribute("data-join")); }
+      else if (kind === "pt3") { pt3(target, host.getAttribute("data-cx"), host.getAttribute("data-pin")); }
+      else if (kind === "pt4") { pt4(target, host.getAttribute("data-mod")); }
+      else if (kind === "pt5") { pt5(target, host.getAttribute("data-pinned")); }
+      else if (kind === "pt6") { overflows.push(new DocOverflow(target, host.getAttribute("data-ov"), 520, false, null)); }
+      else if (kind === "pt7") { pt7(target, host.getAttribute("data-nav")); }
+      else if (kind === "pt7dec") { pt7dec(target); }
+      else if (kind === "pt8") { pt8(target, host.getAttribute("data-dir")); }
+  }
+  function buildRest() {
+    document.querySelectorAll("[data-mark]").forEach(function (s) {
+      var n = s.getAttribute("data-mark"), names = { float: "Float", dock: "Dock", max: "Maximize" };
+      s.innerHTML = mark(n) + names[n];
+    });
+    document.querySelectorAll(".demo").forEach(function (demo) {
+      var host = demo.querySelector("[data-demo]"), kind = host.getAttribute("data-demo"), ctl = null;
+      try {
+        if (kind === "dock") { ctl = buildDockDemo(host, demo); }
+        else if (kind === "autohide") { ctl = buildAutoDemo(host, demo); }
+        else if (kind === "prox") { ctl = buildProxDemo(host, demo); }
+        else if (kind === "overflow") { ctl = buildOverflowDemo(host, demo); }
+      } catch (err) { demo.querySelector(".demo-msg").textContent = "This demo could not start in this browser."; }
+      if (!ctl) { return; }
+      var buttons = demo.querySelectorAll(".seg button");
+      buttons.forEach(function (b) {
+        b.addEventListener("click", function () {
+          buttons.forEach(function (o) { o.setAttribute("aria-pressed", o === b ? "true" : "false"); });
+          ctl.set(b.getAttribute("data-set"), b.getAttribute("data-val"));
+        });
+      });
+      var rs = demo.querySelector("[data-reset]");
+      if (rs) { rs.addEventListener("click", function () { ctl.reset(); }); }
+    });
+  }
+
+  /* Answer sheet */
+  var QUESTIONS = [
+    { id: "T1", title: "Docking look", opts: ["House composite", "VS 2005 period", "VS 2010 period"] },
+    { id: "T2", title: "Indicator tiles", opts: ["Separate tiles", "Cross backplate", "Diamond backplate", "Quiet tiles"] },
+    { id: "T3", title: "Area highlight", opts: ["Translucent tint", "Hatched outline", "None, tiles only"] },
+    { id: "T4", title: "Captions and tool tabs", opts: ["Quiet key", "Filled caption", "Tinted caption, tab-stack tool tabs"] },
+    { id: "T5", title: "Auto-hide flyout", opts: ["Slide, RB-37 shadow", "Appear, RB-37 shadow", "Slide, E3 shadow", "Appear, E3 shadow"] },
+    { id: "T6", title: "Floating window chrome", opts: ["Host title bar", "Drawn caption", "Drawn for one stack, host for two"] },
+    { id: "T7", title: "Seams", opts: ["Graphite seam", "Flat gap", "Hairline keyline"] },
+    { id: "T8", title: "Drag proximity", opts: ["Window key look", "Frame ring", "Hovered pane only", "Tiles only"] },
+    { id: "PT1", title: "Tab shape", opts: ["Plan Paint stack", "Studio 2003 strip", "Classic joined tabs", "Stack for documents, strip elsewhere"] },
+    { id: "PT2", title: "Selected tab join", opts: ["Open seam", "Accent underline", "Plate"] },
+    { id: "PT3", title: "Close and pin glyphs", opts: ["Plate, pin beside", "Plate, pin replaces", "Bare, pin beside", "Bare, pin replaces"] },
+    { id: "PT4", title: "Modified", opts: ["Dot in the close slot", "Asterisk", "Italic label", "Coral tint"] },
+    { id: "PT5", title: "Pinned tabs", opts: ["Full width with pin", "Icon only", "Full width, pin on hover"] },
+    { id: "PT6", title: "Overflow button", opts: ["Double chevron", "Down arrow", "Count"] },
+    { id: "PT7", title: "Navigation pane", opts: ["Banded", "Flat rows", "Tab-stack rows"] },
+    { id: "PT8", title: "Side tab text", opts: ["Bottom to top", "Top to bottom", "Horizontal columns"] }
+  ];
+  var STORE = "gui-forms-docking-look-answers-v1";
+  function loadStore() { try { var s = window.localStorage.getItem(STORE); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+  function saveStore(v) { try { window.localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) { /* storage is a convenience */ } }
+  function buildSheet() {
+    var grid = document.getElementById("sheet-grid"), saved = loadStore() || { picks: {}, notes: {} };
+    QUESTIONS.forEach(function (q) {
+      var fs = make("fieldset"), h = "<legend>" + q.id + " &middot; " + q.title + "</legend>";
+      q.opts.forEach(function (label, i) {
+        var v = q.id + "-" + (i + 1);
+        h += '<label for="ans-' + v + '"><input type="radio" name="ans-' + q.id + '" id="ans-' + v + '" value="' + v + '"> <b>' + v + "</b> <span>" + label + "</span></label>";
+      });
+      h += '<label for="ans-' + q.id + '-other"><input type="radio" name="ans-' + q.id + '" id="ans-' + q.id + '-other" value="' + q.id + '-other"> Other <span>say what in the note</span></label>';
+      h += '<input type="text" id="note-' + q.id + '" aria-label="Note for ' + q.id + '" placeholder="Note (optional)">';
+      fs.innerHTML = h; grid.appendChild(fs);
+      var pick = saved.picks && saved.picks[q.id];
+      if (pick) { var r = document.getElementById("ans-" + pick); if (r) { r.checked = true; } }
+      if (saved.notes && saved.notes[q.id]) { document.getElementById("note-" + q.id).value = saved.notes[q.id]; }
+    });
+    grid.addEventListener("change", updateLine);
+    grid.addEventListener("input", updateLine);
+    document.querySelectorAll(".pick").forEach(function (b) {
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", function () {
+        var v = b.getAttribute("data-pick"), r = document.getElementById("ans-" + v);
+        if (r) { r.checked = true; updateLine(); }
+      });
+    });
+    document.getElementById("copy-answers").addEventListener("click", function () {
+      var ta = document.getElementById("answer-line"), st = document.getElementById("copy-status"), text = ta.value;
+      function fallback() { ta.focus(); ta.select(); st.textContent = "Selected; press Ctrl+C (Cmd+C) to copy."; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { st.textContent = "Copied."; }, fallback);
+      } else { fallback(); }
+    });
+    document.getElementById("clear-answers").addEventListener("click", function () {
+      QUESTIONS.forEach(function (q) {
+        document.querySelectorAll('input[name="ans-' + q.id + '"]').forEach(function (r) { r.checked = false; });
+        document.getElementById("note-" + q.id).value = "";
+      });
+      updateLine();
+    });
+    updateLine();
+  }
+  function updateLine() {
+    var picks = {}, notes = {}, parts = [];
+    QUESTIONS.forEach(function (q) {
+      var r = document.querySelector('input[name="ans-' + q.id + '"]:checked'), note = document.getElementById("note-" + q.id).value.trim();
+      var v = r ? r.value : q.id + "-?";
+      if (r) { picks[q.id] = r.value; }
+      if (note) { notes[q.id] = note; v += " (" + note.replace(/[(),]/g, " ").replace(/\s+/g, " ").trim() + ")"; }
+      parts.push(v);
+    });
+    document.getElementById("answer-line").value = parts.join(", ");
+    document.querySelectorAll(".pick").forEach(function (b) {
+      var v = b.getAttribute("data-pick"), q = v.split("-")[0];
+      b.setAttribute("aria-pressed", picks[q] === v ? "true" : "false");
+    });
+    document.getElementById("copy-status").textContent = "";
+    saveStore({ picks: picks, notes: notes });
+  }
+
+  function motionLabel() {
+    var reduced = reduceQuery && reduceQuery.matches;
+    document.getElementById("motion-state").textContent = reduced ? (motionAnyway ? "(reduced motion requested; playing anyway)" : "(reduced motion requested; demos jump to their end states)") : "(motion on)";
+  }
+  var mo = document.getElementById("motion-anyway");
+  mo.addEventListener("change", function () { motionAnyway = mo.checked; motionLabel(); });
+  if (reduceQuery && reduceQuery.addEventListener) { reduceQuery.addEventListener("change", motionLabel); }
+  motionLabel();
+
+  build();
+  buildSheet();
+  function afterFonts() {
+    ditherCache = {};
+    ditherRoots.forEach(function (r) { dither(r); });
+    overflows.forEach(function (d) { d.nat = null; d.render(); });
+    refitAll();
+  }
+  if (document.fonts && document.fonts.ready) { document.fonts.ready.then(afterFonts); }
+})();
+</script>

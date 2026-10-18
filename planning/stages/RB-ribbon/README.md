@@ -115,7 +115,7 @@ From part 2 (2026-10-14):
     the tab row beside the File tab (or below the ribbon, the user's choice);
     commands only; a click outside the minimized popup is consumed; the
     ribbon saves its own state through the layout store, with explicit save
-    and load available.
+    and load available. Revised by decision 44.
 13. **Galleries and commands (E1-1, E2-2, E3-2):** preview events on gallery
     value commands only (300 ms hover, and keyboard focus); value-bearing
     commands are separate types sharing identity and state with `Command`;
@@ -210,6 +210,16 @@ note):
 43. **What it shows (H2):** a help card for the whole window, supplied by
     the program (title, description, help topic), with F1 opening that
     topic while the card shows.
+
+From the docking interview (2026-10-17,
+`planning/interview/DOCKING_INTERVIEW_ROUND_001.md` part 10):
+
+44. **The ribbon is not a layout.** Its structure is baked into the
+    program; a user's changes (Quick Access Toolbar items and position,
+    minimized) are a settings permutation the program saves with its own
+    settings. The ribbon exposes that state (`RibbonState`, with
+    `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
+    own. Revises decision 12.
 
 ## Gate
 

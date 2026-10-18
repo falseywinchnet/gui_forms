@@ -243,6 +243,13 @@ public:
     /// Uses explicit per-window image quotas. The two-argument constructor
     /// retains the normal defaults; large-document consumers choose a budget.
     Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_limits);
+    /// Shares an application's image registry and theme with every other
+    /// Window constructed with the same resources (stage DK decision 8): an
+    /// ImageId, an ImageList and the theme hold in all of them, so a control
+    /// subtree moved between them keeps its images. Null resources are
+    /// std::invalid_argument; resources made on another thread are
+    /// std::logic_error. The window takes the resources' current theme.
+    Window(Control::Ptr root, Size client_size, std::shared_ptr<ApplicationResources> resources);
     ~Window();
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
@@ -286,7 +293,18 @@ public:
     [[nodiscard]] std::shared_ptr<const Theme> theme_ptr() const noexcept {
         return theme_;
     }
+    // Sets the theme of this window and of every window sharing its
+    // resources (ApplicationResources::set_theme).
     void set_theme(std::shared_ptr<const Theme> theme);
+    // The image registry and theme this window shares; pass it to another
+    // Window's constructor to share them with that window too.
+    [[nodiscard]] std::shared_ptr<ApplicationResources> resources() const noexcept {
+        return resources_;
+    }
+    [[nodiscard]] bool shares_resources_with(const Window& other) const noexcept {
+        const bool same = resources_ == other.resources_;
+        return same;
+    }
     [[nodiscard]] Event<const Theme&>& theme_changed() noexcept {
         return theme_changed_;
     }
@@ -432,10 +450,10 @@ public:
         Control& consumer, Rect local_damage);
     [[nodiscard]] bool remove_image(ImageId image);
     [[nodiscard]] const ImageRegistry& image_resources() const noexcept {
-        return image_resources_;
+        return (*resources_).images();
     }
     [[nodiscard]] ImageRegistrySnapshot image_resource_snapshot() const noexcept {
-        return image_resources_.snapshot();
+        return (*resources_).images().snapshot();
     }
 
     [[nodiscard]] Control::Ptr find(std::string_view stable_id) const;
@@ -569,6 +587,11 @@ private:
     friend class ErrorProvider;
     friend class HelpProvider;
     friend class ImageList;
+    friend class ApplicationResources;
+    // Called by ApplicationResources for every window sharing it.
+    void apply_theme(const std::shared_ptr<const Theme>& theme);
+    void repaint_for_image_replacement();
+    void repaint_for_image_removal();
     friend class BindingSource;
     friend class NotifyIcon;
     friend class BindingContext;
@@ -870,7 +893,9 @@ private:
     LiveSurfaceRegistrationMap live_surface_registrations_;
     std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
-    ImageRegistry image_resources_;
+    // Shared with every window constructed with the same resources; this
+    // window is registered with them from construction to destruction.
+    std::shared_ptr<ApplicationResources> resources_;
     std::uint64_t display_generation_{};
     using FrameRequestList =
         std::vector<std::shared_ptr<detail::ScheduledFrameRequest>>;

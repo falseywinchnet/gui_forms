@@ -91,9 +91,9 @@ QAT on the tab row or below the ribbon, flat buttons, commands only, its
 customize menu and overflow (decisions 12, 24); the minimized ribbon's
 temporary popup with the overlay shadow, a click outside it consumed
 (decisions 12, 24); `RibbonToolTip` with F1 help, in the tooltip family and casting the
-overlay shadow (decisions 37 to 40); the ribbon saving QAT
-items and position and the minimized state through the runtime layout store,
-with explicit save and load (decision 12). Tests: QAT placement and overflow;
+overlay shadow (decisions 37 to 40); the ribbon exposing QAT
+items and position and the minimized state as a settings permutation the
+program saves with its own settings (decisions 12, 44). Tests: QAT placement and overflow;
 the popup's open, close and focus order; persistence round trip.
 
 **Phase 5. Contextual tabs and modes.** Tab sets tinted from the theme's
