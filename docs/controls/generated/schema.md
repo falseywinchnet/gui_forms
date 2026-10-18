@@ -28,7 +28,7 @@ Admitted custom states: `modified`, `pinned`.
 
 Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`, `pin`, `dock_shape`.
 
-Values: `accent_index`, `text_orientation`, `dock_region`.
+Values: `accent_index`, `text_orientation`, `dock_region`, `content_color`.
 
 Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
 
@@ -189,6 +189,38 @@ Properties beyond every control's: `text` (text).
 | `selection_changed` | `TextSelection` |
 | `committed` | `std::string` |
 | `cancelled` | none |
+| `auto_complete_open_changed` | `bool` |
+| `auto_complete_accepted` | `std::string` |
+
+## `token_box` (TokenBox, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `field` | well | `text_box` |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `token`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `token_face` | chip |  |  |
+| `token_label` | label |  |  |
+| `token_close` | glyph |  | hot, pressed |
+| `token_focus` | focus |  |  |
+
+Item states: `selected`, `hot`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `token_added` | `Token` |
+| `token_removed` | `Token` |
+| `selected_token_changed` | `std::optional<TokenId>` |
 
 ## `masked_text_box` (MaskedTextBox, control)
 
@@ -436,6 +468,7 @@ Properties beyond every control's: `items` (collection), `selected_index` (signe
 | `selected_index_changed` | `std::optional<std::size_t>` |
 | `drop_down_changed` | `bool` |
 | `items_changed` | none |
+| `text_changed` | `std::string` |
 
 ## `tree_view` (TreeView, control)
 
@@ -2131,6 +2164,85 @@ Properties beyond every control's: none.
 | `drop_down_item_invoked` | `ToolStripDropDownInvocation` |
 | `item_focus_changed` | `ToolStripItemFocus` |
 
+## `ribbon_font_control` (RibbonFontControl, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `family_field` | well | `combo_box` |  |
+| `size_field` | well | `combo_box` |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `FontChoice` |
+
+## `ribbon_color_picker` (RibbonColorPicker, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face | `button` | hot, pressed, disabled, open |
+| `icon` | icon |  | hot, pressed, disabled, open |
+| `color_bar` | well |  |  |
+| `color_sample` | fill |  |  |
+| `arrow` | actuator | `button` | hot, pressed, disabled, open |
+| `arrow_glyph` | glyph |  | hot, pressed, disabled, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`, `open`.
+
+Item system `palette_entry`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `entry_face` | face |  | hot, selected, focus_visible |
+| `entry_well` | well |  | hot, selected, focus_visible |
+| `entry_sample` | fill |  | hot, selected, focus_visible |
+| `entry_label` | label |  | hot, selected, focus_visible |
+| `entry_focus` | focus |  | hot, selected, focus_visible |
+
+Item states: `hot`, `selected`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `std::optional<Color>` |
+| `palette_open_changed` | `bool` |
+
+## `backstage_view` (BackstageView, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `column` | face |  |  |
+| `page` | face |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `backstage_item`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `item_face` | face |  |  |
+| `item_icon` | icon |  |  |
+| `item_label` | label |  |  |
+| `item_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `topic_changed` | `BackstageTopicChange` |
+| `close_requested` | none |
+
 ## `ribbon_gallery` (RibbonGallery, control)
 
 | Part | Role | Reuses | Own states |
@@ -2383,6 +2495,8 @@ Item system `command`:
 | `command_check_box` | indicator | `check_box` |  |
 | `command_text_box` | well | `text_box` |  |
 | `command_gallery` | well | `ribbon_gallery` |  |
+| `command_font_control` | well | `ribbon_font_control` |  |
+| `command_color_picker` | actuator | `ribbon_color_picker` |  |
 
 Item states: `hot`, `pressed`, `checked`, `open`, `disabled`, `focus_visible`.
 
@@ -2396,6 +2510,8 @@ Properties beyond every control's: none.
 | `selected_tab_changed` | `RibbonTabChange` |
 | `minimized_changed` | `bool` |
 | `application_menu_item_invoked` | `MenuItemInvocation` |
+| `recent_item_invoked` | `RibbonRecentItemInvocation` |
+| `backstage_open_changed` | `bool` |
 
 ## `context_menu` (ContextMenu, component)
 
@@ -2416,6 +2532,18 @@ Properties beyond every control's: none.
 |---|---|
 | `state_changed` | `CommandState` |
 | `invoked` | `CommandInvocation` |
+
+## `font_command` (FontCommand, component)
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `FontChoice` |
+
+## `color_command` (ColorCommand, component)
+
+| Interaction | Payload |
+|---|---|
+| `value_changed` | `std::optional<Color>` |
 
 ## `gallery_command` (GalleryCommand, component)
 

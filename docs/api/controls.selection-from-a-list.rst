@@ -1972,6 +1972,28 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ComboBoxFilter
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: prefix
+
+   .. cpp:enumerator:: substring
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ComboBoxStyle
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: drop_down_list
+
+   .. cpp:enumerator:: drop_down
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: CorrespondenceExpansionReason
 
    ``#include <gui_forms/controls/panel/correspondence_view/correspondence_view.hpp>``

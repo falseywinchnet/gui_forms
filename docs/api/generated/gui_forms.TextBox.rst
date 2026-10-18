@@ -15,8 +15,10 @@ gui_forms::TextBox
 
    The user clicks to place the caret, drags or uses Shift with the arrow keys
    to select, types to replace the selection, and uses the usual editing and
-   clipboard shortcuts. In a single-line box Enter raises :cpp:func:`committed <gui_forms::TextBox::committed>` and Escape
-   raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`, which suits search fields and inline editors. Set a
+   clipboard shortcuts. With :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>` set, Enter in a single-line box
+   raises :cpp:func:`committed <gui_forms::TextBox::committed>`; with :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>` set, Escape raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`.
+   Both suit search fields and inline editors; without them the keys go on to
+   the window's accept and cancel buttons. Set a
    :cpp:func:`password_character <gui_forms::TextBox::password_character>`, or :cpp:func:`use_system_password_character <gui_forms::TextBox::use_system_password_character>`, to mask a secret.
    Use a :cpp:class:`Label <gui_forms::Label>` for text the user only reads, a :cpp:class:`ComboBox <gui_forms::ComboBox>` to choose from a
    list, and a :cpp:class:`NumericUpDown <gui_forms::NumericUpDown>` for numbers.
@@ -74,6 +76,19 @@ gui_forms::TextBox
          Whether Tab inserts a tab character in a multi-line box instead of
          moving focus.
 
+      **accepts_enter** : ``bool``, default ``false``
+         Whether plain Enter (no modifiers) in a single-line box is the box's own
+         when it has nothing else to accept: it raises :cpp:func:`committed <gui_forms::TextBox::committed>` and goes no
+         further. Set it on a box that is an edit session, such as a search field
+         or an in-place editor. Otherwise such an Enter goes on to the containers
+         and the window's accept button. A multi-line box always takes Enter.
+
+      **accepts_escape** : ``bool``, default ``false``
+         Whether plain Escape (no modifiers) is the box's own when it has nothing
+         else to cancel: it raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and goes no further. Set it on a
+         box that is an edit session, such as an in-place editor. Otherwise such
+         an Escape goes on to the containers and the window's cancel button.
+
       **scroll_offset** : ``Point``, read-only
 
       **maximum_length** : ``std::size_t``, default ``0``
@@ -113,6 +128,42 @@ gui_forms::TextBox
       **can_redo** : ``bool``, read-only
          Whether :cpp:func:`redo <gui_forms::TextBox::redo>` would reapply an undone edit.
 
+      **auto_complete_mode** : ``AutoCompleteMode``, default ``AutoCompleteMode::none``
+         How the box completes what the user types: ``suggest`` opens a list of
+         matching candidates under the box, ``append`` adds the rest of the first
+         match after the typed text and selects it, and ``suggest_append`` does
+         both. Completion acts only in a single-line, unmasked, writable box with
+         no edit filter; otherwise the setting is kept and does nothing.
+
+      **auto_complete_source** : ``AutoCompleteSource``, default ``AutoCompleteSource::none``
+         Where the candidates come from. ``custom_source`` uses
+         :cpp:func:`auto_complete_custom_source <gui_forms::TextBox::auto_complete_custom_source>`. The host sources (``file_system`` to
+         ``all_system_sources``) ask the window's host services, and no host
+         supplies them yet: they offer nothing. ``list_items`` throws
+         ``std::invalid_argument``, since a box has no list; an editable :cpp:class:`ComboBox <gui_forms::ComboBox>`
+         offers its items through its own setting.
+
+      **auto_complete_custom_source** : ``std::shared_ptr<AutoCompleteStringCollection>``
+         The :cpp:class:`AutoCompleteStringCollection <gui_forms::AutoCompleteStringCollection>` the ``custom_source`` source reads.
+         A new box owns an empty one; assigning another shares it, so one
+         collection can serve several boxes and lives while any of them holds
+         it. A null collection throws ``std::invalid_argument``.
+
+      **auto_complete_case_sensitive** : ``bool``, default ``false``
+         Whether matching compares the case of ASCII letters. Other characters
+         always compare exactly.
+
+      **auto_complete_open** : ``bool``, read-only
+         Whether the suggestion list is open.
+
+      **auto_complete_suggestions** : ``std::span<const std::string>``, read-only
+         The suggestions the open list shows: the candidates that start with the
+         typed text, in source order, each text once, at most 256. Empty while
+         the list is closed.
+
+      **auto_complete_highlighted** : ``std::optional<std::size_t>``, read-only
+         The highlighted suggestion's index, or none.
+
       **parts** : ``Parts``, read-only
 
       **states** : ``States``, read-only
@@ -129,12 +180,27 @@ gui_forms::TextBox
          It carries the new selection.
 
       **committed** : ``Event<const std::string&>``
-         Raised when the user presses Enter in a single-line box, even a read-only
-         one. It carries the current text.
+         Raised when the user presses plain Enter in a single-line box that
+         :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`, even a read-only one. It carries the current text. It
+         is not raised for an Enter that accepts a suggestion or an appended
+         completion, or that meets a composition.
 
       **cancelled** : ``Event<>``
-         Raised when the user presses Escape, in either mode. The text is left
-         unchanged; restore it in the handler if the edit should be discarded.
+         Raised when the user presses plain Escape in a box that
+         :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`, in either mode. The text is left unchanged; restore it
+         in the handler if the edit should be discarded. It is not raised for an
+         Escape that closes the suggestion list, removes an appended completion,
+         or meets a composition or a selection drag.
+
+      **auto_complete_open_changed** : ``Event<bool>``
+         Raised with ``true`` after the suggestion list opens and with ``false``
+         after it closes, whichever way it closed.
+
+      **auto_complete_accepted** : ``Event<const std::string&>``
+         Raised when the user accepts a completion: a suggestion chosen with
+         Enter, Tab or the pointer, or an appended completion taken with Enter or
+         Tab. It is raised after the text holds the completion and the list has
+         closed, and carries the accepted text.
 
    :Inherited:
 
@@ -174,8 +240,14 @@ gui_forms::TextBox
         - Copies the selection and then deletes it.
       * - :cpp:func:`paste <gui_forms::TextBox::paste>`
         - Replaces the selection with clipboard text.
+      * - :cpp:func:`auto_complete_source_status <gui_forms::TextBox::auto_complete_source_status>`
+        - Whether :cpp:func:`auto_complete_source <gui_forms::TextBox::auto_complete_source>` can offer candidates.
+      * - :cpp:func:`close_auto_complete <gui_forms::TextBox::close_auto_complete>`
+        - Closes the suggestion list and ends an appended completion, keeping the text as it is.
       * - :cpp:func:`set_edit_filter <gui_forms::TextBox::set_edit_filter>`
         - Installs a filter that sees every user edit (typing, deletion, paste and assistive set-value, as a :cpp:class:`TextEdit <gui_forms::TextEdit>` with its :cpp:enum:`TextEditKind <gui_forms::TextEditKind>`) before it is applied, and accepts it, refuses it, or rewrites the whole text and places the caret.
+      * - :cpp:func:`set_auto_complete_anchor <gui_forms::TextBox::set_auto_complete_anchor>`
+        - Sets the control the suggestion list opens under and is as wide as: by default the box itself.
 
    .. seealso::
 
@@ -199,9 +271,54 @@ gui_forms::TextBox
    paste; with Z they undo, and with Shift+Z or Y they redo. Ctrl and Cmd are
    both accepted on every platform. Text input replaces the selection.
 
-   The box handles Enter and Escape itself. While it has focus, they never reach
-   the window's accept and cancel buttons; handle :cpp:func:`committed <gui_forms::TextBox::committed>` and :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`
-   instead.
+   During an input-method composition the box keeps Enter and Escape from the
+   window and leaves them to the input method. Otherwise, in a multi-line box
+   Enter inserts :cpp:func:`newline_sequence <gui_forms::TextBox::newline_sequence>`. In a single-line box Enter is the box's
+   only while an open suggestion list or appended completion is there to
+   accept. With :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>` set, a plain Enter with nothing else to accept
+   raises :cpp:func:`committed <gui_forms::TextBox::committed>` and stops there. Every other Enter goes on unhandled to
+   the containers and the window's accept button, as in Windows Forms, where
+   the form's AcceptButton receives it.
+
+   Escape is the box's only while it has something to cancel: an open
+   suggestion list or appended completion (Escape closes or removes it), a
+   composition, or a selection drag (Escape ends it, keeping what is
+   selected). With :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>` set, a plain Escape with nothing else to
+   cancel raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and stops there. Every other Escape, with or without Shift, goes
+   on unhandled to the containers, menus and the window's cancel button, as in
+   Windows Forms, where the form's CancelButton receives it.
+
+   Auto-complete runs after each edit the user makes. Typing at the end of the
+   text in ``append`` or ``suggest_append`` mode appends the rest of the first
+   candidate that starts with the typed text, selected, so the next character
+   replaces it; the typed text keeps its own case. Deleting, pasting, typing
+   before the end and input-method composition never append, and nothing is
+   appended past :cpp:func:`maximum_length <gui_forms::TextBox::maximum_length>`. In ``suggest`` and ``suggest_append`` mode a
+   list of the matching candidates opens under the box, each with the typed
+   prefix highlighted; it never takes the focus, so typing goes on in the box,
+   and it closes when nothing matches.
+   Matching is by prefix and ignores the case of ASCII letters unless
+   :cpp:func:`auto_complete_case_sensitive <gui_forms::TextBox::auto_complete_case_sensitive>` is set.
+
+   While the list is open, Down highlights the first suggestion and then the
+   next, and from the last returns to the typed text; Up goes the other way.
+   The highlighted suggestion is shown in the box. Enter or Tab accepts the
+   highlighted suggestion, or the appended completion when nothing is
+   highlighted, and is consumed: the next Enter or Tab does its usual work.
+   Enter or Tab with nothing to accept closes the list and does its usual
+   work. Escape closes the list and puts back what the user typed,
+   removing an appended completion. Pressing a row highlights it and releasing
+   on it accepts it. A press outside the list closes it, keeping the text; so
+   do moving the caret, losing the focus, :cpp:func:`set_text <gui_forms::TextBox::set_text>`, undo and redo. A
+   completion belongs to the edit that produced it: one undo removes both.
+   Accepting raises :cpp:func:`text_changed <gui_forms::TextBox::text_changed>` (when the text changes), then
+   :cpp:func:`auto_complete_open_changed <gui_forms::TextBox::auto_complete_open_changed>` with ``false`` if the list was open, then
+   :cpp:func:`auto_complete_accepted <gui_forms::TextBox::auto_complete_accepted>`.
+
+   Composition text is the input method's: while a composition is in progress
+   nothing is appended and the list closes, and the text is left exactly as
+   the input method wrote it. Completion starts again with the first committed
+   input.
 
    Pointer: pressing the primary button focuses the box and places the caret,
    with Shift extending the selection, and dragging selects. In a multi-line box
@@ -219,6 +336,9 @@ gui_forms::TextBox
    empty when masked, together with the protected-content state. It reports
    read-only when :cpp:func:`read_only <gui_forms::TextBox::read_only>` is true, and otherwise offers a set-value action,
    which replaces the whole text as one undoable edit within :cpp:func:`maximum_length <gui_forms::TextBox::maximum_length>`.
+   A box that suggests also publishes that it opens a popup, and the expanded
+   state while its list is open; the open list publishes the role ``list`` with
+   ``list_item`` rows.
 
    .. rubric:: Examples
 
@@ -234,6 +354,7 @@ gui_forms::TextBox
           Search() {
               (*field).set_placeholder_text("Search");
               (*field).set_accessible_name("Search");
+              (*field).set_accepts_enter(true);
               gf::on((*field).committed(), *this, &Search::on_commit);
           }
           void on_commit(const std::string& text) { query = text; }
@@ -259,6 +380,23 @@ gui_forms::TextBox
       (*note).select_all();
       (*note).replace_selection("First line\nSecond line");
       (*note).undo();   // the text is "Draft" again, and can_redo() is true
+
+   A city field that suggests from its own list and appends the first match:
+
+   .. code-block:: cpp
+
+      std::shared_ptr<gf::TextBox> city =
+          gf::make_control<gf::TextBox>(gf::StableId("address.city"));
+      (*(*city).auto_complete_custom_source()).add_range({"Calgary", "Cambridge", "Edmonton"});
+      (*city).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+      (*city).set_auto_complete_mode(gf::AutoCompleteMode::suggest_append);
+      gf::Window window(city, gf::Size{240.0, 200.0});
+      window.request_focus(city);
+      window.dispatch_text(gf::TextInputEvent{"ca"});
+      // The box shows "calgary" with "lgary" selected, and the list offers
+      // Calgary and Cambridge.
+      window.dispatch_key(gf::KeyEvent{gf::KeyAction::down, gf::PhysicalKey::tab});
+      // Tab accepted the completion: the text is "calgary", the caret at its end.
 
 
    .. rubric:: Construction
@@ -342,6 +480,29 @@ gui_forms::TextBox
 
       Sets :cpp:func:`accepts_tab <gui_forms::TextBox::accepts_tab>`; see the property's description above.
 
+   .. cpp:function:: bool accepts_enter() const noexcept
+
+      Whether plain Enter (no modifiers) in a single-line box is the box's own
+      when it has nothing else to accept: it raises :cpp:func:`committed <gui_forms::TextBox::committed>` and goes no
+      further. Set it on a box that is an edit session, such as a search field
+      or an in-place editor. Otherwise such an Enter goes on to the containers
+      and the window's accept button. A multi-line box always takes Enter.
+
+   .. cpp:function:: void set_accepts_enter(bool enabled)
+
+      Sets :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`; see the property's description above.
+
+   .. cpp:function:: bool accepts_escape() const noexcept
+
+      Whether plain Escape (no modifiers) is the box's own when it has nothing
+      else to cancel: it raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and goes no further. Set it on a
+      box that is an edit session, such as an in-place editor. Otherwise such
+      an Escape goes on to the containers and the window's cancel button.
+
+   .. cpp:function:: void set_accepts_escape(bool enabled)
+
+      Sets :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`; see the property's description above.
+
    .. cpp:function:: Point scroll_offset() const noexcept
 
    .. cpp:function:: std::size_t maximum_length() const noexcept
@@ -406,6 +567,65 @@ gui_forms::TextBox
 
       Whether :cpp:func:`redo <gui_forms::TextBox::redo>` would reapply an undone edit.
 
+   .. cpp:function:: AutoCompleteMode auto_complete_mode() const noexcept
+
+      How the box completes what the user types: ``suggest`` opens a list of
+      matching candidates under the box, ``append`` adds the rest of the first
+      match after the typed text and selects it, and ``suggest_append`` does
+      both. Completion acts only in a single-line, unmasked, writable box with
+      no edit filter; otherwise the setting is kept and does nothing.
+
+   .. cpp:function:: void set_auto_complete_mode(AutoCompleteMode mode)
+
+      Sets :cpp:func:`auto_complete_mode <gui_forms::TextBox::auto_complete_mode>`; see the property's description above.
+
+   .. cpp:function:: AutoCompleteSource auto_complete_source() const noexcept
+
+      Where the candidates come from. ``custom_source`` uses
+      :cpp:func:`auto_complete_custom_source <gui_forms::TextBox::auto_complete_custom_source>`. The host sources (``file_system`` to
+      ``all_system_sources``) ask the window's host services, and no host
+      supplies them yet: they offer nothing. ``list_items`` throws
+      ``std::invalid_argument``, since a box has no list; an editable :cpp:class:`ComboBox <gui_forms::ComboBox>`
+      offers its items through its own setting.
+
+   .. cpp:function:: void set_auto_complete_source(AutoCompleteSource source)
+
+      Sets :cpp:func:`auto_complete_source <gui_forms::TextBox::auto_complete_source>`; see the property's description above.
+
+   .. cpp:function:: const std::shared_ptr<AutoCompleteStringCollection>& auto_complete_custom_source() const noexcept
+
+      The :cpp:class:`AutoCompleteStringCollection <gui_forms::AutoCompleteStringCollection>` the ``custom_source`` source reads.
+      A new box owns an empty one; assigning another shares it, so one
+      collection can serve several boxes and lives while any of them holds
+      it. A null collection throws ``std::invalid_argument``.
+
+   .. cpp:function:: void set_auto_complete_custom_source(std::shared_ptr<AutoCompleteStringCollection> source)
+
+      Sets :cpp:func:`auto_complete_custom_source <gui_forms::TextBox::auto_complete_custom_source>`; see the property's description above.
+
+   .. cpp:function:: bool auto_complete_case_sensitive() const noexcept
+
+      Whether matching compares the case of ASCII letters. Other characters
+      always compare exactly.
+
+   .. cpp:function:: void set_auto_complete_case_sensitive(bool case_sensitive)
+
+      Sets :cpp:func:`auto_complete_case_sensitive <gui_forms::TextBox::auto_complete_case_sensitive>`; see the property's description above.
+
+   .. cpp:function:: bool auto_complete_open() const noexcept
+
+      Whether the suggestion list is open.
+
+   .. cpp:function:: std::span<const std::string> auto_complete_suggestions() const noexcept
+
+      The suggestions the open list shows: the candidates that start with the
+      typed text, in source order, each text once, at most 256. Empty while
+      the list is closed.
+
+   .. cpp:function:: std::optional<std::size_t> auto_complete_highlighted() const noexcept
+
+      The highlighted suggestion's index, or none.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: States states() const
@@ -426,13 +646,30 @@ gui_forms::TextBox
 
    .. cpp:function:: Event<const std::string&>& committed() noexcept
 
-      Raised when the user presses Enter in a single-line box, even a read-only
-      one. It carries the current text.
+      Raised when the user presses plain Enter in a single-line box that
+      :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`, even a read-only one. It carries the current text. It
+      is not raised for an Enter that accepts a suggestion or an appended
+      completion, or that meets a composition.
 
    .. cpp:function:: Event<>& cancelled() noexcept
 
-      Raised when the user presses Escape, in either mode. The text is left
-      unchanged; restore it in the handler if the edit should be discarded.
+      Raised when the user presses plain Escape in a box that
+      :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`, in either mode. The text is left unchanged; restore it
+      in the handler if the edit should be discarded. It is not raised for an
+      Escape that closes the suggestion list, removes an appended completion,
+      or meets a composition or a selection drag.
+
+   .. cpp:function:: Event<bool>& auto_complete_open_changed() noexcept
+
+      Raised with ``true`` after the suggestion list opens and with ``false``
+      after it closes, whichever way it closed.
+
+   .. cpp:function:: Event<const std::string&>& auto_complete_accepted() noexcept
+
+      Raised when the user accepts a completion: a suggestion chosen with
+      Enter, Tab or the pointer, or an appended completion taken with Enter or
+      Tab. It is raised after the text holds the completion and the list has
+      closed, and carries the accepted text.
 
 
    .. rubric:: Methods
@@ -499,6 +736,18 @@ gui_forms::TextBox
       is read-only, the window has no host clipboard, the clipboard holds no
       text, or the edit is refused.
 
+   .. cpp:function:: HostServiceStatus auto_complete_source_status()
+
+      Whether :cpp:func:`auto_complete_source <gui_forms::TextBox::auto_complete_source>` can offer candidates. It is accepted for
+      ``none`` and ``custom_source``. For a host source it is the answer of the
+      window's host services, which is :cpp:enumerator:`HostServiceError::unsupported <gui_forms::HostServiceError::unsupported>` from
+      every host today, and also without a host.
+
+   .. cpp:function:: void close_auto_complete()
+
+      Closes the suggestion list and ends an appended completion, keeping the
+      text as it is.
+
    .. cpp:function:: void set_edit_filter(Delegate<TextEdit&> filter) noexcept
 
       Installs a filter that sees every user edit (typing, deletion, paste and
@@ -510,6 +759,14 @@ gui_forms::TextBox
       filter call the text changed is abandoned whatever the verdict. The delegate does not own its target; clear
       it with an empty :cpp:class:`Delegate <gui_forms::Delegate>` before the target goes away. :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
       uses it to put input through its mask.
+
+   .. cpp:function:: void set_auto_complete_anchor(const Control::Ptr& anchor)
+
+      Sets the control the suggestion list opens under and is as wide as: by
+      default the box itself. It must contain the box; the box observes it
+      without owning it, and an anchor that is gone or does not contain the
+      box is ignored. An editable :cpp:class:`ComboBox <gui_forms::ComboBox>` sets itself, so the list spans
+      the whole field.
 
 
    .. rubric:: Extension points

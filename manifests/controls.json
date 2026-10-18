@@ -67,11 +67,22 @@
       "type": "TextBox",
       "header": "gui_forms/controls/panel/text_box/text_box.hpp",
       "category": "Text editing",
-      "purpose": "Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, and ordered text/selection events.",
+      "purpose": "Single- or multiline Unicode editor with directional selection, clipboard and history commands, password projection, bounded input length, suggest and append auto-complete, and ordered text/selection events.",
       "winforms": "TextBox",
       "status": "stable",
       "gallery_page": "text-and-input",
       "doc": "api/generated/gui_forms.TextBox.rst"
+    },
+    {
+      "id": "token_box",
+      "type": "TokenBox",
+      "header": "gui_forms/controls/panel/token_box/token_box.hpp",
+      "category": "Text editing",
+      "purpose": "Text entry whose accepted entries (Enter, a delimiter or an accepted completion) become removable tokens with stable identities, with keyboard selection and removal, a close glyph per token and suggestions from auto-complete.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "text-and-input",
+      "doc": "api/generated/gui_forms.TokenBox.rst"
     },
     {
       "id": "masked_text_box",
@@ -155,7 +166,7 @@
       "type": "ComboBox",
       "header": "gui_forms/controls/panel/combo_box/combo_box.hpp",
       "category": "Selection from a list",
-      "purpose": "Noneditable choice field with placeholder projection, keyboard cycling, and a source-private transient ListBox popup.",
+      "purpose": "Choice field, noneditable or with an editor (drop_down style), with placeholder projection, keyboard cycling, a transient ListBox popup, and auto-complete from its items or a custom list.",
       "winforms": "ComboBox",
       "status": "stable",
       "gallery_page": "collections-and-popups",
@@ -712,6 +723,39 @@
       "doc": "api/generated/gui_forms.ToolStrip.rst"
     },
     {
+      "id": "ribbon_font_control",
+      "type": "RibbonFontControl",
+      "header": "gui_forms/controls/ribbon_font_control/ribbon_font_control.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon font control: a family list and a size list choosing one font through a FontCommand, hosted in a Ribbon or standalone.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonFontControl.rst"
+    },
+    {
+      "id": "ribbon_color_picker",
+      "type": "RibbonColorPicker",
+      "header": "gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon drop-down colour picker: a split button that applies its colour, and a palette popup of Automatic, palette and recent colours, through a ColorCommand.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonColorPicker.rst"
+    },
+    {
+      "id": "backstage_view",
+      "type": "BackstageView",
+      "header": "gui_forms/controls/backstage_view/backstage_view.hpp",
+      "category": "Menus and commands",
+      "purpose": "The File tab's full page: a column of fast commands and topics beside the selected topic's page, opened by a Ribbon over everything below its tab row.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.BackstageView.rst"
+    },
+    {
       "id": "ribbon_gallery",
       "type": "RibbonGallery",
       "header": "gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp",
@@ -782,7 +826,7 @@
       "type": "Ribbon",
       "header": "gui_forms/controls/ribbon/ribbon.hpp",
       "category": "Menus and commands",
-      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors and galleries, adaptive scaling by group layouts and a reduction order (collapsed groups open in a popup, scrolling below the narrowest layout), the document-area hide rule, and minimizing by a click on the selected tab.",
+      "purpose": "Office 2010-style ribbon: File tab and core tabs over a command plane of captioned groups with dialog launchers and command records bound to shared Commands, hosted editors and galleries, adaptive scaling by group layouts and a reduction order (collapsed groups open in a popup, scrolling below the narrowest layout), the document-area hide rule, contextual tab sets tinted from the accent ramp with built-in selection rules, application modes, and minimizing by a click on the selected tab.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "commands-and-menus",
@@ -820,6 +864,28 @@
       "status": "stable",
       "gallery_page": "commands-and-menus",
       "doc": "api/generated/gui_forms.Command.rst"
+    },
+    {
+      "id": "font_command",
+      "type": "FontCommand",
+      "header": "gui_forms/commands/font_command/font_command.hpp",
+      "category": "Menus and commands",
+      "purpose": "Value command of a font control: shares identity and state with a Command and carries a font family and size.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.FontCommand.rst"
+    },
+    {
+      "id": "color_command",
+      "type": "ColorCommand",
+      "header": "gui_forms/commands/color_command/color_command.hpp",
+      "category": "Menus and commands",
+      "purpose": "Value command of a colour picker: shares identity and state with a Command and carries a colour, or Automatic, and the recent colours.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ColorCommand.rst"
     },
     {
       "id": "gallery_command",

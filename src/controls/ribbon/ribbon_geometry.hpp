@@ -52,8 +52,25 @@ inline constexpr double popup_gap = 1.0;
 [[nodiscard]] inline bool hosted(RibbonCommandKind kind) noexcept {
     const bool result = kind == RibbonCommandKind::combo_box || kind == RibbonCommandKind::numeric_up_down ||
                         kind == RibbonCommandKind::check_box || kind == RibbonCommandKind::text_box ||
-                        kind == RibbonCommandKind::gallery;
+                        kind == RibbonCommandKind::gallery || kind == RibbonCommandKind::font_control ||
+                        kind == RibbonCommandKind::color_picker;
     return result;
+}
+
+// Whether a kind holds a control the application made (and the ribbon only
+// adds and places), rather than one the ribbon makes.
+[[nodiscard]] inline bool authored_kind(RibbonCommandKind kind) noexcept {
+    const bool result = kind == RibbonCommandKind::gallery || kind == RibbonCommandKind::font_control ||
+                        kind == RibbonCommandKind::color_picker;
+    return result;
+}
+
+// The application's control a command holds, or null.
+[[nodiscard]] inline Control::Ptr authored_control(const RibbonCommandSpec& command) {
+    if (command.kind == RibbonCommandKind::gallery) return command.gallery;
+    if (command.kind == RibbonCommandKind::font_control) return command.font_control;
+    if (command.kind == RibbonCommandKind::color_picker) return command.color_picker;
+    return {};
 }
 
 [[nodiscard]] inline bool has_menu(RibbonCommandKind kind) noexcept {

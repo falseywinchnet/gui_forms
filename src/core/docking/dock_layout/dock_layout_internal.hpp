@@ -41,8 +41,12 @@ struct DockNodePlace final {
                                                      DockSiteId id) noexcept;
 [[nodiscard]] const DockAutoHideEntry* find_dock_auto_hidden(const DockLayoutState& state,
                                                              DockNodeId stack) noexcept;
+// The result borrows from `descriptors`; a temporary list is refused (house
+// style section 5).
 [[nodiscard]] const DockPanelDescriptor* find_dock_descriptor(
     const std::vector<DockPanelDescriptor>& descriptors, const DockPanelId& id) noexcept;
+const DockPanelDescriptor* find_dock_descriptor(std::vector<DockPanelDescriptor>&& descriptors,
+                                                const DockPanelId& id) = delete;
 
 [[nodiscard]] DockNodePlace dock_place_of(const DockLayoutState& state, DockNodeId node) noexcept;
 [[nodiscard]] DockPanelLocation locate_dock_panel(const DockLayoutState& state,

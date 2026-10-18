@@ -159,12 +159,16 @@ std::vector<std::string> row_ids(const TreeListView& view) {
     return ids;
 }
 
+// The returned row borrows from `rows`, so the vector must outlive it:
+// realized_rows() returns a new vector, and a reference into that temporary
+// dangles at the end of the statement. The deleted overload refuses one.
 const TreeListView::Row& row_named(const std::vector<TreeListView::Row>& rows, std::string_view id) {
     for (const TreeListView::Row& row : rows) {
         if (row.stable_id == id) return row;
     }
     throw std::runtime_error("row is not realized");
 }
+const TreeListView::Row& row_named(std::vector<TreeListView::Row>&& rows, std::string_view id) = delete;
 
 void parts_states_and_paint() {
     std::shared_ptr<TreeListView> view = sample_view();
@@ -442,18 +446,21 @@ void keyboard_traces() {
     (*view).set_selected_id("src");
     require(key(window, PhysicalKey::down) && (*view).selected_id() == std::optional<std::string_view>("lib"),
             "Down skips a disabled row");
-    const TreeListView::Row& beta = row_named((*view).realized_rows(), "beta");
+    const std::vector<TreeListView::Row> disabled_rows = (*view).realized_rows();
+    const TreeListView::Row& beta = row_named(disabled_rows, "beta");
     require(beta.states.disabled, "a disabled node's row publishes disabled");
     click(window, to_window(*view, centre(beta.parts.text.bounds)));
     require((*view).selected_id() == std::optional<std::string_view>("lib"), "a click on a disabled row selects nothing");
 
     // The pointer: a click on the expander toggles without selecting; a
     // double click activates.
-    const TreeListView::Row& lib = row_named((*view).realized_rows(), "lib");
+    const std::vector<TreeListView::Row> expander_rows = (*view).realized_rows();
+    const TreeListView::Row& lib = row_named(expander_rows, "lib");
     click(window, to_window(*view, centre(lib.parts.expander.bounds)));
     require(!(*view).is_expanded("lib") && (*view).selected_id() == std::optional<std::string_view>("lib"),
             "a click on the expander collapses the node");
-    const TreeListView::Row& delta = row_named((*view).realized_rows(), "delta");
+    const std::vector<TreeListView::Row> collapsed_rows = (*view).realized_rows();
+    const TreeListView::Row& delta = row_named(collapsed_rows, "delta");
     click(window, to_window(*view, centre(delta.parts.text.bounds)));
     click(window, to_window(*view, centre(delta.parts.text.bounds)), 2U);
     require((*view).selected_id() == std::optional<std::string_view>("delta") && activations.back() == "delta",

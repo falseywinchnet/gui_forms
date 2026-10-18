@@ -46,6 +46,8 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+// The result borrows from nodes, so a temporary snapshot is refused (house style §5).
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 bool key(Window& window, std::uint32_t physical_key, Modifier modifiers = Modifier::none) {
     KeyEvent event{KeyAction::down, physical_key};
@@ -219,6 +221,8 @@ const DockSite::Stack* find_stack(const std::vector<DockSite::Stack>& stacks, Do
     }
     return nullptr;
 }
+// The result borrows from stacks, so a temporary list is refused (house style §5).
+const DockSite::Stack* find_stack(std::vector<DockSite::Stack>&& stacks, DockNodeId stack) = delete;
 
 Point pin_point(const DockSite& site, DockNodeId stack) {
     const std::vector<DockSite::Stack> items = site.realized_stack_items();
