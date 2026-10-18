@@ -248,6 +248,16 @@ struct DialogKeySnapshot final {
     std::uint64_t mnemonic_cycles{};
 };
 
+// A control subtree's picture (Window::snapshot_control): the registered
+// image, the logical size it covers and its pixels per logical unit.
+struct ControlSnapshot final {
+    ImageId image{};
+    Size logical_size{};
+    double scale{};
+    std::uint32_t pixel_width{};
+    std::uint32_t pixel_height{};
+};
+
 class Window {
 public:
     explicit Window(Control::Ptr root, Size client_size = {});
@@ -285,6 +295,24 @@ public:
     // Created framebuffers own their rendering state independently of the host.
     void set_framebuffer_painter(Painter* painter);
     [[nodiscard]] std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale);
+    // A picture of a control and its descendants as the window last laid
+    // them out (stage DK phase D3: the drag stamp, owner decision D1): the
+    // subtree's retained display chunks are replayed, every paint plane in
+    // order, into an offscreen framebuffer of the host's own CPU raster at
+    // `scale` device pixels per logical unit, and the pixels are registered
+    // as one of this window's images (premultiplied BGRA). Areas the subtree
+    // does not paint stay transparent; the window's backplane is not drawn.
+    // None, changing nothing, while no framebuffer painter is installed (a
+    // headless window, a host whose fonts are not ready), during a paint,
+    // for a control of another window or not shown, for a scale outside
+    // (0, 8], or when the framebuffer or the image registry refuses.
+    // Cost: one replay of the subtree into ceil(width * scale) by
+    // ceil(height * scale) pixels and one copy of them into the registry;
+    // chunks the replay had to rebuild are marked for the next real paint.
+    // The image lives until release_control_snapshot or the window's end.
+    [[nodiscard]] std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale);
+    // Removes a snapshot's image. False for an image that is not there.
+    bool release_control_snapshot(ImageId image) noexcept;
     [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
         return text_metrics_provider_;
     }

@@ -320,6 +320,10 @@ Related types
 
    .. cpp:member:: PartGeometry drag_stamp_label
 
+   .. cpp:member:: PartGeometry drag_stamp_image
+
+      The panel's picture in the stamp, below its label, while the window can snapshot it (Window::snapshot_control); absent where it cannot, the content well standing in.
+
    .. cpp:member:: PartGeometry drop_area
 
    .. cpp:member:: PartGeometry drop_cue

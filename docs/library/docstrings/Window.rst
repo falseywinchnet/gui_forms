@@ -205,6 +205,20 @@ dispatch_pointer
 dispatch_key
     Delivers a key event and returns whether anything handled it: the
     focused control, an accelerator, a dialog key or Tab traversal.
+snapshot_control
+    A picture of a control and its descendants as last laid out: their
+    retained painting is replayed, every paint plane in order, into an
+    offscreen framebuffer of the host's own CPU raster at the given scale,
+    and the pixels are registered as one of the window's images
+    (premultiplied BGRA). Areas the subtree does not paint stay
+    transparent. Returns the image, its logical size, scale and pixel size,
+    or none without a framebuffer painter (headless windows), during a
+    paint, for a control of another window or not shown, or a scale outside
+    (0, 8]. It costs one replay of the subtree and one copy of its pixels;
+    the image lives until `release_control_snapshot` or the window's end.
+    The docking drag's stamp uses it.
+release_control_snapshot
+    Removes a snapshot's image; false when it is not there.
 dispatch_text
     Delivers text input to the focused control and returns whether it was
     handled.

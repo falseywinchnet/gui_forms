@@ -147,6 +147,23 @@ void DockSite::set_drag_threshold(double threshold) {
     drag_threshold_ = threshold;
 }
 
+void DockSite::reset_drag() noexcept {
+    if (drag_.picture) {
+        Window* const host = attached_window();
+        if (host != nullptr) static_cast<void>((*host).release_control_snapshot((*drag_.picture).image));
+    }
+    drag_ = DragSession{};
+}
+
+// The stamp's image area: the stamp below its label.
+Rect DockSite::drag_image_bounds() const noexcept {
+    const Rect label = drag_label_bounds();
+    if (drag_.stamp.empty()) return {};
+    const Rect image{drag_.stamp.x, label.bottom(), drag_.stamp.width,
+                     std::max(0.0, drag_.stamp.bottom() - label.bottom())};
+    return image;
+}
+
 bool DockSite::hidden_by_drag(DockNodeId stack) const noexcept {
     const bool hidden = drag_.phase == DockDragPhase::dragging && !drag_.panel_only && drag_.source_stack == stack;
     return hidden;
@@ -169,7 +186,7 @@ bool DockSite::motion_reduced() const noexcept {
 // A press on a caption arms a drag of the whole stack (D7-1).
 void DockSite::arm_caption_drag(std::size_t stack, Point local, std::uint64_t pointer_id) {
     if (drag_.phase != DockDragPhase::idle || stack >= stacks_.size()) return;
-    drag_ = DragSession{};
+    reset_drag();
     drag_.phase = DockDragPhase::armed;
     drag_.subject = DockSubject::of_stack(stacks_[stack].stack);
     drag_.source_stack = stacks_[stack].stack;
@@ -260,6 +277,11 @@ bool DockSite::begin_drag(const DockSubject& subject, DockNodeId source_stack, b
     session.generation = (*workspace_).layout().generation();
     session.started = FrameClock::now();
     session.stamp = session.source;
+    // The panel's picture before it leaves its place: its view (tabs and
+    // content; a tool stack's caption is drawn by role above it), at the
+    // window's own scale so the stamp only ever shrinks it.
+    if ((*slot).view) session.picture = (*host).snapshot_control((*slot).view, (*host).scale());
+    reset_drag();
     drag_ = std::move(session);
     // The subject leaves an open flyout with it (the stack stays auto-hidden
     // in the model until a drop).
@@ -350,7 +372,7 @@ void DockSite::update_drag_pointer(Point local, Modifier modifiers) {
         const DockNodeId stack = drag_.source_stack;
         const Point press = drag_.press;
         const std::uint64_t pointer_id = drag_.pointer_id;
-        drag_ = DragSession{};
+        reset_drag();
         static_cast<void>(begin_drag(subject, stack, false, press, local, false, pointer_id));
         return;
     }
@@ -438,7 +460,7 @@ Rect DockSite::drag_paint_extent() const {
 // the panel becomes active again.
 void DockSite::end_drag(DockDragEnd end) {
     if (drag_.phase == DockDragPhase::armed) {
-        drag_ = DragSession{};
+        reset_drag();
         return;
     }
     if (drag_.phase != DockDragPhase::dragging || workspace_ == nullptr) return;
@@ -515,7 +537,7 @@ void DockSite::place_settle_target() {
 
 void DockSite::finish_settling() noexcept {
     drag_frames_.disconnect();
-    drag_ = DragSession{};
+    reset_drag();
     try {
         if (drag_layer_) (*drag_layer_).set_visible(false);
         if (is_alive()) invalidate(Dirty::paint | Dirty::semantics);
@@ -525,7 +547,7 @@ void DockSite::finish_settling() noexcept {
 
 bool DockSite::cancel_drag() {
     if (drag_.phase == DockDragPhase::armed) {
-        drag_ = DragSession{};
+        reset_drag();
         return true;
     }
     if (drag_.phase != DockDragPhase::dragging) return false;
@@ -555,7 +577,7 @@ void DockSite::check_capture_after_release() {
 
 void DockSite::on_window_active(bool active) {
     if (active) return;
-    if (drag_.phase == DockDragPhase::armed) drag_ = DragSession{};
+    if (drag_.phase == DockDragPhase::armed) reset_drag();
     if (drag_.phase == DockDragPhase::dragging) end_drag(DockDragEnd::deactivated);
 }
 
@@ -685,8 +707,8 @@ Rect DockSite::drop_cue_bounds() const noexcept {
 }
 
 // In paint order: the tinted area, the stamp (a card face with the
-// subject's caption strip and label over its content well: a miniature
-// drawn by role, not a picture of the content), the tiles (the hovered
+// subject's caption strip and label over the panel's picture, or over its
+// content well when there is none), the tiles (the hovered
 // pane's cross, then the edges), the cue. The stamp's text shrinks with it.
 void DockSite::paint_drag_layer(Painter& painter) {
     if (drag_.phase != DockDragPhase::dragging && drag_.phase != DockDragPhase::settling) return;
@@ -723,10 +745,20 @@ void DockSite::paint_drag_layer(Painter& painter) {
         part.text = drag_.title;
         paint_part(painter, *this, part);
         part.text = {};
-        part.role = PartRole::well;
-        part.bounds = {drag_.stamp.x, label.bottom(), drag_.stamp.width,
-                       std::max(0.0, drag_.stamp.bottom() - label.bottom())};
-        paint_part(painter, *this, part);
+        part.bounds = drag_image_bounds();
+        if (drag_.picture) {
+            // The panel's picture, scaled with the stamp. An image part has
+            // no role of its own; icon (an image) is the nearest atom.
+            part.role = PartRole::icon;
+            part.image = (*drag_.picture).image;
+            paint_part(painter, *this, part);
+            part.image = {};
+        } else {
+            // Without a picture the content well stands in (headless, or a
+            // host that cannot snapshot).
+            part.role = PartRole::well;
+            paint_part(painter, *this, part);
+        }
     }
     const std::size_t tiles = tile_count();
     for (std::size_t index = 0; index < tiles; ++index) {
@@ -804,7 +836,7 @@ void DockSite::announce_drag() {
 bool DockSite::handle_drag_key(KeyEvent& event) {
     if (drag_.phase == DockDragPhase::armed && event.action == KeyAction::down &&
         event.physical_key == PhysicalKey::escape) {
-        drag_ = DragSession{};
+        reset_drag();
         event.handled = true;
         return true;
     }

@@ -208,8 +208,9 @@ struct DockFlyoutChange final {
 // start the subject leaves its place and the place closes up in one layout
 // pass of the site; the layout model is unchanged until the drop (docking
 // study 5.1, invariant 4), so Escape leaves it as it was. A miniature of the
-// panel (its caption or tab, label and content well, drawn by role) is
-// interpolated from the panel's rectangle down to a stamp about 100 units
+// panel (its caption strip by role over a picture of its view, taken with
+// Window::snapshot_control as the drag starts; the content well where the
+// window cannot snapshot) is interpolated from the panel's rectangle down to a stamp about 100 units
 // long over 220 ms and follows the pointer; at the drop it grows into the
 // panel's new place, on Escape back into its old one; reduced motion skips
 // the motion. Targets (DockDropTarget, planned when the drag starts and at
@@ -413,6 +414,10 @@ public:
         // a drop (drop_rejected).
         PartGeometry drag_stamp;
         PartGeometry drag_stamp_label;
+        // The panel's picture in the stamp, below its label, while the
+        // window can snapshot it (Window::snapshot_control); absent where it
+        // cannot, the content well standing in.
+        PartGeometry drag_stamp_image;
         PartGeometry drop_area;
         PartGeometry drop_cue;
         // The open flyout, in the site's coordinates as it stands in its
@@ -799,7 +804,14 @@ private:
         Rect settle_to{};
         FrameTime settle_started{};
         std::string announcement{};
+        // The panel's picture, taken as the drag starts (the stamp's image;
+        // none where the window cannot snapshot), and released when the
+        // session ends (reset_drag).
+        std::optional<ControlSnapshot> picture{};
     };
+    // Ends the session: its picture's image is released, then the session
+    // is cleared.
+    void reset_drag() noexcept;
 
     void create_drag_layer();
     // Whether a tab drag holds `panel` out of `stack`'s view.
@@ -829,6 +841,7 @@ private:
     [[nodiscard]] bool motion_reduced() const noexcept;
     [[nodiscard]] Rect stamp_at(FrameTime now) const;
     [[nodiscard]] Rect drag_label_bounds() const noexcept;
+    [[nodiscard]] Rect drag_image_bounds() const noexcept;
     [[nodiscard]] Rect drop_cue_bounds() const noexcept;
     [[nodiscard]] std::size_t tile_count() const noexcept;
     [[nodiscard]] TileSlot tile_at(std::size_t tile) const;

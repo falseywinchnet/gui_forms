@@ -290,8 +290,9 @@ once; a document tab first slides along its strip (reordering) and tears
 off when the pointer leaves the strip's band. At the start the subject
 leaves its place and the place closes up; the layout itself does not change
 until the drop, so Escape leaves it byte-identical. A miniature of the
-panel (its caption strip, title and content well, drawn by role; not a
-picture of its content) shrinks from the panel's rectangle to about 100
+panel (its caption strip and title by role over a picture of the panel's
+view, taken with `Window::snapshot_control` as the drag starts; the content
+well stands in where the window cannot snapshot, as headless) shrinks from the panel's rectangle to about 100
 units over 220 ms and follows the pointer; at the end it grows into the
 panel's new place, or back into its old one. Over the pane under the
 pointer, and only that pane, a cross of five tiles appears (fading in over

@@ -139,7 +139,7 @@ void DockSite::on_dispose() noexcept {
     drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
-    drag_ = DragSession{};
+    reset_drag();
     close_flyout(DockFlyoutCause::programmatic);
     close_navigator();
     close_position_menu();
@@ -743,7 +743,10 @@ void DockSite::on_detaching_from_window(Window& former_window) noexcept {
     drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
-    drag_ = DragSession{};
+    // The stamp's picture is the former window's image.
+    if (drag_.picture) static_cast<void>(former_window.release_control_snapshot((*drag_.picture).image));
+    drag_.picture.reset();
+    reset_drag();
     focus_token_.disconnect();
     followed_window_ = nullptr;
     root_pointer_.disconnect();
@@ -1468,7 +1471,7 @@ void DockSite::on_pointer(PointerEvent& event) {
         }
         if (event.action == PointerAction::up && event.button == PointerButton::primary) {
             if (drag_.phase == DockDragPhase::armed) {
-                drag_ = DragSession{};
+                reset_drag();
             } else {
                 update_drag_pointer(local, event.modifiers);
                 end_drag(drag_.target ? DockDragEnd::dropped : DockDragEnd::rejected);
@@ -2260,7 +2263,7 @@ constexpr std::array<AnatomyState, 1> drop_cue_states{AnatomyState::drop_rejecte
 // The flyout grip's own states.
 constexpr std::array<AnatomyState, 2> flyout_grip_states{AnatomyState::hot, AnatomyState::captured};
 
-constexpr std::array<PartField<DockSite::Parts>, 10> site_part_fields{{
+constexpr std::array<PartField<DockSite::Parts>, 11> site_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &DockSite::Parts::region},
     {.declaration = {.name = "document_area", .role = PartRole::well, .composed_from = {}},
@@ -2272,6 +2275,9 @@ constexpr std::array<PartField<DockSite::Parts>, 10> site_part_fields{{
      .member = &DockSite::Parts::drag_stamp},
     {.declaration = {.name = "drag_stamp_label", .role = PartRole::label, .composed_from = {}},
      .member = &DockSite::Parts::drag_stamp_label},
+    // The panel's picture: an image part; icon is the nearest role.
+    {.declaration = {.name = "drag_stamp_image", .role = PartRole::icon, .composed_from = {}},
+     .member = &DockSite::Parts::drag_stamp_image},
     {.declaration = {.name = "drop_area", .role = PartRole::drop, .composed_from = {},
                      .states = drop_area_states},
      .member = &DockSite::Parts::drop_area},
@@ -2289,7 +2295,7 @@ constexpr std::array<PartField<DockSite::Parts>, 10> site_part_fields{{
     {.declaration = {.name = "flyout_grip", .role = PartRole::grip, .composed_from = {}, .states = flyout_grip_states},
      .member = &DockSite::Parts::flyout_grip},
 }};
-constexpr std::array<PartDeclaration, 10> site_parts = part_declarations(site_part_fields);
+constexpr std::array<PartDeclaration, 11> site_parts = part_declarations(site_part_fields);
 constexpr std::array<AnatomyState, 5> site_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,
     AnatomyState::focused, AnatomyState::focus_visible,
@@ -2422,6 +2428,7 @@ void DockSite::publish_part_geometry(std::span<PartGeometry> geometry) const {
     if (layer) {
         record.drag_stamp = PartGeometry::from_bounds(drag_.stamp);
         record.drag_stamp_label = PartGeometry::from_bounds(drag_label_bounds());
+        if (drag_.picture) record.drag_stamp_image = PartGeometry::from_bounds(drag_image_bounds());
     }
     const std::optional<DockDropTarget> target = drag_target();
     if (target) {

@@ -248,6 +248,10 @@ gui_forms::Window
         - Changes the client size and marks the whole tree for layout, which runs at the next flush or geometry read.
       * - :cpp:func:`create_framebuffer <gui_forms::Window::create_framebuffer>`
         -  
+      * - :cpp:func:`snapshot_control <gui_forms::Window::snapshot_control>`
+        - A picture of a control and its descendants as last laid out: their retained painting is replayed, every paint plane in order, into an offscreen framebuffer of the host's own CPU raster at the given scale, and the pixels are registered as one of the window's images (premultiplied BGRA).
+      * - :cpp:func:`release_control_snapshot <gui_forms::Window::release_control_snapshot>`
+        - Removes a snapshot's image; false when it is not there.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
@@ -795,6 +799,24 @@ gui_forms::Window
       ``std::invalid_argument``.
 
    .. cpp:function:: std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
+
+   .. cpp:function:: std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale)
+
+      A picture of a control and its descendants as last laid out: their
+      retained painting is replayed, every paint plane in order, into an
+      offscreen framebuffer of the host's own CPU raster at the given scale,
+      and the pixels are registered as one of the window's images
+      (premultiplied BGRA). Areas the subtree does not paint stay
+      transparent. Returns the image, its logical size, scale and pixel size,
+      or none without a framebuffer painter (headless windows), during a
+      paint, for a control of another window or not shown, or a scale outside
+      (0, 8]. It costs one replay of the subtree and one copy of its pixels;
+      the image lives until :cpp:func:`release_control_snapshot <gui_forms::Window::release_control_snapshot>` or the window's end.
+      The docking drag's stamp uses it.
+
+   .. cpp:function:: bool release_control_snapshot(ImageId image) noexcept
+
+      Removes a snapshot's image; false when it is not there.
 
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
 

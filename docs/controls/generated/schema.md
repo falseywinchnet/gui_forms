@@ -1596,6 +1596,7 @@ Properties beyond every control's: none.
 | `focus` | focus |  |  |
 | `drag_stamp` | face |  |  |
 | `drag_stamp_label` | label |  |  |
+| `drag_stamp_image` | icon |  |  |
 | `drop_area` | drop |  | drop_accepted |
 | `drop_cue` | indicator |  | drop_rejected |
 | `flyout_shadow` | shadow |  |  |
