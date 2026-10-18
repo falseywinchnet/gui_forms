@@ -179,6 +179,11 @@ private:
     // Opens the list on the items matching `pattern` (every item for an
     // empty pattern or no filter); nothing opens when none match.
     void open_drop_down(std::string_view pattern);
+    // open_drop_down's drop_down-style list, `width` by `height`, anchored
+    // under the field.
+    void open_field_list(double width, double height);
+    // Empties rows_, row_matches_ and filter_pattern_, as a closed list has.
+    void clear_rows() noexcept;
     // Fills rows_ and row_matches_ for `pattern`.
     void compute_rows(std::string_view pattern);
     // Shows rows_ in the open list, with their matches and the selected
