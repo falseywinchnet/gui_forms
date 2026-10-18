@@ -5,6 +5,7 @@
 #include "gui_forms/controls/panel/combo_box/combo_box.hpp"
 #include "gui_forms/event.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -83,11 +84,13 @@ protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
 
 private:
+    // The control's two fields.
+    enum class Field : std::uint8_t { family, size };
     // Named callbacks: a field's selection changed; the command's value or
     // state changed. Each observes the control weakly.
     struct FieldChanged final {
         std::weak_ptr<RibbonFontControl> target;
-        bool family{};
+        Field field{Field::family};
         void operator()(std::optional<std::size_t> index) const;
     };
     struct CommandValueChanged final {
@@ -104,7 +107,7 @@ private:
     };
 
     [[nodiscard]] Fields fields(Rect client) const;
-    void field_changed(bool family, std::optional<std::size_t> index);
+    void field_changed(Field field, std::optional<std::size_t> index);
     void show(const FontChoice& value);
     void sync_enabled();
 
