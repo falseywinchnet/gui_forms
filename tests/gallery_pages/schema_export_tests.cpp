@@ -140,6 +140,7 @@ void append_vocabulary(std::string& out) {
     out += ",\n";
     names.clear();
     names.push_back("accent_index");
+    names.push_back("content_color");
     append_key(out, "    ", "values");
     append_name_list(out, names);
     out += ",\n";

@@ -52,13 +52,14 @@ Rect centred_square(Rect area, double side) noexcept {
     return square;
 }
 
-// Vocabulary gap (reported to the owner): no part role or PartPaint field
-// carries a content colour, so a colour sample, the value the picker shows,
-// is drawn here by the painter. Its frame and every other part go through
-// paint_part. Nothing else in the picker calls the painter directly.
-void paint_color_sample(Painter& painter, Rect bounds, Color color) {
-    if (bounds.empty()) return;
-    painter.fill_rect(bounds, color);
+// A colour sample sits one unit inside its well, so that the well frames it.
+constexpr double sample_frame = 1.0;
+
+// The fill inside `well`, `frame` units in from each side.
+Rect inset_by(Rect well, double frame) noexcept {
+    if (well.width <= frame * 2.0 || well.height <= frame * 2.0) return {};
+    const Rect inner{well.x + frame, well.y + frame, well.width - frame * 2.0, well.height - frame * 2.0};
+    return inner;
 }
 
 std::string color_name(Color color) {
@@ -210,6 +211,7 @@ RibbonColorPicker::Geometry RibbonColorPicker::geometry() const {
     const double top = std::floor((client.height - side - bar_height * scale) * 0.5);
     if (image_.value != 0U) placed.icon = {inset, top, side, side - bar_height * scale * 0.5};
     placed.bar = {inset, top + side - bar_height * scale * 0.5, side, bar_height * scale};
+    placed.sample = inset_by(placed.bar, sample_frame * scale);
     placed.glyph = centred_square(placed.arrow, arrow_glyph * scale);
     return placed;
 }
@@ -244,6 +246,13 @@ RibbonColorPicker::Parts RibbonColorPicker::own_parts() const {
     record.icon = PartGeometry::from_bounds(placed.icon);
     record.icon.states = face;
     record.color_bar = PartGeometry::from_bounds(placed.bar);
+    // The current colour (none for Automatic), painted by role as a fill
+    // with a content colour (owner decision W-7).
+    const std::optional<Color> shown = value();
+    if (shown) {
+        record.color_sample = PartGeometry::from_bounds(placed.sample);
+        record.color_sample.content_color = shown;
+    }
     record.arrow = PartGeometry::from_bounds(placed.arrow);
     record.arrow.states = arrow;
     record.arrow_glyph = PartGeometry::from_bounds(placed.glyph);
@@ -313,19 +322,25 @@ RibbonColorPicker::PaletteEntryParts RibbonColorPicker::entry_parts(const std::v
     PaletteEntryParts parts;
     parts.entry_face = PartGeometry::from_bounds(cell.bounds);
     if (cell.kind == RibbonPaletteEntryKind::automatic) {
-        const Rect sample{cell.bounds.x + inset * 2.0, cell.bounds.y + (cell.bounds.height - cell_side * scale) * 0.5,
-                          cell_side * scale, cell_side * scale};
-        parts.entry_sample = PartGeometry::from_bounds(sample);
-        const double label_x = sample.x + sample.width + inset * 3.0;
+        const Rect well{cell.bounds.x + inset * 2.0, cell.bounds.y + (cell.bounds.height - cell_side * scale) * 0.5,
+                        cell_side * scale, cell_side * scale};
+        parts.entry_well = PartGeometry::from_bounds(well);
+        const double label_x = well.x + well.width + inset * 3.0;
         parts.entry_label = PartGeometry::from_bounds(
             {label_x, cell.bounds.y, std::max(0.0, cell.bounds.x + cell.bounds.width - label_x), cell.bounds.height});
     } else {
-        parts.entry_sample = PartGeometry::from_bounds(
+        parts.entry_well = PartGeometry::from_bounds(
             {cell.bounds.x + inset, cell.bounds.y + inset, cell.bounds.width - inset * 2.0, cell.bounds.height - inset * 2.0});
+    }
+    // Automatic shows an empty well; a colour shows its sample inside it.
+    if (cell.color) {
+        parts.entry_sample = PartGeometry::from_bounds(inset_by(parts.entry_well.bounds, sample_frame * scale));
+        parts.entry_sample.content_color = cell.color;
     }
     parts.entry_focus = parts.entry_face;
     const AnatomyStateSet states = entry_states(all, entry);
     parts.entry_face.states = states;
+    parts.entry_well.states = states;
     parts.entry_sample.states = states;
     parts.entry_label.states = states;
     parts.entry_focus.states = states;
@@ -366,13 +381,19 @@ void RibbonColorPicker::on_paint(Painter& painter, Rect) {
         paint_part(painter, *this, part);
         part.image = {};
     }
-    // The colour bar: the current colour in a well (none for Automatic).
+    // The colour bar: a well, and the current colour inside it as a fill
+    // with a content colour (none for Automatic).
     part.role = PartRole::well;
     part.states = {};
     part.bounds = own.color_bar.bounds;
     paint_part(painter, *this, part);
-    const std::optional<Color> shown = value();
-    if (shown) paint_color_sample(painter, own.color_bar.bounds, *shown);
+    if (own.color_sample.present) {
+        part.role = PartRole::fill;
+        part.bounds = own.color_sample.bounds;
+        part.content_color = own.color_sample.content_color;
+        paint_part(painter, *this, part);
+        part.content_color.reset();
+    }
     part.role = PartRole::glyph;
     part.states = own.arrow_glyph.states;
     part.bounds = own.arrow_glyph.bounds;
@@ -407,9 +428,15 @@ void RibbonColorPicker::palette_paint(Painter& painter) const {
         part.bounds = parts.entry_face.bounds;
         paint_part(painter, *(*this).palette_popup_, part);
         part.role = PartRole::well;
-        part.bounds = parts.entry_sample.bounds;
+        part.bounds = parts.entry_well.bounds;
         paint_part(painter, *(*this).palette_popup_, part);
-        if (all[entry].color) paint_color_sample(painter, parts.entry_sample.bounds, *all[entry].color);
+        if (parts.entry_sample.present) {
+            part.role = PartRole::fill;
+            part.bounds = parts.entry_sample.bounds;
+            part.content_color = parts.entry_sample.content_color;
+            paint_part(painter, *(*this).palette_popup_, part);
+            part.content_color.reset();
+        }
         if (parts.entry_label.present) {
             part.role = PartRole::label;
             part.bounds = parts.entry_label.bounds;
@@ -738,7 +765,7 @@ constexpr std::array<AnatomyState, 4> face_part_states{
 constexpr std::array<AnatomyState, 3> entry_part_states{
     {AnatomyState::hot, AnatomyState::selected, AnatomyState::focus_visible}};
 
-constexpr std::array<PartField<RibbonColorPicker::Parts>, 7> picker_part_fields{{
+constexpr std::array<PartField<RibbonColorPicker::Parts>, 8> picker_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &RibbonColorPicker::Parts::region},
     {.declaration = {.name = "face", .role = PartRole::face, .composed_from = "button", .states = face_part_states},
@@ -747,6 +774,8 @@ constexpr std::array<PartField<RibbonColorPicker::Parts>, 7> picker_part_fields{
      .member = &RibbonColorPicker::Parts::icon},
     {.declaration = {.name = "color_bar", .role = PartRole::well, .composed_from = {}},
      .member = &RibbonColorPicker::Parts::color_bar},
+    {.declaration = {.name = "color_sample", .role = PartRole::fill, .composed_from = {}},
+     .member = &RibbonColorPicker::Parts::color_sample},
     {.declaration = {.name = "arrow", .role = PartRole::actuator, .composed_from = "button",
                      .states = face_part_states},
      .member = &RibbonColorPicker::Parts::arrow},
@@ -756,10 +785,12 @@ constexpr std::array<PartField<RibbonColorPicker::Parts>, 7> picker_part_fields{
      .member = &RibbonColorPicker::Parts::focus},
 }};
 
-constexpr std::array<PartField<RibbonColorPicker::PaletteEntryParts>, 4> entry_part_fields{{
+constexpr std::array<PartField<RibbonColorPicker::PaletteEntryParts>, 5> entry_part_fields{{
     {.declaration = {.name = "entry_face", .role = PartRole::face, .composed_from = {}, .states = entry_part_states},
      .member = &RibbonColorPicker::PaletteEntryParts::entry_face},
-    {.declaration = {.name = "entry_sample", .role = PartRole::well, .composed_from = {}, .states = entry_part_states},
+    {.declaration = {.name = "entry_well", .role = PartRole::well, .composed_from = {}, .states = entry_part_states},
+     .member = &RibbonColorPicker::PaletteEntryParts::entry_well},
+    {.declaration = {.name = "entry_sample", .role = PartRole::fill, .composed_from = {}, .states = entry_part_states},
      .member = &RibbonColorPicker::PaletteEntryParts::entry_sample},
     {.declaration = {.name = "entry_label", .role = PartRole::label, .composed_from = {}, .states = entry_part_states},
      .member = &RibbonColorPicker::PaletteEntryParts::entry_label},
@@ -767,8 +798,8 @@ constexpr std::array<PartField<RibbonColorPicker::PaletteEntryParts>, 4> entry_p
      .member = &RibbonColorPicker::PaletteEntryParts::entry_focus},
 }};
 
-constexpr std::array<PartDeclaration, 7> picker_parts = part_declarations(picker_part_fields);
-constexpr std::array<PartDeclaration, 4> entry_parts_declared = part_declarations(entry_part_fields);
+constexpr std::array<PartDeclaration, 8> picker_parts = part_declarations(picker_part_fields);
+constexpr std::array<PartDeclaration, 5> entry_parts_declared = part_declarations(entry_part_fields);
 constexpr std::array<AnatomyState, 3> entry_states_declared{
     {AnatomyState::hot, AnatomyState::selected, AnatomyState::focus_visible}};
 constexpr std::array<AnatomyState, 6> picker_states{

@@ -79,6 +79,17 @@ struct PartPaint final {
     // surface part with an accent is tinted from the ramp over its
     // material; text and mark roles ignore it.
     std::optional<AccentIndex> accent{};
+    // The colour the part shows as its content (design language 8.5; owner
+    // decision W-7), such as a colour picker's sample, or none. Only the
+    // fill role honours it: a fill with a content colour is painted that
+    // colour, flat, in the part's shape (corner_radius, else square), in
+    // place of the recipe's material; every other role ignores it. A swatch
+    // is therefore a fill inside a well part that frames it. The colour is
+    // data, as an image is: it is drawn as given in ordinary and
+    // high-contrast presentation alike (the framing well follows the
+    // high-contrast recipe, so the sample stays outlined), and at 45 %
+    // opacity when the part is disabled, as a disabled icon is.
+    std::optional<Color> content_color{};
 };
 
 // The theme context a part's states select: hot, pressed or captured,

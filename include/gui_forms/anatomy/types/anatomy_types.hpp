@@ -269,6 +269,9 @@ struct PartGeometry final {
     AnatomyStateSet states{};
     // The accent the part is tinted with, or none (see AccentIndex).
     std::optional<AccentIndex> accent{};
+    // The colour the part shows as its content, or none: a colour swatch's
+    // sample (PartPaint::content_color; owner decision W-7).
+    std::optional<Color> content_color{};
 
     // A part that is present exactly when `bounds` is not empty.
     [[nodiscard]] static constexpr PartGeometry from_bounds(Rect bounds) noexcept {
@@ -281,7 +284,8 @@ struct PartGeometry final {
     friend constexpr bool operator==(const PartGeometry& left,
                                      const PartGeometry& right) noexcept {
         return left.bounds == right.bounds && left.present == right.present &&
-               left.states == right.states && left.accent == right.accent;
+               left.states == right.states && left.accent == right.accent &&
+               left.content_color == right.content_color;
     }
 };
 

@@ -22,6 +22,34 @@ void require(bool condition, const char* message) {
     std::exit(1);
 }
 
+// Records the solid fills a paint pass draws, in each control's local
+// coordinates (translations are not applied).
+class FillRecorder final : public Painter {
+public:
+    void save() override {}
+    void restore() override {}
+    void translate(Point) override {}
+    void clip_rect(Rect) override {}
+    void fill_rect(Rect rect, Color color) override { fills.push_back({rect, color}); }
+    void stroke_rect(Rect, Color, double) override {}
+    void draw_line(Point, Point, Color, double) override {}
+    void draw_text_utf8(Point, std::string_view, FontSpec, Color) override {}
+    void draw_image(ImageId, Rect, double) override {}
+
+    struct Fill final {
+        Rect bounds{};
+        Color color{};
+    };
+    std::vector<Fill> fills;
+};
+
+bool filled(const FillRecorder& painter, Rect bounds, Color color) {
+    for (const FillRecorder::Fill& fill : painter.fills) {
+        if (fill.bounds == bounds && fill.color == color) return true;
+    }
+    return false;
+}
+
 struct CountInvocation final {
     int* count{};
     void operator()(const CommandInvocation&) const { ++*count; }
@@ -187,11 +215,29 @@ void color_picker() {
                 entries[0].parts.entry_label.present && entries[0].states.selected &&
                 entries[3].color == Color::rgba(255, 192, 0),
             "the palette holds Automatic (selected while no colour is set) and the ten standard colours");
+    require(entries[0].parts.entry_well.present && !entries[0].parts.entry_sample.present &&
+                entries[3].parts.entry_well.present &&
+                entries[3].parts.entry_sample.content_color == Color::rgba(255, 192, 0),
+            "Automatic shows an empty well; each colour a fill with its content colour inside its well");
+    FillRecorder palette;
+    static_cast<void>(window.paint(palette, {0.0, 0.0, 300.0, 300.0}));
+    require(filled(palette, entries[3].parts.entry_sample.bounds, Color::rgba(255, 192, 0)),
+            "the recording painter sees each swatch's content colour");
     const Control::Ptr popup = (*picker).palette_popup();
     click(window, centre(to_window(*popup, entries[2].parts.entry_face.bounds)));
     require(!(*picker).palette_open() && runs == 1 && (*command).value() == Color::rgba(255, 0, 0) &&
                 (*command).recent_colors().size() == 1U,
             "a click on a colour commits it and closes the palette");
+    // Owner decision W-7: the samples are fills carrying content colours,
+    // painted by role.
+    const RibbonColorPicker::Parts own = (*picker).parts();
+    require(own.color_sample.present && own.color_sample.content_color == Color::rgba(255, 0, 0) &&
+                own.color_bar.present && !own.color_bar.content_color,
+            "the colour bar is a well holding a fill whose content colour is the value");
+    FillRecorder bar;
+    static_cast<void>(window.paint(bar, {0.0, 0.0, 300.0, 300.0}));
+    require(filled(bar, own.color_sample.bounds, Color::rgba(255, 0, 0)),
+            "the recording painter sees the colour bar's content colour");
     click(window, centre((*picker).parts().face.bounds));
     require(runs == 2 && (*command).value() == Color::rgba(255, 0, 0), "the face applies the current colour again");
     require(window.request_focus(picker), "the picker takes focus");
