@@ -352,9 +352,22 @@ PageView::Areas PageView::areas_for(Size surface) const {
         return areas;
     }
     const Size wanted = (*strip_).measure(surface);
+    const PageStripPlacement placement = (*strip_).placement();
+    if (placement == PageStripPlacement::left || placement == PageStripPlacement::right) {
+        const double width = std::min(surface.width, wanted.width);
+        const double remaining = std::max(0.0, surface.width - width);
+        if (placement == PageStripPlacement::right) {
+            areas.content = {0.0, 0.0, remaining, surface.height};
+            areas.strip = {remaining, 0.0, width, surface.height};
+        } else {
+            areas.strip = {0.0, 0.0, width, surface.height};
+            areas.content = {width, 0.0, remaining, surface.height};
+        }
+        return areas;
+    }
     const double height = std::min(surface.height, wanted.height);
     const double rest = std::max(0.0, surface.height - height);
-    if ((*strip_).placement() == PageStripPlacement::bottom) {
+    if (placement == PageStripPlacement::bottom) {
         areas.content = {0.0, 0.0, surface.width, rest};
         areas.strip = {0.0, rest, surface.width, height};
     } else {

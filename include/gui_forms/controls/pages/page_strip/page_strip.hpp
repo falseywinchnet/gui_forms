@@ -17,9 +17,14 @@
 
 namespace gui_forms {
 
-// The edge of its content a strip sits on. Side strips (left and right, with
-// turned labels) are phase P5's.
-enum class PageStripPlacement : std::uint8_t { top, bottom };
+// The edge of its content a strip sits on. The tabs touch that edge. A side
+// strip (left or right) stacks its tabs from the top down and turns their
+// labels (PartPaint::orientation): on the left edge they read from bottom to
+// top (owner decision DK-42, interview PT8-1); on the right edge from top to
+// bottom. The interview decided only the left edge; top to bottom on the
+// right is Visual Studio's convention and keeps the glyph tops towards the
+// content on both sides.
+enum class PageStripPlacement : std::uint8_t { top, bottom, left, right };
 
 // How wide each tab is. `content`: its label (and icon) plus padding, within
 // the minimum and maximum. `fixed`: the fixed width, whatever the label.
@@ -186,7 +191,8 @@ public:
     // Whether the tabs do not all fit, so the scroll and list buttons (or,
     // under `shrink_then_list`, the list button) show.
     [[nodiscard]] bool overflowing() const;
-    // The pages whose tabs are laid out, in the order they are shown.
+    // The pages whose tabs are laid out, in the order they are shown (from
+    // the left, or on a side strip from the top).
     [[nodiscard]] std::vector<PageId> visible_pages() const;
     // How many pages have no tab laid out (scrolled out of view or hidden
     // behind the list button).
@@ -438,7 +444,19 @@ private:
     void layout_shrink() const;
     [[nodiscard]] double shrink_cap(std::size_t begin, std::size_t end, double area,
                                     std::optional<std::size_t> extra) const;
+    // The band a tab or button occupies, `length` along the row from
+    // `start` (see placement).
     [[nodiscard]] Rect band_rect(double start, double length) const;
+    [[nodiscard]] bool horizontal() const noexcept;
+    // The strip's extent along its row and across it, from the cached key.
+    [[nodiscard]] double main_extent() const noexcept;
+    [[nodiscard]] double cross_extent() const noexcept;
+    // Where a rect starts along the row.
+    [[nodiscard]] double main_start(Rect bounds) const noexcept;
+    // A part of a tab placed along the tab's reading direction.
+    [[nodiscard]] Rect along_tab(Rect tab, double offset, double length, double cross_offset,
+                                 double cross_length) const noexcept;
+    [[nodiscard]] TextOrientation label_orientation() const noexcept;
     void bump_settings();
 
     // -- one geometry function per part --
