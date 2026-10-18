@@ -138,7 +138,7 @@ void DataGridView::on_dispose() noexcept {
 // -- model -------------------------------------------------------------------
 
 std::size_t DataGridView::row_count() const noexcept {
-    if (row_source_ == DataGridViewRowSource::virtual_rows) return virtual_rows_.size();
+    if (row_source_ == DataGridViewRowSource::virtual_rows) return virtual_order_.count();
     if (row_source_ == DataGridViewRowSource::binding_source) {
         if (!data_source_ || !(*data_source_).is_alive()) return 0U;
         return (*data_source_).count();
@@ -147,8 +147,8 @@ std::size_t DataGridView::row_count() const noexcept {
 }
 
 // The caller guarantees `row` is below row_count().
-const std::string& DataGridView::row_id_text(DataGridViewRowPosition row) const {
-    if (row_source_ == DataGridViewRowSource::virtual_rows) return virtual_rows_[row.value].value;
+std::string DataGridView::row_id_text(DataGridViewRowPosition row) const {
+    if (row_source_ == DataGridViewRowSource::virtual_rows) return virtual_order_.id_at(row.value);
     if (row_source_ == DataGridViewRowSource::binding_source) {
         return (*data_source_).records()[row.value].stable_id;
     }
@@ -164,7 +164,8 @@ void DataGridView::require_cell(DataGridViewRowPosition row, std::size_t column)
 BindingValue DataGridView::stored_value(DataGridViewRowPosition row, std::size_t column) const {
     if (row_source_ == DataGridViewRowSource::virtual_rows) {
         if (!provider_) return BindingValue{};
-        return (*provider_).cell_value(virtual_rows_[row.value], column);
+        const DataGridViewRowId identity{virtual_order_.id_at(row.value)};
+        return (*provider_).cell_value(identity, column);
     }
     if (row_source_ == DataGridViewRowSource::binding_source) {
         const std::string& field = columns_[column].data_property_name;
@@ -181,7 +182,8 @@ BindingValue DataGridView::stored_value(DataGridViewRowPosition row, std::size_t
 bool DataGridView::store_value(DataGridViewRowPosition row, std::size_t column, const BindingValue& value) {
     if (row_source_ == DataGridViewRowSource::virtual_rows) {
         if (!provider_) return false;
-        const bool accepted = (*provider_).push_cell_value(virtual_rows_[row.value], column, value);
+        const DataGridViewRowId identity{virtual_order_.id_at(row.value)};
+        const bool accepted = (*provider_).push_cell_value(identity, column, value);
         return accepted;
     }
     if (row_source_ == DataGridViewRowSource::binding_source) {
@@ -316,6 +318,7 @@ void DataGridView::index_rows_from(std::size_t first) {
 }
 
 std::optional<std::size_t> DataGridView::find_row(std::string_view row_id) const {
+    if (row_source_ == DataGridViewRowSource::virtual_rows) return virtual_order_.position_of(row_id);
     const RowPositions::const_iterator found = row_positions_.find(row_id);
     if (found == row_positions_.end()) return std::nullopt;
     const std::size_t position = (*found).second;
@@ -329,8 +332,12 @@ std::optional<std::size_t> DataGridView::find_row(std::string_view row_id) const
 }
 
 DataGridViewRowPosition DataGridView::event_position(std::string_view row_id) const {
-    const RowPositions::const_iterator found = row_positions_.find(row_id);
     DataGridViewRowPosition position{};
+    if (row_source_ == DataGridViewRowSource::virtual_rows) {
+        position.value = virtual_order_.held_position(row_id).value_or(0U);
+        return position;
+    }
+    const RowPositions::const_iterator found = row_positions_.find(row_id);
     if (found != row_positions_.end()) position.value = (*found).second;
     return position;
 }
@@ -607,7 +614,8 @@ void DataGridView::clear_rows() {
     reset_row_state();
     detach_data_source();
     provider_.reset();
-    virtual_rows_.clear();
+    virtual_order_.clear();
+    window_source_.reset();
     rows_.clear();
     row_positions_.clear();
     row_source_ = DataGridViewRowSource::unbound;
@@ -643,58 +651,270 @@ void DataGridView::set_row_count(std::size_t count) {
     structure_changed();
 }
 
-DataGridView::RowPositions DataGridView::virtual_row_index(const std::vector<DataGridViewRowId>& order) {
-    RowPositions index{};
-    index.reserve(order.size());
-    for (std::size_t position = 0; position < order.size(); ++position) {
-        const std::string& identity = order[position].value;
-        if (identity.empty() || !validate_utf8(identity).valid()) {
+void DataGridView::validate_virtual_order(const std::vector<DataGridViewRowId>& order) {
+    std::unordered_set<std::string_view> seen{};
+    seen.reserve(order.size());
+    for (const DataGridViewRowId& row : order) {
+        if (row.value.empty() || !validate_utf8(row.value).valid()) {
             throw std::invalid_argument("DataGridView virtual row IDs must be valid UTF-8 and not empty");
         }
-        if (!index.emplace(identity, position).second) {
-            throw std::invalid_argument("DataGridView virtual row IDs must be unique");
-        }
+        if (!seen.insert(row.value).second) throw std::invalid_argument("DataGridView virtual row IDs must be unique");
     }
-    return index;
+}
+
+void DataGridView::require_virtual_rows(const char* what) const {
+    if (row_source_ != DataGridViewRowSource::virtual_rows) throw std::logic_error(what);
 }
 
 void DataGridView::set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider,
                                     std::vector<DataGridViewRowId> order) {
     require_mutable();
     if (!provider) throw std::invalid_argument("DataGridView virtual rows require a provider");
-    RowPositions index = virtual_row_index(order);
+    validate_virtual_order(order);
     reset_row_state();
     detach_data_source();
     rows_.clear();
+    row_positions_.clear();
     provider_ = std::move(provider);
-    virtual_rows_ = std::move(order);
-    row_positions_.swap(index);
+    window_source_.reset();
+    virtual_order_.reset(order);
     row_source_ = DataGridViewRowSource::virtual_rows;
+    changes_this_pass_ = 0U;
+    changes_last_pass_ = 0U;
+    // Without a window source the order stays in edit mode; a policy pinned
+    // to window falls back to automatic.
+    if (row_order_policy_ == DataGridViewRowOrderPolicy::window) row_order_policy_ = DataGridViewRowOrderPolicy::automatic;
     structure_changed();
+}
+
+void DataGridView::set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider,
+                                    std::shared_ptr<DataGridViewRowWindowSource> source) {
+    require_mutable();
+    if (!provider) throw std::invalid_argument("DataGridView virtual rows require a provider");
+    if (!source) throw std::invalid_argument("DataGridView virtual rows require a row window source");
+    reset_row_state();
+    detach_data_source();
+    rows_.clear();
+    row_positions_.clear();
+    provider_ = std::move(provider);
+    window_source_ = std::move(source);
+    virtual_order_.reset_to_window(window_source_);
+    window_reason_ = DataGridViewRowOrderSwitchReason::source;
+    row_source_ = DataGridViewRowSource::virtual_rows;
+    changes_this_pass_ = 0U;
+    changes_last_pass_ = 0U;
+    structure_changed();
+    // Few rows, or a policy pinned to edit, take the whole order now.
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::source);
 }
 
 void DataGridView::set_virtual_row_order(std::vector<DataGridViewRowId> order) {
     require_mutable();
-    if (row_source_ != DataGridViewRowSource::virtual_rows) {
-        throw std::logic_error("DataGridView row order is set only on virtual rows");
-    }
-    RowPositions index = virtual_row_index(order);
+    require_virtual_rows("DataGridView row order is set only on virtual rows");
+    validate_virtual_order(order);
     // The current row's position in the old order, for the case that it is
     // gone from the new one.
-    const std::optional<std::size_t> former = current_position();
-    const bool current_kept = current_ && index.contains((*current_).row_id);
+    const std::optional<std::size_t> former =
+        current_ ? virtual_order_.held_position((*current_).row_id) : std::optional<std::size_t>{};
+    bool current_kept = false;
+    for (const DataGridViewRowId& row : order) {
+        if (current_ && row.value == (*current_).row_id) current_kept = true;
+    }
     if (editing_ && !current_kept) cancel_edit();
     // The first displayed row stays on its ID, as ObjectView's top row does.
+    const std::optional<std::string> top = held_top_row();
+    // A full republish is a reset: the order goes to edit mode with these
+    // IDs, and the policy may take it to window mode again.
+    virtual_order_.reset(order);
     std::size_t first = first_row_;
-    if (first_row_ < virtual_rows_.size()) {
-        const RowPositions::const_iterator top = index.find(virtual_rows_[first_row_].value);
-        if (top != index.end()) first = (*top).second;
+    if (top) {
+        const std::optional<std::size_t> found = virtual_order_.position_of(*top);
+        if (found) first = *found;
     }
-    virtual_rows_ = std::move(order);
-    row_positions_.swap(index);
     first_row_ = first;
     drop_missing_rows(former);
     structure_changed();
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::source);
+}
+
+std::optional<std::string> DataGridView::held_top_row() const {
+    if (first_row_ >= virtual_order_.count()) return std::nullopt;
+    std::optional<std::string> top = virtual_order_.held_id_at(first_row_);
+    return top;
+}
+
+void DataGridView::after_reported_change(const std::optional<std::string>& top, std::size_t changed) {
+    const std::size_t count = virtual_order_.count();
+    if (top) {
+        const std::optional<std::size_t> found = virtual_order_.position_of(*top);
+        if (found) first_row_ = *found;
+    }
+    if (first_row_ >= count) first_row_ = count == 0U ? 0U : count - 1U;
+    changes_this_pass_ += changed;
+    structure_changed();
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::change_rate);
+}
+
+void DataGridView::insert_virtual_rows(DataGridViewRowPosition position, std::vector<DataGridViewRowId> ids) {
+    require_mutable();
+    require_virtual_rows("DataGridView virtual rows are inserted only into virtual rows");
+    const std::optional<std::string> top = held_top_row();
+    // Validated by the order (edit mode) before anything changes; inserting
+    // moves no selection, which is kept by ID.
+    virtual_order_.insert(position.value, ids);
+    after_reported_change(top, ids.size());
+}
+
+void DataGridView::remove_virtual_rows(std::vector<DataGridViewRowId> ids) {
+    require_mutable();
+    require_virtual_rows("DataGridView virtual rows are removed only from virtual rows");
+    if (virtual_order_.mode() == DataGridViewRowOrderMode::edit) {
+        std::unordered_set<std::string_view> seen{};
+        seen.reserve(ids.size());
+        for (const DataGridViewRowId& row : ids) {
+            if (!virtual_order_.contains(row.value) || !seen.insert(row.value).second) {
+                throw std::invalid_argument("DataGridView removed virtual rows must be present, each once");
+            }
+        }
+    }
+    const std::optional<std::string> top = held_top_row();
+    const std::optional<std::size_t> former =
+        current_ ? virtual_order_.held_position((*current_).row_id) : std::optional<std::size_t>{};
+    bool current_removed = false;
+    for (const DataGridViewRowId& row : ids) {
+        if (current_ && row.value == (*current_).row_id) current_removed = true;
+    }
+    if (editing_ && current_removed) cancel_edit();
+    virtual_order_.remove(ids);
+    // Only the removed rows leave the selection: the cost follows the change,
+    // not the selection's size.
+    const std::uint64_t before = selection_revision_;
+    for (const DataGridViewRowId& row : ids) {
+        if (selected_rows_.erase(row.value) > 0U) ++selection_revision_;
+        const SelectedCells::iterator cells = selected_cells_.find(row.value);
+        if (cells != selected_cells_.end()) {
+            selected_cells_.erase(cells);
+            ++selection_revision_;
+        }
+        if (anchor_ && (*anchor_).row_id == row.value) anchor_.reset();
+        if (pressed_button_ && (*pressed_button_).row_id == row.value) pressed_button_.reset();
+    }
+    if (current_removed) {
+        const std::size_t count = virtual_order_.count();
+        std::optional<CellKey> next{};
+        if (count > 0U && former) {
+            const DataGridViewRowPosition replacement{std::min(*former, count - 1U)};
+            next = CellKey{row_id_text(replacement), (*current_).column};
+        }
+        current_.reset();
+        apply_current(std::move(next));
+    }
+    publish_selection(before);
+    after_reported_change(top, ids.size());
+}
+
+void DataGridView::move_virtual_row(const DataGridViewRowId& row, DataGridViewRowPosition position) {
+    require_mutable();
+    require_virtual_rows("DataGridView virtual rows are moved only among virtual rows");
+    const std::optional<std::string> top = held_top_row();
+    virtual_order_.move(row.value, position.value);
+    after_reported_change(top, 1U);
+}
+
+void DataGridView::set_virtual_row_window_source(std::shared_ptr<DataGridViewRowWindowSource> source) {
+    require_mutable();
+    require_virtual_rows("DataGridView row window sources serve only virtual rows");
+    if (!source) {
+        // The whole order comes from the old source before it goes.
+        if (virtual_order_.mode() == DataGridViewRowOrderMode::window) {
+            switch_row_order(DataGridViewRowOrderMode::edit, DataGridViewRowOrderSwitchReason::source);
+        }
+        if (virtual_order_.mode() == DataGridViewRowOrderMode::window) {
+            throw std::logic_error("DataGridView could not take the whole row order from its window source");
+        }
+        window_source_.reset();
+        if (row_order_policy_ == DataGridViewRowOrderPolicy::window) row_order_policy_ = DataGridViewRowOrderPolicy::automatic;
+        return;
+    }
+    window_source_ = std::move(source);
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::source);
+}
+
+void DataGridView::set_row_order_policy(DataGridViewRowOrderPolicy policy) {
+    require_mutable();
+    if (policy == DataGridViewRowOrderPolicy::window && !window_source_) {
+        throw std::logic_error("DataGridView window mode requires a row window source");
+    }
+    row_order_policy_ = policy;
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::policy);
+}
+
+void DataGridView::set_row_order_thresholds(DataGridViewRowOrderThresholds thresholds) {
+    require_mutable();
+    if (thresholds.edit_rows > thresholds.window_rows || thresholds.edit_changes > thresholds.window_changes) {
+        throw std::invalid_argument("DataGridView row order thresholds must leave edit below window");
+    }
+    row_order_thresholds_ = thresholds;
+    update_row_order_mode(DataGridViewRowOrderSwitchReason::policy);
+}
+
+void DataGridView::update_row_order_mode(DataGridViewRowOrderSwitchReason cause) {
+    if (row_source_ != DataGridViewRowSource::virtual_rows) return;
+    const DataGridViewRowOrderMode mode = virtual_order_.mode();
+    if (row_order_policy_ == DataGridViewRowOrderPolicy::edit) {
+        if (mode != DataGridViewRowOrderMode::edit) switch_row_order(DataGridViewRowOrderMode::edit, cause);
+        return;
+    }
+    if (row_order_policy_ == DataGridViewRowOrderPolicy::window) {
+        if (mode != DataGridViewRowOrderMode::window && window_source_) {
+            switch_row_order(DataGridViewRowOrderMode::window, cause);
+        }
+        return;
+    }
+    if (!window_source_) return;
+    const std::size_t count = virtual_order_.count();
+    const DataGridViewRowOrderThresholds& limits = row_order_thresholds_;
+    const bool pinned_cause = cause == DataGridViewRowOrderSwitchReason::policy ||
+                              cause == DataGridViewRowOrderSwitchReason::source;
+    if (mode == DataGridViewRowOrderMode::edit) {
+        if (count >= limits.window_rows) {
+            switch_row_order(DataGridViewRowOrderMode::window,
+                             pinned_cause ? cause : DataGridViewRowOrderSwitchReason::row_count);
+        } else if (changes_this_pass_ >= limits.window_changes) {
+            switch_row_order(DataGridViewRowOrderMode::window,
+                             pinned_cause ? cause : DataGridViewRowOrderSwitchReason::change_rate);
+        }
+        return;
+    }
+    const bool few = count <= limits.edit_rows;
+    const bool quiet = changes_last_pass_ <= limits.edit_changes && changes_this_pass_ <= limits.edit_changes;
+    if (few && quiet) {
+        // Back for the reason it left, unless a policy or source change moved it.
+        const DataGridViewRowOrderSwitchReason reason = pinned_cause ? cause : window_reason_;
+        switch_row_order(DataGridViewRowOrderMode::edit, reason);
+    }
+}
+
+void DataGridView::switch_row_order(DataGridViewRowOrderMode mode, DataGridViewRowOrderSwitchReason reason) {
+    const DataGridViewRowOrderMode old_mode = virtual_order_.mode();
+    if (old_mode == mode) return;
+    if (mode == DataGridViewRowOrderMode::edit) {
+        // A source that gives a repeated or empty ID keeps the order in
+        // window mode.
+        if (!virtual_order_.switch_to_edit()) return;
+    } else {
+        if (!window_source_) return;
+        virtual_order_.switch_to_window(window_source_);
+        window_reason_ = reason;
+    }
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    DataGridViewRowOrderModeChange change{};
+    change.old_mode = old_mode;
+    change.new_mode = mode;
+    change.reason = reason;
+    change.row_count = virtual_order_.count();
+    change.changes = changes_this_pass_;
+    row_order_mode_changed_.emit(change);
 }
 
 void DataGridView::refresh_rows() {
@@ -713,7 +933,8 @@ void DataGridView::set_data_source(std::shared_ptr<BindingSource> source) {
     reset_row_state();
     detach_data_source();
     provider_.reset();
-    virtual_rows_.clear();
+    virtual_order_.clear();
+    window_source_.reset();
     rows_.clear();
     row_positions_.clear();
     if (!source) {
@@ -932,6 +1153,14 @@ void DataGridView::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     const GridLayout layout = grid_layout();
     first_row_ = std::min(first_row_, maximum_first_row(layout));
+    // A layout pass ends the change-rate interval of the virtual order
+    // (owner decision W-5), and a window-mode order fetches the rows this
+    // pass shows, plus its margin, unless it holds them already.
+    changes_last_pass_ = changes_this_pass_;
+    changes_this_pass_ = 0U;
+    if (row_source_ == DataGridViewRowSource::virtual_rows) {
+        virtual_order_.prepare_window(first_row_, visible_row_end(layout), row_order_thresholds_.window_margin);
+    }
     horizontal_offset_ = std::clamp(horizontal_offset_, 0.0, maximum_horizontal_offset(layout));
     synchronize_scroll_bars(layout);
     if (vertical_bar_) {

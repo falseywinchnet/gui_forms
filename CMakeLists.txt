@@ -435,6 +435,7 @@ add_library(gui_forms_controls STATIC
     src/controls/status_strip/status_strip.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
+    src/controls/data_grid_view/data_grid_view_row_order.cpp
     src/controls/task_dialog/task_dialog.cpp
     src/controls/notify_icon/notify_icon.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
@@ -2409,6 +2410,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_data_grid_view_tests tests/data_grid_view_tests.cpp)
     target_link_libraries(gui_forms_data_grid_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_data_grid_view_tests COMMAND gui_forms_data_grid_view_tests)
+    add_executable(gui_forms_data_grid_view_order_tests tests/data_grid_view_order_tests.cpp)
+    target_link_libraries(gui_forms_data_grid_view_order_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_data_grid_view_order_tests COMMAND gui_forms_data_grid_view_order_tests)
 
     add_executable(gui_forms_masked_text_box_tests tests/masked_text_box_tests.cpp)
     target_link_libraries(gui_forms_masked_text_box_tests PRIVATE gui_forms_controls gui_forms_host_headless)

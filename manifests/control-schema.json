@@ -1389,6 +1389,7 @@
         {"name": "cell_validating", "payload": "DataGridViewCellValidatingEvent", "mutable_payload": true},
         {"name": "cell_value_changed", "payload": "DataGridViewCellEvent", "mutable_payload": false},
         {"name": "cell_content_click", "payload": "DataGridViewCellEvent", "mutable_payload": false},
+        {"name": "row_order_mode_changed", "payload": "DataGridViewRowOrderModeChange", "mutable_payload": false},
         {"name": "column_header_click", "payload": "std::size_t", "mutable_payload": false},
         {"name": "column_width_changed", "payload": "std::size_t", "mutable_payload": false}
       ]

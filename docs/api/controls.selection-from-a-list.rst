@@ -120,15 +120,25 @@ Related types
    * - :cpp:class:`DataGridViewCellValidatingEvent <gui_forms::DataGridViewCellValidatingEvent>`
      - Raised before an edited text cell commits, with the text as typed.
    * - :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
-     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID.
+     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and gives the order to the grid as row IDs (in full with set_virtual_rows and set_virtual_row_order, by change with insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand through a DataGridViewRowWindowSource); the grid asks for values by ID.
    * - :cpp:class:`DataGridViewColumn <gui_forms::DataGridViewColumn>`
      - One column.
    * - :cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>`
      - One unbound row.
    * - :cpp:class:`DataGridViewRowId <gui_forms::DataGridViewRowId>`
      - A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves.
+   * - :cpp:class:`DataGridViewRowOrder <gui_forms::DataGridViewRowOrder>`
+     - A virtual grid's row order (owner decision W-5), renderer-free: the IDs in presentation order in one of two modes.
+   * - :cpp:class:`DataGridViewRowOrderModeChange <gui_forms::DataGridViewRowOrderModeChange>`
+     -  
+   * - :cpp:class:`DataGridViewRowOrderStatistics <gui_forms::DataGridViewRowOrderStatistics>`
+     - Counters of the order's work since it was made, for diagnostics and the tests that measure each change's cost.
+   * - :cpp:class:`DataGridViewRowOrderThresholds <gui_forms::DataGridViewRowOrderThresholds>`
+     - The automatic policy's thresholds.
    * - :cpp:class:`DataGridViewRowPosition <gui_forms::DataGridViewRowPosition>`
      - A row's presentation position: its index in the grid's current row order, 0 at the top.
+   * - :cpp:class:`DataGridViewRowWindowSource <gui_forms::DataGridViewRowWindowSource>`
+     - The application side of a virtual grid's window mode (owner decision W-5): the application keeps the rows' order, and the grid asks for the IDs at the positions it shows (plus a margin) instead of holding the whole order.
    * - :cpp:class:`ItemCheckEvent <gui_forms::ItemCheckEvent>`
      - ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
    * - :cpp:class:`ListBox::Item <gui_forms::ListBox::Item>`
@@ -816,7 +826,7 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID. It asks for the cells it shows, the current cell, and cells semantics or the application read through the grid; it never asks for any other row. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
+   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and gives the order to the grid as row IDs (in full with set_virtual_rows and set_virtual_row_order, by change with insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand through a DataGridViewRowWindowSource); the grid asks for values by ID. It asks for the cells it shows, the current cell, and cells semantics or the application read through the grid; it never asks for any other row. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
 
 
    .. rubric:: Extension points
@@ -893,7 +903,7 @@ Related types
 
 .. cpp:struct:: DataGridViewRowId final
 
-   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
 
    A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves. Unbound rows, virtual rows and BindingSource records each carry one. The selection, the current cell, an edit in progress and a pressed button cell are kept by it, so inserting, removing and sorting rows never moves them onto other rows. It is also the row's semantic stable ID, and a cell's is the row's, '.' and the column's name.
 
@@ -901,13 +911,211 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: DataGridViewRowOrder final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   A virtual grid's row order (owner decision W-5), renderer-free: the IDs in presentation order in one of two modes. Edit mode keeps every ID in chunks of at most 2 * chunk_capacity IDs, in order, with a Fenwick tree of the chunks' sizes and an ID-to-chunk index. Finding an ID's position or a position's ID costs O(log chunks + chunk_capacity); inserting or removing r rows at one place costs O(r + chunk_capacity + log chunks), plus O(chunks) when a chunk splits, merges or empties (at most once per chunk_capacity changes to one chunk); a move is a removal and an insertion. A reset builds everything, O(rows). Window mode holds the row count and the IDs of one window of positions, [window_first, window_first + window size), each with its position; prepare_window fetches a window from the source when the positions asked for are not all held, and any reported change discards it. An ID outside the window is asked of the source, one at a time. The order validates what the program reports in edit mode (IDs not empty, valid UTF-8, unique, and present when removed or moved) and throws std::invalid_argument, changing nothing; in window mode the source is trusted. Single UI thread.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: DataGridViewRowOrder()
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: DataGridViewRowOrderMode mode() const noexcept
+
+   .. cpp:function:: std::size_t count() const noexcept
+
+   .. cpp:function:: const DataGridViewRowOrderStatistics& statistics() const noexcept
+
+   .. cpp:function:: std::size_t window_first() const noexcept
+
+      Window mode: the positions held, [window_first(), window_end()).
+
+   .. cpp:function:: std::size_t window_end() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void reset(std::span<const DataGridViewRowId> order)
+
+      Edit mode with this order. Throws std::invalid_argument, changing nothing, for an empty, repeated or invalid UTF-8 ID.
+
+   .. cpp:function:: void reset_to_window(std::shared_ptr<DataGridViewRowWindowSource> source)
+
+      Window mode over a source (not null; std::invalid_argument).
+
+   .. cpp:function:: bool switch_to_edit()
+
+      Switches to edit mode by asking the source for every ID; false, changing nothing, when the source gives an empty or repeated ID.
+
+   .. cpp:function:: void switch_to_window(std::shared_ptr<DataGridViewRowWindowSource> source)
+
+      Switches to window mode over a source; the held IDs are released.
+
+   .. cpp:function:: void clear() noexcept
+
+   .. cpp:function:: std::string id_at(std::size_t position) const
+
+      The ID at a position below count(), by value. In window mode a position outside the window is asked of the source.
+
+   .. cpp:function:: std::optional<std::size_t> position_of(std::string_view id) const
+
+      The position of an ID now, or none.
+
+   .. cpp:function:: std::optional<std::size_t> held_position(std::string_view id) const
+
+      Window mode: the position an ID had in the window held before the last reported change, or none. Edit mode: position_of.
+
+   .. cpp:function:: std::optional<std::string> held_id_at(std::size_t position) const
+
+      The ID at a position when it is held without asking the source (always in edit mode; inside the window in window mode), or none.
+
+   .. cpp:function:: bool contains(std::string_view id) const
+
+      Edit mode: whether an ID is in the order. Window mode: false.
+
+   .. cpp:function:: void prepare_window(std::size_t first, std::size_t end, std::size_t margin)
+
+      Window mode: makes the window hold [first, end) widened by ``margin`` rows on each side, asking the source only when it does not already. Edit mode: does nothing.
+
+   .. cpp:function:: void insert(std::size_t position, std::span<const DataGridViewRowId> ids)
+
+      Reported changes. The rows are already in their new places in the application's order. insert: the IDs now stand at [position, position + ids.size()); position is at most count(). move: the ID now stands at ``position``, below count(). Edit mode validates (see above); window mode forgets its window and asks the source for the new count.
+
+   .. cpp:function:: void remove(std::span<const DataGridViewRowId> ids)
+
+   .. cpp:function:: void move(std::string_view id, std::size_t position)
+
+   .. cpp:member:: constexpr std::size_t chunk_capacity
+
+      Default: ``256U``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderModeChange final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:member:: DataGridViewRowOrderMode old_mode
+
+      Default: ``{DataGridViewRowOrderMode::edit}``.
+
+   .. cpp:member:: DataGridViewRowOrderMode new_mode
+
+      Default: ``{DataGridViewRowOrderMode::edit}``.
+
+   .. cpp:member:: DataGridViewRowOrderSwitchReason reason
+
+      Default: ``{DataGridViewRowOrderSwitchReason::row_count}``.
+
+   .. cpp:member:: std::size_t row_count
+
+      The row count and this pass's reported changes when it switched.
+
+   .. cpp:member:: std::size_t changes
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderStatistics final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   Counters of the order's work since it was made, for diagnostics and the tests that measure each change's cost.
+
+   .. cpp:member:: std::uint64_t reported_changes
+
+      Rows reported inserted, removed or moved.
+
+   .. cpp:member:: std::uint64_t index_writes
+
+      ID-index entries written (edit mode).
+
+   .. cpp:member:: std::uint64_t slot_moves
+
+      IDs shifted within chunks (edit mode).
+
+   .. cpp:member:: std::uint64_t chunk_table_rebuilds
+
+      Rebuilds of the chunk table after a chunk split, merged or emptied; each costs the number of chunks.
+
+   .. cpp:member:: std::uint64_t full_builds
+
+      Whole-index builds: resets and switches to edit mode; each costs the number of rows.
+
+   .. cpp:member:: std::uint64_t window_requests
+
+      Window mode: the row_ids calls, the IDs they asked for, and the row_position calls.
+
+   .. cpp:member:: std::uint64_t ids_requested
+
+   .. cpp:member:: std::uint64_t position_queries
+
+   .. cpp:member:: std::uint64_t mode_switches
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowOrderThresholds final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   The automatic policy's thresholds. The grid goes to window mode when the rows reach window_rows, or the reported changes since the last layout pass reach window_changes; it returns to edit mode when the rows are at most edit_rows and both the last pass's and this pass's changes are at most edit_changes. The gaps between the pairs keep it from switching back and forth. window_margin is how many rows past each end of the visible ones a window holds.
+
+   .. cpp:member:: std::size_t window_rows
+
+      Default: ``{250000}``.
+
+   .. cpp:member:: std::size_t edit_rows
+
+      Default: ``{100000}``.
+
+   .. cpp:member:: std::size_t window_changes
+
+      Default: ``{20000}``.
+
+   .. cpp:member:: std::size_t edit_changes
+
+      Default: ``{1000}``.
+
+   .. cpp:member:: std::size_t window_margin
+
+      Default: ``{64}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: DataGridViewRowPosition final
 
-   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
 
    A row's presentation position: its index in the grid's current row order, 0 at the top. A position is not an identity: inserting, removing or sorting rows changes which row holds it. row_id and row_position convert between the two.
 
    .. cpp:member:: std::size_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: DataGridViewRowWindowSource
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   The application side of a virtual grid's window mode (owner decision W-5): the application keeps the rows' order, and the grid asks for the IDs at the positions it shows (plus a margin) instead of holding the whole order. Calls arrive on the grid's UI thread; the source may not mutate the grid from inside one. IDs are not empty, valid UTF-8 and unique, as for set_virtual_rows.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual std::size_t row_count() const = 0
+
+      The number of rows in the current order.
+
+   .. cpp:function:: virtual void row_ids(DataGridViewRowPosition first, std::span<DataGridViewRowId> out) const = 0
+
+      Fills ``out`` with the IDs at positions [first, first + out.size()), which the grid keeps within row_count().
+
+   .. cpp:function:: virtual std::optional<DataGridViewRowPosition> row_position(const DataGridViewRowId& row) const = 0
+
+      The position of a row in the current order, or none when it is gone.
 
 .. cpp:namespace:: gui_forms
 
@@ -1708,6 +1916,42 @@ Enumerations
    .. cpp:enumerator:: combo_box
 
    .. cpp:enumerator:: button
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderMode
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: edit
+
+   .. cpp:enumerator:: window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderPolicy
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: edit
+
+   .. cpp:enumerator:: window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DataGridViewRowOrderSwitchReason
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp>``
+
+   .. cpp:enumerator:: row_count
+
+   .. cpp:enumerator:: change_rate
+
+   .. cpp:enumerator:: policy
+
+   .. cpp:enumerator:: source
 
 .. cpp:namespace:: gui_forms
 

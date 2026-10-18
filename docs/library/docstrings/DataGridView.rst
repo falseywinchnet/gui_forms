@@ -97,6 +97,30 @@ editing_control
     only during an edit.
 drop_down_open
     Whether a combo box cell's choices are open.
+virtual_row_window_source : default none
+    The `DataGridViewRowWindowSource` window mode asks for row IDs. Taking it
+    away (null) in window mode first takes every ID from the old source and
+    goes to edit mode; rows that are not virtual refuse it with
+    `std::logic_error`.
+row_order_mode : default ``DataGridViewRowOrderMode::edit``
+    How the virtual rows' order is held: ``edit`` (every ID, in a chunked
+    order index) or ``window`` (the IDs around the displayed rows).
+row_order_policy : default ``DataGridViewRowOrderPolicy::automatic``
+    Who chooses the mode: the grid, by the thresholds, or the program,
+    pinning ``edit`` or ``window``, which is switched to at once. Pinning
+    ``window`` without a window source throws `std::logic_error`.
+row_order_thresholds
+    The automatic policy's `DataGridViewRowOrderThresholds`: window mode
+    from ``window_rows`` rows (250000) or ``window_changes`` reported changes
+    in one layout pass (20000); edit mode again at most ``edit_rows`` rows
+    (100000) with at most ``edit_changes`` changes (1000) in the last pass
+    and this one; ``window_margin`` rows (64) held past each end of the
+    displayed rows. New thresholds apply at once. Edit thresholds above
+    window thresholds throw `std::invalid_argument`.
+row_order_statistics
+    The order's work counters (`DataGridViewRowOrderStatistics`): reported
+    changes, index writes, slot moves, chunk-table rebuilds, whole builds,
+    window requests, IDs requested, position queries and mode switches.
 
 Events
 ------
@@ -124,6 +148,10 @@ column_header_click
     Raised when a column header is clicked, with the column's index.
 column_width_changed
     Raised after a column's width changes, with the column's index.
+row_order_mode_changed
+    Raised after the virtual rows' order switched mode, with the old and new
+    mode, the reason (``row_count``, ``change_rate``, ``policy`` or
+    ``source``), the row count and this pass's reported changes.
 
 Methods
 -------
@@ -177,19 +205,38 @@ sort
     not commit.
 set_virtual_rows
     Switches to virtual rows: the application's row IDs in presentation
-    order, with values asked of a provider by ID. Unbound rows are discarded,
-    and any edit, the selection and the current cell end. A null provider,
-    or an empty, repeated or invalid UTF-8 ID, throws `std::invalid_argument`
-    and changes nothing.
+    order, or a `DataGridViewRowWindowSource` that keeps the order, with
+    values asked of a provider by ID. Unbound rows are discarded, and any
+    edit, the selection and the current cell end. Given the order, the grid
+    starts in edit mode without a window source; given a source, in the
+    mode its policy chooses. A null provider or source, or an empty,
+    repeated or invalid UTF-8 ID, throws `std::invalid_argument` and changes
+    nothing.
 set_virtual_row_order
     Replaces the virtual rows' order after the application inserted, removed,
     filtered or sorted rows. The selection, the current cell, an edit in
     progress and the first displayed row stay on their IDs. A selected row
     that is gone leaves the selection; when the current row is gone, its
     edit is discarded and the row now at its position, or the new last row,
-    becomes current. Rows that are not virtual refuse it with
-    `std::logic_error`; an invalid ID throws `std::invalid_argument` and
-    changes nothing.
+    becomes current. It is a reset: the order is rebuilt in edit mode, and
+    the policy may move it to window mode again. Rows that are not virtual
+    refuse it with `std::logic_error`; an invalid ID throws
+    `std::invalid_argument` and changes nothing.
+insert_virtual_rows
+    Reports rows the application inserted: their IDs now stand at the given
+    position onwards. Costs in proportion to the change.
+remove_virtual_rows
+    Reports rows the application removed. Only they leave the selection;
+    when the current row is among them, its edit is discarded and the row
+    now at its position, or the new last row, becomes current.
+move_virtual_row
+    Reports a row the application moved: it now stands at the position.
+    The three reports keep the selection, the current cell, an edit and the
+    first displayed row on their IDs. In edit mode an invalid report (an
+    empty, repeated or invalid UTF-8 ID, a removed or moved row that is not
+    there) throws `std::invalid_argument` and a position past the end
+    `std::out_of_range`, changing nothing; in window mode the source is
+    trusted. Rows that are not virtual refuse them with `std::logic_error`.
 refresh_rows
     Repaints after the provider's values changed outside the grid.
 is_cell_selected
@@ -250,8 +297,29 @@ scroll beneath them.
 Rows are identified as in `ObjectView`: by stable ID, with no second
 row-ownership model. A virtual grid holds the application's order of row
 IDs and an index from ID to position; the application owns the rows and their
-values, sorts and filters them itself, and publishes each new order with
-`set_virtual_row_order`. The grid asks its provider, by ID, only for the
+values, sorts and filters them itself, and gives the grid the order in full
+(`set_virtual_row_order`, a reset), by change (`insert_virtual_rows`,
+`remove_virtual_rows`, `move_virtual_row`), or on demand through a window
+source.
+
+The order has two modes (owner decision W-5; `DataGridViewRowOrder`). In
+edit mode the grid holds every ID in chunks of at most 512 with a Fenwick
+tree of their sizes and an ID-to-chunk index, so a reported change costs in
+proportion to the change: O(changed rows + 256 + log chunks), plus the
+number of chunks when one splits, merges or empties, while a reset costs the
+row count. In window mode it holds only the IDs of the displayed rows and
+64 rows past each end, fetched from the window source in one request when
+the displayed rows leave the window, and asks the source for an ID's
+position or a far row's ID one at a time; a reported change only discards
+the window. The automatic policy goes to window mode when the rows reach
+``window_rows`` or one layout pass's reported changes reach
+``window_changes``, and back to edit mode (taking every ID from the source
+once) when the rows are at most ``edit_rows`` and the last pass and this one
+had at most ``edit_changes`` changes; it decides after each report, reset,
+and policy or source change, never during layout, and reports each switch.
+A pass counts when the grid is laid out. The selection, the current cell, an
+edit, focus and the first displayed row follow their IDs in both modes and
+across switches. The grid asks its provider, by ID, only for the
 cells it shows, the current cell, and cells the program or accessibility
 reads, and realizes only the rows in view: painting a window of a million
 rows asks for the values of that window alone (the tests check it). Cell

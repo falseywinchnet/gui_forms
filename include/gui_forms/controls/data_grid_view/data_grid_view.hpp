@@ -8,6 +8,7 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp"
+#include "gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp"
 #include "gui_forms/event.hpp"
 
 #include <cstddef>
@@ -76,38 +77,6 @@ struct DataGridViewColumn final {
     DataGridViewSortDirection sort_glyph{DataGridViewSortDirection::none};
 };
 
-// A row's stable identity: not empty, unique among the grid's rows, and kept
-// while the row moves. Unbound rows, virtual rows and BindingSource records
-// each carry one. The selection, the current cell, an edit in progress and a
-// pressed button cell are kept by it, so inserting, removing and sorting rows
-// never moves them onto other rows. It is also the row's semantic stable ID,
-// and a cell's is the row's, '.' and the column's name.
-struct DataGridViewRowId final {
-    std::string value{};
-
-    friend bool operator==(const DataGridViewRowId& left, const DataGridViewRowId& right) {
-        const bool equal = left.value == right.value;
-        return equal;
-    }
-};
-
-// A row's presentation position: its index in the grid's current row order,
-// 0 at the top. A position is not an identity: inserting, removing or sorting
-// rows changes which row holds it. row_id and row_position convert between
-// the two.
-struct DataGridViewRowPosition final {
-    std::size_t value{};
-
-    friend constexpr bool operator==(DataGridViewRowPosition left, DataGridViewRowPosition right) noexcept {
-        const bool equal = left.value == right.value;
-        return equal;
-    }
-    friend constexpr bool operator<(DataGridViewRowPosition left, DataGridViewRowPosition right) noexcept {
-        const bool less = left.value < right.value;
-        return less;
-    }
-};
-
 // One unbound row. `stable_id` is unique within the grid; an empty ID is
 // replaced by a generated one ("row.1", "row.2", ...). `cells` holds one value
 // per column in column order; a shorter list is padded with empty values.
@@ -159,8 +128,10 @@ struct DataGridViewCellValidatingEvent final {
 
 // The application side of virtual mode (Windows Forms' CellValueNeeded and
 // CellValuePushed), on ObjectView's stable-ID model: the application owns the
-// rows and their order and publishes the order to the grid as row IDs
-// (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID.
+// rows and their order and gives the order to the grid as row IDs (in full
+// with set_virtual_rows and set_virtual_row_order, by change with
+// insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand
+// through a DataGridViewRowWindowSource); the grid asks for values by ID.
 // It asks for the cells it shows, the current cell, and cells semantics or the
 // application read through the grid; it never asks for any other row. Calls
 // arrive on the grid's UI thread, from paint, layout, input and the grid's own
@@ -271,6 +242,54 @@ public:
     // std::invalid_argument, changing nothing, for an empty, repeated or
     // invalid UTF-8 ID.
     void set_virtual_row_order(std::vector<DataGridViewRowId> order);
+
+    // -- the virtual row order (owner decision W-5) ----------------------
+    // Virtual rows whose order a window source keeps: the grid starts in the
+    // mode the order policy gives (window, unless it is pinned to edit or the
+    // automatic policy finds few rows) and asks the source for IDs. Throws
+    // std::invalid_argument for a null provider or source.
+    void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider,
+                          std::shared_ptr<DataGridViewRowWindowSource> source);
+    // Gives the virtual rows a window source, which window mode needs, or
+    // takes it away (null): in window mode the grid first fetches every ID
+    // from the old source and goes to edit mode. Throws std::logic_error
+    // unless the rows are virtual.
+    void set_virtual_row_window_source(std::shared_ptr<DataGridViewRowWindowSource> source);
+    [[nodiscard]] std::shared_ptr<DataGridViewRowWindowSource> virtual_row_window_source() const noexcept {
+        return window_source_;
+    }
+    // Reports changes the application made to its order, each costing in
+    // proportion to the change (see DataGridViewRowOrder). The rows are
+    // already in their new places: the inserted IDs stand at [position,
+    // position + ids.size()), a moved row at `position`. Selected rows and
+    // cells, the current cell, an edit and the first displayed row stay on
+    // their IDs; a removed selected row leaves the selection, and when the
+    // current row is removed its edit is discarded and the row now at its
+    // position, or the new last row, becomes current. In edit mode an
+    // invalid report (an empty, repeated or invalid UTF-8 ID, a removed or
+    // moved row that is not there) throws std::invalid_argument and a position
+    // past the end std::out_of_range, changing nothing; in window mode the
+    // source is trusted. Throws std::logic_error unless the rows are virtual.
+    void insert_virtual_rows(DataGridViewRowPosition position, std::vector<DataGridViewRowId> ids);
+    void remove_virtual_rows(std::vector<DataGridViewRowId> ids);
+    void move_virtual_row(const DataGridViewRowId& row, DataGridViewRowPosition position);
+    // The order's mode, and who chooses it. The automatic policy switches by
+    // the thresholds after each report, reset and policy or source change
+    // (never during layout), raising row_order_mode_changed; pinning a mode
+    // switches to it at once. Pinning window throws std::logic_error without
+    // a window source.
+    [[nodiscard]] DataGridViewRowOrderMode row_order_mode() const noexcept { return virtual_order_.mode(); }
+    [[nodiscard]] DataGridViewRowOrderPolicy row_order_policy() const noexcept { return row_order_policy_; }
+    void set_row_order_policy(DataGridViewRowOrderPolicy policy);
+    [[nodiscard]] const DataGridViewRowOrderThresholds& row_order_thresholds() const noexcept {
+        return row_order_thresholds_;
+    }
+    // Throws std::invalid_argument when edit_rows exceeds window_rows or
+    // edit_changes exceeds window_changes.
+    void set_row_order_thresholds(DataGridViewRowOrderThresholds thresholds);
+    [[nodiscard]] const DataGridViewRowOrderStatistics& row_order_statistics() const noexcept {
+        return virtual_order_.statistics();
+    }
     // Repaints after the provider's values changed outside the grid.
     void refresh_rows();
     // Shows a BindingSource's records as rows: a column shows the field its
@@ -389,6 +408,10 @@ public:
     // user.
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_content_click() noexcept {
         return cell_content_click_;
+    }
+    // Raised after the virtual row order switched mode, with the reason.
+    [[nodiscard]] Event<const DataGridViewRowOrderModeChange&>& row_order_mode_changed() noexcept {
+        return row_order_mode_changed_;
     }
     // Raised when a column header is clicked, with the column's index.
     [[nodiscard]] Event<std::size_t>& column_header_click() noexcept { return column_header_click_; }
@@ -587,8 +610,10 @@ private:
         }
     };
 
-    // Model access over the three row sources, by present position.
-    [[nodiscard]] const std::string& row_id_text(DataGridViewRowPosition row) const;
+    // Model access over the three row sources, by present position. The ID
+    // is a copy: a virtual order in window mode may replace its window
+    // while the caller still uses it.
+    [[nodiscard]] std::string row_id_text(DataGridViewRowPosition row) const;
     [[nodiscard]] bool row_read_only(DataGridViewRowPosition row) const;
     [[nodiscard]] bool cell_read_only(DataGridViewRowPosition row, std::size_t column) const;
     [[nodiscard]] BindingValue stored_value(DataGridViewRowPosition row, std::size_t column) const;
@@ -598,9 +623,21 @@ private:
     // columns.
     void validate_row_text(const DataGridViewRow& row) const;
     [[nodiscard]] std::string generated_row_id(const RowPositions& used);
-    // Validates a virtual order and returns its identity index; throws
-    // std::invalid_argument, changing nothing, for an invalid ID.
-    [[nodiscard]] static RowPositions virtual_row_index(const std::vector<DataGridViewRowId>& order);
+    // Throws std::invalid_argument for an empty, repeated or invalid UTF-8
+    // ID in a virtual order.
+    static void validate_virtual_order(const std::vector<DataGridViewRowId>& order);
+    void require_virtual_rows(const char* what) const;
+    // Before a reported change: the first displayed row's ID, when held
+    // without asking a source.
+    [[nodiscard]] std::optional<std::string> held_top_row() const;
+    // After a reported change: the first displayed row back on its ID, the
+    // change counted, and the mode chosen again.
+    void after_reported_change(const std::optional<std::string>& top, std::size_t changed);
+    // Chooses the mode by the policy and the thresholds, switching and
+    // raising row_order_mode_changed when it changes. `cause` is the reason
+    // reported for a switch the policy or a source made.
+    void update_row_order_mode(DataGridViewRowOrderSwitchReason cause);
+    void switch_row_order(DataGridViewRowOrderMode mode, DataGridViewRowOrderSwitchReason reason);
     void require_cell(DataGridViewRowPosition row, std::size_t column) const;
     void structure_changed();
     void reset_row_state();
@@ -709,8 +746,17 @@ private:
     std::vector<DataGridViewRow> rows_{};
     std::uint64_t next_row_number_{1U};
     std::shared_ptr<DataGridViewCellValueProvider> provider_{};
-    // Virtual rows: the application's order of row IDs.
-    std::vector<DataGridViewRowId> virtual_rows_{};
+    // Virtual rows: the application's order of row IDs (owner decision W-5),
+    // the window source window mode asks, the policy and its thresholds, the
+    // changes reported since the last layout pass and in the pass before,
+    // and the reason the order last went to window mode.
+    DataGridViewRowOrder virtual_order_{};
+    std::shared_ptr<DataGridViewRowWindowSource> window_source_{};
+    DataGridViewRowOrderPolicy row_order_policy_{DataGridViewRowOrderPolicy::automatic};
+    DataGridViewRowOrderThresholds row_order_thresholds_{};
+    std::size_t changes_this_pass_{};
+    std::size_t changes_last_pass_{};
+    DataGridViewRowOrderSwitchReason window_reason_{DataGridViewRowOrderSwitchReason::row_count};
     std::shared_ptr<BindingSource> data_source_{};
     SubscriptionToken source_list_changed_{};
     SubscriptionToken source_position_changed_{};
@@ -778,6 +824,7 @@ private:
     Event<DataGridViewCellValidatingEvent&> cell_validating_{};
     Event<const DataGridViewCellEvent&> cell_value_changed_{};
     Event<const DataGridViewCellEvent&> cell_content_click_{};
+    Event<const DataGridViewRowOrderModeChange&> row_order_mode_changed_{};
     Event<std::size_t> column_header_click_{};
     Event<std::size_t> column_width_changed_{};
 };
