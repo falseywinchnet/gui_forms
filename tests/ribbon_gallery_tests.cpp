@@ -7,6 +7,7 @@
 #include "gui_forms/gui_forms.hpp"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -358,6 +359,76 @@ void popups() {
     require(!(*full).is_alive() && !(*full).popup_open(), "disposing a gallery disposes and closes its full gallery");
 }
 
+// What a release test watches: the galleries and the drop-down's anchor.
+struct ReleaseWatch final {
+    std::weak_ptr<RibbonGallery> gallery{};
+    std::weak_ptr<RibbonGallery> full{};
+    std::weak_ptr<RibbonGallery> drop_down{};
+    std::weak_ptr<Button> anchor{};
+
+    [[nodiscard]] bool all_released() const noexcept {
+        return gallery.expired() && full.expired() && drop_down.expired() && anchor.expired();
+    }
+};
+
+enum class ReleaseEnding : std::uint8_t { closed, open_when_window_goes, disposed_while_open };
+enum class ReleasePopup : std::uint8_t { full_gallery, drop_down };
+
+// Builds a window with an in-ribbon gallery and a drop-down under a button,
+// opens one popup (one at a time: focus scopes nest), ends it as `ending`
+// says, and lets every owner go when it returns.
+ReleaseWatch run_release_case(ReleasePopup popup, ReleaseEnding ending) {
+    ReleaseWatch watch{};
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("release.root"));
+    std::shared_ptr<RibbonGallery> gallery = in_ribbon_gallery("release.gallery", 30U);
+    (*root).add_child(gallery);
+    (*gallery).set_requested_bounds({10.0, 10.0, 260.0, 84.0});
+    std::shared_ptr<Button> anchor = make_control<Button>(StableId("release.anchor"), "Styles");
+    (*root).add_child(anchor);
+    (*anchor).set_requested_bounds({300.0, 10.0, 100.0, 30.0});
+    std::shared_ptr<RibbonGallery> drop_down =
+        make_control<RibbonGallery>(StableId("release.drop-down"), RibbonGalleryForm::drop_down);
+    (*drop_down).set_items({}, numbered_items(8U));
+    Window window(root, {600.0, 500.0});
+    window.perform_layout();
+    std::shared_ptr<RibbonGallery> opened{};
+    if (popup == ReleasePopup::full_gallery) {
+        require((*gallery).show_more(), "the full gallery opens");
+        opened = (*gallery).more_gallery();
+    } else {
+        require((*drop_down).open_popup(anchor), "the drop-down opens");
+        opened = drop_down;
+    }
+    watch.gallery = gallery;
+    watch.full = (*gallery).more_gallery();
+    watch.drop_down = drop_down;
+    watch.anchor = anchor;
+    if (ending == ReleaseEnding::closed) (*opened).close_popup();
+    if (ending == ReleaseEnding::disposed_while_open) {
+        static_cast<void>((*root).remove_child((*gallery).runtime_id()));
+        (*gallery).dispose();
+        (*drop_down).dispose();
+    }
+    return watch;
+}
+
+// A drop-down gallery owns its popup layer, and the layer holds the gallery
+// as its content only while open, so neither keeps the other alive (house
+// style §5, §6). The sanitizer job found the pair holding each other after
+// a popup closed, which also kept the in-ribbon gallery and the anchor
+// button's memory through the layer's weak links.
+void popups_release_their_galleries() {
+    const ReleasePopup popups_tested[] = {ReleasePopup::full_gallery, ReleasePopup::drop_down};
+    for (const ReleasePopup popup : popups_tested) {
+        const ReleaseWatch closed = run_release_case(popup, ReleaseEnding::closed);
+        require(closed.all_released(), "a closed popup leaves nothing alive once its owners let go");
+        const ReleaseWatch open = run_release_case(popup, ReleaseEnding::open_when_window_goes);
+        require(open.all_released(), "a popup still open when the window goes leaves nothing alive");
+        const ReleaseWatch disposed = run_release_case(popup, ReleaseEnding::disposed_while_open);
+        require(disposed.all_released(), "a gallery disposed while open leaves nothing alive");
+    }
+}
+
 void semantics() {
     std::shared_ptr<RibbonGallery> gallery = in_ribbon_gallery("semantics.gallery", 9U);
     (*gallery).set_accessible_name("Styles");
@@ -396,8 +467,9 @@ int main() {
     hover_preview_order();
     keyboard();
     popups();
+    popups_release_their_galleries();
     semantics();
     std::cout << "RibbonGallery: value command, layout, columns, virtualization, preview order, keyboard, "
-                 "popups and semantics passed\n";
+                 "popups, popup release and semantics passed\n";
     return 0;
 }

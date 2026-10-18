@@ -92,6 +92,15 @@ gui_forms::AnchoredPopupLayer
 
       It also has every member of :cpp:class:`Control <gui_forms::Control>` and :cpp:class:`Component <gui_forms::Component>`: geometry, layout, visibility, focus, input routing, painting and disposal.
 
+   .. rubric:: Methods
+
+   .. list-table::
+      :class: autosummary longtable
+      :widths: 35 65
+
+      * - :cpp:func:`clear_content <gui_forms::AnchoredPopupLayer::clear_content>`
+        - Removes the content and releases the layer's reference to it, leaving the layer empty.
+
    .. seealso::
 
       :cpp:class:`ContextMenu <gui_forms::ContextMenu>`
@@ -270,6 +279,13 @@ gui_forms::AnchoredPopupLayer
       The popup stays open until the application closes it, typically by
       ending the focus scope and disconnecting its :cpp:class:`PopupToken <gui_forms::PopupToken>`. Escape is
       reported before the focused control sees the key.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void clear_content()
+
+      Removes the content and releases the layer's reference to it, leaving the layer empty. A control that owns its own layer (a drop-down that is the layer's content) calls this when its popup closes: otherwise the owner and its layer would hold each other and never be freed.
 
 
    .. rubric:: Extension points

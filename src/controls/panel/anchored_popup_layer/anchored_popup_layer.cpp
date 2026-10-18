@@ -55,6 +55,16 @@ void AnchoredPopupLayer::set_content(Control::Ptr content) {
                Dirty::hit_test | Dirty::semantics);
 }
 
+void AnchoredPopupLayer::clear_content() {
+    require_mutable();
+    if (!content_) return;
+    const Control::Ptr released = std::move(content_);
+    content_.reset();
+    static_cast<void>(remove_child((*released).runtime_id()));
+    invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
+               Dirty::hit_test | Dirty::semantics);
+}
+
 void AnchoredPopupLayer::set_placement(AnchoredPopupPlacement placement) {
     require_mutable();
     validate_placement(placement);
