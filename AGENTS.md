@@ -33,7 +33,10 @@ section, so a skim still covers all eleven:
    repeated processing and reuse; transfer ownership explicitly; raw
    addresses only at boundaries; name storage operations (fill, reserve,
    reset, clear, release) precisely; check size arithmetic; keep borrows
-   valid through use.
+   valid through use (a function returning a borrow of an argument deletes
+   its rvalue overload; declare a borrower after what it borrows); memory
+   errors and undefined behaviour are defects in tests too, checked by
+   sanitizer runs of the whole suite.
 6. **Objects and authority:** parents own children and back links only
    observe; cross authority boundaries through named capabilities; define
    the fallback when an owner disappears (reject stale identities, stop
@@ -49,7 +52,8 @@ section, so a skim still covers all eleven:
 9. **Failure and foreign interfaces:** say what a failure leaves behind;
    validate before mutating; explicit results for expected alternatives and
    exceptions only at subsystem boundaries; foreign interfaces state types,
-   counts, ownership and errors.
+   counts, ownership and errors, and take entry-point types from their
+   declarations, never retyped by hand.
 10. **C++ spelling:** no `auto`, trailing returns or structured bindings;
     `(*pointer).member` instead of `->`; no lambdas; hand-written comparisons
     (no `= default`); no coroutines or ranges pipelines.

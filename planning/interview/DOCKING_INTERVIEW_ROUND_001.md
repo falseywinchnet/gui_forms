@@ -642,3 +642,30 @@ and the unchecked macOS and Linux behaviours). The owner, verbatim:
 - **GIVEN, unchecked behaviours.** A sibling model verifies the macOS and
   Linux behaviours on the owner's M4 Mac and a Lima VM, from a script and a
   prompt document the coordinator prepares.
+
+### Note, 2026-10-19: R2's determination, R7 and R9
+
+The coordinator reported that the four real sanitizer findings each broke
+an existing house-style rule (§5 keep borrows valid through use and §2
+break chains that hide allocation, for two pointers into temporaries in
+tests; §5 the lifetime guarantee for a borrower that outlived what it
+borrowed, in a test; §9 foreign interfaces state types, for hand-retyped
+function pointers in the Windows GDI shim), and proposed four additions
+(rvalue overloads deleted on functions returning a borrow of an argument;
+borrowers declared after what they borrow; foreign entry-point types taken
+from their declarations; mandatory sanitizer runs). R7 was explained (the
+owner's J6/P35.6: a tab item exposes selection, never invoke), with the
+option of an expand and collapse state on the ribbon's command plane; R9
+was proposed as an order model switching between an edit mode (delta
+edits on a chunked order index) and a window mode (the grid asks for the
+visible window only), automatically by size and change rate. The owner,
+verbatim:
+
+> accepted on these changes to house policy. additional tools that we can write to check for them are fine too. r7 accepted.r9: accepted.
+
+- **GIVEN:** the four house-style additions, made in both copies (this
+  repository and EpistemicGPT); tools that check them mechanically are
+  welcome.
+- **GIVEN R7-1.** The ribbon's command plane publishes an expand and
+  collapse state; clicking the selected tab keeps working by pointer.
+- **GIVEN R9.** The adaptive order model as proposed.

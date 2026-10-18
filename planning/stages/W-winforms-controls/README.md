@@ -136,6 +136,13 @@ from it. Record under `results/`.
    `data_grid_view.hpp`); it moves onto stable row IDs, and row numbers
    become presentation positions only. The control is provisional, so the
    change is allowed.
+5. **An adaptive order model for virtual grids (owner review R9,
+   2026-10-19).** The grid holds its order in an edit mode (the program
+   reports inserts, removals and moves by ID; a chunked order index makes
+   each cost proportional to the change) or a window mode (the grid asks
+   for the IDs at the visible positions plus a margin and caches that
+   window), switching automatically by row count and change rate and
+   reporting each switch; a full republish stays as a reset.
 
 ## Advanced candidates, 2026-10-14
 
