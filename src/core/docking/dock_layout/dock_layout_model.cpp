@@ -197,7 +197,7 @@ public:
         if (!check_tables()) return result_;
         visited_.assign(state_.nodes.size(), false);
         if (!check_tree(state_.main_root, DockNodeId{}, DockRegion::main_tools)) return result_;
-        if (document_areas_ != 1U) return broken("the main site holds no document area");
+        if (document_areas_ != 1U) return broken("the main site does not hold exactly one document area");
         for (const DockFloatingSite& site : state_.floating_sites) {
             if (!check_tree(site.root, DockNodeId{}, DockRegion::floating)) return result_;
         }
