@@ -159,6 +159,12 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     and application versions with migrations and an upgrade hook; monitor
     fallback with clamping; named layouts in phase 7; lazy creation by
     factories.
+35. **Vocabulary (J1 to J8):** a pin mark; one dock-shape mark with the
+    region as a parameter; a custom item state `modified`; a
+    text-orientation parameter in `PartPaint`; the semantic role `pane`
+    and action `close` (tabs stop publishing `press`); float, dock and
+    maximize marks decided with T6; no new part roles. Admitted to the
+    design language with the enum and schema when built (§12.7).
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

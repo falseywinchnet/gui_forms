@@ -377,3 +377,31 @@ verbatim:
 - **GIVEN I6-1.** Named layouts in the workspace API, in phase 7.
 - **GIVEN I7-1.** Factories by panel ID; on restore only visible selected
   panels are created, others on first show.
+
+## Part 11. Vocabulary, 2026-10-17
+
+Asked as J1 to J8, yes or no, each with its recommendation; J2 was
+restated for D2's shape tiles (one "dock shape" mark with the side as a
+parameter instead of a centre guide mark and arrows). J3 to J6 also answer
+PageView P35's matching items. The owner, verbatim:
+
+> accept. i confirm.
+
+- **GIVEN J1.** A pin mark, `PartMark::pin`, drawn unpinned or pinned by
+  the `checked` state.
+- **GIVEN J2.** One dock-shape mark that takes the resulting region (top,
+  bottom, left, right, tab into) as a parameter, drawn as a small window
+  outline with that region filled (D2's tiles).
+- **GIVEN J3 (and P35).** A custom item state `modified`, shown by the
+  theme; no new mark.
+- **GIVEN J4 (and P35).** A text-orientation parameter in `PartPaint` for
+  vertical side-tab labels.
+- **GIVEN J5.** A semantic role `pane` for tool panels and F6 regions,
+  mapped on the three hosts with stage A. The tab-panel and tab-list roles
+  of P35 come with the PageView round.
+- **GIVEN J6 (and P35).** A semantic action `close`; tabs stop publishing
+  `press`.
+- **GIVEN J7.** Float, dock and maximize marks are decided with taste T6.
+- **GIVEN J8 (confirmed).** No new part roles: guides and tiles use
+  `face`, `glyph` and `drop`; previews use `drop` with `drop_accepted` and
+  `drop_rejected`.
