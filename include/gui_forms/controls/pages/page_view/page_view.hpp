@@ -32,10 +32,11 @@ private:
     Control::Ptr control_;
 };
 
-// What Ctrl+Tab and Ctrl+Shift+Tab do while focus is inside the view (owner
-// decisions DK-30 and DK-38): select the next or previous page (a view on
-// its own), or pass the key on (a view inside docking, whose navigator
-// takes it). Ctrl+PageDown and Ctrl+PageUp select in every view.
+// What Ctrl+Tab and Ctrl+Shift+Tab (the cycle_forward and cycle_backward key
+// commands) do while focus is inside the view (owner decisions DK-30 and
+// DK-38): select the next or previous page (a view on its own), or pass the
+// key on (a view inside docking, whose navigator takes it). Ctrl+PageDown and
+// Ctrl+PageUp select in every view.
 enum class PageViewCtrlTab : std::uint8_t { select_next, pass };
 
 // The presentation a view starts from (owner decision DK-15). `strip`:
@@ -78,8 +79,9 @@ struct PageContentRequest final {
 // when the view is made; they may be changed on the strip afterwards.
 //
 // Closing (owner decision DK-38): the strip raises `page_close_requested`
-// for the close button, a middle click, Ctrl+F4 and the semantic close
-// action; Ctrl+F4 is handled anywhere inside the view, as Ctrl+PageDown is.
+// for the close button, a middle click, Ctrl+F4 (Cmd+W on macOS: the
+// close_document key command) and the semantic close action; the command
+// is handled anywhere inside the view, as Ctrl+PageDown is.
 // When no handler sets `handled`, the close policy decides. Removing the
 // selected page selects another by the set's fallback.
 //

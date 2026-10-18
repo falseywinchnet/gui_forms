@@ -873,6 +873,18 @@ PageStrip::ItemParts PageStrip::tab_parts(std::size_t position) const {
     return parts;
 }
 
+PageStrip::ItemParts PageStrip::tab_parts_of(const PageId& page) const {
+    if (pages_ == nullptr) return {};
+    const std::optional<PagePosition> found = (*pages_).find(page);
+    if (!found) return {};
+    const ItemParts parts = tab_parts((*found).value);
+    return parts;
+}
+
+ControlVisualRole PageStrip::tab_family() const noexcept {
+    return ControlVisualRole::menu_item;
+}
+
 // A button's glyph: a square centred in it, on whole units.
 Rect PageStrip::glyph_bounds(Rect button) const {
     const double side = glyph_size * item_extent_scale();
@@ -1013,10 +1025,11 @@ void PageStrip::on_paint(Painter& painter, Rect) {
     part.bounds = placed.rail;
     paint_part(painter, *this, part);
     // Tabs: flat at rest, a plate when hot or selected (the menu-item
-    // family) until T4 draws Plan Paint's tab stack and the notched document
-    // tab (owner decisions DK-40, DK-42). The close button and pin use the
-    // same family for their own plate, shown only while they are hot.
-    part.family = ControlVisualRole::menu_item;
+    // family, tab_family) until T4 draws Plan Paint's tab stack and the
+    // notched document tab (owner decisions DK-40, DK-42). The close button
+    // and pin use the same family for their own plate, shown only while
+    // they are hot.
+    part.family = tab_family();
     part.alignment = PartTextAlignment::center;
     // Labels and the hidden count turn on a side strip (owner decision
     // DK-42); every other part reads the orientation not at all.
@@ -1795,10 +1808,10 @@ void PageStrip::on_pointer(PointerEvent& event) {
 void PageStrip::on_key(KeyEvent& event) {
     if (!focused_ || event.action != KeyAction::down || pages_ == nullptr || (*pages_).count() == 0U) return;
     const std::size_t count = (*pages_).count();
+    // The named commands' keys are the window's (owner decision DK-30): the
+    // host's defaults, as the application rebound them.
+    const KeyMap& keys = effective_key_map();
     const bool plain = event.modifiers == Modifier::none;
-    const bool control_only = event.modifiers == Modifier::control;
-    const bool control_shift = event.modifiers == (Modifier::control | Modifier::shift);
-    const bool page_key = event.physical_key == PhysicalKey::page_down || event.physical_key == PhysicalKey::page_up;
     // Along the row: Left and Right on a top or bottom strip, Up and Down on
     // a side strip.
     const std::uint32_t previous_key = horizontal() ? PhysicalKey::left : PhysicalKey::up;
@@ -1808,9 +1821,10 @@ void PageStrip::on_key(KeyEvent& event) {
         // Escape ends a live reorder with nothing moved; otherwise it is not
         // the strip's.
         if (!cancel_drag()) return;
-    } else if (event.modifiers == Modifier::shift && event.physical_key == PhysicalKey::f10) {
-        // Shift+F10 asks for the keyboard's tab's context menu, anchored at
-        // the corner of the tab on the content's side where reading starts.
+    } else if (keys.matches(KeyCommand::context_menu, event)) {
+        // Shift+F10 or the context-menu key asks for the keyboard's tab's
+        // context menu, anchored at the corner of the tab on the content's
+        // side where reading starts.
         const Rect absolute = absolute_bounds();
         const Rect tab = layout().tabs[current].bounds;
         Point anchor{absolute.x + tab.x, absolute.y + tab.y + tab.height};
@@ -1820,16 +1834,19 @@ void PageStrip::on_key(KeyEvent& event) {
         }
         if (placement_ == PageStripPlacement::right) anchor = {absolute.x + tab.x, absolute.y + tab.y};
         request_context_menu(current, anchor, PageContextMenuCause::keyboard);
-    } else if (control_only && event.physical_key == PhysicalKey::f4) {
-        // Ctrl+F4 closes the selected closable page (owner decision DK-38);
-        // Delete closes nothing.
+    } else if (keys.matches(KeyCommand::close_document, event)) {
+        // Ctrl+F4 (Cmd+W on macOS) closes the selected closable page (owner
+        // decision DK-38); Delete closes nothing.
         const std::optional<PageId> selected = (*pages_).selected_page();
         if (selected) static_cast<void>(request_close(*selected, PageCloseCause::keyboard));
-    } else if (control_shift && page_key) {
-        static_cast<void>(move_selected(event.physical_key == PhysicalKey::page_down ? 1 : -1));
-    } else if (control_only && page_key) {
-        static_cast<void>(select_relative(event.physical_key == PhysicalKey::page_down ? 1 : -1,
-                                          PageSelectionCause::keyboard));
+    } else if (keys.matches(KeyCommand::move_tab_later, event)) {
+        static_cast<void>(move_selected(1));
+    } else if (keys.matches(KeyCommand::move_tab_earlier, event)) {
+        static_cast<void>(move_selected(-1));
+    } else if (keys.matches(KeyCommand::next_tab, event)) {
+        static_cast<void>(select_relative(1, PageSelectionCause::keyboard));
+    } else if (keys.matches(KeyCommand::previous_tab, event)) {
+        static_cast<void>(select_relative(-1, PageSelectionCause::keyboard));
     } else if (plain && event.physical_key == next_key) {
         move_keyboard((current + 1U) % count);
     } else if (plain && event.physical_key == previous_key) {

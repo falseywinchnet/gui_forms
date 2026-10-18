@@ -34,7 +34,9 @@ pages
     The view's set: add, remove, move, select, take and put pages through it.
 strip
     The child strip that shows the tabs; its placement, sizing, activation,
-    overflow, close buttons and mnemonics are set on it.
+    overflow, close buttons and mnemonics are set on it. Hiding it (as a
+    docking tool stack with one panel does) gives the whole view to the
+    content.
 preset
     ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
     The document preset sets the strip's close buttons to
@@ -107,8 +109,11 @@ page added to an empty set is selected at once, subscribe to
 Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab are taken in the bubble phase, so
 when views are nested the innermost view around the focus answers first; a
 view whose `ctrl_tab` is ``pass`` leaves Ctrl+Tab to the views around it.
-Ctrl+F4 (close the selected closable page) and Ctrl+Shift+PageDown and
-Ctrl+Shift+PageUp (move it within its group) are taken the same way.
+Ctrl+F4 (close the selected closable page; Cmd+W on macOS) and
+Ctrl+Shift+PageDown and Ctrl+Shift+PageUp (move it within its group) are
+taken the same way. All of these are the window's named keyboard commands
+(`KeyCommand`), so a host's convention and an application's rebinding reach
+the view.
 
 Closing a page: the strip raises one ``page_close_requested`` per cause (the
 close button, a middle click, Ctrl+F4, the accessibility action). A handler
