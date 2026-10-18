@@ -455,6 +455,10 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
     src/controls/ribbon/ribbon.cpp
+    src/controls/ribbon/ribbon_contextual.cpp
+    src/controls/ribbon/ribbon_application_menu.cpp
+    src/controls/ribbon/ribbon_file_area.cpp
+    src/controls/backstage_view/backstage_view.cpp
     src/controls/ribbon/ribbon_group_popup.cpp
     src/controls/ribbon/ribbon_scaling.cpp
     src/controls/status_strip/status_strip.cpp
@@ -471,7 +475,11 @@ add_library(gui_forms_controls STATIC
     src/controls/notify_icon/notify_icon.cpp
     src/controls/ribbon_gallery/ribbon_gallery.cpp
     src/controls/ribbon_gallery/ribbon_gallery_parts.cpp
+    src/controls/ribbon_font_control/ribbon_font_control.cpp
+    src/controls/ribbon_color_picker/ribbon_color_picker.cpp
     src/controls/commands/gallery_command/gallery_command.cpp
+    src/controls/commands/font_command/font_command.cpp
+    src/controls/commands/color_command/color_command.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_placement/anchored_popup_placement.cpp
     src/controls/panel/anchored_popup_layer/anchored_popup_layer.cpp
     src/controls/scrollable_control/container_control/container_control.cpp
@@ -502,12 +510,15 @@ add_library(gui_forms_controls STATIC
     src/controls/easing_preview/easing_preview.cpp
     src/controls/panel/text_box/text_box.cpp
     src/controls/panel/text_box/text_box_scroll.cpp
+    src/controls/panel/text_box/text_box_auto_complete.cpp
+    src/controls/panel/text_box/auto_complete/auto_complete.cpp
     src/controls/panel/list_box/list_box.cpp
     src/controls/panel/list_box/checked_list_box/checked_list_box.cpp
     src/controls/panel/combo_box/drop_down_layer.cpp
     src/controls/panel/combo_box/combo_box.cpp
     src/controls/panel/up_down/spin_buttons.cpp
     src/controls/panel/domain_up_down/domain_up_down.cpp
+    src/controls/panel/token_box/token_box.cpp
     src/controls/panel/masked_text_box/masked_text_provider/masked_text_provider.cpp
     src/controls/panel/masked_text_box/masked_text_box.cpp
     src/controls/panel/numeric_up_down/numeric_up_down.cpp
@@ -2247,7 +2258,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_live_surface_idle_wake_tests tests/live_surface_idle_wake_tests.cpp)
     target_link_libraries(gui_forms_live_surface_idle_wake_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_live_surface_idle_wake_tests COMMAND gui_forms_live_surface_idle_wake_tests)
-    set_tests_properties(gui_forms_live_surface_idle_wake_tests PROPERTIES TIMEOUT 15)
+    # A hang detector, not a speed budget: the test takes well under a second
+    # alone and must not fail because a loaded machine schedules its threads late.
+    set_tests_properties(gui_forms_live_surface_idle_wake_tests PROPERTIES TIMEOUT 120)
 
     add_executable(gui_forms_threading_tests tests/threading_tests.cpp)
     target_link_libraries(gui_forms_threading_tests PRIVATE gui_forms_core)
@@ -2453,6 +2466,21 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_domain_up_down_tests tests/domain_up_down_tests.cpp)
     target_link_libraries(gui_forms_domain_up_down_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_domain_up_down_tests COMMAND gui_forms_domain_up_down_tests)
+    add_executable(gui_forms_auto_complete_tests tests/auto_complete_tests.cpp)
+    target_link_libraries(gui_forms_auto_complete_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_auto_complete_tests COMMAND gui_forms_auto_complete_tests)
+    add_executable(gui_forms_combo_box_filter_tests tests/combo_box_filter_tests.cpp)
+    target_link_libraries(gui_forms_combo_box_filter_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_combo_box_filter_tests COMMAND gui_forms_combo_box_filter_tests)
+    add_executable(gui_forms_token_box_tests tests/token_box_tests.cpp)
+    target_link_libraries(gui_forms_token_box_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_token_box_tests COMMAND gui_forms_token_box_tests)
+    add_executable(gui_forms_text_box_escape_tests tests/text_box_escape_tests.cpp)
+    target_link_libraries(gui_forms_text_box_escape_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_text_box_escape_tests COMMAND gui_forms_text_box_escape_tests)
+    add_executable(gui_forms_text_box_enter_tests tests/text_box_enter_tests.cpp)
+    target_link_libraries(gui_forms_text_box_enter_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_text_box_enter_tests COMMAND gui_forms_text_box_enter_tests)
 
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
@@ -2544,6 +2572,12 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_scaling_tests tests/ribbon_scaling_tests.cpp)
     target_link_libraries(gui_forms_ribbon_scaling_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_scaling_tests COMMAND gui_forms_ribbon_scaling_tests)
+    add_executable(gui_forms_ribbon_contextual_tests tests/ribbon_contextual_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_contextual_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_contextual_tests COMMAND gui_forms_ribbon_contextual_tests)
+    add_executable(gui_forms_ribbon_file_area_tests tests/ribbon_file_area_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_file_area_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_file_area_tests COMMAND gui_forms_ribbon_file_area_tests)
     add_executable(gui_forms_tool_strip_container_tests tests/tool_strip_container_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_container_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_container_tests COMMAND gui_forms_tool_strip_container_tests)
