@@ -274,7 +274,11 @@ struct RibbonTabChange final {
 // the application's availability calls, tinted from the theme's accent ramp,
 // with the built-in selection rules; modes choose the tabs and groups shown.
 //
-// Not yet: the Quick Access Toolbar, the minimized popup, Backstage,
+// The file area (phase 6): the File tab opens Backstage when the ribbon has
+// one, else the application menu, in two panes while there are recent items.
+//
+// Not yet: hosting the QuickAccessToolbar on the tab row (it is a separate
+// control the application places), the minimized ribbon's temporary popup,
 // right-to-left mirroring and two-line large labels.
 class Ribbon final : public Control {
 public:
@@ -896,6 +900,9 @@ private:
     mutable ScalingKey scaling_key_{};
     mutable std::vector<TabScaling> scaling_{};
     mutable RowMetrics row_metrics_{};
+    // Scratch for the command rectangles place_group fills while only a
+    // width is wanted (state_width, popup_panel_size); its contents mean
+    // nothing between calls, and its capacity is kept for the next.
     mutable std::vector<Rect> scratch_commands_{};
     mutable RibbonScalingCounters counters_{};
     std::size_t first_group_{};
