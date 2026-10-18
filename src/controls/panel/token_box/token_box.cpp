@@ -79,6 +79,8 @@ void TokenBox::initialize_control_tree() {
     (*editor_).set_border_style(BorderStyle::none);
     (*editor_).set_font(font_);
     (*editor_).set_auto_complete_anchor(shared_from_this());
+    // Enter turns the typed text into a token (editor_committed).
+    (*editor_).set_accepts_enter(true);
     add_child(editor_);
     editor_commit_ = (*editor_).committed().subscribe(*this,
         Delegate<const std::string&>::bind<TokenBox, &TokenBox::editor_committed>(*this));

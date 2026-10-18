@@ -425,7 +425,9 @@ struct InstrumentRack::Impl final {
                     this, module_id, field_id,
                     std::weak_ptr<ComboBox>(choice)});
         } else if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
-            // Escape reverts the field (TextFieldCancelled) and goes no further.
+            // Enter commits the field (TextFieldCommitted) and Escape reverts
+            // it (TextFieldCancelled); neither goes further.
+            (*text).set_accepts_enter(true);
             (*text).set_accepts_escape(true);
             state.changed = (*text).text_changed().subscribe(
                 owner, TextFieldChanged{this, module_id, field_id});
