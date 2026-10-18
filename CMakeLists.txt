@@ -144,6 +144,12 @@ add_library(gui_forms_core STATIC
     src/core/xml/xml_characters/xml_characters.cpp
     src/core/xml/xml_reader/xml_reader.cpp
     src/core/xml/xml_writer/xml_writer.cpp
+    src/core/docking/types/dock_types.cpp
+    src/core/docking/dock_split_solver/dock_split_solver.cpp
+    src/core/docking/dock_layout/dock_layout.cpp
+    src/core/docking/dock_layout/dock_layout_edits.cpp
+    src/core/docking/dock_layout/dock_layout_model.cpp
+    src/core/docking/dock_layout/dock_layout_persistence.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -2264,6 +2270,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_xml_tests tests/xml_tests.cpp)
     target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
+
+    add_executable(gui_forms_dock_layout_tests tests/dock_layout_tests.cpp)
+    target_link_libraries(gui_forms_dock_layout_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_dock_layout_tests COMMAND gui_forms_dock_layout_tests)
 
     add_executable(gui_forms_grapheme_conformance_tests
         tests/grapheme_conformance_tests.cpp
