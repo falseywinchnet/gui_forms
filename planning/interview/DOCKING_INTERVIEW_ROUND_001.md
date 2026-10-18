@@ -576,3 +576,22 @@ as PT5) and whether to draft the stage plan. The owner, verbatim:
 Recorded reading: yes to drafting the plan; the two readings stay listed
 as open items in `planning/stages/DK-docking/PLAN.md` until the owner
 confirms them explicitly.
+
+### Note, 2026-10-17: the plan's open items
+
+Asked: (1) the XML reader and writer: a small first-party one for the
+layout's own elements (UTF-8, no DTDs, no external entities, bounded, with
+a fuzz corpus; recommended) or a pinned third-party parser; (2) the
+notched document tab read as the slanted VS 2005 tab of T1-2; (3)
+"pt4-2" read as PT5, icon-only pinned tabs expanding on hover. The owner,
+verbatim:
+
+> agreed, agreed, agreed.
+
+- **GIVEN:** layouts are read and written by a small first-party XML
+  reader and writer: the layout's own element set, UTF-8 only, no DTDs, no
+  external entities, bounded depth and size, fuzzed.
+- **GIVEN PT1 (confirmed).** Document tabs are the notched, slanted VS 2005
+  tab; strip tabs are Plan Paint's tab stack.
+- **GIVEN PT5-2 with hover (confirmed).** Pinned tabs are icon-only and
+  expand to full width on hover.

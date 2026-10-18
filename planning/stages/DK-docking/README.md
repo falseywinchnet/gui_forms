@@ -195,11 +195,13 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     a one-stack floating window, the host's title bar for more; graphite
     seams with a grip; drag proximity lights only the hovered pane.
 42. **The PageView look (PT1 to PT8):** strip tabs in Plan Paint's stack,
-    document tabs notched (slanted, VS 2005; to be confirmed); an open
+    document tabs notched (slanted, VS 2005); an open
     seam; a plated close glyph, the pin replacing close on pinned tabs; a
     dot for `modified`; pinned tabs icon-only, expanding on hover; a count
     on the overflow button; navigation-pane rows in Plan Paint's tab
-    material; side tabs read bottom to top.
+    material; side tabs read bottom to top. Both readings confirmed.
+43. **A first-party XML reader and writer** for layouts: the layout's own
+    element set, UTF-8 only, no DTDs or external entities, bounded, fuzzed.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

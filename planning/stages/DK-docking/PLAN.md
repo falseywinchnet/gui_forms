@@ -1,7 +1,7 @@
 # Docking and PageView: plan
 
 Date: 2026-10-17. Status: **proposed, awaiting the owner's acceptance**,
-which closes stage DK's gate. Sources: decisions 1 to 42 in `README.md`
+which closes stage DK's gate. Sources: decisions 1 to 43 in `README.md`
 (from interview round 001, `planning/interview/DOCKING_INTERVIEW_ROUND_001.md`),
 the studies `DOCKING_STUDY.md` and `PAGEVIEW_STUDY.md`, and the look studies
 (`docking_look_studies_source.html`). Where this plan and a recorded decision
@@ -217,14 +217,11 @@ its fixed splits and shares the parts (decision 36).
 
 ## Open items
 
-- **The XML reader and writer.** GUI.Forms has none. The plan assumes a
-  small first-party reader and writer for the layout's own element set:
-  UTF-8 only, no DTDs, no external entities, bounded depth and size, with a
-  fuzz corpus. A pinned third-party parser instead is an owner decision.
+- **The XML reader and writer** (decided, decision 43): first-party, for
+  the layout's own element set, UTF-8 only, no DTDs or external entities,
+  bounded depth and size, with a fuzz corpus; built in D1.
 - **P4, what "navigation strip" means,** is asked again before P8, with
   mockups of both readings.
-- **Two readings of the taste answers to confirm** (interview part 15): the
-  notched document tab, and "pt4-2" read as PT5.
 
 ## Gate
 
