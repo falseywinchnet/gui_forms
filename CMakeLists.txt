@@ -2214,7 +2214,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_live_surface_idle_wake_tests tests/live_surface_idle_wake_tests.cpp)
     target_link_libraries(gui_forms_live_surface_idle_wake_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_live_surface_idle_wake_tests COMMAND gui_forms_live_surface_idle_wake_tests)
-    set_tests_properties(gui_forms_live_surface_idle_wake_tests PROPERTIES TIMEOUT 15)
+    # A hang detector, not a speed budget: the test takes well under a second
+    # alone and must not fail because a loaded machine schedules its threads late.
+    set_tests_properties(gui_forms_live_surface_idle_wake_tests PROPERTIES TIMEOUT 120)
 
     add_executable(gui_forms_threading_tests tests/threading_tests.cpp)
     target_link_libraries(gui_forms_threading_tests PRIVATE gui_forms_core)
