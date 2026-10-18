@@ -37,14 +37,16 @@ void decode_scalars(std::string_view text, std::vector<char32_t>& scalars) {
 
 [[nodiscard]] std::size_t utf8_length(char32_t value) noexcept {
     if (value <= U'\u007f') return 1U;
-    if (value <= U'߿') return 2U;
-    if (value <= U'￿') return 3U;
+    if (value <= U'\u07ff') return 2U;
+    if (value <= U'\uffff') return 3U;
     return 4U;
 }
 
+// The C0 and C1 controls, DEL, and the line and paragraph separators
+// (U+2028, U+2029): characters a one-line field cannot show.
 [[nodiscard]] bool control_character(char32_t value) noexcept {
     const bool result = value < U' ' || (value >= U'\u007f' && value <= U'\u009f') ||
-                        value == U' ' || value == U' ';
+                        value == U'\u2028' || value == U'\u2029';
     return result;
 }
 
