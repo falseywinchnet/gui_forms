@@ -237,3 +237,22 @@ hover targeting matched what the owner had seen. The owner, verbatim:
   side, and so on. Recorded reading, to be confirmed by a second mockup:
   position still selects the target, and indicator tiles appear over the
   hovered pane, each a dark tile with the resulting region drawn in blue.
+
+### Note, 2026-10-17: the shape indicators
+
+A third mockup closed up the vacated place and drew blue-on-black tiles
+over the hovered pane, either as a cross of five (top, left, tab into,
+right, bottom) or as one tile for the current result, with an optional
+area highlight; window edges showed one tile at the edge's middle. Asked
+which was closer to what the owner had seen. The owner, verbatim:
+
+> essentially, ya, but the split controls only appeared when you brought the new control over the existing control- for each. so you could kinda see how it would work.
+
+- **GIVEN D2, settled.** The split indicators appear only while the dragged
+  panel is over an existing pane, and only for that pane; each pane shows
+  its own as the panel comes over it, so the user sees how the drop would
+  work there. Recorded reading: the set of split choices for that pane
+  (the cross: top, left, tab into, right, bottom), each tile drawing the
+  resulting shape in blue on black, the one the pointer's position selects
+  lit. The area highlight stays as a working assumption until the taste
+  mockups (T2, T3).

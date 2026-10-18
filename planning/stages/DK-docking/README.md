@@ -122,8 +122,9 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     100 units and 220 ms are the starting stamp size and animation.
 25. **Position-sensitive targets (D2):** the target depends on where the
     pointer hovers within a pane (edge bands split, centre tabs into),
-    with the resulting area highlighted, and indicator tiles over the
-    hovered pane depicting the resulting shape in blue on black; the
+    with the resulting area highlighted; a cross of indicator tiles appears
+    only over the pane the dragged panel is over, each tile depicting the
+    resulting shape in blue on black, the selected one lit; the
     window's outer edges are always global targets (D3-1). No drop
     straight to auto-hide (D2a-1).
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
