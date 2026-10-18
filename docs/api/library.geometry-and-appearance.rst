@@ -5,7 +5,7 @@
 Geometry and appearance
 =======================
 
-Geometry, colour and font value types, theme recipes, surface materials and connected-control geometry.
+Geometry, colour and font value types, theme recipes, the theme engine's primitives and deterministic kernels, surface materials and connected-control geometry.
 
 Types
 -----
@@ -38,6 +38,14 @@ Types
      - Immutable owned representations of one logical cursor.
    * - :cpp:class:`DamageRegion <gui_forms::DamageRegion>`
      - DamageRegion incrementally merges exact rectangular unions, preserves disjoint damage up to 64 rectangles, then collapses to one bound with explicit compaction/collapse telemetry.
+   * - :cpp:class:`DeviceExtent <gui_forms::DeviceExtent>`
+     - A raster's size in device pixels.
+   * - :cpp:class:`DeviceScale <gui_forms::DeviceScale>`
+     - Device pixels per logical unit.
+   * - :cpp:class:`EnginePrimitive <gui_forms::EnginePrimitive>`
+     - One kind of effect.
+   * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
+     - The engine version a primitive was introduced in, and the version a theme declares it needs.
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
      - FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
    * - :cpp:class:`GradientStop <gui_forms::GradientStop>`
@@ -58,10 +66,28 @@ Types
      - MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
+   * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
+     - The first defect found and the index of the parameter it concerns.
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
+   * - :cpp:class:`PartRasterView <gui_forms::PartRasterView>`
+     - A borrowed destination for one part's pixels.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
+   * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
+     - A declared upper bound on the work of one rasterization: at most ``per_device_pixel`` arithmetic operations for each destination pixel, plus ``fixed`` for the whole part.
+   * - :cpp:class:`PrimitiveDescriptor <gui_forms::PrimitiveDescriptor>`
+     - What a primitive is.
+   * - :cpp:class:`PrimitiveParameterBlock <gui_forms::PrimitiveParameterBlock>`
+     - The values of one part's parameters: ``count`` live values, one per declared parameter, in declaration order.
+   * - :cpp:class:`PrimitiveParameterDeclaration <gui_forms::PrimitiveParameterDeclaration>`
+     - One declared parameter.
+   * - :cpp:class:`PrimitiveParameterValue <gui_forms::PrimitiveParameterValue>`
+     - One parameter's value.
+   * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
+     - A fixed table of primitives, in registration order.
+   * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
+     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
@@ -394,6 +420,62 @@ Types
    .. cpp:member:: constexpr std::size_t maximum_rectangles
 
       Default: ``64``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DeviceExtent final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   A raster's size in device pixels.
+
+   .. cpp:member:: std::uint32_t width
+
+   .. cpp:member:: std::uint32_t height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DeviceScale final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   Device pixels per logical unit. Kept apart from plain doubles so that a logical length is never passed where a scale is meant (house style §1).
+
+   .. cpp:member:: double value
+
+      Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: EnginePrimitive
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One kind of effect. A primitive is immutable and holds no per-part state: one instance serves every part, on the UI thread.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: RasterOutcome rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, const PartRasterView& destination) const noexcept
+
+      Validates the destination, the target and the parameters once, then fills every pixel of the destination with premultiplied RGBA8. Anything but ``painted`` leaves the destination's bytes unchanged.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual const PrimitiveDescriptor& descriptor() const noexcept = 0
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: EngineVersion final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   The engine version a primitive was introduced in, and the version a theme declares it needs. Versions order by major, then minor.
+
+   .. cpp:member:: std::uint16_t major
+
+   .. cpp:member:: std::uint16_t minor
 
 .. cpp:namespace:: gui_forms
 
@@ -747,6 +829,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: ParameterValidation final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   The first defect found and the index of the parameter it concerns.
+
+   .. cpp:member:: ParameterDefect defect
+
+      Default: ``{ParameterDefect::none}``.
+
+   .. cpp:member:: std::size_t parameter
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartPaint final
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -787,6 +883,20 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartRasterView final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   A borrowed destination for one part's pixels. ``pixels`` is caller-owned and must stay valid for the call that fills it. Row y starts at byte y * row_bytes; the bytes of a row past width * 4 are padding and are never read or written.
+
+   .. cpp:member:: std::span<std::uint8_t> pixels
+
+   .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: std::size_t row_bytes
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Point
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -796,6 +906,138 @@ Types
    .. cpp:member:: double x
 
    .. cpp:member:: double y
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveCost final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   A declared upper bound on the work of one rasterization: at most ``per_device_pixel`` arithmetic operations for each destination pixel, plus ``fixed`` for the whole part. Budgets are checked against it at load (E4).
+
+   .. cpp:member:: std::uint32_t per_device_pixel
+
+   .. cpp:member:: std::uint32_t fixed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveDescriptor final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   What a primitive is. Every span refers to static storage owned by the primitive's translation unit.
+
+   .. cpp:member:: std::string_view name
+
+      Registered (snake_case) name, as theme documents write it.
+
+   .. cpp:member:: EngineVersion introduced
+
+      The engine version that introduced the primitive. A theme needing a later version than the engine implements falls back (E4).
+
+   .. cpp:member:: std::span<const PartRole> roles
+
+      The part roles the primitive paints: at least one.
+
+   .. cpp:member:: std::span<const AnatomyState> states_read
+
+      The published states the primitive's output depends on. A change to any other state never repaints it.
+
+   .. cpp:member:: std::span<const PrimitiveParameterDeclaration> parameters
+
+   .. cpp:member:: PrimitiveCost cost
+
+   .. cpp:member:: Insets outsets
+
+      How far the primitive draws outside the part's bounds, in logical units; zero for a primitive that stays inside them.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveParameterBlock final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   The values of one part's parameters: ``count`` live values, one per declared parameter, in declaration order.
+
+   .. cpp:member:: std::array<PrimitiveParameterValue, maximum_primitive_parameters> values
+
+   .. cpp:member:: std::size_t count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveParameterDeclaration final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for.
+
+   .. cpp:member:: std::string_view name
+
+   .. cpp:member:: PrimitiveParameterKind kind
+
+      Default: ``{PrimitiveParameterKind::number}``.
+
+   .. cpp:member:: double minimum
+
+   .. cpp:member:: double maximum
+
+   .. cpp:member:: double default_number
+
+   .. cpp:member:: Color default_colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveParameterValue final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One parameter's value. ``number`` is read for a number parameter and ``colour`` for a colour parameter.
+
+   .. cpp:member:: PrimitiveParameterKind kind
+
+      Default: ``{PrimitiveParameterKind::number}``.
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: Color colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: PrimitiveRegistry final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   A fixed table of primitives, in registration order. It borrows each primitive, which must outlive the registry; the first-party primitives have static storage.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const EnginePrimitive* const> primitives() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: RegistrationOutcome register_primitive(const EnginePrimitive& primitive) noexcept
+
+      Checks the primitive's descriptor and adds it. Anything but ``registered`` leaves the registry unchanged.
+
+   .. cpp:function:: const EnginePrimitive* find(std::string_view name) const noexcept
+
+      The primitive registered under ``name``, or null.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitiveTarget final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states. The destination's extent is the caller's choice, normally the logical size times the scale, rounded up.
+
+   .. cpp:member:: Size logical_size
+
+   .. cpp:member:: DeviceScale scale
+
+   .. cpp:member:: AnatomyStateSet states
 
 .. cpp:namespace:: gui_forms
 
@@ -1365,6 +1607,38 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ParameterAssignment
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: assigned
+
+   .. cpp:enumerator:: unknown_name
+
+   .. cpp:enumerator:: wrong_kind
+
+   .. cpp:enumerator:: not_finite
+
+   .. cpp:enumerator:: out_of_range
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ParameterDefect
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: wrong_count
+
+   .. cpp:enumerator:: wrong_kind
+
+   .. cpp:enumerator:: not_finite
+
+   .. cpp:enumerator:: out_of_range
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PartMark
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -1417,6 +1691,80 @@ Enumerations
 
    .. cpp:enumerator:: end
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PrimitiveParameterKind
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: number
+
+   .. cpp:enumerator:: colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RasterOutcome
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: painted
+
+   .. cpp:enumerator:: empty
+
+   .. cpp:enumerator:: invalid_view
+
+   .. cpp:enumerator:: invalid_target
+
+   .. cpp:enumerator:: invalid_parameters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RasterViewDefect
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: extent_too_large
+
+   .. cpp:enumerator:: row_bytes_too_small
+
+   .. cpp:enumerator:: row_bytes_not_whole_pixels
+
+   .. cpp:enumerator:: buffer_too_small
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RegistrationOutcome
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: registered
+
+   .. cpp:enumerator:: registry_full
+
+   .. cpp:enumerator:: name_not_snake_case
+
+   .. cpp:enumerator:: duplicate_name
+
+   .. cpp:enumerator:: no_roles
+
+   .. cpp:enumerator:: role_out_of_range
+
+   .. cpp:enumerator:: state_out_of_range
+
+   .. cpp:enumerator:: too_many_parameters
+
+   .. cpp:enumerator:: parameter_name_not_snake_case
+
+   .. cpp:enumerator:: duplicate_parameter_name
+
+   .. cpp:enumerator:: parameter_range_invalid
+
+   .. cpp:enumerator:: default_out_of_range
+
+   .. cpp:enumerator:: introduced_after_engine
+
 Functions, constants and aliases
 --------------------------------
 
@@ -1445,6 +1793,88 @@ Functions, constants and aliases
    Renderer-neutral material composition used by ButtonBase and available to custom controls which need the same explicit connected physical grammar.
 
 .. cpp:function:: Insets connected_surface_visual_outsets(const SurfaceMaterial& material, std::optional<ConnectedControlTopology> topology) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/engine_math/engine_math.hpp>``
+
+.. cpp:function:: double engine_logarithm(double x) noexcept
+
+   Natural logarithm of ``x``. Requires x > 0 and finite; returns NaN for x < 0 or NaN, −infinity for 0, and +infinity for +infinity.
+
+.. cpp:function:: double engine_exponential(double x) noexcept
+
+   e raised to ``x``. Returns 0 below about −745, +infinity above about 709.8, and NaN for NaN.
+
+.. cpp:function:: double engine_power(double base, double exponent) noexcept
+
+   ``base`` raised to ``exponent``, for base ≥ 0. Exact cases: base^0 is 1, 1^exponent is 1, and 0^exponent is 0 for exponent > 0. Returns NaN for a negative or NaN base and for a NaN exponent.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+.. cpp:function:: PrimitiveParameterBlock default_parameters(const PrimitiveDescriptor& descriptor) noexcept
+
+   The block of a descriptor's declared defaults.
+
+.. cpp:function:: ParameterValidation validate_parameters(const PrimitiveDescriptor& descriptor, const PrimitiveParameterBlock& block) noexcept
+
+   Checks every value against its declaration.
+
+.. cpp:function:: std::optional<std::size_t> find_parameter(const PrimitiveDescriptor& descriptor, std::string_view name) noexcept
+
+.. cpp:function:: ParameterAssignment set_number_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, double value) noexcept
+
+   Set one parameter of ``block`` by name. Anything but ``assigned`` leaves the block unchanged.
+
+.. cpp:function:: ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, Color value) noexcept
+
+.. cpp:function:: const char* registration_outcome_name(RegistrationOutcome outcome) noexcept
+
+.. cpp:function:: const PrimitiveRegistry& builtin_primitive_registry()
+
+   The first-party primitives, registered once in a fixed order on first use. The registry and its primitives live for the rest of the program.
+
+.. cpp:var:: constexpr std::size_t maximum_primitive_parameters
+
+   Value: ``24``.
+
+.. cpp:var:: constexpr std::size_t maximum_registered_primitives
+
+   Value: ``64``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/types/engine_types.hpp>``
+
+.. cpp:function:: RasterViewDefect validate_raster_view(const PartRasterView& view) noexcept
+
+   Checks the view's shape against its buffer once, before any kernel runs. An empty extent is valid and has nothing to fill.
+
+.. cpp:function:: const char* raster_view_defect_name(RasterViewDefect defect) noexcept
+
+   Registered (snake_case) name of a defect, for diagnostics.
+
+.. cpp:var:: constexpr EngineVersion current_engine_version
+
+   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1. Value: ``{0, 1}``.
+
+.. cpp:var:: constexpr double minimum_device_scale
+
+   The scales a primitive accepts. Below 0.5 the dithered lattice's dots would collide; above 8 no host reports a display. Value: ``0.5``.
+
+.. cpp:var:: constexpr double maximum_device_scale
+
+   Value: ``8.0``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_part_raster_side
+
+   The largest part raster, per side. Parts are small; the bound keeps every size product far inside std::size_t. Value: ``16384``.
+
+.. cpp:var:: constexpr std::size_t part_raster_bytes_per_pixel
+
+   Bytes in one pixel: red, green, blue, alpha in that memory order, each premultiplied by alpha (red, green and blue never exceed alpha). Value: ``4``.
 
 .. cpp:namespace:: gui_forms
 

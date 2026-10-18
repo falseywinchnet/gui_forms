@@ -20,6 +20,7 @@
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
 #include "gui_forms/drawing.hpp"
+#include "gui_forms/engine.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/events.hpp"
 #include "gui_forms/feedback.hpp"

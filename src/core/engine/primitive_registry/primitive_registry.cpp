@@ -1,0 +1,197 @@
+#include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
+
+#include "gui_forms/schema/types/schema_types.hpp"
+#include "../primitives/bulge/bulge_primitives.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+
+namespace gui_forms {
+namespace {
+
+bool number_in_range(const PrimitiveParameterDeclaration& declaration, double value) noexcept {
+    const bool inside = value >= declaration.minimum && value <= declaration.maximum;
+    return inside;
+}
+
+PrimitiveParameterValue default_value(const PrimitiveParameterDeclaration& declaration) noexcept {
+    const PrimitiveParameterValue value{declaration.kind, declaration.default_number, declaration.default_colour};
+    return value;
+}
+
+bool target_in_range(const PrimitiveTarget& target) noexcept {
+    const Size size = target.logical_size;
+    const double scale = target.scale.value;
+    if (!std::isfinite(size.width) || !std::isfinite(size.height) || !std::isfinite(scale)) return false;
+    if (size.width <= 0.0 || size.height <= 0.0) return false;
+    // A part's box is bounded like its raster, so no kernel loop runs away.
+    const double largest = static_cast<double>(maximum_part_raster_side);
+    if (size.width > largest || size.height > largest) return false;
+    const bool scale_in_range = scale >= minimum_device_scale && scale <= maximum_device_scale;
+    return scale_in_range;
+}
+
+RegistrationOutcome check_parameters(const PrimitiveDescriptor& descriptor) noexcept {
+    const std::span<const PrimitiveParameterDeclaration> parameters = descriptor.parameters;
+    if (parameters.size() > maximum_primitive_parameters) return RegistrationOutcome::too_many_parameters;
+    for (std::size_t index = 0U; index < parameters.size(); ++index) {
+        const PrimitiveParameterDeclaration& declaration = parameters[index];
+        if (!is_registered_name(declaration.name)) return RegistrationOutcome::parameter_name_not_snake_case;
+        for (std::size_t earlier = 0U; earlier < index; ++earlier) {
+            if (parameters[earlier].name == declaration.name) return RegistrationOutcome::duplicate_parameter_name;
+        }
+        if (declaration.kind != PrimitiveParameterKind::number) continue;
+        const bool finite = std::isfinite(declaration.minimum) && std::isfinite(declaration.maximum);
+        if (!finite || declaration.minimum > declaration.maximum) return RegistrationOutcome::parameter_range_invalid;
+        if (!number_in_range(declaration, declaration.default_number)) return RegistrationOutcome::default_out_of_range;
+    }
+    return RegistrationOutcome::registered;
+}
+
+RegistrationOutcome check_descriptor(const PrimitiveDescriptor& descriptor) noexcept {
+    if (!is_registered_name(descriptor.name)) return RegistrationOutcome::name_not_snake_case;
+    if (descriptor.roles.empty()) return RegistrationOutcome::no_roles;
+    for (const PartRole role : descriptor.roles) {
+        if (static_cast<std::size_t>(role) >= part_role_count) return RegistrationOutcome::role_out_of_range;
+    }
+    for (const AnatomyState state : descriptor.states_read) {
+        if (static_cast<std::size_t>(state) >= anatomy_state_count) return RegistrationOutcome::state_out_of_range;
+    }
+    if (current_engine_version < descriptor.introduced) return RegistrationOutcome::introduced_after_engine;
+    const RegistrationOutcome parameters = check_parameters(descriptor);
+    return parameters;
+}
+
+// The first-party primitives. Static storage: they outlive every registry
+// that borrows them.
+const engine_primitives::BulgePrimitive bulge_primitive{};
+const engine_primitives::DitheredBulgePrimitive dithered_bulge_primitive{};
+
+PrimitiveRegistry make_builtin_registry() {
+    PrimitiveRegistry registry{};
+    const RegistrationOutcome bulge = registry.register_primitive(bulge_primitive);
+    const RegistrationOutcome dithered = registry.register_primitive(dithered_bulge_primitive);
+    // A first-party descriptor that fails its own checks is a defect of this
+    // build, not a runtime condition.
+    if (bulge != RegistrationOutcome::registered || dithered != RegistrationOutcome::registered) std::abort();
+    return registry;
+}
+
+} // namespace
+
+PrimitiveParameterBlock default_parameters(const PrimitiveDescriptor& descriptor) noexcept {
+    PrimitiveParameterBlock block{};
+    const std::size_t count = std::min(descriptor.parameters.size(), maximum_primitive_parameters);
+    for (std::size_t index = 0U; index < count; ++index) {
+        block.values[index] = default_value(descriptor.parameters[index]);
+    }
+    block.count = count;
+    return block;
+}
+
+ParameterValidation validate_parameters(const PrimitiveDescriptor& descriptor,
+                                        const PrimitiveParameterBlock& block) noexcept {
+    if (block.count != descriptor.parameters.size() || block.count > maximum_primitive_parameters) {
+        return ParameterValidation{ParameterDefect::wrong_count, 0U};
+    }
+    for (std::size_t index = 0U; index < block.count; ++index) {
+        const PrimitiveParameterDeclaration& declaration = descriptor.parameters[index];
+        const PrimitiveParameterValue& value = block.values[index];
+        if (value.kind != declaration.kind) return ParameterValidation{ParameterDefect::wrong_kind, index};
+        if (declaration.kind != PrimitiveParameterKind::number) continue;
+        if (!std::isfinite(value.number)) return ParameterValidation{ParameterDefect::not_finite, index};
+        if (!number_in_range(declaration, value.number)) return ParameterValidation{ParameterDefect::out_of_range, index};
+    }
+    return ParameterValidation{};
+}
+
+std::optional<std::size_t> find_parameter(const PrimitiveDescriptor& descriptor, std::string_view name) noexcept {
+    for (std::size_t index = 0U; index < descriptor.parameters.size(); ++index) {
+        if (descriptor.parameters[index].name == name) return index;
+    }
+    return std::nullopt;
+}
+
+ParameterAssignment set_number_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor,
+                                         std::string_view name, double value) noexcept {
+    const std::optional<std::size_t> index = find_parameter(descriptor, name);
+    if (!index || *index >= block.count) return ParameterAssignment::unknown_name;
+    const PrimitiveParameterDeclaration& declaration = descriptor.parameters[*index];
+    if (declaration.kind != PrimitiveParameterKind::number) return ParameterAssignment::wrong_kind;
+    if (!std::isfinite(value)) return ParameterAssignment::not_finite;
+    if (!number_in_range(declaration, value)) return ParameterAssignment::out_of_range;
+    block.values[*index].number = value;
+    return ParameterAssignment::assigned;
+}
+
+ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor,
+                                         std::string_view name, Color value) noexcept {
+    const std::optional<std::size_t> index = find_parameter(descriptor, name);
+    if (!index || *index >= block.count) return ParameterAssignment::unknown_name;
+    const PrimitiveParameterDeclaration& declaration = descriptor.parameters[*index];
+    if (declaration.kind != PrimitiveParameterKind::colour) return ParameterAssignment::wrong_kind;
+    block.values[*index].colour = value;
+    return ParameterAssignment::assigned;
+}
+
+RasterOutcome EnginePrimitive::rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
+                                         const PartRasterView& destination) const noexcept {
+    if (validate_raster_view(destination) != RasterViewDefect::none) return RasterOutcome::invalid_view;
+    if (!target_in_range(target)) return RasterOutcome::invalid_target;
+    const ParameterValidation validation = validate_parameters(descriptor(), parameters);
+    if (validation.defect != ParameterDefect::none) return RasterOutcome::invalid_parameters;
+    if (destination.extent.width == 0U || destination.extent.height == 0U) return RasterOutcome::empty;
+    fill(parameters, target, destination);
+    return RasterOutcome::painted;
+}
+
+const char* registration_outcome_name(RegistrationOutcome outcome) noexcept {
+    switch (outcome) {
+    case RegistrationOutcome::registered: return "registered";
+    case RegistrationOutcome::registry_full: return "registry_full";
+    case RegistrationOutcome::name_not_snake_case: return "name_not_snake_case";
+    case RegistrationOutcome::duplicate_name: return "duplicate_name";
+    case RegistrationOutcome::no_roles: return "no_roles";
+    case RegistrationOutcome::role_out_of_range: return "role_out_of_range";
+    case RegistrationOutcome::state_out_of_range: return "state_out_of_range";
+    case RegistrationOutcome::too_many_parameters: return "too_many_parameters";
+    case RegistrationOutcome::parameter_name_not_snake_case: return "parameter_name_not_snake_case";
+    case RegistrationOutcome::duplicate_parameter_name: return "duplicate_parameter_name";
+    case RegistrationOutcome::parameter_range_invalid: return "parameter_range_invalid";
+    case RegistrationOutcome::default_out_of_range: return "default_out_of_range";
+    case RegistrationOutcome::introduced_after_engine: return "introduced_after_engine";
+    }
+    return "unknown";
+}
+
+RegistrationOutcome PrimitiveRegistry::register_primitive(const EnginePrimitive& primitive) noexcept {
+    const PrimitiveDescriptor& descriptor = primitive.descriptor();
+    const RegistrationOutcome checked = check_descriptor(descriptor);
+    if (checked != RegistrationOutcome::registered) return checked;
+    if (find(descriptor.name) != nullptr) return RegistrationOutcome::duplicate_name;
+    if (count_ == maximum_registered_primitives) return RegistrationOutcome::registry_full;
+    entries_[count_] = &primitive;
+    count_ = count_ + 1U;
+    return RegistrationOutcome::registered;
+}
+
+const EnginePrimitive* PrimitiveRegistry::find(std::string_view name) const noexcept {
+    for (std::size_t index = 0U; index < count_; ++index) {
+        const EnginePrimitive* const entry = entries_[index];
+        if ((*entry).descriptor().name == name) return entry;
+    }
+    return nullptr;
+}
+
+std::span<const EnginePrimitive* const> PrimitiveRegistry::primitives() const noexcept {
+    const std::span<const EnginePrimitive* const> live(entries_.data(), count_);
+    return live;
+}
+
+const PrimitiveRegistry& builtin_primitive_registry() {
+    static const PrimitiveRegistry registry = make_builtin_registry();
+    return registry;
+}
+
+} // namespace gui_forms
