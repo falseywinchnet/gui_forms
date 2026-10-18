@@ -698,6 +698,80 @@ void documents_by_recent_use() {
             "Ctrl+Shift+F6 steps back along the run");
 }
 
+// Where dragging meets auto-hide (phase D5): an auto-hidden stack dragged
+// out of its flyout by the caption; Escape leaves it auto-hidden and the
+// layout byte-identical; a drop docks it in one transaction. And a window
+// shrinking under a drag collapses stacks behind side tabs, the targets
+// following, the drag going on.
+void auto_hide_meets_dragging() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockSite& site = *(*fixture).site;
+    DockWorkspace& workspace = *(*fixture).workspace;
+    Window& window = *(*fixture).window;
+    PresentationSettings settings = window.presentation_settings();
+    settings.reduced_motion = true;
+    window.set_presentation_settings(settings);
+    require(site.run_position_command(DockPanelId("properties"), DockPositionCommand::auto_hide) &&
+                workspace.layout().locate(DockPanelId("properties")).placement == DockPlacementKind::auto_hidden,
+            "Properties is auto-hidden");
+    window.perform_layout();
+    const std::string pinned = saved(workspace);
+    const std::size_t changes = (*fixture).changes;
+    const DockNodeId stack = stack_of(workspace, "properties");
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        require(site.open_flyout(DockPanelId("properties"), DockFlyoutCause::programmatic), "the flyout opens");
+        window.perform_layout();
+        const Point from = centre(caption_of(site, stack));
+        press(window, from);
+        move(window, {from.x - 10.0, from.y + 10.0});
+        require(site.drag_phase() == DockDragPhase::dragging && (*site.drag_subject()).stack == stack &&
+                    !site.flyout_open(),
+                "the flyout's caption drags its stack out, closing the flyout");
+        const Point output = centre(stack_bounds(site, stack_of(workspace, "output")));
+        move(window, output);
+        require(site.drag_target() && (*site.drag_target()).zone == DockDropZone::center, "over Output's middle");
+        if (attempt == 0) {
+            require(key(window, PhysicalKey::escape), "Escape is taken");
+            settle(window);
+            require(saved(workspace) == pinned && (*fixture).changes == changes &&
+                        workspace.layout().locate(DockPanelId("properties")).placement == DockPlacementKind::auto_hidden,
+                    "after Escape the stack is still auto-hidden and the layout is as it was");
+            continue;
+        }
+        release(window, output);
+        settle(window);
+        require((*fixture).changes == changes + 1U &&
+                    workspace.layout().locate(DockPanelId("properties")).placement == DockPlacementKind::docked &&
+                    stack_of(workspace, "properties") == stack_of(workspace, "output") &&
+                    workspace.layout().state().auto_hidden.empty(),
+                "a drop docks the auto-hidden stack in one transaction");
+    }
+    require(static_cast<bool>(workspace.layout().check_invariants()), "the layout stays valid");
+
+    // The window shrinks during a drag.
+    std::unique_ptr<Fixture> shrinking = make_fixture();
+    DockSite& small_site = *(*shrinking).site;
+    Window& small_window = *(*shrinking).window;
+    const std::string before = saved(*(*shrinking).workspace);
+    drag_caption(*shrinking, "output", {400.0, 200.0});
+    small_window.resize({250.0, 260.0});
+    small_window.perform_layout();
+    require(small_site.drag_phase() == DockDragPhase::dragging && !small_site.collapsed_stacks().empty() &&
+                !small_site.drag_panes().empty(),
+            "stacks collapse behind side tabs under the drag, which goes on over the panes left");
+    for (const DockDropPane& pane : small_site.drag_panes()) {
+        for (const DockNodeId collapsed : small_site.collapsed_stacks()) {
+            require(!(pane.node == collapsed), "a collapsed stack is no pane");
+        }
+    }
+    require(key(small_window, PhysicalKey::escape), "Escape is taken");
+    settle(small_window);
+    small_window.resize({800.0, 500.0});
+    small_window.perform_layout();
+    require(saved(*(*shrinking).workspace) == before && (*shrinking).changes == 0U && small_site.collapsed_stacks().empty(),
+            "the layout is as it was and the stacks are back");
+}
+
 } // namespace
 
 int main() {
@@ -711,6 +785,7 @@ int main() {
     keyboard_reaches_every_target();
     restrictions_refuse_targets();
     documents_by_recent_use();
+    auto_hide_meets_dragging();
     std::cout << "DockSite dragging: geometry, the target table, threshold, Escape, capture loss, deactivation, "
                  "layout changes, invalid drops, Ctrl, one transaction per drop, the stamp, tab drags, the "
                  "keyboard move mode and restrictions passed\n";

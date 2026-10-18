@@ -1598,6 +1598,9 @@ Properties beyond every control's: none.
 | `drag_stamp_label` | label |  |  |
 | `drop_area` | drop |  | drop_accepted |
 | `drop_cue` | indicator |  | drop_rejected |
+| `flyout_shadow` | shadow |  |  |
+| `flyout_face` | face |  |  |
+| `flyout_grip` | grip |  | hot, captured |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
@@ -1642,6 +1645,7 @@ Properties beyond every control's: none.
 | Interaction | Payload |
 |---|---|
 | `drag_ended` | `DockDragOutcome` |
+| `flyout_changed` | `DockFlyoutChange` |
 
 ## `dock_navigator` (DockNavigator, control)
 

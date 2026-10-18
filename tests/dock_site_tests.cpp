@@ -270,9 +270,9 @@ void anatomy_and_parts() {
                 near(caption.caption_key.bounds.width, 7.0) && near(caption.caption_menu.bounds.width, 16.0) &&
                 caption.caption_pin.present && caption.caption_close.present &&
                 caption.caption_pin.states.contains(AnatomyState::checked) &&
-                caption.caption_pin.states.contains(AnatomyState::disabled) &&
+                !caption.caption_pin.states.contains(AnatomyState::disabled) &&
                 caption.caption_pin_glyph.states.contains(AnatomyState::checked),
-            "a tool stack's caption carries the key, the label and three buttons, the pin checked and disabled");
+            "a tool stack's caption carries the key, the label and three buttons, the pin checked and enabled");
     require(caption.caption_menu.bounds.x < caption.caption_pin.bounds.x &&
                 caption.caption_pin.bounds.x < caption.caption_close.bounds.x &&
                 near(caption.caption_close.bounds.x + 16.0 + 3.0,
@@ -486,7 +486,15 @@ void collapse_by_priority() {
     window.perform_layout();
     collapsed = site.collapsed_stacks();
     require(collapsed.size() == 3U, "at the smallest only the documents remain");
-    require(site.parts().document_area.bounds.width > 199.0, "the documents take the whole width");
+    // The collapsed stacks wait behind side tabs (phase D5), whose bands the
+    // documents leave free.
+    double bands = 0.0;
+    for (const DockSide edge : {DockSide::left, DockSide::right}) {
+        const std::shared_ptr<PageStrip> strip = site.side_strip(edge);
+        if (strip) bands += (*strip).absolute_bounds().width;
+    }
+    require(bands > 0.0 && site.parts().document_area.bounds.width + bands > 199.0,
+            "the documents take the whole width between the side strips");
     window.resize({800.0, 500.0});
     window.perform_layout();
     require(site.collapsed_stacks().empty() &&
@@ -748,12 +756,12 @@ void position_menu() {
     Window& window = *(*fixture).window;
     const DockPanelId properties("properties");
     require(!site.position_command_enabled(properties, DockPositionCommand::float_panel) &&
-                !site.position_command_enabled(properties, DockPositionCommand::auto_hide) &&
+                site.position_command_enabled(properties, DockPositionCommand::auto_hide) &&
                 !site.position_command_enabled(properties, DockPositionCommand::dock) &&
                 site.position_command_enabled(properties, DockPositionCommand::dock_as_document) &&
                 site.position_command_enabled(properties, DockPositionCommand::hide) &&
                 site.position_command_enabled(properties, DockPositionCommand::close),
-            "a docked tool panel may dock as a document, hide or close; Float and Auto Hide wait");
+            "a docked tool panel may auto-hide, dock as a document, hide or close; Float waits");
     require(!site.position_command_enabled(DockPanelId("output"), DockPositionCommand::dock_as_document),
             "a panel without dock-as-document may not join the documents");
     // Alt+Hyphen opens the active panel's menu.

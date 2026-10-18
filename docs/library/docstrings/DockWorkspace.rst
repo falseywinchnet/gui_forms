@@ -31,6 +31,10 @@ document_history
     The placed documents that have been active, most recent first.
 site : default none
     The `DockSite` showing the workspace, or none.
+flyout_opening : default ``DockFlyoutOpening::hover_or_click``
+    What opens an auto-hidden panel's flyout from its side tab (owner
+    decision DK-27, E1-1): resting the pointer on the tab or clicking it, or
+    (``click``) only clicking it.
 
 Events
 ------
@@ -70,7 +74,10 @@ create_panel_content
 activate_panel
     Makes a panel docked in the main site active: selects it in its stack,
     creates its content, moves focus into it through the site and updates
-    the tracks. False, changing nothing, for any other panel.
+    the tracks. A panel behind a side tab (auto-hidden, or in a stack
+    collapsed by shrinking) opens in its flyout with focus inside; an
+    auto-hidden stack's selection is not edited. False, changing nothing,
+    for any other panel.
 
 See Also
 --------
@@ -81,9 +88,10 @@ DockNavigator : The Ctrl+Tab switcher over the two histories.
 Notes
 -----
 Lazy creation (owner decision DK-34): a factory runs the first time its
-panel is shown selected in a stack the site shows. A panel behind another
-tab, hidden, in a collapsed stack, floating or auto-hidden (phases D4 and D5
-show those) is not created. Hiding keeps the content; closing releases it,
+panel is shown selected in a stack the site shows or in a flyout. A panel
+behind another tab, hidden, behind a side tab whose flyout has not opened,
+in a stack hidden by the maximized document area, or floating (phase D4
+shows those) is not created. Hiding keeps the content; closing releases it,
 and a closed panel shown again is built again by its factory.
 
 Command routing (owner decision DK-29): the workspace names, on its site's

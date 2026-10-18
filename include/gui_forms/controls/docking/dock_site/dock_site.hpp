@@ -11,6 +11,7 @@
 #include "gui_forms/window.hpp"
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -23,9 +24,10 @@
 namespace gui_forms {
 
 // The rows of a panel's position menu (owner decision DK-30; docking study
-// 5.7). Float waits for floating windows (phase D4) and Auto Hide for
-// auto-hide (phase D5); both are listed, disabled. Move starts the keyboard
-// move mode (phase D3, G3-1).
+// 5.7). Float waits for floating windows (phase D4) and is listed, disabled.
+// Auto Hide pins a root-level tool stack out to the nearest window edge; for
+// an auto-hidden panel Dock returns its stack to where it stood. Move starts
+// the keyboard move mode (phase D3, G3-1).
 enum class DockPositionCommand : std::uint8_t {
     float_panel,
     dock,
@@ -59,6 +61,43 @@ struct DockDragOutcome final {
     DockTransactionResult result{};
 };
 
+// Why a flyout opened or closed (DockFlyoutChange; owner decision DK-27,
+// docking study 5.5).
+enum class DockFlyoutCause : std::uint8_t {
+    // Opening: the pointer rested on a side tab for the hover delay.
+    hover,
+    // Opening: a side tab was clicked. Closing: the caption's close or pin.
+    pointer,
+    // Opening: Enter or Space on a side tab, or the tab's accessibility
+    // action.
+    keyboard,
+    // open_flyout and close_flyout, or activating the panel.
+    programmatic,
+    // Closing: the pointer left a flyout that does not have focus, for the
+    // leave delay.
+    pointer_left,
+    // Closing: a press outside the flyout and the side strips (it goes on to
+    // what was pressed).
+    outside_press,
+    // Closing: focus left a flyout that had it.
+    focus_lost,
+    // Closing: Escape inside the flyout; focus returns to where it was.
+    escape,
+    // Closing: another side tab's flyout replaced it.
+    swapped,
+    // Closing: the layout changed so that the panel is no longer behind a
+    // side tab (docked back, hidden, closed, or its collapsed stack has room
+    // again).
+    layout,
+};
+
+// Raised after a flyout opened (open true) or closed.
+struct DockFlyoutChange final {
+    DockPanelId panel{};
+    bool open{};
+    DockFlyoutCause cause{DockFlyoutCause::programmatic};
+};
+
 // The main window's part of a docking layout, in one window (stage DK phase
 // D2; owner decisions DK-18 to DK-23, DK-28 to DK-30, DK-41): binary splits
 // separated by seams, tool stacks with captions, and the one document area
@@ -72,17 +111,51 @@ struct DockDragOutcome final {
 // selection; tool stacks show their tabs at the bottom only when they hold
 // two or more panels, document stacks at the top. A panel's content is its
 // workspace control, created when the panel is first shown selected (lazy
-// creation). Floating sites and auto-hidden stacks are not realized until
-// phases D4 and D5.
+// creation). Floating sites are not realized until phase D4.
 //
+// Auto-hide (stage DK phase D5; owner decisions DK-27, DK-28, DK-41, DK-42):
+// each window edge holding auto-hidden panels shows a side strip, a PageStrip
+// (`<site id>.side.<edge>`) with one tab per panel, the auto-hidden stacks in
+// layout order and their panels in stack order; left and right strips turn
+// their labels (bottom to top on the left, top to bottom on the right). The
+// strips take their band from the site's edges, left and right the full
+// height and top and bottom between them; the tree is laid out in what
+// remains. A side tab opens its panel's flyout: an in-window overlay that
+// slides out from the strip over the tree in `flyout_slide_duration`
+// (linear until the motion of stage T2; at once under reduced motion),
+// casting the overlay shadow, holding the stack's caption (its pin unchecked
+// for an auto-hidden stack), the panel and a grip on its inner edge. The
+// flyout opens when the pointer rests on a tab for `flyout_hover_delay`
+// (unless the workspace's flyout_opening is click), at once on a click, or
+// on Enter or Space on a focused tab (each strip is a focus region; its
+// arrow keys move without opening). Opened by click, keyboard or program,
+// focus moves into the panel; opened by hover, focus stays where it was
+// until the user clicks inside. A flyout without focus closes
+// `flyout_leave_delay` after the pointer leaves it and its tab; one with
+// focus stays until focus leaves it. A press outside the flyout and the
+// strips closes it and goes on to what was pressed. Escape inside closes it
+// and returns focus to the control that had it before (not a side strip),
+// else to the active document. The grip resizes the flyout within the tree's
+// extent; the new extent lasts for the session (the layout is not edited).
+// Opening, resizing and closing a flyout never edit the layout: a group's
+// side tab shows that panel without changing the stack's selection.
+//
+// The pin of a root-level tool stack's caption auto-hides the whole stack
+// (E4-1) as one user transaction, onto the window edge nearest the stack,
+// with the stack's extent across that edge; the pin of a flyout of an
+// auto-hidden stack returns the stack to where it stood (DockEdit::unpin),
+// so a pin and an unpin with nothing between leave the layout exactly as it
+// was.
+//
+
 // Parts: seams (item system `seam`), 3 units, with a grip of dots, between
 // the two children of each split; a seam is dragged with the pointer or,
 // while the site has focus, moved with the arrow keys (Tab and Shift+Tab
 // step between seams), within both sides' minimums (DockLayout's solver).
 // Each tool stack has a caption (item system `stack`): the identity key,
 // the selected panel's title, the position menu, the pin (root-level items
-// only, owner decision DK-28: checked while docked, disabled until D5) and
-// close (which hides the panel). The caption of the stack holding the
+// only, owner decision DK-28: checked while docked; pressing it auto-hides
+// the stack) and close (which hides the panel). The caption of the stack holding the
 // active panel is `current`: the look (a pale tint with a 2-unit accent line
 // on top, decision DK-41) is the default theme's (T4); until then it paints
 // through paint_part with today's recipes.
@@ -90,14 +163,19 @@ struct DockDragOutcome final {
 // Shrinking: when the site is smaller than the tree's minimum, tool stacks
 // collapse in increasing collapse priority (the largest priority of their
 // panels; ties collapse the later stack in tree order first) until the rest
-// fits (owner decision DK-23). Until auto-hide exists (D5) a collapsed stack
-// is hidden in place: the layout model is unchanged and its panels keep
-// their places, and the stack returns when room returns. A stack whose
-// collapse would not reduce the shortfall is kept.
+// fits (owner decision DK-23). A collapsed stack goes behind side tabs on
+// the window edge nearest the place it would have in the tree, as if
+// auto-hidden, and opens in a flyout like one; the layout model is unchanged
+// (the stack stays docked, its flyout's pin checked: pressing it auto-hides
+// the stack for good), and the stack returns to the tree when room returns.
+// The side strips' bands are taken before the collapse is planned, so a
+// collapse that adds a strip is planned again with that band. A stack whose
+// collapse would not reduce the shortfall is kept. The maximized document
+// area hides the tool stacks in place, without side tabs.
 //
 // Keyboard (owner decision DK-30), while focus is in the site: F6 and
 // Shift+F6 move between the stacks (each a focus region of the window, in
-// tree order); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
+// tree order) and then the side strips (left, top, right, bottom); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
 // documents, Alt+F7 and Alt+Shift+F7 on the tool panels, and releasing the
 // modifier activates the current row; Ctrl+F6 and Ctrl+Shift+F6 activate the
 // next and previous document in most-recently-used order (DK-46); Escape
@@ -155,6 +233,10 @@ struct DockDragOutcome final {
 // the announcement (drag_announcement, also the site's semantic
 // description while a drag runs). Enter commits through the same
 // transaction as a drop; Escape cancels.
+// position as the value and increment, decrement and set_value. A side strip
+// is a tab list (vertical on the left and right) named "Auto-hidden panels";
+// an open flyout's stack is a `pane` named by its panel, with the caption's
+// buttons (the pin a check box, checked while the stack is docked).
 class DockSite : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -183,7 +265,8 @@ public:
 
     // The PageView realizing a stack of the main site, or null.
     [[nodiscard]] std::shared_ptr<PageView> stack_view(DockNodeId stack) const;
-    // The realized stacks in tree order, collapsed ones included.
+    // The realized stacks in tree order, collapsed ones included, then the
+    // auto-hidden stacks in layout order.
     [[nodiscard]] std::vector<DockNodeId> realized_stacks() const;
     // The tool stacks hidden by shrinking or by the maximized document area,
     // after the last layout pass, in the order they collapsed.
@@ -265,6 +348,40 @@ public:
     // Raised once when a drag that left the armed phase ends, after the
     // layout transaction of a drop.
     [[nodiscard]] Event<const DockDragOutcome&>& drag_ended() noexcept { return drag_ended_; }
+    // -- auto-hide (phase D5) --
+    // The pointer's rest on a side tab before its flyout opens, the leave
+    // delay before an unfocused flyout closes, and the slide's duration
+    // (owner decisions DK-27 and DK-41; docking study 5.5).
+    static constexpr std::chrono::milliseconds flyout_hover_delay{400};
+    static constexpr std::chrono::milliseconds flyout_leave_delay{500};
+    static constexpr std::chrono::milliseconds flyout_slide_duration{180};
+    // The side strip on an edge, or null while that edge has no side tabs.
+    [[nodiscard]] std::shared_ptr<PageStrip> side_strip(DockSide edge) const;
+    // The panels behind side tabs on an edge, in tab order: auto-hidden
+    // stacks', then collapsed stacks'.
+    [[nodiscard]] std::vector<DockPanelId> side_panels(DockSide edge) const;
+    // Opens the flyout of a panel behind a side tab (closing another
+    // flyout first, cause swapped). Focus moves into the panel unless the
+    // cause is hover. True when the flyout is open for the panel afterwards;
+    // false, changing nothing, for a panel behind no side tab or a detached
+    // site.
+    bool open_flyout(const DockPanelId& panel, DockFlyoutCause cause = DockFlyoutCause::programmatic);
+    void close_flyout(DockFlyoutCause cause = DockFlyoutCause::programmatic) noexcept;
+    [[nodiscard]] bool flyout_open() const noexcept { return flyout_panel_.has_value(); }
+    // The panel the flyout shows, or none.
+    [[nodiscard]] const std::optional<DockPanelId>& flyout_panel() const noexcept { return flyout_panel_; }
+    // How far the flyout has slid out, from 0 to 1 (1 while closed).
+    [[nodiscard]] double flyout_reveal() const noexcept { return flyout_progress_; }
+    // The open flyout's extent across its edge, in logical units, or 0.
+    [[nodiscard]] double flyout_extent() const;
+    // Sets the open flyout's extent, as its grip does, within the tree's
+    // extent; it lasts for the session. False when no flyout is open or the
+    // extent is not finite.
+    bool resize_flyout(double extent);
+    // The flyout's root control while it is open (an overlay of the window),
+    // or null.
+    [[nodiscard]] Control::Ptr flyout_control() const noexcept;
+    [[nodiscard]] Event<const DockFlyoutChange&>& flyout_changed() noexcept { return flyout_changed_; }
 
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
@@ -298,6 +415,13 @@ public:
         PartGeometry drag_stamp_label;
         PartGeometry drop_area;
         PartGeometry drop_cue;
+        // The open flyout, in the site's coordinates as it stands in its
+        // slide: its overlay shadow, its face and the grip on its inner edge
+        // (hot and captured as the pointer is on it or drags it). Absent
+        // while no flyout is open.
+        PartGeometry flyout_shadow;
+        PartGeometry flyout_face;
+        PartGeometry flyout_grip;
     };
     [[nodiscard]] Parts parts() const;
     // Item system seam: the bar between a split's two children and its grip.
@@ -369,9 +493,9 @@ public:
         TileParts parts;
         TileStates states;
     };
-    // The seams, then the stacks that are not collapsed, in tree order;
-    // then, while dragging, the tiles (the hovered pane's cross, then the
-    // edges).
+    // The seams, then the stacks that are not collapsed, in tree order, then
+    // the open flyout's stack (its caption in the site's coordinates); then,
+    // while dragging, the tiles (the hovered pane's cross, then the edges).
     [[nodiscard]] std::vector<Seam> realized_seams() const;
     [[nodiscard]] std::vector<Stack> realized_stack_items() const;
     [[nodiscard]] std::vector<Tile> realized_tiles() const;
@@ -395,9 +519,14 @@ private:
     friend class DockWorkspace;
     class StackView;
     class DragLayer;
+    class Flyout;
+    struct SlideTick;
+    struct HoverElapsed;
+    struct LeaveElapsed;
+    struct StaleFlyout;
 
-    // What the pointer or a press is on.
-    enum class Zone : std::uint8_t { none, seam, caption, menu, pin, close };
+    // What the pointer or a press is on; grip only in the flyout.
+    enum class Zone : std::uint8_t { none, seam, caption, menu, pin, close, grip };
     struct Hit final {
         Zone zone{Zone::none};
         // The seam's index for Zone::seam; the stack's index in stacks_ for
@@ -414,7 +543,12 @@ private:
         }
     };
     // One realized stack and its view. `collapsed` is the last layout pass's
-    // decision; `bounds` and `caption` are its rectangles there.
+    // decision (always set for an auto-hidden stack, which has no place in
+    // the tree); `bounds` and `caption` are its rectangles there, or, while
+    // the stack is in the flyout, the flyout's in the site's coordinates.
+    // `side_tabbed`: collapsed by shrinking, so behind side tabs on `edge`;
+    // an auto-hidden stack is always behind side tabs on its entry's edge.
+    // `in_flyout`: the view is the flyout's child, not the site's.
     struct StackSlot final {
         DockNodeId stack{};
         DockNodeKind kind{DockNodeKind::tool_stack};
@@ -422,8 +556,38 @@ private:
         // The selected panel's title, kept for painting the caption.
         std::string title{};
         bool collapsed{};
+        bool auto_hidden{};
+        bool side_tabbed{};
+        bool in_flyout{};
+        DockSide edge{DockSide::left};
         Rect bounds{};
         Rect caption{};
+    };
+    // One window edge's side tabs: the strip's own page set (owned here and
+    // released from the strip before it goes), the strip, its band in the
+    // site's coordinates (empty while the edge has no tabs) and the panels
+    // it shows, in order.
+    struct SideStrip final {
+        std::unique_ptr<PageSet> pages{};
+        std::shared_ptr<PageStrip> strip{};
+        Rect band{};
+        std::vector<DockPanelId> panels{};
+    };
+    // A flyout extent set by the grip, for the rest of the session.
+    struct FlyoutExtent final {
+        DockNodeId stack{};
+        double extent{};
+    };
+    // The open flyout's rectangles in the site's coordinates: `full` is the
+    // whole flyout where it stands in its slide (it starts under the strip
+    // and moves out), `revealed` the part past the strip's band, which is the
+    // popup's bounds; caption, content and grip lie inside `full`.
+    struct FlyoutGeometry final {
+        Rect full{};
+        Rect revealed{};
+        Rect caption{};
+        Rect content{};
+        Rect grip{};
     };
     // One seam from the last layout pass: the split, its axis, the bar and
     // its wider hit band, and what a move needs (the span shared by the two
@@ -525,6 +689,63 @@ private:
 
     [[nodiscard]] std::vector<SemanticNode> caption_nodes(const StackSlot& slot, std::size_t index) const;
     bool caption_action(std::size_t index, std::string_view stable_id, SemanticAction action);
+    void paint_caption(Painter& painter, const Control& surface, const StackSlot& slot, std::size_t index,
+                       Point offset) const;
+    // Runs a caption button of the stack at `index` (pin or close).
+    void press_caption_button(std::size_t index, Zone zone);
+
+    // -- auto-hide --
+    [[nodiscard]] SideStrip& side(DockSide edge) noexcept;
+    [[nodiscard]] const SideStrip& side(DockSide edge) const noexcept;
+    void ensure_side_strip(DockSide edge);
+    void release_side_strips() noexcept;
+    // Brings each edge's strip in line with the slots behind side tabs.
+    void sync_side_strips();
+    [[nodiscard]] double side_band_thickness() const;
+    // The tree's rectangle once the bands of the edges in `edges` (indexed
+    // by DockSide) are taken from `surface`, and each band.
+    [[nodiscard]] Rect tree_area(Size surface, const std::array<bool, 4>& edges,
+                                 std::array<Rect, 4>& bands) const;
+    // The edge nearest a rectangle inside the tree's rectangle.
+    [[nodiscard]] static DockSide nearest_edge(Rect bounds, Rect area) noexcept;
+    // Each collapsed tool stack's edge: where it would stand in the tree.
+    void assign_collapsed_edges(Rect area, std::span<const DockNodeId> collapsed);
+    [[nodiscard]] StackSlot* side_slot_of(const DockPanelId& panel);
+    [[nodiscard]] std::size_t flyout_slot_index() const noexcept;
+    [[nodiscard]] double flyout_default_extent(const StackSlot& slot) const;
+    [[nodiscard]] FlyoutGeometry flyout_geometry() const;
+    void place_flyout();
+    void focus_into_flyout();
+    [[nodiscard]] bool focus_in_flyout() const;
+    void restore_focus_from_flyout();
+    void on_side_tab_invoked(DockSide edge, const PageInvocation& invocation);
+    void on_root_pointer(const PointerEvent& event);
+    [[nodiscard]] bool side_tab_at(Point point, std::optional<DockPanelId>& tab) const;
+    void close_on_outside_press(const PointerEvent& event);
+    void on_flyout_pointer_preview(const PointerEvent& event);
+    void on_flyout_pointer(PointerEvent& event);
+    void on_flyout_key(KeyEvent& event);
+    void on_flyout_revoked();
+    void paint_flyout(Painter& painter, const Control& surface) const;
+    [[nodiscard]] Hit flyout_hit(Point local) const;
+    void start_hover(const DockPanelId& panel);
+    void stop_hover() noexcept;
+    void start_leave();
+    void slide_tick(FrameTime now);
+    void hover_elapsed(const DockPanelId& panel);
+    void leave_elapsed();
+    void stale_flyout_elapsed();
+    // Closes, once the layout pass is over, a flyout whose stack is no
+    // longer behind side tabs.
+    void schedule_stale_check();
+    // Takes the slot's view into the flyout or gives it back.
+    void move_view_to_flyout(StackSlot& slot);
+    void move_view_to_site(StackSlot& slot);
+    // Puts a view into the flyout (Flyout is complete only in
+    // dock_site_auto_hide.cpp).
+    void flyout_adopt(const Control::Ptr& view);
+    // Lets go of the flyout control, which stops reaching back.
+    void release_flyout_control() noexcept;
 
     // -- dragging (dock_site_drag.cpp) --
     // One tile as painted and published: where it is, which target it
@@ -693,6 +914,52 @@ private:
     Modifier document_step_release_{Modifier::none};
     bool document_stepping_{};
     Event<const DockDragOutcome&> drag_ended_{};
+
+    // Auto-hide: the side strips by DockSide, the tree's rectangle from the
+    // last layout pass, and the flyout. The flyout control is the window's
+    // overlay while open (flyout_token_) and observes the site, which
+    // releases it before letting it go.
+    std::array<SideStrip, 4> sides_{};
+    Rect tree_area_{};
+    std::shared_ptr<Flyout> flyout_{};
+    // The same control as a Control, for the sources that see Flyout only
+    // declared.
+    Control::Ptr flyout_root_{};
+    PopupToken flyout_token_{};
+    SubscriptionToken flyout_revoked_{};
+    std::optional<DockPanelId> flyout_panel_{};
+    DockNodeId flyout_stack_{};
+    double flyout_progress_{1.0};
+    FrameTime flyout_started_{};
+    FrameRequestToken slide_timer_{};
+    FrameRequestToken hover_timer_{};
+    DockPanelId hover_panel_{};
+    FrameRequestToken leave_timer_{};
+    FrameRequestToken stale_timer_{};
+    bool pointer_in_flyout_{};
+    bool flyout_focused_{};
+    bool flyout_closing_{};
+    // A side tab's press opened the flyout: the strip's focus that follows
+    // is sent on into it, until the release.
+    bool flyout_focus_pending_{};
+    // The position menu was opened from the flyout's caption: focus in it
+    // does not count as leaving the flyout.
+    bool menu_from_flyout_{};
+    // The grip drag: the extent and the pointer where it started.
+    bool grip_captured_{};
+    double grip_start_extent_{};
+    Point grip_origin_{};
+    // Kept for its storage: the tree arranged without collapsing, to find
+    // the edge of each collapsed stack.
+    std::vector<DockArrangedNode> arranged_scratch_{};
+    // The last control focused outside the flyout and the side strips, and
+    // the one focus returns to when the flyout closes with focus inside.
+    Control::WeakPtr focus_outside_{};
+    Control::WeakPtr return_focus_{};
+    std::vector<FlyoutExtent> flyout_extents_{};
+    SubscriptionToken root_pointer_{};
+    Window* observed_root_window_{};
+    Event<const DockFlyoutChange&> flyout_changed_{};
 };
 
 } // namespace gui_forms

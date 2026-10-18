@@ -1128,6 +1128,12 @@ void example() {
     (*site).set_document_area_maximized(true);
     window.perform_layout();
     // The Files stack is hidden; the document fills the site.
+    (*site).set_document_area_maximized(false);
+    static_cast<void>((*site).run_position_command(gf::DockPanelId("files"), gf::DockPositionCommand::auto_hide));
+    window.perform_layout();
+    // Files is behind a side tab on the left edge.
+    static_cast<void>((*site).open_flyout(gf::DockPanelId("files")));
+    // Its flyout slides out over the document, with focus inside.
 }
 }  // namespace doc_example_DockSite_1
 

@@ -52,6 +52,11 @@ gui_forms::DockWorkspace
       **document_history** : ``std::span<const DockPanelId>``, read-only
          The placed documents that have been active, most recent first.
 
+      **flyout_opening** : ``DockFlyoutOpening``, default ``DockFlyoutOpening::hover_or_click``
+         What opens an auto-hidden panel's flyout from its side tab (owner
+         decision DK-27, E1-1): resting the pointer on the tab or clicking it, or
+         (``click``) only clicking it.
+
       **site** : ``DockSite*``, default none, read-only
          The :cpp:class:`DockSite <gui_forms::DockSite>` showing the workspace, or none.
 
@@ -111,9 +116,10 @@ gui_forms::DockWorkspace
    .. rubric:: Notes
 
    Lazy creation (owner decision DK-34): a factory runs the first time its
-   panel is shown selected in a stack the site shows. A panel behind another
-   tab, hidden, in a collapsed stack, floating or auto-hidden (phases D4 and D5
-   show those) is not created. Hiding keeps the content; closing releases it,
+   panel is shown selected in a stack the site shows or in a flyout. A panel
+   behind another tab, hidden, behind a side tab whose flyout has not opened,
+   in a stack hidden by the maximized document area, or floating (phase D4
+   shows those) is not created. Hiding keeps the content; closing releases it,
    and a closed panel shown again is built again by its factory.
 
    Command routing (owner decision DK-29): the workspace names, on its site's
@@ -206,6 +212,16 @@ gui_forms::DockWorkspace
 
       The placed documents that have been active, most recent first.
 
+   .. cpp:function:: DockFlyoutOpening flyout_opening() const noexcept
+
+      What opens an auto-hidden panel's flyout from its side tab (owner
+      decision DK-27, E1-1): resting the pointer on the tab or clicking it, or
+      (``click``) only clicking it.
+
+   .. cpp:function:: void set_flyout_opening(DockFlyoutOpening opening) noexcept
+
+      Sets :cpp:func:`flyout_opening <gui_forms::DockWorkspace::flyout_opening>`; see the property's description above.
+
    .. cpp:function:: DockSite* site() const noexcept
 
       The :cpp:class:`DockSite <gui_forms::DockSite>` showing the workspace, or none.
@@ -273,7 +289,10 @@ gui_forms::DockWorkspace
 
       Makes a panel docked in the main site active: selects it in its stack,
       creates its content, moves focus into it through the site and updates
-      the tracks. False, changing nothing, for any other panel.
+      the tracks. A panel behind a side tab (auto-hidden, or in a stack
+      collapsed by shrinking) opens in its flyout with focus inside; an
+      auto-hidden stack's selection is not edited. False, changing nothing,
+      for any other panel.
 
    .. cpp:function:: bool set_panel_title(const DockPanelId& panel, std::string title)
 

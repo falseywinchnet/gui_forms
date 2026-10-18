@@ -232,7 +232,10 @@ bool DockSite::begin_drag(const DockSubject& subject, DockNodeId source_stack, b
     if (drag_.phase != DockDragPhase::idle && drag_.phase != DockDragPhase::armed) return false;
     Window* const host = attached_window();
     StackSlot* const slot = slot_for(source_stack);
-    if (host == nullptr || slot == nullptr || (*slot).collapsed || (*slot).bounds.empty()) return false;
+    // A stack behind side tabs is dragged only from its open flyout (phase
+    // D5), whose rectangle is the stamp's start.
+    if (host == nullptr || slot == nullptr || (*slot).bounds.empty()) return false;
+    if ((*slot).collapsed && !(*slot).in_flyout) return false;
     close_position_menu();
     close_navigator();
     const DockNode* const node = (*workspace_).layout().find_node(source_stack);
@@ -258,6 +261,9 @@ bool DockSite::begin_drag(const DockSubject& subject, DockNodeId source_stack, b
     session.started = FrameClock::now();
     session.stamp = session.source;
     drag_ = std::move(session);
+    // The subject leaves an open flyout with it (the stack stays auto-hidden
+    // in the model until a drop).
+    if (flyout_panel_) close_flyout(DockFlyoutCause::programmatic);
     // The page leaves its view, or the whole stack the layout, at the next
     // layout pass.
     set_focusable(true);
@@ -787,22 +793,6 @@ void DockSite::announce_drag() {
     if (text == drag_.announcement) return;
     drag_.announcement = std::move(text);
     invalidate(Dirty::semantics);
-}
-
-// -- interactions --------------------------------------------------------------
-
-namespace {
-
-// The events DockSite adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 1> site_interactions{{
-    {.name = "drag_ended", .payload = "DockDragOutcome", .mutable_payload = false},
-}};
-
-} // namespace
-
-void DockSite::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
-    Control::append_interactions(interactions);
-    interactions.insert(interactions.end(), site_interactions.begin(), site_interactions.end());
 }
 
 // -- keys ----------------------------------------------------------------------

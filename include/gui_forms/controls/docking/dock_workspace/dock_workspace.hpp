@@ -62,6 +62,11 @@ struct DockActivationChange final {
     DockActivationCause cause{DockActivationCause::programmatic};
 };
 
+// What opens an auto-hidden panel's flyout from its side tab (owner decision
+// DK-27, E1-1): resting the pointer on the tab for DockSite's hover delay or
+// clicking it (the default), or only clicking it.
+enum class DockFlyoutOpening : std::uint8_t { hover_or_click, click };
+
 // The docking workspace (owner decisions DK-3, DK-29, DK-34): a component
 // owning the DockLayout, the panel registrations with their factories, the
 // content each created panel holds, and the activation tracks with their
@@ -73,9 +78,10 @@ struct DockActivationChange final {
 // tool panel.
 //
 // Lazy creation: a panel's factory runs the first time the panel is shown
-// selected in a realized stack, never for a panel that stays behind another
-// tab, hidden, collapsed or in a site D2 does not realize (floating and
-// auto-hidden stacks). The workspace keeps each created control until the
+// selected in a realized stack or in a flyout, never for a panel that stays
+// behind another tab, hidden, collapsed or behind a side tab without its
+// flyout opening, or in a floating site (not realized until D4). The
+// workspace keeps each created control until the
 // panel is closed (close_panel, or a document leaving the layout); hiding
 // keeps it.
 //
@@ -145,9 +151,15 @@ public:
     }
     // Makes a panel docked in the main site active: selects it in its stack,
     // creates its content, moves focus into it (through the bound site) and
-    // updates the tracks. False, changing nothing, for a panel that is not
-    // docked in the main site or not registered.
+    // updates the tracks. A panel behind a side tab (auto-hidden, or in a
+    // stack collapsed by shrinking) opens in its flyout with focus inside;
+    // an auto-hidden stack's selection is not edited. False, changing
+    // nothing, for a panel that is neither, or not registered.
     bool activate_panel(const DockPanelId& panel, DockActivationCause cause = DockActivationCause::programmatic);
+
+    // The workspace setting for opening flyouts; hover_or_click by default.
+    [[nodiscard]] DockFlyoutOpening flyout_opening() const noexcept { return flyout_opening_; }
+    void set_flyout_opening(DockFlyoutOpening opening) noexcept { flyout_opening_ = opening; }
 
     // Raised after a track changed: the panel track first, then the document
     // track when both change. Handlers may activate other panels.
@@ -197,6 +209,7 @@ private:
     // Observes the bound site; the site clears it when it is destroyed.
     DockSite* site_{};
     SubscriptionToken layout_token_{};
+    DockFlyoutOpening flyout_opening_{DockFlyoutOpening::hover_or_click};
     Event<const DockActivationChange&> activation_changed_{};
 };
 

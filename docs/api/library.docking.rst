@@ -169,7 +169,7 @@ Related types
 
    ``#include <gui_forms/docking/types/dock_types.hpp>``
 
-   A tool stack pinned out to an edge of the main site (auto-hide). The stack keeps its node ID while it is out, so unpinning returns the same stack.
+   A tool stack pinned out to an edge of the main site (auto-hide). The stack keeps its node ID while it is out, so unpinning returns the same stack. Pinning out and unpinning are inverse edits: unpinning beside the same neighbour recreates the split the stack stood in with its old identity and ratio, and neither edit writes the panels' remembered places, so a pin followed by an unpin leaves the layout exactly as it was.
 
    .. cpp:member:: DockNodeId stack
 
@@ -183,7 +183,7 @@ Related types
 
    .. cpp:member:: DockNodeId neighbour
 
-      Where the stack stood before it was pinned out.
+      Where the stack stood before it was pinned out: the node beside it, which side of that node, and the stack's share of their split.
 
    .. cpp:member:: DockSide side
 
@@ -192,6 +192,14 @@ Related types
    .. cpp:member:: double ratio
 
       Default: ``{0.25}``.
+
+   .. cpp:member:: DockNodeId split
+
+      The split the stack stood in (removed while the stack is out) and that split's own ratio (its first child's share); none when the stack stood alone, for example in a restored layout written before these were saved.
+
+   .. cpp:member:: double split_ratio
+
+      Default: ``{0.5}``.
 
 .. cpp:namespace:: gui_forms
 

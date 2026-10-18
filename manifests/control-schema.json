@@ -3240,7 +3240,10 @@
         {"name": "drag_stamp", "role": "face", "composed_from": null, "states": []},
         {"name": "drag_stamp_label", "role": "label", "composed_from": null, "states": []},
         {"name": "drop_area", "role": "drop", "composed_from": null, "states": ["drop_accepted"]},
-        {"name": "drop_cue", "role": "indicator", "composed_from": null, "states": ["drop_rejected"]}
+        {"name": "drop_cue", "role": "indicator", "composed_from": null, "states": ["drop_rejected"]},
+        {"name": "flyout_shadow", "role": "shadow", "composed_from": null, "states": []},
+        {"name": "flyout_face", "role": "face", "composed_from": null, "states": []},
+        {"name": "flyout_grip", "role": "grip", "composed_from": null, "states": ["hot", "captured"]}
       ],
       "states": ["normal", "enabled", "disabled", "focused", "focus_visible"],
       "custom_states": [],
@@ -3318,7 +3321,8 @@
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
         {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
-        {"name": "drag_ended", "payload": "DockDragOutcome", "mutable_payload": false}
+        {"name": "drag_ended", "payload": "DockDragOutcome", "mutable_payload": false},
+        {"name": "flyout_changed", "payload": "DockFlyoutChange", "mutable_payload": false}
       ]
     },
     {

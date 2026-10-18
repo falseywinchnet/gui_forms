@@ -61,6 +61,8 @@ Related types
      -  
    * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
      -  
+   * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
+     - Raised after a flyout opened (open true) or closed.
    * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
      -  
    * - :cpp:class:`DockNavigator::ItemParts <gui_forms::DockNavigator::ItemParts>`
@@ -196,6 +198,22 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: DockFlyoutChange final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Raised after a flyout opened (open true) or closed.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: DockFlyoutCause cause
+
+      Default: ``{DockFlyoutCause::programmatic}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: DockNavigator::Item final
 
    ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
@@ -305,6 +323,14 @@ Related types
    .. cpp:member:: PartGeometry drop_area
 
    .. cpp:member:: PartGeometry drop_cue
+
+   .. cpp:member:: PartGeometry flyout_shadow
+
+      The open flyout, in the site's coordinates as it stands in its slide: its overlay shadow, its face and the grip on its inner edge (hot and captured as the pointer is on it or drags it). Absent while no flyout is open.
+
+   .. cpp:member:: PartGeometry flyout_face
+
+   .. cpp:member:: PartGeometry flyout_grip
 
 .. cpp:namespace:: gui_forms
 
@@ -837,6 +863,32 @@ Enumerations
    .. cpp:enumerator:: dragging
 
    .. cpp:enumerator:: settling
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockFlyoutCause
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: hover
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: programmatic
+
+   .. cpp:enumerator:: pointer_left
+
+   .. cpp:enumerator:: outside_press
+
+   .. cpp:enumerator:: focus_lost
+
+   .. cpp:enumerator:: escape
+
+   .. cpp:enumerator:: swapped
+
+   .. cpp:enumerator:: layout
 
 .. cpp:namespace:: gui_forms
 

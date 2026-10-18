@@ -186,7 +186,15 @@ Control::Ptr DockWorkspace::create_panel_content(const DockPanelId& panel) {
 // -- activation ----------------------------------------------------------------
 
 bool DockWorkspace::activate_panel(const DockPanelId& panel, DockActivationCause cause) {
-    if (find_entry(panel) == nullptr || !docked_in_main_site(panel)) return false;
+    if (find_entry(panel) == nullptr) return false;
+    if (layout_.locate(panel).placement == DockPlacementKind::auto_hidden) {
+        // Its flyout opens with focus inside, which makes it active; the
+        // stack's selection stays as it is (a flyout never edits the layout).
+        if (site_ == nullptr || !(*site_).open_flyout(panel, DockFlyoutCause::programmatic)) return false;
+        note_active(panel, cause);
+        return true;
+    }
+    if (!docked_in_main_site(panel)) return false;
     const DockPanelLocation location = layout_.locate(panel);
     const DockNode* const stack = layout_.find_node(location.stack);
     if (stack != nullptr && (*stack).selected != location.index) {

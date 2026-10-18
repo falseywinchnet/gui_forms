@@ -455,6 +455,7 @@ add_library(gui_forms_controls STATIC
     src/controls/docking/dock_workspace/dock_workspace.cpp
     src/controls/docking/dock_site/dock_site.cpp
     src/controls/docking/dock_site/dock_site_drag.cpp
+    src/controls/docking/dock_site/dock_site_auto_hide.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
@@ -2460,6 +2461,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_dock_site_tests tests/dock_site_tests.cpp)
     target_link_libraries(gui_forms_dock_site_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_dock_site_tests COMMAND gui_forms_dock_site_tests)
+    add_executable(gui_forms_dock_auto_hide_tests tests/dock_auto_hide_tests.cpp)
+    target_link_libraries(gui_forms_dock_auto_hide_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_auto_hide_tests COMMAND gui_forms_dock_auto_hide_tests)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
