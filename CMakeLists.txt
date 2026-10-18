@@ -429,6 +429,7 @@ add_library(gui_forms_controls STATIC
     src/controls/menu/context_menu/context_menu.cpp
     src/controls/menu/menu_strip/menu_strip.cpp
     src/controls/tool_strip/tool_strip.cpp
+    src/controls/pages/navigation_pane/navigation_pane.cpp
     src/controls/quick_access_toolbar/quick_access_toolbar.cpp
     src/controls/quick_access_toolbar/ribbon_state.cpp
     src/controls/tool_strip_panel/tool_strip_panel.cpp
@@ -2426,6 +2427,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_page_view_document_tests tests/page_view_document_tests.cpp)
     target_link_libraries(gui_forms_page_view_document_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_page_view_document_tests COMMAND gui_forms_page_view_document_tests)
+    add_executable(gui_forms_navigation_pane_tests tests/navigation_pane_tests.cpp)
+    target_link_libraries(gui_forms_navigation_pane_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_navigation_pane_tests COMMAND gui_forms_navigation_pane_tests)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
