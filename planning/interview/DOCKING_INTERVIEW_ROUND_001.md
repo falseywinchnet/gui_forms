@@ -405,3 +405,18 @@ PageView P35's matching items. The owner, verbatim:
 - **GIVEN J8 (confirmed).** No new part roles: guides and tiles use
   `face`, `glyph` and `drop`; previews use `drop` with `drop_accepted` and
   `drop_rejected`.
+
+## Part 12. Fit, 2026-10-17
+
+Asked as K1 and K2, each with its recommendation marked (K1-1, K2-1), with
+the remaining PageView questions and the taste mockups proposed next. The
+owner, verbatim:
+
+> alright. show me b-g. and for the mockups, dont use in-app visualizations but a html look and feel page.
+
+- **GIVEN K1-1.** File Manager keeps its fixed split composition (DNA-F01,
+  DNA-P01), sharing parts and looks with docking.
+- **GIVEN K2-1.** `ToolStripContainer` strip dragging moves onto the
+  docking drag session and targets after docking's phase 3.
+- **GIVEN, mockups.** The taste mockups are an HTML look-and-feel page, not
+  in-conversation visualizations.

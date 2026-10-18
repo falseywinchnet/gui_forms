@@ -165,6 +165,8 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     and action `close` (tabs stop publishing `press`); float, dock and
     maximize marks decided with T6; no new part roles. Admitted to the
     design language with the enum and schema when built (§12.7).
+36. **Fit (K1-1, K2-1):** File Manager keeps its fixed splits; toolbar
+    dragging joins the docking drag session after phase 3.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
