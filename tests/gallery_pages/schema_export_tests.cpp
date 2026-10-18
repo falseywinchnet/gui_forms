@@ -501,6 +501,7 @@ void test_schema_export() {
     const std::shared_ptr<SemanticFeedback> feedback = std::make_shared<SemanticFeedback>(window);
     const std::shared_ptr<BindingSource> binding_source = std::make_shared<BindingSource>(window);
     const std::shared_ptr<BindingContext> binding_context = std::make_shared<BindingContext>(window);
+    const std::shared_ptr<DockWorkspace> dock_workspace = std::make_shared<DockWorkspace>("schema.workspace");
     const std::shared_ptr<Label> bound = make_control<Label>(StableId("schema.bound"));
     const std::shared_ptr<Binding> binding =
         (*bound).data_bindings().add("Text", binding_source, "Name");
@@ -520,6 +521,7 @@ void test_schema_export() {
     record_component("binding", *binding, records);
     record_component("binding_source", *binding_source, records);
     record_component("binding_context", *binding_context, records);
+    record_component("dock_workspace", *dock_workspace, records);
 
     std::size_t services = 0;
     for (std::size_t index = 0; index < records.size(); ++index) {

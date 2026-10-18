@@ -514,6 +514,28 @@
       "doc": "api/generated/gui_forms.NavigationPane.rst"
     },
     {
+      "id": "dock_site",
+      "type": "DockSite",
+      "header": "gui_forms/controls/docking/dock_site/dock_site.hpp",
+      "category": "Layout",
+      "purpose": "The docked part of a DockWorkspace in one window: binary splits with 3-unit seams moved by pointer and keyboard within minimums, captioned tool stacks and the document area built from PageView, root-level pins, the position menu, F6 regions, the Ctrl+Tab navigator, Escape and Shift+Escape, a maximized document area, and tool stacks collapsing by priority when the window is too small.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "containers-and-focus",
+      "doc": "api/generated/gui_forms.DockSite.rst"
+    },
+    {
+      "id": "dock_navigator",
+      "type": "DockNavigator",
+      "header": "gui_forms/controls/docking/dock_navigator/dock_navigator.hpp",
+      "category": "Layout",
+      "purpose": "The two-list Ctrl+Tab switcher of docking: active tool windows beside active files in most-recently-active order, stepping with Tab and the arrows and choosing on the modifier's release, Enter or a press.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "containers-and-focus",
+      "doc": "api/generated/gui_forms.DockNavigator.rst"
+    },
+    {
       "id": "tab_page",
       "type": "TabPage",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp",
@@ -765,6 +787,17 @@
       "status": "stable",
       "gallery_page": "commands-and-menus",
       "doc": "api/generated/gui_forms.ContextMenu.rst"
+    },
+    {
+      "id": "dock_workspace",
+      "type": "DockWorkspace",
+      "header": "gui_forms/controls/docking/dock_workspace/dock_workspace.hpp",
+      "category": "Components",
+      "purpose": "Docking workspace component: owns the DockLayout, the panel registrations with lazy factories and their content, and the active panel and active document tracks with their histories, named on the window's command routing chain.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "containers-and-focus",
+      "doc": "api/generated/gui_forms.DockWorkspace.rst"
     },
     {
       "id": "command",

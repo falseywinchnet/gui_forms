@@ -49,6 +49,8 @@ Related types
      - DispatchOperation observes and explicitly cancels one bounded FIFO work record; dropping it does not cancel fire-and-forget work.
    * - :cpp:class:`DisplayChunkInfo <gui_forms::DisplayChunkInfo>`
      - DisplayChunkInfo exposes immutable generation, paint plane, logical bounds, and command count for one retained recording without exposing its private commands.
+   * - :cpp:class:`FocusedControlChange <gui_forms::FocusedControlChange>`
+     - Focus moved from one control to another (or to or from none) through request_focus.
    * - :cpp:class:`FocusScopeChange <gui_forms::FocusScopeChange>`
      - FocusScopeChange publishes exact scope/root identity, depth, close reason, direction, and restoration outcome.
    * - :cpp:class:`FocusScopeId <gui_forms::FocusScopeId>`
@@ -338,6 +340,20 @@ Related types
    .. cpp:member:: Rect logical_bounds
 
    .. cpp:member:: std::size_t command_count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FocusedControlChange final
+
+   ``#include <gui_forms/window/window.hpp>``
+
+   Focus moved from one control to another (or to or from none) through request_focus. ``previous_id`` and ``current_id`` are zero for none; ``stable_id`` is the newly focused control's, or empty.
+
+   .. cpp:member:: RuntimeId previous_id
+
+   .. cpp:member:: RuntimeId current_id
+
+   .. cpp:member:: std::string stable_id
 
 .. cpp:namespace:: gui_forms
 

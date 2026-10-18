@@ -1068,6 +1068,20 @@ void example() {
 }
 }  // namespace doc_example_DockLayout_2
 
+namespace doc_example_DockNavigator_1 {
+void example() {
+    std::shared_ptr<gf::DockNavigator> navigator =
+        gf::make_control<gf::DockNavigator>(gf::StableId("switcher"));
+    std::vector<gf::DockNavigatorEntry> tools{{gf::DockPanelId("output"), "Output"}};
+    std::vector<gf::DockNavigatorEntry> files{{gf::DockPanelId("b.txt"), "b.txt"},
+                                              {gf::DockPanelId("a.txt"), "a.txt"}};
+    (*navigator).set_entries(std::move(tools), std::move(files));
+    static_cast<void>((*navigator).step(1));        // a.txt is current
+    static_cast<void>((*navigator).switch_list());  // Output is current
+    (*navigator).set_release_modifier(gf::Modifier::control);
+}
+}  // namespace doc_example_DockNavigator_1
+
 namespace doc_example_DockPanelDescriptor_1 {
 void example() {
     gf::DockPanelDescriptor toolbox;
@@ -1079,6 +1093,79 @@ void example() {
     toolbox.default_placement.ratio = 0.2;
 }
 }  // namespace doc_example_DockPanelDescriptor_1
+
+namespace doc_example_DockSite_1 {
+struct Views final {
+    void make(gf::DockPanelCreation& creation) {
+        creation.content = gf::make_control<gf::TextBox>(gf::StableId("view." + creation.panel.value));
+    }
+};
+
+void example() {
+    Views views;
+    gf::DockWorkspace workspace("ide");
+    const gf::Delegate<gf::DockPanelCreation&> factory =
+        gf::Delegate<gf::DockPanelCreation&>::bind<Views, &Views::make>(views);
+    gf::DockPanelRegistration files{};
+    files.descriptor.id = gf::DockPanelId("files");
+    files.descriptor.default_placement.side = gf::DockSide::left;
+    files.descriptor.minimum_size = {120.0, 80.0};
+    files.title = "Files";
+    files.factory = factory;
+    gf::DockPanelRegistration readme{};
+    readme.descriptor.id = gf::DockPanelId("readme");
+    readme.descriptor.kind = gf::DockPanelKind::document;
+    readme.title = "README";
+    readme.factory = factory;
+    static_cast<void>(workspace.register_panel(files));
+    static_cast<void>(workspace.register_panel(readme));
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("readme")));
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("files")));
+    std::shared_ptr<gf::DockSite> site = gf::make_control<gf::DockSite>(gf::StableId("ide.site"), workspace);
+    gf::Window window(site, {640.0, 400.0});
+    window.perform_layout();
+    // Two stacks and one seam; both panels' views were made on layout.
+    (*site).set_document_area_maximized(true);
+    window.perform_layout();
+    // The Files stack is hidden; the document fills the site.
+}
+}  // namespace doc_example_DockSite_1
+
+namespace doc_example_DockWorkspace_1 {
+struct Views final {
+    int made = 0;
+    void make(gf::DockPanelCreation& creation) {
+        ++made;
+        creation.content = gf::make_control<gf::TextBox>(gf::StableId("view." + creation.panel.value));
+    }
+};
+
+void example() {
+    Views views;
+    gf::DockWorkspace workspace("editor");
+    const gf::Delegate<gf::DockPanelCreation&> factory =
+        gf::Delegate<gf::DockPanelCreation&>::bind<Views, &Views::make>(views);
+    gf::DockPanelRegistration outline{};
+    outline.descriptor.id = gf::DockPanelId("outline");
+    outline.descriptor.default_placement.side = gf::DockSide::left;
+    outline.title = "Outline";
+    outline.factory = factory;
+    static_cast<void>(workspace.register_panel(outline));
+    const std::array<std::string_view, 2> files{"a.txt", "b.txt"};
+    for (const std::string_view file : files) {
+        gf::DockPanelRegistration document{};
+        document.descriptor.id = gf::DockPanelId(std::string(file));
+        document.descriptor.kind = gf::DockPanelKind::document;
+        document.title = std::string(file);
+        document.factory = factory;
+        static_cast<void>(workspace.register_panel(document));
+        static_cast<void>(workspace.show_panel(document.descriptor.id));
+    }
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("outline")));
+    // views.made is 0: nothing is shown until a site lays the workspace out.
+    // The active panel is the outline and the active document b.txt.
+}
+}  // namespace doc_example_DockWorkspace_1
 
 namespace doc_example_DomainUpDown_1 {
 void example() {
@@ -3663,7 +3750,10 @@ int main() {
     failures += run("DockEdit example 1", &doc_example_DockEdit_1::example);
     failures += run("DockLayout example 1", &doc_example_DockLayout_1::example);
     failures += run("DockLayout example 2", &doc_example_DockLayout_2::example);
+    failures += run("DockNavigator example 1", &doc_example_DockNavigator_1::example);
     failures += run("DockPanelDescriptor example 1", &doc_example_DockPanelDescriptor_1::example);
+    failures += run("DockSite example 1", &doc_example_DockSite_1::example);
+    failures += run("DockWorkspace example 1", &doc_example_DockWorkspace_1::example);
     failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);
     failures += run("DrawingSurface example 1", &doc_example_DrawingSurface_1::example);
     failures += run("DrawingSurface example 2", &doc_example_DrawingSurface_2::example);

@@ -43,7 +43,8 @@ gui_forms::PageView
 
       **strip** : ``std::shared_ptr<PageStrip>``, read-only
          The child strip that shows the tabs; its placement, sizing, activation
-         and mnemonics are set on it.
+         and mnemonics are set on it. Hiding it (as a docking tool stack with one
+         panel does) gives the whole view to the content.
 
       **ctrl_tab** : ``PageViewCtrlTab``, default ``PageViewCtrlTab::select_next``
          What Ctrl+Tab and Ctrl+Shift+Tab do while focus is inside the view:
@@ -184,7 +185,8 @@ gui_forms::PageView
    .. cpp:function:: const std::shared_ptr<PageStrip>& strip() const noexcept
 
       The child strip that shows the tabs; its placement, sizing, activation
-      and mnemonics are set on it.
+      and mnemonics are set on it. Hiding it (as a docking tool stack with one
+      panel does) gives the whole view to the content.
 
    .. cpp:function:: PageViewCtrlTab ctrl_tab() const noexcept
 
