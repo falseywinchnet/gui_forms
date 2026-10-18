@@ -348,6 +348,8 @@ gui_forms::Window
         - Shows a detached control as an overlay owned by another control, such as a menu or a drop-down, and returns a :cpp:class:`PopupToken <gui_forms::PopupToken>` that closes it.
       * - :cpp:func:`register_accelerator <gui_forms::Window::register_accelerator>`
         - Installs a window-wide keyboard shortcut owned by a :cpp:class:`Component <gui_forms::Component>`.
+      * - :cpp:func:`offer_accelerators <gui_forms::Window::offer_accelerators>`
+        - Offers a key press to the accelerators that wait for the focused route, as a key the window's own route declined; true when one took it.
       * - :cpp:func:`command_target <gui_forms::Window::command_target>`
         -  
       * - :cpp:func:`resolve_command <gui_forms::Window::resolve_command>`
@@ -1070,6 +1072,13 @@ gui_forms::Window
       after the focused control declines a key, unless
       ``AcceleratorOptions::before_focused_route`` is set. The returned token,
       or disposing the owner, removes it.
+
+   .. cpp:function:: bool offer_accelerators(const KeyEvent& event)
+
+      Offers a key press to the accelerators that wait for the focused route,
+      as a key the window's own route declined; true when one took it. A
+      floating docking window passes the keys it did not use to its main
+      window this way (stage DK phase D4), so shortcuts work from it.
 
    .. cpp:function:: std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const
 

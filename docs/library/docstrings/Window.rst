@@ -271,6 +271,11 @@ register_accelerator
     after the focused control declines a key, unless
     `AcceleratorOptions::before_focused_route` is set. The returned token,
     or disposing the owner, removes it.
+offer_accelerators
+    Offers a key press to the accelerators that wait for the focused route,
+    as a key the window's own route declined; true when one took it. A
+    floating docking window passes the keys it did not use to its main
+    window this way (stage DK phase D4), so shortcuts work from it.
 set_command_target
     Names the `CommandTarget` of one stage of the command routing chain:
     the active panel, the active document or the main window, or clears it

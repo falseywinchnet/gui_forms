@@ -82,7 +82,10 @@ struct CollapsesEarlier final {
 // -- construction --------------------------------------------------------------
 
 DockSite::DockSite(StableId stable_id, DockWorkspace& workspace)
-    : Control(std::move(stable_id)), workspace_(&workspace) {
+    : DockSite(std::move(stable_id), workspace, DockSiteId{}) {}
+
+DockSite::DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floating_site)
+    : Control(std::move(stable_id)), workspace_(&workspace), floating_site_(floating_site) {
     set_cursor(CursorKind::arrow);
     set_paint_plane(PaintPlane::control);
     const std::string prefix((*this).stable_id().value());
@@ -95,9 +98,8 @@ DockSite::DockSite(StableId stable_id, DockWorkspace& workspace)
         menu_commands_[index] = std::make_shared<Command>(prefix + ".position." + std::string(position_names[index]),
                                                           std::string(position_texts[index]));
     }
+    // The workspace tells the site of each layout change.
     (*workspace_).attach_site(*this);
-    layout_token_ = (*workspace_).layout().changed().subscribe(
-        *this, Delegate<const DockLayoutChange&>::bind<DockSite, &DockSite::on_layout_changed>(*this));
     activation_token_ = (*workspace_).activation_changed().subscribe(
         *this, Delegate<const DockActivationChange&>::bind<DockSite, &DockSite::on_activation_changed>(*this));
 }
@@ -125,7 +127,6 @@ DockSite::~DockSite() {
     flyout_token_.disconnect();
     release_side_strips();
     if (menu_) (*menu_).close();
-    layout_token_.disconnect();
     activation_token_.disconnect();
     for (StackSlot& slot : stacks_) {
         if (slot.view) (*slot.view).release_site();
@@ -146,7 +147,6 @@ void DockSite::on_dispose() noexcept {
     root_pointer_.disconnect();
     if (menu_) (*menu_).dispose();
     focus_token_.disconnect();
-    layout_token_.disconnect();
     activation_token_.disconnect();
     if (workspace_ != nullptr) (*workspace_).detach_site(*this);
     workspace_ = nullptr;
@@ -161,7 +161,6 @@ void DockSite::release_workspace() noexcept {
     close_flyout(DockFlyoutCause::programmatic);
     close_navigator();
     close_position_menu();
-    layout_token_.disconnect();
     activation_token_.disconnect();
     workspace_ = nullptr;
     try {
@@ -279,16 +278,28 @@ void DockSite::remove_slot(StackSlot& slot) noexcept {
     slot.in_flyout = false;
 }
 
-// Brings the views in line with the main site's tree: one per stack in tree
+DockNodeId DockSite::site_root() const {
+    if (workspace_ == nullptr) return DockNodeId{};
+    const DockLayout& layout = (*workspace_).layout();
+    if (!floating()) return layout.state().main_root;
+    const DockFloatingSite* const site = layout.find_floating_site(floating_site_);
+    if (site == nullptr) return DockNodeId{};
+    return (*site).root;
+}
+
+// Brings the views in line with the site's tree: one per stack in tree
 // order, reused by node identity, each holding its stack's panels.
 void DockSite::realize() {
     if (workspace_ == nullptr || !is_alive()) return;
     const DockLayout& layout = (*workspace_).layout();
     std::vector<DockNodeId> order{};
-    collect_main_stacks(layout, layout.state().main_root, order);
-    // The auto-hidden stacks follow the tree's, in layout order.
+    collect_main_stacks(layout, site_root(), order);
+    // In the main site the auto-hidden stacks follow the tree's, in layout
+    // order.
     const std::size_t tree_count = order.size();
-    for (const DockAutoHideEntry& entry : layout.state().auto_hidden) order.push_back(entry.stack);
+    if (!floating()) {
+        for (const DockAutoHideEntry& entry : layout.state().auto_hidden) order.push_back(entry.stack);
+    }
     std::vector<StackSlot> next{};
     next.reserve(order.size());
     for (std::size_t position = 0; position < order.size(); ++position) {
@@ -487,8 +498,11 @@ bool focus_within(const Control& site, Window* host) {
 void DockSite::on_layout_changed(const DockLayoutChange&) {
     // The program changed the layout under a drag: the drag ends, never
     // applied to a stale tree (docking study 5.1, invariant 2). A drop's own
-    // transaction runs while settling.
-    if (drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) {
+    // transaction runs while settling. A drag this site only shows ends
+    // with its own site.
+    if (drag_.guest) {
+        leave_guest_drag();
+    } else if (drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) {
         end_drag(DockDragEnd::layout_changed);
     }
     const bool focus_was_inside = focus_within(*this, attached_window());
@@ -744,7 +758,7 @@ void DockSite::on_detaching_from_window(Window& former_window) noexcept {
     capture_token_.disconnect();
     active_token_.disconnect();
     // The stamp's picture is the former window's image.
-    if (drag_.picture) static_cast<void>(former_window.release_control_snapshot((*drag_.picture).image));
+    if (drag_.picture && !drag_.guest) static_cast<void>(former_window.release_control_snapshot((*drag_.picture).image));
     drag_.picture.reset();
     reset_drag();
     focus_token_.disconnect();
@@ -883,7 +897,7 @@ DockSite::Extent DockSite::extent_of(DockNodeId node_id, std::span<const DockNod
 Size DockSite::minimum_size() const {
     if (workspace_ == nullptr) return Size{};
     const std::vector<DockNodeId> none{};
-    const Extent extent = extent_of((*workspace_).layout().state().main_root, none);
+    const Extent extent = extent_of(site_root(), none);
     return extent.minimum;
 }
 
@@ -892,6 +906,8 @@ Size DockSite::minimum_size() const {
 // fit, the next stack in collapse order whose collapse reduces the shortfall.
 std::vector<DockNodeId> DockSite::plan_collapse(Size available) const {
     std::vector<DockNodeId> collapsed{};
+    // A floating window keeps its minimum size instead (phase D4).
+    if (floating()) return collapsed;
     std::vector<CollapseCandidate> candidates{};
     candidates.reserve(stacks_.size());
     for (std::size_t order = 0; order < stacks_.size(); ++order) {
@@ -1066,7 +1082,7 @@ void DockSite::arrange(Rect final_bounds) {
         area = tree_area(surface, edges, bands);
     }
     tree_area_ = area;
-    place((*workspace_).layout().state().main_root, area, collapsed_);
+    place(site_root(), area, collapsed_);
     for (StackSlot& slot : stacks_) {
         if (slot.auto_hidden) {
             slot.collapsed = true;
@@ -1462,7 +1478,21 @@ void DockSite::on_pointer(PointerEvent& event) {
     }
     const Rect absolute = absolute_bounds();
     const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
-    if (drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) {
+    // A floating window moved by its caption (phase D4).
+    if (window_move_.active) {
+        const Control::Ptr keep = shared_from_this();
+        if (event.action == PointerAction::move) {
+            continue_window_move(event.modifiers);
+            event.handled = true;
+            return;
+        }
+        if (event.action == PointerAction::up && event.button == PointerButton::primary) {
+            end_window_move(false);
+            event.handled = true;
+            return;
+        }
+    }
+    if ((drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) && !drag_.guest) {
         const Control::Ptr keep = shared_from_this();
         if (event.action == PointerAction::move) {
             update_drag_pointer(local, event.modifiers);
@@ -1474,7 +1504,9 @@ void DockSite::on_pointer(PointerEvent& event) {
                 reset_drag();
             } else {
                 update_drag_pointer(local, event.modifiers);
-                end_drag(drag_.target ? DockDragEnd::dropped : DockDragEnd::rejected);
+                // The drop's target may be this site's or another window's;
+                // end_drag decides.
+                end_drag(DockDragEnd::dropped);
             }
             event.handled = true;
             return;
@@ -1523,6 +1555,12 @@ void DockSite::on_pointer(PointerEvent& event) {
     const std::optional<DockPanelId> panel = selected_panel(stacks_[hit.index]);
     if (!panel) return;
     if (hit.zone == Zone::caption) {
+        // A double-click on a floating caption docks the stack back (phase
+        // D4).
+        if (event.click_count >= 2U && floating() && hit.index < stacks_.size()) {
+            static_cast<void>((*workspace_).dock_back(DockSubject::of_stack(stacks_[hit.index].stack)));
+            return;
+        }
         static_cast<void>((*workspace_).activate_panel(*panel, DockActivationCause::pointer));
         // The press may become a drag of the whole stack (D7-1).
         if (is_alive() && hit.index < stacks_.size()) arm_caption_drag(hit.index, local, event.pointer_id);
@@ -1640,7 +1678,7 @@ bool DockSite::handle_docking_key(KeyEvent& event) {
         handled = step_document(1, release);
     } else if (keys.matches(KeyCommand::previous_document, event)) {
         handled = step_document(-1, release);
-    } else if (keys.matches(KeyCommand::maximize_document_area, event)) {
+    } else if (keys.matches(KeyCommand::maximize_document_area, event) && !floating()) {
         set_document_area_maximized(!maximized_);
         handled = true;
     } else if (keys.matches(KeyCommand::return_to_document, event)) {
@@ -1674,10 +1712,26 @@ void DockSite::on_key_preview(KeyEvent& event) {
 void DockSite::on_key(KeyEvent& event) {
     if (handle_seam_key(event)) return;
     static_cast<void>(handle_docking_key(event));
+    pass_key_to_main_window(event);
 }
 
 void DockSite::on_key_bubble(KeyEvent& event) {
     static_cast<void>(handle_docking_key(event));
+    pass_key_to_main_window(event);
+}
+
+// A floating site is its window's root, so a key reaching it here was taken
+// by nothing on the route: this window's accelerators are tried, then the
+// main window's (owner decision DK-29, F2-1), so its shortcuts work from a
+// floating window.
+void DockSite::pass_key_to_main_window(KeyEvent& event) {
+    if (event.handled || event.action != KeyAction::down || !floating() || workspace_ == nullptr) return;
+    Window* const own = attached_window();
+    const DockSite* const main_site = (*workspace_).site();
+    Window* const main = main_site == nullptr ? nullptr : (*main_site).attached_window();
+    if (own == nullptr || main == nullptr || main == own) return;
+    const Control::Ptr keep = shared_from_this();
+    if ((*own).offer_accelerators(event) || (*main).offer_accelerators(event)) event.handled = true;
 }
 
 // The shown documents in most-recently-used order (owner decision DK-46):
@@ -1770,15 +1824,16 @@ bool DockSite::position_command_enabled(const DockPanelId& panel, DockPositionCo
     const DockPanelLocation location = layout.locate(panel);
     if (descriptor == nullptr) return false;
     const bool auto_hidden = location.placement == DockPlacementKind::auto_hidden;
-    if (location.placement != DockPlacementKind::docked && !auto_hidden) return false;
+    const bool floating_panel = location.placement == DockPlacementKind::floating;
+    if (location.placement != DockPlacementKind::docked && !auto_hidden && !floating_panel) return false;
     const DockNode* const stack = layout.find_node(location.stack);
     const bool in_documents = stack != nullptr && (*stack).kind == DockNodeKind::document_stack;
     const bool tool = (*descriptor).kind == DockPanelKind::tool;
     bool enabled = false;
     switch (command) {
     case DockPositionCommand::float_panel:
-        // Floating windows are phase D4.
-        enabled = false;
+        // While the workspace has windows and the panel may float (phase D4).
+        enabled = !floating_panel && (*workspace_).can_float(DockSubject::of_panel(panel));
         break;
     case DockPositionCommand::auto_hide: {
         // A root-level tool stack (DK decision 28) that the layout lets go to
@@ -1797,6 +1852,10 @@ bool DockSite::position_command_enabled(const DockPanelId& panel, DockPositionCo
             transaction.origin = DockEditOrigin::user;
             transaction.edits.push_back(DockEdit::unpin(location.stack));
             enabled = static_cast<bool>(layout.check(transaction));
+            break;
+        }
+        if (floating_panel) {
+            enabled = (*workspace_).dock_back_edit(DockSubject::of_panel(panel)).has_value();
             break;
         }
         enabled = tool && in_documents && (*descriptor).allowed.docked;
@@ -1826,6 +1885,31 @@ bool DockSite::run_position_command(const DockPanelId& panel, DockPositionComman
     if (command == DockPositionCommand::move) {
         const bool started = begin_keyboard_move(panel);
         return started;
+    }
+    if (command == DockPositionCommand::float_panel) {
+        // Where it floated last, else where it stands now (phase D4).
+        Rect frame{100.0, 100.0, 320.0, 240.0};
+        bool remembered = false;
+        for (const DockPanelRecord& record : (*workspace_).layout().state().panels) {
+            if (!(record.id == panel) || !record.floating) continue;
+            frame = (*record.floating).frame;
+            remembered = true;
+        }
+        const StackSlot* const slot = slot_for(location.stack);
+        if (!remembered && slot != nullptr && !(*slot).bounds.empty()) {
+            const std::optional<Point> corner = to_desktop(Point{(*slot).bounds.x, (*slot).bounds.y});
+            if (corner) frame = {(*corner).x, (*corner).y, (*slot).bounds.width, (*slot).bounds.height};
+        }
+        if (flyout_panel_ && flyout_stack_ == location.stack) close_flyout(DockFlyoutCause::pointer);
+        result = (*workspace_).float_subject(DockSubject::of_panel(panel), frame);
+        if (result) static_cast<void>((*workspace_).activate_panel(panel, DockActivationCause::keyboard));
+        const bool applied = result.applied;
+        return applied;
+    }
+    if (command == DockPositionCommand::dock && location.placement == DockPlacementKind::floating) {
+        result = (*workspace_).dock_back(DockSubject::of_panel(panel));
+        const bool applied = result.applied;
+        return applied;
     }
     if (command == DockPositionCommand::auto_hide) {
         // The whole stack goes to the window edge nearest it, keeping its
@@ -1888,7 +1972,8 @@ bool DockSite::show_position_menu(const DockPanelId& panel, MenuOpenMode mode) {
     }
     if (workspace_ == nullptr || attached_window() == nullptr) return false;
     const DockPanelLocation location = (*workspace_).layout().locate(panel);
-    if (location.placement != DockPlacementKind::docked && location.placement != DockPlacementKind::auto_hidden) {
+    if (location.placement != DockPlacementKind::docked && location.placement != DockPlacementKind::auto_hidden &&
+        location.placement != DockPlacementKind::floating) {
         return false;
     }
     std::size_t index = stacks_.size();
@@ -1908,7 +1993,7 @@ bool DockSite::show_position_menu(const DockPanelId& panel, MenuOpenMode mode) {
     // Dock is checked while the panel stands in a docked tool stack, Auto
     // Hide while it is auto-hidden.
     (*menu_commands_[command_index(DockPositionCommand::dock)])
-        .set_checked(slot.kind == DockNodeKind::tool_stack && !slot.auto_hidden);
+        .set_checked(slot.kind == DockNodeKind::tool_stack && !slot.auto_hidden && !floating());
     (*menu_commands_[command_index(DockPositionCommand::auto_hide)]).set_checked(slot.auto_hidden);
     const std::string prefix(stable_id().value());
     std::vector<MenuItemSpec> items{};

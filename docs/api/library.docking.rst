@@ -498,6 +498,10 @@ Related types
 
       True for the change published by a restore. Default: ``{false}``.
 
+   .. cpp:member:: bool frames_only
+
+      True when every edit was set_floating_frame: a floating window moved or resized and no site's tree changed (phase D4), so realizing controls need not rebuild. Default: ``{false}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: DockLayoutState final
@@ -961,6 +965,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DockDropEdges
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   .. cpp:enumerator:: global
+
+   .. cpp:enumerator:: none
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: DockDropTargetKind
 
    ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
@@ -1288,17 +1302,17 @@ Functions, constants and aliases
 
    The zone of ``pane`` a point selects from its position alone.
 
-.. cpp:function:: DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale) noexcept
+.. cpp:function:: DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale, DockDropEdges edges = DockDropEdges::global) noexcept
 
-   What a point hovers: the site's edge tiles and bands first, then the pane containing it (a cross tile under the point, else its zone).
+   What a point hovers: the site's edge tiles and bands first (unless ``edges`` is none), then the pane containing it (a cross tile under the point, else its zone).
 
 .. cpp:function:: DockEdit dock_drop_edit(const DockSubject& subject, DockDropTargetKind kind, DockNodeId pane, DockDropZone zone)
 
    The edit a target makes for ``subject``: dock_into a stack or the empty document area for the centre, dock_beside a pane for a side, dock_at_edge for an edge.
 
-.. cpp:function:: void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack, Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out)
+.. cpp:function:: void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack, Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out, DockDropEdges edges = DockDropEdges::global)
 
-   Fills ``out`` (cleared first) with every target of a drag of ``subject`` over ``panes`` and the site's edges that ``layout`` accepts as a user edit (DockLayout::check, so the three restriction layers and the user lock decide): each pane's zones in DockDropZone order, panes in the order given (the keyboard's Tab order), then the edges top, left, right, bottom. The centre of ``own_stack`` (where a dragged panel came from) is left out: dropping a panel back into its own stack changes nothing. A side a document stack refuses is tried beside its document area (DockDropPane).
+   Fills ``out`` (cleared first) with every target of a drag of ``subject`` over ``panes`` and the site's edges that ``layout`` accepts as a user edit (DockLayout::check, so the three restriction layers and the user lock decide): each pane's zones in DockDropZone order, panes in the order given (the keyboard's Tab order), then, unless ``edges`` is none, the edges top, left, right, bottom. The centre of ``own_stack`` (where a dragged panel came from) is left out: dropping a panel back into its own stack changes nothing. A side a document stack refuses is tried beside its document area (DockDropPane).
 
 .. cpp:function:: std::optional<std::size_t> find_dock_drop_target(std::span<const DockDropTarget> targets, std::span<const DockDropPane> panes, const DockDropHit& hit) noexcept
 

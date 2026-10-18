@@ -608,6 +608,13 @@ public:
     [[nodiscard]] AcceleratorToken register_accelerator(
         Component& owner, KeyGesture gesture, std::function<bool()> callback,
         AcceleratorOptions options = {});
+    // Offers a key press to this window's accelerators that wait for the
+    // focused route (those not before_focused_route), as a key the window's
+    // own route declined would be: true when one took it. For a window
+    // passing on keys it did not use, as a floating docking window passes
+    // them to its main window (stage DK phase D4, owner decision DK-29:
+    // shortcuts work from a floating tool window). UI thread.
+    bool offer_accelerators(const KeyEvent& event);
     // The command routing chain (owner decision DK-29; the order is in
     // gui_forms/commands/command_route). Names the target of the active
     // panel, active document or main window stage, or clears it with null.

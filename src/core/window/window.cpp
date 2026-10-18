@@ -354,6 +354,12 @@ void Window::close_accelerator(
     accelerators_.erase(found);
 }
 
+bool Window::offer_accelerators(const KeyEvent& event) {
+    require_ui_thread("accelerator offer");
+    const bool taken = dispatch_accelerator(event, false);
+    return taken;
+}
+
 bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
     if (event.action != KeyAction::down) return false;
     const AcceleratorList snapshot = accelerators_;
