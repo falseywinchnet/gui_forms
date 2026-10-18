@@ -150,6 +150,15 @@ const char* image_sampling_name(ImageSampling value) noexcept {
     return "unknown";
 }
 
+const char* text_orientation_name(TextOrientation value) noexcept {
+    switch (value) {
+    case TextOrientation::horizontal: return "horizontal";
+    case TextOrientation::bottom_to_top: return "bottom_to_top";
+    case TextOrientation::top_to_bottom: return "top_to_bottom";
+    }
+    return "unknown";
+}
+
 const char* material_edge_name(MaterialEdge edge) noexcept {
     switch (edge) {
     case MaterialEdge::top: return "top";
@@ -274,6 +283,8 @@ void append_operation(std::ostringstream& output,
     output << ",\"text_byte_count\":" << operation.text_byte_count
            << ",\"text\":";
     append_json_string(output, operation.text);
+    output << ",\"text_orientation\":";
+    append_json_string(output, text_orientation_name(operation.text_orientation));
     output << '}';
 }
 

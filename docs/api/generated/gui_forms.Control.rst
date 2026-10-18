@@ -121,6 +121,9 @@ gui_forms::Control
          The theme in use: the nearest :cpp:func:`theme_override <gui_forms::Control::theme_override>` on this control or an
          ancestor, else the window's theme, else the default theme.
 
+      **effective_key_map** : ``KeyMap``, read-only
+         The attached window's key map (Window::key_map), or the PC convention's while detached. A control asks it whether a key event is a named keyboard command instead of naming the keys itself.
+
       **theme_override** : ``std::shared_ptr<const Theme>``
          A theme for this control and its subtree instead of the inherited one,
          or null. Setting null throws ``std::invalid_argument``; use
@@ -233,6 +236,9 @@ gui_forms::Control
 
       **accessible_description** : ``std::string``
          A longer description for assistive technology. Empty by default.
+
+      **command_target** : ``std::shared_ptr<CommandTarget>``
+         The command target this control offers its window's command routing chain while focus is on it or inside it (the focused route, owner decision DK-29; see gui_forms/commands/command_route). The control shares ownership, so a docking workspace may also name the same target as an active panel's or document's. None by default.
 
       **effective_cursor** : ``CursorKind``, read-only
          The cursor in use: the :cpp:func:`cursor <gui_forms::Control::cursor>` of this control or of its nearest
@@ -691,6 +697,10 @@ gui_forms::Control
       The theme in use: the nearest :cpp:func:`theme_override <gui_forms::Control::theme_override>` on this control or an
       ancestor, else the window's theme, else the default theme.
 
+   .. cpp:function:: const KeyMap& effective_key_map() const noexcept
+
+      The attached window's key map (Window::key_map), or the PC convention's while detached. A control asks it whether a key event is a named keyboard command instead of naming the keys itself.
+
    .. cpp:function:: std::shared_ptr<const Theme> theme_override() const noexcept
 
       A theme for this control and its subtree instead of the inherited one,
@@ -911,6 +921,12 @@ gui_forms::Control
    .. cpp:function:: void set_accessible_description(std::string description)
 
       Sets :cpp:func:`accessible_description <gui_forms::Control::accessible_description>`; see the property's description above.
+
+   .. cpp:function:: const std::shared_ptr<CommandTarget>& command_target() const noexcept
+
+      The command target this control offers its window's command routing chain while focus is on it or inside it (the focused route, owner decision DK-29; see gui_forms/commands/command_route). The control shares ownership, so a docking workspace may also name the same target as an active panel's or document's. None by default.
+
+   .. cpp:function:: void set_command_target(std::shared_ptr<CommandTarget> target) noexcept
 
    .. cpp:function:: CursorKind effective_cursor() const noexcept
 

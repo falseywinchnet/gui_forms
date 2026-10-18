@@ -124,6 +124,8 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.position_in_set = descriptor.position_in_set;
     node.set_size = descriptor.set_size;
     node.has_popup = descriptor.has_popup;
+    node.controlled_panel = descriptor.controlled_panel;
+    node.orientation = descriptor.orientation;
     node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
@@ -352,6 +354,12 @@ void Window::close_accelerator(
     accelerators_.erase(found);
 }
 
+bool Window::offer_accelerators(const KeyEvent& event) {
+    require_ui_thread("accelerator offer");
+    const bool taken = dispatch_accelerator(event, false);
+    return taken;
+}
+
 bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
     if (event.action != KeyAction::down) return false;
     const AcceleratorList snapshot = accelerators_;
@@ -542,6 +550,14 @@ bool Window::request_focus(const Control::Ptr& control) {
             FocusChangePublication{this, control, true});
     }
     metrics_.record_focus_transition();
+    FocusedControlChange moved{};
+    if (previous) moved.previous_id = (*previous).runtime_id();
+    const Control::Ptr current = focused_.lock();
+    if (current) {
+        moved.current_id = (*current).runtime_id();
+        moved.stable_id = std::string((*current).stable_id().value());
+    }
+    focused_control_changed_.emit(moved);
     return true;
 }
 

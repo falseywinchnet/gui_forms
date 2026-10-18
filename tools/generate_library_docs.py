@@ -91,6 +91,12 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "Retained events and owned handlers, application-owned `Value` state, "
           "command bindings and semantic feedback records.",
           ("event", "value", "commands", "feedback")),
+    Group("pages", "Pages",
+          "The renderer-free page model shared by page strips, page views and "
+          "docking stacks: stable page identities, order with a pinned group, "
+          "cancellable selection, activation history, batches, and moving a page "
+          "with its content between sets.",
+          ("pages",)),
     Group("input-and-semantics", "Input and semantics",
           "Pointer, keyboard, text and drag event records, and the semantic tree "
           "published to accessibility and automation.",
@@ -112,6 +118,15 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "prepared-text, text-mask and document-view services.",
           ("text", "text_shaping", "typography", "prepared_text", "text_mask",
            "document_view")),
+    Group("docking", "Docking",
+          "The renderer-free docking layout model: binary splits, tool and "
+          "document stacks, floating sites, auto-hide, placeholders, "
+          "restrictions, transactions and saved layouts.",
+          ("docking",)),
+    Group("xml", "XML documents",
+          "The bounded first-party XML reader and writer that GUI.Forms uses "
+          "for its own files, such as saved docking layouts.",
+          ("xml",)),
     Group("images-and-resources", "Images and resources",
           "The window-owned image registry and its PNG resource records.",
           ("resources",)),

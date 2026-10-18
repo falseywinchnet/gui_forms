@@ -26,6 +26,7 @@ struct MenuSnapshot final {
     CommandState command_state;
     std::string text;
     std::vector<MenuSnapshot> children;
+    bool italic{};
 };
 
 struct ConsecutiveSeparators final {
@@ -90,6 +91,7 @@ inline std::vector<MenuSnapshot> snapshot_items(
         snapshot.kind = spec.kind;
         snapshot.command = spec.command;
         snapshot.text = spec.text;
+        snapshot.italic = spec.italic;
         if (spec.command) {
             snapshot.command_state = (*spec.command).state();
             if (!snapshot.command_state.visible) continue;

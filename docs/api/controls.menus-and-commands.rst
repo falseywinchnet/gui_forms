@@ -15,6 +15,12 @@ Commands, menu strips and context menus.
      - A window's menu bar: a row of top-level menus such as File, Edit and View.
    * - :cpp:class:`ToolStrip <gui_forms::ToolStrip>`
      - A command strip of buttons, labels, separators and drop-down buttons.
+   * - :cpp:class:`RibbonFontControl <gui_forms::RibbonFontControl>`
+     - A ribbon font control: a family list and a size list choosing one font.
+   * - :cpp:class:`RibbonColorPicker <gui_forms::RibbonColorPicker>`
+     - A ribbon drop-down colour picker: a split button over a palette popup.
+   * - :cpp:class:`BackstageView <gui_forms::BackstageView>`
+     - The File tab's full page: a column of commands and topics beside the topic's page.
    * - :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>`
      - A ribbon gallery: a grid of image items in categories, in the ribbon or as a drop-down.
    * - :cpp:class:`StatusStrip <gui_forms::StatusStrip>`
@@ -33,6 +39,10 @@ Commands, menu strips and context menus.
      - A popup menu of commands that the application opens at a point, such as on a right-click.
    * - :cpp:class:`Command <gui_forms::Command>`
      - An application action, such as Save or Copy, shared by every button, menu item and shortcut that triggers it.
+   * - :cpp:class:`FontCommand <gui_forms::FontCommand>`
+     - The value command of a font control: a shared Command and a font choice.
+   * - :cpp:class:`ColorCommand <gui_forms::ColorCommand>`
+     - The value command of a colour picker: a shared Command, a colour and the recent colours.
    * - :cpp:class:`GalleryCommand <gui_forms::GalleryCommand>`
      - The value command of a gallery: a shared Command, the chosen item, and live preview.
 
@@ -41,6 +51,9 @@ Commands, menu strips and context menus.
 
    generated/gui_forms.MenuStrip
    generated/gui_forms.ToolStrip
+   generated/gui_forms.RibbonFontControl
+   generated/gui_forms.RibbonColorPicker
+   generated/gui_forms.BackstageView
    generated/gui_forms.RibbonGallery
    generated/gui_forms.StatusStrip
    generated/gui_forms.QuickAccessToolbar
@@ -50,6 +63,8 @@ Commands, menu strips and context menus.
    generated/gui_forms.Ribbon
    generated/gui_forms.ContextMenu
    generated/gui_forms.Command
+   generated/gui_forms.FontCommand
+   generated/gui_forms.ColorCommand
    generated/gui_forms.GalleryCommand
 
 Related types
@@ -59,8 +74,22 @@ Related types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`BackstageItemSpec <gui_forms::BackstageItemSpec>`
+     -  
+   * - :cpp:class:`BackstageTopicChange <gui_forms::BackstageTopicChange>`
+     - The selected topic after it changed.
+   * - :cpp:class:`BackstageView::Item <gui_forms::BackstageView::Item>`
+     -  
+   * - :cpp:class:`BackstageView::ItemParts <gui_forms::BackstageView::ItemParts>`
+     - The "backstage_item" item system: one column entry.
+   * - :cpp:class:`BackstageView::ItemStates <gui_forms::BackstageView::ItemStates>`
+     -  
+   * - :cpp:class:`BackstageView::Parts <gui_forms::BackstageView::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`BindingNavigatorAddNew <gui_forms::BindingNavigatorAddNew>`
      - Raised by a BindingNavigator's add command.
+   * - :cpp:class:`FontChoice <gui_forms::FontChoice>`
+     - A font as a font control shows and chooses it: a family name and a size in points.
    * - :cpp:class:`GalleryPreview <gui_forms::GalleryPreview>`
      - A preview a gallery asks the application to show (preview_requested) or to withdraw (preview_cancelled): the gallery item's stable ID and the stable ID of the gallery that asked.
    * - :cpp:class:`MenuItemInvocation <gui_forms::MenuItemInvocation>`
@@ -105,6 +134,14 @@ Related types
      - The "tab" item system: one core tab on the tab row.
    * - :cpp:class:`Ribbon::TabStates <gui_forms::Ribbon::TabStates>`
      -  
+   * - :cpp:class:`RibbonColorPicker::PaletteEntry <gui_forms::RibbonColorPicker::PaletteEntry>`
+     -  
+   * - :cpp:class:`RibbonColorPicker::PaletteEntryParts <gui_forms::RibbonColorPicker::PaletteEntryParts>`
+     - The palette's entries, as its "palette_entry" item system: Automatic, then the palette, then the recent colours.
+   * - :cpp:class:`RibbonColorPicker::PaletteEntryStates <gui_forms::RibbonColorPicker::PaletteEntryStates>`
+     -  
+   * - :cpp:class:`RibbonColorPicker::Parts <gui_forms::RibbonColorPicker::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`RibbonCommandClick <gui_forms::RibbonCommandClick>`
      - A click on a button-family command (or its split face), after its Command ran.
    * - :cpp:class:`RibbonCommandSpec <gui_forms::RibbonCommandSpec>`
@@ -113,6 +150,8 @@ Related types
      - A click on a group's dialog launcher.
    * - :cpp:class:`RibbonDropDownInvocation <gui_forms::RibbonDropDownInvocation>`
      - A choice from a split or drop-down command's menu.
+   * - :cpp:class:`RibbonFontControl::Parts <gui_forms::RibbonFontControl::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`RibbonGallery::Category <gui_forms::RibbonGallery::Category>`
      -  
    * - :cpp:class:`RibbonGallery::CategoryParts <gui_forms::RibbonGallery::CategoryParts>`
@@ -137,6 +176,10 @@ Related types
      - One entry of a tab's reduction ladder: every group's state and the width, in logical units, the groups need side by side.
    * - :cpp:class:`RibbonLadderGroupState <gui_forms::RibbonLadderGroupState>`
      - One group's place in a ladder entry: its layout (an index into Ribbon::group_layouts), that layout's size, and its gallery's column count (zero without a gallery).
+   * - :cpp:class:`RibbonRecentItem <gui_forms::RibbonRecentItem>`
+     - One item of the application menu's recent pane (stage RB, phase 6): a recently used document, shown numbered under the pane's caption, with its ``description`` (a folder, say) for accessibility.
+   * - :cpp:class:`RibbonRecentItemInvocation <gui_forms::RibbonRecentItemInvocation>`
+     - A choice from the recent pane.
    * - :cpp:class:`RibbonReductionStep <gui_forms::RibbonReductionStep>`
      -  
    * - :cpp:class:`RibbonScalingCounters <gui_forms::RibbonScalingCounters>`
@@ -149,8 +192,10 @@ Related types
      - A parse never fails as a whole: a malformed known entry is reported and its built-in default kept, as the configuration contract (§7) asks.
    * - :cpp:class:`RibbonTabChange <gui_forms::RibbonTabChange>`
      - The selected tab after it changed.
+   * - :cpp:class:`RibbonTabSetSpec <gui_forms::RibbonTabSetSpec>`
+     - A contextual tab set (stage RB, phase 5): tabs that show while the application makes the set available, such as while a picture is selected.
    * - :cpp:class:`RibbonTabSpec <gui_forms::RibbonTabSpec>`
-     - A core tab.
+     - A tab.
    * - :cpp:class:`StatusStrip::Parts <gui_forms::StatusStrip::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's, and its items are ToolStrip's "item" system.
    * - :cpp:class:`ToolStrip::Item <gui_forms::ToolStrip::Item>`
@@ -176,6 +221,104 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: BackstageItemSpec final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: BackstageItemKind kind
+
+      Default: ``{BackstageItemKind::command}``.
+
+   .. cpp:member:: std::shared_ptr<Command> command
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: bool definitive
+
+   .. cpp:member:: Control::Ptr page
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackstageTopicChange final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   The selected topic after it changed.
+
+   .. cpp:member:: std::string backstage_id
+
+   .. cpp:member:: std::size_t item
+
+   .. cpp:member:: std::string topic_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackstageView::Item final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackstageView::ItemParts final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   The "backstage_item" item system: one column entry.
+
+   .. cpp:member:: PartGeometry item_face
+
+   .. cpp:member:: PartGeometry item_icon
+
+   .. cpp:member:: PartGeometry item_label
+
+   .. cpp:member:: PartGeometry item_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackstageView::ItemStates final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: BackstageView::Parts final
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry column
+
+   .. cpp:member:: PartGeometry page
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: BindingNavigatorAddNew final
 
    ``#include <gui_forms/controls/binding_navigator/binding_navigator.hpp>``
@@ -185,6 +328,18 @@ Related types
    .. cpp:member:: std::string navigator_id
 
    .. cpp:member:: std::optional<BindingRecord> record
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FontChoice final
+
+   ``#include <gui_forms/commands/font_command/font_command.hpp>``
+
+   A font as a font control shows and chooses it: a family name and a size in points. An empty family or a zero size is unknown, as for a selection whose text mixes fonts; the control shows that field empty.
+
+   .. cpp:member:: std::string family
+
+   .. cpp:member:: double size
 
 .. cpp:namespace:: gui_forms
 
@@ -240,6 +395,10 @@ Related types
    .. cpp:member:: std::string text
 
    .. cpp:member:: std::vector<MenuItemSpec> children
+
+   .. cpp:member:: bool italic
+
+      The row's text is set in the italic style. A presentational bridge: no anatomy state names why a row is set apart (PageStrip's list sets the pages it does not show in italic, owner decision DK-42, PT6).
 
 .. cpp:namespace:: gui_forms
 
@@ -445,6 +604,10 @@ Related types
 
    .. cpp:member:: PartGeometry command_gallery
 
+   .. cpp:member:: PartGeometry command_font_control
+
+   .. cpp:member:: PartGeometry command_color_picker
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: Ribbon::CommandStates final
@@ -579,6 +742,80 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RibbonColorPicker::PaletteEntry final
+
+   ``#include <gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RibbonPaletteEntryKind kind
+
+      Default: ``{RibbonPaletteEntryKind::palette}``.
+
+   .. cpp:member:: std::optional<Color> color
+
+   .. cpp:member:: PaletteEntryParts parts
+
+   .. cpp:member:: PaletteEntryStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonColorPicker::PaletteEntryParts final
+
+   ``#include <gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp>``
+
+   The palette's entries, as its "palette_entry" item system: Automatic, then the palette, then the recent colours.
+
+   .. cpp:member:: PartGeometry entry_face
+
+   .. cpp:member:: PartGeometry entry_well
+
+   .. cpp:member:: PartGeometry entry_sample
+
+   .. cpp:member:: PartGeometry entry_label
+
+   .. cpp:member:: PartGeometry entry_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonColorPicker::PaletteEntryStates final
+
+   ``#include <gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonColorPicker::Parts final
+
+   ``#include <gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry color_bar
+
+   .. cpp:member:: PartGeometry color_sample
+
+   .. cpp:member:: PartGeometry arrow
+
+   .. cpp:member:: PartGeometry arrow_glyph
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RibbonCommandClick final
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
@@ -595,7 +832,7 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   One command record. ``stable_id`` is unique within the ribbon (across tabs, groups and commands) and names the command in events, semantics and the published anatomy. A button, toggle or split takes its text (when ``text`` is empty), enabled, visible and checked state from its required ``command``, and runs it on a click; a drop-down's command is optional. ``text`` may carry a mnemonic ("&Paste"). Labels are always shown (owner decision 6); a small command with an image may leave its label out (``show_label`` false: an authored icon-only command, decision 30). ``drop_down`` is the menu of a split or drop-down command. A hosted command's ``text`` is its control's accessible name (and a check box's caption); ``choices`` are a combo box's items and ``width`` its width in logical units (zero for the default). A gallery command's ``gallery`` is an in-ribbon RibbonGallery the application made and configured; the ribbon adds it as its child and sets its column count.
+   One command record. ``stable_id`` is unique within the ribbon (across tabs, groups and commands) and names the command in events, semantics and the published anatomy. A button, toggle or split takes its text (when ``text`` is empty), enabled, visible and checked state from its required ``command``, and runs it on a click; a drop-down's command is optional. ``text`` may carry a mnemonic ("&Paste"). Labels are always shown (owner decision 6); a small command with an image may leave its label out (``show_label`` false: an authored icon-only command, decision 30). ``drop_down`` is the menu of a split or drop-down command. A hosted command's ``text`` is its control's accessible name (and a check box's caption); ``choices`` are a combo box's items and ``width`` its width in logical units (zero for the default). A gallery command's ``gallery`` is an in-ribbon RibbonGallery the application made and configured; the ribbon adds it as its child and sets its column count. A font control's ``font_control`` and a colour picker's ``color_picker`` are, likewise, the application's controls, which the ribbon adds and places on one row.
 
    .. cpp:member:: std::string stable_id
 
@@ -625,6 +862,10 @@ Related types
 
    .. cpp:member:: std::shared_ptr<RibbonGallery> gallery
 
+   .. cpp:member:: std::shared_ptr<RibbonFontControl> font_control
+
+   .. cpp:member:: std::shared_ptr<RibbonColorPicker> color_picker
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: RibbonDialogLaunch final
@@ -650,6 +891,20 @@ Related types
    .. cpp:member:: std::string command_id
 
    .. cpp:member:: MenuItemInvocation choice
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonFontControl::Parts final
+
+   ``#include <gui_forms/controls/ribbon_font_control/ribbon_font_control.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry family_field
+
+   .. cpp:member:: PartGeometry size_field
 
 .. cpp:namespace:: gui_forms
 
@@ -809,7 +1064,7 @@ Related types
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner. ``image`` is the icon of the group's collapsed button (none: the first command image). ``layouts`` are its size definitions, largest first; empty layouts are generated (Ribbon::group_layouts).
+   A group of commands on a tab, with a caption beneath and, when ``dialog_launcher`` is set, a launcher button in the caption's corner. ``image`` is the icon of the group's collapsed button (none: the first command image). ``layouts`` are its size definitions, largest first; empty layouts are generated (Ribbon::group_layouts). ``modes`` are the application modes it shows in.
 
    .. cpp:member:: std::string stable_id
 
@@ -822,6 +1077,10 @@ Related types
    .. cpp:member:: ImageId image
 
    .. cpp:member:: std::vector<RibbonGroupLayout> layouts
+
+   .. cpp:member:: std::uint32_t modes
+
+      Default: ``{ribbon_all_modes}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -850,6 +1109,32 @@ Related types
       Default: ``{RibbonGroupSize::large}``.
 
    .. cpp:member:: std::size_t gallery_columns
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonRecentItem final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   One item of the application menu's recent pane (stage RB, phase 6): a recently used document, shown numbered under the pane's caption, with its ``description`` (a folder, say) for accessibility.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::string description
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonRecentItemInvocation final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A choice from the recent pane.
+
+   .. cpp:member:: std::string ribbon_id
+
+   .. cpp:member:: std::string item_id
 
 .. cpp:namespace:: gui_forms
 
@@ -943,11 +1228,23 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RibbonTabSetSpec final
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   A contextual tab set (stage RB, phase 5): tabs that show while the application makes the set available, such as while a picture is selected. A shown set is marked by a tint from the theme's accent ramp on its tabs and on the command plane of its selected tab (owner decisions 14, 22, 25), with no captioned band; ``caption`` ("Picture Tools") names the set to accessibility.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string caption
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: RibbonTabSpec final
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
 
-   A core tab. ``text`` may carry a mnemonic ("&Home"). ``reduction_order`` is the order in which its groups shrink as the ribbon narrows; after it (or without it) every group that can still shrink does so one step at a time, right to left, repeating (WPF's cycle, decision 32).
+   A tab. ``text`` may carry a mnemonic ("&Home"). ``reduction_order`` is the order in which its groups shrink as the ribbon narrows; after it (or without it) every group that can still shrink does so one step at a time, right to left, repeating (WPF's cycle, decision 32). ``tab_set`` names the contextual tab set the tab belongs to (empty: a core tab); ``modes`` are the application modes it shows in.
 
    .. cpp:member:: std::string stable_id
 
@@ -956,6 +1253,12 @@ Related types
    .. cpp:member:: std::vector<RibbonGroupSpec> groups
 
    .. cpp:member:: std::vector<RibbonReductionStep> reduction_order
+
+   .. cpp:member:: std::string tab_set
+
+   .. cpp:member:: std::uint32_t modes
+
+      Default: ``{ribbon_all_modes}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1184,6 +1487,16 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: BackstageItemKind
+
+   ``#include <gui_forms/controls/backstage_view/backstage_view.hpp>``
+
+   .. cpp:enumerator:: command
+
+   .. cpp:enumerator:: topic
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: MenuItemKind
 
    ``#include <gui_forms/components/context_menu/context_menu.hpp>``
@@ -1278,6 +1591,10 @@ Enumerations
 
    .. cpp:enumerator:: gallery
 
+   .. cpp:enumerator:: font_control
+
+   .. cpp:enumerator:: color_picker
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: RibbonCommandSize
@@ -1314,6 +1631,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RibbonPaletteEntryKind
+
+   ``#include <gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: palette
+
+   .. cpp:enumerator:: recent
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: RibbonReductionKind
 
    ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
@@ -1339,6 +1668,18 @@ Enumerations
    .. cpp:enumerator:: duplicate_key
 
    .. cpp:enumerator:: too_many_commands
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RibbonTabSetAvailability
+
+   ``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+   .. cpp:enumerator:: not_available
+
+   .. cpp:enumerator:: available
+
+   .. cpp:enumerator:: active
 
 .. cpp:namespace:: gui_forms
 
@@ -1438,3 +1779,11 @@ Functions, constants and aliases
    The toolbar's part of the state, and its application to a toolbar. ``minimized`` is the Ribbon's, which applies it. Command IDs the toolbar does not declare survive apply and capture (the toolbar keeps them, inert); unrecognized entries are not the toolbar's, so capture returns none and a caller that keeps them copies them from the state it loaded. Applying sets the toolbar's shown commands and placement, emitting placement_changed when the placement changes.
 
 .. cpp:function:: void apply_ribbon_state(QuickAccessToolbar& toolbar, const RibbonState& state)
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/controls/ribbon/ribbon.hpp>``
+
+.. cpp:var:: constexpr std::uint32_t ribbon_all_modes
+
+   The application modes a tab or group belongs to (stage RB, phase 5; owner decision 14, F2-1, after the Windows Ribbon Framework's application modes): one bit per mode, 32 modes. A tab or group shows while it shares a bit with Ribbon::application_modes. Every mode by default. Value: ``0xFFFFFFFFU``.

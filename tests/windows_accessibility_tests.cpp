@@ -1,6 +1,7 @@
 #include "gui_forms/application.hpp"
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/input_controls.hpp"
+#include "gui_forms/container_controls.hpp"
 #include <windows.h>
 #include <oleacc.h>
 #include <iostream>
@@ -34,10 +35,16 @@ struct Probe {
     AccessibleOwner retained;
     void clicked(ButtonBase&) { ++count; }
 };
+LONG role_of(IAccessible& object) {
+    VARIANT role{};
+    if (FAILED(object.get_accRole(self(), &role)) || role.vt != VT_I4) { return -1; }
+    return role.lVal;
+}
 struct Ready {
     Probe* probe;
     std::shared_ptr<NumericUpDown> number;
     std::shared_ptr<TextBox> text;
+    std::shared_ptr<TabControl> tabs;
     void operator()(gui_forms::Window& window, ApplicationWindowHandle handle) const {
         HWND hwnd = FindWindowW(L"GUIForms.Window.v1", L"GUI.Forms accessibility fixture");
         require(hwnd != nullptr, "native window exists");
@@ -74,6 +81,19 @@ struct Ready {
         require((*coordinate.value).accHitTest(x + width / 2, y + height / 2, &hit) == S_OK &&
             hit.vt == VT_I4 && hit.lVal == CHILDID_SELF, "hit testing a leaf returns CHILDID_SELF");
         VariantClear(&hit);
+        // Docking vocabulary (DK-35, DK-40): a tab page is a property page,
+        // and a tab's default action, with press no longer published, is
+        // select.
+        AccessibleOwner page; page.value = named(*root.value, L"Overview page");
+        require(page.value && role_of(*page.value) == ROLE_SYSTEM_PROPERTYPAGE, "a tab panel is an MSAA property page");
+        AccessibleOwner tab; tab.value = named(*root.value, L"Details");
+        require(tab.value && role_of(*tab.value) == ROLE_SYSTEM_PAGETAB, "a tab is an MSAA page tab");
+        BSTR action = nullptr;
+        require((*tab.value).get_accDefaultAction(self(), &action) == S_OK && action && wcscmp(action, L"select") == 0,
+            "a tab's default action is select");
+        SysFreeString(action);
+        require(SUCCEEDED((*tab.value).accDoDefaultAction(self())) && (*tabs).selected_index() == 1U,
+            "the default action selects the tab");
         require(handle.request_close().accepted(), "fixture closes");
     }
 };
@@ -87,8 +107,14 @@ int main() {
         (*number).set_accessible_name("Canvas X"); (*number).set_requested_bounds({10, 50, 160, 30}); (*number).set_range(0, 200); (*root).add_child(number);
         std::shared_ptr<TextBox> text = make_control<TextBox>(StableId("text"));
         (*text).set_accessible_name("Artwork text"); (*text).set_requested_bounds({10, 90, 160, 30}); (*root).add_child(text);
+        std::shared_ptr<TabControl> tabs = make_control<TabControl>(StableId("tabs"));
+        (*tabs).set_requested_bounds({200, 10, 190, 150}); (*root).add_child(tabs);
+        std::shared_ptr<TabPage> overview = make_control<TabPage>(StableId("tabs.overview"), "Overview");
+        (*overview).set_accessible_name("Overview page"); (*tabs).add_page(overview);
+        std::shared_ptr<TabPage> details = make_control<TabPage>(StableId("tabs.details"), "Details");
+        (*details).set_accessible_name("Details page"); (*tabs).add_page(details);
         Probe probe; SubscriptionToken token = (*button).clicked().subscribe(Delegate<ButtonBase&>::bind<Probe, &Probe::clicked>(probe));
-        ApplicationWindowOptions options; options.title = "GUI.Forms accessibility fixture"; options.ready = Ready{&probe, number, text};
+        ApplicationWindowOptions options; options.title = "GUI.Forms accessibility fixture"; options.ready = Ready{&probe, number, text, tabs};
         const ApplicationResult result = Application::run(std::make_unique<gui_forms::Window>(root, Size{400, 300}), options);
         if (result.callback_exception) { std::rethrow_exception(result.callback_exception); }
         require(result.accepted(), "native fixture completed");

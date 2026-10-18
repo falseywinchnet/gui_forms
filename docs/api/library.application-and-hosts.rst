@@ -59,6 +59,10 @@ Related types
      - HostActivationEvent carries portable top-level activation state.
    * - :cpp:class:`HostAttachEvent <gui_forms::HostAttachEvent>`
      - HostAttachEvent is the sole constructed-to-attached transition and carries initial logical client size and device scale.
+   * - :cpp:class:`HostAutoCompleteRequest <gui_forms::HostAutoCompleteRequest>`
+     - ``prefix_utf8`` is borrowed for the call.
+   * - :cpp:class:`HostAutoCompleteResult <gui_forms::HostAutoCompleteResult>`
+     -  
    * - :cpp:class:`HostCapabilities <gui_forms::HostCapabilities>`
      - HostCapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative.
    * - :cpp:class:`HostClipboardFilesResult <gui_forms::HostClipboardFilesResult>`
@@ -389,6 +393,34 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: HostAutoCompleteRequest final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   ``prefix_utf8`` is borrowed for the call. A host returns at most ``maximum_candidates`` strings, each valid UTF-8, in its own order.
+
+   .. cpp:member:: HostAutoCompleteSource source
+
+      Default: ``{HostAutoCompleteSource::file_system}``.
+
+   .. cpp:member:: std::string_view prefix_utf8
+
+   .. cpp:member:: std::size_t maximum_candidates
+
+      Default: ``{256U}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostAutoCompleteResult final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: std::vector<std::string> candidates_utf8
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: HostCapabilities final
 
    ``#include <gui_forms/host/types/host_capabilities/host_capabilities.hpp>``
@@ -411,7 +443,7 @@ Related types
 
    .. cpp:member:: constexpr std::uint32_t current_protocol_version
 
-      Default: ``7``.
+      8: the host's keyboard-command defaults (``key_map``). Default: ``8``.
 
    .. cpp:member:: std::uint32_t protocol_version
 
@@ -424,6 +456,10 @@ Related types
    .. cpp:member:: HostCapability available
 
       Default: ``{HostCapability::none}``.
+
+   .. cpp:member:: KeyMap key_map
+
+      The keys this host's convention gives the named keyboard commands (owner decision DK-30, interview G5-1): host data, not core policy. The first HostSession of an application seeds the application's KeyBindings with it (owner decision DK-44); the application's rebindings stay over it. Default: ``{pc_key_map()}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -945,6 +981,10 @@ Related types
 
       Reads local file references without opening or decoding their contents.
 
+   .. cpp:function:: HostAutoCompleteResult query_auto_complete(const HostAutoCompleteRequest& request)
+
+      Completion candidates from a host-owned source (TextBox and ComboBox auto-complete). No host adapter supplies any yet: the base implementation reports unsupported. Accepted results are bounded to the request's maximum and to valid, non-empty UTF-8 strings without NUL; anything else is reported as backend_failure with no candidates.
+
    .. cpp:function:: HostServiceStatus write_clipboard_image(HostImageView image)
 
       Copies an image to the native clipboard before returning. Does not retain the borrowed view. Replaces clipboard contents on successful publication.
@@ -1053,6 +1093,10 @@ Related types
       *Protected.*
 
    .. cpp:function:: virtual HostClipboardFilesResult read_clipboard_files_impl()
+
+      *Protected.*
+
+   .. cpp:function:: virtual HostAutoCompleteResult query_auto_complete_impl(const HostAutoCompleteRequest& request)
 
       *Protected.*
 
@@ -2455,6 +2499,24 @@ Enumerations
    .. cpp:enumerator:: released
 
    .. cpp:enumerator:: revoked
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: HostAutoCompleteSource
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:enumerator:: file_system
+
+   .. cpp:enumerator:: file_system_directories
+
+   .. cpp:enumerator:: history_list
+
+   .. cpp:enumerator:: recently_used_list
+
+   .. cpp:enumerator:: all_url
+
+   .. cpp:enumerator:: all_system_sources
 
 .. cpp:namespace:: gui_forms
 

@@ -30,7 +30,7 @@ void TabPage::set_text(std::string text) {
 
 SemanticDescriptor TabPage::semantic_descriptor() const {
     SemanticDescriptor descriptor;
-    descriptor.role = SemanticRole::group;
+    descriptor.role = SemanticRole::tab_panel;
     descriptor.name = accessible_name().empty() ? text_ : accessible_name();
     descriptor.description = accessible_description();
     descriptor.exposed = true;

@@ -261,6 +261,16 @@ Ribbon::CommandMetrics Ribbon::measure_command(const RibbonCommandSpec& command)
     const double scale = effective_text_scale();
     CommandMetrics metrics;
     if (command.kind == RibbonCommandKind::gallery) return metrics;
+    // The application's row controls measure themselves, without text.
+    if (command.kind == RibbonCommandKind::font_control || command.kind == RibbonCommandKind::color_picker) {
+        const Size natural = command.kind == RibbonCommandKind::font_control ? (*command.font_control).natural_size()
+                                                                            : (*command.color_picker).natural_size();
+        double width = natural.width;
+        if (command.width > 0.0) width = command.width * scale;
+        metrics.large_width = width;
+        metrics.small_width = width;
+        return metrics;
+    }
     if (hosted(command.kind)) {
         double width = command.width;
         if (width <= 0.0 && command.kind == RibbonCommandKind::combo_box) width = default_combo_box_width;
@@ -359,7 +369,7 @@ void Ribbon::build_ladder(std::size_t tab, TabScaling& scaling) const {
             for (std::size_t candidate = 0; candidate < groups; ++candidate) {
                 if (spec.groups[candidate].stable_id == step.group) group = candidate;
             }
-            if (group == groups) continue;
+            if (group == groups || !group_shown(tab, group)) continue;
             RibbonLadderGroupState& current = state[group];
             const bool collapsed = current.size == RibbonGroupSize::collapsed;
             if (step.kind == RibbonReductionKind::layout && current.layout + 1U < layouts[group].size()) {
@@ -376,6 +386,7 @@ void Ribbon::build_ladder(std::size_t tab, TabScaling& scaling) const {
         for (std::size_t tries = 0; !stepped && tries < groups; ++tries) {
             const std::size_t group = cursor;
             cursor = cursor == 0U ? groups - 1U : cursor - 1U;
+            if (!group_shown(tab, group)) continue;
             RibbonLadderGroupState& current = state[group];
             const bool collapsed = current.size == RibbonGroupSize::collapsed;
             if (scaling.galleries[group] && !collapsed &&
@@ -419,6 +430,8 @@ double Ribbon::place_group(const TabScaling& scaling, std::size_t tab, std::size
     const double scale = effective_text_scale();
     const RibbonGroupSpec& spec = tabs_[tab].groups[group];
     commands.assign(spec.commands.size(), Rect{});
+    // A group outside the application modes takes no room.
+    if (!group_shown(tab, group)) return 0.0;
     const double padding = group_padding * scale;
     const double gap = column_gap * scale;
     if (group_layout.size == RibbonGroupSize::collapsed) {
@@ -491,10 +504,14 @@ void Ribbon::place_plane(Layout& placed) const {
     const std::size_t groups = tabs_[tab].groups.size();
     std::vector<RibbonLadderEntry>::const_iterator found =
         std::lower_bound(ladder.begin(), ladder.end(), plane.width, EntryWiderThan{});
-    if (found == ladder.end()) {
+    // Within scroll_hysteresis of the narrowest entry a latched plane keeps
+    // scrolling though that entry fits (owner decision 45).
+    const bool fits = found != ladder.end();
+    if (!fits || scroll_latched_) {
         found = ladder.end() - 1;
         placed.scrolling = groups != 0U;
     }
+    const bool band = placed.scrolling && fits;
     const std::size_t step = static_cast<std::size_t>(found - ladder.begin());
     placed.step = step;
     const RibbonLadderEntry& entry = ladder[step];
@@ -522,7 +539,10 @@ void Ribbon::place_plane(Layout& placed) const {
     }
     const double plane_right = plane.x + plane.width;
     double limit = plane_right;
-    if (placed.scrolling && x > plane_right) {
+    // In the hysteresis band everything would fit: the right button still
+    // shows, over the groups it covers.
+    const bool right_needed = x > plane_right || (band && x > plane_right - button);
+    if (placed.scrolling && right_needed) {
         limit = std::max(start, plane_right - button);
         placed.scroll_right = {limit, plane.y, plane_right - limit, plane.height};
         for (std::size_t group = first + 1U; group < groups; ++group) {
@@ -549,6 +569,10 @@ Ribbon::Layout Ribbon::layout_for(Rect client) const {
     double x = client.x + row_widths.application + tab_gap * scale;
     placed.tabs.reserve(tabs_.size());
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
+        if (!shown(tab)) {
+            placed.tabs.push_back(Rect{});
+            continue;
+        }
         const double width = row_widths.tabs[tab];
         placed.tabs.push_back({x, client.y, width, row});
         x += width + tab_gap * scale;

@@ -76,6 +76,8 @@ Point centre(const Control& control, Rect local) {
     return point;
 }
 
+// A borrow into `items`, which must outlive it: temporaries are refused
+// (house style §5).
 const RibbonGallery::Item* find_item(const std::vector<RibbonGallery::Item>& items, std::string_view id) {
     for (const RibbonGallery::Item& item : items) {
         if (item.stable_id == id) return &item;
@@ -184,8 +186,8 @@ void layout_and_columns() {
             "an item without labels shows a face and an image area");
     (*gallery).set_show_labels(true);
     window.perform_layout();
-    const std::vector<RibbonGallery::Item> labelled_items = (*gallery).realized_items();
-    require((*find_item(labelled_items, labelled_items.front().stable_id)).parts.item_label.present,
+    const std::vector<RibbonGallery::Item> labelled = (*gallery).realized_items();
+    require((*find_item(labelled, labelled.front().stable_id)).parts.item_label.present,
             "labels show under the images when asked");
 }
 
@@ -232,8 +234,8 @@ void hover_preview_order() {
     const Point c = centre(*gallery, (*find_item(items, "item.2")).parts.item_face.bounds);
     move_to(window, a);
     require(fixture.log.entries.empty(), "no preview before the dwell");
-    const std::vector<RibbonGallery::Item> item_0_items = (*gallery).realized_items();
-    require((*find_item(item_0_items, "item.0")).states.hot, "the item under the pointer is hot");
+    const std::vector<RibbonGallery::Item> hovered = (*gallery).realized_items();
+    require((*find_item(hovered, "item.0")).states.hot, "the item under the pointer is hot");
     elapse_dwell(window);
     move_to(window, b);
     elapse_dwell(window);
@@ -246,9 +248,8 @@ void hover_preview_order() {
     click_at(window, c);
     require(fixture.log.joined() == "preview:item.2 value:item.2 invoked ",
             "a click commits without a cancellation, value before invocation");
-    const std::vector<RibbonGallery::Item> item_2_items = (*gallery).realized_items();
-    require((*gallery).selected_id() == std::string("item.2") &&
-                (*find_item(item_2_items, "item.2")).states.selected,
+    const std::vector<RibbonGallery::Item> chosen = (*gallery).realized_items();
+    require((*gallery).selected_id() == std::string("item.2") && (*find_item(chosen, "item.2")).states.selected,
             "the selection follows the command's value");
     fixture.log.entries.clear();
     move_to(window, a);
@@ -332,8 +333,8 @@ void popups() {
     fixture.log.entries.clear();
     click_at(window, more);
     window.perform_layout();
-    const std::vector<RibbonGallery::Item> item_11_items = (*full).realized_items();
-    const Point choice = centre(*full, (*find_item(item_11_items, "item.11")).parts.item_face.bounds);
+    const std::vector<RibbonGallery::Item> reopened = (*full).realized_items();
+    const Point choice = centre(*full, (*find_item(reopened, "item.11")).parts.item_face.bounds);
     click_at(window, choice);
     require(fixture.log.joined() == "popup:open value:item.11 invoked popup:closed ",
             "a click in the popup commits, then closes it");

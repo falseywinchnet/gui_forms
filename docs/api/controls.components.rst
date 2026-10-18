@@ -11,6 +11,8 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`DockWorkspace <gui_forms::DockWorkspace>`
+     - A docking workspace: the layout, the panels and their factories, and which panel and document are active.
    * - :cpp:class:`Timer <gui_forms::Timer>`
      - A component that raises ``tick`` at a fixed interval on a window's UI thread.
    * - :cpp:class:`BackgroundWorker <gui_forms::BackgroundWorker>`
@@ -35,6 +37,7 @@ Nonvisual components: bindings, providers, image lists, timers and semantic feed
 .. toctree::
    :hidden:
 
+   generated/gui_forms.DockWorkspace
    generated/gui_forms.Timer
    generated/gui_forms.BackgroundWorker
    generated/gui_forms.NotifyIcon
@@ -59,6 +62,12 @@ Related types
      - One progress report, delivered on the UI thread.
    * - :cpp:class:`BackgroundWorkerTask <gui_forms::BackgroundWorkerTask>`
      - The one object the work function may touch on the worker thread: the argument, the result, the cancellation request and progress reports.
+   * - :cpp:class:`DockActivationChange <gui_forms::DockActivationChange>`
+     -  
+   * - :cpp:class:`DockPanelCreation <gui_forms::DockPanelCreation>`
+     - A factory's request: build the content of ``panel`` and store it in ``content``.
+   * - :cpp:class:`DockPanelRegistration <gui_forms::DockPanelRegistration>`
+     - What the program registers for one panel: the layout's descriptor, the title its caption and tab show, and the factory that builds its content.
    * - :cpp:class:`ErrorIconSnapshot <gui_forms::ErrorIconSnapshot>`
      - ErrorIconSnapshot is a read-only diagnostic record for one target: stable identity, message, exact glyph bounds, target availability, popup presentation, blink activity, and current phase visibility.
    * - :cpp:class:`ErrorProviderChange <gui_forms::ErrorProviderChange>`
@@ -137,6 +146,50 @@ Related types
    .. cpp:function:: void set_cancelled(bool cancelled) noexcept
 
       The work acknowledges a cancellation: run_worker_completed reports the run as cancelled, as Windows Forms' DoWorkEventArgs.Cancel does.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockActivationChange final
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   .. cpp:member:: DockActivationTrack track
+
+      Default: ``{DockActivationTrack::panel}``.
+
+   .. cpp:member:: std::optional<DockPanelId> old_panel
+
+   .. cpp:member:: std::optional<DockPanelId> new_panel
+
+   .. cpp:member:: DockActivationCause cause
+
+      Default: ``{DockActivationCause::programmatic}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockPanelCreation final
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   A factory's request: build the content of ``panel`` and store it in ``content``. Left null, the panel shows an empty area and the factory is asked again the next time the panel is shown selected.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: Control::Ptr content
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockPanelRegistration final
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   What the program registers for one panel: the layout's descriptor, the title its caption and tab show, and the factory that builds its content. The factory is a named delegate: its object must outlive the workspace's use of it (remove the panel or destroy the workspace first).
+
+   .. cpp:member:: DockPanelDescriptor descriptor
+
+   .. cpp:member:: std::string title
+
+   .. cpp:member:: Delegate<DockPanelCreation&> factory
 
 .. cpp:namespace:: gui_forms
 
@@ -292,6 +345,44 @@ Related types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockActivationCause
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   .. cpp:enumerator:: programmatic
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: focus
+
+   .. cpp:enumerator:: navigator
+
+   .. cpp:enumerator:: fallback
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockActivationTrack
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   .. cpp:enumerator:: panel
+
+   .. cpp:enumerator:: document
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockFlyoutOpening
+
+   ``#include <gui_forms/controls/docking/dock_workspace/dock_workspace.hpp>``
+
+   .. cpp:enumerator:: hover_or_click
+
+   .. cpp:enumerator:: click
 
 .. cpp:namespace:: gui_forms
 
