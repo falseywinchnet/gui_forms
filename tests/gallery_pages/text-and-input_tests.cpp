@@ -90,6 +90,22 @@ void test_text_and_input(gui_forms::Window& window,
                 window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
                 (*band).text() == "Medium wave" && (*band).selected_index() == 1U,
             "the band field suggests from its items and the accepted item is selected");
+
+    const std::shared_ptr<gui_forms::TokenBox> recipients = std::dynamic_pointer_cast<TokenBox>(
+        window.find("gallery.text.tokens.recipients"));
+    const std::shared_ptr<gui_forms::Label> tokens_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.text.tokens.status"));
+    require(recipients && tokens_status && (*recipients).tokens().size() == 1U,
+            "the token box specimen starts with one recipient");
+    require(window.request_focus((*recipients).editor()) && window.dispatch_text({"Alan Turing,"}) &&
+                (*recipients).tokens().size() == 2U &&
+                (*tokens_status).text() == "Added \"Alan Turing\" · recipients: 2",
+            "a comma turns the typed name into a token and the page reports it");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::backspace}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::backspace}) &&
+                (*recipients).tokens().size() == 1U &&
+                (*tokens_status).text() == "Removed \"Alan Turing\" · recipients: 1",
+            "Backspace selects and then removes the last token");
 }
 
 } // namespace gallery_pages_tests

@@ -2851,6 +2851,7 @@ struct Search final : gf::Component {
     Search() {
         (*field).set_placeholder_text("Search");
         (*field).set_accessible_name("Search");
+        (*field).set_accepts_enter(true);
         gf::on((*field).committed(), *this, &Search::on_commit);
     }
     void on_commit(const std::string& text) { query = text; }
@@ -2942,6 +2943,22 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_TokenBox_1 {
+void example() {
+    std::shared_ptr<gf::TokenBox> recipients =
+        gf::make_control<gf::TokenBox>(gf::StableId("mail.to"));
+    (*(*recipients).auto_complete_custom_source()).add_range({"Ada Lovelace", "Alan Turing"});
+    (*recipients).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*recipients).set_auto_complete_mode(gf::AutoCompleteMode::suggest);
+    const gf::TokenId grace = (*recipients).add_token("Grace Hopper");
+    gf::Window window(recipients, gf::Size{400.0, 60.0});
+    window.request_focus((*recipients).editor());
+    window.dispatch_text(gf::TextInputEvent{"Barbara Liskov,"});
+    // The box holds "Grace Hopper" and "Barbara Liskov"; the editor is empty.
+    (*recipients).remove_token(grace);   // now only "Barbara Liskov"
+}
+}  // namespace doc_example_TokenBox_1
 
 namespace doc_example_ToolStrip_1 {
 void example() {
@@ -3561,6 +3578,7 @@ int main() {
     failures += run("TextBox example 3", &doc_example_TextBox_3::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("TokenBox example 1", &doc_example_TokenBox_1::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
     failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
     failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);

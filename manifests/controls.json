@@ -74,6 +74,17 @@
       "doc": "api/generated/gui_forms.TextBox.rst"
     },
     {
+      "id": "token_box",
+      "type": "TokenBox",
+      "header": "gui_forms/controls/panel/token_box/token_box.hpp",
+      "category": "Text editing",
+      "purpose": "Text entry whose accepted entries (Enter, a delimiter or an accepted completion) become removable tokens with stable identities, with keyboard selection and removal, a close glyph per token and suggestions from auto-complete.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "text-and-input",
+      "doc": "api/generated/gui_forms.TokenBox.rst"
+    },
+    {
       "id": "masked_text_box",
       "type": "MaskedTextBox",
       "header": "gui_forms/controls/panel/masked_text_box/masked_text_box.hpp",

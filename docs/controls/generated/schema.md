@@ -186,6 +186,36 @@ Properties beyond every control's: `text` (text).
 | `auto_complete_open_changed` | `bool` |
 | `auto_complete_accepted` | `std::string` |
 
+## `token_box` (TokenBox, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `well` | well |  |  |
+| `field` | well | `text_box` |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `token`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `token_face` | chip |  |  |
+| `token_label` | label |  |  |
+| `token_close` | glyph |  | hot, pressed |
+| `token_focus` | focus |  |  |
+
+Item states: `selected`, `hot`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `token_added` | `Token` |
+| `token_removed` | `Token` |
+| `selected_token_changed` | `std::optional<TokenId>` |
+
 ## `masked_text_box` (MaskedTextBox, control)
 
 | Part | Role | Reuses | Own states |

@@ -27,6 +27,7 @@ public:
         build_commands(body);
         build_masked(body);
         build_auto_complete(body);
+        build_tokens(body);
         refresh_state();
     }
 
@@ -176,6 +177,40 @@ private:
         on((*(*band_).editor()).auto_complete_accepted(), *this, &TextAndInputPage::completion_accepted);
     }
 
+    // TokenBox specimen: recipients entered by Enter, a comma or a
+    // suggestion, each a removable token.
+    void build_tokens(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> tokens = group("gallery.text.tokens",
+                                                    "TokenBox · entries become removable tokens", {930.0, 150.0});
+        (*body).add_at(tokens, {24.0, 944.0, 930.0, 150.0});
+        (*tokens).add_at(label("gallery.text.tokens.caption", "Recipients", 11.0, 600, muted),
+                         {24.0, 42.0, 130.0, 24.0});
+        recipients_ = make_control<TokenBox>(StableId("gallery.text.tokens.recipients"));
+        (*recipients_).set_accessible_name("Recipients");
+        (*(*recipients_).auto_complete_custom_source()).add_range(
+            {"Ada Lovelace", "Alan Turing", "Grace Hopper", "Edsger Dijkstra", "Barbara Liskov"});
+        (*recipients_).set_auto_complete_source(AutoCompleteSource::custom_source);
+        (*recipients_).set_auto_complete_mode(AutoCompleteMode::suggest);
+        static_cast<void>((*recipients_).add_token("Grace Hopper"));
+        (*tokens).add_at(recipients_, {154.0, 36.0, 700.0, 58.0});
+        tokens_status_ = label("gallery.text.tokens.status",
+                               "Enter, a comma or a suggestion adds a token; Backspace selects and removes the last",
+                               11.0, 600, green);
+        (*tokens).add_at(tokens_status_, {154.0, 104.0, 700.0, 26.0});
+        on((*recipients_).token_added(), *this, &TextAndInputPage::token_added);
+        on((*recipients_).token_removed(), *this, &TextAndInputPage::token_removed);
+    }
+
+    void token_added(const Token& token) {
+        (*tokens_status_).set_text("Added \"" + token.text + "\" · recipients: " +
+                                   std::to_string((*recipients_).tokens().size()));
+    }
+
+    void token_removed(const Token& token) {
+        (*tokens_status_).set_text("Removed \"" + token.text + "\" · recipients: " +
+                                   std::to_string((*recipients_).tokens().size()));
+    }
+
     void completion_accepted(const std::string& text) {
         (*complete_status_).set_text("Accepted \"" + text + "\"");
     }
@@ -242,6 +277,8 @@ private:
     std::shared_ptr<TextBox> city_;
     std::shared_ptr<ComboBox> band_;
     std::shared_ptr<Label> complete_status_;
+    std::shared_ptr<TokenBox> recipients_;
+    std::shared_ptr<Label> tokens_status_;
     Command undo_{"gallery.text.command.undo", "Undo"};
     Command redo_{"gallery.text.command.redo", "Redo"};
 };
