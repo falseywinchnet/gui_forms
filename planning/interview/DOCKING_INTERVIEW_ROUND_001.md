@@ -420,3 +420,72 @@ owner, verbatim:
   docking drag session and targets after docking's phase 3.
 - **GIVEN, mockups.** The taste mockups are an HTML look-and-feel page, not
   in-conversation visualizations.
+
+## Part 13. PageView B to G, 2026-10-17
+
+Asked as P7 to P34, with P19, P20, P21, P32, P33 and the document part of
+P11 named as already settled by DK H3, J3, E2, I2 with RB-44, and H4.
+Recommendations marked: P7-1, P8-1, P9-3, P10-1, P11-1 (strip preset),
+P12-1, P13-1 for the document preset (the strip preset scrolls), P14-2
+later, P15-1, P16-1 with widths frozen during successive closes, P17-1,
+P18-1, P22-1, P23-1, P24-1, P25-1, P26-2, P27-1, P28-2 (restated for the
+postage-stamp drag), P29-1, P30-1, P31-1, P34-1. The owner, verbatim:
+
+> p13: last. the user may have set a desirable priority. accepted otherwise.
+
+- **Settled earlier:** P19 by DK H3-2 (pinned pages an opt-in capability);
+  P20 by DK H3-2 (no preview page); P21 by DK J3 (custom item state
+  `modified`); P32 by DK E2-1 (close and pass through); P33 by DK I2-2 and
+  RB-44 (the pane's state is a settings permutation the program saves);
+  P11's document preset by DK H4-3 (shrink, then a list).
+- **GIVEN P7-1.** One cancellable `selecting`, then
+  `selected_page_changed`, keyed by `PageId`.
+- **GIVEN P8-1.** The view reports `page_invoked` and shows `current` when
+  told; activation is decided outside (DK F1).
+- **GIVEN P9-3.** Arrow keys select as they move by default; manual
+  selection (Space or Enter) per view when content is slow.
+- **GIVEN P10-1.** After the selected page closes: the strip preset selects
+  the next page, else the previous; the document preset the most recent
+  other page.
+- **GIVEN P11-1 (strip preset).** Scroll buttons plus a list button.
+- **GIVEN P12-1.** Content-sized items with a minimum and maximum, optional
+  fill; a fixed size as the alternative.
+- **GIVEN P13 (last).** A hidden page chosen from the overflow list takes
+  the last visible position, so the order the user set at the front is
+  kept: the page it displaces goes to the overflow and the visible order
+  is otherwise unchanged. Recorded reading: P13-2, "swaps with the last
+  visible page", for the document preset; the strip preset scrolls to it.
+- **GIVEN P14-2.** Multiple rows offered later (phase 5), in a stable order,
+  pinned pages in a row of their own.
+- **GIVEN P15-1.** The mouse wheel scrolls a strip.
+- **GIVEN P16-1.** Close buttons on the selected and hot tabs, space
+  reserved on every closable tab; widths frozen during successive closes.
+- **GIVEN P17-1.** Middle click closes a closable tab on release over the
+  tab that was pressed.
+- **GIVEN P18-1.** A close request event; a standalone view removes the
+  page when no handler takes it; inside docking the view only requests
+  (DK H1).
+- **GIVEN P22-1.** No "+" button.
+- **GIVEN P23-1.** Every view handles Ctrl+PageDown and Ctrl+PageUp when
+  focus is inside it; Ctrl+Tab on for standalone views and passed to the
+  navigator inside docking (DK G1-2).
+- **GIVEN P24-1.** Ctrl+Shift+PageDown and Ctrl+Shift+PageUp move a tab
+  within its pinned or ordinary group.
+- **GIVEN P25-1.** Mnemonics on in the strip and navigation presets, off in
+  the document preset.
+- **GIVEN P26-2.** Ctrl+F4 (Cmd+W on macOS) closes the selected closable
+  page; Delete does not.
+- **GIVEN P27-1.** Reordering is a per-view flag, off by default for the
+  strip preset and on for the document preset.
+- **GIVEN P28-2.** Reordering slides the other tabs live to make room,
+  matching the postage stamp's close-up (DK decision 24).
+- **GIVEN P29-1.** Tear-off only through docking's drag hand-off; a view
+  alone never creates windows.
+- **GIVEN P30-1.** The navigation pane: header, content, grip with large
+  buttons and an overflow icon strip, the configure menu (Show more, Show
+  fewer, hidden pages) and an `options` event; no built-in dialog.
+- **GIVEN P31-1.** The collapsed pane is a narrow bar with the vertical
+  caption (DK J4) and the overflow icons; the caption opens the content in
+  a popup over the window.
+- **GIVEN P34-1.** Navigation buttons are tabs in a tab list; the pane is a
+  named group.

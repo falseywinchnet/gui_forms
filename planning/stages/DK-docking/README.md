@@ -167,6 +167,23 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     design language with the enum and schema when built (§12.7).
 36. **Fit (K1-1, K2-1):** File Manager keeps its fixed splits; toolbar
     dragging joins the docking drag session after phase 3.
+37. **PageView selection and layout (P7 to P15):** cancellable selection
+    by `PageId`; activation decided outside; automatic arrow selection,
+    manual per view; next-else-previous (strip) or most recent (document)
+    after a close; strip overflow by scroll and list buttons;
+    content-sized items; a page chosen from the overflow list takes the
+    last visible position, keeping the user's order at the front;
+    multiple rows later; the wheel scrolls.
+38. **PageView document features and keys (P16 to P26):** close buttons on
+    selected and hot tabs with frozen widths; middle-click close on
+    release; close requests decided by the owner; no "+" button;
+    Ctrl+PageDown/PageUp in every view, Ctrl+Tab per view policy;
+    Ctrl+Shift+PageDown/PageUp moves a tab; mnemonics except in documents;
+    Ctrl+F4 closes, Delete does not.
+39. **PageView dragging and the navigation pane (P27 to P34):** reorder per
+    view (on for documents); live sliding; tear-off only through docking;
+    the Outlook-style pane with a configure menu and `options` event, a
+    collapsed bar with a vertical caption and popup, tab-list semantics.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
