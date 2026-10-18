@@ -23,7 +23,9 @@ void ColorValueEditor::initialize_control_tree() {
         StableId(std::string(stable_id().value()) + ".text"),
         format_value(value_));
     (*editor_).set_font({FontRole::monospace, 9.5, 400, false});
-    // Escape restores the value (cancel) and goes no further.
+    // Enter commits the text (commit_text) and Escape restores the value
+    // (cancel); neither goes further.
+    (*editor_).set_accepts_enter(true);
     (*editor_).set_accepts_escape(true);
     add_child(editor_);
     const std::weak_ptr<ColorValueEditor> weak =

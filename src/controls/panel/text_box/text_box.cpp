@@ -148,6 +148,11 @@ void TextBox::set_accepts_tab(bool enabled_value) {
     accepts_tab_ = enabled_value;
 }
 
+void TextBox::set_accepts_enter(bool enabled_value) {
+    require_mutable();
+    accepts_enter_ = enabled_value;
+}
+
 void TextBox::set_accepts_escape(bool enabled_value) {
     require_mutable();
     accepts_escape_ = enabled_value;
@@ -1073,14 +1078,24 @@ void TextBox::on_key(KeyEvent& event) {
         return;
     }
     if (event.physical_key == PhysicalKey::enter) {
+        // An open suggestion list or appended completion took Enter above.
+        if (composing_) {
+            // The composition is the input method's to commit; the box keeps
+            // the key from reaching the containers or the accept button.
+            event.handled = true;
+            return;
+        }
         if (multiline_) {
             if (!read_only_) static_cast<void>(replace_selection(newline_));
             event.handled = true;
             return;
         }
-        const std::string value(text());
-        committed_.emit(value);
-        event.handled = true;
+        if (accepts_enter_ && event.modifiers == Modifier::none) {
+            const std::string value(text());
+            committed_.emit(value);
+            event.handled = true;
+        }
+        // Otherwise nothing here to commit: the key goes on unhandled.
         return;
     }
     if (event.physical_key == PhysicalKey::escape) {

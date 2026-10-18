@@ -237,9 +237,17 @@ void suggest_keyboard_trace() {
 
     require(type(window, "l") && box.auto_complete_open(), "the list opens again");
     trace.clear();
+    require(!press(window, PhysicalKey::enter) && !box.auto_complete_open() &&
+                trace.size() == 1U && trace[0] == "close",
+            "Enter with nothing highlighted closes the list and goes on to the window");
+    box.set_text("");
+    require(type(window, "c") && box.auto_complete_open(), "the list opens once more");
+    box.set_accepts_enter(true);
+    trace.clear();
     require(press(window, PhysicalKey::enter) && !box.auto_complete_open() &&
-                trace.size() == 2U && trace[0] == "close" && trace[1] == "committed cal",
-            "Enter with nothing highlighted closes the list and commits as usual");
+                trace.size() == 2U && trace[0] == "close" && trace[1] == "committed c",
+            "in a box that accepts Enter, it closes the list and commits as usual");
+    box.set_accepts_enter(false);
 
     require(type(window, "x") && !box.auto_complete_open(), "text that matches nothing shows no list");
 }

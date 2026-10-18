@@ -122,6 +122,16 @@ public:
     void set_newline_sequence(std::string sequence);
     [[nodiscard]] bool accepts_tab() const noexcept { return accepts_tab_; }
     void set_accepts_tab(bool enabled);
+    // In a single-line box Enter is the box's own only while it has
+    // something to accept: an open suggestion list or appended completion,
+    // or an input-method composition. Otherwise Enter goes on to the
+    // containers and the window's accept button. A box that is an edit
+    // session (a search field, an in-place editor) opts in with
+    // accepts_enter: plain Enter (no modifiers) with nothing else to accept
+    // then raises committed() and stops there. Off by default. A multi-line
+    // box always takes Enter to insert newline_sequence.
+    [[nodiscard]] bool accepts_enter() const noexcept { return accepts_enter_; }
+    void set_accepts_enter(bool enabled);
     // Escape is the box's own only while it has something to cancel: an open
     // suggestion list or appended completion, an input-method composition or
     // a selection drag. Otherwise Escape, with or without Shift, goes on to
@@ -252,6 +262,8 @@ public:
     [[nodiscard]] Event<const TextSelection&>& selection_changed() noexcept {
         return selection_changed_;
     }
+    // Raised by plain Enter in a single-line box that accepts_enter, when
+    // the box has nothing else to accept. It carries the text.
     [[nodiscard]] Event<const std::string&>& committed() noexcept {
         return committed_;
     }
@@ -404,6 +416,7 @@ private:
     bool multiline_{};
     bool word_wrap_{};
     bool accepts_tab_{};
+    bool accepts_enter_{};
     bool accepts_escape_{};
     std::string newline_{"\n"};
     bool reveal_pending_{true};
