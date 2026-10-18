@@ -109,4 +109,29 @@ KeyMap pc_key_map() {
     return map;
 }
 
+KeyBindings::KeyBindings() : defaults_(pc_key_map()), effective_(pc_key_map()) {}
+
+void KeyBindings::rebind(KeyCommand command, KeyBinding binding) {
+    effective_.set_binding(command, binding);
+    rebound_[static_cast<std::size_t>(command)] = true;
+}
+
+void KeyBindings::restore(KeyCommand command) {
+    const KeyBinding& fallback = defaults_.binding(command);
+    effective_.set_binding(command, fallback);
+    rebound_[static_cast<std::size_t>(command)] = false;
+}
+
+bool KeyBindings::seed(const KeyMap& defaults) {
+    if (seeded_) return false;
+    seeded_ = true;
+    defaults_ = defaults;
+    for (std::size_t index = 0; index < key_command_count; ++index) {
+        if (rebound_[index]) continue;
+        const KeyCommand command = static_cast<KeyCommand>(index);
+        effective_.set_binding(command, defaults_.binding(command));
+    }
+    return true;
+}
+
 } // namespace gui_forms

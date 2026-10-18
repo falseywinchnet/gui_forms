@@ -203,6 +203,8 @@ void prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
         entry.owner_id = std::move(source.owner_id);
         entry.tool_window = source.tool_window;
         entry.model = std::move(source.model);
+        // One key map for the application's windows (owner decision DK-44).
+        (*entry.model).set_key_bindings(Application::key_bindings());
         entry.options.title = (*bridge).options.title;
         entry.options.initial_size = (*bridge).options.initial_size;
         entry.options.minimum_size = (*bridge).options.minimum_size;

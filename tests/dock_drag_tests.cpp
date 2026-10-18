@@ -181,6 +181,8 @@ const DockSite::Stack* find_stack(const std::vector<DockSite::Stack>& stacks, Do
     }
     return nullptr;
 }
+// The result points into `stacks`: a temporary list may not be passed.
+const DockSite::Stack* find_stack(std::vector<DockSite::Stack>&& stacks, DockNodeId stack) = delete;
 
 Rect stack_bounds(const DockSite& site, DockNodeId stack) {
     const std::vector<DockSite::Stack> stacks = site.realized_stack_items();
@@ -670,6 +672,32 @@ void restrictions_refuse_targets() {
     settle(window);
 }
 
+// Ctrl+F6 steps documents in most-recently-used order (owner decision
+// DK-46), on along one order while Ctrl is held.
+void documents_by_recent_use() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockWorkspace& workspace = *(*fixture).workspace;
+    Window& window = *(*fixture).window;
+    require(workspace.register_panel(document((*fixture).factory, "doc.third", "Third.txt")), "a third document");
+    apply(workspace, DockEdit::show(DockPanelId("doc.third")));
+    window.perform_layout();
+    // Tab order: first, second, third. Use: second, third, then first.
+    require(workspace.activate_panel(DockPanelId("doc.second")) && workspace.activate_panel(DockPanelId("doc.third")) &&
+                workspace.activate_panel(DockPanelId("doc.first")),
+            "the documents activate in turn");
+    require(key(window, PhysicalKey::f6, Modifier::control) && (*workspace.active_document()).value == "doc.third",
+            "Ctrl+F6 goes to the document used before (not the next tab, Second)");
+    require(key(window, PhysicalKey::f6, Modifier::control) && (*workspace.active_document()).value == "doc.second",
+            "with Ctrl held it steps on along the same order");
+    KeyEvent up{KeyAction::up, PhysicalKey::left_control};
+    static_cast<void>(window.dispatch_key(up));
+    require(key(window, PhysicalKey::f6, Modifier::control) && (*workspace.active_document()).value == "doc.third",
+            "after Ctrl's release the order starts again from the new most recent");
+    require(key(window, PhysicalKey::f6, Modifier::control | Modifier::shift) &&
+                (*workspace.active_document()).value == "doc.second",
+            "Ctrl+Shift+F6 steps back along the run");
+}
+
 } // namespace
 
 int main() {
@@ -682,6 +710,7 @@ int main() {
     tab_drags();
     keyboard_reaches_every_target();
     restrictions_refuse_targets();
+    documents_by_recent_use();
     std::cout << "DockSite dragging: geometry, the target table, threshold, Escape, capture loss, deactivation, "
                  "layout changes, invalid drops, Ctrl, one transaction per drop, the stamp, tab drags, the "
                  "keyboard move mode and restrictions passed\n";

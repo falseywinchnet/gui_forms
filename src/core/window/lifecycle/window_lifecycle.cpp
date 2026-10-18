@@ -175,27 +175,25 @@ void Window::set_active(bool active) {
 
 // Nothing a control shows depends on the key map yet (no control displays a
 // command's keys), so changing it invalidates nothing.
+void Window::set_key_bindings(std::shared_ptr<KeyBindings> bindings) {
+    require_ui_thread("key binding mutation");
+    if (!bindings) throw std::invalid_argument("GUI.Forms window key bindings may not be null");
+    key_bindings_ = std::move(bindings);
+}
+
 void Window::rebind_key_command(KeyCommand command, KeyBinding binding) {
     require_ui_thread("key binding mutation");
-    key_map_.set_binding(command, binding);
-    key_command_rebound_[static_cast<std::size_t>(command)] = true;
+    (*key_bindings_).rebind(command, binding);
 }
 
 void Window::restore_key_command(KeyCommand command) {
     require_ui_thread("key binding mutation");
-    const KeyBinding& host_default = host_key_map_.binding(command);
-    key_map_.set_binding(command, host_default);
-    key_command_rebound_[static_cast<std::size_t>(command)] = false;
+    (*key_bindings_).restore(command);
 }
 
 void Window::install_host_key_map(const KeyMap& defaults) {
     require_ui_thread("host key map installation");
-    host_key_map_ = defaults;
-    for (std::size_t index = 0; index < key_command_count; ++index) {
-        if (key_command_rebound_[index]) continue;
-        const KeyCommand command = static_cast<KeyCommand>(index);
-        key_map_.set_binding(command, host_key_map_.binding(command));
-    }
+    static_cast<void>((*key_bindings_).seed(defaults));
 }
 
 void Window::set_text_scale(double text_scale) {

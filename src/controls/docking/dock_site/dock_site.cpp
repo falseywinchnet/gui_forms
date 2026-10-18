@@ -1259,6 +1259,7 @@ void DockSite::on_pointer_preview(PointerEvent& event) {
         return;
     }
     if (event.action != PointerAction::down || event.button != PointerButton::primary) return;
+    document_stepping_ = false;
     if (drag_.phase == DockDragPhase::settling) {
         event.handled = true;
         return;
@@ -1457,9 +1458,9 @@ bool DockSite::handle_docking_key(KeyEvent& event) {
     } else if (keys.matches(KeyCommand::previous_tool_panel, event)) {
         handled = open_navigator(DockNavigatorList::tools, -1, release);
     } else if (keys.matches(KeyCommand::next_document, event)) {
-        handled = activate_relative_document(1);
+        handled = step_document(1, release);
     } else if (keys.matches(KeyCommand::previous_document, event)) {
-        handled = activate_relative_document(-1);
+        handled = step_document(-1, release);
     } else if (keys.matches(KeyCommand::maximize_document_area, event)) {
         set_document_area_maximized(!maximized_);
         handled = true;
@@ -1487,6 +1488,7 @@ bool DockSite::handle_docking_key(KeyEvent& event) {
 // A drag takes its keys (Escape, Ctrl, and the keyboard move mode's)
 // before the focused control sees them.
 void DockSite::on_key_preview(KeyEvent& event) {
+    end_document_steps(event);
     static_cast<void>(handle_drag_key(event));
 }
 
@@ -1499,8 +1501,11 @@ void DockSite::on_key_bubble(KeyEvent& event) {
     static_cast<void>(handle_docking_key(event));
 }
 
-bool DockSite::activate_relative_document(int direction) {
-    if (workspace_ == nullptr) return false;
+// The shown documents in most-recently-used order (owner decision DK-46):
+// the workspace's document history first (the active document leads it),
+// then the documents never active, in tab order.
+void DockSite::collect_document_steps(std::vector<DockPanelId>& out) const {
+    out.clear();
     std::vector<DockPanelId> documents{};
     for (const StackSlot& slot : stacks_) {
         if (slot.kind != DockNodeKind::document_stack || slot.collapsed) continue;
@@ -1508,19 +1513,73 @@ bool DockSite::activate_relative_document(int direction) {
         if (node == nullptr) continue;
         documents.insert(documents.end(), (*node).panels.begin(), (*node).panels.end());
     }
-    if (documents.empty()) return false;
-    const std::size_t count = documents.size();
+    for (const DockPanelId& panel : (*workspace_).document_history()) {
+        if (std::find(documents.begin(), documents.end(), panel) == documents.end()) continue;
+        out.push_back(panel);
+    }
+    for (const DockPanelId& panel : documents) {
+        if (std::find(out.begin(), out.end(), panel) == out.end()) out.push_back(panel);
+    }
+}
+
+// One step along the order from the active document, wrapping: +1 is the
+// document used before it, -1 the one used longest ago.
+bool DockSite::activate_relative_document(int direction) {
+    if (workspace_ == nullptr) return false;
+    collect_document_steps(document_steps_);
+    document_stepping_ = false;
+    if (document_steps_.empty()) return false;
+    const std::size_t count = document_steps_.size();
     std::size_t next = direction >= 0 ? 0U : count - 1U;
     const std::optional<DockPanelId>& active = (*workspace_).active_document();
-    if (active) {
-        const std::vector<DockPanelId>::const_iterator found = std::find(documents.begin(), documents.end(), *active);
-        if (found != documents.end()) {
-            const std::size_t at = static_cast<std::size_t>(found - documents.begin());
-            next = direction >= 0 ? (at + 1U) % count : (at + count - 1U) % count;
-        }
-    }
-    const bool activated = (*workspace_).activate_panel(documents[next], DockActivationCause::keyboard);
+    if (active && document_steps_.front() == *active) next = direction >= 0 ? 1U % count : count - 1U;
+    const DockPanelId chosen = document_steps_[next];
+    const bool activated = (*workspace_).activate_panel(chosen, DockActivationCause::keyboard);
     return activated;
+}
+
+// The keys' steps (Ctrl+F6, Ctrl+Shift+F6): the first press takes the order
+// as it stands and each further press, with the chord's modifier still held,
+// steps on along that same order, as the navigator's rows do; releasing the
+// modifier, any other key or a press ends the run, and the document reached
+// is then the most recent.
+bool DockSite::step_document(int direction, Modifier release) {
+    if (workspace_ == nullptr) return false;
+    if (!document_stepping_) {
+        collect_document_steps(document_steps_);
+        if (document_steps_.empty()) return false;
+        document_step_ = 0U;
+        const std::optional<DockPanelId>& active = (*workspace_).active_document();
+        const bool leads = active && document_steps_.front() == *active;
+        if (!leads) document_step_ = direction >= 0 ? document_steps_.size() - 1U : 0U;
+        document_stepping_ = true;
+        document_step_release_ = release;
+    }
+    const std::size_t count = document_steps_.size();
+    document_step_ = direction >= 0 ? (document_step_ + 1U) % count : (document_step_ + count - 1U) % count;
+    const DockPanelId chosen = document_steps_[document_step_];
+    const bool activated = (*workspace_).activate_panel(chosen, DockActivationCause::keyboard);
+    return activated;
+}
+
+// Ends a run of document steps when its modifier is let go, or on any other
+// key.
+void DockSite::end_document_steps(const KeyEvent& event) noexcept {
+    if (!document_stepping_) return;
+    if (event.action == KeyAction::up) {
+        const bool held = document_step_release_ != Modifier::none &&
+                          has_modifier(event.modifiers, document_step_release_);
+        if (!held) document_stepping_ = false;
+        return;
+    }
+    if (workspace_ == nullptr) {
+        document_stepping_ = false;
+        return;
+    }
+    const KeyMap& keys = effective_key_map();
+    const bool stepping = keys.matches(KeyCommand::next_document, event) ||
+                          keys.matches(KeyCommand::previous_document, event);
+    if (!stepping) document_stepping_ = false;
 }
 
 // -- the position menu ---------------------------------------------------------

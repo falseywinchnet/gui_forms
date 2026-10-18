@@ -88,13 +88,20 @@ invoke_required
 host_services
     The services of the attached native host, or null when none is attached.
 key_map
-    The keys of the named keyboard commands (`KeyCommand`) in this window:
-    the host's defaults with the application's rebindings over them. A
-    window starts with the PC convention (`pc_key_map`: Ctrl+F4 closes a
-    document, Shift+F10 or the context-menu key opens a context menu); a
-    host session installs the defaults its host reports
-    (`HostCapabilities::key_map`), so under the macOS host Cmd+W closes a
-    document. Controls ask it through `Control::effective_key_map`.
+    The keys of the named keyboard commands (`KeyCommand`), from the
+    window's `key_bindings`: the host's defaults with the application's
+    rebindings over them. Until a host seeds them, the defaults are the PC
+    convention (`pc_key_map`: Ctrl+F4 closes a document, Shift+F10 or the
+    context-menu key opens a context menu); the first host session seeds
+    them with its host's (`HostCapabilities::key_map`), so under the macOS
+    host Cmd+W closes a document. Controls ask it through
+    `Control::effective_key_map`.
+key_bindings
+    The window's `KeyBindings`, which an application shares among all its
+    windows (decision DK-44): `Application::run` gives every window the
+    application's one set, and a floating window takes its main window's.
+    A window made on its own has a set of its own. `set_key_bindings` shares
+    another set; a null set throws `std::invalid_argument`.
 needs_frame
     Whether painting is pending.
 occluded : default ``false``
@@ -202,9 +209,10 @@ dispatch_text
     Delivers text input to the focused control and returns whether it was
     handled.
 rebind_key_command
-    Binds a `KeyCommand` to a `KeyBinding` (up to two chords) in this
-    window, over the host's default; an empty binding leaves the command
-    without keys. The rebinding is kept when a host attaches later. A
+    Binds a `KeyCommand` to a `KeyBinding` (up to two chords) in the
+    window's key bindings, so in every window sharing them, over the host's
+    default; an empty binding leaves the command without keys. The
+    rebinding is kept when a host attaches later. A
     command outside the enumeration, or a chord with unknown modifier bits
     or modifiers without a key, throws `std::invalid_argument` and binds
     nothing.

@@ -123,7 +123,9 @@ open_navigator
 close_navigator
     Closes the navigator without choosing.
 activate_relative_document
-    Activates the next or previous document in tab order, wrapping; false
+    Activates a document by most-recently-used order (decision DK-46): the
+    one used before the active document, or with -1 the one used longest
+    ago (documents never active come last, in tab order), wrapping; false
     when there is no document.
 begin_keyboard_move
     Starts the keyboard move mode for a docked panel, on the first target;
@@ -180,8 +182,11 @@ between the stacks, which are the window's focus regions in tree order
 (the program's other regions keep their places); Ctrl+Tab and
 Ctrl+Shift+Tab open the navigator on the documents and Alt+F7 and
 Alt+Shift+F7 on the tool panels, and releasing Ctrl or Alt activates the
-current row; Ctrl+F6 and Ctrl+Shift+F6 activate the next and previous
-document; Escape in a tool panel, when its content leaves it unhandled,
+current row; Ctrl+F6 and Ctrl+Shift+F6 step through the documents in
+most-recently-used order (decision DK-46): the first press takes the order
+as it stands, each further press with Ctrl still held steps on along it,
+and releasing Ctrl (or any other key, or a press) ends the run; Escape in a
+tool panel, when its content leaves it unhandled,
 returns to the active document; Shift+Escape hides the active tool panel;
 Ctrl+Shift+F12 toggles the maximized document area; Alt+Hyphen, Shift+F10
 and the context-menu key open the active panel's position menu. A focused

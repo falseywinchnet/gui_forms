@@ -100,8 +100,9 @@ struct DockDragOutcome final {
 // tree order); Ctrl+Tab and Ctrl+Shift+Tab open the navigator on the
 // documents, Alt+F7 and Alt+Shift+F7 on the tool panels, and releasing the
 // modifier activates the current row; Ctrl+F6 and Ctrl+Shift+F6 activate the
-// next and previous document in tab order; Escape in a tool panel (unless
-// its content used it) returns to the active document, Shift+Escape hides
+// next and previous document in most-recently-used order (DK-46); Escape
+// in a tool panel (unless its content used it) returns to the active
+// document, Shift+Escape hides
 // the active tool panel; Ctrl+Shift+F12 toggles the maximized document area
 // (every tool stack hidden, as by collapsing, and restored); Alt+Hyphen,
 // Shift+F10 and the context-menu key open the active panel's position menu.
@@ -223,8 +224,11 @@ public:
     // The open navigator, or null.
     [[nodiscard]] std::shared_ptr<DockNavigator> navigator() const noexcept;
 
-    // Activates the next (+1) or previous (-1) document in tab order after
-    // the active one, wrapping. False when there is no document.
+    // Activates a document by most-recently-used order (owner decision
+    // DK-46): +1 the document used before the active one, -1 the one used
+    // longest ago (documents never active come last, in tab order),
+    // wrapping. False when there is no document. Ctrl+F6 and Ctrl+Shift+F6
+    // step on along one order while their modifier is held.
     bool activate_relative_document(int direction);
 
     // -- dragging (phase D3) --
@@ -491,6 +495,9 @@ private:
     void continue_seam_drag(Point local);
     bool set_seam_first(std::size_t seam, double first);
     bool handle_docking_key(KeyEvent& event);
+    void collect_document_steps(std::vector<DockPanelId>& out) const;
+    bool step_document(int direction, Modifier release);
+    void end_document_steps(const KeyEvent& event) noexcept;
     bool handle_seam_key(KeyEvent& event);
     [[nodiscard]] std::optional<DockPanelId> focused_panel() const;
     [[nodiscard]] bool focus_in_tool_stack() const;
@@ -679,8 +686,12 @@ private:
     SubscriptionToken capture_token_{};
     SubscriptionToken active_token_{};
     double drag_threshold_{4.0};
-    // The stacks in tree order, reused by plan_drag_targets.
-    std::vector<DockNodeId> drag_order_{};
+    // A run of Ctrl+F6 steps: the order taken at its first press, the
+    // position reached and the modifier whose release ends it.
+    std::vector<DockPanelId> document_steps_{};
+    std::size_t document_step_{};
+    Modifier document_step_release_{Modifier::none};
+    bool document_stepping_{};
     Event<const DockDragOutcome&> drag_ended_{};
 };
 

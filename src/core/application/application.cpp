@@ -66,6 +66,11 @@ HostServiceStatus ApplicationWindowHandle::toggle_full_screen() const {
     return result;
 }
 
+const std::shared_ptr<KeyBindings>& Application::key_bindings() {
+    static const std::shared_ptr<KeyBindings> shared = std::make_shared<KeyBindings>();
+    return shared;
+}
+
 ApplicationResult Application::validate(const std::vector<ApplicationWindow>& windows) {
     if (windows.empty() || windows.size() > maximum_windows) {
         return {ApplicationError::invalid_argument};

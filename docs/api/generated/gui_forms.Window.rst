@@ -76,13 +76,21 @@ gui_forms::Window
          The services of the attached native host, or null when none is attached.
 
       **key_map** : ``KeyMap``, read-only
-         The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`) in this window:
-         the host's defaults with the application's rebindings over them. A
-         window starts with the PC convention (``pc_key_map``: Ctrl+F4 closes a
-         document, Shift+F10 or the context-menu key opens a context menu); a
-         host session installs the defaults its host reports
-         (``HostCapabilities::key_map``), so under the macOS host Cmd+W closes a
-         document. Controls ask it through ``Control::effective_key_map``.
+         The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), from the
+         window's :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`: the host's defaults with the application's
+         rebindings over them. Until a host seeds them, the defaults are the PC
+         convention (``pc_key_map``: Ctrl+F4 closes a document, Shift+F10 or the
+         context-menu key opens a context menu); the first host session seeds
+         them with its host's (``HostCapabilities::key_map``), so under the macOS
+         host Cmd+W closes a document. Controls ask it through
+         ``Control::effective_key_map``.
+
+      **key_bindings** : ``std::shared_ptr<KeyBindings>``
+         The window's :cpp:class:`KeyBindings <gui_forms::KeyBindings>`, which an application shares among all its
+         windows (decision DK-44): ``Application::run`` gives every window the
+         application's one set, and a floating window takes its main window's.
+         A window made on its own has a set of its own. :cpp:func:`set_key_bindings <gui_forms::Window::set_key_bindings>` shares
+         another set; a null set throws ``std::invalid_argument``.
 
       **paint_lease_snapshot** : ``PaintLeaseSnapshot``, read-only
          Returns revision, epoch, lease, wake, deferral, and receipt counters plus current lease state.
@@ -243,7 +251,7 @@ gui_forms::Window
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
-        - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in this window, over the host's default; an empty binding leaves the command without keys.
+        - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the window's key bindings, so in every window sharing them, over the host's default; an empty binding leaves the command without keys.
       * - :cpp:func:`restore_key_command <gui_forms::Window::restore_key_command>`
         - Returns a command to the host's default.
       * - :cpp:func:`begin_update <gui_forms::Window::begin_update>`
@@ -570,13 +578,26 @@ gui_forms::Window
 
    .. cpp:function:: const KeyMap& key_map() const noexcept
 
-      The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`) in this window:
-      the host's defaults with the application's rebindings over them. A
-      window starts with the PC convention (``pc_key_map``: Ctrl+F4 closes a
-      document, Shift+F10 or the context-menu key opens a context menu); a
-      host session installs the defaults its host reports
-      (``HostCapabilities::key_map``), so under the macOS host Cmd+W closes a
-      document. Controls ask it through ``Control::effective_key_map``.
+      The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), from the
+      window's :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`: the host's defaults with the application's
+      rebindings over them. Until a host seeds them, the defaults are the PC
+      convention (``pc_key_map``: Ctrl+F4 closes a document, Shift+F10 or the
+      context-menu key opens a context menu); the first host session seeds
+      them with its host's (``HostCapabilities::key_map``), so under the macOS
+      host Cmd+W closes a document. Controls ask it through
+      ``Control::effective_key_map``.
+
+   .. cpp:function:: const std::shared_ptr<KeyBindings>& key_bindings() const noexcept
+
+      The window's :cpp:class:`KeyBindings <gui_forms::KeyBindings>`, which an application shares among all its
+      windows (decision DK-44): ``Application::run`` gives every window the
+      application's one set, and a floating window takes its main window's.
+      A window made on its own has a set of its own. :cpp:func:`set_key_bindings <gui_forms::Window::set_key_bindings>` shares
+      another set; a null set throws ``std::invalid_argument``.
+
+   .. cpp:function:: void set_key_bindings(std::shared_ptr<KeyBindings> bindings)
+
+      Sets :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`; see the property's description above.
 
    .. cpp:function:: PaintLeaseSnapshot paint_lease_snapshot() const noexcept
 
@@ -779,9 +800,10 @@ gui_forms::Window
 
    .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
 
-      Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in this
-      window, over the host's default; an empty binding leaves the command
-      without keys. The rebinding is kept when a host attaches later. A
+      Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the
+      window's key bindings, so in every window sharing them, over the host's
+      default; an empty binding leaves the command without keys. The
+      rebinding is kept when a host attaches later. A
       command outside the enumeration, or a chord with unknown modifier bits
       or modifiers without a key, throws ``std::invalid_argument`` and binds
       nothing.

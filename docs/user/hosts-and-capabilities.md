@@ -54,10 +54,12 @@ keyboard commands (`KeyCommand`: `close_document`, `next_tab`,
 `position_menu`, `return_to_document`, `hide_tool_panel`,
 `maximize_document_area`, `move_panel`), and each host reports the keys its convention
 gives them in `HostCapabilities::key_map`; `to_json` lists them as HID usage
-and modifier bits. A host session installs that map in its window, and
-controls ask the window (`Control::effective_key_map`) rather than naming
-keys themselves. An application rebinds a command with
-`Window::rebind_key_command`; the rebinding stays over whatever host
+and modifier bits. An application has one set of keys for all its windows
+(`KeyBindings`, `Application::key_bindings`, owner decision DK-44): the
+first host session seeds it with its host's map, and controls ask their
+window (`Control::effective_key_map`) rather than naming keys themselves.
+An application rebinds a command with `Window::rebind_key_command` from any
+of its windows, and the rebinding holds in all of them, over whatever host
 attaches.
 
 | Command | Windows, X11, headless (`pc_key_map`) | macOS |

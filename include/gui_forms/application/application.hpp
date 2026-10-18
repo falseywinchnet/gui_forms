@@ -110,6 +110,12 @@ public:
     [[nodiscard]] static ApplicationResult validate(
         const std::vector<ApplicationWindow>& windows);
     [[nodiscard]] static HostCapabilities capabilities();
+    // The application's one set of keyboard-command keys (owner decision
+    // DK-44): `run` gives it to every window it runs, before the host
+    // attaches, so the host seeds it once and a rebinding in any window
+    // holds in all. Made on first use; lives as long as the process. UI
+    // thread only.
+    [[nodiscard]] static const std::shared_ptr<KeyBindings>& key_bindings();
     [[nodiscard]] static ApplicationResult run(
         std::unique_ptr<Window> window, ApplicationWindowOptions options = {});
     [[nodiscard]] static ApplicationResult run(
