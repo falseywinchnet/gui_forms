@@ -28,12 +28,16 @@ struct SupplyRecord final {
     }
 };
 
+// The returned pointer borrows from `items`, so the vector must outlive it;
+// a pointer into the temporary realized_items() returns would dangle, and the
+// deleted overload refuses one.
 const ToolStrip::Item* find_item(const std::vector<ToolStrip::Item>& items, std::string_view id) {
     for (const ToolStrip::Item& item : items) {
         if (item.stable_id == id) return &item;
     }
     return nullptr;
 }
+const ToolStrip::Item* find_item(std::vector<ToolStrip::Item>&& items, std::string_view id) = delete;
 
 std::string count_text(const BindingNavigator& navigator) {
     for (const ToolStripItemSpec& item : navigator.items()) {
@@ -85,7 +89,8 @@ void standard_items_and_states() {
                 enabled((*navigator).move_previous_command()) && (*(*navigator).text_box("position")).text() == "2",
             "the next command moves the source and the states follow");
 
-    const ToolStrip::Item* last = find_item((*navigator).realized_items(), "move_last");
+    const std::vector<ToolStrip::Item> moved_items = (*navigator).realized_items();
+    const ToolStrip::Item* last = find_item(moved_items, "move_last");
     const Point at{(*last).parts.item_face.bounds.x + 4.0, (*last).parts.item_face.bounds.y + 4.0};
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, at}));
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, at}));

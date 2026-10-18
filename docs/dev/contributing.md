@@ -58,6 +58,15 @@ python3 -B tools/check_house_style.py include src demo tests examples tools file
 It is a review aid, not a certification: ownership, lifetimes and
 initialization still need a human reader.
 
+`tools/check_lifetime_rules.py` checks two lifetime rules the same way and
+CI runs it beside the spelling scanner: a function that returns a pointer or
+reference borrowed from a container or snapshot argument must delete its
+rvalue overload, and a function pointer obtained with `GetProcAddress` or
+`dlsym` must take its type from the function's declaration (`decltype`, or a
+`static_assert` against it). The `sanitizers` job builds and runs the whole
+suite on Linux under AddressSanitizer, UndefinedBehaviorSanitizer and
+LeakSanitizer (`python tools/ci_build.py --sanitize`); any report fails it.
+
 ## Tests and evidence
 
 Every behavioural change ships with a test. Core and control behaviour is

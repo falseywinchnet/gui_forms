@@ -29,6 +29,7 @@ const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_semantic(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 bool has_action(const SemanticNode& node, const SemanticAction action) {
     const std::vector<SemanticAction>::const_iterator found =

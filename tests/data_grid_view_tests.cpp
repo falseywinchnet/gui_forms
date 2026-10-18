@@ -138,6 +138,7 @@ const DataGridView::Cell* find_cell(const std::vector<DataGridView::Cell>& cells
     }
     return nullptr;
 }
+const DataGridView::Cell* find_cell(std::vector<DataGridView::Cell>&& cells, std::size_t row, std::size_t column) = delete;
 
 void click(Window& window, Point point, Modifier modifiers = Modifier::none, std::uint32_t clicks = 1U) {
     PointerEvent down{PointerAction::down, PointerButton::primary, point};
@@ -396,7 +397,8 @@ void text_editing() {
     require(window.dispatch_text({"bad"}), "the editor takes typing");
     require(key(window, PhysicalKey::tab) && (*grid).is_current_cell_in_edit_mode() && validations == 1,
             "a refused value keeps the cell in edit");
-    const DataGridView::Cell* refused = find_cell((*grid).realized_cells(), 1U, 0U);
+    const std::vector<DataGridView::Cell> refused_cells = (*grid).realized_cells();
+    const DataGridView::Cell* refused = find_cell(refused_cells, 1U, 0U);
     require(refused != nullptr && (*refused).states.invalid, "the refused cell publishes invalid");
     (*(*grid).editing_control()).set_text("Echo");
     require(key(window, PhysicalKey::tab) && !(*grid).is_current_cell_in_edit_mode() &&
@@ -420,7 +422,8 @@ void text_editing() {
             "a read-only column does not edit");
     (*grid).set_column_read_only(0U, false);
     window.perform_layout();
-    const DataGridView::Cell* target = find_cell((*grid).realized_cells(), 2U, 0U);
+    const std::vector<DataGridView::Cell> target_cells = (*grid).realized_cells();
+    const DataGridView::Cell* target = find_cell(target_cells, 2U, 0U);
     click(window, centre(*grid, (*target).parts.cell.bounds), Modifier::none, 2U);
     require((*grid).is_current_cell_in_edit_mode(), "a double click begins an edit");
     (*grid).cancel_edit();
@@ -440,28 +443,34 @@ void check_button_and_combo_cells() {
     require(key(window, PhysicalKey::space) && (*grid).cell_value(0U, 1U) == BindingValue{false} &&
                 changed.size() == 1U && clicked.size() == 1U,
             "Space toggles a check box cell");
-    const DataGridView::Cell* check = find_cell((*grid).realized_cells(), 1U, 1U);
+    const std::vector<DataGridView::Cell> check_cells = (*grid).realized_cells();
+    const DataGridView::Cell* check = find_cell(check_cells, 1U, 1U);
     click(window, centre(*grid, (*check).parts.cell_check_well.bounds));
+    const std::vector<DataGridView::Cell> toggled_cells = (*grid).realized_cells();
     require((*grid).cell_value(1U, 1U) == BindingValue{true} &&
-                (*find_cell((*grid).realized_cells(), 1U, 1U)).states.checked,
+                (*find_cell(toggled_cells, 1U, 1U)).states.checked,
             "clicking the check well toggles and publishes checked");
     (*grid).set_read_only(true);
     require(key(window, PhysicalKey::space) && (*grid).cell_value(1U, 1U) == BindingValue{true},
             "a read-only grid does not toggle");
     (*grid).set_read_only(false);
 
-    const DataGridView::Cell* button = find_cell((*grid).realized_cells(), 2U, 3U);
+    const std::vector<DataGridView::Cell> button_cells = (*grid).realized_cells();
+    const DataGridView::Cell* button = find_cell(button_cells, 2U, 3U);
     const Point face = centre(*grid, (*button).parts.cell_button_face.bounds);
-    require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, face}) &&
-                (*find_cell((*grid).realized_cells(), 2U, 3U)).states.pressed,
+    const bool held = window.dispatch_pointer({PointerAction::down, PointerButton::primary, face});
+    const std::vector<DataGridView::Cell> held_cells = (*grid).realized_cells();
+    require(held && (*find_cell(held_cells, 2U, 3U)).states.pressed,
             "a held button cell publishes pressed");
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, face}));
     require(clicked.size() == 3U && clicked.back().row == 2U && clicked.back().column == 3U,
             "releasing on the button cell raises cell_content_click");
 
     require((*grid).set_current_cell(DataGridViewCellAddress{0U, 2U}), "a combo box cell becomes current");
-    require(key(window, PhysicalKey::f4) && (*grid).drop_down_open() && (*grid).is_current_cell_in_edit_mode() &&
-                (*find_cell((*grid).realized_cells(), 0U, 2U)).states.open,
+    const bool opened = key(window, PhysicalKey::f4);
+    const std::vector<DataGridView::Cell> opened_cells = (*grid).realized_cells();
+    require(opened && (*grid).drop_down_open() && (*grid).is_current_cell_in_edit_mode() &&
+                (*find_cell(opened_cells, 0U, 2U)).states.open,
             "F4 opens the combo box cell's choices");
     const std::size_t before = changed.size();
     require(key(window, PhysicalKey::down) && key(window, PhysicalKey::enter), "a choice is made by keyboard");
@@ -472,7 +481,8 @@ void check_button_and_combo_cells() {
     require(key(window, PhysicalKey::end) && key(window, PhysicalKey::enter) && (*grid).cell_text(0U, 2U) == "USB" &&
                 changed.size() == before + 1U,
             "a different choice becomes the cell's value");
-    const DataGridView::Cell* combo = find_cell((*grid).realized_cells(), 1U, 2U);
+    const std::vector<DataGridView::Cell> combo_cells = (*grid).realized_cells();
+    const DataGridView::Cell* combo = find_cell(combo_cells, 1U, 2U);
     click(window, centre(*grid, (*combo).parts.cell_drop_down.bounds));
     require((*grid).drop_down_open() && (*grid).current_cell() == DataGridViewCellAddress{1U, 2U},
             "clicking a drop-down actuator opens that cell's choices");

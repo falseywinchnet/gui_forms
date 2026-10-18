@@ -113,6 +113,7 @@ const Ribbon::CommandItem* find_command(const std::vector<Ribbon::CommandItem>& 
     }
     return nullptr;
 }
+const Ribbon::CommandItem* find_command(std::vector<Ribbon::CommandItem>&& items, std::string_view id) = delete;
 
 Point centre(Rect bounds) {
     const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
@@ -206,20 +207,23 @@ void one_command_path() {
             "Down enters the command plane and Enter runs the first command");
     require(key(window, PhysicalKey::right) && key(window, PhysicalKey::space) && cuts == 1,
             "Right moves to the next command and Space runs it");
-    require((*find_command((*ribbon).realized_commands(), "cut")).states.focus_visible,
+    const std::vector<Ribbon::CommandItem> focused_items = (*ribbon).realized_commands();
+    require((*find_command(focused_items, "cut")).states.focus_visible,
             "the keyboard's command shows the focus cue");
     require((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}) && cuts == 2,
             "the semantic press runs the command");
     require(key(window, PhysicalKey::c, Modifier::alt) && copies == 1, "a command's mnemonic runs it");
     require(clicks.size() == 5U, "every path reports the same click");
 
-    require((*ribbon).on_semantic_child_action("ribbon.command.bold", SemanticAction::press, {}) &&
-                (*commands.bold).state().checked &&
-                (*find_command((*ribbon).realized_commands(), "bold")).states.checked,
+    const bool toggled = (*ribbon).on_semantic_child_action("ribbon.command.bold", SemanticAction::press, {});
+    const std::vector<Ribbon::CommandItem> bold_items = (*ribbon).realized_commands();
+    require(toggled && (*commands.bold).state().checked &&
+                (*find_command(bold_items, "bold")).states.checked,
             "a toggle flips its command's checked state");
     (*commands.cut).set_enabled(false);
     static_cast<void>((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}));
-    require(cuts == 2 && (*find_command((*ribbon).realized_commands(), "cut")).states.disabled,
+    const std::vector<Ribbon::CommandItem> disabled_items = (*ribbon).realized_commands();
+    require(cuts == 2 && (*find_command(disabled_items, "cut")).states.disabled,
             "a disabled command does not run and shows disabled");
 }
 
@@ -254,7 +258,8 @@ void state_repaints_only_its_command() {
     Window window(ribbon, {900.0, 112.0});
     window.perform_layout();
     static_cast<void>(window.take_damage());
-    const Rect cut = (*find_command((*ribbon).realized_commands(), "cut")).parts.command_face.bounds;
+    const std::vector<Ribbon::CommandItem> cut_items = (*ribbon).realized_commands();
+    const Rect cut = (*find_command(cut_items, "cut")).parts.command_face.bounds;
     (*commands.cut).set_enabled(false);
     const DamageRegion damage = window.take_damage();
     const Rect bounds = damage.bounds();
@@ -324,10 +329,12 @@ void menus_and_launchers() {
     window.perform_layout();
     std::vector<std::string> launches;
     SubscriptionToken launched = (*ribbon).dialog_launcher_clicked().subscribe(RecordLaunch{&launches});
-    const Ribbon::CommandItem paste = *find_command((*ribbon).realized_commands(), "paste");
+    const std::vector<Ribbon::CommandItem> split_items = (*ribbon).realized_commands();
+    const Ribbon::CommandItem paste = *find_command(split_items, "paste");
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
                                                centre(paste.parts.command_arrow.bounds)}));
-    require((*ribbon).menu_open() && (*find_command((*ribbon).realized_commands(), "paste")).states.open,
+    const std::vector<Ribbon::CommandItem> paste_items = (*ribbon).realized_commands();
+    require((*ribbon).menu_open() && (*find_command(paste_items, "paste")).states.open,
             "a split's arrow opens its menu over the ribbon");
     (*ribbon).close_menus();
     click(window, centre((*ribbon).parts().application_button.bounds));

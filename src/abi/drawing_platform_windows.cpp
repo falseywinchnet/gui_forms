@@ -5,6 +5,8 @@
 #endif
 #include <windows.h>
 
+#include "gui_forms/c_api.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -43,9 +45,12 @@ std::uint8_t composite_channel(std::uint8_t foreground,
 }
 
 struct CompatibilityUser32 final {
-    using GetDc = HDC (WINAPI*)(HWND);
-    using ReleaseDc = int (WINAPI*)(HWND, HDC);
-    using GetClientBounds = BOOL (WINAPI*)(HWND, RECT*);
+    // The compatibility shim exports user32's own names and signatures, so
+    // the entry-point types come from user32's declarations (house style
+    // section 9).
+    using GetDc = decltype(&::GetDC);
+    using ReleaseDc = decltype(&::ReleaseDC);
+    using GetClientBounds = decltype(&::GetClientRect);
 
     HMODULE module{};
     GetDc get_dc{::GetDC};
@@ -365,8 +370,9 @@ gd_result publish_retained_surface(std::uintptr_t destination,
     if (window == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
     const HMODULE forms = GetModuleHandleW(L"gui_forms_abi0.dll");
     if (forms == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
-    using Submit = int (__cdecl*)(std::uintptr_t, std::uint32_t, std::uint32_t,
-                                  std::uint64_t, const void*);
+    // Declared in gui_forms/c_api.h; only the declaration is used, the ABI
+    // is resolved by name.
+    using Submit = decltype(&gf_windows_paint_endpoint_submit_bgra_v1);
     const Submit submit = reinterpret_cast<Submit>(GetProcAddress(
         forms, "gf_windows_paint_endpoint_submit_bgra_v1"));
     if (submit == nullptr) return GD_ERROR_UNSUPPORTED_VERSION;
@@ -376,7 +382,7 @@ gd_result publish_retained_surface(std::uintptr_t destination,
     }
     return submit(reinterpret_cast<std::uintptr_t>(window),
                   snapshot.width, snapshot.height, snapshot.row_bytes(),
-                  snapshot.pixels().data()) == 0
+                  snapshot.pixels().data()) == GF_OK
         ? GD_OK : GD_ERROR_UNSUPPORTED_VERSION;
 }
 

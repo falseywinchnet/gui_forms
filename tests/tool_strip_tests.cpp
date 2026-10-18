@@ -41,6 +41,7 @@ const ToolStrip::Item* find_item(const std::vector<ToolStrip::Item>& items, std:
     }
     return nullptr;
 }
+const ToolStrip::Item* find_item(std::vector<ToolStrip::Item>&& items, std::string_view id) = delete;
 
 void press(Window& window, Point point) {
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, point}),
@@ -114,7 +115,8 @@ void clicks_and_commands() {
             "clicking an item executes its command and reports the click");
 
     press(window, centre((*find_item(items, "bold")).parts.item_face.bounds));
-    require((*strip).item_checked("bold") && (*find_item((*strip).realized_items(), "bold")).states.checked,
+    const std::vector<ToolStrip::Item> bold_items = (*strip).realized_items();
+    require((*strip).item_checked("bold") && (*find_item(bold_items, "bold")).states.checked,
             "check-on-click toggles and publishes checked");
 
     (*save).set_enabled(false);
@@ -129,7 +131,8 @@ void clicks_and_commands() {
     const ToolStrip::Item run = *find_item(items, "run");
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, centre(run.parts.item_arrow.bounds)}),
             "the split arrow takes the press");
-    require((*strip).drop_down_open() && (*find_item((*strip).realized_items(), "run")).states.open,
+    const std::vector<ToolStrip::Item> run_items = (*strip).realized_items();
+    require((*strip).drop_down_open() && (*find_item(run_items, "run")).states.open,
             "pressing a split button's arrow opens its menu");
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, centre(run.parts.item_arrow.bounds)}));
     (*strip).close_drop_down();

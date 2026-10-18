@@ -131,6 +131,7 @@ const VisualPaintOperationSnapshot& prepared_operation(const VisualInspectionSna
     }
     throw std::runtime_error("prepared operation missing from inspection");
 }
+const VisualPaintOperationSnapshot& prepared_operation(VisualInspectionSnapshot&& snapshot) = delete;
 
 void test_visual_inspection(const std::span<const std::byte> bytes) {
     PreparedTextService service{};

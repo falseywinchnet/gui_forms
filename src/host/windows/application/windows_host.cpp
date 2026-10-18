@@ -35,6 +35,8 @@
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
+#include <shellscalingapi.h>
+#include <dwmapi.h>
 
 #include <algorithm>
 #include <array>
@@ -412,8 +414,8 @@ bool apply_system_cursor(CursorKind kind) noexcept {
     return applied;
 }
 
-using GetDpiForMonitorFunction =
-    HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+// Shcore's entry point, typed from its declaration (house style section 9).
+using GetDpiForMonitorFunction = decltype(&::GetDpiForMonitor);
 
 GetDpiForMonitorFunction load_get_dpi_for_monitor() noexcept {
     HMODULE library = LoadLibraryW(L"Shcore.dll");
@@ -431,7 +433,7 @@ double native_monitor_scale(HMONITOR monitor) noexcept {
     UINT x = 96U;
     UINT y = 96U;
     if (get_dpi_for_monitor == nullptr ||
-        FAILED(get_dpi_for_monitor(monitor, 0, &x, &y)) || x == 0U) {
+        FAILED(get_dpi_for_monitor(monitor, MDT_EFFECTIVE_DPI, &x, &y)) || x == 0U) {
         return 1.0;
     }
     return static_cast<double>(x) / 96.0;
@@ -527,7 +529,7 @@ Function load_function(HMODULE module, const char* name) noexcept {
 }
 
 double query_scale(HWND window) noexcept {
-    using GetDpiForWindowFunction = UINT(WINAPI*)(HWND);
+    using GetDpiForWindowFunction = decltype(&::GetDpiForWindow);
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
         const GetDpiForWindowFunction function =
             load_function<GetDpiForWindowFunction>(
@@ -545,7 +547,7 @@ double query_scale(HWND window) noexcept {
 
 void adjust_client_frame(RECT& frame, DWORD style, DWORD extended_style,
                          double scale) noexcept {
-    using AdjustForDpiFunction = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+    using AdjustForDpiFunction = decltype(&::AdjustWindowRectExForDpi);
     const HMODULE user32 = GetModuleHandleW(L"user32.dll");
     if (user32 != nullptr) {
         const AdjustForDpiFunction function = load_function<AdjustForDpiFunction>(
@@ -557,13 +559,13 @@ void adjust_client_frame(RECT& frame, DWORD style, DWORD extended_style,
 }
 
 void enable_best_dpi_awareness() noexcept {
-    using SetContextFunction = BOOL(WINAPI*)(HANDLE);
-    using SetAwareFunction = BOOL(WINAPI*)();
+    using SetContextFunction = decltype(&::SetProcessDpiAwarenessContext);
+    using SetAwareFunction = decltype(&::SetProcessDPIAware);
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
         const SetContextFunction set_context =
             load_function<SetContextFunction>(
             user32, "SetProcessDpiAwarenessContext");
-        if (set_context != nullptr && set_context(reinterpret_cast<HANDLE>(-4))) return;
+        if (set_context != nullptr && set_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) return;
         const SetAwareFunction set_aware = load_function<SetAwareFunction>(
             user32, "SetProcessDPIAware");
         if (set_aware != nullptr) static_cast<void>(set_aware());

@@ -26,6 +26,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 bool has_action(const SemanticNode& node, SemanticAction action) {
     return std::find(node.actions.begin(), node.actions.end(), action) !=
@@ -178,11 +179,12 @@ void test_semantic_actions_use_control_behavior() {
     require(window.perform_semantic_action("actions.combo", SemanticAction::expand) &&
                 (*combo).dropped_down() && window.focus_scope_depth() == 1U,
             "semantic combo expansion must enter the real popup focus scope");
-    require(window.perform_semantic_action("actions.combo.popup.list.item.1",
-                                            SemanticAction::press) &&
+    const bool chosen = window.perform_semantic_action("actions.combo.popup.list.item.1", SemanticAction::press);
+    const SemanticSnapshot closed = window.semantic_snapshot();
+    require(chosen &&
                 (*combo).selected_index() == 1U && !(*combo).dropped_down() &&
                 window.focus_scope_depth() == 0U &&
-                !find_node(window.semantic_snapshot().roots,
+                !find_node(closed.roots,
                            "actions.combo.popup.list"),
             "semantic popup row press must commit, detach, and restore focus safely");
     require(window.perform_semantic_action("actions.combo", SemanticAction::expand) &&
@@ -191,7 +193,8 @@ void test_semantic_actions_use_control_behavior() {
     require(window.perform_semantic_action("actions.combo", SemanticAction::collapse) &&
                 !(*combo).dropped_down() && window.focus_scope_depth() == 0U,
             "semantic combo collapse must revoke the real popup scope");
-    require(!find_node(window.semantic_snapshot().roots,
+    const SemanticSnapshot after_close = window.semantic_snapshot();
+    require(!find_node(after_close.roots,
                        "actions.combo.popup.list"),
             "detached popup semantics must disappear in the closing generation");
 }
@@ -256,7 +259,8 @@ void test_modal_semantic_scope() {
             "stale accessible objects cannot activate background commands");
     require(window.perform_semantic_action("inside", SemanticAction::set_value, "hello"), "modal field remains editable");
     window.end_focus_scope(scope);
-    require(find_node(window.semantic_snapshot().roots, "outside"), "closing modal restores semantic tree");
+    const SemanticSnapshot outside_snapshot = window.semantic_snapshot();
+    require(find_node(outside_snapshot.roots, "outside"), "closing modal restores semantic tree");
 }
 
 } // namespace

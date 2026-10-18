@@ -1,20 +1,35 @@
 #include <windows.h>
 
+#include "gui_forms/c_api.h"
+
 #include <cstdint>
 #include <cstdio>
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <mutex>
+#include <type_traits>
 #include <unordered_set>
 
 namespace {
 
-using GetEndpointDc = int(__cdecl*)(std::uintptr_t, std::uintptr_t*);
-using ReleaseEndpointDc = int(__cdecl*)(std::uintptr_t, std::uintptr_t);
-using PublishEndpointDc = int(__cdecl*)(std::uintptr_t);
-using BeginEndpointWrite = int(__cdecl*)(std::uintptr_t, std::uint64_t*);
-using EndEndpointWrite = int(__cdecl*)(std::uint64_t, std::uint32_t);
+// Pointer types for the gui_forms_abi0.dll entry points this shim resolves by
+// name at run time; it never links the ABI. Calling a function through a
+// pointer to a different function type is undefined behaviour even where the
+// calling convention agrees (an `int` return for the `gf_result` enum was
+// reported by UBSan's -fsanitize=function), so each type spells the declared
+// signature and the assertions hold it to the declaration in c_api.h. Only
+// the declarations are used; nothing here imports the ABI's symbols.
+using GetEndpointDc = gf_result (*)(std::uintptr_t, std::uintptr_t*);
+using ReleaseEndpointDc = gf_result (*)(std::uintptr_t, std::uintptr_t);
+using PublishEndpointDc = gf_result (*)(std::uintptr_t);
+using BeginEndpointWrite = gf_result (*)(std::uintptr_t, std::uint64_t*);
+using EndEndpointWrite = gf_result (*)(std::uint64_t, std::uint32_t);
+static_assert(std::is_same_v<GetEndpointDc, decltype(&gf_windows_paint_endpoint_get_dc_v1)>);
+static_assert(std::is_same_v<ReleaseEndpointDc, decltype(&gf_windows_paint_endpoint_release_dc_v1)>);
+static_assert(std::is_same_v<PublishEndpointDc, decltype(&gf_windows_paint_endpoint_publish_dc_v1)>);
+static_assert(std::is_same_v<BeginEndpointWrite, decltype(&gf_windows_paint_endpoint_begin_write_v1)>);
+static_assert(std::is_same_v<EndEndpointWrite, decltype(&gf_windows_paint_endpoint_end_write_v1)>);
 
 std::mutex bitmap_orientation_mutex;
 std::unordered_set<HBITMAP> top_down_bitmaps;
@@ -99,7 +114,7 @@ bool endpoint_dc(HWND window, HDC* output) noexcept {
         "gf_windows_paint_endpoint_get_dc_v1");
     if (entry == nullptr || output == nullptr) return false;
     std::uintptr_t value{};
-    if (entry(reinterpret_cast<std::uintptr_t>(window), &value) != 0 ||
+    if (entry(reinterpret_cast<std::uintptr_t>(window), &value) != GF_OK ||
         value == 0U) return false;
     *output = reinterpret_cast<HDC>(value);
     remember_dc(*output, DcKind::endpoint);
@@ -111,7 +126,7 @@ bool release_endpoint_dc(HWND window, HDC dc) noexcept {
         "gf_windows_paint_endpoint_release_dc_v1");
     return entry != nullptr &&
         entry(reinterpret_cast<std::uintptr_t>(window),
-              reinterpret_cast<std::uintptr_t>(dc)) == 0;
+              reinterpret_cast<std::uintptr_t>(dc)) == GF_OK;
 }
 
 void publish_endpoint_dc(HDC dc) noexcept {
@@ -127,7 +142,7 @@ bool request_endpoint_write(HDC dc, std::uint64_t* lease) noexcept {
     static const BeginEndpointWrite entry = forms_entry<BeginEndpointWrite>(
         "gf_windows_paint_endpoint_begin_write_v1");
     return entry != nullptr && lease != nullptr &&
-        entry(reinterpret_cast<std::uintptr_t>(dc), lease) == 0 &&
+        entry(reinterpret_cast<std::uintptr_t>(dc), lease) == GF_OK &&
         *lease != 0U;
 }
 
