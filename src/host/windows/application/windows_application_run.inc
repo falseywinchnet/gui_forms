@@ -21,6 +21,9 @@ struct WindowsRunSlot final {
     bool initial{};
     // Shown and hidden by the floating policy (HostWindowKindTraits).
     bool floating{};
+    // CreateWindowExW failed: the state never had a native window, so it
+    // never reaches destroyed(); reclaim releases it all the same.
+    bool never_created{};
     bool print_metrics_on_close{};
     std::function<void(std::string_view metrics_json, std::string_view host_json)> final_snapshot{};
     std::string capture_path{};
@@ -156,7 +159,8 @@ public:
     // initial windows are shown (WM_ACTIVATEAPP reports later changes).
     void report_foreground();
     // Releases runtime windows that closed during the turn, after printing
-    // their metrics as the run prints every window's at exit.
+    // their metrics as the run prints every window's at exit, and runtime
+    // windows whose native creation failed.
     void reclaim();
     // Prints one window's final metrics and snapshot.
     static void publish_final_metrics(WindowsRunSlot& slot);
@@ -302,6 +306,7 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
                                   owner, nullptr, instance_, &state);
     if (window == nullptr || !state.initialize(window)) {
         if (window != nullptr) DestroyWindow(window);
+        if (window == nullptr) window_slot.never_created = true;
         retire(id);
         outcome.admission.status.error = HostServiceError::backend_failure;
         outcome.admission.window = {};
@@ -368,8 +373,11 @@ void WindowsApplicationRun::publish_final_metrics(WindowsRunSlot& run_slot) {
 void WindowsApplicationRun::reclaim() {
     for (std::size_t index = slots_.size(); index > 0U; --index) {
         WindowsRunSlot& candidate = *slots_[index - 1U];
-        if (candidate.initial || !candidate.state || !(*candidate.state).destroyed()) continue;
-        publish_final_metrics(candidate);
+        if (candidate.initial || !candidate.state) continue;
+        const bool closed = (*candidate.state).destroyed();
+        if (!closed && !candidate.never_created) continue;
+        // A window that was never created has no metrics to publish.
+        if (closed) publish_final_metrics(candidate);
         slots_.erase(slots_.begin() + static_cast<std::ptrdiff_t>(index - 1U));
     }
 }
