@@ -123,6 +123,8 @@ protected:
 private:
     // The styles of the style list, in its order.
     enum class FontStyle : std::uint8_t { regular, bold, italic, bold_italic };
+    // The name the style list shows for `style`.
+    [[nodiscard]] static std::string_view style_name(FontStyle style) noexcept;
 
     [[nodiscard]] Parts dialog_parts() const;
     // Shows the selection in the controls.
