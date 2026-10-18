@@ -1942,6 +1942,51 @@ void example() {
 }
 }  // namespace doc_example_ObjectView_2
 
+namespace doc_example_PageSet_1 {
+void example() {
+    gf::PageSet pages;
+    gf::PageRecord home{};
+    home.id = gf::PageId{"home"};
+    home.title = "Home";
+    gf::PageRecord view{};
+    view.id = gf::PageId{"view"};
+    view.title = "View";
+    gf::PageRecord help{};
+    help.id = gf::PageId{"help"};
+    help.title = "Help";
+    gf::PageEditStatus status = pages.insert(home, gf::PagePlacement::end_of_group());
+    status = pages.insert(view, gf::PagePlacement::end_of_group());
+    status = pages.insert(help, gf::PagePlacement::end_of_group());
+    // "home" was selected when it entered the empty set.
+    status = pages.select(gf::PageId{"view"}, gf::PageSelectionCause::programmatic);
+    status = pages.remove(gf::PageId{"view"});
+    // The selection fell back to "help", the page that took its position.
+    bool fell_back = *pages.selected_page() == gf::PageId{"help"};
+    static_cast<void>(status);
+    static_cast<void>(fell_back);
+}
+}  // namespace doc_example_PageSet_1
+
+namespace doc_example_PageSet_2 {
+void example() {
+    gf::PageSet left;
+    gf::PageSet right;
+    gf::PageRecord record{};
+    record.id = gf::PageId{"notes"};
+    record.title = "Notes";
+    gf::PageEditStatus status = left.insert(record, gf::PagePlacement::end_of_group());
+    gf::PageTakeResult taken = left.take(gf::PageId{"notes"});
+    {
+        gf::PageSetBatch batch(right);
+        status = right.put(taken.page, gf::PagePlacement::end_of_group());
+        status = right.select(gf::PageId{"notes"}, gf::PageSelectionCause::programmatic);
+    }
+    // One pages_changed and one selected_page_changed were published by
+    // `right` when the batch closed.
+    static_cast<void>(status);
+}
+}  // namespace doc_example_PageSet_2
+
 namespace doc_example_Panel_1 {
 void example() {
     std::shared_ptr<gf::Panel> shell = gf::make_control<gf::Panel>(gf::StableId("shell"));
@@ -3448,6 +3493,8 @@ int main() {
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
     failures += run("ObjectView example 2", &doc_example_ObjectView_2::example);
+    failures += run("PageSet example 1", &doc_example_PageSet_1::example);
+    failures += run("PageSet example 2", &doc_example_PageSet_2::example);
     failures += run("Panel example 1", &doc_example_Panel_1::example);
     failures += run("Panel example 2", &doc_example_Panel_2::example);
     failures += run("PictureBox example 1", &doc_example_PictureBox_1::example);

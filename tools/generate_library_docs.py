@@ -91,6 +91,12 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "Retained events and owned handlers, application-owned `Value` state, "
           "command bindings and semantic feedback records.",
           ("event", "value", "commands", "feedback")),
+    Group("pages", "Pages",
+          "The renderer-free page model shared by page strips, page views and "
+          "docking stacks: stable page identities, order with a pinned group, "
+          "cancellable selection, activation history, batches, and moving a page "
+          "with its content between sets.",
+          ("pages",)),
     Group("input-and-semantics", "Input and semantics",
           "Pointer, keyboard, text and drag event records, and the semantic tree "
           "published to accessibility and automation.",
