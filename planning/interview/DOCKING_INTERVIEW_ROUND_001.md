@@ -345,3 +345,35 @@ answers PageView P11). The owner, verbatim:
   application switches on; no preview tab.
 - **GIVEN H4-3 (and P11).** Document tabs shrink first, then overflow into
   a menu listing every document.
+
+## Part 10. Persistence and restore, 2026-10-17
+
+Asked as I1 to I7, each with its recommendation marked (I1-1 the runtime
+layout store's syntax, not yet chosen; I2-1 automatic saving with explicit
+save and load, as RB-12; I3-1; I4-1; I5-1; I6-1; I7-1). The owner,
+verbatim:
+
+> xml. such as sdrsharp uses. the program is responsible for saving its own setup, but that's only for configurables. for ribbon type layout- that's baked into the program, so its a settings permutation, not a layout. otherwise accepted.
+
+- **GIVEN I1 (XML).** A saved docking layout is XML, as SDRSharp keeps its
+  dock layout in a separate `Layout.xml` (RES §6). Recorded reading: this
+  settles the docking layout's format; it does not choose the syntax of
+  the general settings store (RES §7), which stays open.
+- **GIVEN I2-2.** The program is responsible for saving its own setup: the
+  framework writes and reads a layout when the program asks and never
+  saves on its own. Only configurable things are saved; what the program
+  bakes in is not.
+- **GIVEN, the ribbon is not a layout.** A ribbon's structure is baked into
+  the program; what a user changes on it (Quick Access Toolbar items and
+  position, minimized) is a settings permutation, saved with the
+  program's settings, not a layout. This revises RB-12's "through the
+  layout store" (RB decision 44).
+- **GIVEN I3-1.** Unknown panel IDs are kept as inactive placeholders and
+  restored if the panel returns.
+- **GIVEN I4-1.** A framework format version with built-in migrations, and
+  an application layout version with an upgrade hook.
+- **GIVEN I5-1.** Missing monitors: the same ID, else the most overlap,
+  else the primary; clamped so the caption is reachable.
+- **GIVEN I6-1.** Named layouts in the workspace API, in phase 7.
+- **GIVEN I7-1.** Factories by panel ID; on restore only visible selected
+  panels are created, others on first show.

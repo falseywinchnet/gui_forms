@@ -150,6 +150,15 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     application option); activation history kept by the framework;
     pinned tabs as an opt-in `PageStrip` capability, no preview tab (also
     P19); tabs shrink, then overflow to a menu (also P11).
+32. **Layouts are XML (I1),** as SDRSharp's `Layout.xml`; the general
+    settings store's syntax stays open.
+33. **The program saves (I2-2):** the framework writes and reads a layout
+    on request and never saves on its own; only configurable things are
+    saved.
+34. **Restore (I3-1 to I7-1):** unknown IDs kept as placeholders; format
+    and application versions with migrations and an upgrade hook; monitor
+    fallback with clamping; named layouts in phase 7; lazy creation by
+    factories.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
