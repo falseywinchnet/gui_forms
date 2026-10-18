@@ -1,6 +1,7 @@
 #include "gui_forms/controls/tool_strip/tool_strip.hpp"
 
 #include "../menu/menu_utilities.hpp"
+#include "../scrollable_control/scrolling_utilities.hpp"
 
 #include "gui_forms/basic_controls.hpp"
 #include "gui_forms/delegate.hpp"
@@ -39,18 +40,6 @@ constexpr double default_hosted_width = 100.0;
 constexpr double maximum_hosted_width = 1024.0;
 constexpr double maximum_end_reserve = 64.0;
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t item_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 bool has_menu(ToolStripItemKind kind) noexcept {
     const bool result = kind == ToolStripItemKind::drop_down_button ||
                         kind == ToolStripItemKind::split_button;
@@ -61,6 +50,12 @@ bool has_menu(ToolStripItemKind kind) noexcept {
 bool hosted(ToolStripItemKind kind) noexcept {
     const bool result = kind == ToolStripItemKind::combo_box || kind == ToolStripItemKind::text_box ||
                         kind == ToolStripItemKind::progress_bar;
+    return result;
+}
+
+// A label that StatusStrip stretches over the width the other items leave.
+bool spring_label(const ToolStripItemSpec& item) noexcept {
+    const bool result = item.spring && item.kind == ToolStripItemKind::label;
     return result;
 }
 
@@ -210,8 +205,10 @@ void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
     for (std::size_t index = 0; index < items_.size(); ++index) {
         item_states_[index].checked = items_[index].checked;
         if (items_[index].command) {
-            command_tokens_.push_back((*items_[index].command).state_changed().subscribe(
-                *this, Delegate<const CommandState&>::bind<ToolStrip, &ToolStrip::on_command_state>(*this)));
+            const Delegate<const CommandState&> repaint =
+                Delegate<const CommandState&>::bind<ToolStrip, &ToolStrip::on_command_state>(*this);
+            SubscriptionToken token = (*items_[index].command).state_changed().subscribe(*this, repaint);
+            command_tokens_.push_back(std::move(token));
         }
     }
     hot_index_.reset();
@@ -412,7 +409,10 @@ Size ToolStrip::item_size(const ToolStripItemSpec& item) const {
     double width = item_padding * scale * 2.0;
     if (shows_image) width += image_size * scale;
     if (shows_image && shows_text) width += image_text_gap * scale;
-    if (shows_text) width += resolve_text_layout_utf8(text, effective_font(font_)).logical_size.width;
+    if (shows_text) {
+        const ResolvedTextLayout label = resolve_text_layout_utf8(text, effective_font(font_));
+        width += label.logical_size.width;
+    }
     if (item.kind == ToolStripItemKind::drop_down_button) width += drop_down_arrow_width * scale;
     if (item.kind == ToolStripItemKind::split_button) width += split_arrow_width * scale;
     if (item.kind != ToolStripItemKind::label) width = std::max(width, minimum_button_width * scale);
@@ -462,19 +462,18 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
         if (along_height && items_[index].kind != ToolStripItemKind::separator) {
             widths[index] = vertical_item_extent * scale;
         }
-        if (!(status_layout_ && items_[index].spring && items_[index].kind == ToolStripItemKind::label)) {
-            total += widths[index];
-        }
+        // Spring labels take their width from what is left, below.
+        if (!(status_layout_ && spring_label(items_[index]))) total += widths[index];
     }
     if (status_layout_) {
         // Spring labels share what the other items leave, equally.
         std::size_t springs = 0U;
         for (std::size_t index = 0; index < count; ++index) {
-            if (shown[index] && items_[index].spring && items_[index].kind == ToolStripItemKind::label) ++springs;
+            if (shown[index] && spring_label(items_[index])) ++springs;
         }
         const double free = std::max(0.0, end - start - total);
         for (std::size_t index = 0; index < count; ++index) {
-            if (shown[index] && items_[index].spring && items_[index].kind == ToolStripItemKind::label) {
+            if (shown[index] && spring_label(items_[index])) {
                 widths[index] = free / static_cast<double>(springs);
             }
         }
@@ -575,8 +574,8 @@ ToolStrip::ItemParts ToolStrip::item_parts(std::size_t index, Rect bounds) const
         x += side + image_text_gap * scale;
     }
     if (shows_text) {
-        const double width = resolve_text_layout_utf8(text, effective_font(font_)).logical_size.width;
-        const Rect label{x, bounds.y, width, bounds.height};
+        const ResolvedTextLayout measured = resolve_text_layout_utf8(text, effective_font(font_));
+        const Rect label{x, bounds.y, measured.logical_size.width, bounds.height};
         parts.item_label = PartGeometry::from_bounds(Rect::intersection(label, content));
     }
     return parts;
@@ -777,19 +776,26 @@ std::optional<std::size_t> ToolStrip::next_interactive(std::size_t start, int di
     return std::nullopt;
 }
 
+bool ToolStrip::flip_checked(std::size_t index) {
+    const ToolStripItemSpec& item = items_[index];
+    if (item.command) {
+        const bool checked = (*item.command).state().checked;
+        (*item.command).set_checked(!checked);
+        return false;
+    }
+    item_states_[index].checked = !item_states_[index].checked;
+    return true;
+}
+
 void ToolStrip::click(std::size_t index) {
+    // A copy of the whole item: the command it executes and the click
+    // handlers may replace the strip's items.
     const ToolStripItemSpec item = items_[index];
     if (!item_interactive(index)) return;
-    if (item.check_on_click) {
-        if (item.command) {
-            (*item.command).set_checked(!(*item.command).state().checked);
-        } else {
-            item_states_[index].checked = !item_states_[index].checked;
-            invalidate(Dirty::paint | Dirty::semantics);
-        }
-    }
-    if (item.command && window() != nullptr) {
-        static_cast<void>((*item.command).execute_routed(*window(), stable_id().value()));
+    if (item.check_on_click && flip_checked(index)) invalidate(Dirty::paint | Dirty::semantics);
+    Window* const host = window();
+    if (item.command && host != nullptr) {
+        static_cast<void>((*item.command).execute_routed(*host, stable_id().value()));
     } else if (item.command) {
         static_cast<void>((*item.command).execute(stable_id().value()));
     }
@@ -1013,13 +1019,9 @@ void ToolStrip::on_popup_item_invoked(const MenuItemInvocation& invocation) {
     const std::optional<std::size_t> index = index_of(invocation.item_id);
     if (index) {
         const ToolStripItemSpec& item = items_[*index];
-        if (item.check_on_click) {
-            if (item.command) {
-                (*item.command).set_checked(!(*item.command).state().checked);
-            } else {
-                item_states_[*index].checked = !item_states_[*index].checked;
-            }
-        }
+        // The item is in the overflow menu, not on the strip, so the strip
+        // has nothing of it to repaint.
+        if (item.check_on_click) static_cast<void>(flip_checked(*index));
         const ToolStripItemClick clicked{strip_id, item.stable_id};
         item_clicked_.emit(clicked);
         return;
@@ -1057,7 +1059,7 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
         if (hosted(item.kind)) continue;
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = item_runtime_id(node.stable_id);
+        node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
         node.name = item_text(item);
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         node.states = SemanticState::visible;
@@ -1099,7 +1101,8 @@ bool ToolStrip::on_semantic_child_action(std::string_view id, SemanticAction act
         return true;
     }
     if (action == SemanticAction::focus) {
-        if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
+        Window* const host = window();
+        if (host != nullptr) static_cast<void>((*host).request_focus(shared_from_this()));
         focus_item(index);
         return true;
     }
