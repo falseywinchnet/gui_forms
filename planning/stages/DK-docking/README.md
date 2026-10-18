@@ -118,11 +118,14 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     the panel disappears from its place and an interpolated miniature of
     it, animated from the panel's rectangle down to a small stamp, follows
     the pointer; the panel itself is never resized; Escape puts it back
-    (D1b-1). Whether the vacated place closes up during the drag is open.
+    (D1b-1). The vacated place closes up as soon as the drag starts; about
+    100 units and 220 ms are the starting stamp size and animation.
 25. **Position-sensitive targets (D2):** the target depends on where the
     pointer hovers within a pane (edge bands split, centre tabs into),
-    with the resulting area highlighted; the window's outer edges are
-    always global targets (D3-1). No drop straight to auto-hide (D2a-1).
+    with the resulting area highlighted, and indicator tiles over the
+    hovered pane depicting the resulting shape in blue on black; the
+    window's outer edges are always global targets (D3-1). No drop
+    straight to auto-hide (D2a-1).
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

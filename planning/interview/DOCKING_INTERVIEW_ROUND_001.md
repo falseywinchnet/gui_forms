@@ -213,3 +213,27 @@ verbatim:
   up during the drag or stays as an empty slot until the drop, and how the
   miniature grows back into the target at the drop (and into its old place
   on Escape).
+
+### Note, 2026-10-17: the mockup's three questions
+
+A mockup showed the corrected stamp (the panel leaving a dashed empty
+slot, a miniature animated from the panel's rectangle to a 100 px stamp
+in 220 ms, growing into the target at the drop or back into its place on
+Escape) and position-sensitive targets with a highlighted result area.
+Asked: (1) whether the vacated place stays empty until the drop or closes
+up at once; (2) the stamp size and animation length; (3) whether the
+hover targeting matched what the owner had seen. The owner, verbatim:
+
+> close up. makes sense. marginally, but what i saw had visible indicators that appear over that show with blue on black the shape essentially- if it was on top, on side, etc.
+
+- **GIVEN:** the vacated place closes up as soon as the drag starts; the
+  neighbouring panes take its space (one layout transaction).
+- **GIVEN:** the mockup's stamp (about 100 logical units wide) and its
+  animation (about 220 ms) make sense as starting values; the motion
+  belongs to the engine (T2) when it exists.
+- **GIVEN D2, refined.** The targeting matched only marginally. What the
+  owner saw shows visible indicators over the pane under the pointer that
+  depict, in blue on black, the shape the result would take: on top, on a
+  side, and so on. Recorded reading, to be confirmed by a second mockup:
+  position still selects the target, and indicator tiles appear over the
+  hovered pane, each a dark tile with the resulting region drawn in blue.
