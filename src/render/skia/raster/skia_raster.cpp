@@ -921,8 +921,11 @@ void SkiaRaster::draw_inset_box_shadow(
     const Rect outside{rect.x - reach, rect.y - reach,
                        rect.width + reach * 2.0,
                        rect.height + reach * 2.0};
-    SkPathBuilder complement_builder;
-    complement_builder.setFillType(SkPathFillType::kEvenOdd);
+    // The fill type goes to the constructor, as in the executor's builders.
+    // Set afterwards with setFillType, it did not reach the built path in
+    // the sanitized build, whose toolkit is instrumented while libskia is
+    // not: the even-odd hole was filled (#167).
+    SkPathBuilder complement_builder(SkPathFillType::kEvenOdd);
     complement_builder.addRect(to_sk_rect(outside));
     if (!hole.empty()) {
         complement_builder.addRRect(to_sk_rrect(
