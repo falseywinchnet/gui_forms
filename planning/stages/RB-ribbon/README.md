@@ -220,6 +220,11 @@ From the docking interview (2026-10-17,
     settings. The ribbon exposes that state (`RibbonState`, with
     `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
     own. Revises decision 12.
+45. **The scroll buttons take 8 units of hysteresis (R4),** as the hide
+    rule does (decision 36); WordPad's are about 9.5.
+46. **Minimizing is accessible (R7-1):** the command plane publishes an
+    expand and collapse state, since tabs expose selection and never
+    invoke; clicking the selected tab keeps working by pointer.
 
 From the owner's review of phase 2b (relayed by the coordinator, 2026-10):
 

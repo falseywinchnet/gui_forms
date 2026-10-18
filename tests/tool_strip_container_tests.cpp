@@ -30,6 +30,7 @@ const ToolStrip::Item* find_item(const std::vector<ToolStrip::Item>& items, std:
     }
     return nullptr;
 }
+const ToolStrip::Item* find_item(std::vector<ToolStrip::Item>&& items, std::string_view id) = delete;
 
 std::vector<ToolStripItemSpec> tools() {
     const std::shared_ptr<Command> choice = std::make_shared<Command>("choice", "Choice");

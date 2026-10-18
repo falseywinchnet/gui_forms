@@ -57,7 +57,8 @@ std::vector<HostMonitor> device_monitors() {
     return monitors;
 }
 
-using DwmGetWindowAttributeFunction = HRESULT(WINAPI*)(HWND, DWORD, PVOID, DWORD);
+// dwmapi.dll's entry point, typed from its declaration (house style section 9).
+using DwmGetWindowAttributeFunction = decltype(&::DwmGetWindowAttribute);
 
 // The visible window bounds without the invisible resize borders Windows 10
 // and later add around a sizable window (DWMWA_EXTENDED_FRAME_BOUNDS, 9),

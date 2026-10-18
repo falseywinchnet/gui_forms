@@ -32,6 +32,7 @@ const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_semantic(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 std::shared_ptr<PropertyList> make_properties() {
     std::shared_ptr<gui_forms::PropertyList> properties = make_control<PropertyList>(StableId("inspection.properties"));

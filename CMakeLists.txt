@@ -1165,6 +1165,11 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/win32_compat_shim.def
     )
     target_compile_features(gui_forms_win32_compat PRIVATE cxx_std_20)
+    # Declarations only: the shim checks its run-time entry-point types
+    # against c_api.h and resolves the ABI by name; it does not link it.
+    target_include_directories(gui_forms_win32_compat PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
     target_compile_definitions(gui_forms_win32_compat PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )

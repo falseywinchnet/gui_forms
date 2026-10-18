@@ -28,6 +28,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 struct Fixture final {
     Fixture() : window(root, {520.0, 390.0}) {
@@ -231,10 +232,12 @@ void test_popup_keyboard_commit_cancel_and_outside_dismissal() {
             "Escape must discard popup-local selection and close the focus scope");
 
     (*fixture.picker).set_dropped_down(true);
-    require(fixture.window.dispatch_pointer(
-                {PointerAction::down, PointerButton::primary, {490.0, 360.0}}) &&
+    const bool pressed = fixture.window.dispatch_pointer(
+        {PointerAction::down, PointerButton::primary, {490.0, 360.0}});
+    const SemanticSnapshot dismissed = fixture.window.semantic_snapshot();
+    require(pressed &&
                 !(*fixture.picker).dropped_down() &&
-                !find_node(fixture.window.semantic_snapshot().roots,
+                !find_node(dismissed.roots,
                            "date.picker.popup.calendar"),
             "outside press must dismiss the retained popup and its semantic subtree");
 }
