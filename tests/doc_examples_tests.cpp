@@ -2851,6 +2851,7 @@ struct Search final : gf::Component {
     Search() {
         (*field).set_placeholder_text("Search");
         (*field).set_accessible_name("Search");
+        (*field).set_accepts_enter(true);
         gf::on((*field).committed(), *this, &Search::on_commit);
     }
     void on_commit(const std::string& text) { query = text; }

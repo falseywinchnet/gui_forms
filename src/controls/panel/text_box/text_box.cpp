@@ -70,6 +70,8 @@ void TextBox::set_text(std::string text) {
         return;
     }
     end_auto_complete(false);
+    // Replacing the whole text abandons any composition it held.
+    composing_ = false;
     store_.set_text(text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
     layout_positions_.clear();
@@ -144,6 +146,16 @@ void TextBox::set_newline_sequence(std::string sequence) {
 void TextBox::set_accepts_tab(bool enabled_value) {
     require_mutable();
     accepts_tab_ = enabled_value;
+}
+
+void TextBox::set_accepts_enter(bool enabled_value) {
+    require_mutable();
+    accepts_enter_ = enabled_value;
+}
+
+void TextBox::set_accepts_escape(bool enabled_value) {
+    require_mutable();
+    accepts_escape_ = enabled_value;
 }
 
 void TextBox::set_maximum_length(std::size_t length) {
@@ -1066,19 +1078,46 @@ void TextBox::on_key(KeyEvent& event) {
         return;
     }
     if (event.physical_key == PhysicalKey::enter) {
+        // An open suggestion list or appended completion took Enter above.
+        if (composing_) {
+            // The composition is the input method's to commit; the box keeps
+            // the key from reaching the containers or the accept button.
+            event.handled = true;
+            return;
+        }
         if (multiline_) {
             if (!read_only_) static_cast<void>(replace_selection(newline_));
             event.handled = true;
             return;
         }
-        const std::string value(text());
-        committed_.emit(value);
-        event.handled = true;
+        if (accepts_enter_ && event.modifiers == Modifier::none) {
+            const std::string value(text());
+            committed_.emit(value);
+            event.handled = true;
+        }
+        // Otherwise nothing here to commit: the key goes on unhandled.
         return;
     }
     if (event.physical_key == PhysicalKey::escape) {
-        cancelled_.emit();
-        event.handled = true;
+        // An open suggestion list or appended completion took Escape above.
+        if (composing_) {
+            // The composition is the input method's to cancel; the box keeps
+            // the key from reaching the containers or the cancel button.
+            event.handled = true;
+            return;
+        }
+        if (selecting_ && has_pointer_capture()) {
+            // Escape ends a selection drag, keeping what it selected so far.
+            selecting_ = false;
+            set_pointer_capture(false);
+            event.handled = true;
+            return;
+        }
+        if (accepts_escape_ && event.modifiers == Modifier::none) {
+            cancelled_.emit();
+            event.handled = true;
+        }
+        // Otherwise nothing here to cancel: the key goes on unhandled.
         return;
     }
     if (command && event.physical_key == PhysicalKey::a) {
@@ -1207,6 +1246,8 @@ void TextBox::on_text_input(TextInputEvent& event) {
             return;
         }
     }
+    // An empty composition is the input method cancelling one.
+    composing_ = event.composing && !event.text_utf8.empty();
     event.handled = replace(start, end, event.text_utf8, TextEditKind::typing);
     if (event.handled) auto_complete_after_edit(TextEditKind::typing, event.composing);
 }
@@ -1236,6 +1277,7 @@ void TextBox::on_focus_changed(bool focused) {
     caret_damage_.valid = false;
     focused_ = focused;
     selecting_ = false;
+    composing_ = false;
     if (focused_) {
         reset_caret_blink();
     } else {
@@ -1338,6 +1380,7 @@ void TextBox::on_detached_from_window() noexcept {
     caret_frame_.disconnect();
     focused_ = false;
     selecting_ = false;
+    composing_ = false;
 }
 
 
