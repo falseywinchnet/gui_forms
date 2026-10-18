@@ -690,11 +690,11 @@ void regions_and_escape_keys() {
     require(key(window, PhysicalKey::f6, Modifier::shift) && active_is(workspace, "output", "doc.second"),
             "Shift+F6 goes back");
 
-    // Escape in a tool panel returns to the active document, unless the
-    // content uses it (a text box does).
-    require(!key(window, PhysicalKey::escape) || active_is(workspace, "output", "doc.second"),
-            "a text box keeps its Escape");
-    require(active_is(workspace, "output", "doc.second"), "the text box's Escape leaves Output active");
+    // Escape in a tool panel returns to the active document, from a text box
+    // too: a text box passes on an Escape it has nothing to cancel (W
+    // decision 6, #140).
+    require(key(window, PhysicalKey::escape) && active_is(workspace, "doc.second", "doc.second"),
+            "Escape from a tool panel's text box returns to the active document");
     require(window.request_focus(window.find("content.output.action")), "Output's button takes focus");
     require(key(window, PhysicalKey::escape) && active_is(workspace, "doc.second", "doc.second") &&
                 (*window.focused_control()).stable_id().value() == "content.doc.second.edit",
