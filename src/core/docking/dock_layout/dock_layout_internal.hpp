@@ -30,17 +30,22 @@ struct DockNodePlace final {
 };
 
 // Lookups. Pointers borrow from the state and are invalidated by any change
-// to the vector they point into (adding a node can reallocate nodes).
+// to the vector they point into (adding a node can reallocate nodes). A
+// temporary state is refused (house style section 5).
 [[nodiscard]] DockNode* find_dock_node(DockLayoutState& state, DockNodeId id) noexcept;
 [[nodiscard]] const DockNode* find_dock_node(const DockLayoutState& state, DockNodeId id) noexcept;
+const DockNode* find_dock_node(DockLayoutState&& state, DockNodeId id) = delete;
 [[nodiscard]] DockPanelRecord* find_dock_record(DockLayoutState& state, const DockPanelId& id) noexcept;
 [[nodiscard]] const DockPanelRecord* find_dock_record(const DockLayoutState& state,
                                                      const DockPanelId& id) noexcept;
+const DockPanelRecord* find_dock_record(DockLayoutState&& state, const DockPanelId& id) = delete;
 [[nodiscard]] DockFloatingSite* find_dock_site(DockLayoutState& state, DockSiteId id) noexcept;
 [[nodiscard]] const DockFloatingSite* find_dock_site(const DockLayoutState& state,
                                                      DockSiteId id) noexcept;
+const DockFloatingSite* find_dock_site(DockLayoutState&& state, DockSiteId id) = delete;
 [[nodiscard]] const DockAutoHideEntry* find_dock_auto_hidden(const DockLayoutState& state,
                                                              DockNodeId stack) noexcept;
+const DockAutoHideEntry* find_dock_auto_hidden(DockLayoutState&& state, DockNodeId stack) = delete;
 // The result borrows from `descriptors`; a temporary list is refused (house
 // style section 5).
 [[nodiscard]] const DockPanelDescriptor* find_dock_descriptor(
@@ -81,6 +86,7 @@ void detach_dock_panel(DockLayoutState& state, const DockPanelId& panel);
 // entry whose element is gone, appending their owners to `dropped`.
 [[nodiscard]] const DockUnknownFields* find_unknown_fields(const DockLayoutState& state,
                                                           const DockUnknownOwner& owner) noexcept;
+const DockUnknownFields* find_unknown_fields(DockLayoutState&& state, const DockUnknownOwner& owner) = delete;
 [[nodiscard]] bool unknown_owner_exists(const DockLayoutState& state, const DockUnknownOwner& owner) noexcept;
 void prune_unknown_fields(DockLayoutState& state, std::vector<DockUnknownOwner>& dropped);
 
