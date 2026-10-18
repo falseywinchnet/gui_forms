@@ -1,8 +1,9 @@
 A row of tabs over the selected page's content, in the strip or the document preset.
 
 A page view owns a `PageSet` and shows it through a child `PageStrip`, with
-the selected page's control in the content area below (or, with the strip at
-the bottom, above). Each page's content is an ordinary control the
+the selected page's control in the content area beside it: below a strip at
+the top, above one at the bottom, and to the right or left of a strip on
+the left or right edge. Each page's content is an ordinary control the
 application supplies, either when it adds the page or later, the first time
 the page is selected. The view remembers which control had focus in each
 page, and Ctrl+PageDown and Ctrl+PageUp move between pages from anywhere

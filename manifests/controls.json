@@ -485,7 +485,7 @@
       "type": "PageStrip",
       "header": "gui_forms/controls/pages/page_strip/page_strip.hpp",
       "category": "Grouping",
-      "purpose": "The tab headers of a borrowed PageSet in one row at the top or bottom: content-sized, fixed or fill tabs with minimum and maximum widths, scroll and list buttons or shrink then a counted list when they overflow, close buttons with frozen widths, modified dots, icon-only pinned tabs, automatic or manual keyboard selection, mnemonics, and tab-list semantics without press.",
+      "purpose": "The tab headers of a borrowed PageSet in one row on any edge (turned labels on the sides): content-sized, fixed or fill tabs with minimum and maximum widths, scroll and list buttons or shrink then a counted list when they overflow, close buttons with frozen widths, modified dots, icon-only pinned tabs, automatic or manual keyboard selection, mnemonics, and tab-list semantics without press.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "tabs-and-pages",

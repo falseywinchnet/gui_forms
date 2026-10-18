@@ -1,4 +1,4 @@
-The tab headers of a page set in one row, at the top or the bottom of their content.
+The tab headers of a page set in one row, on the top, bottom, left or right edge of their content.
 
 A page strip shows the pages of a `PageSet` as tabs, in the set's order, and
 shows and changes the set's selection. It has no content area of its own:
@@ -26,8 +26,14 @@ Properties
 page_set
     The bound set, or null after `release_page_set`.
 placement : default ``PageStripPlacement::top``
-    The edge of the content the strip sits on, top or bottom. The tabs touch
-    that edge, and the selected tab's seam lies along it.
+    The edge of the content the strip sits on: top, bottom, left or right.
+    The tabs touch that edge, and the selected tab's seam lies along it. A
+    side strip stacks its tabs from the top down, its overflow buttons at
+    the bottom, and turns their labels: on the left edge they read from
+    bottom to top, on the right edge from top to bottom. Each tab's icon,
+    label and close button follow the reading direction, so on the left edge
+    the icon is at the bottom and the close button at the top. Up and Down
+    move between the tabs of a side strip.
 item_sizing : default ``PageItemSizing::content``
     ``content`` sizes each tab to its icon and label plus padding, within the
     minimum and maximum widths; ``fixed`` gives every tab the fixed width;
@@ -175,7 +181,7 @@ Ctrl+Shift+PageUp move the selected page within its group. The macOS
 Command+W is not bound: the framework has no host keymap defaults yet.
 
 Every page is published to accessibility as a tab of the strip's tab list
-(role ``tab_group``, horizontal): those scrolled out of view are published
+(role ``tab_group``, horizontal, or vertical on a side strip): those scrolled out of view are published
 without bounds and without the visible state, so every tab can be reached.
 Tabs carry their position in the set and offer ``select``, and ``close`` when
 the page is closable; they never offer ``press``. Until accessibility gains

@@ -23,6 +23,7 @@ public:
         build_strip(page);
         build_view(page);
         build_documents(page);
+        build_side_strips(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
         on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
@@ -250,6 +251,34 @@ private:
         on((*(*documents_).strip()).page_close_requested(), *this, &TabsPage::on_document_close_requested);
     }
 
+    // Two PageViews with side strips (owner decision DK-42): on the left
+    // edge the labels read from bottom to top, on the right edge from top to
+    // bottom; Up and Down move between the tabs.
+    void build_side_strips(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> side_group = group(
+            "gallery.tabs.side.group", "PageView · side strips with turned labels", {930.0, 340.0});
+        (*page).add_at(side_group, {24.0, 1256.0, 930.0, 340.0});
+        const std::array<PageStripPlacement, 2> edges{PageStripPlacement::left, PageStripPlacement::right};
+        const std::array<std::string_view, 2> names{"left", "right"};
+        for (std::size_t edge = 0U; edge < edges.size(); ++edge) {
+            const std::string prefix = "gallery.tabs.side." + std::string(names[edge]);
+            std::shared_ptr<PageView> view = make_control<PageView>(StableId(prefix));
+            (*(*view).strip()).set_placement(edges[edge]);
+            (*view).set_accessible_name(std::string(names[edge]) + " side pages");
+            for (std::size_t index = 0U; index < side_titles.size(); ++index) {
+                PageRecord record{};
+                record.id = PageId{std::string(names[edge]) + "." + std::to_string(index)};
+                record.title = std::string(side_titles[index]);
+                std::shared_ptr<Label> body = label(
+                    prefix + ".body." + std::to_string(index),
+                    std::string(side_titles[index]) + " · " + std::string(names[edge]) + " edge", 11.0, 400, ink);
+                static_cast<void>((*view).add_page(record, body));
+            }
+            (*side_group).add_at(view, {20.0 + 450.0 * static_cast<double>(edge), 36.0, 430.0, 286.0});
+            side_views_[edge] = view;
+        }
+    }
+
     // The view removes the page after this handler, which leaves the
     // request unhandled.
     void on_document_close_requested(PageCloseRequest& request) {
@@ -305,6 +334,8 @@ private:
         "README.md",        "page_view.cpp",  "page_strip.cpp", "page_set.cpp",   "page_view.hpp",
         "page_strip.hpp",   "CMakeLists.txt", "PLAN.md",        "README.rst",     "tests.cpp"};
 
+    static constexpr std::array<std::string_view, 4> side_titles{"Explorer", "Search", "Outline", "Output"};
+
     static constexpr std::array<std::string_view, 14> strip_titles{
         "Overview", "Activity", "Security", "Diagnostics", "Network", "Storage", "Accounts",
         "Notifications", "Display", "Sound", "Keyboard", "Accessibility", "Updates", "About"};
@@ -319,6 +350,7 @@ private:
     std::shared_ptr<Label> view_status_;
     std::shared_ptr<PageView> documents_;
     std::shared_ptr<Label> documents_status_;
+    std::array<std::shared_ptr<PageView>, 2> side_views_{};
     Value<bool> activity_visible_{true};
 };
 

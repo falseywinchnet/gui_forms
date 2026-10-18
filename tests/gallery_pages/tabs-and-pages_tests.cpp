@@ -80,6 +80,19 @@ void test_tabs_and_pages(gui_forms::Window& window) {
                 !(*documents).pages().find(PageId{"doc.1"}) &&
                 (*documents_status).text().find("Closed page_view.cpp") != std::string::npos,
             "closing a gallery document removes it and reports the cause");
+
+    std::shared_ptr<gui_forms::PageView> left = std::dynamic_pointer_cast<PageView>(
+        window.find("gallery.tabs.side.left"));
+    std::shared_ptr<gui_forms::PageView> right = std::dynamic_pointer_cast<PageView>(
+        window.find("gallery.tabs.side.right"));
+    require(left && right && (*(*left).strip()).placement() == PageStripPlacement::left &&
+                (*(*right).strip()).placement() == PageStripPlacement::right &&
+                (*left).pages().count() == 4U && (*(*left).strip()).realized_item_count() > 0U &&
+                (*(*right).strip()).realized_item_count() > 0U,
+            "the gallery shows a PageView with its strip on each side edge");
+    require(window.perform_semantic_action("gallery.tabs.side.left.strip.tab.left.2", SemanticAction::select) &&
+                (*(*left).page_content(PageId{"left.2"})).effectively_visible(),
+            "selecting a side tab shows its page");
 }
 
 } // namespace gallery_pages_tests

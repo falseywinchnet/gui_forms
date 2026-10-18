@@ -30,7 +30,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    * - :cpp:class:`TabControl <gui_forms::TabControl>`
      - A set of pages shown one at a time, chosen from a row of tabs.
    * - :cpp:class:`PageStrip <gui_forms::PageStrip>`
-     - The tab headers of a page set in one row, at the top or the bottom of their content.
+     - The tab headers of a page set in one row, on the top, bottom, left or right edge of their content.
    * - :cpp:class:`PageView <gui_forms::PageView>`
      - A row of tabs over the selected page's content, in the strip or the document preset.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
@@ -582,6 +582,10 @@ Enumerations
    .. cpp:enumerator:: top
 
    .. cpp:enumerator:: bottom
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: right
 
 .. cpp:namespace:: gui_forms
 
