@@ -119,7 +119,7 @@ Related types
    * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
      -  
    * - :cpp:class:`TabControl::ItemParts <gui_forms::TabControl::ItemParts>`
-     -  
+     - A tab's parts, in the control's coordinates: the strip's tab, label, focus and seam parts of the same names (the strip paints them).
    * - :cpp:class:`TabControl::ItemStates <gui_forms::TabControl::ItemStates>`
      -  
    * - :cpp:class:`TabControl::Parts <gui_forms::TabControl::Parts>`
@@ -673,6 +673,8 @@ Related types
 
    ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
 
+   A tab's parts, in the control's coordinates: the strip's tab, label, focus and seam parts of the same names (the strip paints them).
+
    .. cpp:member:: PartGeometry tab
 
    .. cpp:member:: PartGeometry tab_label
@@ -905,6 +907,18 @@ Enumerations
    .. cpp:enumerator:: buttons
 
    .. cpp:enumerator:: flat_buttons
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TabSizeMode
+
+   ``#include <gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp>``
+
+   .. cpp:enumerator:: normal
+
+   .. cpp:enumerator:: fill_to_right
+
+   .. cpp:enumerator:: fixed
 
 Functions, constants and aliases
 --------------------------------

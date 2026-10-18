@@ -16,3 +16,6 @@
 #include "gui_forms/controls/pages/page_strip/page_strip.hpp"
 #include "gui_forms/controls/pages/page_view/page_view.hpp"
 #include "gui_forms/controls/pages/navigation_pane/navigation_pane.hpp"
+#include "gui_forms/controls/docking/dock_navigator/dock_navigator.hpp"
+#include "gui_forms/controls/docking/dock_workspace/dock_workspace.hpp"
+#include "gui_forms/controls/docking/dock_site/dock_site.hpp"

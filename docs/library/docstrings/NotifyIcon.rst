@@ -57,7 +57,8 @@ balloon_tip_closed
     Raised when notification text from the icon closes or times out.
 menu_item_invoked
     Raised after a row of the context menu, chosen in the native menu, has
-    run its command.
+    run its command, through the bound window's command chain (decision
+    DK-47).
 
 Methods
 -------

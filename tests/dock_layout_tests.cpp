@@ -53,6 +53,8 @@ using gui_forms::DockSplitSizes;
 using gui_forms::DockSubject;
 using gui_forms::DockTransaction;
 using gui_forms::DockTransactionResult;
+using gui_forms::DockUnknownOwner;
+using gui_forms::DockUnknownOwnerKind;
 using gui_forms::DockUpgradeDecision;
 using gui_forms::DockVisiblePanel;
 using gui_forms::Rect;
@@ -572,6 +574,41 @@ void test_pins() {
                     "unpinning a docked stack");
 }
 
+// Pinning out and unpinning are inverse edits (DockAutoHideEntry): with
+// nothing between, every stack in the standard layout comes back to the
+// state it left, the split's identity and ratio included, and the saved
+// layout is byte for byte the same; an auto-hidden layout saves and
+// restores the split to recreate.
+void test_pin_round_trip_exact() {
+    DockLayout layout{};
+    register_standard(layout);
+    show_standard(layout);
+    require(static_cast<bool>(apply_one(layout, DockEdit::set_ratio(DockNodeId{3}, 0.1))),
+            "a ratio that 1 - (1 - r) does not give back exactly");
+    const std::array<std::string_view, 3> tools{"tools.solution", "tools.properties", "tools.output"};
+    for (const std::string_view tool : tools) {
+        const DockLayoutState before = layout.state();
+        const std::string saved = layout.write_xml().text;
+        const DockNodeId stack = layout.locate(panel(tool)).stack;
+        require(static_cast<bool>(apply_one(layout, DockEdit::auto_hide(DockSubject::of_stack(stack), DockSide::left))),
+                "the stack pins out");
+        const std::string pinned = layout.write_xml().text;
+        require(pinned.find(" split=\"") != std::string::npos && pinned.find(" split_ratio=\"") != std::string::npos,
+                "the saved auto-hide entry names the split to recreate");
+        DockLayout restored{};
+        register_standard(restored);
+        const DockRestoreResult result = restored.restore_xml(pinned, DockRestoreOptions{});
+        require(result.status == DockRestoreStatus::restored && restored.write_xml().text == pinned,
+                "an auto-hidden layout restores and writes again the same");
+        require(static_cast<bool>(apply_one(restored, DockEdit::unpin(stack))) && restored.write_xml().text == saved,
+                "unpinning the restored layout gives the layout before the pin");
+        require(static_cast<bool>(apply_one(layout, DockEdit::unpin(stack))), "the stack docks back");
+        require(layout.state() == before && layout.write_xml().text == saved,
+                "pin then unpin leaves the layout exactly as it was");
+    }
+    require(static_cast<bool>(layout.check_invariants()), "valid after the round trips");
+}
+
 void test_transactions() {
     DockLayout layout{};
     register_standard(layout);
@@ -843,8 +880,161 @@ void test_restore_newer_format() {
     const DockNode& root = *layout.find_node(layout.state().main_root);
     require(root.id == DockNodeId{3} && root.second == DockNodeId{1}, "the split left with one child collapses");
     const DockLayoutWriteResult written = layout.write_xml();
-    require(written.text.find("theme") == std::string::npos && written.text.find("format=\"2\"") != std::string::npos,
-            "unknown fields are not written back; the current format is");
+    require(written.text.find("theme=\"dark\"") != std::string::npos &&
+                written.text.find("<named_layouts>") != std::string::npos &&
+                written.text.find("pinned_width=\"40\"") != std::string::npos &&
+                written.text.find("grid_stack") == std::string::npos &&
+                written.text.find("format=\"2\"") != std::string::npos,
+            "unknown fields are written back (DK decision 48), except an element holding panels; the format "
+            "written is this framework's");
+}
+
+// A newer layout's unknown fields on every kind of known element, with
+// comments, in the writer's own layout (DK decision 48). Restoring and
+// saving gives the same text but for the documented normalizations: the
+// format attribute is the one this framework writes, and comments are not
+// kept.
+const std::string unknown_fields_xml =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    "<!-- written by a newer framework -->\n"
+    "<dock_layout format=\"3\" application_version=\"0\" next_id=\"9\" theme=\"dark\">\n"
+    "  <named_layouts>\n"
+    "    <layout name=\"debug\"/>\n"
+    "  </named_layouts>\n"
+    "  <main_site>\n"
+    "    <window x=\"10\" y=\"20\" width=\"800\" height=\"600\" monitor=\"M\" maximized=\"false\" snapped=\"left\"/>\n"
+    "    <split id=\"7\" axis=\"vertical\" ratio=\"0.75\" animate=\"true\">\n"
+    "      <split id=\"5\" axis=\"horizontal\" ratio=\"0.75\">\n"
+    "        <split id=\"3\" axis=\"horizontal\" ratio=\"0.25\">\n"
+    "          <tool_stack id=\"2\" selected=\"0\" pinned_width=\"40\">\n"
+    "            <panel id=\"tools.solution\" badge=\"3\"/>\n"
+    "            <accent colour=\"blue\"/>\n"
+    "          </tool_stack>\n"
+    "          <document_area id=\"1\">\n"
+    "            <!-- the documents -->\n"
+    "            <document_stack id=\"8\" selected=\"1\">\n"
+    "              <panel id=\"doc.a\"/>\n"
+    "              <panel id=\"doc.b\"/>\n"
+    "            </document_stack>\n"
+    "            <watermark>Drop files here</watermark>\n"
+    "          </document_area>\n"
+    "        </split>\n"
+    "        <tool_stack id=\"4\" selected=\"0\">\n"
+    "          <panel id=\"tools.properties\"/>\n"
+    "        </tool_stack>\n"
+    "      </split>\n"
+    "      <tool_stack id=\"6\" selected=\"0\">\n"
+    "        <panel id=\"tools.output\"/>\n"
+    "      </tool_stack>\n"
+    "    </split>\n"
+    "    <guides visible=\"true\"/>\n"
+    "  </main_site>\n"
+    "  <panel_record id=\"doc.a\" kind=\"document\" last=\"docked\" colour=\"red\"/>\n"
+    "  <panel_record id=\"doc.b\" kind=\"document\" last=\"docked\"/>\n"
+    "  <panel_record id=\"tools.output\" kind=\"tool\" last=\"docked\"/>\n"
+    "  <panel_record id=\"tools.properties\" kind=\"tool\" last=\"docked\">\n"
+    "    <docked stack=\"4\" index=\"0\" neighbour=\"0\" side=\"left\" ratio=\"0.25\" pinned=\"yes\"/>\n"
+    "  </panel_record>\n"
+    "  <panel_record id=\"tools.solution\" kind=\"tool\" last=\"docked\">\n"
+    "    <history count=\"2\"/>\n"
+    "  </panel_record>\n"
+    "  <statistics opened=\"12\"/>\n"
+    "</dock_layout>\n";
+
+std::string normalized_unknown_fields_xml() {
+    std::string text = unknown_fields_xml;
+    const std::array<std::string_view, 2> comments{"<!-- written by a newer framework -->\n",
+                                                   "            <!-- the documents -->\n"};
+    for (const std::string_view comment : comments) {
+        const std::size_t at = text.find(comment);
+        if (at != std::string::npos) text.erase(at, comment.size());
+    }
+    const std::string_view newer = "format=\"3\"";
+    const std::size_t at = text.find(newer);
+    if (at != std::string::npos) text.replace(at, newer.size(), "format=\"2\"");
+    return text;
+}
+
+bool contains(const std::string& text, std::string_view part) {
+    const bool found = text.find(part) != std::string::npos;
+    return found;
+}
+
+bool dropped(const DockTransactionResult& result, DockUnknownOwnerKind kind, std::uint32_t id,
+             std::string_view panel_id) {
+    for (const DockUnknownOwner& owner : result.dropped_unknown_fields) {
+        if (owner.kind == kind && owner.id == id && owner.panel.value == panel_id) return true;
+    }
+    return false;
+}
+
+// Unknown fields are kept and written back in place; they survive an edit
+// that does not touch their element; an edit that removes an element drops
+// its unknown fields and says so.
+void test_unknown_fields_kept() {
+    DockLayout layout{};
+    register_standard(layout);
+    const DockRestoreResult result = layout.restore_xml(unknown_fields_xml, DockRestoreOptions{});
+    require(result.status == DockRestoreStatus::restored, "the newer layout restores");
+    require(has_diagnostic(result, DockRestoreDiagnosticKind::unknown_attribute) &&
+                has_diagnostic(result, DockRestoreDiagnosticKind::unknown_element) &&
+                !has_diagnostic(result, DockRestoreDiagnosticKind::unknown_fields_dropped),
+            "the unknown fields are reported, and none is dropped");
+    const std::string expected = normalized_unknown_fields_xml();
+    const std::string written = layout.write_xml().text;
+    if (written != expected) std::cerr << written;
+    require(written == expected,
+            "saving writes the unknown fields back in place: the same text but the format and the comments");
+    DockLayout again{};
+    register_standard(again);
+    require(again.restore_xml(written, DockRestoreOptions{}).status == DockRestoreStatus::restored &&
+                again.write_xml().text == expected,
+            "and a second round trip is stable");
+
+    // An edit that leaves their elements in place keeps them.
+    const DockTransactionResult ratio = apply_one(layout, DockEdit::set_ratio(DockNodeId{5}, 0.6));
+    require(static_cast<bool>(ratio) && ratio.dropped_unknown_fields.empty(), "a ratio change drops nothing");
+    const std::string after_ratio = layout.write_xml().text;
+    require(contains(after_ratio, "pinned_width=\"40\"") && contains(after_ratio, "<accent colour=\"blue\"/>") &&
+                contains(after_ratio, "badge=\"3\"") && contains(after_ratio, "theme=\"dark\"") &&
+                contains(after_ratio, "<watermark>Drop files here</watermark>") &&
+                contains(after_ratio, "animate=\"true\""),
+            "unknown fields survive an edit that does not touch their element");
+    // Moving a panel keeps the fields of its <panel> with it.
+    const DockTransactionResult moved = apply_one(
+        layout, DockEdit::dock_into(DockSubject::of_panel(panel("tools.solution")), DockNodeId{4}));
+    require(static_cast<bool>(moved), "Solution joins Properties");
+    require(dropped(moved, DockUnknownOwnerKind::node, 2U, "") &&
+                !dropped(moved, DockUnknownOwnerKind::panel, 0U, "tools.solution"),
+            "its emptied stack's fields are dropped and reported; the panel's go with it");
+    const std::string after_move = layout.write_xml().text;
+    require(!contains(after_move, "pinned_width") && !contains(after_move, "<accent") &&
+                contains(after_move, "<panel id=\"tools.solution\" badge=\"3\"/>"),
+            "the removed stack's fields are gone, the panel's are written where it now stands");
+    // Hiding the panel removes its <panel> element and with it its fields.
+    const DockTransactionResult hidden = apply_one(layout, DockEdit::hide(panel("tools.solution")));
+    require(static_cast<bool>(hidden) && dropped(hidden, DockUnknownOwnerKind::panel, 0U, "tools.solution") &&
+                !contains(layout.write_xml().text, "badge"),
+            "a hidden panel's reference fields are dropped and reported");
+    require(contains(layout.write_xml().text, "<history count=\"2\"/>"), "its record's fields stay");
+    require(static_cast<bool>(layout.check_invariants()), "valid throughout");
+
+    // A restore that removes an element (an unregistered panel's stack)
+    // drops that element's fields and reports it.
+    DockLayout partial{};
+    const std::array<std::string_view, 4> registered{"doc.a", "doc.b", "tools.properties", "tools.output"};
+    for (const std::string_view id : registered) {
+        DockPanelDescriptor descriptor{};
+        descriptor.id = panel(id);
+        descriptor.kind = id.rfind("doc", 0) == 0 ? DockPanelKind::document : DockPanelKind::tool;
+        require(partial.register_panel(descriptor), "a panel registers");
+    }
+    const DockRestoreResult without = partial.restore_xml(unknown_fields_xml, DockRestoreOptions{});
+    require(without.status == DockRestoreStatus::restored &&
+                has_diagnostic(without, DockRestoreDiagnosticKind::unknown_fields_dropped) &&
+                !contains(partial.write_xml().text, "pinned_width") &&
+                contains(partial.write_xml().text, "theme=\"dark\""),
+            "a restore that removes an element drops its unknown fields with a diagnostic");
 }
 
 void test_restore_corrupt() {
@@ -1185,6 +1375,7 @@ int main() {
     test_restrictions();
     test_floating_limit();
     test_pins();
+    test_pin_round_trip_exact();
     test_transactions();
     test_split_solver_and_arrange();
     test_monitor_fallback();
@@ -1192,6 +1383,7 @@ int main() {
     test_restore_removed_plugin();
     test_restore_older_format();
     test_restore_newer_format();
+    test_unknown_fields_kept();
     test_restore_corrupt();
     test_restore_application_upgrade();
     test_lazy_creation_report();

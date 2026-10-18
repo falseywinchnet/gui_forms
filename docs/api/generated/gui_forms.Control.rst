@@ -121,6 +121,9 @@ gui_forms::Control
          The theme in use: the nearest :cpp:func:`theme_override <gui_forms::Control::theme_override>` on this control or an
          ancestor, else the window's theme, else the default theme.
 
+      **effective_key_map** : ``KeyMap``, read-only
+         The attached window's key map (Window::key_map), or the PC convention's while detached. A control asks it whether a key event is a named keyboard command instead of naming the keys itself.
+
       **theme_override** : ``std::shared_ptr<const Theme>``
          A theme for this control and its subtree instead of the inherited one,
          or null. Setting null throws ``std::invalid_argument``; use
@@ -693,6 +696,10 @@ gui_forms::Control
 
       The theme in use: the nearest :cpp:func:`theme_override <gui_forms::Control::theme_override>` on this control or an
       ancestor, else the window's theme, else the default theme.
+
+   .. cpp:function:: const KeyMap& effective_key_map() const noexcept
+
+      The attached window's key map (Window::key_map), or the PC convention's while detached. A control asks it whether a key event is a named keyboard command instead of naming the keys itself.
 
    .. cpp:function:: std::shared_ptr<const Theme> theme_override() const noexcept
 
