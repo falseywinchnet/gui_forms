@@ -65,7 +65,8 @@ SpinHalf SpinButtons::half_at(Point window_position) const {
     if (!bounds.contains(window_position)) return SpinHalf::none;
     const SpinHalves halves = spin_halves({0.0, 0.0, bounds.width, bounds.height});
     const double local_y = window_position.y - bounds.y;
-    return local_y < halves.lower.y ? SpinHalf::upper : SpinHalf::lower;
+    const SpinHalf half = local_y < halves.lower.y ? SpinHalf::upper : SpinHalf::lower;
+    return half;
 }
 
 void SpinButtons::show(SpinHalf hot, SpinHalf pressed) {
@@ -92,7 +93,8 @@ void SpinButtons::on_pointer(PointerEvent& event) {
     if (event.button != PointerButton::primary) return;
     if (event.action == PointerAction::down && half != SpinHalf::none) {
         show(half, half);
-        stepped_.emit(half == SpinHalf::upper ? 1 : -1);
+        const int step = half == SpinHalf::upper ? 1 : -1;
+        stepped_.emit(step);
         event.handled = true;
     } else if (event.action == PointerAction::up) {
         show(half, SpinHalf::none);

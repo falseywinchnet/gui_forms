@@ -5,9 +5,9 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
-#include <array>
 #include <stdexcept>
 #include <utility>
 
@@ -30,6 +30,16 @@ bool equal_folded(std::string_view left, std::string_view right) noexcept {
         }
     }
     return true;
+}
+
+// The byte length of the UTF-8 sequence `lead` starts, from its high bits.
+// A continuation or invalid lead counts as one byte, so a malformed
+// sequence is read one byte at a time.
+std::size_t utf8_sequence_length(unsigned char lead) noexcept {
+    if (lead >= 0xF0U) return 4U;
+    if (lead >= 0xE0U) return 3U;
+    if (lead >= 0xC0U) return 2U;
+    return 1U;
 }
 
 // The sorted order: ASCII case folded, then byte order, so "apple" and
@@ -98,16 +108,10 @@ void DomainUpDown::filter_edit(TextEdit& edit) {
     if (!read_only_) return;
     edit.verdict = TextEditVerdict::refuse;
     if (edit.kind != TextEditKind::typing || edit.replacement.empty()) return;
-    // The first character typed, as its UTF-8 bytes.
+    // The first character typed, as its UTF-8 bytes (fewer when the
+    // replacement ends inside the sequence).
     const unsigned char lead = static_cast<unsigned char>(edit.replacement[0]);
-    std::size_t length = 1U;
-    if (lead >= 0xF0U) {
-        length = 4U;
-    } else if (lead >= 0xE0U) {
-        length = 3U;
-    } else if (lead >= 0xC0U) {
-        length = 2U;
-    }
+    const std::size_t length = utf8_sequence_length(lead);
     const std::string_view typed = edit.replacement.substr(0U, length);
     const std::optional<std::size_t> found = next_item_starting_with(typed);
     // Showing the item changes the editor's text inside its filter call; the
@@ -263,8 +267,11 @@ void DomainUpDown::step(std::ptrdiff_t offset) {
         }
     }
     select(static_cast<std::size_t>(next), true);
-    if (editor_ && window() != nullptr) {
-        static_cast<void>((*window()).request_focus(editor_));
+    // Stepping puts the focus in the field with the new item's text
+    // selected, so typing replaces it. Outside a window nothing has focus.
+    Window* const host = window();
+    if (editor_ && host != nullptr) {
+        static_cast<void>((*host).request_focus(editor_));
         (*editor_).select_all();
     }
 }
@@ -279,12 +286,14 @@ void DomainUpDown::down_button() {
 
 void DomainUpDown::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
+    // The spin column takes button_width_ (or the whole width, when narrower)
+    // at the right; the field takes the rest.
     const double button_width = std::min(button_width_, std::max(0.0, final_bounds.width));
-    if (editor_) set_child_layout(
-        editor_, {0.0, 0.0, std::max(0.0, final_bounds.width - button_width), final_bounds.height});
-    if (spinner_) set_child_layout(
-        spinner_, {std::max(0.0, final_bounds.width - button_width), 0.0, button_width,
-                   final_bounds.height});
+    const double field_width = std::max(0.0, final_bounds.width - button_width);
+    const Rect field{0.0, 0.0, field_width, final_bounds.height};
+    const Rect column{field_width, 0.0, button_width, final_bounds.height};
+    if (editor_) set_child_layout(editor_, field);
+    if (spinner_) set_child_layout(spinner_, column);
 }
 
 void DomainUpDown::on_key_preview(KeyEvent& event) {
@@ -343,8 +352,10 @@ bool DomainUpDown::on_semantic_action(SemanticAction action, std::string_view va
         set_text(std::string(value_text));
         return true;
     }
-    if (action == SemanticAction::focus && editor_ && window() != nullptr) {
-        return (*window()).request_focus(editor_);
+    Window* const host = window();
+    if (action == SemanticAction::focus && editor_ && host != nullptr) {
+        const bool focused = (*host).request_focus(editor_);
+        return focused;
     }
     return Panel::on_semantic_action(action, value_text);
 }
@@ -450,9 +461,10 @@ void DomainUpDown::publish_part_geometry(std::span<PartGeometry> geometry) const
 AnatomyStateSet DomainUpDown::anatomy_states() const {
     AnatomyStateSet states = ScrollableControl::anatomy_states();
     if (read_only_) states.insert(AnatomyState::read_only);
-    if (visual_status() == ControlVisualStatus::invalid) {
+    const ControlVisualStatus status = visual_status();
+    if (status == ControlVisualStatus::invalid) {
         states.insert(AnatomyState::invalid);
-    } else if (visual_status() == ControlVisualStatus::pending) {
+    } else if (status == ControlVisualStatus::pending) {
         states.insert(AnatomyState::pending);
     }
     return states;

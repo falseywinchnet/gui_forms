@@ -12,8 +12,8 @@ namespace gui_forms {
 // control's published anatomy both take their rectangles from spin_halves and
 // spin_glyph, so they describe the same parts.
 struct SpinHalves final {
-    Rect upper;
-    Rect lower;
+    Rect upper{};
+    Rect lower{};
 };
 
 // Splits `column` where its halves meet: the upper half takes the floor of
