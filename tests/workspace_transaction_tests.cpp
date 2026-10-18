@@ -223,6 +223,59 @@ void test_transaction_destructor_commits() {
     require(empty_refused, "an empty notification was accepted");
 }
 
+// Finding V1 (owner decision V1-1): a host that refuses a window after it
+// has taken the entry (a native creation failure) may already have destroyed
+// the entry's model, so the transaction must abandon, not close, the scope it
+// opened on that model. The headless host injects the failure. With
+// refuse_and_keep the model survives in refused_models(), and the scope's
+// update level is still entered: nothing left it, and no layout ran. With
+// refuse_and_destroy the model is gone; closing its scope would be a
+// use-after-free, which the sanitizer job reports.
+void test_refusal_after_the_host_took_the_entry() {
+    ApplicationWindowHandle main{};
+    Window* main_model = nullptr;
+    const std::shared_ptr<Panel> main_root = make_panel("main.root", {0.0, 0.0, 400.0, 300.0});
+    std::vector<ApplicationWindow> windows;
+    ApplicationWindow primary = make_entry("main", "", HostWindowFloating::none, main_root, {400.0, 300.0}, {});
+    primary.options.ready = KeepWindow{&main, &main_model};
+    windows.push_back(std::move(primary));
+    host::HeadlessApplication application(std::move(windows));
+    const std::shared_ptr<ApplicationResources> resources = (*main_model).resources();
+    {
+        WorkspaceTransaction transaction(main.windows());
+        application.inject_open_fault(host::HeadlessOpenFault::refuse_and_keep);
+        ApplicationWindow entry = make_entry("float.kept", "main", HostWindowFloating::tool,
+                                             make_panel("float.kept.root", {0.0, 0.0, 200.0, 300.0}),
+                                             {200.0, 300.0}, resources);
+        const ApplicationWindowOpenResult refused = transaction.open_window(std::move(entry));
+        require(refused.status.error == HostServiceError::backend_failure && !refused.window.active(),
+                "the injected failure did not refuse the window");
+        require(!entry.model, "the host did not take the entry before refusing it");
+        require(application.refused_models().size() == 1U, "the refused model was not kept");
+        const MetricsSnapshot kept = (*application.refused_models()[0]).metrics_snapshot();
+        require(kept.update_scope_depth == 1U && kept.arrange_passes == 0U,
+                "the transaction closed the scope of a model the host had taken and refused");
+        const WorkspaceTransactionResult result = transaction.commit();
+        require(result.status.accepted() && result.windows_laid_out == 0U && result.windows_shown == 0U,
+                "the refused window stayed in the transaction");
+    }
+    const MetricsSnapshot after = (*application.refused_models()[0]).metrics_snapshot();
+    require(after.update_scope_depth == 1U && after.arrange_passes == 0U,
+            "the commit touched the refused model");
+    {
+        WorkspaceTransaction transaction(main.windows());
+        application.inject_open_fault(host::HeadlessOpenFault::refuse_and_destroy);
+        ApplicationWindow entry = make_entry("float.lost", "main", HostWindowFloating::tool,
+                                             make_panel("float.lost.root", {0.0, 0.0, 200.0, 300.0}),
+                                             {200.0, 300.0}, resources);
+        const ApplicationWindowOpenResult refused = transaction.open_window(std::move(entry));
+        require(refused.status.error == HostServiceError::backend_failure, "the destroying fault did not refuse");
+        const WorkspaceTransactionResult result = transaction.commit();
+        require(result.windows_laid_out == 0U, "a destroyed model stayed in the transaction");
+    }
+    require(main.windows().window_count() == 1U, "a refused window stayed in the run");
+}
+
 std::uint64_t milliseconds(std::uint64_t value) {
     const std::uint64_t nanoseconds = value * 1000000U;
     return nanoseconds;
@@ -351,6 +404,7 @@ int main() {
     try {
         test_two_window_transaction();
         test_transaction_destructor_commits();
+        test_refusal_after_the_host_took_the_entry();
         test_capture_drag();
         test_native_move_loop_fallback();
         std::cout << "gui_forms_workspace_transaction_tests: all tests passed\n";

@@ -55,7 +55,9 @@ public:
     void include(Window& window);
     // Opens a window, hidden, and includes its model. It is shown at the
     // commit when `entry.options.initially_visible` was true. The refusals
-    // are ApplicationWindows::open_window's.
+    // are ApplicationWindows::open_window's; on a refusal the model is no
+    // longer included (its scope is closed when the entry is still the
+    // caller's, abandoned when the host had taken it).
     [[nodiscard]] ApplicationWindowOpenResult open_window(ApplicationWindow&& entry);
     // Shows `window` at the commit, after every window has laid out.
     [[nodiscard]] HostServiceStatus show_window(const ApplicationWindowHandle& window);
