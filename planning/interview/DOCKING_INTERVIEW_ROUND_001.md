@@ -687,3 +687,14 @@ panels. The owner, verbatim:
 > accepted.
 
 - **GIVEN N1-1 to N10-1** as recommended.
+
+### Note, 2026-10-19: C1, content colour
+
+Asked: the ribbon colour picker paints its swatches directly because no part
+role or paint field carries a content colour; (1) a content-colour field on
+the shared paint path (recommended), (2) a swatch part role carrying a
+colour, (3) keep the documented exception. The owner, verbatim:
+
+> accepted.
+
+- **GIVEN C1-1.** A content-colour field on `PartPaint` (W decision 7).
