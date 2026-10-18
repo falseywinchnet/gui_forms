@@ -184,6 +184,10 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     view (on for documents); live sliding; tear-off only through docking;
     the Outlook-style pane with a configure menu and `options` event, a
     collapsed bar with a vertical caption and popup, tab-list semantics.
+40. **PageView vocabulary (P35):** a `tab_panel` role, a tab-to-panel
+    relation and a tab-list orientation field (with stage A); tree roles
+    deferred; a custom item state `pinned`; tabs paint as `menu_item`
+    until T4; no new marks for the navigation pane.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

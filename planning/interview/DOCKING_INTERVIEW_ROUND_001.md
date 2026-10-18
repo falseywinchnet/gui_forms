@@ -489,3 +489,28 @@ postage-stamp drag), P29-1, P30-1, P31-1, P34-1. The owner, verbatim:
   a popup over the window.
 - **GIVEN P34-1.** Navigation buttons are tabs in a tab list; the pane is a
   named group.
+
+## Part 14. PageView vocabulary, 2026-10-17
+
+Asked as the P35 items not already answered by DK J1 to J8 (P35.1, 2, 3
+and 6 settled there; P35.10 not needed after P22-1), yes or no, each with
+its recommendation. The owner, verbatim:
+
+> accepted. i confirm.
+
+- **GIVEN P35.4.** A `tab_panel` semantic role for page content, with
+  stage A.
+- **GIVEN P35.5.** A tab-to-panel relation field on semantic nodes and an
+  orientation field for tab lists, with stage A.
+- **GIVEN P35.7.** Tree and tree item roles deferred to stage A; no
+  explorer-bar mode is admitted.
+- **GIVEN P35.8 (confirmed).** A custom item state `pinned`; no `preview`
+  state, since there is no preview page (P20).
+- **GIVEN P35.9.** Tabs paint with the `menu_item` family until T4, which
+  adds the tab stack's drawing.
+- **GIVEN P35.11 (confirmed).** No new marks for the navigation pane:
+  `arrow_left` and `arrow_right` collapse and expand, `customize` is the
+  configure button, `grip_dots` the grip.
+
+Every word question of the round is now answered. The taste questions
+(DK T1 to T8, PageView PT1 to PT8) follow on an HTML look-and-feel page.
