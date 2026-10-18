@@ -46,6 +46,14 @@ Related types
      - Where show() puts a panel that the layout has no memory of.
    * - :cpp:class:`DockDockedMemory <gui_forms::DockDockedMemory>`
      - Remembered placements (DK decision 22).
+   * - :cpp:class:`DockDropHit <gui_forms::DockDropHit>`
+     - What the pointer is over: a window edge, or a pane's zone, or nothing in particular inside the site (``over_site`` without a pane), or outside it.
+   * - :cpp:class:`DockDropMetrics <gui_forms::DockDropMetrics>`
+     - The geometry, in logical units at text scale 1 (the look study's quiet tiles, T2-4; its zone threshold and global bands).
+   * - :cpp:class:`DockDropPane <gui_forms::DockDropPane>`
+     - A pane the pointer can hover: a stack of the main site as it is laid out during the drag (the dragged subject's place closed up), or the empty document area.
+   * - :cpp:class:`DockDropTarget <gui_forms::DockDropTarget>`
+     - One accepted target: what a drop there does (``edit``, one DockLayout edit validated against the restrictions when the drag started) and the area the subject would take (``highlight``, in the site's coordinates).
    * - :cpp:class:`DockFloatingMemory <gui_forms::DockFloatingMemory>`
      -  
    * - :cpp:class:`DockFloatingSite <gui_forms::DockFloatingSite>`
@@ -272,6 +280,116 @@ Related types
    .. cpp:member:: double ratio
 
       Default: ``{0.25}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDropHit final
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   What the pointer is over: a window edge, or a pane's zone, or nothing in particular inside the site (``over_site`` without a pane), or outside it.
+
+   .. cpp:member:: bool over_site
+
+      Default: ``{false}``.
+
+   .. cpp:member:: bool edge
+
+      Default: ``{false}``.
+
+   .. cpp:member:: std::optional<std::size_t> pane
+
+      The pane's index in the panes given, while over a pane.
+
+   .. cpp:member:: DockDropZone zone
+
+      Default: ``{DockDropZone::center}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDropMetrics final
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   The geometry, in logical units at text scale 1 (the look study's quiet tiles, T2-4; its zone threshold and global bands).
+
+   .. cpp:member:: constexpr double side_band
+
+      A pane's zone is its nearest edge while the pointer lies within this fraction of the pane from it, else the centre. Default: ``0.28``.
+
+   .. cpp:member:: constexpr double tile
+
+      The cross: tiles of this side and gap, shrunk (not below ``minimum_tile``) to fit a small pane with ``cross_margin`` to spare. Default: ``24.0``.
+
+   .. cpp:member:: constexpr double tile_gap
+
+      Default: ``7.0``.
+
+   .. cpp:member:: constexpr double minimum_tile
+
+      Default: ``12.0``.
+
+   .. cpp:member:: constexpr double cross_margin
+
+      Default: ``10.0``.
+
+   .. cpp:member:: constexpr double edge_tile
+
+      The window edges: a tile of this side inset by ``edge_margin`` from each edge's middle, and a band of ``edge_band`` along each edge. Default: ``18.0``.
+
+   .. cpp:member:: constexpr double edge_margin
+
+      Default: ``5.0``.
+
+   .. cpp:member:: constexpr double edge_band
+
+      Default: ``8.0``.
+
+   .. cpp:member:: constexpr double side_share
+
+      The share a dropped subject takes: half the pane beside it, a quarter of the window along an edge. Default: ``0.5``.
+
+   .. cpp:member:: constexpr double edge_share
+
+      Default: ``0.25``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDropPane final
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   A pane the pointer can hover: a stack of the main site as it is laid out during the drag (the dragged subject's place closed up), or the empty document area. ``bounds`` in the site's coordinates. A document stack also names its document area (``area``, ``area_bounds``): a side the stack itself refuses (a tool panel beside a document) docks beside the whole area, as Visual Studio's outer guides do.
+
+   .. cpp:member:: DockNodeId node
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: DockNodeId area
+
+   .. cpp:member:: Rect area_bounds
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDropTarget final
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   One accepted target: what a drop there does (``edit``, one DockLayout edit validated against the restrictions when the drag started) and the area the subject would take (``highlight``, in the site's coordinates). For an edge target, ``zone`` is the edge (never center) and ``pane`` is none.
+
+   .. cpp:member:: DockDropTargetKind kind
+
+      Default: ``{DockDropTargetKind::pane}``.
+
+   .. cpp:member:: DockNodeId pane
+
+   .. cpp:member:: DockDropZone zone
+
+      Default: ``{DockDropZone::center}``.
+
+   .. cpp:member:: Rect highlight
+
+   .. cpp:member:: DockEdit edit
 
 .. cpp:namespace:: gui_forms
 
@@ -777,6 +895,32 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DockDropTargetKind
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   .. cpp:enumerator:: pane
+
+   .. cpp:enumerator:: edge
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockDropZone
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   .. cpp:enumerator:: top
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: right
+
+   .. cpp:enumerator:: bottom
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: DockEditKind
 
    ``#include <gui_forms/docking/types/dock_types.hpp>``
@@ -1027,6 +1171,46 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+.. cpp:function:: std::array<Rect, dock_drop_zone_count> dock_cross_tiles(Rect pane, double scale) noexcept
+
+   The cross over a pane, in DockDropZone order. Every tile lies inside the pane; a pane too small for the smallest cross gets the tiles anyway, clipped by the caller.
+
+.. cpp:function:: std::array<Rect, dock_drop_zone_count> dock_edge_tiles(Rect site, double scale) noexcept
+
+   The edge tiles of the site, in DockDropZone order with the centre's slot left empty.
+
+.. cpp:function:: Rect dock_drop_highlight(Rect bounds, DockDropZone zone, bool edge) noexcept
+
+   The area a subject dropped on ``zone`` of ``pane`` would take; an edge's when ``edge`` (a quarter of the site along that edge).
+
+.. cpp:function:: DockDropZone dock_zone_at(Rect pane, Point point) noexcept
+
+   The zone of ``pane`` a point selects from its position alone.
+
+.. cpp:function:: DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale) noexcept
+
+   What a point hovers: the site's edge tiles and bands first, then the pane containing it (a cross tile under the point, else its zone).
+
+.. cpp:function:: DockEdit dock_drop_edit(const DockSubject& subject, DockDropTargetKind kind, DockNodeId pane, DockDropZone zone)
+
+   The edit a target makes for ``subject``: dock_into a stack or the empty document area for the centre, dock_beside a pane for a side, dock_at_edge for an edge.
+
+.. cpp:function:: void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack, Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out)
+
+   Fills ``out`` (cleared first) with every target of a drag of ``subject`` over ``panes`` and the site's edges that ``layout`` accepts as a user edit (DockLayout::check, so the three restriction layers and the user lock decide): each pane's zones in DockDropZone order, panes in the order given (the keyboard's Tab order), then the edges top, left, right, bottom. The centre of ``own_stack`` (where a dragged panel came from) is left out: dropping a panel back into its own stack changes nothing. A side a document stack refuses is tried beside its document area (DockDropPane).
+
+.. cpp:function:: std::optional<std::size_t> find_dock_drop_target(std::span<const DockDropTarget> targets, std::span<const DockDropPane> panes, const DockDropHit& hit) noexcept
+
+   The planned target a hit selects, as an index into ``targets``, or none (a refused zone, a gap inside the site, or outside it).
+
+.. cpp:var:: constexpr std::size_t dock_drop_zone_count
+
+   Value: ``5``.
 
 .. cpp:namespace:: gui_forms
 

@@ -3236,7 +3236,11 @@
       "parts": [
         {"name": "region", "role": "region", "composed_from": null, "states": []},
         {"name": "document_area", "role": "well", "composed_from": null, "states": []},
-        {"name": "focus", "role": "focus", "composed_from": null, "states": []}
+        {"name": "focus", "role": "focus", "composed_from": null, "states": []},
+        {"name": "drag_stamp", "role": "face", "composed_from": null, "states": []},
+        {"name": "drag_stamp_label", "role": "label", "composed_from": null, "states": []},
+        {"name": "drop_area", "role": "drop", "composed_from": null, "states": ["drop_accepted"]},
+        {"name": "drop_cue", "role": "indicator", "composed_from": null, "states": ["drop_rejected"]}
       ],
       "states": ["normal", "enabled", "disabled", "focused", "focus_visible"],
       "custom_states": [],
@@ -3266,6 +3270,15 @@
             {"name": "caption_close_glyph", "role": "glyph", "composed_from": null, "states": ["disabled"]}
           ],
           "states": ["current", "disabled"],
+          "custom_states": []
+        },
+        {
+          "name": "drop_tile",
+          "parts": [
+            {"name": "tile", "role": "actuator", "composed_from": null, "states": []},
+            {"name": "tile_glyph", "role": "glyph", "composed_from": null, "states": []}
+          ],
+          "states": ["selected", "disabled", "expanding"],
           "custom_states": []
         }
       ],
@@ -3304,7 +3317,8 @@
         {"name": "pointer_preview_observed", "payload": "PointerEvent", "mutable_payload": false},
         {"name": "focus_observed", "payload": "bool", "mutable_payload": false},
         {"name": "arranged_bounds_changed", "payload": "Rect", "mutable_payload": false},
-        {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true}
+        {"name": "help_requested", "payload": "HelpRequestEvent", "mutable_payload": true},
+        {"name": "drag_ended", "payload": "DockDragOutcome", "mutable_payload": false}
       ]
     },
     {

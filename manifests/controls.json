@@ -518,7 +518,7 @@
       "type": "DockSite",
       "header": "gui_forms/controls/docking/dock_site/dock_site.hpp",
       "category": "Layout",
-      "purpose": "The docked part of a DockWorkspace in one window: binary splits with 3-unit seams moved by pointer and keyboard within minimums, captioned tool stacks and the document area built from PageView, root-level pins, the position menu, F6 regions, the Ctrl+Tab navigator, Escape and Shift+Escape, a maximized document area, and tool stacks collapsing by priority when the window is too small.",
+      "purpose": "The docked part of a DockWorkspace in one window: binary splits with 3-unit seams moved by pointer and keyboard within minimums, captioned tool stacks and the document area built from PageView, root-level pins, the position menu, F6 regions, the Ctrl+Tab navigator, Escape and Shift+Escape, a maximized document area, tool stacks collapsing by priority when the window is too small, and dragging in one window: caption and tab drags with a postage-stamp miniature, position-sensitive targets with quiet tiles over the hovered pane and global edge targets, Ctrl suppression, snap-back, and the keyboard move mode.",
       "winforms": "GUI.Forms-only",
       "status": "provisional",
       "gallery_page": "containers-and-focus",

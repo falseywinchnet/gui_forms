@@ -24,7 +24,8 @@ namespace gui_forms {
 
 // The rows of a panel's position menu (owner decision DK-30; docking study
 // 5.7). Float waits for floating windows (phase D4) and Auto Hide for
-// auto-hide (phase D5); both are listed, disabled.
+// auto-hide (phase D5); both are listed, disabled. Move starts the keyboard
+// move mode (phase D3, G3-1).
 enum class DockPositionCommand : std::uint8_t {
     float_panel,
     dock,
@@ -32,6 +33,30 @@ enum class DockPositionCommand : std::uint8_t {
     auto_hide,
     hide,
     close,
+    move,
+};
+
+// The phases of a drag (docking study 5.1, phase D3): `armed` from a press
+// on a caption until the pointer has moved the drag threshold; `dragging`
+// while the stamp follows the pointer, or the keyboard steps through the
+// targets; `settling` while the stamp grows into its new place, or back into
+// its old one. Input other than the drag's own is not taken while settling.
+enum class DockDragPhase : std::uint8_t { idle, armed, dragging, settling };
+
+// How a drag ended: dropped on a target (one layout transaction); Escape;
+// the pointer capture lost; the window deactivated; the layout changed
+// under it (by the program, so the drag never applies to a stale tree); or
+// released where nothing accepts it, which snaps back until floating
+// windows exist (D4-1; phase D4 floats instead).
+enum class DockDragEnd : std::uint8_t { dropped, escaped, capture_lost, deactivated, layout_changed, rejected };
+
+struct DockDragOutcome final {
+    DockDragEnd end{DockDragEnd::escaped};
+    DockSubject subject{};
+    // The target dropped on, for `dropped`.
+    std::optional<DockDropTarget> target{};
+    // The layout transaction's result, for `dropped`.
+    DockTransactionResult result{};
 };
 
 // The main window's part of a docking layout, in one window (stage DK phase
@@ -94,6 +119,41 @@ enum class DockPositionCommand : std::uint8_t {
 // document stacks "Documents"), holding the PageView's tab list and tab
 // panel and its caption buttons; each seam is a `split_pane` with its
 // position as the value and increment, decrement and set_value.
+//
+// Dragging (phase D3; owner decisions DK-24 to DK-26, DK-30, DK-41): a press
+// on a caption that moves the drag threshold (4 units, D5-1) drags the whole
+// stack; a tab dragged off its strip drags one panel (D7-1). A tool stack's
+// strip does not reorder, so its tab drag is claimed at once
+// (page_drag_started); a document strip reorders by its live slide until the
+// pointer leaves the strip's band, and then the panel tears off. At the
+// start the subject leaves its place and the place closes up in one layout
+// pass of the site; the layout model is unchanged until the drop (docking
+// study 5.1, invariant 4), so Escape leaves it as it was. A miniature of the
+// panel (its caption or tab, label and content well, drawn by role) is
+// interpolated from the panel's rectangle down to a stamp about 100 units
+// long over 220 ms and follows the pointer; at the drop it grows into the
+// panel's new place, on Escape back into its old one; reduced motion skips
+// the motion. Targets (DockDropTarget, planned when the drag starts and at
+// every layout pass): over the hovered pane only, a cross of five quiet
+// tiles (top, left, tab into, right, bottom) appears, fading in over 100 ms;
+// the pointer's position within the pane (or the tile under it) selects
+// one, which is lit; the main window's edges are global targets with a tile
+// at each edge's middle; the area the subject would take is tinted. Targets
+// the restrictions refuse are not planned and their tiles are disabled.
+// Ctrl held suppresses docking. A release on a target applies one user
+// transaction and activates the moved panel; a release elsewhere snaps
+// back. Escape, losing the pointer capture, the window deactivating and a
+// layout change by the program cancel.
+//
+// The keyboard move mode (G3-1, docking study 5.7.1): the position menu's
+// Move or the move_panel key command (Ctrl+Alt+Shift+M) on the active
+// panel. The arrows step through the current pane's tiles (Left and Right
+// along left, centre, right; Up and Down along top, centre, bottom), Tab and
+// Shift+Tab to the next and previous pane and then the window edges, over
+// exactly the targets the pointer reaches; each step updates the preview and
+// the announcement (drag_announcement, also the site's semantic
+// description while a drag runs). Enter commits through the same
+// transaction as a drop; Escape cancels.
 class DockSite : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -167,11 +227,47 @@ public:
     // the active one, wrapping. False when there is no document.
     bool activate_relative_document(int direction);
 
+    // -- dragging (phase D3) --
+    [[nodiscard]] DockDragPhase drag_phase() const noexcept { return drag_.phase; }
+    // The subject of the drag under way (armed or dragging), or none.
+    [[nodiscard]] std::optional<DockSubject> drag_subject() const;
+    // While dragging: the planned targets in keyboard order, the panes they
+    // were planned over (the layout with the subject's place closed up),
+    // and the selected target, or none (between targets, over a refused
+    // zone, outside the site, or with Ctrl held).
+    [[nodiscard]] std::span<const DockDropTarget> drag_targets() const noexcept;
+    [[nodiscard]] std::span<const DockDropPane> drag_panes() const noexcept;
+    [[nodiscard]] std::optional<DockDropTarget> drag_target() const;
+    // Whether Ctrl suppresses docking now (D6-1).
+    [[nodiscard]] bool drag_suppressed() const noexcept { return drag_.suppressed; }
+    // The stamp's rectangle in the site's coordinates while dragging or
+    // settling, else empty.
+    [[nodiscard]] Rect drag_stamp() const noexcept;
+    // What the drag announces now ("Output: dock right of Properties"), or
+    // empty while idle.
+    [[nodiscard]] const std::string& drag_announcement() const noexcept { return drag_.announcement; }
+    // The distance, in logical units along either axis, a caption press
+    // moves before it drags (owner decision DK-26, D5-1: 4, or a host's
+    // metric; no host reports one yet). Throws std::out_of_range outside 1
+    // to 64.
+    [[nodiscard]] double drag_threshold() const noexcept { return drag_threshold_; }
+    void set_drag_threshold(double threshold);
+    // Starts the keyboard move mode for a panel docked in the main site, on
+    // the first planned target. False, starting nothing, for any other
+    // panel, while a drag runs, or when there is no target.
+    bool begin_keyboard_move(const DockPanelId& panel);
+    // Ends a drag as Escape does. False when none runs.
+    bool cancel_drag();
+    // Raised once when a drag that left the armed phase ends, after the
+    // layout transaction of a drop.
+    [[nodiscard]] Event<const DockDragOutcome&>& drag_ended() noexcept { return drag_ended_; }
+
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_pointer_preview(PointerEvent& event) override;
     void on_pointer(PointerEvent& event) override;
+    void on_key_preview(KeyEvent& event) override;
     void on_key(KeyEvent& event) override;
     void on_key_bubble(KeyEvent& event) override;
     void on_focus_changed(bool focused) override;
@@ -190,6 +286,14 @@ public:
         // The document area's rectangle, its well showing while it is empty.
         PartGeometry document_area;
         PartGeometry focus;
+        // The drag layer (present only while dragging or settling): the
+        // stamp, its label, the tinted area the subject would take
+        // (drop_accepted) and the cue at the pointer where nothing accepts
+        // a drop (drop_rejected).
+        PartGeometry drag_stamp;
+        PartGeometry drag_stamp_label;
+        PartGeometry drop_area;
+        PartGeometry drop_cue;
     };
     [[nodiscard]] Parts parts() const;
     // Item system seam: the bar between a split's two children and its grip.
@@ -240,9 +344,33 @@ public:
         StackParts parts;
         StackStates states;
     };
-    // The seams, then the stacks that are not collapsed, in tree order.
+    // Item system drop_tile: a target tile and its dock-shape glyph, over
+    // the hovered pane (five) and at the window's edges (four), while
+    // dragging. `selected` is the lit tile; `disabled` a choice the
+    // restrictions refuse; `expanding` while the cross fades in.
+    struct TileParts final {
+        PartGeometry tile;
+        PartGeometry tile_glyph;
+    };
+    struct TileStates final {
+        bool selected{};
+        bool disabled{};
+        bool expanding{};
+    };
+    struct Tile final {
+        DockDropTargetKind kind{DockDropTargetKind::pane};
+        DockNodeId pane{};
+        DockDropZone zone{DockDropZone::center};
+        std::string stable_id;
+        TileParts parts;
+        TileStates states;
+    };
+    // The seams, then the stacks that are not collapsed, in tree order;
+    // then, while dragging, the tiles (the hovered pane's cross, then the
+    // edges).
     [[nodiscard]] std::vector<Seam> realized_seams() const;
     [[nodiscard]] std::vector<Stack> realized_stack_items() const;
+    [[nodiscard]] std::vector<Tile> realized_tiles() const;
 
     // The semantic identities: `<site id>.seam.<split id>` for a seam,
     // `<site id>.stack.<node id>` for a stack's view and
@@ -251,6 +379,7 @@ public:
     [[nodiscard]] std::string stack_identity(DockNodeId stack) const;
 
 protected:
+    void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attachment_committed() noexcept override;
     void on_detaching_from_window(Window& former_window) noexcept override;
     void on_dispose() noexcept override;
@@ -261,6 +390,7 @@ protected:
 private:
     friend class DockWorkspace;
     class StackView;
+    class DragLayer;
 
     // What the pointer or a press is on.
     enum class Zone : std::uint8_t { none, seam, caption, menu, pin, close };
@@ -389,6 +519,104 @@ private:
     [[nodiscard]] std::vector<SemanticNode> caption_nodes(const StackSlot& slot, std::size_t index) const;
     bool caption_action(std::size_t index, std::string_view stable_id, SemanticAction action);
 
+    // -- dragging (dock_site_drag.cpp) --
+    // One tile as painted and published: where it is, which target it
+    // stands for, and whether it is lit or refused.
+    struct TileSlot final {
+        DockDropTargetKind kind{DockDropTargetKind::pane};
+        DockNodeId pane{};
+        DockDropZone zone{DockDropZone::center};
+        Rect bounds{};
+        bool lit{};
+        bool refused{};
+    };
+    // The drag session. `panel_only`: a tab drag of one panel out of a stack
+    // that keeps others (its page leaves the view); otherwise the whole
+    // source stack leaves the layout pass. `grab` is where the pointer holds
+    // the source, as fractions of `source`, the subject's rectangle when the
+    // drag started. `panes` and `targets` are planned at the start and at
+    // every layout pass; `target` and `hovered_pane` index them.
+    struct DragSession final {
+        DockDragPhase phase{DockDragPhase::idle};
+        DockSubject subject{};
+        DockNodeId source_stack{};
+        bool panel_only{};
+        bool keyboard{};
+        bool suppressed{};
+        bool over_site{};
+        std::uint64_t pointer_id{1U};
+        Point press{};
+        Point pointer{};
+        Point grab{};
+        Rect source{};
+        std::string title{};
+        std::uint64_t generation{};
+        FrameTime started{};
+        std::vector<DockDropPane> panes{};
+        std::vector<DockDropTarget> targets{};
+        std::optional<std::size_t> target{};
+        std::optional<std::size_t> hovered_pane{};
+        FrameTime hovered_since{};
+        // The hovered pane's cross is fading in (T2-4, about 100 ms).
+        bool tiles_fading{};
+        // A panel_only drag's page has left its view (done at the first
+        // layout pass, never inside the strip's own drag event).
+        bool page_held_out{};
+        Rect stamp{};
+        // Settling: from the stamp where the drag ended to the panel's
+        // rectangle, which the next layout pass finds (`settle_panel`).
+        DockPanelId settle_panel{};
+        bool settle_found{};
+        Rect settle_from{};
+        Rect settle_to{};
+        FrameTime settle_started{};
+        std::string announcement{};
+    };
+
+    void create_drag_layer();
+    // Whether a tab drag holds `panel` out of `stack`'s view.
+    [[nodiscard]] bool dragged_out(DockNodeId stack, const DockPanelId& panel) const noexcept;
+    void arm_caption_drag(std::size_t stack, Point local, std::uint64_t pointer_id);
+    void on_tab_drag(DockNodeId stack, PageDragStart& start);
+    bool tear_off_document_tab(const PointerEvent& event);
+    // `press` is where the subject was grabbed and `pointer` where the
+    // pointer is now, both in the site's coordinates.
+    bool begin_drag(const DockSubject& subject, DockNodeId source_stack, bool panel_only, Point press,
+                    Point pointer, bool keyboard, std::uint64_t pointer_id);
+    // Posted when the capture is released during a drag: a primary release
+    // releases it just before the drop, so only a drag still running after
+    // that dispatch lost its capture.
+    struct CaptureCheck;
+    void check_capture_after_release();
+    [[nodiscard]] Rect drag_paint_extent() const;
+    void plan_drag_targets();
+    void update_drag_pointer(Point local, Modifier modifiers);
+    void select_drag_target(std::optional<std::size_t> target, std::optional<std::size_t> hovered_pane);
+    void end_drag(DockDragEnd end);
+    void finish_settling() noexcept;
+    void request_drag_frames();
+    void advance_drag(FrameTime now);
+    void place_settle_target();
+    [[nodiscard]] bool hidden_by_drag(DockNodeId stack) const noexcept;
+    [[nodiscard]] bool motion_reduced() const noexcept;
+    [[nodiscard]] Rect stamp_at(FrameTime now) const;
+    [[nodiscard]] Rect drag_label_bounds() const noexcept;
+    [[nodiscard]] Rect drop_cue_bounds() const noexcept;
+    [[nodiscard]] std::size_t tile_count() const noexcept;
+    [[nodiscard]] TileSlot tile_at(std::size_t tile) const;
+    // A tile's glyph: the tile less a fifth of its side all round.
+    [[nodiscard]] static Rect tile_glyph_bounds(Rect tile) noexcept;
+    [[nodiscard]] AnatomyStateSet tile_states(const TileSlot& tile) const;
+    [[nodiscard]] std::string tile_identity(const TileSlot& tile) const;
+    [[nodiscard]] std::string describe_target(const DockDropTarget& target) const;
+    void announce_drag();
+    bool handle_drag_key(KeyEvent& event);
+    void step_keyboard_target(int direction);
+    void step_keyboard_zone(std::uint32_t key);
+    void paint_drag_layer(Painter& painter);
+    void on_capture_changed(const PointerCaptureChange& change);
+    void on_window_active(bool active);
+
     DockWorkspace* workspace_{};
     SubscriptionToken layout_token_{};
     SubscriptionToken activation_token_{};
@@ -429,7 +657,7 @@ private:
     SubscriptionToken menu_invoked_{};
     SubscriptionToken menu_changed_{};
     // One command per position row, in DockPositionCommand order.
-    std::array<std::shared_ptr<Command>, 6> menu_commands_{};
+    std::array<std::shared_ptr<Command>, 7> menu_commands_{};
     DockPanelId menu_panel_{};
     std::size_t menu_stack_{};
     bool menu_open_{};
@@ -442,6 +670,18 @@ private:
     SubscriptionToken navigator_cancelled_{};
     SubscriptionToken navigator_revoked_{};
     SubscriptionToken window_pointer_{};
+    // The drag: its session, the layer that paints it above the stacks (a
+    // child kept last), its frames and the window events that cancel it.
+    DragSession drag_{};
+    std::shared_ptr<DragLayer> drag_layer_{};
+    FrameRequestToken drag_frames_{};
+    DispatchOperation capture_check_{};
+    SubscriptionToken capture_token_{};
+    SubscriptionToken active_token_{};
+    double drag_threshold_{4.0};
+    // The stacks in tree order, reused by plan_drag_targets.
+    std::vector<DockNodeId> drag_order_{};
+    Event<const DockDragOutcome&> drag_ended_{};
 };
 
 } // namespace gui_forms

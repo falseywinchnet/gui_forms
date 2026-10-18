@@ -766,6 +766,8 @@ Enumerations
 
    .. cpp:enumerator:: maximize_document_area
 
+   .. cpp:enumerator:: move_panel
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms

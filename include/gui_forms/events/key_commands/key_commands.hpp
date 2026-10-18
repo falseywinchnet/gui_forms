@@ -70,6 +70,9 @@ enum class KeyCommand : std::uint8_t {
     return_to_document,
     hide_tool_panel,
     maximize_document_area,
+    // Ctrl+Alt+Shift+M (docking study 5.7, a proposal; G3-1): the keyboard
+    // move mode for the active panel, as the position menu's Move.
+    move_panel,
     count,
 };
 

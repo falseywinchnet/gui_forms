@@ -51,6 +51,42 @@ realized_seams
 realized_stack_items
     The stacks shown after the last layout pass, with their parts and
     states.
+realized_tiles
+    While dragging: the drop tiles shown, the hovered pane's five then the
+    window's four edge tiles, with their parts and states.
+drag_phase : default ``DockDragPhase::idle``
+    Where a drag is: ``armed`` after a press on a caption, ``dragging``,
+    ``settling`` while the stamp grows into its place.
+drag_subject : default none
+    The stack or panel being dragged.
+drag_targets
+    While dragging, every target the drag offers, in the keyboard's order:
+    each pane's top, left, centre, right and bottom (those the
+    restrictions accept), panes in tree order, then the window's top, left,
+    right and bottom edges.
+drag_panes
+    The panes the targets were planned over: the stacks as laid out with
+    the dragged subject's place closed up, or the empty document area.
+drag_target : default none
+    The target a drop would use now.
+drag_suppressed : default ``false``
+    Whether Ctrl suppresses docking.
+drag_stamp
+    The stamp's rectangle while dragging or settling.
+drag_announcement
+    What the drag announces ("Output: dock left of Properties"), also the
+    site's semantic description while the drag runs.
+drag_threshold : default ``4``
+    How far, in logical units along either axis, a caption press moves
+    before it drags; outside 1 to 64 throws `std::out_of_range`.
+
+Events
+------
+drag_ended
+    Raised once when a drag that started ends, with how it ended
+    (`DockDragEnd`: dropped, escaped, capture lost, deactivated, layout
+    changed, rejected), its subject and, for a drop, the target and the
+    transaction's result. Raised after a drop's transaction.
 
 Methods
 -------
@@ -89,6 +125,11 @@ close_navigator
 activate_relative_document
     Activates the next or previous document in tab order, wrapping; false
     when there is no document.
+begin_keyboard_move
+    Starts the keyboard move mode for a docked panel, on the first target;
+    false for any other panel, while a drag runs, or with no target.
+cancel_drag
+    Ends a drag as Escape does; false when none runs.
 seam_identity
     The semantic identity of a split's seam.
 stack_identity
@@ -117,7 +158,8 @@ The position menu lists Float and Auto Hide, both unavailable until phases
 D4 and D5; Dock, checked while the panel stands in a tool stack and
 available for a tool panel docked as a document (it returns to its default
 side); Dock as Tabbed Document, for a tool panel whose descriptor allows it;
-Hide; and Close. A document's menu lists Float and Close.
+Hide; Close; and Move, the keyboard move mode. A document's menu lists
+Float, Close and Move.
 
 Seams are 3 units with a grip of dots (decision DK-41). Dragging one, or
 moving it with the arrow keys along its split while the site has focus,
@@ -158,9 +200,40 @@ had focus there, else its first focusable control. When the panel holding
 focus is hidden, closed, moved or collapsed, focus goes to the active panel,
 else the active document.
 
+Dragging (phase D3, decisions DK-24 to DK-26): a press on a caption that
+moves 4 units drags the whole stack; a tool tab dragged drags one panel at
+once; a document tab first slides along its strip (reordering) and tears
+off when the pointer leaves the strip's band. At the start the subject
+leaves its place and the place closes up; the layout itself does not change
+until the drop, so Escape leaves it byte-identical. A miniature of the
+panel (its caption strip, title and content well, drawn by role; not a
+picture of its content) shrinks from the panel's rectangle to about 100
+units over 220 ms and follows the pointer; at the end it grows into the
+panel's new place, or back into its old one. Over the pane under the
+pointer, and only that pane, a cross of five tiles appears (fading in over
+100 ms); where the pointer is in the pane, or the tile under it, selects
+top, left, right or bottom (split the pane) or the centre (tab into it),
+and that tile is lit; the area the subject would take is tinted. A tool
+panel over a document stack's side docks beside the whole document area.
+The window's edges are global targets throughout, with a tile at each
+edge's middle. Targets the restrictions (dock groups, allowed placements,
+the user lock) refuse are not offered and their tiles are disabled. Ctrl
+held suppresses docking. A release on a target applies one transaction
+and activates the moved panel; a release elsewhere snaps back with a
+rejected cue (floating arrives in phase D4). Escape, losing the pointer
+capture, the window deactivating and a layout change by the program end a
+drag with the layout unchanged.
+
+The keyboard move mode (Move in the position menu, or the ``move_panel``
+key command, Ctrl+Alt+Shift+M): the arrows step through the current
+pane's tiles, Left and Right along left, centre and right, Up and Down
+along top, centre and bottom; Tab and Shift+Tab move to the next and
+previous pane and then the window's edges, over exactly the targets the
+pointer reaches. Enter drops; Escape cancels.
+
 Not yet: floating sites (phase D4) and auto-hidden stacks (D5) are kept in
-the layout but not shown; dragging panels is phase D3; document tab close
-glyphs and the overflow list arrive with the page view's document preset.
+the layout but not shown; document tab close glyphs and the overflow list
+arrive with the page view's document preset.
 
 To accessibility the site is a group named "Docking workspace" (or its
 accessible name). Each stack is a ``pane`` named by its selected panel, or
@@ -181,7 +254,12 @@ Every part is drawn by the by-role paint path. The site's parts are
 ``chevron_down``), ``caption_pin`` and ``caption_pin_glyph`` (the ``pin``
 mark, checked), ``caption_close`` and ``caption_close_glyph``; its states
 are current and disabled, and the buttons carry their own hot, pressed,
-open, checked and disabled.
+open, checked and disabled. While dragging, the site's ``drag_stamp``,
+``drag_stamp_label``, ``drop_area`` (drop_accepted) and ``drop_cue``
+(drop_rejected, the ``close`` mark) are present, and the ``drop_tile``
+item system has ``tile`` and ``tile_glyph`` (the ``dock_shape`` mark with
+the zone's region), with selected (lit), disabled (refused) and expanding
+(fading in).
 
 Examples
 --------

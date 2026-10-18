@@ -72,6 +72,40 @@ gui_forms::DockSite
       **navigator** : ``std::shared_ptr<DockNavigator>``, default none, read-only
          The open navigator.
 
+      **drag_phase** : ``DockDragPhase``, default ``DockDragPhase::idle``, read-only
+         Where a drag is: ``armed`` after a press on a caption, ``dragging``,
+         ``settling`` while the stamp grows into its place.
+
+      **drag_subject** : ``std::optional<DockSubject>``, default none, read-only
+         The stack or panel being dragged.
+
+      **drag_targets** : ``std::span<const DockDropTarget>``, read-only
+         While dragging, every target the drag offers, in the keyboard's order:
+         each pane's top, left, centre, right and bottom (those the
+         restrictions accept), panes in tree order, then the window's top, left,
+         right and bottom edges.
+
+      **drag_panes** : ``std::span<const DockDropPane>``, read-only
+         The panes the targets were planned over: the stacks as laid out with
+         the dragged subject's place closed up, or the empty document area.
+
+      **drag_target** : ``std::optional<DockDropTarget>``, default none, read-only
+         The target a drop would use now.
+
+      **drag_suppressed** : ``bool``, default ``false``, read-only
+         Whether Ctrl suppresses docking.
+
+      **drag_stamp** : ``Rect``, read-only
+         The stamp's rectangle while dragging or settling.
+
+      **drag_announcement** : ``std::string``, read-only
+         What the drag announces ("Output: dock left of Properties"), also the
+         site's semantic description while the drag runs.
+
+      **drag_threshold** : ``double``, default ``4``
+         How far, in logical units along either axis, a caption press moves
+         before it drags; outside 1 to 64 throws ``std::out_of_range``.
+
       **parts** : ``Parts``, read-only
 
       **realized_seams** : ``std::vector<Seam>``, read-only
@@ -80,6 +114,18 @@ gui_forms::DockSite
       **realized_stack_items** : ``std::vector<Stack>``, read-only
          The stacks shown after the last layout pass, with their parts and
          states.
+
+      **realized_tiles** : ``std::vector<Tile>``, read-only
+         While dragging: the drop tiles shown, the hovered pane's five then the
+         window's four edge tiles, with their parts and states.
+
+   :Events:
+
+      **drag_ended** : ``Event<const DockDragOutcome&>``
+         Raised once when a drag that started ends, with how it ended
+         (:cpp:enum:`DockDragEnd <gui_forms::DockDragEnd>`: dropped, escaped, capture lost, deactivated, layout
+         changed, rejected), its subject and, for a drop, the target and the
+         transaction's result. Raised after a drop's transaction.
 
    :Inherited:
 
@@ -115,6 +161,10 @@ gui_forms::DockSite
         - Closes the navigator without choosing.
       * - :cpp:func:`activate_relative_document <gui_forms::DockSite::activate_relative_document>`
         - Activates the next or previous document in tab order, wrapping; false when there is no document.
+      * - :cpp:func:`begin_keyboard_move <gui_forms::DockSite::begin_keyboard_move>`
+        - Starts the keyboard move mode for a docked panel, on the first target; false for any other panel, while a drag runs, or with no target.
+      * - :cpp:func:`cancel_drag <gui_forms::DockSite::cancel_drag>`
+        - Ends a drag as Escape does; false when none runs.
       * - :cpp:func:`seam_identity <gui_forms::DockSite::seam_identity>`
         - The semantic identity of a split's seam.
       * - :cpp:func:`stack_identity <gui_forms::DockSite::stack_identity>`
@@ -150,7 +200,8 @@ gui_forms::DockSite
    D4 and D5; Dock, checked while the panel stands in a tool stack and
    available for a tool panel docked as a document (it returns to its default
    side); Dock as Tabbed Document, for a tool panel whose descriptor allows it;
-   Hide; and Close. A document's menu lists Float and Close.
+   Hide; Close; and Move, the keyboard move mode. A document's menu lists
+   Float, Close and Move.
 
    Seams are 3 units with a grip of dots (decision DK-41). Dragging one, or
    moving it with the arrow keys along its split while the site has focus,
@@ -191,9 +242,40 @@ gui_forms::DockSite
    focus is hidden, closed, moved or collapsed, focus goes to the active panel,
    else the active document.
 
+   Dragging (phase D3, decisions DK-24 to DK-26): a press on a caption that
+   moves 4 units drags the whole stack; a tool tab dragged drags one panel at
+   once; a document tab first slides along its strip (reordering) and tears
+   off when the pointer leaves the strip's band. At the start the subject
+   leaves its place and the place closes up; the layout itself does not change
+   until the drop, so Escape leaves it byte-identical. A miniature of the
+   panel (its caption strip, title and content well, drawn by role; not a
+   picture of its content) shrinks from the panel's rectangle to about 100
+   units over 220 ms and follows the pointer; at the end it grows into the
+   panel's new place, or back into its old one. Over the pane under the
+   pointer, and only that pane, a cross of five tiles appears (fading in over
+   100 ms); where the pointer is in the pane, or the tile under it, selects
+   top, left, right or bottom (split the pane) or the centre (tab into it),
+   and that tile is lit; the area the subject would take is tinted. A tool
+   panel over a document stack's side docks beside the whole document area.
+   The window's edges are global targets throughout, with a tile at each
+   edge's middle. Targets the restrictions (dock groups, allowed placements,
+   the user lock) refuse are not offered and their tiles are disabled. Ctrl
+   held suppresses docking. A release on a target applies one transaction
+   and activates the moved panel; a release elsewhere snaps back with a
+   rejected cue (floating arrives in phase D4). Escape, losing the pointer
+   capture, the window deactivating and a layout change by the program end a
+   drag with the layout unchanged.
+
+   The keyboard move mode (Move in the position menu, or the ``move_panel``
+   key command, Ctrl+Alt+Shift+M): the arrows step through the current
+   pane's tiles, Left and Right along left, centre and right, Up and Down
+   along top, centre and bottom; Tab and Shift+Tab move to the next and
+   previous pane and then the window's edges, over exactly the targets the
+   pointer reaches. Enter drops; Escape cancels.
+
    Not yet: floating sites (phase D4) and auto-hidden stacks (D5) are kept in
-   the layout but not shown; dragging panels is phase D3; document tab close
-   glyphs and the overflow list arrive with the page view's document preset.
+   the layout but not shown; document tab close glyphs and the overflow list
+   arrive with the page view's document preset.
 
    To accessibility the site is a group named "Docking workspace" (or its
    accessible name). Each stack is a ``pane`` named by its selected panel, or
@@ -214,7 +296,12 @@ gui_forms::DockSite
    ``chevron_down``), ``caption_pin`` and ``caption_pin_glyph`` (the ``pin``
    mark, checked), ``caption_close`` and ``caption_close_glyph``; its states
    are current and disabled, and the buttons carry their own hot, pressed,
-   open, checked and disabled.
+   open, checked and disabled. While dragging, the site's ``drag_stamp``,
+   ``drag_stamp_label``, ``drop_area`` (drop_accepted) and ``drop_cue``
+   (drop_rejected, the ``close`` mark) are present, and the ``drop_tile``
+   item system has ``tile`` and ``tile_glyph`` (the ``dock_shape`` mark with
+   the zone's region), with selected (lit), disabled (refused) and expanding
+   (fading in).
 
    .. rubric:: Examples
 
@@ -319,6 +406,53 @@ gui_forms::DockSite
 
       The open navigator.
 
+   .. cpp:function:: DockDragPhase drag_phase() const noexcept
+
+      Where a drag is: ``armed`` after a press on a caption, ``dragging``,
+      ``settling`` while the stamp grows into its place.
+
+   .. cpp:function:: std::optional<DockSubject> drag_subject() const
+
+      The stack or panel being dragged.
+
+   .. cpp:function:: std::span<const DockDropTarget> drag_targets() const noexcept
+
+      While dragging, every target the drag offers, in the keyboard's order:
+      each pane's top, left, centre, right and bottom (those the
+      restrictions accept), panes in tree order, then the window's top, left,
+      right and bottom edges.
+
+   .. cpp:function:: std::span<const DockDropPane> drag_panes() const noexcept
+
+      The panes the targets were planned over: the stacks as laid out with
+      the dragged subject's place closed up, or the empty document area.
+
+   .. cpp:function:: std::optional<DockDropTarget> drag_target() const
+
+      The target a drop would use now.
+
+   .. cpp:function:: bool drag_suppressed() const noexcept
+
+      Whether Ctrl suppresses docking.
+
+   .. cpp:function:: Rect drag_stamp() const noexcept
+
+      The stamp's rectangle while dragging or settling.
+
+   .. cpp:function:: const std::string& drag_announcement() const noexcept
+
+      What the drag announces ("Output: dock left of Properties"), also the
+      site's semantic description while the drag runs.
+
+   .. cpp:function:: double drag_threshold() const noexcept
+
+      How far, in logical units along either axis, a caption press moves
+      before it drags; outside 1 to 64 throws ``std::out_of_range``.
+
+   .. cpp:function:: void set_drag_threshold(double threshold)
+
+      Sets :cpp:func:`drag_threshold <gui_forms::DockSite::drag_threshold>`; see the property's description above.
+
    .. cpp:function:: Parts parts() const
 
    .. cpp:function:: std::vector<Seam> realized_seams() const
@@ -329,6 +463,21 @@ gui_forms::DockSite
 
       The stacks shown after the last layout pass, with their parts and
       states.
+
+   .. cpp:function:: std::vector<Tile> realized_tiles() const
+
+      While dragging: the drop tiles shown, the hovered pane's five then the
+      window's four edge tiles, with their parts and states.
+
+
+   .. rubric:: Events
+
+   .. cpp:function:: Event<const DockDragOutcome&>& drag_ended() noexcept
+
+      Raised once when a drag that started ends, with how it ended
+      (:cpp:enum:`DockDragEnd <gui_forms::DockDragEnd>`: dropped, escaped, capture lost, deactivated, layout
+      changed, rejected), its subject and, for a drop, the target and the
+      transaction's result. Raised after a drop's transaction.
 
 
    .. rubric:: Methods
@@ -392,6 +541,15 @@ gui_forms::DockSite
       Activates the next or previous document in tab order, wrapping; false
       when there is no document.
 
+   .. cpp:function:: bool begin_keyboard_move(const DockPanelId& panel)
+
+      Starts the keyboard move mode for a docked panel, on the first target;
+      false for any other panel, while a drag runs, or with no target.
+
+   .. cpp:function:: bool cancel_drag()
+
+      Ends a drag as Escape does; false when none runs.
+
    .. cpp:function:: std::string seam_identity(DockNodeId split) const
 
       The semantic identity of a split's seam.
@@ -413,6 +571,8 @@ gui_forms::DockSite
 
    .. cpp:function:: void on_pointer(PointerEvent& event) override
 
+   .. cpp:function:: void on_key_preview(KeyEvent& event) override
+
    .. cpp:function:: void on_key(KeyEvent& event) override
 
    .. cpp:function:: void on_key_bubble(KeyEvent& event) override
@@ -432,6 +592,10 @@ gui_forms::DockSite
    .. cpp:function:: std::string realized_item_stable_id(std::size_t item) const override
 
    .. cpp:function:: AnatomyStateSet realized_item_anatomy_states(std::size_t item) const override
+
+   .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
+
+      *Protected.*
 
    .. cpp:function:: void on_attachment_committed() noexcept override
 

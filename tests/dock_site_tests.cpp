@@ -237,9 +237,9 @@ void anatomy_and_parts() {
     DockWorkspace& workspace = *(*fixture).workspace;
     const ControlAnatomy& anatomy = site.anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "dock_site" &&
-                anatomy.item_systems.size() == 2U && anatomy.item_systems[0].name == "seam" &&
-                anatomy.item_systems[1].name == "stack",
-            "DockSite publishes a valid anatomy with its seam and stack item systems");
+                anatomy.item_systems.size() == 3U && anatomy.item_systems[0].name == "seam" &&
+                anatomy.item_systems[1].name == "stack" && anatomy.item_systems[2].name == "drop_tile",
+            "DockSite publishes a valid anatomy with its seam, stack and drop tile item systems");
     const DockNavigator navigator(StableId("lone"));
     require(validate_control_anatomy(navigator.anatomy()).defect == AnatomyDefect::none &&
                 navigator.anatomy().control_id == "dock_navigator",

@@ -52,7 +52,7 @@ keyboard commands (`KeyCommand`: `close_document`, `next_tab`,
 `cycle_backward`, `context_menu`, and docking's `next_document`,
 `previous_document`, `next_tool_panel`, `previous_tool_panel`,
 `position_menu`, `return_to_document`, `hide_tool_panel`,
-`maximize_document_area`), and each host reports the keys its convention
+`maximize_document_area`, `move_panel`), and each host reports the keys its convention
 gives them in `HostCapabilities::key_map`; `to_json` lists them as HID usage
 and modifier bits. A host session installs that map in its window, and
 controls ask the window (`Control::effective_key_map`) rather than naming
@@ -67,7 +67,7 @@ attaches.
 | `move_tab_later`, `move_tab_earlier` | Ctrl+Shift+PageDown, Ctrl+Shift+PageUp | the same |
 | `cycle_forward`, `cycle_backward` | Ctrl+Tab, Ctrl+Shift+Tab | the same |
 | `context_menu` | Shift+F10, or the context-menu key | the same |
-| docking's commands | Ctrl+F6, Ctrl+Shift+F6, Alt+F7, Alt+Shift+F7, Alt+Hyphen, Escape, Shift+Escape, Ctrl+Shift+F12 | the same |
+| docking's commands | Ctrl+F6, Ctrl+Shift+F6, Alt+F7, Alt+Shift+F7, Alt+Hyphen, Escape, Shift+Escape, Ctrl+Shift+F12, Ctrl+Alt+Shift+M (move) | the same |
 
 The context-menu key is `PhysicalKey::context_menu` (HID "Keyboard
 Application"): `VK_APPS` on Windows and the `Menu` keysym on X11. Apple

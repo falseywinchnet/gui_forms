@@ -1594,6 +1594,10 @@ Properties beyond every control's: none.
 | `region` | region |  |  |
 | `document_area` | well |  |  |
 | `focus` | focus |  |  |
+| `drag_stamp` | face |  |  |
+| `drag_stamp_label` | label |  |  |
+| `drop_area` | drop |  | drop_accepted |
+| `drop_cue` | indicator |  | drop_rejected |
 
 States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
 
@@ -1624,9 +1628,20 @@ Item system `stack`:
 
 Item states: `current`, `disabled`.
 
+Item system `drop_tile`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `tile` | actuator |  |  |
+| `tile_glyph` | glyph |  |  |
+
+Item states: `selected`, `disabled`, `expanding`.
+
 Properties beyond every control's: none.
 
-Interactions beyond every control's: none.
+| Interaction | Payload |
+|---|---|
+| `drag_ended` | `DockDragOutcome` |
 
 ## `dock_navigator` (DockNavigator, control)
 

@@ -151,6 +151,7 @@ add_library(gui_forms_core STATIC
     src/core/docking/dock_layout/dock_layout_edits.cpp
     src/core/docking/dock_layout/dock_layout_model.cpp
     src/core/docking/dock_layout/dock_layout_persistence.cpp
+    src/core/docking/dock_drop_targets/dock_drop_targets.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -453,6 +454,7 @@ add_library(gui_forms_controls STATIC
     src/controls/docking/dock_navigator/dock_navigator.cpp
     src/controls/docking/dock_workspace/dock_workspace.cpp
     src/controls/docking/dock_site/dock_site.cpp
+    src/controls/docking/dock_site/dock_site_drag.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
@@ -2495,6 +2497,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_vocabulary_tests tests/ribbon_vocabulary_tests.cpp)
     target_link_libraries(gui_forms_ribbon_vocabulary_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_vocabulary_tests COMMAND gui_forms_ribbon_vocabulary_tests)
+    add_executable(gui_forms_dock_drag_tests tests/dock_drag_tests.cpp)
+    target_link_libraries(gui_forms_dock_drag_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_drag_tests COMMAND gui_forms_dock_drag_tests)
     add_executable(gui_forms_docking_vocabulary_tests tests/docking_vocabulary_tests.cpp)
     target_link_libraries(gui_forms_docking_vocabulary_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_docking_vocabulary_tests COMMAND gui_forms_docking_vocabulary_tests)

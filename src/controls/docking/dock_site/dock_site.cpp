@@ -1,4 +1,5 @@
 #include "gui_forms/controls/docking/dock_site/dock_site.hpp"
+#include "dock_site_children.hpp"
 
 #include "gui_forms/delegate.hpp"
 #include "gui_forms/text.hpp"
@@ -38,13 +39,12 @@ constexpr double accent_height = 2.0;
 constexpr double strip_preferred_height = 26.0;
 constexpr double extent_tolerance = 1e-9;
 
-constexpr std::string_view document_pane_name = "Documents";
 
-constexpr std::array<std::string_view, 6> position_names{
-    "float", "dock", "dock_as_document", "auto_hide", "hide", "close",
+constexpr std::array<std::string_view, 7> position_names{
+    "float", "dock", "dock_as_document", "auto_hide", "hide", "close", "move",
 };
-constexpr std::array<std::string_view, 6> position_texts{
-    "Float", "Dock", "Dock as Tabbed Document", "Auto Hide", "Hide", "Close",
+constexpr std::array<std::string_view, 7> position_texts{
+    "Float", "Dock", "Dock as Tabbed Document", "Auto Hide", "Hide", "Close", "Move",
 };
 
 // Virtual semantic children carry a runtime ID derived from their stable ID,
@@ -119,63 +119,6 @@ Control::Ptr first_focusable(const Control::Ptr& root) {
 
 } // namespace
 
-// -- the stack view ------------------------------------------------------------
-
-// A stack's PageView: a `pane` region named by its selected panel ("Documents"
-// for a document stack), whose caption buttons (painted by the site) are its
-// semantic children.
-class DockSite::StackView final : public PageView {
-public:
-    StackView(StableId stable_id, DockSite& site, DockNodeKind kind)
-        : PageView(std::move(stable_id), options_for(kind)), site_(&site), kind_(kind) {}
-
-    void release_site() noexcept { site_ = nullptr; }
-
-    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
-        SemanticDescriptor descriptor{};
-        descriptor.role = SemanticRole::pane;
-        if (kind_ == DockNodeKind::document_stack) {
-            descriptor.name = std::string(document_pane_name);
-        } else if (site_ != nullptr) {
-            const std::size_t index = (*site_).slot_index_of(*this);
-            if (index < (*site_).stacks_.size()) descriptor.name = (*site_).stacks_[index].title;
-        }
-        descriptor.exposed = true;
-        descriptor.include_descendants = true;
-        return descriptor;
-    }
-
-    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
-        std::vector<SemanticNode> nodes{};
-        if (site_ == nullptr) return nodes;
-        const std::size_t index = (*site_).slot_index_of(*this);
-        if (index >= (*site_).stacks_.size()) return nodes;
-        nodes = (*site_).caption_nodes((*site_).stacks_[index], index);
-        return nodes;
-    }
-
-    bool on_semantic_child_action(std::string_view stable_id, SemanticAction action,
-                                  std::string_view value) override {
-        if (site_ != nullptr) {
-            const std::size_t index = (*site_).slot_index_of(*this);
-            if (index < (*site_).stacks_.size() && (*site_).caption_action(index, stable_id, action)) return true;
-        }
-        const bool handled = PageView::on_semantic_child_action(stable_id, action, value);
-        return handled;
-    }
-
-private:
-    [[nodiscard]] static PageSetOptions options_for(DockNodeKind kind) noexcept {
-        PageSetOptions options{};
-        options.fallback = kind == DockNodeKind::document_stack ? PageSelectionFallback::most_recent
-                                                                : PageSelectionFallback::neighbour;
-        return options;
-    }
-
-    DockSite* site_{};
-    DockNodeKind kind_{DockNodeKind::tool_stack};
-};
-
 // -- construction --------------------------------------------------------------
 
 DockSite::DockSite(StableId stable_id, DockWorkspace& workspace)
@@ -200,10 +143,14 @@ DockSite::DockSite(StableId stable_id, DockWorkspace& workspace)
 }
 
 void DockSite::initialize_control_tree() {
+    create_drag_layer();
     realize();
 }
 
 DockSite::~DockSite() {
+    drag_frames_.disconnect();
+    capture_token_.disconnect();
+    active_token_.disconnect();
     focus_token_.disconnect();
     window_pointer_.disconnect();
     navigator_revoked_.disconnect();
@@ -214,11 +161,16 @@ DockSite::~DockSite() {
     for (StackSlot& slot : stacks_) {
         if (slot.view) (*slot.view).release_site();
     }
+    if (drag_layer_) (*drag_layer_).release_site();
     if (workspace_ != nullptr) (*workspace_).detach_site(*this);
     workspace_ = nullptr;
 }
 
 void DockSite::on_dispose() noexcept {
+    drag_frames_.disconnect();
+    capture_token_.disconnect();
+    active_token_.disconnect();
+    drag_ = DragSession{};
     close_navigator();
     close_position_menu();
     if (menu_) (*menu_).dispose();
@@ -230,6 +182,7 @@ void DockSite::on_dispose() noexcept {
     for (StackSlot& slot : stacks_) {
         if (slot.view) (*slot.view).release_site();
     }
+    if (drag_layer_) (*drag_layer_).release_site();
     Control::on_dispose();
 }
 
@@ -375,11 +328,16 @@ void DockSite::realize() {
         PageStrip& strip = *view.strip();
         strip.set_mnemonics_enabled(false);
         if (node.kind == DockNodeKind::tool_stack) strip.set_placement(PageStripPlacement::bottom);
+        // Documents reorder by dragging along their strip (owner decision
+        // DK-39) and tear off when the pointer leaves it; a tool tab's drag
+        // is the docking drag at once (phase D3).
+        if (node.kind == DockNodeKind::document_stack) strip.set_reorder_enabled(true);
         // The workspace's navigator takes Ctrl+Tab (owner decision DK-30).
         view.set_ctrl_tab(PageViewCtrlTab::pass);
         on(view.pages().selected_page_changed(), *this, &DockSite::on_view_selection, stack);
         on(view.content_requested(), *this, &DockSite::on_view_content, stack);
         on(strip.page_close_requested(), *this, &DockSite::on_view_close, stack);
+        on(strip.page_drag_started(), *this, &DockSite::on_tab_drag, stack);
         add_child(slot.view);
         next.push_back(std::move(slot));
     }
@@ -390,6 +348,8 @@ void DockSite::realize() {
         static_cast<void>(set_child_index((*slot.view).runtime_id(), index));
         sync_pages(slot, *layout.find_node(slot.stack));
     }
+    // The drag layer paints over every stack.
+    if (drag_layer_) static_cast<void>(set_child_index((*drag_layer_).runtime_id(), stacks_.size()));
     update_focus_regions();
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -406,12 +366,19 @@ void DockSite::sync_pages(StackSlot& slot, const DockNode& node) {
             --position;
             const PageId page = pages.record_at(PagePosition{position}).id;
             const DockPanelId panel(page.value);
-            if (std::find(node.panels.begin(), node.panels.end(), panel) == node.panels.end()) {
+            if (std::find(node.panels.begin(), node.panels.end(), panel) == node.panels.end() ||
+                dragged_out(slot.stack, panel)) {
                 static_cast<void>(pages.remove(page));
             }
         }
+        // While a tab drag holds one panel out of the stack, the pages after
+        // it move up one place.
+        std::size_t shown = 0U;
         for (std::size_t index = 0; index < node.panels.size(); ++index) {
             const DockPanelId& panel = node.panels[index];
+            if (dragged_out(slot.stack, panel)) continue;
+            const std::size_t place_index = shown;
+            ++shown;
             const PageId page{panel.value};
             const std::string title = (*workspace_).panel_title(panel);
             const std::optional<PagePosition> found = pages.find(page);
@@ -420,14 +387,17 @@ void DockSite::sync_pages(StackSlot& slot, const DockNode& node) {
                 record.id = page;
                 record.title = title;
                 record.closable = node.kind == DockNodeKind::document_stack;
-                static_cast<void>(
-                    view.add_page(record, (*workspace_).panel_content(panel), PagePlacement::at(PagePosition{index})));
+                static_cast<void>(view.add_page(record, (*workspace_).panel_content(panel),
+                                                PagePlacement::at(PagePosition{place_index})));
                 continue;
             }
-            if ((*found).value != index) static_cast<void>(pages.move(page, PagePosition{index}));
-            if (pages.record_at(PagePosition{index}).title != title) static_cast<void>(pages.set_title(page, title));
+            if ((*found).value != place_index) static_cast<void>(pages.move(page, PagePosition{place_index}));
+            if (pages.record_at(PagePosition{place_index}).title != title) {
+                static_cast<void>(pages.set_title(page, title));
+            }
         }
-        if (!node.panels.empty() && node.selected < node.panels.size()) {
+        if (!node.panels.empty() && node.selected < node.panels.size() &&
+            !dragged_out(slot.stack, node.panels[node.selected])) {
             const PageId selected{node.panels[node.selected].value};
             static_cast<void>(pages.select(selected, PageSelectionCause::programmatic));
         }
@@ -437,7 +407,7 @@ void DockSite::sync_pages(StackSlot& slot, const DockNode& node) {
     const std::optional<DockPanelId> panel = selected_panel(slot);
     slot.title = panel ? (*workspace_).panel_title(*panel) : std::string{};
     // A tool stack shows its tabs only with two or more panels.
-    const bool strip_shown = node.kind == DockNodeKind::document_stack || node.panels.size() >= 2U;
+    const bool strip_shown = node.kind == DockNodeKind::document_stack || pages.count() >= 2U;
     PageStrip& strip = *view.strip();
     if (strip.visible() != strip_shown) {
         strip.set_visible(strip_shown);
@@ -510,6 +480,12 @@ bool focus_within(const Control& site, Window* host) {
 } // namespace
 
 void DockSite::on_layout_changed(const DockLayoutChange&) {
+    // The program changed the layout under a drag: the drag ends, never
+    // applied to a stale tree (docking study 5.1, invariant 2). A drop's own
+    // transaction runs while settling.
+    if (drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) {
+        end_drag(DockDragEnd::layout_changed);
+    }
     const bool focus_was_inside = focus_within(*this, attached_window());
     realize();
     refocus_if_lost(focus_was_inside);
@@ -679,6 +655,12 @@ void DockSite::on_attachment_committed() noexcept {
             focus_token_.disconnect();
             focus_token_ = (*host).focused_control_changed().subscribe(
                 *this, Delegate<const FocusedControlChange&>::bind<DockSite, &DockSite::on_focus_moved>(*this));
+            capture_token_.disconnect();
+            capture_token_ = (*host).pointer_capture_changed().subscribe(
+                *this, Delegate<const PointerCaptureChange&>::bind<DockSite, &DockSite::on_capture_changed>(*this));
+            active_token_.disconnect();
+            active_token_ = (*host).active_changed().subscribe(
+                *this, Delegate<bool>::bind<DockSite, &DockSite::on_window_active>(*this));
             followed_window_ = host;
         }
         update_focus_regions();
@@ -690,6 +672,10 @@ void DockSite::on_attachment_committed() noexcept {
 void DockSite::on_detaching_from_window(Window& former_window) noexcept {
     close_navigator();
     close_position_menu();
+    drag_frames_.disconnect();
+    capture_token_.disconnect();
+    active_token_.disconnect();
+    drag_ = DragSession{};
     focus_token_.disconnect();
     followed_window_ = nullptr;
     try {
@@ -766,12 +752,13 @@ DockSite::Extent DockSite::extent_of(DockNodeId node_id, std::span<const DockNod
     const DockNode* const node = (*workspace_).layout().find_node(node_id);
     if (node == nullptr) return extent;
     if ((*node).kind == DockNodeKind::tool_stack) {
-        if (contains_node(collapsed, node_id)) return extent;
+        if (contains_node(collapsed, node_id) || hidden_by_drag(node_id)) return extent;
         extent.present = true;
         extent.minimum = stack_minimum(*node);
         return extent;
     }
     if ((*node).kind == DockNodeKind::document_stack) {
+        if (hidden_by_drag(node_id)) return extent;
         extent.present = true;
         extent.minimum = stack_minimum(*node);
         return extent;
@@ -870,7 +857,9 @@ void DockSite::place(DockNodeId node_id, Rect bounds, std::span<const DockNodeId
     }
     if ((*node).kind == DockNodeKind::document_area) {
         document_area_ = bounds;
-        if (!((*node).first == DockNodeId{})) place((*node).first, bounds, collapsed);
+        if ((*node).first == DockNodeId{}) return;
+        // Content wholly held out by a drag leaves the area empty.
+        if (extent_of((*node).first, collapsed).present) place((*node).first, bounds, collapsed);
         return;
     }
     const Extent first = extent_of((*node).first, collapsed);
@@ -950,12 +939,20 @@ void DockSite::arrange(Rect final_bounds) {
         return;
     }
     const bool focus_was_inside = focus_within(*this, attached_window());
+    if (drag_.phase == DockDragPhase::dragging && drag_.panel_only && !drag_.page_held_out) {
+        drag_.page_held_out = true;
+        StackSlot* const source = slot_for(drag_.source_stack);
+        const DockNode* const node = (*workspace_).layout().find_node(drag_.source_stack);
+        if (source != nullptr && node != nullptr) sync_pages(*source, *node);
+    }
     const Size surface{final_bounds.width, final_bounds.height};
     collapsed_ = plan_collapse(surface);
     const Rect whole{0.0, 0.0, surface.width, surface.height};
     place((*workspace_).layout().state().main_root, whole, collapsed_);
     for (StackSlot& slot : stacks_) {
-        slot.collapsed = contains_node(collapsed_, slot.stack);
+        // A stack a drag holds out of the layout is hidden as a collapsed
+        // one is (collapsed_stacks does not list it).
+        slot.collapsed = contains_node(collapsed_, slot.stack) || hidden_by_drag(slot.stack);
         set_child_layout_collapsed(slot.view, slot.collapsed);
         if (slot.collapsed) continue;
         Rect content = slot.bounds;
@@ -968,10 +965,15 @@ void DockSite::arrange(Rect final_bounds) {
     if (keyboard_seam_ >= seams_.size()) keyboard_seam_ = 0U;
     const bool moved = seams_moved() || previous_collapsed_ != collapsed_ || !(previous_document_area == document_area_);
     if (moved) invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
-    // The site takes focus (for its seams) only while it has some.
-    set_focusable(!seams_.empty());
+    // The site takes focus (for its seams) only while it has some, and while
+    // a drag runs (for its keys).
+    set_focusable(!seams_.empty() || drag_.phase != DockDragPhase::idle);
     for (StackSlot& slot : stacks_) supply_content(slot);
-    refocus_if_lost(focus_was_inside);
+    if (drag_layer_) set_child_layout(drag_layer_, whole);
+    if (drag_.phase == DockDragPhase::dragging) plan_drag_targets();
+    if (drag_.phase == DockDragPhase::settling) place_settle_target();
+    // During a drag the focus may stay lost; the drag's end puts it back.
+    if (drag_.phase == DockDragPhase::idle) refocus_if_lost(focus_was_inside);
 }
 
 DockSite::CaptionGeometry DockSite::caption_geometry(Rect caption, bool pin) const {
@@ -1249,7 +1251,16 @@ std::optional<std::size_t> DockSite::focused_seam() const noexcept {
 // pressed control takes focus, so a click on an unfocusable part of a panel
 // still activates it. Presses on a stack's tabs are left to the strip.
 void DockSite::on_pointer_preview(PointerEvent& event) {
-    if (workspace_ == nullptr || event.action != PointerAction::down || event.button != PointerButton::primary) {
+    if (workspace_ == nullptr) return;
+    // A document tab sliding along its strip tears off when the pointer
+    // leaves the strip's band.
+    if (event.action == PointerAction::move && drag_.phase == DockDragPhase::idle && tear_off_document_tab(event)) {
+        event.handled = true;
+        return;
+    }
+    if (event.action != PointerAction::down || event.button != PointerButton::primary) return;
+    if (drag_.phase == DockDragPhase::settling) {
+        event.handled = true;
         return;
     }
     const Rect absolute = absolute_bounds();
@@ -1284,6 +1295,28 @@ void DockSite::on_pointer(PointerEvent& event) {
     }
     const Rect absolute = absolute_bounds();
     const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
+    if (drag_.phase == DockDragPhase::armed || drag_.phase == DockDragPhase::dragging) {
+        const Control::Ptr keep = shared_from_this();
+        if (event.action == PointerAction::move) {
+            update_drag_pointer(local, event.modifiers);
+            event.handled = true;
+            return;
+        }
+        if (event.action == PointerAction::up && event.button == PointerButton::primary) {
+            if (drag_.phase == DockDragPhase::armed) {
+                drag_ = DragSession{};
+            } else {
+                update_drag_pointer(local, event.modifiers);
+                end_drag(drag_.target ? DockDragEnd::dropped : DockDragEnd::rejected);
+            }
+            event.handled = true;
+            return;
+        }
+    }
+    if (drag_.phase == DockDragPhase::settling) {
+        event.handled = true;
+        return;
+    }
     if (event.action == PointerAction::move || event.action == PointerAction::enter) {
         if (seam_captured_) {
             continue_seam_drag(local);
@@ -1331,6 +1364,8 @@ void DockSite::on_pointer(PointerEvent& event) {
     if (!panel) return;
     if (hit.zone == Zone::caption) {
         static_cast<void>((*workspace_).activate_panel(*panel, DockActivationCause::pointer));
+        // The press may become a drag of the whole stack (D7-1).
+        if (is_alive() && hit.index < stacks_.size()) arm_caption_drag(hit.index, local, event.pointer_id);
         return;
     }
     if (hit.zone == Zone::menu) {
@@ -1436,6 +1471,10 @@ bool DockSite::handle_docking_key(KeyEvent& event) {
     } else if (keys.matches(KeyCommand::hide_tool_panel, event)) {
         const std::optional<DockPanelId> panel = focused_panel();
         if (focus_in_tool_stack() && panel) handled = run_position_command(*panel, DockPositionCommand::hide);
+    } else if (keys.matches(KeyCommand::move_panel, event)) {
+        std::optional<DockPanelId> panel = focused_panel();
+        if (!panel) panel = (*workspace_).active_panel();
+        if (panel) handled = begin_keyboard_move(*panel);
     } else if (keys.matches(KeyCommand::position_menu, event) || keys.matches(KeyCommand::context_menu, event)) {
         std::optional<DockPanelId> panel = focused_panel();
         if (!panel) panel = (*workspace_).active_panel();
@@ -1443,6 +1482,12 @@ bool DockSite::handle_docking_key(KeyEvent& event) {
     }
     if (handled) event.handled = true;
     return handled;
+}
+
+// A drag takes its keys (Escape, Ctrl, and the keyboard move mode's)
+// before the focused control sees them.
+void DockSite::on_key_preview(KeyEvent& event) {
+    static_cast<void>(handle_drag_key(event));
 }
 
 void DockSite::on_key(KeyEvent& event) {
@@ -1508,6 +1553,9 @@ bool DockSite::position_command_enabled(const DockPanelId& panel, DockPositionCo
     case DockPositionCommand::close:
         enabled = (*descriptor).allowed.closed;
         break;
+    case DockPositionCommand::move:
+        enabled = drag_.phase == DockDragPhase::idle;
+        break;
     }
     return enabled;
 }
@@ -1516,6 +1564,10 @@ bool DockSite::run_position_command(const DockPanelId& panel, DockPositionComman
     if (!position_command_enabled(panel, command)) return false;
     const DockPanelDescriptor& descriptor = *(*workspace_).layout().find_descriptor(panel);
     DockTransactionResult result{};
+    if (command == DockPositionCommand::move) {
+        const bool started = begin_keyboard_move(panel);
+        return started;
+    }
     if (command == DockPositionCommand::hide) {
         result = (*workspace_).hide_panel(panel, DockEditOrigin::user);
     } else if (command == DockPositionCommand::close) {
@@ -1580,6 +1632,9 @@ bool DockSite::show_position_menu(const DockPanelId& panel, MenuOpenMode mode) {
     const std::size_t close = command_index(DockPositionCommand::close);
     items.emplace_back(prefix + ".position.close", MenuItemKind::command, menu_commands_[close],
                        std::string(position_texts[close]));
+    const std::size_t move = command_index(DockPositionCommand::move);
+    items.emplace_back(prefix + ".position.move", MenuItemKind::command, menu_commands_[move],
+                       std::string(position_texts[move]));
     (*menu_).set_items(std::move(items));
     const Rect absolute = absolute_bounds();
     Point anchor{absolute.x + slot.bounds.x, absolute.y + slot.bounds.y};
@@ -1766,6 +1821,8 @@ SemanticDescriptor DockSite::semantic_descriptor() const {
     descriptor.role = SemanticRole::group;
     descriptor.name = accessible_name().empty() ? "Docking workspace" : accessible_name();
     descriptor.description = accessible_description();
+    // A drag's announcement, while one runs (no live-region vocabulary yet).
+    if (!drag_.announcement.empty()) descriptor.description = drag_.announcement;
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
     return descriptor;
@@ -1886,15 +1943,31 @@ bool DockSite::caption_action(std::size_t index, std::string_view stable_id, Sem
 
 namespace {
 
-constexpr std::array<PartField<DockSite::Parts>, 3> site_part_fields{{
+constexpr std::array<AnatomyState, 1> drop_area_states{AnatomyState::drop_accepted};
+constexpr std::array<AnatomyState, 1> drop_cue_states{AnatomyState::drop_rejected};
+
+constexpr std::array<PartField<DockSite::Parts>, 7> site_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &DockSite::Parts::region},
     {.declaration = {.name = "document_area", .role = PartRole::well, .composed_from = {}},
      .member = &DockSite::Parts::document_area},
     {.declaration = {.name = "focus", .role = PartRole::focus, .composed_from = {}},
      .member = &DockSite::Parts::focus},
+    // The drag layer (phase D3).
+    {.declaration = {.name = "drag_stamp", .role = PartRole::face, .composed_from = {}},
+     .member = &DockSite::Parts::drag_stamp},
+    {.declaration = {.name = "drag_stamp_label", .role = PartRole::label, .composed_from = {}},
+     .member = &DockSite::Parts::drag_stamp_label},
+    {.declaration = {.name = "drop_area", .role = PartRole::drop, .composed_from = {},
+                     .states = drop_area_states},
+     .member = &DockSite::Parts::drop_area},
+    // Where nothing accepts the drop: the rejected cue (D4-1). No mark says
+    // "refused"; it draws the close mark, the nearest atom.
+    {.declaration = {.name = "drop_cue", .role = PartRole::indicator, .composed_from = {},
+                     .states = drop_cue_states},
+     .member = &DockSite::Parts::drop_cue},
 }};
-constexpr std::array<PartDeclaration, 3> site_parts = part_declarations(site_part_fields);
+constexpr std::array<PartDeclaration, 7> site_parts = part_declarations(site_part_fields);
 constexpr std::array<AnatomyState, 5> site_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,
     AnatomyState::focused, AnatomyState::focus_visible,
@@ -1965,9 +2038,27 @@ constexpr std::array<StateField<DockSite::StackStates>, 2> stack_state_fields{{
 }};
 constexpr std::array<AnatomyState, 2> stack_states_declared = state_declarations(stack_state_fields);
 
-constexpr std::array<ItemSystemDeclaration, 2> site_item_systems{{
+// A drop tile: its plate (lit while selected, disabled where the
+// restrictions refuse, expanding while the cross fades in) and its
+// dock-shape glyph (PartMark::dock_shape with the zone's region).
+constexpr std::array<PartField<DockSite::TileParts>, 2> tile_part_fields{{
+    {.declaration = {.name = "tile", .role = PartRole::actuator, .composed_from = {}},
+     .member = &DockSite::TileParts::tile},
+    {.declaration = {.name = "tile_glyph", .role = PartRole::glyph, .composed_from = {}},
+     .member = &DockSite::TileParts::tile_glyph},
+}};
+constexpr std::array<PartDeclaration, 2> tile_parts_declared = part_declarations(tile_part_fields);
+constexpr std::array<StateField<DockSite::TileStates>, 3> tile_state_fields{{
+    {AnatomyState::selected, &DockSite::TileStates::selected},
+    {AnatomyState::disabled, &DockSite::TileStates::disabled},
+    {AnatomyState::expanding, &DockSite::TileStates::expanding},
+}};
+constexpr std::array<AnatomyState, 3> tile_states_declared = state_declarations(tile_state_fields);
+
+constexpr std::array<ItemSystemDeclaration, 3> site_item_systems{{
     {.name = "seam", .parts = seam_parts_declared, .states = seam_states_declared, .custom_states = {}},
     {.name = "stack", .parts = stack_parts_declared, .states = stack_states_declared, .custom_states = {}},
+    {.name = "drop_tile", .parts = tile_parts_declared, .states = tile_states_declared, .custom_states = {}},
 }};
 
 constexpr ControlAnatomy site_anatomy{
@@ -2005,6 +2096,21 @@ void DockSite::publish_part_geometry(std::span<PartGeometry> geometry) const {
     record.region = PartGeometry::from_bounds(surface);
     record.document_area = PartGeometry::from_bounds(document_area_);
     record.focus = PartGeometry::from_bounds(surface);
+    const bool layer = drag_.phase == DockDragPhase::dragging || drag_.phase == DockDragPhase::settling;
+    if (layer) {
+        record.drag_stamp = PartGeometry::from_bounds(drag_.stamp);
+        record.drag_stamp_label = PartGeometry::from_bounds(drag_label_bounds());
+    }
+    const std::optional<DockDropTarget> target = drag_target();
+    if (target) {
+        record.drop_area = PartGeometry::from_bounds((*target).highlight);
+        record.drop_area.states.insert(AnatomyState::drop_accepted);
+    }
+    const Rect cue = drop_cue_bounds();
+    if (!cue.empty()) {
+        record.drop_cue = PartGeometry::from_bounds(cue);
+        record.drop_cue.states.insert(AnatomyState::drop_rejected);
+    }
     write_parts(anatomy(), site_part_fields, record, geometry);
 }
 
@@ -2067,18 +2173,23 @@ std::size_t DockSite::visible_stack_at(std::size_t ordinal) const {
 }
 
 std::size_t DockSite::realized_item_count() const {
-    const std::size_t count = seams_.size() + visible_stack_count();
+    const std::size_t count = seams_.size() + visible_stack_count() + tile_count();
     return count;
 }
 
 ItemSystemIndex DockSite::publish_realized_item_system(std::size_t item) const {
-    const ItemSystemIndex system{static_cast<std::uint8_t>(item < seams_.size() ? 0U : 1U)};
-    return system;
+    std::uint8_t system = 0U;
+    if (item >= seams_.size()) system = 1U;
+    if (item >= seams_.size() + visible_stack_count()) system = 2U;
+    const ItemSystemIndex index{system};
+    return index;
 }
 
 std::string DockSite::realized_item_stable_id(std::size_t item) const {
     if (item >= realized_item_count()) throw std::out_of_range("DockSite item is out of range");
     if (item < seams_.size()) return seam_identity(seams_[item].split);
+    const std::size_t first_tile = seams_.size() + visible_stack_count();
+    if (item >= first_tile) return tile_identity(tile_at(item - first_tile));
     const std::size_t index = visible_stack_at(item - seams_.size());
     const std::string identity = stack_identity(stacks_[index].stack);
     return identity;
@@ -2087,6 +2198,8 @@ std::string DockSite::realized_item_stable_id(std::size_t item) const {
 AnatomyStateSet DockSite::realized_item_anatomy_states(std::size_t item) const {
     if (item >= realized_item_count()) throw std::out_of_range("DockSite item is out of range");
     if (item < seams_.size()) return seam_states(item);
+    const std::size_t first_tile = seams_.size() + visible_stack_count();
+    if (item >= first_tile) return tile_states(tile_at(item - first_tile));
     const std::size_t index = visible_stack_at(item - seams_.size());
     const AnatomyStateSet states = stack_states(stacks_[index]);
     return states;
@@ -2096,6 +2209,15 @@ void DockSite::publish_realized_item_geometry(std::size_t item, std::span<PartGe
     if (item < seams_.size()) {
         const SeamParts record = seam_parts(item);
         write_declared_parts(seam_parts_declared, seam_part_fields, record, geometry);
+        return;
+    }
+    const std::size_t first_tile = seams_.size() + visible_stack_count();
+    if (item >= first_tile) {
+        const TileSlot tile = tile_at(item - first_tile);
+        TileParts record;
+        record.tile = PartGeometry::from_bounds(tile.bounds);
+        record.tile_glyph = PartGeometry::from_bounds(tile_glyph_bounds(tile.bounds));
+        write_declared_parts(tile_parts_declared, tile_part_fields, record, geometry);
         return;
     }
     const std::size_t index = visible_stack_at(item - seams_.size());
@@ -2117,6 +2239,26 @@ std::vector<DockSite::Seam> DockSite::realized_seams() const {
         seams.push_back(std::move(record));
     }
     return seams;
+}
+
+std::vector<DockSite::Tile> DockSite::realized_tiles() const {
+    std::vector<Tile> tiles{};
+    const std::size_t count = tile_count();
+    tiles.reserve(count);
+    const std::size_t first_tile = seams_.size() + visible_stack_count();
+    for (std::size_t index = 0; index < count; ++index) {
+        const TileSlot slot = tile_at(index);
+        Tile record;
+        record.kind = slot.kind;
+        record.pane = slot.pane;
+        record.zone = slot.zone;
+        record.stable_id = tile_identity(slot);
+        const PartGeometryBuffer published = published_realized_item_geometry(first_tile + index);
+        read_declared_parts(tile_parts_declared, tile_part_fields, published.parts(), record.parts);
+        read_states(tile_state_fields, tile_states(slot), record.states);
+        tiles.push_back(std::move(record));
+    }
+    return tiles;
 }
 
 std::vector<DockSite::Stack> DockSite::realized_stack_items() const {

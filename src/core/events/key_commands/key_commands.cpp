@@ -22,9 +22,10 @@ constexpr std::array<std::string_view, key_command_count> key_command_names{{
     "return_to_document",
     "hide_tool_panel",
     "maximize_document_area",
+    "move_panel",
 }};
 
-static_assert(key_command_count == 16U, "every KeyCommand has a name");
+static_assert(key_command_count == 17U, "every KeyCommand has a name");
 
 constexpr std::uint8_t modifier_bits = static_cast<std::uint8_t>(
     Modifier::shift | Modifier::control | Modifier::alt | Modifier::meta);
@@ -103,6 +104,8 @@ KeyMap pc_key_map() {
     map.set_binding(KeyCommand::return_to_document, {{PhysicalKey::escape, Modifier::none}, {}});
     map.set_binding(KeyCommand::hide_tool_panel, {{PhysicalKey::escape, Modifier::shift}, {}});
     map.set_binding(KeyCommand::maximize_document_area, {{PhysicalKey::f12, control_shift}, {}});
+    map.set_binding(KeyCommand::move_panel,
+                    {{PhysicalKey::m, Modifier::control | Modifier::alt | Modifier::shift}, {}});
     return map;
 }
 
