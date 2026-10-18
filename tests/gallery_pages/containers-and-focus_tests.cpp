@@ -42,6 +42,26 @@ void test_containers_and_focus(gui_forms::Window& window) {
     require(!(*split).first_collapsed() &&
                 (*collapse).text() == "Collapse navigation",
             "gallery SplitContainer must restore its retained allocation");
+
+    // The docked workspace: four stacks realized, only the shown panels'
+    // controls made, and focus in a panel activating it.
+    std::shared_ptr<gui_forms::DockSite> site = std::dynamic_pointer_cast<DockSite>(
+        window.find("gallery.containers.dock"));
+    std::shared_ptr<gui_forms::Label> dock_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.containers.docking.status"));
+    require(site && dock_status && (*site).workspace() != nullptr && (*site).realized_stacks().size() == 4U &&
+                (*site).realized_seams().size() == 3U,
+            "the gallery's docked workspace realizes four stacks and three seams");
+    require(window.find("gallery.containers.dock.content.classes") &&
+                !window.find("gallery.containers.dock.content.toolbox") &&
+                !window.find("gallery.containers.dock.content.form.cs"),
+            "only the selected panels of shown stacks are made");
+    require(window.request_focus(window.find("gallery.containers.dock.field.properties")) &&
+                (*dock_status).text().find("Active: Properties") != std::string::npos,
+            "focus in a panel makes it the active panel");
+    require(window.find("gallery.containers.navigator") &&
+                window.semantic_snapshot().to_json().find("Active Tool Windows") != std::string::npos,
+            "the gallery's navigator publishes its lists");
 }
 
 } // namespace gallery_pages_tests

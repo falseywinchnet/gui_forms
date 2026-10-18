@@ -192,6 +192,15 @@ gui_forms::Window
       **active_changed** : ``Event<bool>``
          Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
 
+      **focused_control_changed** : ``Event<const FocusedControlChange&>``
+         Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
+         none), once the controls' own focus notifications ran, with the old and
+         new controls' runtime identities and the new one's stable identity. It is
+         not raised when focus is dropped because the focused control left the
+         window. A handler may request focus again; that move raises its own
+         event afterwards. A :cpp:class:`DockSite <gui_forms::DockSite>` follows it to keep its workspace's active
+         panel.
+
       **dialog_result_changed** : ``Event<DialogResult>``
          Raised after :cpp:func:`dialog_result <gui_forms::Window::dialog_result>` changes, with the new result.
 
@@ -695,6 +704,16 @@ gui_forms::Window
    .. cpp:function:: Event<bool>& active_changed() noexcept
 
       Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
+
+   .. cpp:function:: Event<const FocusedControlChange&>& focused_control_changed() noexcept
+
+      Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
+      none), once the controls' own focus notifications ran, with the old and
+      new controls' runtime identities and the new one's stable identity. It is
+      not raised when focus is dropped because the focused control left the
+      window. A handler may request focus again; that move raises its own
+      event afterwards. A :cpp:class:`DockSite <gui_forms::DockSite>` follows it to keep its workspace's active
+      panel.
 
    .. cpp:function:: Event<DialogResult>& dialog_result_changed() noexcept
 

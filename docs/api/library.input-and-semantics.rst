@@ -427,6 +427,18 @@ Types
 
       Default: ``0x57U``.
 
+   .. cpp:member:: constexpr std::uint32_t application
+
+      The context-menu key (HID "Keyboard Application"). Default: ``0x65U``.
+
+   .. cpp:member:: constexpr std::uint32_t left_control
+
+      Default: ``0xE0U``.
+
+   .. cpp:member:: constexpr std::uint32_t right_control
+
+      Default: ``0xE4U``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PointerEvent

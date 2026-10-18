@@ -1587,6 +1587,75 @@ Properties beyond every control's: none.
 | `state_changed` | `NavigationPaneState` |
 | `popup_open_changed` | `bool` |
 
+## `dock_site` (DockSite, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `document_area` | well |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `seam`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `seam_bar` | seam |  |  |
+| `seam_grip` | grip |  |  |
+
+Item states: `hot`, `captured`, `focus_visible`, `disabled`.
+
+Item system `stack`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `stack_area` | region | `page_view` |  |
+| `caption` | face |  |  |
+| `caption_accent` | keyline |  |  |
+| `caption_key` | chip |  |  |
+| `caption_label` | caption |  |  |
+| `caption_menu` | actuator | `button` | hot, pressed, open, disabled |
+| `caption_menu_glyph` | glyph |  | disabled |
+| `caption_pin` | actuator | `button` | hot, pressed, checked, disabled |
+| `caption_pin_glyph` | glyph |  | checked, disabled |
+| `caption_close` | actuator | `button` | hot, pressed, disabled |
+| `caption_close_glyph` | glyph |  | disabled |
+
+Item states: `current`, `disabled`.
+
+Properties beyond every control's: none.
+
+Interactions beyond every control's: none.
+
+## `dock_navigator` (DockNavigator, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `face` | face |  |  |
+| `tool_heading` | caption |  |  |
+| `document_heading` | caption |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `entry`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `entry_face` | face | `menu_item` |  |
+| `entry_label` | label |  |  |
+
+Item states: `hot`, `selected`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `chosen` | `DockNavigatorChoice` |
+| `cancelled` | none |
+
 ## `tab_page` (TabPage, control)
 
 | Part | Role | Reuses | Own states |
@@ -2245,6 +2314,12 @@ Properties beyond every control's: none.
 |---|---|
 | `item_invoked` | `MenuItemInvocation` |
 | `open_changed` | `bool` |
+
+## `dock_workspace` (DockWorkspace, component)
+
+| Interaction | Payload |
+|---|---|
+| `activation_changed` | `DockActivationChange` |
 
 ## `command` (Command, component)
 
