@@ -54,6 +54,8 @@ void BreadcrumbTrail::initialize_control_tree() {
     (*editor_).set_border_style(BorderStyle::none);
     (*editor_).set_placeholder_text("Enter an exact path");
     (*editor_).set_accessible_name("Exact location path");
+    // Escape ends the path edit (editor_cancelled) and goes no further.
+    (*editor_).set_accepts_escape(true);
     (*editor_).set_visible(false);
     (*editor_).set_font(font_);
     add_child(editor_);

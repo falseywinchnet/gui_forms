@@ -332,6 +332,8 @@ std::shared_ptr<ScaledPanel> make_navigation(ProductRefs& refs) {
     (*search).set_requested_bounds({980, 6, 463, 28});
     (*search).set_placeholder_text("Search Projects and descendants");
     (*search).set_style(house_style());
+    // Escape leaves the search (SearchController::on_search_cancelled).
+    (*search).set_accepts_escape(true);
     refs.search = search;
     (*panel).add_at(search, (*search).requested_bounds());
     return panel;

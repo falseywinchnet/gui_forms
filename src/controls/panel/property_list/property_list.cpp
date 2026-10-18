@@ -316,6 +316,8 @@ struct PropertyList::Impl final {
     void connect_row(RowState& state) {
         const std::string row_id = spec(state).stable_id;
         if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
+            // Escape reverts the row (TextCancelled) and goes no further.
+            (*text).set_accepts_escape(true);
             state.value_subscription = (*text).text_changed().subscribe(
                 owner, TextValueChanged{this, row_id});
             state.commit_subscription = (*text).committed().subscribe(

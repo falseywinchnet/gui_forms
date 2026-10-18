@@ -228,8 +228,12 @@ void suggest_keyboard_trace() {
     require(trace.size() == 6U && trace[4] == "text ca" && trace[5] == "close",
             "Escape restores the text before the list closes, and raises no cancelled");
     trace.clear();
+    require(!press(window, PhysicalKey::escape) && trace.empty(),
+            "with nothing pending, Escape goes on to the window and raises no cancelled");
+    box.set_accepts_escape(true);
     require(press(window, PhysicalKey::escape) && trace.size() == 1U && trace[0] == "cancelled",
-            "with nothing pending, Escape is the box's own");
+            "with nothing pending, a box that accepts Escape raises cancelled");
+    box.set_accepts_escape(false);
 
     require(type(window, "l") && box.auto_complete_open(), "the list opens again");
     trace.clear();
