@@ -120,7 +120,9 @@ enum class DockFlyoutOpening : std::uint8_t { hover_or_click, click };
 // under the docking lock) with the monitor its centre is on; a frame the
 // program sets is requested from the window. The close button of a floating
 // window hides its tool panels and closes its documents (one user
-// transaction, after the close request returns), which closes the window.
+// transaction, after the close request returns), which closes the window;
+// with no main site bound, the transaction runs inside the request and the
+// host closes the window.
 // Keys a floating window's own route and accelerators do not take are
 // offered to the main window's accelerators (Window::offer_accelerators),
 // so shortcuts such as Ctrl+S work from a floating tool window (F2-1).

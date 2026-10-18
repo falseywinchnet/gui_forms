@@ -39,18 +39,6 @@ constexpr double default_hosted_width = 100.0;
 constexpr double maximum_hosted_width = 1024.0;
 constexpr double maximum_end_reserve = 64.0;
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t item_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 bool has_menu(ToolStripItemKind kind) noexcept {
     const bool result = kind == ToolStripItemKind::drop_down_button ||
                         kind == ToolStripItemKind::split_button;
@@ -1057,7 +1045,7 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
         if (hosted(item.kind)) continue;
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = item_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.name = item_text(item);
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         node.states = SemanticState::visible;

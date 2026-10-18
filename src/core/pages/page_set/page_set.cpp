@@ -578,8 +578,13 @@ PageSetBatch::PageSetBatch(PageSet& set) noexcept : set_(&set) {
     (*set_).begin_batch();
 }
 
+// Publishing can run a handler that throws; a destructor may not let that
+// out (see the class comment for what is left behind).
 PageSetBatch::~PageSetBatch() {
-    close();
+    try {
+        close();
+    } catch (...) {
+    }
 }
 
 void PageSetBatch::close() {

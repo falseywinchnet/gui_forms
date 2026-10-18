@@ -51,7 +51,6 @@ using dock_site_detail::contains_node;
 using dock_site_detail::first_focusable;
 using dock_site_detail::focus_candidate;
 using dock_site_detail::moved;
-using dock_site_detail::node_runtime_id;
 using dock_site_detail::seam_bar_thickness;
 using dock_site_detail::strip_extent;
 using dock_site_detail::to_window;
@@ -1026,41 +1025,69 @@ bool DockSite::seams_moved() const noexcept {
     return false;
 }
 
+// One layout pass, in stages: remember the last pass and clear its
+// rectangles; hold a dragged panel's page out of its view; take the side
+// strips' bands and plan the collapse; place the tree; lay out the stack
+// views and the side strips; follow the flyout; then publish what moved and
+// update what depends on the pass (focusability, content, drag targets,
+// focus).
 void DockSite::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    // The last pass's seams, collapse and document area, to tell whether
-    // the site's own parts moved (the views report their own changes).
-    previous_seams_.swap(seams_);
-    seams_.clear();
-    previous_collapsed_.swap(collapsed_);
-    const Rect previous_document_area = document_area_;
-    const Rect previous_tree_area = tree_area_;
-    document_area_ = {};
-    for (StackSlot& slot : stacks_) {
-        slot.bounds = {};
-        slot.caption = {};
-    }
+    const PreviousPass previous = begin_layout_pass();
     if (workspace_ == nullptr) {
         collapsed_.clear();
         return;
     }
     const bool focus_was_inside = focus_within(*this, attached_window());
-    if (drag_.phase == DockDragPhase::dragging && drag_.panel_only && !drag_.page_held_out) {
-        drag_.page_held_out = true;
-        StackSlot* const source = slot_for(drag_.source_stack);
-        const DockNode* const node = (*workspace_).layout().find_node(drag_.source_stack);
-        if (source != nullptr && node != nullptr) sync_pages(*source, *node);
-    }
+    hold_out_dragged_page();
     const Size surface{final_bounds.width, final_bounds.height};
-    // The side strips' bands come off the edges first: those of the
-    // auto-hidden stacks, then, while collapsing puts stacks behind side tabs
-    // on further edges, theirs, planning the collapse again each time (at
-    // most once per edge).
     std::array<bool, 4> edges{};
+    std::array<Rect, 4> bands{};
+    tree_area_ = plan_bands_and_collapse(surface, edges, bands);
+    place(site_root(), tree_area_, collapsed_);
+    arrange_stack_views();
+    arrange_side_strips(edges, bands);
+    follow_flyout_after_pass();
+    finish_layout_pass(previous, surface, focus_was_inside);
+}
+
+// The last pass's seams, collapse, document area and tree area, kept to tell
+// whether the site's own parts moved (the views report their own changes);
+// the slots' rectangles are cleared for this pass.
+DockSite::PreviousPass DockSite::begin_layout_pass() {
+    previous_seams_.swap(seams_);
+    seams_.clear();
+    previous_collapsed_.swap(collapsed_);
+    PreviousPass previous{};
+    previous.document_area = document_area_;
+    previous.tree_area = tree_area_;
+    document_area_ = {};
+    for (StackSlot& slot : stacks_) {
+        slot.bounds = {};
+        slot.caption = {};
+    }
+    return previous;
+}
+
+// A tab drag of one panel holds its page out of its view from the first
+// pass of the drag (never inside the strip's own drag event).
+void DockSite::hold_out_dragged_page() {
+    if (drag_.phase != DockDragPhase::dragging || !drag_.panel_only || drag_.page_held_out) return;
+    drag_.page_held_out = true;
+    StackSlot* const source = slot_for(drag_.source_stack);
+    const DockNode* const node = (*workspace_).layout().find_node(drag_.source_stack);
+    if (source != nullptr && node != nullptr) sync_pages(*source, *node);
+}
+
+// The side strips' bands come off the edges first: those of the auto-hidden
+// stacks, then, while collapsing puts stacks behind side tabs on further
+// edges, theirs, planning the collapse again each time (at most once per
+// edge). Fills `edges` (which edges have a band) and `bands`, sets
+// collapsed_, and returns the tree's rectangle.
+Rect DockSite::plan_bands_and_collapse(Size surface, std::array<bool, 4>& edges, std::array<Rect, 4>& bands) {
     for (const StackSlot& slot : stacks_) {
         if (slot.auto_hidden) edges[static_cast<std::size_t>(slot.edge)] = true;
     }
-    std::array<Rect, 4> bands{};
     Rect area = tree_area(surface, edges, bands);
     for (std::size_t attempt = 0; attempt <= edges.size(); ++attempt) {
         collapsed_ = plan_collapse(Size{area.width, area.height});
@@ -1077,8 +1104,12 @@ void DockSite::arrange(Rect final_bounds) {
         if (!added) break;
         area = tree_area(surface, edges, bands);
     }
-    tree_area_ = area;
-    place(site_root(), area, collapsed_);
+    return area;
+}
+
+// Each slot's collapse from this pass's plan, and each view not in the
+// flyout laid out below its caption (or collapsed).
+void DockSite::arrange_stack_views() {
     for (StackSlot& slot : stacks_) {
         if (slot.auto_hidden) {
             slot.collapsed = true;
@@ -1103,6 +1134,11 @@ void DockSite::arrange(Rect final_bounds) {
         }
         set_child_layout(slot.view, content);
     }
+}
+
+// Each edge's band, then the strips brought in line with the slots behind
+// side tabs and laid out in their bands (collapsed while empty).
+void DockSite::arrange_side_strips(const std::array<bool, 4>& edges, const std::array<Rect, 4>& bands) {
     for (std::size_t edge = 0; edge < sides_.size(); ++edge) sides_[edge].band = edges[edge] ? bands[edge] : Rect{};
     sync_side_strips();
     for (const SideStrip& entry : sides_) {
@@ -1111,20 +1147,26 @@ void DockSite::arrange(Rect final_bounds) {
         set_child_layout_collapsed(entry.strip, !shown);
         if (shown) set_child_layout(entry.strip, entry.band);
     }
-    // A collapsed stack's flyout whose stack has room again closes once the
-    // pass is over (the window's popups are not edited during layout).
-    if (flyout_panel_) {
-        const StackSlot* const slot = slot_for(flyout_stack_);
-        const bool behind_tabs = slot != nullptr && ((*slot).auto_hidden || (*slot).side_tabbed);
-        if (!behind_tabs) {
-            schedule_stale_check();
-        } else {
-            place_flyout();
-        }
+}
+
+// A collapsed stack's flyout whose stack has room again closes once the pass
+// is over (the window's popups are not edited during layout); one still
+// behind side tabs follows the pass.
+void DockSite::follow_flyout_after_pass() {
+    if (!flyout_panel_) return;
+    const StackSlot* const slot = slot_for(flyout_stack_);
+    const bool behind_tabs = slot != nullptr && ((*slot).auto_hidden || (*slot).side_tabbed);
+    if (!behind_tabs) {
+        schedule_stale_check();
+    } else {
+        place_flyout();
     }
+}
+
+void DockSite::finish_layout_pass(const PreviousPass& previous, Size surface, bool focus_was_inside) {
     if (keyboard_seam_ >= seams_.size()) keyboard_seam_ = 0U;
-    const bool moved = seams_moved() || previous_collapsed_ != collapsed_ || !(previous_document_area == document_area_) ||
-                       !(previous_tree_area == tree_area_);
+    const bool moved = seams_moved() || previous_collapsed_ != collapsed_ ||
+                       !(previous.document_area == document_area_) || !(previous.tree_area == tree_area_);
     if (moved) invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     // The site takes focus (for its seams) only while it has some, and while
     // a drag runs (for its keys).
@@ -2221,7 +2263,7 @@ std::vector<SemanticNode> DockSite::semantic_virtual_children() const {
         const SeamSlot& slot = seams_[seam];
         SemanticNode node{};
         node.stable_id = seam_identity(slot.split);
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::split_pane;
         node.name = slot.axis == DockAxis::horizontal ? "Vertical seam" : "Horizontal seam";
         node.numeric_value = slot.first;
@@ -2269,7 +2311,7 @@ std::vector<SemanticNode> DockSite::caption_nodes(const StackSlot& slot, std::si
     nodes.reserve(3U);
     SemanticNode menu{};
     menu.stable_id = prefix + ".menu";
-    menu.runtime_id = node_runtime_id(menu.stable_id);
+    menu.runtime_id = virtual_semantic_runtime_id(menu.stable_id);
     menu.role = SemanticRole::menu_button;
     menu.name = "Window position";
     menu.has_popup = true;
@@ -2282,7 +2324,7 @@ std::vector<SemanticNode> DockSite::caption_nodes(const StackSlot& slot, std::si
     if (!placed.pin.empty()) {
         SemanticNode pin{};
         pin.stable_id = prefix + ".pin";
-        pin.runtime_id = node_runtime_id(pin.stable_id);
+        pin.runtime_id = virtual_semantic_runtime_id(pin.stable_id);
         pin.role = SemanticRole::check_box;
         pin.name = "Pinned";
         pin.bounds = to_window(absolute, placed.pin);
@@ -2297,7 +2339,7 @@ std::vector<SemanticNode> DockSite::caption_nodes(const StackSlot& slot, std::si
     }
     SemanticNode close{};
     close.stable_id = prefix + ".close";
-    close.runtime_id = node_runtime_id(close.stable_id);
+    close.runtime_id = virtual_semantic_runtime_id(close.stable_id);
     close.role = SemanticRole::button;
     close.name = "Close";
     close.bounds = to_window(absolute, placed.close);

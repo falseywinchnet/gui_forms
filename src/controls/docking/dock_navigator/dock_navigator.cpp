@@ -23,18 +23,6 @@ constexpr double label_inset = 8.0;
 constexpr std::string_view tool_heading_text = "Active Tool Windows";
 constexpr std::string_view document_heading_text = "Active Files";
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 Rect to_window(Rect absolute, Rect local) noexcept {
     const Rect result{absolute.x + local.x, absolute.y + local.y, local.width, local.height};
     return result;
@@ -374,7 +362,7 @@ std::vector<SemanticNode> DockNavigator::semantic_virtual_children() const {
         const std::vector<DockNavigatorEntry>& held = list_entries(list);
         SemanticNode node{};
         node.stable_id = own + std::string(list_suffix(list));
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list;
         node.name = std::string(names[kind]);
         node.bounds = to_window(absolute, list == DockNavigatorList::tools ? placed.tool_rows : placed.document_rows);
@@ -383,7 +371,7 @@ std::vector<SemanticNode> DockNavigator::semantic_virtual_children() const {
         for (std::size_t index = 0; index < held.size(); ++index) {
             SemanticNode row{};
             row.stable_id = entry_identity(list, held[index].panel);
-            row.runtime_id = node_runtime_id(row.stable_id);
+            row.runtime_id = virtual_semantic_runtime_id(row.stable_id);
             row.role = SemanticRole::list_item;
             row.name = held[index].title;
             row.position_in_set = index + 1U;

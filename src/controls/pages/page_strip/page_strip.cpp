@@ -43,18 +43,6 @@ constexpr double insertion_thickness = 2.0;
 // Widths within this of each other are equal (the shrink pass divides).
 constexpr double width_tolerance = 0.001;
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 // A title shown with mnemonics off keeps every `&`; the page list's menu
 // parses markers, so each `&` is doubled for it.
 std::string literal_menu_text(std::string_view title) {
@@ -1618,6 +1606,28 @@ void PageStrip::request_context_menu(std::size_t position, Point anchor, PageCon
     page_context_menu_requested_.emit(request);
 }
 
+// The keyboard context menu's anchor for the tab at `position`, in window
+// coordinates: the corner of the tab on the content's side where reading
+// starts. A tab that is not laid out (scrolled out of view) is scrolled into
+// view first. One that still has no bounds (under shrink_then_list, or a
+// strip too short to show it) anchors at the same corner of the list
+// button, or of the strip itself when there is no list button.
+Point PageStrip::keyboard_menu_anchor(std::size_t position) {
+    if (layout().tabs[position].bounds.empty()) reveal(position);
+    const Layout& placed = layout();
+    Rect target = placed.tabs[position].bounds;
+    if (target.empty()) target = placed.list_button;
+    if (target.empty()) target = placed.rail;
+    const Rect absolute = absolute_bounds();
+    Point anchor{absolute.x + target.x, absolute.y + target.y + target.height};
+    if (placement_ == PageStripPlacement::bottom) anchor = {absolute.x + target.x, absolute.y + target.y};
+    if (placement_ == PageStripPlacement::left) {
+        anchor = {absolute.x + target.x + target.width, absolute.y + target.y + target.height};
+    }
+    if (placement_ == PageStripPlacement::right) anchor = {absolute.x + target.x, absolute.y + target.y};
+    return anchor;
+}
+
 // A secondary press on a tab, released over the same tab, asks for its
 // context menu at the pointer; it selects nothing.
 void PageStrip::on_secondary_button(PointerEvent& event, Hit hit) {
@@ -1826,16 +1836,8 @@ void PageStrip::on_key(KeyEvent& event) {
         if (!cancel_drag()) return;
     } else if (keys.matches(KeyCommand::context_menu, event)) {
         // Shift+F10 or the context-menu key asks for the keyboard's tab's
-        // context menu, anchored at the corner of the tab on the content's
-        // side where reading starts.
-        const Rect absolute = absolute_bounds();
-        const Rect tab = layout().tabs[current].bounds;
-        Point anchor{absolute.x + tab.x, absolute.y + tab.y + tab.height};
-        if (placement_ == PageStripPlacement::bottom) anchor = {absolute.x + tab.x, absolute.y + tab.y};
-        if (placement_ == PageStripPlacement::left) {
-            anchor = {absolute.x + tab.x + tab.width, absolute.y + tab.y + tab.height};
-        }
-        if (placement_ == PageStripPlacement::right) anchor = {absolute.x + tab.x, absolute.y + tab.y};
+        // context menu.
+        const Point anchor = keyboard_menu_anchor(current);
         request_context_menu(current, anchor, PageContextMenuCause::keyboard);
     } else if (keys.matches(KeyCommand::close_document, event)) {
         // Ctrl+F4 (Cmd+W on macOS) closes the selected closable page (owner
@@ -2040,7 +2042,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         const Rect bounds = placed.tabs[position].bounds;
         SemanticNode node{};
         node.stable_id = tab_identity(record.id);
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
         node.name = placed.tabs[position].label;
         if (record.pinned) node.description = "pinned";
@@ -2073,7 +2075,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         for (std::size_t index = 0; index < scroll_bounds.size(); ++index) {
             SemanticNode button{};
             button.stable_id = strip_id + scroll_ids[index];
-            button.runtime_id = node_runtime_id(button.stable_id);
+            button.runtime_id = virtual_semantic_runtime_id(button.stable_id);
             button.role = SemanticRole::button;
             button.name = scroll_names[index];
             button.bounds = to_window(absolute, scroll_bounds[index]);
@@ -2085,7 +2087,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
     }
     SemanticNode list{};
     list.stable_id = strip_id + ".list_button";
-    list.runtime_id = node_runtime_id(list.stable_id);
+    list.runtime_id = virtual_semantic_runtime_id(list.stable_id);
     list.role = SemanticRole::menu_button;
     list.name = "All pages";
     if (overflow_ == PageStripOverflow::shrink_then_list) list.description = placed.list_count_text + " hidden";
