@@ -443,16 +443,12 @@ void DomainUpDown::publish_part_geometry(std::span<PartGeometry> geometry) const
         record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
     }
     if (spinner_) {
-        const SpinButtons& spin = static_cast<const SpinButtons&>(*spinner_);
-        const SpinHalves halves = spin_halves((*spinner_).committed_arranged_bounds());
-        record.up_arrow = PartGeometry::from_bounds(halves.upper);
-        record.down_arrow = PartGeometry::from_bounds(halves.lower);
-        record.up_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
-        record.down_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
-        record.up_arrow.states = spin.half_states(SpinHalf::upper);
-        record.down_arrow.states = spin.half_states(SpinHalf::lower);
-        record.up_glyph.states = record.up_arrow.states;
-        record.down_glyph.states = record.down_arrow.states;
+        // spinner_ is the SpinButtons initialize_control_tree made.
+        const SpinPartGeometry spin = spin_part_geometry(static_cast<const SpinButtons&>(*spinner_));
+        record.up_arrow = spin.upper_arrow;
+        record.down_arrow = spin.lower_arrow;
+        record.up_glyph = spin.upper_glyph;
+        record.down_glyph = spin.lower_glyph;
     }
     write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
     write_parts(anatomy(), domain_up_down_extra_part_fields, record, geometry);

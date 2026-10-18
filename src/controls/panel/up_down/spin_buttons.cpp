@@ -27,6 +27,20 @@ Rect spin_glyph(Rect half) noexcept {
     return glyph;
 }
 
+SpinPartGeometry spin_part_geometry(const SpinButtons& spin) {
+    const SpinHalves halves = spin_halves(spin.committed_arranged_bounds());
+    SpinPartGeometry parts;
+    parts.upper_arrow = PartGeometry::from_bounds(halves.upper);
+    parts.lower_arrow = PartGeometry::from_bounds(halves.lower);
+    parts.upper_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
+    parts.lower_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
+    parts.upper_arrow.states = spin.half_states(SpinHalf::upper);
+    parts.lower_arrow.states = spin.half_states(SpinHalf::lower);
+    parts.upper_glyph.states = parts.upper_arrow.states;
+    parts.lower_glyph.states = parts.lower_arrow.states;
+    return parts;
+}
+
 SpinButtons::SpinButtons(StableId stable_id) : Control(std::move(stable_id)) {
     set_focusable(false);
     set_cursor(CursorKind::hand);
