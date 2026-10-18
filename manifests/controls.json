@@ -503,6 +503,17 @@
       "doc": "api/generated/gui_forms.PageView.rst"
     },
     {
+      "id": "navigation_pane",
+      "type": "NavigationPane",
+      "header": "gui_forms/controls/pages/navigation_pane/navigation_pane.hpp",
+      "category": "Grouping",
+      "purpose": "Outlook-style navigation pane over its own PageSet: header with collapse, the selected page's control, a grip stepping the large buttons, an overflow icon strip with a configure menu (more, fewer, hidden pages, options event), a collapsed bar with a turned caption opening the content in a popup, and a state record the program saves.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "tabs-and-pages",
+      "doc": "api/generated/gui_forms.NavigationPane.rst"
+    },
+    {
       "id": "tab_page",
       "type": "TabPage",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp",

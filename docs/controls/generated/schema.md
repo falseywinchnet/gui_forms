@@ -1531,6 +1531,62 @@ Properties beyond every control's: none.
 |---|---|
 | `content_requested` | `PageContentRequest` |
 
+## `navigation_pane` (NavigationPane, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `header` | face |  |  |
+| `header_icon` | icon |  |  |
+| `header_label` | caption |  |  |
+| `collapse_button` | actuator | `button` | hot, pressed, focus_visible |
+| `collapse_glyph` | glyph |  | hot, pressed, focus_visible |
+| `content` | well |  |  |
+| `grip_bar` | face |  | hot, captured, focus_visible |
+| `grip` | grip |  | hot, captured, focus_visible |
+| `button_area` | face |  |  |
+| `overflow_area` | face |  |  |
+| `configure_button` | actuator | `button` | hot, pressed, open, focus_visible |
+| `configure_glyph` | glyph |  | hot, pressed, open, focus_visible |
+| `collapsed_bar` | face |  |  |
+| `collapsed_label` | label |  | hot, pressed, open, focus_visible |
+| `popup_shadow` | shadow |  |  |
+| `popup_face` | face |  |  |
+| `popup_header` | face |  |  |
+| `popup_label` | caption |  |  |
+| `popup_content` | well |  |  |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `nav_page`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `nav_page_face` | face |  |  |
+| `nav_page_icon` | icon |  |  |
+| `nav_page_label` | label |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `focus_visible`.
+
+Item system `nav_overflow`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `nav_overflow_face` | face |  |  |
+| `nav_overflow_icon` | icon |  |  |
+| `nav_overflow_label` | label |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `focus_visible`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `options_requested` | `NavigationPaneOptionsRequest` |
+| `state_changed` | `NavigationPaneState` |
+| `popup_open_changed` | `bool` |
+
 ## `tab_page` (TabPage, control)
 
 | Part | Role | Reuses | Own states |

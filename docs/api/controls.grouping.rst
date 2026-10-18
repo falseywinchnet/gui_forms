@@ -30,9 +30,11 @@ Panels, group boxes, cards, tabs and expandable sections.
    * - :cpp:class:`TabControl <gui_forms::TabControl>`
      - A set of pages shown one at a time, chosen from a row of tabs.
    * - :cpp:class:`PageStrip <gui_forms::PageStrip>`
-     - The tab headers of a page set in one row, on the top, bottom, left or right edge of their content.
+     - The tab headers of a page set in one row, at the top or the bottom of their content.
    * - :cpp:class:`PageView <gui_forms::PageView>`
-     - A row of tabs over the selected page's content, in the strip or the document preset.
+     - A row of tabs over the selected page's content: the strip preset of the page view family.
+   * - :cpp:class:`NavigationPane <gui_forms::NavigationPane>`
+     - An Outlook-style navigation pane: the selected page's content above a stack of large page buttons.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
      - One page of a tab control, with the caption shown on its tab.
 
@@ -50,6 +52,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    generated/gui_forms.TabControl
    generated/gui_forms.PageStrip
    generated/gui_forms.PageView
+   generated/gui_forms.NavigationPane
    generated/gui_forms.TabPage
 
 Related types
@@ -65,24 +68,32 @@ Related types
      - CardLayout defines validated logical padding, section gaps, and footer/header allocation used by Card measurement and arrangement.
    * - :cpp:class:`GroupBox::Parts <gui_forms::GroupBox::Parts>`
      - Stage T1 anatomy, as dot members: a face, the frame and the caption.
+   * - :cpp:class:`NavigationPane::Item <gui_forms::NavigationPane::Item>`
+     -  
+   * - :cpp:class:`NavigationPane::ItemStates <gui_forms::NavigationPane::ItemStates>`
+     -  
+   * - :cpp:class:`NavigationPane::PageButtonParts <gui_forms::NavigationPane::PageButtonParts>`
+     - Item system nav_page: a large button.
+   * - :cpp:class:`NavigationPane::PageIconParts <gui_forms::NavigationPane::PageIconParts>`
+     - Item system nav_overflow: an icon.
+   * - :cpp:class:`NavigationPane::Parts <gui_forms::NavigationPane::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`NavigationPaneOptionsRequest <gui_forms::NavigationPaneOptionsRequest>`
+     - "Navigation pane options..." was chosen from the configure menu.
+   * - :cpp:class:`NavigationPaneRestore <gui_forms::NavigationPaneRestore>`
+     - What applying a saved state found: identities the pane's set does not hold (a page the program no longer adds), which were skipped.
+   * - :cpp:class:`NavigationPaneState <gui_forms::NavigationPaneState>`
+     - The part of a navigation pane's state a program saves with its settings (owner decision DK-33: the framework never saves on its own).
    * - :cpp:class:`PageCloseRequest <gui_forms::PageCloseRequest>`
      - A request to close a closable page.
    * - :cpp:class:`PageContentRequest <gui_forms::PageContentRequest>`
      - A selected page has no content yet (owner decision DK-16).
-   * - :cpp:class:`PageContextMenuRequest <gui_forms::PageContextMenuRequest>`
-     - A request for a tab's context menu (PageView study I11).
    * - :cpp:class:`PageControlContent <gui_forms::PageControlContent>`
      - The content of one page of a PageView: the application's control, shown in the view's content area while its page is selected.
-   * - :cpp:class:`PageDoubleClick <gui_forms::PageDoubleClick>`
-     - The second press of a double click landed on a tab's body (not its close button or pin), after the press selected the page (PageView study I12).
-   * - :cpp:class:`PageDragStart <gui_forms::PageDragStart>`
-     - A press on a tab moved past the drag threshold (owner decision DK-39, PageView study I9).
    * - :cpp:class:`PageInvocation <gui_forms::PageInvocation>`
      - A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already).
    * - :cpp:class:`PageItemWidths <gui_forms::PageItemWidths>`
      - Tab widths in logical units at text scale 1.
-   * - :cpp:class:`PagePinRequest <gui_forms::PagePinRequest>`
-     - A request to pin or unpin a page: a click on a pinned tab's pin glyph asks to unpin it.
    * - :cpp:class:`PageStrip::Item <gui_forms::PageStrip::Item>`
      -  
    * - :cpp:class:`PageStrip::ItemParts <gui_forms::PageStrip::ItemParts>`
@@ -93,8 +104,6 @@ Related types
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`PageView::Parts <gui_forms::PageView::Parts>`
      - Stage T1 anatomy, as dot members; its states are Control's.
-   * - :cpp:class:`PageViewOptions <gui_forms::PageViewOptions>`
-     -  
    * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
    * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
@@ -176,11 +185,163 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: NavigationPane::Item final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   .. cpp:member:: NavigationPaneItemKind kind
+
+      Default: ``{NavigationPaneItemKind::large_button}``.
+
+   .. cpp:member:: PagePosition position
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: PageButtonParts button
+
+      The parts of the item's own system; the other record is absent.
+
+   .. cpp:member:: PageIconParts icon
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::ItemStates final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::PageButtonParts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Item system nav_page: a large button.
+
+   .. cpp:member:: PartGeometry nav_page_face
+
+   .. cpp:member:: PartGeometry nav_page_icon
+
+   .. cpp:member:: PartGeometry nav_page_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::PageIconParts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Item system nav_overflow: an icon. A page without an image shows the first character of its title in nav_overflow_label instead.
+
+   .. cpp:member:: PartGeometry nav_overflow_face
+
+   .. cpp:member:: PartGeometry nav_overflow_icon
+
+   .. cpp:member:: PartGeometry nav_overflow_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPane::Parts final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's. The popup parts are in the pane's coordinates although the popup lies outside it, and are present only while it is open.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry header_icon
+
+   .. cpp:member:: PartGeometry header_label
+
+   .. cpp:member:: PartGeometry collapse_button
+
+   .. cpp:member:: PartGeometry collapse_glyph
+
+   .. cpp:member:: PartGeometry content
+
+   .. cpp:member:: PartGeometry grip_bar
+
+   .. cpp:member:: PartGeometry grip
+
+   .. cpp:member:: PartGeometry button_area
+
+   .. cpp:member:: PartGeometry overflow_area
+
+   .. cpp:member:: PartGeometry configure_button
+
+   .. cpp:member:: PartGeometry configure_glyph
+
+   .. cpp:member:: PartGeometry collapsed_bar
+
+   .. cpp:member:: PartGeometry collapsed_label
+
+   .. cpp:member:: PartGeometry popup_shadow
+
+   .. cpp:member:: PartGeometry popup_face
+
+   .. cpp:member:: PartGeometry popup_header
+
+   .. cpp:member:: PartGeometry popup_label
+
+   .. cpp:member:: PartGeometry popup_content
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneOptionsRequest final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   "Navigation pane options..." was chosen from the configure menu. The pane has no options dialog of its own (owner decision DK-39, question P30); the program shows its own.
+
+   .. cpp:member:: std::string pane_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneRestore final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   What applying a saved state found: identities the pane's set does not hold (a page the program no longer adds), which were skipped.
+
+   .. cpp:member:: std::size_t unknown_pages
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: NavigationPaneState final
+
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
+
+   The part of a navigation pane's state a program saves with its settings (owner decision DK-33: the framework never saves on its own). Pages are named by identity; ``page_order`` is the pane's page order and ``hidden_pages`` the pages the user hid from the buttons, in page order. ``button_count`` is the number of large buttons the user chose, which the pane shows as far as its height allows.
+
+   .. cpp:member:: bool collapsed
+
+   .. cpp:member:: std::size_t button_count
+
+   .. cpp:member:: std::vector<PageId> hidden_pages
+
+   .. cpp:member:: std::vector<PageId> page_order
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PageCloseRequest final
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
-   A request to close a closable page. The strip never removes a page itself: whoever owns the set decides (owner decision DK-38). A handler that acts on the request, or refuses it (a document that asks to save and is cancelled), sets ``handled``. A PageView whose close policy is ``remove_when_unhandled`` removes the page after the handlers when none set it; a docking owner only requests.
+   A request to close a closable page. The strip never removes a page itself: whoever owns the set decides (owner decision DK-38). A handler that acts on the request sets ``handled``.
 
    .. cpp:member:: PageId page
 
@@ -202,24 +363,6 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: PageContextMenuRequest final
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   A request for a tab's context menu (PageView study I11). The strip shows no menu of its own; a handler that shows one sets ``handled``. ``anchor`` is in window coordinates: the pointer, or for the keyboard the corner of the tab on the content's side where reading starts.
-
-   .. cpp:member:: PageId page
-
-   .. cpp:member:: Point anchor
-
-   .. cpp:member:: PageContextMenuCause cause
-
-      Default: ``{PageContextMenuCause::pointer}``.
-
-   .. cpp:member:: bool handled
-
-.. cpp:namespace:: gui_forms
-
 .. cpp:class:: PageControlContent final : public PageContent
 
    ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
@@ -237,32 +380,6 @@ Related types
    .. rubric:: Properties
 
    .. cpp:function:: const Control::Ptr& control() const noexcept
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: PageDoubleClick final
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   The second press of a double click landed on a tab's body (not its close button or pin), after the press selected the page (PageView study I12).
-
-   .. cpp:member:: PageId page
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: PageDragStart final
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   A press on a tab moved past the drag threshold (owner decision DK-39, PageView study I9). An owner that takes the drag over (a docking workspace) sets ``claimed``: the strip then gives up the pointer capture, unless the owner has already taken it, and does nothing more with this press; it never reorders. Unclaimed, the strip reorders live when reordering is enabled. Both points are in window coordinates.
-
-   .. cpp:member:: PageId page
-
-   .. cpp:member:: Point press_point
-
-   .. cpp:member:: Point pointer
-
-   .. cpp:member:: bool claimed
 
 .. cpp:namespace:: gui_forms
 
@@ -304,20 +421,6 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:struct:: PagePinRequest final
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   A request to pin or unpin a page: a click on a pinned tab's pin glyph asks to unpin it. When no handler sets ``handled``, the strip applies it to the set (PageSet::set_pinned).
-
-   .. cpp:member:: PageId page
-
-   .. cpp:member:: bool pinned
-
-   .. cpp:member:: bool handled
-
-.. cpp:namespace:: gui_forms
-
 .. cpp:struct:: PageStrip::Item final
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
@@ -340,27 +443,13 @@ Related types
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
-   Item part names start with tab: an item part may not repeat one of the strip's own part names. The close button, the pin and the modified dot share one slot after the label; at most one of them is present.
+   Item part names start with tab: an item part may not repeat one of the strip's own part names. Phase P4 adds the close and pin actuators and the modified mark in the space after the label.
 
    .. cpp:member:: PartGeometry tab
 
    .. cpp:member:: PartGeometry tab_icon
 
    .. cpp:member:: PartGeometry tab_label
-
-   .. cpp:member:: PartGeometry tab_modified
-
-      The dot of a modified page, while its close button is not shown.
-
-   .. cpp:member:: PartGeometry tab_close
-
-   .. cpp:member:: PartGeometry tab_close_glyph
-
-   .. cpp:member:: PartGeometry tab_pin
-
-      A pinned tab's pin, shown in place of the close button while the tab is expanded.
-
-   .. cpp:member:: PartGeometry tab_pin_glyph
 
    .. cpp:member:: PartGeometry tab_seam
 
@@ -384,15 +473,9 @@ Related types
 
    .. cpp:member:: bool focus_visible
 
-   .. cpp:member:: bool captured
-
-      The tab is being dragged in a live reorder.
-
    .. cpp:member:: bool pinned
 
-      The admitted custom states (DK-35, DK-40): the page is in the pinned group; its content has unsaved changes.
-
-   .. cpp:member:: bool modified
+      The admitted custom state (DK-40): the page is in the pinned group.
 
 .. cpp:namespace:: gui_forms
 
@@ -418,15 +501,7 @@ Related types
 
    .. cpp:member:: PartGeometry list_button
 
-   .. cpp:member:: PartGeometry list_count
-
-      The count of hidden pages on the list button (``shrink_then_list``).
-
    .. cpp:member:: PartGeometry list_glyph
-
-   .. cpp:member:: PartGeometry insertion_mark
-
-      The gap bar a claimant shows while dropping a page into the strip.
 
    .. cpp:member:: PartGeometry focus
 
@@ -449,24 +524,6 @@ Related types
       The selected page's content area.
 
    .. cpp:member:: PartGeometry focus
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:struct:: PageViewOptions final
-
-   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
-
-   .. cpp:member:: PageViewPreset preset
-
-      Default: ``{PageViewPreset::strip}``.
-
-   .. cpp:member:: bool pinning_enabled
-
-      Pinned tabs (owner decision DK-31) are opt-in. Default: ``{false}``.
-
-   .. cpp:member:: std::size_t capacity
-
-      As PageSetOptions::capacity. Default: ``{PageSetLimits::default_capacity}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -575,15 +632,13 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:enum-class:: PageCloseButtons
+.. cpp:enum-class:: NavigationPaneItemKind
 
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+   ``#include <gui_forms/controls/pages/navigation_pane/navigation_pane.hpp>``
 
-   .. cpp:enumerator:: none
+   .. cpp:enumerator:: large_button
 
-   .. cpp:enumerator:: selected_and_hot
-
-   .. cpp:enumerator:: all
+   .. cpp:enumerator:: icon
 
 .. cpp:namespace:: gui_forms
 
@@ -593,21 +648,9 @@ Enumerations
 
    .. cpp:enumerator:: pointer
 
-   .. cpp:enumerator:: middle_button
-
    .. cpp:enumerator:: keyboard
 
    .. cpp:enumerator:: semantic
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:enum-class:: PageContextMenuCause
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   .. cpp:enumerator:: pointer
-
-   .. cpp:enumerator:: keyboard
 
 .. cpp:namespace:: gui_forms
 
@@ -623,20 +666,6 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
-.. cpp:enum-class:: PageStrip::DragState::Phase
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   .. cpp:enumerator:: idle
-
-   .. cpp:enumerator:: armed
-
-   .. cpp:enumerator:: sliding
-
-   .. cpp:enumerator:: claimed
-
-.. cpp:namespace:: gui_forms
-
 .. cpp:enum-class:: PageStripActivation
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
@@ -644,16 +673,6 @@ Enumerations
    .. cpp:enumerator:: automatic
 
    .. cpp:enumerator:: manual
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:enum-class:: PageStripOverflow
-
-   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-   .. cpp:enumerator:: scroll
-
-   .. cpp:enumerator:: shrink_then_list
 
 .. cpp:namespace:: gui_forms
 
@@ -665,20 +684,6 @@ Enumerations
 
    .. cpp:enumerator:: bottom
 
-   .. cpp:enumerator:: left
-
-   .. cpp:enumerator:: right
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:enum-class:: PageViewClosePolicy
-
-   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
-
-   .. cpp:enumerator:: remove_when_unhandled
-
-   .. cpp:enumerator:: request_only
-
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: PageViewCtrlTab
@@ -688,16 +693,6 @@ Enumerations
    .. cpp:enumerator:: select_next
 
    .. cpp:enumerator:: pass
-
-.. cpp:namespace:: gui_forms
-
-.. cpp:enum-class:: PageViewPreset
-
-   ``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
-
-   .. cpp:enumerator:: strip
-
-   .. cpp:enumerator:: document
 
 .. cpp:namespace:: gui_forms
 
@@ -724,22 +719,3 @@ Enumerations
    .. cpp:enumerator:: buttons
 
    .. cpp:enumerator:: flat_buttons
-
-Functions, constants and aliases
---------------------------------
-
-.. cpp:namespace:: gui_forms
-
-``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
-
-.. cpp:var:: constexpr double page_drag_threshold
-
-   How far a press on a tab must move, along either axis and in logical units, before it becomes a drag (owner decision DK-26). Value: ``4.0``.
-
-.. cpp:namespace:: gui_forms
-
-``#include <gui_forms/controls/pages/page_view/page_view.hpp>``
-
-.. cpp:function:: PageSetOptions page_set_options(const PageViewOptions& options) noexcept
-
-   The set options a view's options give: pinning and capacity as stated, and the preset's selection after a close (strip: neighbour; document: most recent, owner decision DK-37).

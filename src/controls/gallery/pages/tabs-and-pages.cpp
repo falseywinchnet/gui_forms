@@ -24,6 +24,7 @@ public:
         build_view(page);
         build_documents(page);
         build_side_strips(page);
+        build_navigation(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
         on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
@@ -329,6 +330,51 @@ private:
         (*view_status_).set_text("Created " + request.page.value + " on its first selection");
     }
 
+    // A NavigationPane: six pages with content, four large buttons, the
+    // overflow icons and the configure menu; collapsing it shows the bar and
+    // the popup. Its state is shown as the program would save it.
+    void build_navigation(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> navigation_group = group(
+            "gallery.tabs.navigation.group", "NavigationPane · grip, overflow strip, configure menu and collapse",
+            {930.0, 380.0});
+        (*page).add_at(navigation_group, {24.0, 1616.0, 930.0, 380.0});
+        navigation_ = make_control<NavigationPane>(StableId("gallery.tabs.navigation"));
+        (*navigation_).set_accessible_name("Gallery navigation");
+        (*navigation_group).add_at(navigation_, {20.0, 36.0, 240.0, 324.0});
+        (*navigation_).set_expanded_width(240.0);
+        PageSet& pages = (*navigation_).pages();
+        constexpr std::array<std::string_view, 6> ids{"mail", "calendar", "contacts", "tasks", "notes", "folders"};
+        constexpr std::array<std::string_view, 6> titles{"Mail", "Calendar", "Contacts", "Tasks", "Notes", "Folders"};
+        for (std::size_t index = 0U; index < ids.size(); ++index) {
+            PageRecord record{};
+            record.id = PageId{std::string(ids[index])};
+            record.title = std::string(titles[index]);
+            static_cast<void>(pages.insert(record, PagePlacement::end_of_group()));
+            std::shared_ptr<Label> content = label(
+                "gallery.tabs.navigation.content." + std::string(ids[index]),
+                std::string(titles[index]) + " · the selected page's control", 11.0, 400, ink);
+            std::unique_ptr<PageContent> held = std::make_unique<PageControlContent>(content);
+            static_cast<void>(pages.set_content(record.id, held));
+        }
+        static_cast<void>((*navigation_).set_page_hidden(PageId{"notes"}, true));
+        navigation_status_ = label("gallery.tabs.navigation.status",
+                                   "Drag the grip or use the configure menu; Notes is hidden", 11.0, 600, green);
+        (*navigation_group).add_at(navigation_status_, {290.0, 40.0, 620.0, 44.0});
+        on((*navigation_).state_changed(), *this, &TabsPage::on_navigation_state);
+        on((*navigation_).options_requested(), *this, &TabsPage::on_navigation_options);
+    }
+
+    void on_navigation_state(const NavigationPaneState& state) {
+        std::string text = state.collapsed ? "Collapsed" : "Expanded";
+        text += " · " + std::to_string(state.button_count) + " large buttons · " +
+                std::to_string(state.hidden_pages.size()) + " hidden";
+        (*navigation_status_).set_text(text);
+    }
+
+    void on_navigation_options(const NavigationPaneOptionsRequest&) {
+        (*navigation_status_).set_text("Options requested · the program shows its own dialog");
+    }
+
     void on_strip_invoked(const PageInvocation& invocation) {
         const std::optional<PagePosition> found = strip_pages_.find(invocation.page);
         if (!found) return;
@@ -371,6 +417,8 @@ private:
     std::shared_ptr<PageView> documents_;
     std::shared_ptr<Label> documents_status_;
     std::array<std::shared_ptr<PageView>, 2> side_views_{};
+    std::shared_ptr<NavigationPane> navigation_;
+    std::shared_ptr<Label> navigation_status_;
     Value<bool> activity_visible_{true};
 };
 
