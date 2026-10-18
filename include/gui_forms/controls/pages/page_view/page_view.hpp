@@ -38,6 +38,33 @@ private:
 // takes it). Ctrl+PageDown and Ctrl+PageUp select in every view.
 enum class PageViewCtrlTab : std::uint8_t { select_next, pass };
 
+// The presentation a view starts from (owner decision DK-15). `strip`:
+// content-sized tabs, scroll and list overflow, mnemonics, no close buttons,
+// selection after a close by neighbour. `document` (DK-31, DK-38): close
+// buttons on the selected and hot tabs, shrink then list overflow, no
+// mnemonics (titles are data), selection after a close by most recent
+// activation. The navigation preset is phase P8's.
+enum class PageViewPreset : std::uint8_t { strip, document };
+
+// What a view does with a close request no handler took (owner decision
+// DK-38). `remove_when_unhandled`, the default: the view removes the page.
+// `request_only`, for an owner that decides (a docking workspace): the view
+// never removes a page itself.
+enum class PageViewClosePolicy : std::uint8_t { remove_when_unhandled, request_only };
+
+struct PageViewOptions final {
+    PageViewPreset preset{PageViewPreset::strip};
+    // Pinned tabs (owner decision DK-31) are opt-in.
+    bool pinning_enabled{false};
+    // As PageSetOptions::capacity.
+    std::size_t capacity{PageSetLimits::default_capacity};
+};
+
+// The set options a view's options give: pinning and capacity as stated, and
+// the preset's selection after a close (strip: neighbour; document: most
+// recent, owner decision DK-37).
+[[nodiscard]] PageSetOptions page_set_options(const PageViewOptions& options) noexcept;
+
 // A selected page has no content yet (owner decision DK-16). A handler
 // supplies it with `set_page_content` (or the set's `set_content`); a page
 // left without content shows an empty content area and is not asked again.
@@ -46,10 +73,15 @@ struct PageContentRequest final {
 };
 
 // A PageStrip over its own PageSet, and a content area showing the selected
-// page's control (owner decisions DK-13 to DK-16): the strip preset, with
-// content-sized tabs at the top, scroll and list overflow, mnemonics and
-// automatic selection. The document and navigation presets are phases P4
-// and P8.
+// page's control (owner decisions DK-13 to DK-16), in the strip or document
+// preset (see PageViewPreset). The preset sets the strip's settings once,
+// when the view is made; they may be changed on the strip afterwards.
+//
+// Closing (owner decision DK-38): the strip raises `page_close_requested`
+// for the close button, a middle click, Ctrl+F4 and the semantic close
+// action; Ctrl+F4 is handled anywhere inside the view, as Ctrl+PageDown is.
+// When no handler sets `handled`, the close policy decides. Removing the
+// selected page selects another by the set's fallback.
 //
 // The view owns its set and the strip borrows it; the view releases the
 // strip when it is destroyed. Each page with content is shown in a panel the
@@ -71,7 +103,11 @@ struct PageContentRequest final {
 class PageView : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
+    // The strip preset over a set made with `options`.
     explicit PageView(StableId stable_id, PageSetOptions options = {});
+    // The preset, over a set made with the options `page_set_options` gives.
+    // Throws std::invalid_argument for an invalid preset.
+    PageView(StableId stable_id, PageViewOptions options);
     ~PageView() override;
     // Creates the strip. `make_control` calls it; do not call it yourself.
     void initialize_control_tree();
@@ -93,6 +129,10 @@ public:
     // The stable identity of the page's tab panel, or empty when the page has
     // no content shown by this view.
     [[nodiscard]] std::string panel_identity(const PageId& page) const;
+
+    [[nodiscard]] PageViewPreset preset() const noexcept { return preset_; }
+    [[nodiscard]] PageViewClosePolicy close_policy() const noexcept { return close_policy_; }
+    void set_close_policy(PageViewClosePolicy policy);
 
     [[nodiscard]] PageViewCtrlTab ctrl_tab() const noexcept { return ctrl_tab_; }
     void set_ctrl_tab(PageViewCtrlTab policy);
@@ -158,6 +198,8 @@ private:
     void on_selection_changed(const PageSelectionChange& change);
 
     PageSet pages_;
+    PageViewPreset preset_{PageViewPreset::strip};
+    PageViewClosePolicy close_policy_{PageViewClosePolicy::remove_when_unhandled};
     std::shared_ptr<PageStrip> strip_{};
     // One per page of the set (reconciled on every change), in no order.
     std::vector<PageSlot> slots_{};

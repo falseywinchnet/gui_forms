@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <utility>
 
@@ -28,6 +29,17 @@ constexpr double button_width = 16.0;
 constexpr double glyph_size = 7.0;
 constexpr double seam_thickness = 1.0;
 constexpr double focus_inset = 2.0;
+// The slot after a tab's label: a square for the close button or the pin,
+// with the modified dot centred in it, and the gap before it.
+constexpr double slot_gap = 4.0;
+constexpr double slot_size = 14.0;
+constexpr double dot_size = 6.0;
+// The list button under shrink_then_list: padding, the count of hidden pages,
+// a gap, the down arrow, padding.
+constexpr double list_padding = 4.0;
+constexpr double count_glyph_gap = 2.0;
+// Widths within this of each other are equal (the shrink pass divides).
+constexpr double width_tolerance = 0.001;
 
 // Virtual semantic children carry a runtime ID derived from their stable ID,
 // in the high half so it never meets a control's own runtime ID.
@@ -69,9 +81,9 @@ bool valid_widths(const PageItemWidths& widths) noexcept {
     return result;
 }
 
-// The pinned custom state is the first (and only) custom state of the page
-// item system.
+// The page item system's custom states, in declaration order.
 constexpr CustomStateIndex pinned_state{0U};
+constexpr CustomStateIndex modified_state{1U};
 
 } // namespace
 
@@ -106,16 +118,22 @@ void PageStrip::release_page_set() noexcept {
     selection_token_.disconnect();
     pages_ = nullptr;
     keyboard_page_.reset();
+    middle_pressed_.reset();
     hot_ = {};
     pressed_ = {};
     first_visible_ = 0U;
+    widths_frozen_ = false;
+    frozen_widths_.clear();
     ++settings_revision_;
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
 // -- settings ------------------------------------------------------------------
 
+// A setting changed: frozen widths thaw and the layout is recomputed.
 void PageStrip::bump_settings() {
+    widths_frozen_ = false;
+    frozen_widths_.clear();
     ++settings_revision_;
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -164,6 +182,29 @@ void PageStrip::set_activation(PageStripActivation activation) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void PageStrip::set_overflow(PageStripOverflow overflow) {
+    require_mutable();
+    if (overflow != PageStripOverflow::scroll && overflow != PageStripOverflow::shrink_then_list) {
+        throw std::invalid_argument("PageStrip overflow is invalid");
+    }
+    if (overflow_ == overflow) return;
+    overflow_ = overflow;
+    first_visible_ = 0U;
+    close_page_list();
+    bump_settings();
+}
+
+void PageStrip::set_close_buttons(PageCloseButtons buttons) {
+    require_mutable();
+    if (buttons != PageCloseButtons::none && buttons != PageCloseButtons::selected_and_hot &&
+        buttons != PageCloseButtons::all) {
+        throw std::invalid_argument("PageStrip close buttons are invalid");
+    }
+    if (close_buttons_ == buttons) return;
+    close_buttons_ = buttons;
+    bump_settings();
+}
+
 void PageStrip::set_mnemonics_enabled(bool enabled) {
     require_mutable();
     if (mnemonics_enabled_ == enabled) return;
@@ -176,6 +217,8 @@ void PageStrip::set_font(FontSpec font) {
     if (!valid_font_spec(font)) throw std::invalid_argument("PageStrip font specification is invalid");
     if (font_ == font) return;
     font_ = font;
+    widths_frozen_ = false;
+    frozen_widths_.clear();
     ++settings_revision_;
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -214,7 +257,8 @@ void PageStrip::on_attached_to_window() {
 void PageStrip::on_pages_changed(const PageSetChange& change) {
     if (pages_ == nullptr) return;
     if (keyboard_page_ && !(*pages_).find(*keyboard_page_)) keyboard_page_ = (*pages_).selected_page();
-    const bool hot_stale = hot_.zone == Zone::tab && hot_.position >= (*pages_).count();
+    if (middle_pressed_ && !(*pages_).find(*middle_pressed_)) middle_pressed_.reset();
+    const bool hot_stale = hot_.zone != Zone::none && hot_.position >= (*pages_).count();
     if (hot_stale || change.membership || change.order) hot_ = {};
     if (change.membership || change.order) {
         pressed_ = {};
@@ -239,8 +283,16 @@ Size PageStrip::measure(Size available) {
     return result;
 }
 
+// A new size thaws frozen widths: they were kept for the old one.
 void PageStrip::arrange(Rect final_bounds) {
+    const Rect before = client_rectangle();
     arrange_self(final_bounds);
+    const bool resized = before.width != final_bounds.width || before.height != final_bounds.height;
+    if (resized && widths_frozen_) {
+        widths_frozen_ = false;
+        frozen_widths_.clear();
+        ++settings_revision_;
+    }
 }
 
 double PageStrip::item_extent_scale() const noexcept {
@@ -260,6 +312,12 @@ PageStrip::LayoutKey PageStrip::current_key() const {
         key.set_revision = (*pages_).revision();
         key.page_count = (*pages_).count();
     }
+    key.expanded = key.page_count;
+    const bool on_tab = hot_.zone == Zone::tab || hot_.zone == Zone::tab_close || hot_.zone == Zone::tab_pin;
+    if (key.bound && on_tab && hot_.position < key.page_count &&
+        (*pages_).record_at(PagePosition{hot_.position}).pinned) {
+        key.expanded = hot_.position;
+    }
     return key;
 }
 
@@ -269,7 +327,10 @@ const PageStrip::Layout& PageStrip::layout() const {
     return layout_;
 }
 
-// Fills each slot's label, icon flag and width (before fill sharing).
+// Fills each slot's label, flags and natural width (before fill sharing,
+// frozen widths and shrinking). A pinned tab with an icon is collapsed to
+// it unless it is the hot one; a pinned page without an image has nothing
+// smaller to show and keeps its label.
 void PageStrip::measure_tabs() const {
     const double scale = item_extent_scale();
     const FontSpec font = effective_font(font_);
@@ -277,26 +338,55 @@ void PageStrip::measure_tabs() const {
     const double minimum = item_widths_.minimum * scale;
     const double maximum = item_widths_.maximum * scale;
     const double fixed = item_widths_.fixed * scale;
+    const double padding = tab_padding * scale;
+    const double slot = (slot_gap + slot_size) * scale;
+    const bool close_reserved = close_buttons_ != PageCloseButtons::none;
     const std::size_t count = layout_.tabs.size();
     for (std::size_t position = 0; position < count; ++position) {
         const PageRecord& record = (*pages_).record_at(PagePosition{position});
-        TabSlot& slot = layout_.tabs[position];
+        TabSlot& tab = layout_.tabs[position];
         if (mnemonics_enabled_) {
-            slot.label = parse_mnemonic_text(record.title).display_text;
+            tab.label = parse_mnemonic_text(record.title).display_text;
         } else {
-            slot.label = record.title;
+            tab.label = record.title;
         }
-        slot.has_icon = images && !record.image_key.empty() && (*image_list_).contains_key(record.image_key);
-        slot.bounds = {};
-        if (item_sizing_ == PageItemSizing::fixed) {
-            slot.width = fixed;
-            continue;
+        tab.has_icon = images && !record.image_key.empty() && (*image_list_).contains_key(record.image_key);
+        tab.pinned = record.pinned;
+        tab.reserves_slot = record.pinned || record.modified || (close_reserved && record.closable);
+        tab.collapsed = record.pinned && tab.has_icon && position != layout_.key.expanded;
+        tab.settled = false;
+        tab.bounds = {};
+        double natural = fixed;
+        if (tab.collapsed) {
+            natural = padding * 2.0 + image_size * scale;
+        } else if (item_sizing_ != PageItemSizing::fixed) {
+            double content = padding * 2.0;
+            if (tab.has_icon) content += image_size * scale;
+            if (tab.has_icon && !tab.label.empty()) content += image_text_gap * scale;
+            if (!tab.label.empty()) content += resolve_text_layout_utf8(tab.label, font).logical_size.width;
+            if (tab.reserves_slot) content += slot;
+            natural = std::clamp(content, minimum, maximum);
         }
-        double content = tab_padding * scale * 2.0;
-        if (slot.has_icon) content += image_size * scale;
-        if (slot.has_icon && !slot.label.empty()) content += image_text_gap * scale;
-        if (!slot.label.empty()) content += resolve_text_layout_utf8(slot.label, font).logical_size.width;
-        slot.width = std::clamp(content, minimum, maximum);
+        tab.natural = natural;
+        tab.width = natural;
+    }
+}
+
+// While widths are frozen, every ordinary tab whose page had a tab when they
+// froze keeps that width; others keep their measured width.
+void PageStrip::apply_frozen_widths() const {
+    if (!widths_frozen_) return;
+    const std::size_t count = layout_.tabs.size();
+    for (std::size_t position = 0; position < count; ++position) {
+        TabSlot& tab = layout_.tabs[position];
+        if (tab.pinned) continue;
+        const PageId& page = (*pages_).record_at(PagePosition{position}).id;
+        for (const FrozenWidth& frozen : frozen_widths_) {
+            if (frozen.page != page) continue;
+            tab.width = frozen.width;
+            tab.natural = frozen.width;
+            break;
+        }
     }
 }
 
@@ -312,82 +402,119 @@ std::size_t PageStrip::first_showing(std::size_t target, double area) const {
     return first;
 }
 
+// The band a tab or button occupies: `length` along the row from `start`,
+// across it from the edge away from the content (less the away gap) to the
+// content's edge.
+Rect PageStrip::band_rect(double start, double length) const {
+    const double gap = away_gap * layout_.key.scale;
+    const double thickness = layout_.key.surface.height;
+    const double top = placement_ == PageStripPlacement::top ? gap : 0.0;
+    const Rect band{start, top, length, std::max(0.0, thickness - gap)};
+    return band;
+}
+
 // Lays out whole tabs from `first_visible` while they fit in `area` after
 // `start`; the first tab always shows, cut to the area when it is wider.
 void PageStrip::place_tabs(double start, double area) const {
-    const double scale = item_extent_scale();
-    const double height = layout_.key.surface.height;
-    const double gap = away_gap * scale;
-    const double tab_top = placement_ == PageStripPlacement::top ? gap : 0.0;
-    const double tab_height = std::max(0.0, height - gap);
     const double end = start + area;
     const std::size_t count = layout_.tabs.size();
     double x = start;
-    layout_.visible_count = 0U;
     for (std::size_t position = layout_.first_visible; position < count; ++position) {
         const double width = layout_.tabs[position].width;
         if (position > layout_.first_visible && x + width > end) break;
         const double shown = std::min(width, end - x);
         if (shown <= 0.0) break;
-        layout_.tabs[position].bounds = {x, tab_top, shown, tab_height};
-        ++layout_.visible_count;
+        layout_.tabs[position].bounds = band_rect(x, shown);
+        layout_.visible.push_back(position);
         x += width;
     }
 }
 
-void PageStrip::compute_layout(const LayoutKey& key) const {
-    // Anything but a scroll scrolls the selected (or keyboard) page back
-    // into view.
-    const LayoutKey previous = layout_.key;
-    const bool scroll_only = layout_.valid && previous.surface == key.surface && previous.scale == key.scale &&
-                             previous.set_revision == key.set_revision &&
-                             previous.settings_revision == key.settings_revision &&
-                             previous.page_count == key.page_count && previous.bound == key.bound;
-    layout_.key = key;
-    layout_.valid = true;
-    layout_.rail = {0.0, 0.0, key.surface.width, key.surface.height};
-    layout_.scroll_back = {};
-    layout_.scroll_forward = {};
-    layout_.list_button = {};
-    layout_.first_visible = 0U;
-    layout_.visible_count = 0U;
-    layout_.last_first = 0U;
-    layout_.overflow = false;
-    layout_.selected = selected_position();
-    const std::size_t count = key.bound ? key.page_count : 0U;
-    layout_.tabs.resize(count);
-    if (count == 0U) {
-        first_visible_ = 0U;
-        return;
+// Places the tabs already listed in `visible`, in that order, from `start`
+// to the list button (or the strip's end); a tab reaching past it is cut to
+// it and those after it are dropped.
+void PageStrip::place_visible(double start) const {
+    const double end = layout_.overflow ? layout_.list_button.x
+                                        : layout_.key.surface.width - edge_inset * layout_.key.scale;
+    double x = start;
+    std::size_t placed = 0U;
+    for (; placed < layout_.visible.size(); ++placed) {
+        TabSlot& tab = layout_.tabs[layout_.visible[placed]];
+        const double shown = std::min(tab.width, end - x);
+        if (shown <= 0.0) break;
+        tab.bounds = band_rect(x, shown);
+        x += tab.width;
     }
-    measure_tabs();
-    const double scale = key.scale;
+    layout_.visible.resize(placed);
+}
+
+// The width the widest tabs are cut to so that the ordinary tabs in
+// [begin, end), and `extra` when given, fill `area`: the widest shrink first
+// and narrower tabs keep their width (water filling: each round, the tabs no
+// wider than an equal share of what is left keep their width and leave the
+// share). The largest double when they fit without cutting.
+double PageStrip::shrink_cap(std::size_t begin, std::size_t end, double area,
+                             std::optional<std::size_t> extra) const {
+    std::size_t remaining = end - begin;
+    if (extra) ++remaining;
+    double natural = 0.0;
+    for (std::size_t position = begin; position < end; ++position) {
+        layout_.tabs[position].settled = false;
+        natural += layout_.tabs[position].width;
+    }
+    if (extra) {
+        layout_.tabs[*extra].settled = false;
+        natural += layout_.tabs[*extra].width;
+    }
+    if (remaining == 0U || natural <= area) return std::numeric_limits<double>::max();
+    double left = area;
+    double cap = left / static_cast<double>(remaining);
+    bool changed = true;
+    while (changed && remaining > 0U) {
+        changed = false;
+        cap = left / static_cast<double>(remaining);
+        for (std::size_t position = begin; position < end; ++position) {
+            TabSlot& tab = layout_.tabs[position];
+            if (tab.settled || tab.width > cap) continue;
+            tab.settled = true;
+            left -= tab.width;
+            --remaining;
+            changed = true;
+        }
+        if (extra && !layout_.tabs[*extra].settled && layout_.tabs[*extra].width <= cap) {
+            layout_.tabs[*extra].settled = true;
+            left -= layout_.tabs[*extra].width;
+            --remaining;
+            changed = true;
+        }
+    }
+    if (remaining == 0U) return std::numeric_limits<double>::max();
+    const double result = std::max(0.0, cap);
+    return result;
+}
+
+// The strip policy: whole tabs from the scroll position, and scroll back,
+// scroll forward and list buttons at the end when they do not all fit.
+void PageStrip::layout_scroll(bool scroll_only) const {
+    const double scale = layout_.key.scale;
     const double inset = edge_inset * scale;
-    const double available = std::max(0.0, key.surface.width - inset * 2.0);
-    if (item_sizing_ == PageItemSizing::fill) {
-        const double share = available / static_cast<double>(count);
-        const double width = std::clamp(share, item_widths_.minimum * scale, item_widths_.maximum * scale);
-        for (TabSlot& slot : layout_.tabs) slot.width = width;
-    }
+    const double available = std::max(0.0, layout_.key.surface.width - inset * 2.0);
+    const std::size_t count = layout_.tabs.size();
     double total = 0.0;
-    for (const TabSlot& slot : layout_.tabs) total += slot.width;
+    for (const TabSlot& tab : layout_.tabs) total += tab.width;
     if (total <= available) {
         first_visible_ = 0U;
         place_tabs(inset, available);
         return;
     }
-    // Overflow (the strip policy): scroll back, scroll forward and the list
-    // button at the end, the tabs in the area before them.
     layout_.overflow = true;
     const double buttons = button_width * scale;
     const double area = std::max(0.0, available - buttons * 3.0);
-    const double gap = away_gap * scale;
-    const double band_top = placement_ == PageStripPlacement::top ? gap : 0.0;
-    const double band_height = std::max(0.0, key.surface.height - gap);
-    const double end = key.surface.width - inset;
-    layout_.scroll_back = {end - buttons * 3.0, band_top, buttons, band_height};
-    layout_.scroll_forward = {end - buttons * 2.0, band_top, buttons, band_height};
-    layout_.list_button = {end - buttons, band_top, buttons, band_height};
+    const double end = layout_.key.surface.width - inset;
+    layout_.scroll_back = band_rect(end - buttons * 3.0, buttons);
+    layout_.scroll_forward = band_rect(end - buttons * 2.0, buttons);
+    layout_.list_button = band_rect(end - buttons, buttons);
+    layout_.list_glyph = glyph_bounds(layout_.list_button);
     layout_.last_first = first_showing(count - 1U, area);
     std::size_t first = std::min(first_visible_, layout_.last_first);
     std::optional<std::size_t> target = layout_.selected;
@@ -408,31 +535,236 @@ void PageStrip::compute_layout(const LayoutKey& key) const {
     place_tabs(inset, area);
 }
 
+// The document policy: pinned tabs at their width, then the ordinary tabs
+// shrunk towards the minimum, the widest first; when even the minimum does
+// not fit, the front run of ordinary tabs that fits (at the minimum, then
+// widened to fill the row), the selected page after it when it would be
+// hidden, and the list button with the count of the rest.
+void PageStrip::layout_shrink() const {
+    const double scale = layout_.key.scale;
+    const double inset = edge_inset * scale;
+    const double available = std::max(0.0, layout_.key.surface.width - inset * 2.0);
+    const std::size_t count = layout_.tabs.size();
+    const std::size_t pinned = std::min((*pages_).pinned_count(), count);
+    double pinned_total = 0.0;
+    for (std::size_t position = 0; position < pinned; ++position) pinned_total += layout_.tabs[position].width;
+    const double ordinary_area = std::max(0.0, available - pinned_total);
+    double natural_total = 0.0;
+    for (std::size_t position = pinned; position < count; ++position) {
+        natural_total += layout_.tabs[position].width;
+    }
+    const double minimum = item_widths_.minimum * scale;
+    layout_.front_end = count;
+    bool fits = natural_total <= ordinary_area;
+    if (!fits && !widths_frozen_) {
+        const double cap = shrink_cap(pinned, count, ordinary_area, std::nullopt);
+        fits = cap >= minimum - width_tolerance;
+        if (fits) {
+            for (std::size_t position = pinned; position < count; ++position) {
+                layout_.tabs[position].width = std::min(layout_.tabs[position].width, cap);
+            }
+        }
+    }
+    if (fits) {
+        for (std::size_t position = 0; position < count; ++position) layout_.visible.push_back(position);
+        place_visible(inset);
+        return;
+    }
+    // Overflow: the list button at the strip's end, sized for the largest
+    // count it can show so it does not move as the count changes.
+    layout_.overflow = true;
+    const FontSpec font = effective_font(font_);
+    const std::string widest = std::to_string(count - pinned);
+    const double count_width = resolve_text_layout_utf8(widest, font).logical_size.width;
+    const double list_width = (list_padding * 2.0 + count_glyph_gap + glyph_size) * scale + count_width;
+    const double end = layout_.key.surface.width - inset;
+    layout_.list_button = band_rect(end - list_width, list_width);
+    const Rect button = layout_.list_button;
+    layout_.list_count = {button.x + list_padding * scale, button.y, count_width, button.height};
+    const Rect arrow{layout_.list_count.x + count_width + count_glyph_gap * scale, button.y, glyph_size * scale,
+                     button.height};
+    layout_.list_glyph = glyph_bounds(arrow);
+    const double area = std::max(0.0, ordinary_area - list_width);
+    // The front run at the minimum (frozen tabs keep their width).
+    double used = 0.0;
+    std::size_t front = pinned;
+    while (front < count) {
+        const double least = widths_frozen_ ? layout_.tabs[front].width : std::min(layout_.tabs[front].width, minimum);
+        if (used + least > area) break;
+        used += least;
+        ++front;
+    }
+    std::optional<std::size_t> target = layout_.selected;
+    if (focused_ && activation_ == PageStripActivation::manual) target = keyboard_position();
+    std::optional<std::size_t> extra{};
+    if (target && *target >= front) {
+        const double least = widths_frozen_ ? layout_.tabs[*target].width
+                                            : std::min(layout_.tabs[*target].width, minimum);
+        used += least;
+        while (front > pinned && used > area) {
+            --front;
+            const double dropped = widths_frozen_ ? layout_.tabs[front].width
+                                                  : std::min(layout_.tabs[front].width, minimum);
+            used -= dropped;
+        }
+        extra = *target;
+    }
+    layout_.front_end = front;
+    if (!widths_frozen_) {
+        const double cap = shrink_cap(pinned, front, area, extra);
+        for (std::size_t position = pinned; position < front; ++position) {
+            layout_.tabs[position].width = std::min(layout_.tabs[position].width, cap);
+        }
+        if (extra) layout_.tabs[*extra].width = std::min(layout_.tabs[*extra].width, cap);
+    }
+    for (std::size_t position = 0; position < front; ++position) layout_.visible.push_back(position);
+    if (extra) layout_.visible.push_back(*extra);
+    place_visible(inset);
+    layout_.list_count_text = std::to_string(count - layout_.visible.size());
+}
+
+void PageStrip::compute_layout(const LayoutKey& key) const {
+    // Anything but a scroll scrolls the selected (or keyboard) page back
+    // into view.
+    const LayoutKey previous = layout_.key;
+    const bool scroll_only = layout_.valid && previous.surface == key.surface && previous.scale == key.scale &&
+                             previous.set_revision == key.set_revision &&
+                             previous.settings_revision == key.settings_revision &&
+                             previous.page_count == key.page_count && previous.expanded == key.expanded &&
+                             previous.bound == key.bound;
+    layout_.key = key;
+    layout_.valid = true;
+    layout_.rail = {0.0, 0.0, key.surface.width, key.surface.height};
+    layout_.scroll_back = {};
+    layout_.scroll_forward = {};
+    layout_.list_button = {};
+    layout_.list_count = {};
+    layout_.list_glyph = {};
+    layout_.list_count_text.clear();
+    layout_.visible.clear();
+    layout_.first_visible = 0U;
+    layout_.last_first = 0U;
+    layout_.front_end = 0U;
+    layout_.hidden = 0U;
+    layout_.overflow = false;
+    layout_.selected = selected_position();
+    const std::size_t count = key.bound ? key.page_count : 0U;
+    layout_.tabs.resize(count);
+    if (count == 0U) {
+        first_visible_ = 0U;
+        return;
+    }
+    measure_tabs();
+    if (item_sizing_ == PageItemSizing::fill) {
+        const double scale = key.scale;
+        const double available = std::max(0.0, key.surface.width - edge_inset * scale * 2.0);
+        double collapsed = 0.0;
+        std::size_t open = 0U;
+        for (const TabSlot& tab : layout_.tabs) {
+            if (tab.collapsed) {
+                collapsed += tab.width;
+            } else {
+                ++open;
+            }
+        }
+        if (open > 0U) {
+            const double share = std::max(0.0, available - collapsed) / static_cast<double>(open);
+            const double width = std::clamp(share, item_widths_.minimum * scale, item_widths_.maximum * scale);
+            for (TabSlot& tab : layout_.tabs) {
+                if (tab.collapsed) continue;
+                tab.width = width;
+                tab.natural = width;
+            }
+        }
+    }
+    apply_frozen_widths();
+    if (overflow_ == PageStripOverflow::shrink_then_list) {
+        first_visible_ = 0U;
+        layout_shrink();
+    } else {
+        layout_scroll(scroll_only);
+    }
+    layout_.hidden = count - layout_.visible.size();
+}
+
 // -- part geometry -------------------------------------------------------------
 
-// One tab's parts, from its laid-out bounds; all absent when the tab is
-// scrolled out of view. Interior, from the start: padding, icon, gap, label,
-// padding. Phase P4 reserves its close, pin and modified slot after the label
-// by narrowing `interior_end` here.
-PageStrip::ItemParts PageStrip::tab_parts(std::size_t position) const {
+// What a tab's slot after its label shows, with the tab as hot or not: a
+// pinned tab's pin (or its modified dot while not hot); otherwise the close
+// button where the rule shows it and the tab is hot, else the modified dot,
+// else the close button where the rule shows it on a tab that is not hot.
+PageStrip::SlotContent PageStrip::slot_content(std::size_t position, bool hot) const {
+    const Layout& placed = layout();
+    const TabSlot& tab = placed.tabs[position];
+    if (!tab.reserves_slot || tab.collapsed) return SlotContent::none;
+    const PageRecord& record = (*pages_).record_at(PagePosition{position});
+    if (record.pinned) {
+        if (record.modified && !hot) return SlotContent::modified;
+        return SlotContent::pin;
+    }
+    const bool selected = placed.selected && *placed.selected == position;
+    bool close_shown = false;
+    if (record.closable && close_buttons_ == PageCloseButtons::all) close_shown = true;
+    if (record.closable && close_buttons_ == PageCloseButtons::selected_and_hot) close_shown = hot || selected;
+    if (close_shown && hot) return SlotContent::close;
+    if (record.modified) return SlotContent::modified;
+    if (close_shown) return SlotContent::close;
+    return SlotContent::none;
+}
+
+// One tab's parts, from its laid-out bounds; all absent when the tab is not
+// laid out. Interior, from the start: padding, icon, gap, label, the slot
+// gap, the slot (close, pin or modified dot), padding. The slot's space is
+// reserved whether or not anything shows in it. A collapsed pinned tab
+// shows its icon centred and nothing else.
+PageStrip::ItemParts PageStrip::tab_parts_as(std::size_t position, bool hot) const {
     const Layout& placed = layout();
     ItemParts parts;
     if (position >= placed.tabs.size()) return parts;
-    const TabSlot& slot = placed.tabs[position];
-    const Rect bounds = slot.bounds;
+    const TabSlot& tab = placed.tabs[position];
+    const Rect bounds = tab.bounds;
     if (bounds.empty()) return parts;
     const double scale = placed.key.scale;
     parts.tab = PartGeometry::from_bounds(bounds);
     const double padding = tab_padding * scale;
-    const double interior_end = bounds.x + bounds.width - padding;
+    double interior_end = bounds.x + bounds.width - padding;
     double x = bounds.x + padding;
-    if (slot.has_icon) {
-        const double side = image_size * scale;
-        const Rect icon{x, std::floor(bounds.y + (bounds.height - side) * 0.5), side, side};
-        parts.tab_icon = PartGeometry::from_bounds(Rect::intersection(icon, bounds));
-        x += side + image_text_gap * scale;
+    if (tab.reserves_slot && !tab.collapsed) {
+        const double side = slot_size * scale;
+        const Rect slot{interior_end - side, std::floor(bounds.y + (bounds.height - side) * 0.5), side, side};
+        const Rect shown = Rect::intersection(slot, bounds);
+        interior_end = slot.x - slot_gap * scale;
+        const SlotContent content = slot_content(position, hot);
+        if (content == SlotContent::close) {
+            const AnatomyStateSet states = slot_states(Zone::tab_close, position);
+            parts.tab_close = PartGeometry::from_bounds(shown);
+            parts.tab_close.states = states;
+            parts.tab_close_glyph = PartGeometry::from_bounds(glyph_bounds(shown));
+            parts.tab_close_glyph.states = states;
+        } else if (content == SlotContent::pin) {
+            AnatomyStateSet states = slot_states(Zone::tab_pin, position);
+            // The pin is drawn pinned: the part is checked.
+            states.insert(AnatomyState::checked);
+            parts.tab_pin = PartGeometry::from_bounds(shown);
+            parts.tab_pin.states = states;
+            parts.tab_pin_glyph = PartGeometry::from_bounds(glyph_bounds(shown));
+            parts.tab_pin_glyph.states = states;
+        } else if (content == SlotContent::modified) {
+            const double dot = dot_size * scale;
+            const Rect mark{std::floor(slot.x + (side - dot) * 0.5), std::floor(slot.y + (side - dot) * 0.5), dot,
+                            dot};
+            parts.tab_modified = PartGeometry::from_bounds(Rect::intersection(mark, bounds));
+        }
     }
-    if (!slot.label.empty() && interior_end > x) {
+    if (tab.has_icon) {
+        const double side = image_size * scale;
+        double icon_x = x;
+        if (tab.collapsed) icon_x = std::floor(bounds.x + (bounds.width - side) * 0.5);
+        const Rect icon{icon_x, std::floor(bounds.y + (bounds.height - side) * 0.5), side, side};
+        parts.tab_icon = PartGeometry::from_bounds(Rect::intersection(icon, bounds));
+        x = icon_x + side + image_text_gap * scale;
+    }
+    if (!tab.collapsed && !tab.label.empty() && interior_end > x) {
         const Rect label{x, bounds.y, interior_end - x, bounds.height};
         parts.tab_label = PartGeometry::from_bounds(label);
     }
@@ -449,8 +781,13 @@ PageStrip::ItemParts PageStrip::tab_parts(std::size_t position) const {
     return parts;
 }
 
+PageStrip::ItemParts PageStrip::tab_parts(std::size_t position) const {
+    const ItemParts parts = tab_parts_as(position, tab_hot(position));
+    return parts;
+}
+
 // A button's glyph: a square centred in it, on whole units.
-Rect PageStrip::scroll_glyph_bounds(Rect button) const {
+Rect PageStrip::glyph_bounds(Rect button) const {
     const double side = glyph_size * item_extent_scale();
     if (button.width < side || button.height < side) return {};
     const Rect glyph{std::floor(button.x + (button.width - side) * 0.5),
@@ -465,11 +802,12 @@ PageStrip::Parts PageStrip::strip_parts() const {
     record.region = PartGeometry::from_bounds(surface);
     record.rail = PartGeometry::from_bounds(placed.rail);
     record.scroll_back = PartGeometry::from_bounds(placed.scroll_back);
-    record.scroll_back_glyph = PartGeometry::from_bounds(scroll_glyph_bounds(placed.scroll_back));
+    record.scroll_back_glyph = PartGeometry::from_bounds(glyph_bounds(placed.scroll_back));
     record.scroll_forward = PartGeometry::from_bounds(placed.scroll_forward);
-    record.scroll_forward_glyph = PartGeometry::from_bounds(scroll_glyph_bounds(placed.scroll_forward));
+    record.scroll_forward_glyph = PartGeometry::from_bounds(glyph_bounds(placed.scroll_forward));
     record.list_button = PartGeometry::from_bounds(placed.list_button);
-    record.list_glyph = PartGeometry::from_bounds(scroll_glyph_bounds(placed.list_button));
+    record.list_count = PartGeometry::from_bounds(placed.list_count);
+    record.list_glyph = PartGeometry::from_bounds(placed.list_glyph);
     record.focus = PartGeometry::from_bounds(surface);
     if (placed.overflow) {
         const AnatomyStateSet back = button_states(Zone::scroll_back);
@@ -480,6 +818,7 @@ PageStrip::Parts PageStrip::strip_parts() const {
         record.scroll_forward.states = forward;
         record.scroll_forward_glyph.states = forward;
         record.list_button.states = list;
+        record.list_count.states = list;
         record.list_glyph.states = list;
     }
     return record;
@@ -510,9 +849,16 @@ std::optional<std::size_t> PageStrip::keyboard_position() const {
     return position;
 }
 
+// A tab is hot while the pointer is over it, its close button or its pin.
+bool PageStrip::tab_hot(std::size_t position) const noexcept {
+    const bool on_tab = hot_.zone == Zone::tab || hot_.zone == Zone::tab_close || hot_.zone == Zone::tab_pin;
+    const bool result = on_tab && hot_.position == position;
+    return result;
+}
+
 AnatomyStateSet PageStrip::tab_states(std::size_t position) const {
     AnatomyStateSet states;
-    if (hot_.zone == Zone::tab && hot_.position == position) states.insert(AnatomyState::hot);
+    if (tab_hot(position)) states.insert(AnatomyState::hot);
     if (pressed_.zone == Zone::tab && pressed_.position == position) states.insert(AnatomyState::pressed);
     const std::optional<std::size_t> selected = layout().selected;
     if (selected && *selected == position) states.insert(AnatomyState::selected);
@@ -521,21 +867,34 @@ AnatomyStateSet PageStrip::tab_states(std::size_t position) const {
         const std::optional<std::size_t> keyboard = keyboard_position();
         if (keyboard && *keyboard == position) states.insert(AnatomyState::focus_visible);
     }
-    if (pages_ != nullptr && position < (*pages_).count() && (*pages_).record_at(PagePosition{position}).pinned) {
-        states.insert(pinned_state);
+    if (pages_ != nullptr && position < (*pages_).count()) {
+        const PageRecord& record = (*pages_).record_at(PagePosition{position});
+        if (record.pinned) states.insert(pinned_state);
+        if (record.modified) states.insert(modified_state);
     }
+    return states;
+}
+
+// The states of a tab's close button or pin: its own hot and pressed.
+AnatomyStateSet PageStrip::slot_states(Zone zone, std::size_t position) const {
+    AnatomyStateSet states;
+    const Hit own{zone, position};
+    if (hot_ == own) states.insert(AnatomyState::hot);
+    if (pressed_ == own) states.insert(AnatomyState::pressed);
+    if (!effectively_enabled()) states.insert(AnatomyState::disabled);
     return states;
 }
 
 bool PageStrip::can_scroll_backward() const {
     const Layout& placed = layout();
-    const bool result = placed.overflow && placed.first_visible > 0U;
+    const bool result = overflow_ == PageStripOverflow::scroll && placed.overflow && placed.first_visible > 0U;
     return result;
 }
 
 bool PageStrip::can_scroll_forward() const {
     const Layout& placed = layout();
-    const bool result = placed.overflow && placed.first_visible < placed.last_first;
+    const bool result =
+        overflow_ == PageStripOverflow::scroll && placed.overflow && placed.first_visible < placed.last_first;
     return result;
 }
 
@@ -564,21 +923,23 @@ void PageStrip::on_paint(Painter& painter, Rect) {
     part.bounds = placed.rail;
     paint_part(painter, *this, part);
     // Tabs: flat at rest, a plate when hot or selected (the menu-item
-    // family) until T4 draws Plan Paint's tab stack (owner decision DK-40).
+    // family) until T4 draws Plan Paint's tab stack and the notched document
+    // tab (owner decisions DK-40, DK-42). The close button and pin use the
+    // same family for their own plate, shown only while they are hot.
     part.family = ControlVisualRole::menu_item;
     part.alignment = PartTextAlignment::center;
     const double scale = window() != nullptr ? (*window()).scale() : 1.0;
-    const std::size_t end = placed.first_visible + placed.visible_count;
-    for (std::size_t position = placed.first_visible; position < end; ++position) {
+    for (const std::size_t position : placed.visible) {
         const ItemParts parts = tab_parts(position);
-        part.states = tab_states(position);
+        const AnatomyStateSet states = tab_states(position);
+        part.states = states;
         part.role = PartRole::face;
         part.bounds = parts.tab.bounds;
         paint_part(painter, *this, part);
         if (parts.tab_icon.present) {
             const PageRecord& record = (*pages_).record_at(PagePosition{position});
-            const ImageVisualState state = part.states.contains(AnatomyState::selected) ? ImageVisualState::selected
-                                                                                          : ImageVisualState::normal;
+            const ImageVisualState state = states.contains(AnatomyState::selected) ? ImageVisualState::selected
+                                                                                    : ImageVisualState::normal;
             const ImageListResolution resolved = (*image_list_).resolve(record.image_key, state, scale);
             part.role = PartRole::icon;
             part.bounds = parts.tab_icon.bounds;
@@ -592,6 +953,38 @@ void PageStrip::on_paint(Painter& painter, Rect) {
             part.text = placed.tabs[position].label;
             paint_part(painter, *this, part);
             part.text = {};
+        }
+        if (parts.tab_close.present) {
+            part.states = parts.tab_close.states;
+            part.role = PartRole::actuator;
+            part.bounds = parts.tab_close.bounds;
+            paint_part(painter, *this, part);
+            part.role = PartRole::glyph;
+            part.bounds = parts.tab_close_glyph.bounds;
+            part.mark = PartMark::close;
+            paint_part(painter, *this, part);
+            part.mark = PartMark::none;
+        }
+        if (parts.tab_pin.present) {
+            part.states = parts.tab_pin.states;
+            part.role = PartRole::actuator;
+            part.bounds = parts.tab_pin.bounds;
+            paint_part(painter, *this, part);
+            part.role = PartRole::glyph;
+            part.bounds = parts.tab_pin_glyph.bounds;
+            part.mark = PartMark::pin;
+            paint_part(painter, *this, part);
+            part.mark = PartMark::none;
+        }
+        part.states = states;
+        if (parts.tab_modified.present) {
+            // The modified dot: a filled round mark, the nearest admitted
+            // mark (there is no `modified` mark; DK-35 gave the state only).
+            part.role = PartRole::glyph;
+            part.bounds = parts.tab_modified.bounds;
+            part.mark = PartMark::radio_dot;
+            paint_part(painter, *this, part);
+            part.mark = PartMark::none;
         }
         if (parts.tab_seam.present) {
             part.role = PartRole::seam;
@@ -611,6 +1004,7 @@ void PageStrip::on_paint(Painter& painter, Rect) {
     // box's, rather than the tool strip's overflow mark.
     const std::array<PartMark, 3> marks{PartMark::arrow_left, PartMark::arrow_right, PartMark::chevron_down};
     for (std::size_t index = 0; index < buttons.size(); ++index) {
+        if (!(*buttons[index]).present) continue;
         part.states = (*buttons[index]).states;
         part.role = PartRole::actuator;
         part.bounds = (*buttons[index]).bounds;
@@ -620,6 +1014,14 @@ void PageStrip::on_paint(Painter& painter, Rect) {
         part.mark = marks[index];
         paint_part(painter, *this, part);
         part.mark = PartMark::none;
+    }
+    if (own.list_count.present) {
+        part.states = own.list_count.states;
+        part.role = PartRole::label;
+        part.bounds = own.list_count.bounds;
+        part.text = placed.list_count_text;
+        paint_part(painter, *this, part);
+        part.text = {};
     }
 }
 
@@ -637,11 +1039,14 @@ PageStrip::Hit PageStrip::hit_at(Point window_point) const {
         if (placed.list_button.contains(local)) hit.zone = Zone::list_button;
         if (hit.zone != Zone::none) return hit;
     }
-    const std::size_t end = placed.first_visible + placed.visible_count;
-    for (std::size_t position = placed.first_visible; position < end; ++position) {
+    for (const std::size_t position : placed.visible) {
         if (!placed.tabs[position].bounds.contains(local)) continue;
-        hit.zone = Zone::tab;
         hit.position = position;
+        hit.zone = Zone::tab;
+        // The tab under the pointer is hot, so its slot is asked as hot.
+        const ItemParts parts = tab_parts_as(position, true);
+        if (parts.tab_close.present && parts.tab_close.bounds.contains(local)) hit.zone = Zone::tab_close;
+        if (parts.tab_pin.present && parts.tab_pin.bounds.contains(local)) hit.zone = Zone::tab_pin;
         return hit;
     }
     return hit;
@@ -649,7 +1054,8 @@ PageStrip::Hit PageStrip::hit_at(Point window_point) const {
 
 std::optional<PageId> PageStrip::page_at(Point window_point) const {
     const Hit hit = hit_at(window_point);
-    if (hit.zone != Zone::tab || pages_ == nullptr) return std::nullopt;
+    const bool on_tab = hit.zone == Zone::tab || hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin;
+    if (!on_tab || pages_ == nullptr) return std::nullopt;
     const PageId page = (*pages_).record_at(PagePosition{hit.position}).id;
     return page;
 }
@@ -664,7 +1070,8 @@ std::optional<PageId> PageStrip::focused_page() const {
 void PageStrip::set_hot(Hit hit) {
     if (hot_ == hit) return;
     hot_ = hit;
-    invalidate(Dirty::paint);
+    // A pinned tab expands while hot, which moves the tabs after it.
+    invalidate(Dirty::paint | Dirty::hit_test);
 }
 
 bool PageStrip::choose(std::size_t position, PageSelectionCause cause) {
@@ -680,10 +1087,50 @@ bool PageStrip::choose(std::size_t position, PageSelectionCause cause) {
     return true;
 }
 
+// Under shrink_then_list a hidden ordinary page takes the last visible
+// position (interview P13): selected first, so a cancelled selection moves
+// nothing, then moved there, in one batch (one pages_changed, one
+// selected_page_changed). The pages before that position keep their places.
+bool PageStrip::choose_from_list(std::size_t position) {
+    if (pages_ == nullptr || position >= (*pages_).count()) return false;
+    const Layout& placed = layout();
+    const std::size_t pinned = (*pages_).pinned_count();
+    const bool hidden = placed.tabs[position].bounds.empty();
+    const bool relocate = overflow_ == PageStripOverflow::shrink_then_list && hidden && position >= pinned;
+    const PageId page = (*pages_).record_at(PagePosition{position}).id;
+    if (!relocate) {
+        const bool chosen = choose(position, PageSelectionCause::pointer);
+        if (!chosen || !is_alive() || pages_ == nullptr) return chosen;
+        const std::optional<PagePosition> still = (*pages_).find(page);
+        if (still) reveal((*still).value);
+        return chosen;
+    }
+    std::size_t destination = pinned;
+    if (placed.front_end > pinned) destination = placed.front_end - 1U;
+    const Control::Ptr keep = shared_from_this();
+    PageSetBatch batch(*pages_);
+    const PageEditStatus selected = (*pages_).select(page, PageSelectionCause::pointer);
+    if (!page_edit_succeeded(selected)) {
+        batch.close();
+        return false;
+    }
+    // The destination lies in the ordinary group, as the page does, so the
+    // move cannot cross the pinned boundary.
+    const PageEditStatus moved = (*pages_).move(page, PagePosition{destination});
+    static_cast<void>(moved);
+    batch.close();
+    if (!is_alive() || pages_ == nullptr) return false;
+    if (focused_) keyboard_page_ = page;
+    const PageInvocation invoked{page, PageSelectionCause::pointer};
+    page_invoked_.emit(invoked);
+    return true;
+}
+
 void PageStrip::reveal(std::size_t position) {
     const Layout& placed = layout();
+    if (overflow_ != PageStripOverflow::scroll) return;
     if (!placed.overflow || position >= placed.tabs.size()) return;
-    const std::size_t end = placed.first_visible + placed.visible_count;
+    const std::size_t end = placed.first_visible + placed.visible.size();
     if (position >= placed.first_visible && position < end) return;
     const double scale = placed.key.scale;
     const double available = std::max(0.0, placed.key.surface.width - edge_inset * scale * 2.0);
@@ -738,12 +1185,16 @@ bool PageStrip::overflowing() const {
 std::vector<PageId> PageStrip::visible_pages() const {
     std::vector<PageId> visible;
     const Layout& placed = layout();
-    visible.reserve(placed.visible_count);
-    const std::size_t end = placed.first_visible + placed.visible_count;
-    for (std::size_t position = placed.first_visible; position < end; ++position) {
+    visible.reserve(placed.visible.size());
+    for (const std::size_t position : placed.visible) {
         visible.push_back((*pages_).record_at(PagePosition{position}).id);
     }
     return visible;
+}
+
+std::size_t PageStrip::hidden_count() const {
+    const std::size_t hidden = layout().hidden;
+    return hidden;
 }
 
 bool PageStrip::select_relative(int direction, PageSelectionCause cause) {
@@ -754,6 +1205,73 @@ bool PageStrip::select_relative(int direction, PageSelectionCause cause) {
     const std::size_t next = direction > 0 ? (current + 1U) % count : (current + count - 1U) % count;
     const bool chosen = choose(next, cause);
     return chosen;
+}
+
+bool PageStrip::move_selected(int direction) {
+    require_mutable();
+    if (pages_ == nullptr || (direction != 1 && direction != -1)) return false;
+    const std::optional<std::size_t> selected = selected_position();
+    if (!selected) return false;
+    const std::size_t pinned = (*pages_).pinned_count();
+    const bool in_pinned = *selected < pinned;
+    const std::size_t group_begin = in_pinned ? 0U : pinned;
+    const std::size_t group_end = in_pinned ? pinned : (*pages_).count();
+    if (direction < 0 && *selected == group_begin) return false;
+    if (direction > 0 && *selected + 1U >= group_end) return false;
+    const std::size_t destination = direction > 0 ? *selected + 1U : *selected - 1U;
+    const PageId page = (*pages_).record_at(PagePosition{*selected}).id;
+    const PageEditStatus status = (*pages_).move(page, PagePosition{destination});
+    const bool moved = status == PageEditStatus::applied;
+    return moved;
+}
+
+bool PageStrip::request_close(const PageId& page, PageCloseCause cause) {
+    require_mutable();
+    if (pages_ == nullptr) return false;
+    const std::optional<PagePosition> found = (*pages_).find(page);
+    if (!found || !(*pages_).record_at(*found).closable) return false;
+    // The request holds its own copy of the identity: a handler may remove
+    // the page `page` refers to.
+    PageCloseRequest request{page, cause, false};
+    const Control::Ptr keep = shared_from_this();
+    page_close_requested_.emit(request);
+    if (!is_alive()) return request.handled;
+    if (!request.handled) close_unhandled(request);
+    return request.handled;
+}
+
+void PageStrip::close_unhandled(PageCloseRequest&) {}
+
+void PageStrip::request_pin(std::size_t position, bool pinned) {
+    if (pages_ == nullptr || position >= (*pages_).count()) return;
+    PagePinRequest request{(*pages_).record_at(PagePosition{position}).id, pinned, false};
+    const Control::Ptr keep = shared_from_this();
+    page_pin_requested_.emit(request);
+    if (!is_alive() || pages_ == nullptr || request.handled) return;
+    static_cast<void>((*pages_).set_pinned(request.page, request.pinned));
+}
+
+// Keeps every ordinary tab's current width until the pointer leaves the
+// strip, so that after a close the next tab's close button arrives under
+// the pointer (owner decision DK-38, interview P16).
+void PageStrip::freeze_widths() {
+    const Layout& placed = layout();
+    frozen_widths_.clear();
+    const std::size_t count = placed.tabs.size();
+    for (std::size_t position = 0; position < count; ++position) {
+        if (placed.tabs[position].pinned) continue;
+        const FrozenWidth frozen{(*pages_).record_at(PagePosition{position}).id, placed.tabs[position].width};
+        frozen_widths_.push_back(frozen);
+    }
+    widths_frozen_ = true;
+}
+
+void PageStrip::thaw_widths() {
+    if (!widths_frozen_) return;
+    widths_frozen_ = false;
+    frozen_widths_.clear();
+    ++settings_revision_;
+    invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
 // The keyboard moves to `position`: under automatic activation that selects
@@ -768,9 +1286,53 @@ void PageStrip::move_keyboard(std::size_t position) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+// A primary release: a close button or pin pressed and released over itself
+// asks for the close or the unpin.
+void PageStrip::on_pointer_release(PointerEvent& event, Hit hit) {
+    const Hit pressed = pressed_;
+    const bool engaged = pressed.zone != Zone::none;
+    pressed_ = {};
+    if (engaged) invalidate(Dirty::paint);
+    event.handled = engaged;
+    if (hit != pressed || pages_ == nullptr || pressed.position >= (*pages_).count()) return;
+    if (pressed.zone == Zone::tab_close) {
+        const PageId page = (*pages_).record_at(PagePosition{pressed.position}).id;
+        freeze_widths();
+        static_cast<void>(request_close(page, PageCloseCause::pointer));
+        return;
+    }
+    if (pressed.zone == Zone::tab_pin) request_pin(pressed.position, false);
+}
+
+// A middle press on a tab, released over the same tab, closes it when it is
+// closable (owner decision DK-38, interview P17); press and release on
+// different tabs do nothing.
+void PageStrip::on_middle_button(PointerEvent& event, Hit hit) {
+    const bool on_tab = hit.zone == Zone::tab || hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin;
+    if (event.action == PointerAction::down) {
+        middle_pressed_.reset();
+        if (!on_tab || pages_ == nullptr) return;
+        middle_pressed_ = (*pages_).record_at(PagePosition{hit.position}).id;
+        event.handled = true;
+        return;
+    }
+    if (event.action != PointerAction::up) return;
+    const std::optional<PageId> pressed = middle_pressed_;
+    middle_pressed_.reset();
+    if (!pressed || !on_tab || pages_ == nullptr) return;
+    const PageId page = (*pages_).record_at(PagePosition{hit.position}).id;
+    if (page != *pressed) return;
+    event.handled = true;
+    if (!(*pages_).record_at(PagePosition{hit.position}).closable) return;
+    freeze_widths();
+    static_cast<void>(request_close(page, PageCloseCause::middle_button));
+}
+
 void PageStrip::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::leave) {
         set_hot({});
+        middle_pressed_.reset();
+        thaw_widths();
         return;
     }
     const Hit hit = hit_at(event.position);
@@ -781,7 +1343,7 @@ void PageStrip::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::wheel) {
         // The wheel scrolls an overflowing strip (owner decision DK-37):
         // turned up or left towards the start.
-        if (!layout().overflow) return;
+        if (overflow_ != PageStripOverflow::scroll || !layout().overflow) return;
         int direction = event.wheel_delta.y > 0.0 ? -1 : 1;
         if (event.wheel_delta.y == 0.0) direction = event.wheel_delta.x > 0.0 ? 1 : -1;
         if (event.wheel_delta.y == 0.0 && event.wheel_delta.x == 0.0) return;
@@ -789,12 +1351,13 @@ void PageStrip::on_pointer(PointerEvent& event) {
         event.handled = true;
         return;
     }
+    if (event.button == PointerButton::middle) {
+        on_middle_button(event, hit);
+        return;
+    }
     if (event.button != PointerButton::primary) return;
     if (event.action == PointerAction::up) {
-        const bool engaged = pressed_.zone != Zone::none;
-        pressed_ = {};
-        if (engaged) invalidate(Dirty::paint);
-        event.handled = engaged;
+        on_pointer_release(event, hit);
         return;
     }
     if (event.action != PointerAction::down || hit.zone == Zone::none) return;
@@ -815,6 +1378,8 @@ void PageStrip::on_pointer(PointerEvent& event) {
         }
         return;
     }
+    // A close button or pin acts on its release.
+    if (hit.zone == Zone::tab_close || hit.zone == Zone::tab_pin) return;
     // A tab: the selection first, so a view behind the strip can remember
     // the focus its old page held, then the focus.
     static_cast<void>(choose(hit.position, PageSelectionCause::pointer));
@@ -827,8 +1392,17 @@ void PageStrip::on_key(KeyEvent& event) {
     const std::size_t count = (*pages_).count();
     const bool plain = event.modifiers == Modifier::none;
     const bool control_only = event.modifiers == Modifier::control;
+    const bool control_shift = event.modifiers == (Modifier::control | Modifier::shift);
+    const bool page_key = event.physical_key == PhysicalKey::page_down || event.physical_key == PhysicalKey::page_up;
     const std::size_t current = keyboard_position().value_or(0U);
-    if (control_only && (event.physical_key == PhysicalKey::page_down || event.physical_key == PhysicalKey::page_up)) {
+    if (control_only && event.physical_key == PhysicalKey::f4) {
+        // Ctrl+F4 closes the selected closable page (owner decision DK-38);
+        // Delete closes nothing.
+        const std::optional<PageId> selected = (*pages_).selected_page();
+        if (selected) static_cast<void>(request_close(*selected, PageCloseCause::keyboard));
+    } else if (control_shift && page_key) {
+        static_cast<void>(move_selected(event.physical_key == PhysicalKey::page_down ? 1 : -1));
+    } else if (control_only && page_key) {
         static_cast<void>(select_relative(event.physical_key == PhysicalKey::page_down ? 1 : -1,
                                           PageSelectionCause::keyboard));
     } else if (plain && event.physical_key == PhysicalKey::right) {
@@ -898,6 +1472,9 @@ void PageStrip::prepare_list_commands() {
     }
 }
 
+// Every page has a row, in order; a page whose tab is not laid out is set in
+// italic (owner decision DK-42, PT6). Italic is a font style, not an atom:
+// the row is marked through MenuItemSpec::italic.
 bool PageStrip::show_page_list(MenuOpenMode mode) {
     require_mutable();
     if (mode != MenuOpenMode::keyboard && mode != MenuOpenMode::pointer) {
@@ -915,6 +1492,7 @@ bool PageStrip::show_page_list(MenuOpenMode mode) {
         const PageRecord& record = (*pages_).record_at(PagePosition{position});
         const std::string text = (*list_commands_[position]).state().text;
         rows.emplace_back(record.id.value, MenuItemKind::radio, list_commands_[position], text);
+        rows.back().italic = placed.tabs[position].bounds.empty();
     }
     (*list_).set_items(std::move(rows));
     const Rect absolute = absolute_bounds();
@@ -938,23 +1516,23 @@ bool PageStrip::page_list_open() const noexcept {
     return result;
 }
 
+std::vector<MenuItemSpec> PageStrip::page_list_items() const {
+    if (!page_list_open()) return {};
+    const std::vector<MenuItemSpec> rows = (*list_).items();
+    return rows;
+}
+
 void PageStrip::on_list_open_changed(bool open) {
     list_open_ = open;
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
-// A page chosen from the list is selected and scrolled into view (the strip
-// policy, interview P13; the document preset's "takes the last visible
-// position" is phase P4's).
 void PageStrip::on_list_item_invoked(const MenuItemInvocation& invocation) {
     if (pages_ == nullptr) return;
     const PageId page{invocation.item_id};
     const std::optional<PagePosition> found = (*pages_).find(page);
     if (!found) return;
-    static_cast<void>(choose((*found).value, PageSelectionCause::pointer));
-    if (!is_alive() || pages_ == nullptr) return;
-    const std::optional<PagePosition> still = (*pages_).find(page);
-    if (still) reveal((*still).value);
+    static_cast<void>(choose_from_list((*found).value));
 }
 
 // -- semantics -----------------------------------------------------------------
@@ -992,9 +1570,11 @@ SemanticDescriptor PageStrip::semantic_descriptor() const {
     return descriptor;
 }
 
-// Every page is a tab, laid out or scrolled out of view (then without the
-// visible state and bounds), so assistive technology reaches each one; the
-// scroll and list buttons follow while the strip overflows.
+// Every page is a tab, laid out or not (then without the visible state and
+// bounds), so assistive technology reaches each one; the scroll and list
+// buttons follow while the strip overflows. Until stage A gives `pinned` and
+// `modified` an accessible state, a tab's description names them (PageView
+// study §5.6).
 std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes{};
     if (pages_ == nullptr) return nodes;
@@ -1013,6 +1593,9 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         node.runtime_id = node_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
         node.name = placed.tabs[position].label;
+        if (record.pinned) node.description = "pinned";
+        if (record.pinned && record.modified) node.description += ", ";
+        if (record.modified) node.description += "modified";
         node.position_in_set = position + 1U;
         node.set_size = count;
         node.controlled_panel = page_panel_identity(record.id);
@@ -1032,27 +1615,30 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
     }
     if (!placed.overflow) return nodes;
     const std::string strip_id(stable_id().value());
-    const std::array<Rect, 2> scroll_bounds{placed.scroll_back, placed.scroll_forward};
-    const std::array<const char*, 2> scroll_ids{".scroll_back", ".scroll_forward"};
-    const std::array<const char*, 2> scroll_names{"Scroll tabs back", "Scroll tabs forward"};
-    const std::array<bool, 2> scroll_possible{can_scroll_backward(), can_scroll_forward()};
-    for (std::size_t index = 0; index < scroll_bounds.size(); ++index) {
-        SemanticNode button{};
-        button.stable_id = strip_id + scroll_ids[index];
-        button.runtime_id = node_runtime_id(button.stable_id);
-        button.role = SemanticRole::button;
-        button.name = scroll_names[index];
-        button.bounds = to_window(absolute, scroll_bounds[index]);
-        button.states = SemanticState::visible;
-        if (enabled && scroll_possible[index]) button.states |= SemanticState::enabled;
-        button.actions = {SemanticAction::press};
-        nodes.push_back(std::move(button));
+    if (overflow_ == PageStripOverflow::scroll) {
+        const std::array<Rect, 2> scroll_bounds{placed.scroll_back, placed.scroll_forward};
+        const std::array<const char*, 2> scroll_ids{".scroll_back", ".scroll_forward"};
+        const std::array<const char*, 2> scroll_names{"Scroll tabs back", "Scroll tabs forward"};
+        const std::array<bool, 2> scroll_possible{can_scroll_backward(), can_scroll_forward()};
+        for (std::size_t index = 0; index < scroll_bounds.size(); ++index) {
+            SemanticNode button{};
+            button.stable_id = strip_id + scroll_ids[index];
+            button.runtime_id = node_runtime_id(button.stable_id);
+            button.role = SemanticRole::button;
+            button.name = scroll_names[index];
+            button.bounds = to_window(absolute, scroll_bounds[index]);
+            button.states = SemanticState::visible;
+            if (enabled && scroll_possible[index]) button.states |= SemanticState::enabled;
+            button.actions = {SemanticAction::press};
+            nodes.push_back(std::move(button));
+        }
     }
     SemanticNode list{};
     list.stable_id = strip_id + ".list_button";
     list.runtime_id = node_runtime_id(list.stable_id);
     list.role = SemanticRole::menu_button;
     list.name = "All pages";
+    if (overflow_ == PageStripOverflow::shrink_then_list) list.description = placed.list_count_text + " hidden";
     list.has_popup = true;
     list.bounds = to_window(absolute, placed.list_button);
     list.states = SemanticState::visible;
@@ -1101,11 +1687,9 @@ bool PageStrip::on_semantic_child_action(std::string_view id, SemanticAction act
         return chosen;
     }
     if (action == SemanticAction::close) {
-        const PageRecord& record = (*pages_).record_at(PagePosition{*position});
-        if (!record.closable) return false;
-        PageCloseRequest request{record.id, PageCloseCause::semantic, false};
-        page_close_requested_.emit(request);
-        return request.handled;
+        const PageId page = (*pages_).record_at(PagePosition{*position}).id;
+        const bool handled = request_close(page, PageCloseCause::semantic);
+        return handled;
     }
     return false;
 }
@@ -1118,8 +1702,11 @@ constexpr std::array<AnatomyState, 3> scroll_button_states{
     {AnatomyState::hot, AnatomyState::pressed, AnatomyState::disabled}};
 constexpr std::array<AnatomyState, 3> list_button_states{
     {AnatomyState::hot, AnatomyState::pressed, AnatomyState::open}};
+constexpr std::array<AnatomyState, 2> close_button_states{{AnatomyState::hot, AnatomyState::pressed}};
+constexpr std::array<AnatomyState, 3> pin_button_states{
+    {AnatomyState::hot, AnatomyState::pressed, AnatomyState::checked}};
 
-constexpr std::array<PartField<PageStrip::Parts>, 9> page_strip_part_fields{{
+constexpr std::array<PartField<PageStrip::Parts>, 10> page_strip_part_fields{{
     {.declaration = {.name = "region", .role = PartRole::region, .composed_from = {}},
      .member = &PageStrip::Parts::region},
     {.declaration = {.name = "rail", .role = PartRole::face, .composed_from = {}},
@@ -1139,6 +1726,9 @@ constexpr std::array<PartField<PageStrip::Parts>, 9> page_strip_part_fields{{
     {.declaration = {.name = "list_button", .role = PartRole::actuator, .composed_from = "button",
                      .states = list_button_states},
      .member = &PageStrip::Parts::list_button},
+    {.declaration = {.name = "list_count", .role = PartRole::label, .composed_from = {},
+                     .states = list_button_states},
+     .member = &PageStrip::Parts::list_count},
     {.declaration = {.name = "list_glyph", .role = PartRole::glyph, .composed_from = {},
                      .states = list_button_states},
      .member = &PageStrip::Parts::list_glyph},
@@ -1146,13 +1736,29 @@ constexpr std::array<PartField<PageStrip::Parts>, 9> page_strip_part_fields{{
      .member = &PageStrip::Parts::focus},
 }};
 
-constexpr std::array<PartField<PageStrip::ItemParts>, 5> page_strip_item_part_fields{{
+constexpr std::array<PartField<PageStrip::ItemParts>, 10> page_strip_item_part_fields{{
     {.declaration = {.name = "tab", .role = PartRole::face, .composed_from = {}},
      .member = &PageStrip::ItemParts::tab},
     {.declaration = {.name = "tab_icon", .role = PartRole::icon, .composed_from = {}},
      .member = &PageStrip::ItemParts::tab_icon},
     {.declaration = {.name = "tab_label", .role = PartRole::label, .composed_from = {}},
      .member = &PageStrip::ItemParts::tab_label},
+    // The modified dot: a glyph drawn with the radio_dot mark, the nearest
+    // admitted mark (DK-35 admitted the state `modified`, no mark).
+    {.declaration = {.name = "tab_modified", .role = PartRole::glyph, .composed_from = {}},
+     .member = &PageStrip::ItemParts::tab_modified},
+    {.declaration = {.name = "tab_close", .role = PartRole::actuator, .composed_from = "button",
+                     .states = close_button_states},
+     .member = &PageStrip::ItemParts::tab_close},
+    {.declaration = {.name = "tab_close_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = close_button_states},
+     .member = &PageStrip::ItemParts::tab_close_glyph},
+    {.declaration = {.name = "tab_pin", .role = PartRole::actuator, .composed_from = "button",
+                     .states = pin_button_states},
+     .member = &PageStrip::ItemParts::tab_pin},
+    {.declaration = {.name = "tab_pin_glyph", .role = PartRole::glyph, .composed_from = {},
+                     .states = pin_button_states},
+     .member = &PageStrip::ItemParts::tab_pin_glyph},
     {.declaration = {.name = "tab_seam", .role = PartRole::seam, .composed_from = {}},
      .member = &PageStrip::ItemParts::tab_seam},
     {.declaration = {.name = "tab_focus", .role = PartRole::focus, .composed_from = {}},
@@ -1167,12 +1773,13 @@ constexpr std::array<StateField<PageStrip::ItemStates>, 5> page_strip_item_state
     {.state = AnatomyState::focus_visible, .member = &PageStrip::ItemStates::focus_visible},
 }};
 
-constexpr std::array<PartDeclaration, 9> page_strip_parts = part_declarations(page_strip_part_fields);
-constexpr std::array<PartDeclaration, 5> page_strip_item_parts = part_declarations(page_strip_item_part_fields);
+constexpr std::array<PartDeclaration, 10> page_strip_parts = part_declarations(page_strip_part_fields);
+constexpr std::array<PartDeclaration, 10> page_strip_item_parts = part_declarations(page_strip_item_part_fields);
 constexpr std::array<AnatomyState, 5> page_strip_item_states = state_declarations(page_strip_item_state_fields);
-// The admitted custom state `pinned` (DK-40); `modified` joins it with the
-// document preset (P4), which has the flag to show.
-constexpr std::array<CustomStateDeclaration, 1> page_strip_item_custom_states{{pinned_custom_state}};
+// The admitted custom states (DK-35, DK-40), in the order of pinned_state and
+// modified_state.
+constexpr std::array<CustomStateDeclaration, 2> page_strip_item_custom_states{
+    {pinned_custom_state, modified_custom_state}};
 constexpr std::array<AnatomyState, 5> page_strip_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,
     AnatomyState::focused, AnatomyState::focus_visible,
@@ -1210,24 +1817,24 @@ PageStrip::Parts PageStrip::parts() const {
 }
 
 std::size_t PageStrip::realized_item_count() const {
-    const std::size_t count = layout().visible_count;
+    const std::size_t count = layout().visible.size();
     return count;
 }
 
 std::string PageStrip::realized_item_stable_id(std::size_t item) const {
-    const std::size_t position = layout().first_visible + item;
+    const std::size_t position = layout().visible[item];
     const std::string identity = tab_identity((*pages_).record_at(PagePosition{position}).id);
     return identity;
 }
 
 void PageStrip::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
-    const std::size_t position = layout().first_visible + item;
+    const std::size_t position = layout().visible[item];
     const ItemParts record = tab_parts(position);
     write_item_parts(anatomy().item_systems.front(), page_strip_item_part_fields, record, geometry);
 }
 
 AnatomyStateSet PageStrip::realized_item_anatomy_states(std::size_t item) const {
-    const std::size_t position = layout().first_visible + item;
+    const std::size_t position = layout().visible[item];
     const AnatomyStateSet states = tab_states(position);
     return states;
 }
@@ -1238,7 +1845,7 @@ std::vector<PageStrip::Item> PageStrip::realized_items() const {
     records.reserve(count);
     for (std::size_t item = 0; item < count; ++item) {
         const PartGeometryBuffer published = published_realized_item_geometry(item);
-        const std::size_t position = layout().first_visible + item;
+        const std::size_t position = layout().visible[item];
         Item record;
         record.position = PagePosition{position};
         record.page = (*pages_).record_at(record.position).id;
@@ -1248,6 +1855,7 @@ std::vector<PageStrip::Item> PageStrip::realized_items() const {
         const AnatomyStateSet states = realized_item_anatomy_states(item);
         read_states(page_strip_item_state_fields, states, record.states);
         record.states.pinned = states.contains(pinned_state);
+        record.states.modified = states.contains(modified_state);
         records.push_back(record);
     }
     return records;
@@ -1256,9 +1864,10 @@ std::vector<PageStrip::Item> PageStrip::realized_items() const {
 namespace {
 
 // The events PageStrip adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 2> page_strip_interactions{{
+constexpr std::array<InteractionDeclaration, 3> page_strip_interactions{{
     {.name = "page_invoked", .payload = "PageInvocation", .mutable_payload = false},
     {.name = "page_close_requested", .payload = "PageCloseRequest", .mutable_payload = true},
+    {.name = "page_pin_requested", .payload = "PagePinRequest", .mutable_payload = true},
 }};
 
 } // namespace

@@ -58,7 +58,8 @@ private:
     std::string title_{};
 };
 
-// The view's strip: a PageStrip that names the panel each tab controls.
+// The view's strip: a PageStrip that names the panel each tab controls and
+// applies the view's close policy to a close request nobody handled.
 class PageViewStrip final : public PageStrip {
 public:
     PageViewStrip(StableId stable_id, PageSet& pages) : PageStrip(std::move(stable_id), pages) {}
@@ -70,6 +71,13 @@ protected:
         const std::string identity = (*view).panel_identity(page);
         return identity;
     }
+
+    void close_unhandled(PageCloseRequest& request) override {
+        const std::shared_ptr<PageView> view = std::dynamic_pointer_cast<PageView>(parent());
+        if (!view || (*view).close_policy() != PageViewClosePolicy::remove_when_unhandled) return;
+        const PageEditStatus removed = (*view).pages().remove(request.page);
+        request.handled = removed == PageEditStatus::applied;
+    }
 };
 
 } // namespace
@@ -79,6 +87,23 @@ PageControlContent::PageControlContent(Control::Ptr control) : control_(std::mov
 }
 
 PageControlContent::~PageControlContent() = default;
+
+PageSetOptions page_set_options(const PageViewOptions& options) noexcept {
+    PageSetOptions result{};
+    result.pinning_enabled = options.pinning_enabled;
+    result.capacity = options.capacity;
+    result.fallback = options.preset == PageViewPreset::document ? PageSelectionFallback::most_recent
+                                                                 : PageSelectionFallback::neighbour;
+    return result;
+}
+
+PageView::PageView(StableId stable_id, PageViewOptions options)
+    : PageView(std::move(stable_id), page_set_options(options)) {
+    if (options.preset != PageViewPreset::strip && options.preset != PageViewPreset::document) {
+        throw std::invalid_argument("PageView preset is invalid");
+    }
+    preset_ = options.preset;
+}
 
 PageView::PageView(StableId stable_id, PageSetOptions options)
     : Control(std::move(stable_id)), pages_(options) {
@@ -94,6 +119,11 @@ PageView::PageView(StableId stable_id, PageSetOptions options)
 void PageView::initialize_control_tree() {
     const std::string prefix(stable_id().value());
     strip_ = make_control<PageViewStrip>(StableId(prefix + ".strip"), pages_);
+    if (preset_ == PageViewPreset::document) {
+        (*strip_).set_close_buttons(PageCloseButtons::selected_and_hot);
+        (*strip_).set_overflow(PageStripOverflow::shrink_then_list);
+        (*strip_).set_mnemonics_enabled(false);
+    }
     add_child(strip_);
 }
 
@@ -150,6 +180,14 @@ std::size_t PageView::slot_index(const PageId& page) const {
 }
 
 // -- settings ------------------------------------------------------------------
+
+void PageView::set_close_policy(PageViewClosePolicy policy) {
+    require_mutable();
+    if (policy != PageViewClosePolicy::remove_when_unhandled && policy != PageViewClosePolicy::request_only) {
+        throw std::invalid_argument("PageView close policy is invalid");
+    }
+    close_policy_ = policy;
+}
 
 void PageView::set_ctrl_tab(PageViewCtrlTab policy) {
     require_mutable();
@@ -360,10 +398,24 @@ void PageView::on_paint(Painter& painter, Rect) {
 // -- keys ----------------------------------------------------------------------
 
 // The bubble phase reaches the innermost view around the focus first, so a
-// nested view handles these keys before the view around it.
+// nested view handles these keys before the view around it. Ctrl+F4 closes
+// the selected closable page and Ctrl+Shift+PageDown and PageUp move it
+// within its group (owner decision DK-38). Delete is left to the focused
+// control: it closes nothing.
 void PageView::on_key_bubble(KeyEvent& event) {
-    if (event.action != KeyAction::down || !strip_ || pages_.count() == 0U) return;
+    if (event.handled || event.action != KeyAction::down || !strip_ || pages_.count() == 0U) return;
     const bool page_key = event.physical_key == PhysicalKey::page_down || event.physical_key == PhysicalKey::page_up;
+    if (event.physical_key == PhysicalKey::f4 && event.modifiers == Modifier::control) {
+        const std::optional<PageId> selected = pages_.selected_page();
+        if (selected) static_cast<void>((*strip_).request_close(*selected, PageCloseCause::keyboard));
+        event.handled = true;
+        return;
+    }
+    if (page_key && event.modifiers == (Modifier::control | Modifier::shift)) {
+        static_cast<void>((*strip_).move_selected(event.physical_key == PhysicalKey::page_down ? 1 : -1));
+        event.handled = true;
+        return;
+    }
     if (page_key && event.modifiers == Modifier::control) {
         const int direction = event.physical_key == PhysicalKey::page_down ? 1 : -1;
         static_cast<void>((*strip_).select_relative(direction, PageSelectionCause::keyboard));

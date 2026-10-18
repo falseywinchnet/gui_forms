@@ -249,9 +249,10 @@ void anatomy_and_parts() {
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "page_strip",
             "PageStrip publishes a valid anatomy");
     require(anatomy.item_systems.size() == 1U && anatomy.item_systems.front().name == "page" &&
-                anatomy.item_systems.front().custom_states.size() == 1U &&
-                anatomy.item_systems.front().custom_states.front().name == "pinned",
-            "PageStrip's tabs are the page item system with the admitted pinned state");
+                anatomy.item_systems.front().custom_states.size() == 2U &&
+                anatomy.item_systems.front().custom_states[0].name == "pinned" &&
+                anatomy.item_systems.front().custom_states[1].name == "modified",
+            "PageStrip's tabs are the page item system with the admitted pinned and modified states");
     const PageStrip::Parts parts = (*strip).parts();
     require(parts.region.present && parts.rail.present && !parts.scroll_back.present &&
                 !parts.list_button.present,
