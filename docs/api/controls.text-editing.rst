@@ -13,6 +13,8 @@ Text entry.
 
    * - :cpp:class:`TextBox <gui_forms::TextBox>`
      - An editable text field: one line by default, or a plain-text document with ``multiline``.
+   * - :cpp:class:`TokenBox <gui_forms::TokenBox>`
+     - A text field that turns each accepted entry into a removable token.
    * - :cpp:class:`MaskedTextBox <gui_forms::MaskedTextBox>`
      - A text box that takes input through a mask.
    * - :cpp:class:`AutoCompleteStringCollection <gui_forms::AutoCompleteStringCollection>`
@@ -24,6 +26,7 @@ Text entry.
    :hidden:
 
    generated/gui_forms.TextBox
+   generated/gui_forms.TokenBox
    generated/gui_forms.MaskedTextBox
    generated/gui_forms.AutoCompleteStringCollection
    generated/gui_forms.MaskedTextProvider
@@ -53,8 +56,24 @@ Related types
      -  
    * - :cpp:class:`TextEdit <gui_forms::TextEdit>`
      - One user edit, offered to the edit filter before the TextBox changes anything: replace [start, end) of text() with ``replacement``.
+   * - :cpp:class:`TextMatchRange <gui_forms::TextMatchRange>`
+     - The part of a text that matched a pattern: ``length`` bytes from byte ``offset``, both on scalar boundaries of the text.
    * - :cpp:class:`TextSelection <gui_forms::TextSelection>`
      - TextSelection is TextBox's normalized byte-boundary selection value.
+   * - :cpp:class:`Token <gui_forms::Token>`
+     - One accepted entry.
+   * - :cpp:class:`TokenBox::Item <gui_forms::TokenBox::Item>`
+     -  
+   * - :cpp:class:`TokenBox::ItemParts <gui_forms::TokenBox::ItemParts>`
+     -  
+   * - :cpp:class:`TokenBox::ItemStates <gui_forms::TokenBox::ItemStates>`
+     -  
+   * - :cpp:class:`TokenBox::Parts <gui_forms::TokenBox::Parts>`
+     - Stage T1 anatomy, as dot members.
+   * - :cpp:class:`TokenBox::States <gui_forms::TokenBox::States>`
+     -  
+   * - :cpp:class:`TokenId <gui_forms::TokenId>`
+     - A token's identity in its TokenBox: assigned when the token is added and never reused, so it stays valid while positions change.
 
 .. cpp:namespace:: gui_forms
 
@@ -259,6 +278,18 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: TextMatchRange final
+
+   ``#include <gui_forms/controls/panel/text_box/auto_complete/auto_complete.hpp>``
+
+   The part of a text that matched a pattern: ``length`` bytes from byte ``offset``, both on scalar boundaries of the text. A zero length is no match. Suggestion and drop-down lists highlight it.
+
+   .. cpp:member:: std::size_t offset
+
+   .. cpp:member:: std::size_t length
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TextSelection final
 
    ``#include <gui_forms/controls/panel/text_box/text_box.hpp>``
@@ -290,6 +321,102 @@ Related types
    .. cpp:member:: Utf8Offset anchor
 
    .. cpp:member:: Utf8Offset caret
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: Token final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   One accepted entry.
+
+   .. cpp:member:: TokenId id
+
+   .. cpp:member:: std::string text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenBox::Item final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   .. cpp:member:: TokenId id
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenBox::ItemParts final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   .. cpp:member:: PartGeometry token_face
+
+   .. cpp:member:: PartGeometry token_label
+
+   .. cpp:member:: PartGeometry token_close
+
+   .. cpp:member:: PartGeometry token_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenBox::ItemStates final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenBox::Parts final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   Stage T1 anatomy, as dot members. Tokens are an item system.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry field
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenBox::States final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   .. cpp:member:: bool normal
+
+   .. cpp:member:: bool enabled
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focused
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TokenId final
+
+   ``#include <gui_forms/controls/panel/token_box/token_box.hpp>``
+
+   A token's identity in its TokenBox: assigned when the token is added and never reused, so it stays valid while positions change. It is not an index.
+
+   .. cpp:member:: std::uint64_t value
 
 Enumerations
 ------------

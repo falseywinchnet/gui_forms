@@ -56,6 +56,14 @@ void add_match(std::string_view candidate, std::string_view typed, bool case_sen
     matches.emplace_back(candidate);
 }
 
+// Each suggestion's typed prefix, highlighted in the list: a prefix match
+// is the typed text's bytes from the start.
+std::vector<TextMatchRange> prefix_matches(std::size_t count, std::size_t typed_bytes) {
+    const TextMatchRange match{.offset = 0U, .length = typed_bytes};
+    std::vector<TextMatchRange> matches(count, match);
+    return matches;
+}
+
 } // namespace
 
 void TextBox::set_auto_complete_mode(AutoCompleteMode mode) {
@@ -353,6 +361,7 @@ void TextBox::open_auto_complete_list() {
     if (session.open) {
         session.synchronizing = true;
         (*session.list).set_items(session.suggestions);
+        (*session.list).set_matches(prefix_matches(session.suggestions.size(), session.typed.size()));
         (*session.list).clear_selection();
         (*session.list).set_top_index(0U);
         session.synchronizing = false;
@@ -379,6 +388,7 @@ void TextBox::open_auto_complete_list() {
     (*list).set_paint_plane(PaintPlane::overlay);
     (*list).set_font(font_);
     (*list).set_items(session.suggestions);
+    (*list).set_matches(prefix_matches(session.suggestions.size(), session.typed.size()));
     (*layer).set_content(list);
     PopupToken token = (*window()).open_popup(shared_from_this(), layer);
     session.layer = layer;
@@ -517,6 +527,7 @@ void TextBox::auto_complete_collection_changed() {
     }
     session.synchronizing = true;
     (*session.list).set_items(session.suggestions);
+    (*session.list).set_matches(prefix_matches(session.suggestions.size(), session.typed.size()));
     if (kept) {
         (*session.list).select_index(*kept);
     } else {

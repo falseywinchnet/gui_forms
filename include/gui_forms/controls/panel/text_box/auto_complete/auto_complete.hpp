@@ -52,6 +52,14 @@ enum class TextMatchMode : std::uint8_t {
     substring,  // the pattern occurs anywhere in the candidate
 };
 
+// The part of a text that matched a pattern: `length` bytes from byte
+// `offset`, both on scalar boundaries of the text. A zero length is no
+// match. Suggestion and drop-down lists highlight it.
+struct TextMatchRange final {
+    std::size_t offset{};
+    std::size_t length{};
+};
+
 // The byte offset in `candidate` of the first match of `pattern`, or none.
 // Bytes compare exactly, except that ASCII letters compare without case
 // unless `case_sensitive`; other characters (accented and non-Latin letters

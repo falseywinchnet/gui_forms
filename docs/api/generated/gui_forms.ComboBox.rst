@@ -98,6 +98,18 @@ gui_forms::ComboBox
       **editor** : ``std::shared_ptr<TextBox>``, read-only
          The drop_down style's :cpp:class:`TextBox <gui_forms::TextBox>`, or null in the drop_down_list style.
 
+      **drop_down_filter** : ``ComboBoxFilter``, default ``ComboBoxFilter::none``
+         Whether typing searches the list, in the drop_down style: ``prefix``
+         shows the items that start with the typed text and ``substring`` the items
+         that contain it, ignoring ASCII case, with the matched text highlighted.
+         While a filter is set the editor does not auto-complete. Changing it
+         closes the list; it is kept in the drop_down_list style, where it does
+         nothing.
+
+      **drop_down_items** : ``std::span<const std::size_t>``, read-only
+         The items the open list shows, as indices into :cpp:func:`items <gui_forms::ComboBox::items>`, in row order;
+         empty while the list is closed.
+
       **auto_complete_mode** : ``AutoCompleteMode``, default ``AutoCompleteMode::none``
          How the drop_down style's editor completes what is typed, as
          ``TextBox::auto_complete_mode``. The setting is kept in the
@@ -183,8 +195,11 @@ gui_forms::ComboBox
    In the drop_down style the open list does not take the focus: the editor
    keeps it, so typing goes on while the list is open, and the list closes
    when the field loses the focus. Up and Down choose the previous or next
-   item whether the list is open or not, and the editor shows each one; F4 and
-   Alt+Down open and close the list, and Enter and Escape close it. Space is
+   item, and the editor shows each one: while the list is open they move
+   through its rows, and from no selection either goes to the first row;
+   while it is closed they step through the items as in the drop_down_list
+   style. F4 and Alt+Down open and close the list, and Enter and Escape close
+   it. Space is
    typed. A press on the field's button opens or closes the list; a press in
    the editor places the caret. The selection follows the text: typed text
    that equals an item, ignoring ASCII case, selects it (the text stays as
@@ -192,6 +207,20 @@ gui_forms::ComboBox
    list is open (:cpp:func:`auto_complete_mode <gui_forms::ComboBox::auto_complete_mode>`), Up, Down, Enter and Escape are the
    suggestion list's; F4 and Alt+Down still open the field's own list, which
    closes the suggestions.
+
+   With a :cpp:func:`drop_down_filter <gui_forms::ComboBox::drop_down_filter>`, the combo box is searchable. Each edit the user
+   makes opens the list on the items that match the typed text, in their own
+   order, narrows or widens the rows as the text changes, and closes the list
+   when nothing matches; text set by the program (:cpp:func:`set_text <gui_forms::ComboBox::set_text>`, or the editor
+   showing a chosen item) does not filter. Opening the list with the button,
+   F4, Alt+Down or :cpp:func:`set_dropped_down <gui_forms::ComboBox::set_dropped_down>` shows every item. The rows keep their
+   items' identities: the selection is always an index into :cpp:func:`items <gui_forms::ComboBox::items>`, a row's
+   semantic ID ends in its item's index rather than its position, a row
+   pressed or chosen with the keys selects its item, and when the items change
+   under the open list the filter is applied again and the selection follows
+   the text. The matched text of each row is drawn as a highlight under its
+   label and published as the row's ``match`` part, except on the selected row,
+   whose own plate marks it.
 
    Opening the list and clicking a row therefore raises :cpp:func:`drop_down_changed <gui_forms::ComboBox::drop_down_changed>`
    with ``true``, then :cpp:func:`selected_index_changed <gui_forms::ComboBox::selected_index_changed>` if the row was not already
@@ -253,6 +282,21 @@ gui_forms::ComboBox
       window.dispatch_text(gf::TextInputEvent{"m"});
       // The field shows "medium wave" with "edium wave" selected, and the
       // text equals the second item, so (*band).selected_index() is 1.
+
+   A searchable field that lists the stations containing what is typed:
+
+   .. code-block:: cpp
+
+      std::shared_ptr<gf::ComboBox> station =
+          gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+      (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+      (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+      (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+      gf::Window window(station, gf::Size{240.0, 200.0});
+      window.request_focus((*station).editor());
+      window.dispatch_text(gf::TextInputEvent{"hb"});
+      // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+      // (*station).drop_down_items() is {0, 1, 3}.
 
 
    .. rubric:: Construction
@@ -369,6 +413,24 @@ gui_forms::ComboBox
    .. cpp:function:: std::shared_ptr<TextBox> editor() const noexcept
 
       The drop_down style's :cpp:class:`TextBox <gui_forms::TextBox>`, or null in the drop_down_list style.
+
+   .. cpp:function:: ComboBoxFilter drop_down_filter() const noexcept
+
+      Whether typing searches the list, in the drop_down style: ``prefix``
+      shows the items that start with the typed text and ``substring`` the items
+      that contain it, ignoring ASCII case, with the matched text highlighted.
+      While a filter is set the editor does not auto-complete. Changing it
+      closes the list; it is kept in the drop_down_list style, where it does
+      nothing.
+
+   .. cpp:function:: void set_drop_down_filter(ComboBoxFilter filter)
+
+      Sets :cpp:func:`drop_down_filter <gui_forms::ComboBox::drop_down_filter>`; see the property's description above.
+
+   .. cpp:function:: std::span<const std::size_t> drop_down_items() const noexcept
+
+      The items the open list shows, as indices into :cpp:func:`items <gui_forms::ComboBox::items>`, in row order;
+      empty while the list is closed.
 
    .. cpp:function:: AutoCompleteMode auto_complete_mode() const noexcept
 

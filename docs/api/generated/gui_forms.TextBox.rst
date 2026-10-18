@@ -15,8 +15,10 @@ gui_forms::TextBox
 
    The user clicks to place the caret, drags or uses Shift with the arrow keys
    to select, types to replace the selection, and uses the usual editing and
-   clipboard shortcuts. In a single-line box Enter raises :cpp:func:`committed <gui_forms::TextBox::committed>` and Escape
-   raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`, which suits search fields and inline editors. Set a
+   clipboard shortcuts. With :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>` set, Enter in a single-line box
+   raises :cpp:func:`committed <gui_forms::TextBox::committed>`; with :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>` set, Escape raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`.
+   Both suit search fields and inline editors; without them the keys go on to
+   the window's accept and cancel buttons. Set a
    :cpp:func:`password_character <gui_forms::TextBox::password_character>`, or :cpp:func:`use_system_password_character <gui_forms::TextBox::use_system_password_character>`, to mask a secret.
    Use a :cpp:class:`Label <gui_forms::Label>` for text the user only reads, a :cpp:class:`ComboBox <gui_forms::ComboBox>` to choose from a
    list, and a :cpp:class:`NumericUpDown <gui_forms::NumericUpDown>` for numbers.
@@ -73,6 +75,19 @@ gui_forms::TextBox
       **accepts_tab** : ``bool``, default ``false``
          Whether Tab inserts a tab character in a multi-line box instead of
          moving focus.
+
+      **accepts_enter** : ``bool``, default ``false``
+         Whether plain Enter (no modifiers) in a single-line box is the box's own
+         when it has nothing else to accept: it raises :cpp:func:`committed <gui_forms::TextBox::committed>` and goes no
+         further. Set it on a box that is an edit session, such as a search field
+         or an in-place editor. Otherwise such an Enter goes on to the containers
+         and the window's accept button. A multi-line box always takes Enter.
+
+      **accepts_escape** : ``bool``, default ``false``
+         Whether plain Escape (no modifiers) is the box's own when it has nothing
+         else to cancel: it raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and goes no further. Set it on a
+         box that is an edit session, such as an in-place editor. Otherwise such
+         an Escape goes on to the containers and the window's cancel button.
 
       **scroll_offset** : ``Point``, read-only
 
@@ -165,14 +180,17 @@ gui_forms::TextBox
          It carries the new selection.
 
       **committed** : ``Event<const std::string&>``
-         Raised when the user presses Enter in a single-line box, even a read-only
-         one. It carries the current text.
+         Raised when the user presses plain Enter in a single-line box that
+         :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`, even a read-only one. It carries the current text. It
+         is not raised for an Enter that accepts a suggestion or an appended
+         completion, or that meets a composition.
 
       **cancelled** : ``Event<>``
-         Raised when the user presses Escape, in either mode. The text is left
-         unchanged; restore it in the handler if the edit should be discarded.
-         It is not raised for an Escape that closes the suggestion list or
-         removes an appended completion.
+         Raised when the user presses plain Escape in a box that
+         :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`, in either mode. The text is left unchanged; restore it
+         in the handler if the edit should be discarded. It is not raised for an
+         Escape that closes the suggestion list, removes an appended completion,
+         or meets a composition or a selection drag.
 
       **auto_complete_open_changed** : ``Event<bool>``
          Raised with ``true`` after the suggestion list opens and with ``false``
@@ -253,9 +271,22 @@ gui_forms::TextBox
    paste; with Z they undo, and with Shift+Z or Y they redo. Ctrl and Cmd are
    both accepted on every platform. Text input replaces the selection.
 
-   The box handles Enter and Escape itself. While it has focus, they never reach
-   the window's accept and cancel buttons; handle :cpp:func:`committed <gui_forms::TextBox::committed>` and :cpp:func:`cancelled <gui_forms::TextBox::cancelled>`
-   instead.
+   During an input-method composition the box keeps Enter and Escape from the
+   window and leaves them to the input method. Otherwise, in a multi-line box
+   Enter inserts :cpp:func:`newline_sequence <gui_forms::TextBox::newline_sequence>`. In a single-line box Enter is the box's
+   only while an open suggestion list or appended completion is there to
+   accept. With :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>` set, a plain Enter with nothing else to accept
+   raises :cpp:func:`committed <gui_forms::TextBox::committed>` and stops there. Every other Enter goes on unhandled to
+   the containers and the window's accept button, as in Windows Forms, where
+   the form's AcceptButton receives it.
+
+   Escape is the box's only while it has something to cancel: an open
+   suggestion list or appended completion (Escape closes or removes it), a
+   composition, or a selection drag (Escape ends it, keeping what is
+   selected). With :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>` set, a plain Escape with nothing else to
+   cancel raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and stops there. Every other Escape, with or without Shift, goes
+   on unhandled to the containers, menus and the window's cancel button, as in
+   Windows Forms, where the form's CancelButton receives it.
 
    Auto-complete runs after each edit the user makes. Typing at the end of the
    text in ``append`` or ``suggest_append`` mode appends the rest of the first
@@ -263,8 +294,9 @@ gui_forms::TextBox
    replaces it; the typed text keeps its own case. Deleting, pasting, typing
    before the end and input-method composition never append, and nothing is
    appended past :cpp:func:`maximum_length <gui_forms::TextBox::maximum_length>`. In ``suggest`` and ``suggest_append`` mode a
-   list of the matching candidates opens under the box; it never takes the
-   focus, so typing goes on in the box, and it closes when nothing matches.
+   list of the matching candidates opens under the box, each with the typed
+   prefix highlighted; it never takes the focus, so typing goes on in the box,
+   and it closes when nothing matches.
    Matching is by prefix and ignores the case of ASCII letters unless
    :cpp:func:`auto_complete_case_sensitive <gui_forms::TextBox::auto_complete_case_sensitive>` is set.
 
@@ -272,9 +304,9 @@ gui_forms::TextBox
    next, and from the last returns to the typed text; Up goes the other way.
    The highlighted suggestion is shown in the box. Enter or Tab accepts the
    highlighted suggestion, or the appended completion when nothing is
-   highlighted, and is consumed: the next Enter commits and the next Tab moves
-   the focus. Enter or Tab with nothing to accept closes the list and does its
-   usual work. Escape closes the list and puts back what the user typed,
+   highlighted, and is consumed: the next Enter or Tab does its usual work.
+   Enter or Tab with nothing to accept closes the list and does its usual
+   work. Escape closes the list and puts back what the user typed,
    removing an appended completion. Pressing a row highlights it and releasing
    on it accepts it. A press outside the list closes it, keeping the text; so
    do moving the caret, losing the focus, :cpp:func:`set_text <gui_forms::TextBox::set_text>`, undo and redo. A
@@ -322,6 +354,7 @@ gui_forms::TextBox
           Search() {
               (*field).set_placeholder_text("Search");
               (*field).set_accessible_name("Search");
+              (*field).set_accepts_enter(true);
               gf::on((*field).committed(), *this, &Search::on_commit);
           }
           void on_commit(const std::string& text) { query = text; }
@@ -446,6 +479,29 @@ gui_forms::TextBox
    .. cpp:function:: void set_accepts_tab(bool enabled)
 
       Sets :cpp:func:`accepts_tab <gui_forms::TextBox::accepts_tab>`; see the property's description above.
+
+   .. cpp:function:: bool accepts_enter() const noexcept
+
+      Whether plain Enter (no modifiers) in a single-line box is the box's own
+      when it has nothing else to accept: it raises :cpp:func:`committed <gui_forms::TextBox::committed>` and goes no
+      further. Set it on a box that is an edit session, such as a search field
+      or an in-place editor. Otherwise such an Enter goes on to the containers
+      and the window's accept button. A multi-line box always takes Enter.
+
+   .. cpp:function:: void set_accepts_enter(bool enabled)
+
+      Sets :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`; see the property's description above.
+
+   .. cpp:function:: bool accepts_escape() const noexcept
+
+      Whether plain Escape (no modifiers) is the box's own when it has nothing
+      else to cancel: it raises :cpp:func:`cancelled <gui_forms::TextBox::cancelled>` and goes no further. Set it on a
+      box that is an edit session, such as an in-place editor. Otherwise such
+      an Escape goes on to the containers and the window's cancel button.
+
+   .. cpp:function:: void set_accepts_escape(bool enabled)
+
+      Sets :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`; see the property's description above.
 
    .. cpp:function:: Point scroll_offset() const noexcept
 
@@ -590,15 +646,18 @@ gui_forms::TextBox
 
    .. cpp:function:: Event<const std::string&>& committed() noexcept
 
-      Raised when the user presses Enter in a single-line box, even a read-only
-      one. It carries the current text.
+      Raised when the user presses plain Enter in a single-line box that
+      :cpp:func:`accepts_enter <gui_forms::TextBox::accepts_enter>`, even a read-only one. It carries the current text. It
+      is not raised for an Enter that accepts a suggestion or an appended
+      completion, or that meets a composition.
 
    .. cpp:function:: Event<>& cancelled() noexcept
 
-      Raised when the user presses Escape, in either mode. The text is left
-      unchanged; restore it in the handler if the edit should be discarded.
-      It is not raised for an Escape that closes the suggestion list or
-      removes an appended completion.
+      Raised when the user presses plain Escape in a box that
+      :cpp:func:`accepts_escape <gui_forms::TextBox::accepts_escape>`, in either mode. The text is left unchanged; restore it
+      in the handler if the edit should be discarded. It is not raised for an
+      Escape that closes the suggestion list, removes an appended completion,
+      or meets a composition or a selection drag.
 
    .. cpp:function:: Event<bool>& auto_complete_open_changed() noexcept
 

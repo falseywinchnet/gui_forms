@@ -2,8 +2,10 @@ An editable text field: one line by default, or a plain-text document with `mult
 
 The user clicks to place the caret, drags or uses Shift with the arrow keys
 to select, types to replace the selection, and uses the usual editing and
-clipboard shortcuts. In a single-line box Enter raises `committed` and Escape
-raises `cancelled`, which suits search fields and inline editors. Set a
+clipboard shortcuts. With `accepts_enter` set, Enter in a single-line box
+raises `committed`; with `accepts_escape` set, Escape raises `cancelled`.
+Both suit search fields and inline editors; without them the keys go on to
+the window's accept and cancel buttons. Set a
 `password_character`, or `use_system_password_character`, to mask a secret.
 Use a `Label` for text the user only reads, a `ComboBox` to choose from a
 list, and a `NumericUpDown` for numbers.
@@ -51,6 +53,17 @@ newline_sequence : default ``"\n"``
 accepts_tab : default ``false``
     Whether Tab inserts a tab character in a multi-line box instead of
     moving focus.
+accepts_enter : default ``false``
+    Whether plain Enter (no modifiers) in a single-line box is the box's own
+    when it has nothing else to accept: it raises `committed` and goes no
+    further. Set it on a box that is an edit session, such as a search field
+    or an in-place editor. Otherwise such an Enter goes on to the containers
+    and the window's accept button. A multi-line box always takes Enter.
+accepts_escape : default ``false``
+    Whether plain Escape (no modifiers) is the box's own when it has nothing
+    else to cancel: it raises `cancelled` and goes no further. Set it on a
+    box that is an edit session, such as an in-place editor. Otherwise such
+    an Escape goes on to the containers and the window's cancel button.
 maximum_length : default ``0``
     Largest number of Unicode scalar values the user may produce; zero means
     no limit. An edit, paste or assistive-technology set-value whose result
@@ -119,13 +132,16 @@ selection_changed
     Raised after the selection or caret moves, and after every text change.
     It carries the new selection.
 committed
-    Raised when the user presses Enter in a single-line box, even a read-only
-    one. It carries the current text.
+    Raised when the user presses plain Enter in a single-line box that
+    `accepts_enter`, even a read-only one. It carries the current text. It
+    is not raised for an Enter that accepts a suggestion or an appended
+    completion, or that meets a composition.
 cancelled
-    Raised when the user presses Escape, in either mode. The text is left
-    unchanged; restore it in the handler if the edit should be discarded.
-    It is not raised for an Escape that closes the suggestion list or
-    removes an appended completion.
+    Raised when the user presses plain Escape in a box that
+    `accepts_escape`, in either mode. The text is left unchanged; restore it
+    in the handler if the edit should be discarded. It is not raised for an
+    Escape that closes the suggestion list, removes an appended completion,
+    or meets a composition or a selection drag.
 auto_complete_open_changed
     Raised with `true` after the suggestion list opens and with `false`
     after it closes, whichever way it closed.
@@ -220,9 +236,22 @@ with Cmd. Ctrl or Cmd with A selects all; with C, X and V they copy, cut and
 paste; with Z they undo, and with Shift+Z or Y they redo. Ctrl and Cmd are
 both accepted on every platform. Text input replaces the selection.
 
-The box handles Enter and Escape itself. While it has focus, they never reach
-the window's accept and cancel buttons; handle `committed` and `cancelled`
-instead.
+During an input-method composition the box keeps Enter and Escape from the
+window and leaves them to the input method. Otherwise, in a multi-line box
+Enter inserts `newline_sequence`. In a single-line box Enter is the box's
+only while an open suggestion list or appended completion is there to
+accept. With `accepts_enter` set, a plain Enter with nothing else to accept
+raises `committed` and stops there. Every other Enter goes on unhandled to
+the containers and the window's accept button, as in Windows Forms, where
+the form's AcceptButton receives it.
+
+Escape is the box's only while it has something to cancel: an open
+suggestion list or appended completion (Escape closes or removes it), a
+composition, or a selection drag (Escape ends it, keeping what is
+selected). With `accepts_escape` set, a plain Escape with nothing else to
+cancel raises `cancelled` and stops there. Every other Escape, with or without Shift, goes
+on unhandled to the containers, menus and the window's cancel button, as in
+Windows Forms, where the form's CancelButton receives it.
 
 Auto-complete runs after each edit the user makes. Typing at the end of the
 text in `append` or `suggest_append` mode appends the rest of the first
@@ -230,8 +259,9 @@ candidate that starts with the typed text, selected, so the next character
 replaces it; the typed text keeps its own case. Deleting, pasting, typing
 before the end and input-method composition never append, and nothing is
 appended past `maximum_length`. In `suggest` and `suggest_append` mode a
-list of the matching candidates opens under the box; it never takes the
-focus, so typing goes on in the box, and it closes when nothing matches.
+list of the matching candidates opens under the box, each with the typed
+prefix highlighted; it never takes the focus, so typing goes on in the box,
+and it closes when nothing matches.
 Matching is by prefix and ignores the case of ASCII letters unless
 `auto_complete_case_sensitive` is set.
 
@@ -239,9 +269,9 @@ While the list is open, Down highlights the first suggestion and then the
 next, and from the last returns to the typed text; Up goes the other way.
 The highlighted suggestion is shown in the box. Enter or Tab accepts the
 highlighted suggestion, or the appended completion when nothing is
-highlighted, and is consumed: the next Enter commits and the next Tab moves
-the focus. Enter or Tab with nothing to accept closes the list and does its
-usual work. Escape closes the list and puts back what the user typed,
+highlighted, and is consumed: the next Enter or Tab does its usual work.
+Enter or Tab with nothing to accept closes the list and does its usual
+work. Escape closes the list and puts back what the user typed,
 removing an appended completion. Pressing a row highlights it and releasing
 on it accepts it. A press outside the list closes it, keeping the text; so
 do moving the caret, losing the focus, `set_text`, undo and redo. A
@@ -289,6 +319,7 @@ A search field that acts when the user presses Enter:
        Search() {
            (*field).set_placeholder_text("Search");
            (*field).set_accessible_name("Search");
+           (*field).set_accepts_enter(true);
            gf::on((*field).committed(), *this, &Search::on_commit);
        }
        void on_commit(const std::string& text) { query = text; }

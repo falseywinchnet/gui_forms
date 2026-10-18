@@ -65,6 +65,16 @@ auto_complete_custom_source
     The collection the `custom_source` source reads; a new combo box owns an
     empty one, and an assigned one is shared. A null collection throws
     `std::invalid_argument`.
+drop_down_filter : default ``ComboBoxFilter::none``
+    Whether typing searches the list, in the drop_down style: `prefix`
+    shows the items that start with the typed text and `substring` the items
+    that contain it, ignoring ASCII case, with the matched text highlighted.
+    While a filter is set the editor does not auto-complete. Changing it
+    closes the list; it is kept in the drop_down_list style, where it does
+    nothing.
+drop_down_items
+    The items the open list shows, as indices into `items`, in row order;
+    empty while the list is closed.
 placeholder_text : default ``""``
     Text shown in a muted colour when nothing is selected. It is also the
     accessible description when the control has none of its own. It must
@@ -153,8 +163,11 @@ disabled or removed from the window.
 In the drop_down style the open list does not take the focus: the editor
 keeps it, so typing goes on while the list is open, and the list closes
 when the field loses the focus. Up and Down choose the previous or next
-item whether the list is open or not, and the editor shows each one; F4 and
-Alt+Down open and close the list, and Enter and Escape close it. Space is
+item, and the editor shows each one: while the list is open they move
+through its rows, and from no selection either goes to the first row;
+while it is closed they step through the items as in the drop_down_list
+style. F4 and Alt+Down open and close the list, and Enter and Escape close
+it. Space is
 typed. A press on the field's button opens or closes the list; a press in
 the editor places the caret. The selection follows the text: typed text
 that equals an item, ignoring ASCII case, selects it (the text stays as
@@ -162,6 +175,20 @@ typed), and other text clears the selection. While the editor's suggestion
 list is open (`auto_complete_mode`), Up, Down, Enter and Escape are the
 suggestion list's; F4 and Alt+Down still open the field's own list, which
 closes the suggestions.
+
+With a `drop_down_filter`, the combo box is searchable. Each edit the user
+makes opens the list on the items that match the typed text, in their own
+order, narrows or widens the rows as the text changes, and closes the list
+when nothing matches; text set by the program (`set_text`, or the editor
+showing a chosen item) does not filter. Opening the list with the button,
+F4, Alt+Down or `set_dropped_down` shows every item. The rows keep their
+items' identities: the selection is always an index into `items`, a row's
+semantic ID ends in its item's index rather than its position, a row
+pressed or chosen with the keys selects its item, and when the items change
+under the open list the filter is applied again and the selection follows
+the text. The matched text of each row is drawn as a highlight under its
+label and published as the row's `match` part, except on the selected row,
+whose own plate marks it.
 
 Opening the list and clicking a row therefore raises `drop_down_changed`
 with `true`, then `selected_index_changed` if the row was not already
@@ -223,3 +250,18 @@ An editable field that completes from its items:
    window.dispatch_text(gf::TextInputEvent{"m"});
    // The field shows "medium wave" with "edium wave" selected, and the
    // text equals the second item, so (*band).selected_index() is 1.
+
+A searchable field that lists the stations containing what is typed:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::ComboBox> station =
+       gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+   (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+   (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+   (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+   gf::Window window(station, gf::Size{240.0, 200.0});
+   window.request_focus((*station).editor());
+   window.dispatch_text(gf::TextInputEvent{"hb"});
+   // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+   // (*station).drop_down_items() is {0, 1, 3}.

@@ -632,6 +632,21 @@ void example() {
 }
 }  // namespace doc_example_ComboBox_3
 
+namespace doc_example_ComboBox_4 {
+void example() {
+    std::shared_ptr<gf::ComboBox> station =
+        gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+    (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+    (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+    gf::Window window(station, gf::Size{240.0, 200.0});
+    window.request_focus((*station).editor());
+    window.dispatch_text(gf::TextInputEvent{"hb"});
+    // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+    // (*station).drop_down_items() is {0, 1, 3}.
+}
+}  // namespace doc_example_ComboBox_4
+
 namespace doc_example_Command_1 {
 struct Document final : gf::Component {
     gf::Command save{"file.save", "Save"};
@@ -2836,6 +2851,7 @@ struct Search final : gf::Component {
     Search() {
         (*field).set_placeholder_text("Search");
         (*field).set_accessible_name("Search");
+        (*field).set_accepts_enter(true);
         gf::on((*field).committed(), *this, &Search::on_commit);
     }
     void on_commit(const std::string& text) { query = text; }
@@ -2927,6 +2943,22 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_TokenBox_1 {
+void example() {
+    std::shared_ptr<gf::TokenBox> recipients =
+        gf::make_control<gf::TokenBox>(gf::StableId("mail.to"));
+    (*(*recipients).auto_complete_custom_source()).add_range({"Ada Lovelace", "Alan Turing"});
+    (*recipients).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*recipients).set_auto_complete_mode(gf::AutoCompleteMode::suggest);
+    const gf::TokenId grace = (*recipients).add_token("Grace Hopper");
+    gf::Window window(recipients, gf::Size{400.0, 60.0});
+    window.request_focus((*recipients).editor());
+    window.dispatch_text(gf::TextInputEvent{"Barbara Liskov,"});
+    // The box holds "Grace Hopper" and "Barbara Liskov"; the editor is empty.
+    (*recipients).remove_token(grace);   // now only "Barbara Liskov"
+}
+}  // namespace doc_example_TokenBox_1
 
 namespace doc_example_ToolStrip_1 {
 void example() {
@@ -3435,6 +3467,7 @@ int main() {
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
     failures += run("ComboBox example 2", &doc_example_ComboBox_2::example);
     failures += run("ComboBox example 3", &doc_example_ComboBox_3::example);
+    failures += run("ComboBox example 4", &doc_example_ComboBox_4::example);
     failures += run("Command example 1", &doc_example_Command_1::example);
     failures += run("Command example 2", &doc_example_Command_2::example);
     failures += run("CommandBar example 1", &doc_example_CommandBar_1::example);
@@ -3545,6 +3578,7 @@ int main() {
     failures += run("TextBox example 3", &doc_example_TextBox_3::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("TokenBox example 1", &doc_example_TokenBox_1::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
     failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
     failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);
