@@ -196,3 +196,20 @@ D6-1; D7-1). The owner, verbatim:
 - **GIVEN D6-1.** Ctrl held suppresses docking during a drag.
 - **GIVEN D7-1.** A caption drag moves the whole stack; a tab drag moves
   one panel.
+
+### Note, 2026-10-17: the postage stamp corrected
+
+While a mockup was being drawn, the owner corrected the reading of D1,
+verbatim:
+
+> by th epostage stamp i do NOT mean the panel resizes, i mean it dissapears and an interpolated miniature is shown
+
+- **GIVEN D1, corrected.** At the start of a drag the panel disappears from
+  its place, and an interpolated miniature of it is shown instead: an
+  image of the panel animated from the panel's own rectangle down to the
+  small stamp that follows the pointer. The panel itself is never
+  resized. This replaces the D1 entry's "Recorded reading" above where
+  the two differ. Open, for the mockup: whether the vacated place closes
+  up during the drag or stays as an empty slot until the drop, and how the
+  miniature grows back into the target at the drop (and into its old place
+  on Escape).

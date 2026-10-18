@@ -114,9 +114,11 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
 22. **Placeholders remember hidden panels' places (C5-1).**
 23. **Shrinking collapses tool panels by declared priority (C6-1),** then
     the window minimum grows.
-24. **The postage-stamp drag (D1):** a dragged panel tears off at once and
-    shrinks to a small image of itself that follows the pointer; the
-    layout changes only at the drop; Escape puts it back (D1b-1).
+24. **The postage-stamp drag (D1, as corrected):** at the start of a drag
+    the panel disappears from its place and an interpolated miniature of
+    it, animated from the panel's rectangle down to a small stamp, follows
+    the pointer; the panel itself is never resized; Escape puts it back
+    (D1b-1). Whether the vacated place closes up during the drag is open.
 25. **Position-sensitive targets (D2):** the target depends on where the
     pointer hovers within a pane (edge bands split, centre tabs into),
     with the resulting area highlighted; the window's outer edges are
