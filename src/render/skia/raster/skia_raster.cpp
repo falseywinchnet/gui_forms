@@ -1136,6 +1136,26 @@ void SkiaRaster::draw_text_utf8(Point origin,
     }
 }
 
+void SkiaRaster::draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font_spec,
+                                       const Color color, const TextOrientation orientation) {
+    if (orientation == TextOrientation::horizontal) {
+        draw_text_utf8(origin, text, font_spec, color);
+        return;
+    }
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || text.empty()) return;
+    const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
+    // A positive Skia rotation turns clockwise on the y-down surface:
+    // bottom_to_top is a quarter turn anticlockwise, top_to_bottom clockwise.
+    const SkScalar degrees = orientation == TextOrientation::bottom_to_top ? -90.0F : 90.0F;
+    (*canvas).save();
+    (*canvas).translate(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y));
+    (*canvas).rotate(degrees);
+    const Point run_origin{0.0, 0.0};
+    (*impl_).draw_shaped_text(*canvas, shaped, run_origin, font_spec, color);
+    (*canvas).restore();
+}
+
 Size SkiaRaster::measure_text_utf8(std::string_view text,
                                    FontSpec font_spec) {
     if (text.empty()) return {0.0, font_spec.size};

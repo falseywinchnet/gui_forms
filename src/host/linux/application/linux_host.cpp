@@ -369,6 +369,8 @@ std::uint32_t key_usage(KeySym key) {
     return PhysicalKey::enter;
   case XK_Escape:
     return PhysicalKey::escape;
+  case XK_Menu:
+    return PhysicalKey::context_menu;
   case XK_BackSpace:
     return PhysicalKey::backspace;
   case XK_Tab:
@@ -1467,7 +1469,9 @@ HostCapabilities linux_capabilities() {
               HostCapability::typed_drag_destination |
               HostCapability::runtime_windows | HostCapability::window_frames |
               HostCapability::screen_pointer | HostCapability::window_at_point |
-              HostCapability::window_ordering};
+              HostCapability::window_ordering,
+          // X11 desktops follow the PC keyboard convention.
+          pc_key_map()};
 }
 int run_linux_application(std::vector<LinuxApplicationWindow> windows,
                           LinuxApplicationOptions application) {

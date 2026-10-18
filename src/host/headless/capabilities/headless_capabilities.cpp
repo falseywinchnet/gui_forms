@@ -29,6 +29,8 @@ HostCapabilities headless_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering};
+                HostCapability::window_ordering,
+            // The reference host reports the PC convention.
+            pc_key_map()};
 }
 } // namespace gui_forms::host

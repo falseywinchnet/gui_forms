@@ -1,5 +1,7 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 
+#include "text_box_auto_complete_session.hpp"
+
 #include "../input_control_utilities.hpp"
 #include "gui_forms/detail/algorithm/binary_search.hpp"
 #include "gui_forms/detail/bound_member_function.hpp"
@@ -40,6 +42,7 @@ TextBox::TextBox(StableId stable_id, std::string text)
     set_focusable(true);
     set_cursor(CursorKind::text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
+    auto_complete_custom_source_ = std::make_shared<AutoCompleteStringCollection>();
     define_bindable_property({
         {"text", BindingValueKind::text, "Appearance",
          "Editable UTF-8 text content.", BindingValue{std::string{}},
@@ -66,6 +69,9 @@ void TextBox::set_text(std::string text) {
     if (text == store_.utf8()) {
         return;
     }
+    end_auto_complete(false);
+    // Replacing the whole text abandons any composition it held.
+    composing_ = false;
     store_.set_text(text);
     selection_ = {store_.utf8_size(), store_.utf8_size()};
     layout_positions_.clear();
@@ -99,6 +105,7 @@ void TextBox::set_read_only(bool read_only) {
     if (read_only_ == read_only) {
         return;
     }
+    end_auto_complete(false);
     read_only_ = read_only;
     invalidate(Dirty::paint | Dirty::semantics);
 }
@@ -109,6 +116,7 @@ void TextBox::set_multiline(bool enabled_value) {
     if (enabled_value && (password_protected() || validate_multiline_text(text()) != MultilineValidation::valid)) {
         throw std::invalid_argument("Multiline TextBox requires unmasked valid UTF-8, at most 1 MiB total and 4096 bytes per line");
     }
+    end_auto_complete(false);
     multiline_ = enabled_value;
     multiline_width_ = -1.0;
     horizontal_offset_ = 0.0;
@@ -140,6 +148,16 @@ void TextBox::set_accepts_tab(bool enabled_value) {
     accepts_tab_ = enabled_value;
 }
 
+void TextBox::set_accepts_enter(bool enabled_value) {
+    require_mutable();
+    accepts_enter_ = enabled_value;
+}
+
+void TextBox::set_accepts_escape(bool enabled_value) {
+    require_mutable();
+    accepts_escape_ = enabled_value;
+}
+
 void TextBox::set_maximum_length(std::size_t length) {
     require_mutable();
     if (length > maximum_configured_length_) {
@@ -161,6 +179,7 @@ void TextBox::set_password_character(char32_t character) {
             "TextBox password character must be one printable Unicode scalar");
     }
     if (password_character_ == character) return;
+    end_auto_complete(false);
     password_character_ = character;
     layout_positions_.clear();
     layout_offsets_.clear();
@@ -174,6 +193,7 @@ void TextBox::set_use_system_password_character(bool enabled_value) {
         throw std::invalid_argument("Multiline TextBox does not support password masking");
     }
     if (use_system_password_character_ == enabled_value) return;
+    end_auto_complete(false);
     use_system_password_character_ = enabled_value;
     layout_positions_.clear();
     layout_offsets_.clear();
@@ -224,6 +244,7 @@ TextBox::Snapshot TextBox::snapshot() const {
 }
 
 void TextBox::apply_snapshot(Snapshot snapshot) {
+    end_auto_complete(false);
     store_.set_text(snapshot.text);
     selection_ = snapshot.selection;
     layout_positions_.clear();
@@ -979,6 +1000,8 @@ void TextBox::on_pointer(PointerEvent& event) {
         if (window() != nullptr) {
             static_cast<void>((*window()).request_focus(shared_from_this()));
         }
+        // Placing the caret ends a completion and keeps the text.
+        end_auto_complete(false);
         const Utf8Offset position = multiline_ ? multiline_position_at(local_x, local_y) : position_at(local_x);
         const bool extend = includes(event.modifiers, Modifier::shift);
         set_selection(extend ? TextSelection{selection_.anchor, position}
@@ -1005,6 +1028,10 @@ void TextBox::on_pointer(PointerEvent& event) {
 
 void TextBox::on_key(KeyEvent& event) {
     if (!focused_ || !enabled() || event.action != KeyAction::down) {
+        return;
+    }
+    if (auto_complete_key(event)) {
+        event.handled = true;
         return;
     }
     const bool extend = includes(event.modifiers, Modifier::shift);
@@ -1051,22 +1078,50 @@ void TextBox::on_key(KeyEvent& event) {
         return;
     }
     if (event.physical_key == PhysicalKey::enter) {
+        // An open suggestion list or appended completion took Enter above.
+        if (composing_) {
+            // The composition is the input method's to commit; the box keeps
+            // the key from reaching the containers or the accept button.
+            event.handled = true;
+            return;
+        }
         if (multiline_) {
             if (!read_only_) static_cast<void>(replace_selection(newline_));
             event.handled = true;
             return;
         }
-        const std::string value(text());
-        committed_.emit(value);
-        event.handled = true;
+        if (accepts_enter_ && event.modifiers == Modifier::none) {
+            const std::string value(text());
+            committed_.emit(value);
+            event.handled = true;
+        }
+        // Otherwise nothing here to commit: the key goes on unhandled.
         return;
     }
     if (event.physical_key == PhysicalKey::escape) {
-        cancelled_.emit();
-        event.handled = true;
+        // An open suggestion list or appended completion took Escape above.
+        if (composing_) {
+            // The composition is the input method's to cancel; the box keeps
+            // the key from reaching the containers or the cancel button.
+            event.handled = true;
+            return;
+        }
+        if (selecting_ && has_pointer_capture()) {
+            // Escape ends a selection drag, keeping what it selected so far.
+            selecting_ = false;
+            set_pointer_capture(false);
+            event.handled = true;
+            return;
+        }
+        if (accepts_escape_ && event.modifiers == Modifier::none) {
+            cancelled_.emit();
+            event.handled = true;
+        }
+        // Otherwise nothing here to cancel: the key goes on unhandled.
         return;
     }
     if (command && event.physical_key == PhysicalKey::a) {
+        end_auto_complete(false);
         select_all();
         event.handled = true;
         return;
@@ -1077,12 +1132,14 @@ void TextBox::on_key(KeyEvent& event) {
         return;
     }
     if (command && event.physical_key == PhysicalKey::x) {
-        static_cast<void>(cut());
+        const bool cut_done = cut();
+        if (cut_done) auto_complete_after_edit(TextEditKind::deletion, false);
         event.handled = true;
         return;
     }
     if (command && event.physical_key == PhysicalKey::v) {
-        static_cast<void>(paste());
+        const bool pasted = paste();
+        if (pasted) auto_complete_after_edit(TextEditKind::paste, false);
         event.handled = true;
         return;
     }
@@ -1101,6 +1158,8 @@ void TextBox::on_key(KeyEvent& event) {
     }
     if (event.physical_key == PhysicalKey::left ||
         event.physical_key == PhysicalKey::right) {
+        // Moving the caret ends a completion and keeps the text.
+        end_auto_complete(false);
         const bool line_navigation = includes(event.modifiers, Modifier::meta);
         const bool word_navigation = !line_navigation &&
             (includes(event.modifiers, Modifier::control) ||
@@ -1128,6 +1187,7 @@ void TextBox::on_key(KeyEvent& event) {
     }
     if (event.physical_key == PhysicalKey::home ||
         event.physical_key == PhysicalKey::end) {
+        end_auto_complete(false);
         const Utf8Offset next = event.physical_key == PhysicalKey::home
             ? Utf8Offset(0U) : store_.utf8_size();
         set_selection(extend ? TextSelection{selection_.anchor, next}
@@ -1160,6 +1220,7 @@ void TextBox::on_key(KeyEvent& event) {
             event.handled = replace(std::min(other, selection_.caret),
                                     std::max(other, selection_.caret), {}, TextEditKind::deletion);
         }
+        if (event.handled) auto_complete_after_edit(TextEditKind::deletion, false);
     }
 }
 
@@ -1185,7 +1246,10 @@ void TextBox::on_text_input(TextInputEvent& event) {
             return;
         }
     }
+    // An empty composition is the input method cancelling one.
+    composing_ = event.composing && !event.text_utf8.empty();
     event.handled = replace(start, end, event.text_utf8, TextEditKind::typing);
+    if (event.handled) auto_complete_after_edit(TextEditKind::typing, event.composing);
 }
 
 void TextBox::reset_caret_blink() {
@@ -1213,11 +1277,14 @@ void TextBox::on_focus_changed(bool focused) {
     caret_damage_.valid = false;
     focused_ = focused;
     selecting_ = false;
+    composing_ = false;
     if (focused_) {
         reset_caret_blink();
     } else {
         caret_frame_.disconnect();
         caret_visible_ = false;
+        // Leaving the box ends a completion and keeps the text.
+        end_auto_complete(false);
     }
     invalidate(Dirty::paint | Dirty::semantics);
 }
@@ -1286,12 +1353,18 @@ SemanticDescriptor TextBox::semantic_descriptor() const {
     if (password_protected()) descriptor.states |= SemanticState::protected_content;
     descriptor.actions = {SemanticAction::focus};
     if (!read_only_) descriptor.actions.push_back(SemanticAction::set_value);
+    // A suggesting box opens a list; it is expanded while the list is open.
+    const bool suggesting = auto_complete_mode_ == AutoCompleteMode::suggest ||
+                            auto_complete_mode_ == AutoCompleteMode::suggest_append;
+    if (suggesting && auto_complete_active()) descriptor.has_popup = true;
+    if (auto_complete_open()) descriptor.states |= SemanticState::expanded;
     descriptor.exposed = true;
     return descriptor;
 }
 
 bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) {
     if (action == SemanticAction::set_value && !read_only_) {
+        end_auto_complete(false);
         const Utf8Offset start(0U);
         const Utf8Offset end = store_.utf8_size();
         const bool replaced = replace(start, end, value, TextEditKind::value);
@@ -1302,10 +1375,12 @@ bool TextBox::on_semantic_action(SemanticAction action, std::string_view value) 
 }
 
 void TextBox::on_detached_from_window() noexcept {
+    discard_auto_complete_list();
     caret_damage_.valid = false;
     caret_frame_.disconnect();
     focused_ = false;
     selecting_ = false;
+    composing_ = false;
 }
 
 
@@ -1463,11 +1538,13 @@ AnatomyStateSet TextBox::anatomy_states() const {
 namespace {
 
 // The events TextBox adds to those of Panel, in declaration order.
-constexpr std::array<InteractionDeclaration, 4> text_box_interactions{{
+constexpr std::array<InteractionDeclaration, 6> text_box_interactions{{
     {.name = "text_changed", .payload = "std::string", .mutable_payload = false},
     {.name = "selection_changed", .payload = "TextSelection", .mutable_payload = false},
     {.name = "committed", .payload = "std::string", .mutable_payload = false},
     {.name = "cancelled", .payload = "", .mutable_payload = false},
+    {.name = "auto_complete_open_changed", .payload = "bool", .mutable_payload = false},
+    {.name = "auto_complete_accepted", .payload = "std::string", .mutable_payload = false},
 }};
 
 } // namespace

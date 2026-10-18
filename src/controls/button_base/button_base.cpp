@@ -76,8 +76,15 @@ private:
         if (!state_.connected()) return;
         command_.set_checked(checked);
     }
+    // Through the window's command chain when the button has a window
+    // (owner decision DK-47); a detached button executes the command.
     void invoke(ButtonBase& source) {
         if (!state_.connected()) return;
+        Window* const window = source.attached_window();
+        if (window != nullptr) {
+            static_cast<void>(command_.execute_routed(*window, source.stable_id().value()));
+            return;
+        }
         static_cast<void>(command_.execute(source.stable_id().value()));
     }
     ButtonBase& button_;

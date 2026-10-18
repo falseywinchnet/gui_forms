@@ -74,6 +74,8 @@ struct VisualPaintOperationSnapshot final {
     ImageSampling image_sampling{ImageSampling::linear};
     std::size_t text_byte_count{};
     std::string text;
+    // The reading direction of a draw_text operation.
+    TextOrientation text_orientation{TextOrientation::horizontal};
 };
 
 struct VisualControlStateSnapshot final {
