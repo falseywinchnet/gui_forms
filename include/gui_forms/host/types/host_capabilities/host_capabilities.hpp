@@ -17,8 +17,9 @@ struct HostCapabilities final {
     HostCapability available{HostCapability::none};
     // The keys this host's convention gives the named keyboard commands
     // (owner decision DK-30, interview G5-1): host data, not core policy.
-    // HostSession installs it as the window's defaults; an application's
-    // rebindings (Window::rebind_key_command) stay over it.
+    // The first HostSession of an application seeds the application's
+    // KeyBindings with it (owner decision DK-44); the application's
+    // rebindings stay over it.
     KeyMap key_map{pc_key_map()};
 
     [[nodiscard]] bool supports(HostCapability capability) const noexcept {

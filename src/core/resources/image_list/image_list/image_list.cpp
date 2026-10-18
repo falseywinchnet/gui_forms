@@ -29,7 +29,8 @@ namespace {
 } // namespace
 
 ImageList::ImageList(Window& window, Size image_size)
-    : window_lifetime_(window.lifetime_), image_size_(image_size) {
+    : window_lifetime_(window.lifetime_), resources_(window.resources_),
+      image_size_(image_size) {
     window.verify_access("ImageList construction");
     validate_image_size(image_size_);
 }
@@ -40,7 +41,8 @@ ImageList::~ImageList() {
     // destructor never races the Window registry and the Window still owns the
     // bounded resources until its own teardown.
     if (is_alive()) {
-        if (Window* owner = bound_window(); owner && (*owner).check_access()) {
+        const std::shared_ptr<ApplicationResources> resources = resources_.lock();
+        if (resources && (*resources).check_access()) {
             release_all();
         }
     }
@@ -52,18 +54,25 @@ Window* ImageList::bound_window() const noexcept {
 }
 
 bool ImageList::belongs_to(const Window& window) const noexcept {
-    return bound_window() == &window;
+    const std::shared_ptr<ApplicationResources> resources = resources_.lock();
+    const bool shared = resources && window.resources_ == resources;
+    return shared;
 }
 
 void ImageList::require_access(std::string_view operation) const {
     if (!is_alive()) {
         throw std::logic_error("GUI.Forms cannot mutate a disposed ImageList");
     }
-    Window* owner = bound_window();
-    if (!owner) {
+    const std::shared_ptr<ApplicationResources> resources = resources_.lock();
+    if (!resources) {
         throw std::logic_error("GUI.Forms cannot use an ImageList after Window shutdown");
     }
-    (*owner).verify_access(operation);
+    if (!(*resources).check_access()) {
+        std::string message = "GUI.Forms ";
+        message += operation;
+        message += " must run on the window's UI thread";
+        throw std::logic_error(message);
+    }
 }
 
 bool ImageList::valid_state(ImageVisualState state) noexcept {
@@ -139,8 +148,8 @@ std::optional<std::size_t> ImageList::variant_index(
 }
 
 Size ImageList::source_size(ImageId image) const {
-    Window* owner = bound_window();
-    const std::optional<ImageResourceView> resource = owner ? (*owner).image_resources().find(image)
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
+    const std::optional<ImageResourceView> resource = owner ? (*owner).images().find(image)
                                 : std::optional<ImageResourceView>{};
     if (!resource) throw std::invalid_argument("ImageList requires a live Window image ID");
     return {static_cast<double>((*resource).metadata.width),
@@ -161,7 +170,7 @@ ImageLoadResult ImageList::add_png(std::string key,
                                   density_scale)) {
         throw std::invalid_argument("ImageList already contains this key/density variant");
     }
-    Window* owner = bound_window();
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
     ImageLoadResult loaded = (*owner).load_png(encoded);
     if (!loaded) return loaded;
     std::size_t changed_index{};
@@ -181,7 +190,7 @@ ImageLoadResult ImageList::add_png(std::string key,
             changed_index = entries_.size() - 1U;
         }
     } catch (...) {
-        if ((*owner).image_resources().find(loaded.image)) {
+        if ((*owner).images().find(loaded.image)) {
             static_cast<void>((*owner).remove_image(loaded.image));
         }
         throw;
@@ -200,7 +209,7 @@ ImageLoadResult ImageList::set_variant_png(
     const std::size_t entry_index = require_index(key);
     Entry& entry = entries_[entry_index];
     const std::optional<std::size_t> existing = variant_index(entry, state, density_scale);
-    Window* owner = bound_window();
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
     if (existing && entry.variants[*existing].owned) {
         Variant& variant = entry.variants[*existing];
         ImageLoadResult replaced = (*owner).replace_png(variant.image, encoded);
@@ -228,7 +237,7 @@ ImageLoadResult ImageList::set_variant_png(
             entry.variants.push_back(next);
         }
     } catch (...) {
-        if ((*owner).image_resources().find(loaded.image)) {
+        if ((*owner).images().find(loaded.image)) {
             static_cast<void>((*owner).remove_image(loaded.image));
         }
         throw;
@@ -282,9 +291,8 @@ void ImageList::set_variant_image(std::string_view key, ImageVisualState state,
         Variant& previous = entry.variants[*existing];
         if (previous.image == image) return;
         if (previous.owned) {
-            if (Window* owner = bound_window()) {
-                static_cast<void>((*owner).remove_image(previous.image));
-            }
+            const std::shared_ptr<ApplicationResources> owner = resources_.lock();
+            if (owner) static_cast<void>((*owner).remove_image(previous.image));
         }
         previous = {state, density_scale, image, source, false};
         emit_change(ImageListChangeKind::replaced, entry_index, entry.key);
@@ -316,7 +324,7 @@ void ImageList::set_key_name(std::size_t index, std::string key) {
 }
 
 void ImageList::release_entry(Entry& entry) noexcept {
-    Window* owner = bound_window();
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
     if (!owner) return;
     for (Variant& variant : entry.variants) {
         if (!variant.owned || variant.image.value == 0U) continue;
@@ -377,7 +385,7 @@ ImageListResolution ImageList::resolve(std::size_t index,
     result.requested_scale = density_scale;
     if (!is_alive() || index >= entries_.size() || !valid_state(state) ||
         !std::isfinite(density_scale) || density_scale <= 0.0) return result;
-    Window* owner = bound_window();
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
     if (!owner) return result;
 
     std::array<ImageVisualState, 3> states{state, ImageVisualState::normal,
@@ -404,7 +412,7 @@ ImageListResolution ImageList::resolve(std::size_t index,
         const Variant* smaller{};
         for (const Variant& variant : entry.variants) {
             if (variant.state != candidate_state ||
-                !(*owner).image_resources().find(variant.image)) continue;
+                !(*owner).images().find(variant.image)) continue;
             if (variant.density_scale == density_scale) exact = &variant;
             else if (variant.density_scale > density_scale &&
                      (!larger || variant.density_scale < (*larger).density_scale)) {
@@ -442,7 +450,10 @@ void ImageList::emit_change(ImageListChangeKind kind, std::size_t index,
 }
 
 void ImageList::verify_dispose_thread() {
-    if (Window* owner = bound_window()) (*owner).verify_access("ImageList disposal");
+    const std::shared_ptr<ApplicationResources> owner = resources_.lock();
+    if (owner && !(*owner).check_access()) {
+        throw std::logic_error("GUI.Forms ImageList disposal must run on the window's UI thread");
+    }
 }
 
 void ImageList::on_dispose() noexcept {
@@ -456,6 +467,7 @@ void ImageList::on_dispose() noexcept {
         // faults; Component::dispose is deliberately non-throwing here.
     }
     window_lifetime_.reset();
+    resources_.reset();
 }
 
 namespace {

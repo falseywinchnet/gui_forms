@@ -280,14 +280,33 @@ private:
     // Puts item beside target on side, in a new split; item takes ratio of
     // the split's span.
     void attach_beside(DockNodeId target_id, DockSide side, double ratio, DockNodeId item) {
+        const bool item_first = side_comes_first(side);
+        const double split_ratio = item_first ? ratio : 1.0 - ratio;
+        attach_in_split(target_id, side, item, new_node_id(), split_ratio);
+    }
+
+    // Whether no node or floating site uses an identity that was assigned
+    // before (node and site IDs share one count).
+    [[nodiscard]] bool identity_free(DockNodeId id) const noexcept {
+        if (id == DockNodeId{} || id.value >= state_.next_id) return false;
+        if (find_dock_node(state_, id) != nullptr) return false;
+        const DockSiteId as_site{id.value};
+        const bool free = find_dock_site(state_, as_site) == nullptr;
+        return free;
+    }
+
+    // Puts item beside target on side, in a split with the given identity
+    // whose first child takes split_ratio of its span.
+    void attach_in_split(DockNodeId target_id, DockSide side, DockNodeId item, DockNodeId split_identity,
+                         double split_ratio) {
         DockNode split{};
-        split.id = new_node_id();
+        split.id = split_identity;
         split.kind = DockNodeKind::split;
         split.axis = axis_for(side);
         const bool item_first = side_comes_first(side);
         split.first = item_first ? item : target_id;
         split.second = item_first ? target_id : item;
-        split.ratio = item_first ? ratio : 1.0 - ratio;
+        split.ratio = split_ratio;
         const DockNodeId split_id = split.id;
         const DockNodeId parent = (*find_dock_node(state_, target_id)).parent;
         insert_dock_node(state_, std::move(split));
@@ -590,8 +609,6 @@ private:
         const DockRefusal admitted = admit_stack(stack_id, DockRegion::auto_hidden);
         if (is_refusal(admitted)) return admitted;
         const StackSurroundings surroundings = surroundings_of(state_, stack_id);
-        remember(stack_id);
-        unlink_stack(stack_id);
         DockAutoHideEntry entry{};
         entry.stack = stack_id;
         entry.edge = edge;
@@ -599,6 +616,15 @@ private:
         entry.neighbour = surroundings.neighbour;
         entry.side = surroundings.side;
         entry.ratio = surroundings.ratio;
+        // The split unlink_stack removes, so that unpinning can recreate it.
+        const DockNode* parent = find_dock_node(state_, (*find_dock_node(state_, stack_id)).parent);
+        if (parent != nullptr && (*parent).kind == DockNodeKind::split) {
+            entry.split = (*parent).id;
+            entry.split_ratio = (*parent).ratio;
+        }
+        // The panels' remembered places are left as they are: a pin is
+        // undone by unpinning, not by show (DockAutoHideEntry).
+        unlink_stack(stack_id);
         state_.auto_hidden.push_back(entry);
         return accepted();
     }
@@ -609,7 +635,6 @@ private:
         const DockAutoHideEntry entry = *found;
         const DockRefusal admitted = admit_stack(stack_id, DockRegion::main_tools);
         if (is_refusal(admitted)) return admitted;
-        remember(stack_id);
         unlink_stack(stack_id);
         DockNodeId target = entry.neighbour;
         DockSide side = entry.side;
@@ -618,6 +643,12 @@ private:
         if (!neighbour_usable) {
             target = state_.main_root;
             side = entry.edge;
+        }
+        // Beside the same neighbour the old split comes back with its
+        // identity and exact ratio, so the layout is as it was before the pin.
+        if (neighbour_usable && identity_free(entry.split) && valid_ratio(entry.split_ratio)) {
+            attach_in_split(target, side, stack_id, entry.split, entry.split_ratio);
+            return accepted();
         }
         const double ratio = valid_ratio(entry.ratio) ? entry.ratio : 0.25;
         attach_beside(target, side, ratio, stack_id);

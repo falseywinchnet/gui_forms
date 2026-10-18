@@ -461,11 +461,14 @@ def declarations() -> tuple[list[TypeRecord], list[EnumRecord], list[HeaderScope
     enums: list[EnumRecord] = []
     header_scopes: list[HeaderScope] = []
     # ``enum class`` declarations are catalogued separately; excluding their
-    # ``class`` token keeps the type and enumeration branches disjoint.
+    # ``class`` token keeps the type and enumeration branches disjoint. A base
+    # or underlying-type clause stops at ``;``, so that a forward declaration
+    # (``enum class E : std::uint8_t;``) is not taken for a definition whose
+    # ``{`` comes later in the header.
     type_pattern = re.compile(
-        r"(?<!enum )\b(class|struct)\s+([A-Za-z_]\w*)\s*(final\s*)?(?::\s*([^\{]+))?\s*\{")
+        r"(?<!enum )\b(class|struct)\s+([A-Za-z_]\w*)\s*(final\s*)?(?::\s*([^\{;]+))?\s*\{")
     enum_pattern = re.compile(
-        r"\benum\s+class\s+([A-Za-z_]\w*)\s*(?::\s*[^\{]+)?\s*\{")
+        r"\benum\s+class\s+([A-Za-z_]\w*)\s*(?::\s*[^\{;]+)?\s*\{")
     for path in headers:
         text = path.read_text(encoding="utf-8")
         lines = text.splitlines()

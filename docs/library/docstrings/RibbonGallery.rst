@@ -94,6 +94,10 @@ close_popup
 show_more
     In the ribbon: opens the full gallery under this one. Returns false for
     the drop-down form or when it cannot open.
+width_for_columns
+    In the ribbon: the width, in logical units at the current text scale, the
+    gallery measures at a given column count. A `Ribbon` holding the gallery
+    reads it for each column step of its reduction ladder.
 
 See Also
 --------

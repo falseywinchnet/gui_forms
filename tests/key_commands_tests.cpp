@@ -5,6 +5,7 @@
 // defaults and its restoration; the context-menu key beside Shift+F10;
 // refusals that leave the map unchanged.
 
+#include "gui_forms/application.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "headless_host.hpp"
 
@@ -273,6 +274,44 @@ void context_menu_key() {
             "the context-menu key with a modifier is not the command");
 }
 
+// One key map per application (owner decision DK-44): windows sharing one
+// KeyBindings see each other's rebindings; the first host seeds it, a later
+// one does not; Application's set is one object.
+void application_key_map() {
+    std::shared_ptr<Panel> first_root = make_control<Panel>(StableId("first"));
+    std::shared_ptr<Panel> second_root = make_control<Panel>(StableId("second"));
+    Window first(first_root, {100.0, 100.0});
+    Window second(second_root, {100.0, 100.0});
+    require(first.key_bindings() != second.key_bindings(), "windows made alone have sets of their own");
+    second.set_key_bindings(first.key_bindings());
+    second.rebind_key_command(KeyCommand::next_tab, {{PhysicalKey::right, Modifier::alt}, {}});
+    require(first.key_map().matches(KeyCommand::next_tab, key(PhysicalKey::right, Modifier::alt)),
+            "a rebinding in one window holds in the windows sharing its set");
+    {
+        HostSession seeding(first, macos_style_capabilities());
+        require(second.key_map().matches(KeyCommand::close_document, key(PhysicalKey::w, Modifier::meta)) &&
+                    (*second.key_bindings()).seeded(),
+                "the first host seeds the shared set for every window");
+    }
+    {
+        HostSession later(second, host::headless_capabilities());
+        require(first.key_map().matches(KeyCommand::close_document, key(PhysicalKey::w, Modifier::meta)),
+                "a later host does not reseed the set");
+    }
+    first.restore_key_command(KeyCommand::next_tab);
+    require(second.key_map().matches(KeyCommand::next_tab, key(PhysicalKey::page_down, Modifier::control)),
+            "restoring returns every sharing window to the default");
+    bool refused = false;
+    try {
+        first.set_key_bindings({});
+    } catch (const std::invalid_argument&) {
+        refused = true;
+    }
+    require(refused && first.key_bindings() == second.key_bindings(), "a null set is refused");
+    require(Application::key_bindings() && Application::key_bindings() == Application::key_bindings(),
+            "the application has one set");
+}
+
 } // namespace
 
 int main() {
@@ -284,6 +323,7 @@ int main() {
         macos_style_map_reaches_the_view();
         rebinding_over_the_host();
         context_menu_key();
+        application_key_map();
         std::cout << "Key commands: the PC convention, the headless host's map, a macOS-style map with Cmd+W in "
                      "PageStrip and PageView, rebinding and restoring over a host, the context-menu key and "
                      "refusals passed\n";
