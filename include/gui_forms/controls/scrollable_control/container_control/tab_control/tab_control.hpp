@@ -2,6 +2,7 @@
 
 #include "gui_forms/controls/scrollable_control/container_control/container_control.hpp"
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
+#include "gui_forms/pages/page_set/page_set.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +15,9 @@
 
 namespace gui_forms {
 
+class PageStrip;
+struct PageInvocation;
+
 enum class TabAlignment : std::uint8_t {
     top,
     bottom,
@@ -21,10 +25,23 @@ enum class TabAlignment : std::uint8_t {
     right,
 };
 
+// How the tabs are drawn (until stage T4 draws Plan Paint's tab stack, each
+// is a recipe family of the by-role paint path): `normal`, flat at rest with
+// a plate when hot or selected (the menu-item family); `buttons`, a button's
+// plate on every tab; `flat_buttons`, a command button's lighter plate.
 enum class TabAppearance : std::uint8_t {
     normal,
     buttons,
     flat_buttons,
+};
+
+// How wide each tab is (Windows Forms TabSizeMode). `normal`: its caption
+// plus padding. `fill_to_right`: the row shared equally among the tabs.
+// `fixed`: `item_size` along the row, whatever the caption.
+enum class TabSizeMode : std::uint8_t {
+    normal,
+    fill_to_right,
+    fixed,
 };
 
 struct TabSelectionChange final {
@@ -32,9 +49,23 @@ struct TabSelectionChange final {
     std::optional<std::size_t> new_index;
 };
 
+// A set of TabPages shown one at a time, chosen from a row of tabs (the
+// Windows Forms surface). The tabs are a PageStrip (owner decision DK-14,
+// phase P8): the control keeps one record per page in a PageSet the strip
+// shows, so the strip's geometry, painting by role, overflow (scroll and
+// list buttons) and keys serve the tabs. The strip is an internal child: it
+// takes no focus (the control keeps it, as one tab stop) and publishes no
+// semantics of its own (the control publishes its tabs as before).
 class TabControl final : public ContainerControl {
 public:
+    static constexpr bool initialize_tree_after_construction = true;
+    // The most pages a tab control holds: its strip's set's capacity.
+    static constexpr std::size_t maximum_pages = PageSetLimits::maximum_capacity;
+
     explicit TabControl(StableId stable_id);
+    ~TabControl() override;
+    // Creates the tab strip. `make_control` calls it; do not call it yourself.
+    void initialize_control_tree();
 
     void add_page(std::shared_ptr<TabPage> page);
     [[nodiscard]] std::shared_ptr<TabPage> remove_page(const TabPage& page);
@@ -52,12 +83,17 @@ public:
     void set_alignment(TabAlignment alignment);
     [[nodiscard]] TabAppearance appearance() const noexcept { return appearance_; }
     void set_appearance(TabAppearance appearance);
+    [[nodiscard]] TabSizeMode size_mode() const noexcept { return size_mode_; }
+    void set_size_mode(TabSizeMode mode);
     [[nodiscard]] Size item_size() const noexcept { return item_size_; }
     void set_item_size(Size size);
     [[nodiscard]] const BasicControlStyle& style() const noexcept { return style_; }
     void set_style(BasicControlStyle style);
     [[nodiscard]] Rect tab_bounds(std::size_t index) const;
     [[nodiscard]] Rect display_bounds() const noexcept;
+    // Whether the tabs do not all fit, so the strip shows its scroll and list
+    // buttons.
+    [[nodiscard]] bool overflowing() const;
     [[nodiscard]] Event<const TabSelectionChange&>& selected_index_changed() noexcept {
         return selected_index_changed_;
     }
@@ -65,8 +101,8 @@ public:
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
     void on_paint(Painter& painter, Rect local_damage) override;
-    void on_pointer(PointerEvent& event) override;
     void on_key_preview(KeyEvent& event) override;
+    void on_key(KeyEvent& event) override;
     void on_focus_changed(bool focused) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override;
@@ -85,6 +121,8 @@ public:
         PartGeometry display;
     };
     [[nodiscard]] Parts parts() const;
+    // A tab's parts, in the control's coordinates: the strip's tab, label,
+    // focus and seam parts of the same names (the strip paints them).
     struct ItemParts final {
         PartGeometry tab;
         PartGeometry tab_label;
@@ -108,6 +146,7 @@ protected:
     void publish_part_geometry(std::span<PartGeometry> geometry) const override;
     void publish_realized_item_geometry(std::size_t item,
                                         std::span<PartGeometry> geometry) const override;
+    void on_dispose() noexcept override;
 
 private:
     using RememberedFocusMap =
@@ -115,21 +154,42 @@ private:
     [[nodiscard]] std::optional<std::size_t> index_of(
         const std::shared_ptr<TabPage>& page) const;
     void select_relative(int delta);
+    void show_selected(std::size_t index, const std::vector<std::shared_ptr<TabPage>>& live);
     void remember_page_focus(const std::shared_ptr<TabPage>& page);
     void restore_page_focus(const std::shared_ptr<TabPage>& page,
                             bool selection_owned_focus);
     void reconcile_pages();
+    // -- the strip's set --
+    void synchronize_tab_set();
+    void select_in_tab_set(const std::shared_ptr<TabPage>& page);
+    void configure_strip();
+    [[nodiscard]] Rect header_bounds() const noexcept;
+    [[nodiscard]] ItemParts tab_parts(const TabPage& page) const;
+    [[nodiscard]] bool nested_tab_control_has_focus() const;
+    void on_set_selecting(PageSelectingEvent& event);
+    void on_set_selection_changed(const PageSelectionChange& change);
+    void on_strip_invoked(const PageInvocation& invocation);
 
     std::vector<std::weak_ptr<TabPage>> pages_;
     std::weak_ptr<TabPage> selected_page_;
     RememberedFocusMap remembered_focus_;
     BasicControlStyle style_;
     Size item_size_{120.0, 30.0};
-    FontSpec font_{FontRole::control, 11.0, 600, false, 0.24};
     TabAlignment alignment_{TabAlignment::top};
     TabAppearance appearance_{TabAppearance::normal};
-    bool pointer_engaged_{};
-    bool focused_{};
+    TabSizeMode size_mode_{TabSizeMode::normal};
+    // The strip's pages: one record per live page in tab order, the page's
+    // stable ID its PageId and its text its title; the set's selection is
+    // the control's. The strip borrows the set and is released before the
+    // set is destroyed.
+    PageSet tab_set_;
+    std::shared_ptr<PageStrip> strip_;
+    // Set while the control edits `tab_set_` itself, so that its handlers
+    // ignore the set's events about those edits.
+    bool editing_tab_set_{};
+    SubscriptionToken selecting_token_;
+    SubscriptionToken selection_token_;
+    SubscriptionToken invoked_token_;
     Event<const TabSelectionChange&> selected_index_changed_;
 };
 

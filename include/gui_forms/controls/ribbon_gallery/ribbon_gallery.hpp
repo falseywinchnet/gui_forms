@@ -102,6 +102,10 @@ public:
     void set_column_range(std::size_t minimum, std::size_t maximum);
     [[nodiscard]] std::size_t columns() const noexcept { return columns_; }
     void set_columns(std::size_t columns);
+    // In-ribbon form: the width, in logical units at the current text scale,
+    // the gallery measures at `columns` columns (the ribbon's scaling reads
+    // it for each column step).
+    [[nodiscard]] double width_for_columns(std::size_t columns) const noexcept;
     // Drop-down form: columns per row and the rows shown before it scrolls
     // (each 1 to 32). The full gallery the more button opens uses them.
     [[nodiscard]] std::size_t drop_down_columns() const noexcept { return drop_down_columns_; }

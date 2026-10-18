@@ -2,9 +2,11 @@ A set of pages shown one at a time, chosen from a row of tabs.
 
 A tab control holds `TabPage` controls and shows the selected one in its
 display area, with a tab for every page along one edge. The user selects a
-page by clicking its tab, with the arrow keys, Home and End while the tab
-strip has focus, or with Ctrl+Tab and Ctrl+Shift+Tab from anywhere inside
-the control. Use `ExpandableSections` when several parts should be visible
+page by clicking its tab, with the arrow keys, Home and End while the
+control has focus, or with Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PageDown and
+Ctrl+PageUp from anywhere inside the control. The tabs are a `PageStrip`:
+they are as wide as their captions, and when they do not fit the strip's
+scroll and list buttons appear. Use `ExpandableSections` when several parts should be visible
 at once, and a `SplitContainer` to show two panes side by side.
 
 Parameters
@@ -32,17 +34,26 @@ alignment : default ``TabAlignment::top``
     The edge the tabs run along: top or bottom with tabs side by side, left
     or right with tabs stacked. The display area takes the rest.
 appearance : default ``TabAppearance::normal``
-    How tabs are drawn: `TabAppearance::normal` joins the selected tab to
-    the page, `TabAppearance::buttons` insets the unselected tabs like
-    buttons, and `TabAppearance::flat_buttons` gives the unselected tabs a
-    lighter face.
+    How tabs are drawn, through the theme's recipes until the tab stack has
+    its own look: `TabAppearance::normal` flat at rest with a plate when hot
+    or selected, the selected tab joined to the page; `TabAppearance::buttons`
+    a button's plate on every tab; `TabAppearance::flat_buttons` a command
+    button's lighter plate on every tab.
+size_mode : default ``TabSizeMode::normal``
+    How wide each tab is: `TabSizeMode::normal` its caption plus padding,
+    `TabSizeMode::fill_to_right` the row shared equally, `TabSizeMode::fixed`
+    `item_size` whatever the caption.
 item_size : default ``{120.0, 30.0}``
-    The size of every tab, in logical pixels before the window's text
-    scale. Smaller than 24 by 18, or not finite, throws
-    `std::invalid_argument`.
+    In logical units before the window's text scale. Its height is the
+    thickness of a top or bottom tab row, its width the thickness of a left
+    or right column, in every size mode. Under `TabSizeMode::fixed` it is
+    every tab's size. Smaller than 24 by 18, larger than 1024 by 1024, or
+    not finite, throws `std::invalid_argument`.
 style
-    The colours of the tab strip and the page frame. The default is the
-    built-in `BasicControlStyle`; it does not follow the window's theme.
+    Kept for compatibility: the control paints by role from the window's
+    theme and no longer reads it.
+overflowing
+    Whether the tabs do not all fit, so the scroll and list buttons show.
 display_bounds
     The area given to the selected page, in the control's coordinates. With
     the default alignment it starts one pixel above the bottom of the tab
@@ -66,8 +77,11 @@ Methods
 add_page
     Adds a page at the end, making it a child of the control. The first
     page added is selected; later pages are hidden until selected. Adding a
-    page that is already here does nothing; a null page throws
-    `std::invalid_argument`; the errors of `add_child` also apply.
+    page that is already here does nothing; a null page, or one whose stable
+    ID another page of the control has, throws `std::invalid_argument`; a
+    page beyond `TabControl::maximum_pages` (4096) throws
+    `std::length_error`; the errors of `add_child` also apply. A refused page
+    leaves the control unchanged.
 remove_page
     Removes a page and returns it, or returns null when it is not a page of
     this control. When the selected page is removed, the page that takes its
@@ -76,14 +90,17 @@ page_at
     The page at an index; an index outside the pages throws
     `std::out_of_range`.
 tab_bounds
-    The rectangle of the tab at an index, in the control's coordinates; an
-    index outside the pages throws `std::out_of_range`.
+    The rectangle of the tab at an index, in the control's coordinates, or
+    an empty rectangle while the tab is scrolled out of view; an index
+    outside the pages throws `std::out_of_range`.
 
 See Also
 --------
 TabPage : One page of a tab control.
 TabAlignment : The edge the tabs run along.
 TabAppearance : How the tabs are drawn.
+TabSizeMode : How wide each tab is.
+PageStrip : The tab strip a tab control is built on.
 ExpandableSections : Several collapsible parts visible at once.
 
 Notes
@@ -95,27 +112,42 @@ whenever it lays out its pages, so do not set it yourself. Children added
 with `add_child`
 instead of `add_page` are not arranged.
 
-Every tab is `item_size` wide (or tall, for left and right alignment), and
-the tabs do not wrap or scroll: tabs beyond the control's edge are cut off.
-Captions are drawn as written; `&` has no mnemonic meaning here.
+The tabs are an internal `PageStrip` child (``<stable id>.strip``) over one
+record per page: its layout, its painting by role and its overflow serve
+the control. When the tabs do not fit, they keep their widths and the strip
+shows scroll buttons and a list button; the selected tab is always scrolled
+into view. On the left and right the captions turn, reading bottom to top
+on the left and top to bottom on the right. The strip takes no focus and
+publishes nothing to accessibility; the control does both. Captions are
+drawn as written; `&` has no mnemonic meaning here.
 
 A primary press on a tab focuses the control and selects the tab
 immediately. The control takes focus as one tab stop. While it has focus,
 Left and Right (top and bottom alignment) or Up and Down (left and right
 alignment) select the previous or next tab, wrapping around, and Home and
-End select the first and last. Ctrl+Tab and Ctrl+Shift+Tab (Meta works in
-place of Ctrl) cycle forwards and backwards, wrapping around, while focus is
-anywhere inside the control. When the selection changes while focus is
-inside the old page, the control remembers that focused control and moves
-focus to the control last focused in the new page, or else to the tab
-strip. A click on a tab moves focus to the tab strip before it selects, so
-it does not remember the old page's focus.
+End select the first and last. Ctrl+Tab and Ctrl+Shift+Tab, and
+Ctrl+PageDown and Ctrl+PageUp, cycle forwards and backwards, wrapping
+around, while focus is anywhere inside the control and before the focused
+control sees the key; when tab controls are nested, the innermost one
+around the focus takes them. These are the window's named keyboard
+commands (``cycle_forward``, ``cycle_backward``, ``next_tab``,
+``previous_tab``), so `Window::rebind_key_command` changes them. The
+commands a tab control does not offer (``close_document``, Ctrl+F4 or Cmd+W;
+``context_menu``, Shift+F10 or the context-menu key; moving a tab) pass to
+the controls around it, such as a `PageView` holding the tab control in a
+document. When the selection changes while focus is inside the old page,
+the control remembers that focused control and moves focus to the control
+last focused in the new page, or else to the control itself. A click on a
+tab moves focus to the control before it selects, so it does not remember
+the old page's focus.
 
 The control is published to accessibility as a `tab_group` whose value is
 the selected page's caption. Each page has a virtual `tab` child named by
-its caption, with the selected state; its focus, select and press actions
-all focus the control and select that tab. The selected page is published
-as a `group` named by its caption.
+its caption, with the selected state, naming its page as the panel it
+controls; a tab scrolled out of view has no bounds and is not visible. Its
+focus and select actions (and press, which tabs no longer publish) focus the
+control and select that tab. The selected page is published as a
+``tab_panel`` named by its caption.
 
 The control does not scroll; leave `auto_scroll` off and scroll the pages
 instead.

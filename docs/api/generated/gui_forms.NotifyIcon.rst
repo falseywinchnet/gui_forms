@@ -82,7 +82,8 @@ gui_forms::NotifyIcon
 
       **menu_item_invoked** : ``Event<const MenuItemInvocation&>``
          Raised after a row of the context menu, chosen in the native menu, has
-         run its command.
+         run its command, through the bound window's command chain (decision
+         DK-47).
 
    :Inherited:
 
@@ -243,7 +244,8 @@ gui_forms::NotifyIcon
    .. cpp:function:: Event<const MenuItemInvocation&>& menu_item_invoked() noexcept
 
       Raised after a row of the context menu, chosen in the native menu, has
-      run its command.
+      run its command, through the bound window's command chain (decision
+      DK-47).
 
 
    .. rubric:: Methods

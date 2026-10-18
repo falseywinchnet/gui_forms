@@ -73,8 +73,9 @@ struct PageInvocation final {
 };
 
 // Why a page's close was asked for: the close button (`pointer`), a middle
-// click released over the tab it pressed (`middle_button`), Ctrl+F4
-// (`keyboard`), or the accessibility close action (`semantic`).
+// click released over the tab it pressed (`middle_button`), the
+// close_document key command (`keyboard`: Ctrl+F4, Cmd+W on macOS), or the
+// accessibility close action (`semantic`).
 enum class PageCloseCause : std::uint8_t { pointer, middle_button, keyboard, semantic };
 
 // A request to close a closable page. The strip never removes a page itself:
@@ -116,8 +117,8 @@ struct PageDragStart final {
 };
 
 // Why a tab's context menu was asked for: a secondary click released over
-// the tab it pressed (`pointer`), or Shift+F10 on the keyboard's tab
-// (`keyboard`).
+// the tab it pressed (`pointer`), or the context_menu key command (Shift+F10
+// or the context-menu key) on the keyboard's tab (`keyboard`).
 enum class PageContextMenuCause : std::uint8_t { pointer, keyboard };
 
 // A request for a tab's context menu (PageView study I11). The strip shows
@@ -166,8 +167,8 @@ struct PageDoubleClick final {
 //
 // Document features (owner decision DK-38, interview P16 to P26): a close
 // button on closable tabs (see PageCloseButtons) with a plate while hot; a
-// middle click released over the tab it pressed closes it; Ctrl+F4 closes the
-// selected closable page (Delete does not); every close is a
+// middle click released over the tab it pressed closes it; Ctrl+F4 (Cmd+W on
+// macOS) closes the selected closable page (Delete does not); every close is a
 // `page_close_requested`. A tab whose page is `modified` shows a dot in the
 // close button's place, replaced by the close button while the tab is hot.
 // After a close by the pointer the tabs keep their widths until the pointer
@@ -176,6 +177,14 @@ struct PageDoubleClick final {
 // then their full width; their pin glyph replaces the close button and
 // asks to unpin. Ctrl+Shift+PageDown and Ctrl+Shift+PageUp move the
 // selected page within its group.
+//
+// Keys: the strip's commands are the window's named keyboard commands
+// (KeyCommand, owner decision DK-30), so a host's convention and an
+// application's rebinding reach it: close_document, next_tab and
+// previous_tab, move_tab_later and move_tab_earlier, context_menu. The
+// keys of moving between tabs (the arrows along the row, Home, End, Space
+// and Enter under manual activation) and Escape ending a drag are the
+// strip's own.
 //
 // Dragging (owner decision DK-39): a press on a tab that moves past
 // `page_drag_threshold` raises `page_drag_started`. A claimed drag belongs to
@@ -392,6 +401,11 @@ public:
     // The tabs laid out (not those scrolled out of view or hidden), in the
     // order they are shown.
     [[nodiscard]] std::vector<Item> realized_items() const;
+    // One page's tab parts, in the strip's coordinates and with their part
+    // states, as `realized_items` publishes them; all absent when the page is
+    // not in the set or its tab is not laid out. For an owner that publishes
+    // the tabs under its own anatomy (TabControl).
+    [[nodiscard]] ItemParts tab_parts_of(const PageId& page) const;
 
     // The semantic identity of a page's tab: `<strip id>.tab.<page id>`.
     [[nodiscard]] std::string tab_identity(const PageId& page) const;
@@ -405,6 +419,10 @@ protected:
     // A strip alone does nothing; PageView's strip applies the view's close
     // policy and sets `handled` when it removed the page.
     virtual void close_unhandled(PageCloseRequest& request);
+    // The recipe family the tabs and their buttons are painted in:
+    // `menu_item` (flat at rest) until stage T4 draws the tab stack.
+    // TabControl's strip answers its appearance (buttons, flat buttons).
+    [[nodiscard]] virtual ControlVisualRole tab_family() const noexcept;
 
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;

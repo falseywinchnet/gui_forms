@@ -23,10 +23,19 @@ std::string json_escape(const std::string& text) {
     return result;
 }
 
+// One chord as {"key":<HID usage>,"modifiers":<Modifier bits>}; nothing for
+// an empty chord. `first` says whether no chord precedes it in the list.
+void append_chord(std::ostringstream& output, KeyChord chord, bool first) {
+    if (chord.empty()) return;
+    if (!first) output << ',';
+    output << "{\"key\":" << chord.physical_key
+           << ",\"modifiers\":" << static_cast<unsigned>(chord.modifiers) << '}';
+}
+
 } // namespace
 
 std::string HostCapabilities::to_json() const {
-    constexpr std::array<std::pair<HostCapability, const char*>, 23> names{{
+    constexpr std::array<std::pair<HostCapability, const char*>, 28> names{{
         {HostCapability::lifecycle, "lifecycle"},
         {HostCapability::scale_notifications, "scale_notifications"},
         {HostCapability::monitor_geometry, "monitor_geometry"},
@@ -50,6 +59,11 @@ std::string HostCapabilities::to_json() const {
         {HostCapability::notification_area, "notification_area"},
         {HostCapability::notification_area_messages, "notification_area_messages"},
         {HostCapability::notification_area_menus, "notification_area_menus"},
+        {HostCapability::runtime_windows, "runtime_windows"},
+        {HostCapability::window_frames, "window_frames"},
+        {HostCapability::screen_pointer, "screen_pointer"},
+        {HostCapability::window_at_point, "window_at_point"},
+        {HostCapability::window_ordering, "window_ordering"},
     }};
     std::ostringstream output;
     output << "{\"protocol_version\":" << protocol_version
@@ -64,7 +78,16 @@ std::string HostCapabilities::to_json() const {
         output << (first ? "\"" : ",\"") << name << '"';
         first = false;
     }
-    output << "]}";
+    output << "],\"key_map\":{";
+    for (std::size_t index = 0; index < key_command_count; ++index) {
+        const KeyCommand command = static_cast<KeyCommand>(index);
+        const KeyBinding& binding = key_map.binding(command);
+        output << (index == 0U ? "\"" : ",\"") << key_command_name(command) << "\":[";
+        append_chord(output, binding.primary, true);
+        append_chord(output, binding.secondary, binding.primary.empty());
+        output << ']';
+    }
+    output << "}}";
     return output.str();
 }
 
