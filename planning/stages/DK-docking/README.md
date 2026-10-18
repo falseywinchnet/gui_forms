@@ -82,7 +82,7 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
    `DockWorkspace` component, and controls that realize it.
 4. **Tool panels and documents together from the start (A3-1).**
 5. **DK's own small split solver (A4-1),** which stage L may adopt or
-   replace.
+   replace; binary after decision 18.
 6. **Runtime windows (B1-1):** opened and destroyed during a run, at most
    64 windows and 32 floating sites.
 7. **Screen coordinates (B2-1):** window frames, the screen pointer and the
@@ -105,6 +105,15 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     stack and explorer bar only when a consumer asks.
 16. **Late page content (P5-1)** through `content_requested`.
 17. **`PageStrip` is public (P6-1).**
+18. **Binary splits (C1-2):** two children per split, nested; one ratio per
+    split within both children's minimums.
+19. **One document area per main window (C2-1),** always present;
+    documents may float.
+20. **Mixed stacks only by "dock as document" (C3-2).**
+21. **Dock groups (C4-1),** with a default group.
+22. **Placeholders remember hidden panels' places (C5-1).**
+23. **Shrinking collapses tool panels by declared priority (C6-1),** then
+    the window minimum grows.
 
 ## What exists today
 

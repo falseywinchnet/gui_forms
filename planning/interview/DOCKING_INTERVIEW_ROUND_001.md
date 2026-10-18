@@ -135,3 +135,27 @@ owner, verbatim:
 - **GIVEN P5-1.** A page may start without content and receive it through
   `content_requested` on first selection (docking's lazy creation).
 - **GIVEN P6-1.** `PageStrip` is a public control of its own.
+
+## Part 4. Layout model and restrictions, 2026-10-17
+
+Asked as C1 to C6, each with its recommendation marked (C1-1 n-ary
+weighted splits, C2-1, C3-2, C4-1, C5-1, C6-1). The owner, verbatim:
+
+> two per split. otherwise accepted.
+
+- **GIVEN C1-2.** Split nodes are binary: two children per split, nested to
+  make more (DockPanel Suite's form). This narrows A4: the split solver DK
+  writes divides one span between two children by a ratio, within both
+  children's minimums, applied recursively.
+- **GIVEN C2-1.** One document area per main window, always present even
+  when empty; documents may also float.
+- **GIVEN C3-2.** A tool panel and documents share a stack only when the
+  panel's descriptor allows "dock as document".
+- **GIVEN C4-1.** "Enabled control groups" are dock groups: a panel joins a
+  stack or site only when its group admits it, with a default group so
+  applications that ignore groups are unaffected.
+- **GIVEN C5-1.** Hidden panels keep placeholders for their last docked,
+  floating and auto-hide placements.
+- **GIVEN C6-1.** When the window shrinks below the panels' minimums, tool
+  panels collapse to auto-hide by declared priority, then the window
+  minimum grows (DDV-007-02).
