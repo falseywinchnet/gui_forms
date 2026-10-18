@@ -298,3 +298,29 @@ owner, verbatim:
   `secondary_participating` (DDV-007-01).
 - **GIVEN F5-1.** Clicking a floating tool window activates it (it becomes
   key); F2's routing keeps document commands working.
+
+## Part 8. Keyboard, 2026-10-17
+
+Asked as G1 to G7, each with its recommendation marked (G1-2, G2-1, G3-1
+described over D2's split tiles, G4-1, G5-1, G6-1, G7-1). The owner,
+verbatim:
+
+> accepted.
+
+- **GIVEN G1-2.** A `TabControl` with focus inside it keeps Ctrl+Tab; the
+  workspace navigator gets it otherwise (most local wins).
+- **GIVEN G2-1.** Visual Studio's keys are the defaults: Ctrl+F6 (next
+  document), Alt+F7 (next tool panel), Alt+Hyphen and the context-menu key
+  or Shift+F10 (the position menu), Escape in a tool panel (to the active
+  document), Shift+Escape (hide the active tool panel).
+- **GIVEN G3-1.** A keyboard move mode steps through the same targets as a
+  pointer drag: the hovered pane's split tiles (D2) by arrows, the next
+  pane, the window edges and Float by Tab, with the same preview and live
+  announcements; Enter commits through the same transaction, Escape
+  cancels with no change.
+- **GIVEN G4-1.** The navigator shows two lists, tool panels and documents.
+- **GIVEN G5-1.** Keyboard defaults per host (Cmd+W on macOS) are host
+  keymap defaults, not core policy.
+- **GIVEN G6-1.** Applications may rebind docking keys; they are commands.
+- **GIVEN G7-1.** A "maximize the document area" command hides and restores
+  all tool panels, default Ctrl+Shift+F12.

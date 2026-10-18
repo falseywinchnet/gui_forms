@@ -140,6 +140,11 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     window; the main window shows `secondary_participating` while a
     floating tool window is key; clicking a floating tool window makes it
     key.
+30. **Keyboard (G1-2 to G7-1):** Ctrl+Tab to a focused `TabControl`, else
+    the two-list navigator; Visual Studio's docking keys as defaults; a
+    keyboard move mode over the same targets as the pointer; host keymap
+    defaults; rebindable commands; Ctrl+Shift+F12 maximizes the document
+    area.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
