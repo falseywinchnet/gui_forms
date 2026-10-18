@@ -669,3 +669,21 @@ verbatim:
 - **GIVEN R7-1.** The ribbon's command plane publishes an expand and
   collapse state; clicking the selected tab keeps working by pointer.
 - **GIVEN R9.** The adaptive order model as proposed.
+
+### Note, 2026-10-19: the second review (N1 to N10)
+
+Raised from the D3, D5, layout and TextBox reports, each with a
+recommendation: N1-1 keep TextBox's Escape and Enter passing on with
+opt-in `accepts_escape`/`accepts_enter`; N2-1 an empty TokenBox passes
+Enter on; N3-2 the tiles' fade is left to T2/T4; N4-1 a "refused" mark
+(a circle with a slash) for the rejected-drop cue; N5-1 a live-region
+semantic role, mapped with stage A; N6-1 Ctrl+Alt+Shift+M starts the
+keyboard move mode; N7-1 a document tab tears off 16 units outside its
+strip; N8-1 the auto-hide edge tie order left, right, bottom, top; N9-1 a
+flyout's resized extent is saved with the layout in D7; N10-1 an `open`
+item state for side tabs, and the Alt+F7 navigator lists auto-hidden
+panels. The owner, verbatim:
+
+> accepted.
+
+- **GIVEN N1-1 to N10-1** as recommended.

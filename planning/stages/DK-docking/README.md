@@ -217,6 +217,20 @@ From the review of the builders' choices (2026-10-19, interview part 16):
     not by a person watching.
 50. **macOS and Linux behaviours are verified by a sibling model** on the
     owner's M4 Mac and a Lima VM, from a script and a prompt document.
+
+From the second review (2026-10-19, N1 to N10):
+
+51. **Vocabulary:** a `refused` mark (a circle with a slash) for the
+    rejected-drop cue (N4); a live-region semantic role, mapped with stage
+    A, for the move mode's announcements (N5); an `open` custom item state
+    for a side tab whose flyout is open (N10).
+52. **The tiles' fade is the theme's (N3):** no opacity input in
+    `paint_part` until T2/T4.
+53. **Ctrl+Alt+Shift+M starts the keyboard move mode (N6);** a document tab
+    tears off 16 units outside its strip (N7); the auto-hide edge tie order
+    is left, right, bottom, top (N8).
+54. **A flyout's resized extent is saved with the layout (N9),** in D7.
+55. **The Alt+F7 navigator lists auto-hidden panels (N10).**
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).

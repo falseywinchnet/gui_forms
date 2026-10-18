@@ -143,6 +143,10 @@ from it. Record under `results/`.
    for the IDs at the visible positions plus a margin and caches that
    window), switching automatically by row count and change rate and
    reporting each switch; a full republish stays as a reset.
+6. **TextBox keys (owner review N1, N2, 2026-10-19).** Escape and Enter
+   pass on to the window's cancel and accept buttons unless the box has
+   something to cancel or accept; editors that need them opt in with
+   `accepts_escape`/`accepts_enter`. An empty `TokenBox` passes Enter on.
 
 ## Advanced candidates, 2026-10-14
 
