@@ -105,3 +105,33 @@ B2-1; B3-1; B4-1; B5a-1; B6-1; B7-1. The owner, verbatim:
   drag on its caption, setting the native frame per pointer move; phase 0
   measures smoothness and a host that cannot keep up falls back to the
   native move loop with progress reports (B7-2).
+
+## Part 3. PageView shape, 2026-10-17
+
+Asked as P1 to P6, each with its recommendation marked (P1-1, P2-1, P3-1,
+P4-1 unless the owner meant Outlook 2013's bottom bar, P5-1, P6-1). The
+owner, verbatim:
+
+> accepted on these. for P4; i dont remember the context.
+
+- **GIVEN P1-1.** One renderer-free `PageSet` and separate presenters:
+  `PageStrip` (headers only), `PageView` (strip plus content, with presets)
+  and `NavigationPane`. Docking's tab stacks and auto-hide strips are built
+  from them and lose their own tab item systems; the docking study's
+  section 4 is read with that change.
+- **GIVEN P2-1.** `TabControl` keeps its Windows Forms surface; its layout
+  and painting are later re-based on `PageStrip` and `paint_part`.
+- **GIVEN P3-1.** Strip, document and Outlook-style presentations now; the
+  navigation strip next; the stack (list bar) and explorer bar are not
+  admitted until a consumer asks. Backstage stays the ribbon's (RB-26).
+- **P4 deferred.** The phrase "navigation strips" came from the list of
+  advanced controls the owner pasted on 2026-10-14 ("multiple tab
+  presentation modes, including document tabs, navigation strips, and
+  Outlook-style navigation"); the owner does not recall which control it
+  meant. Since P3-1 builds the navigation strip after the first three
+  presentations, P4 is asked again when that phase is planned, with
+  mockups of both readings. Working assumption until then: P4-1, a left
+  column of icon-and-label items that collapses to icons when narrow.
+- **GIVEN P5-1.** A page may start without content and receive it through
+  `content_requested` on first selection (docking's lazy creation).
+- **GIVEN P6-1.** `PageStrip` is a public control of its own.

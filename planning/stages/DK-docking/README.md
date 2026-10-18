@@ -95,6 +95,16 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
 11. **X11 utility windows with skip-taskbar (B6-1).**
 12. **The framework's own capture drag moves floating windows (B7-1),**
     falling back to the native move loop where a host cannot keep up.
+13. **The PageView family (P1-1):** one `PageSet` with `PageStrip`,
+    `PageView` and `NavigationPane`; docking's stacks and auto-hide strips
+    are built from them.
+14. **`TabControl` keeps its surface (P2-1)** and is later re-based on
+    `PageStrip` and `paint_part`.
+15. **Presentations (P3-1):** strip, document and Outlook-style now; the
+    navigation strip next (what it means, P4, is asked again then);
+    stack and explorer bar only when a consumer asks.
+16. **Late page content (P5-1)** through `content_requested`.
+17. **`PageStrip` is public (P6-1).**
 
 ## What exists today
 
