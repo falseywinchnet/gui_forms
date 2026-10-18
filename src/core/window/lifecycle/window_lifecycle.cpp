@@ -23,14 +23,24 @@ Window::Window(Control::Ptr root, Size client_size)
     : Window(std::move(root), client_size, ImageRegistryLimits{}) {}
 
 Window::Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_limits)
+    : Window(std::move(root), client_size, std::make_shared<ApplicationResources>(image_limits)) {}
+
+Window::Window(Control::Ptr root, Size client_size,
+               std::shared_ptr<ApplicationResources> resources)
     : root_(std::move(root)), client_size_(client_size),
-      theme_(default_theme()),
-      image_resources_(image_limits),
+      theme_(resources ? (*resources).theme_ptr() : default_theme()),
+      resources_(std::move(resources)),
       lifetime_(std::make_shared<detail::WindowLifetime>()),
       ui_thread_(std::this_thread::get_id()),
       dispatcher_state_(std::make_shared<detail::DispatcherState>(ui_thread_)) {
     initialize_cursor_identity();
     (*lifetime_).window = this;
+    if (!resources_) {
+        throw std::invalid_argument("GUI.Forms window requires application resources");
+    }
+    if (!(*resources_).check_access()) {
+        throw std::logic_error("GUI.Forms window resources belong to another thread");
+    }
     if (!root_) {
         throw std::invalid_argument("GUI.Forms window requires a retained root control");
     }
@@ -44,6 +54,8 @@ Window::Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_li
     const Rect initial_damage{0.0, 0.0, client_size_.width, client_size_.height};
     add_damage_all_planes(initial_damage);
     metrics_.record_dirty_mark(initial_damage.area());
+    // Last: a constructor that throws never leaves itself registered.
+    (*resources_).attach(*this);
 }
 Window::~Window() {
     invalidate_cursor_interaction(CursorError::closing);
@@ -66,6 +78,7 @@ Window::~Window() {
     if (root_) {
         detach_subtree(root_);
     }
+    (*resources_).detach(*this);
     (*lifetime_).window = nullptr;
 }
 void Window::resize(Size client_size) {
@@ -144,8 +157,13 @@ void Window::set_presentation_settings(PresentationSettings settings) {
 void Window::set_theme(std::shared_ptr<const Theme> theme) {
     require_ui_thread("theme mutation");
     if (!theme) throw std::invalid_argument("window theme may not be null");
+    // Every window sharing the resources takes the theme, this one included.
+    (*resources_).set_theme(std::move(theme));
+}
+
+void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
     if (theme_ == theme) return;
-    theme_ = std::move(theme);
+    theme_ = theme;
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);
@@ -171,6 +189,29 @@ void Window::set_active(bool active) {
         }
     }
     active_changed_.emit(active_);
+}
+
+// Nothing a control shows depends on the key map yet (no control displays a
+// command's keys), so changing it invalidates nothing.
+void Window::set_key_bindings(std::shared_ptr<KeyBindings> bindings) {
+    require_ui_thread("key binding mutation");
+    if (!bindings) throw std::invalid_argument("GUI.Forms window key bindings may not be null");
+    key_bindings_ = std::move(bindings);
+}
+
+void Window::rebind_key_command(KeyCommand command, KeyBinding binding) {
+    require_ui_thread("key binding mutation");
+    (*key_bindings_).rebind(command, binding);
+}
+
+void Window::restore_key_command(KeyCommand command) {
+    require_ui_thread("key binding mutation");
+    (*key_bindings_).restore(command);
+}
+
+void Window::install_host_key_map(const KeyMap& defaults) {
+    require_ui_thread("host key map installation");
+    static_cast<void>((*key_bindings_).seed(defaults));
 }
 
 void Window::set_text_scale(double text_scale) {

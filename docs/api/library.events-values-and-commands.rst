@@ -35,8 +35,12 @@ Related types
      - CommandBindingOptions independently controls enabled, text, visibility, and accessible-description synchronization; all remain enabled by default.
    * - :cpp:class:`CommandInvocation <gui_forms::CommandInvocation>`
      - CommandInvocation correlates one admitted execution to command identity, presentation source, and monotonic sequence.
+   * - :cpp:class:`CommandRouteResult <gui_forms::CommandRouteResult>`
+     - Where a routing ended.
    * - :cpp:class:`CommandState <gui_forms::CommandState>`
      - CommandState is the complete generation-stamped text, icon, shortcut, availability, visibility, check, default, and destructive presentation snapshot.
+   * - :cpp:class:`CommandTarget <gui_forms::CommandTarget>`
+     - The command handlers one place in the chain offers: a document's Save, a tool panel's Refresh.
    * - :cpp:class:`Delegate <gui_forms::Delegate>`
      - A Delegate binds invocation only.
    * - :cpp:class:`EventStatistics <gui_forms::EventStatistics>`
@@ -116,6 +120,24 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: CommandRouteResult final
+
+   ``#include <gui_forms/commands/command_route/command_route.hpp>``
+
+   Where a routing ended. ``stage`` and ``target_name`` describe the handling target, and are focused_route and empty unless the outcome is handled.
+
+   .. cpp:member:: CommandRouteOutcome outcome
+
+      Default: ``{CommandRouteOutcome::unhandled}``.
+
+   .. cpp:member:: CommandRouteStage stage
+
+      Default: ``{CommandRouteStage::focused_route}``.
+
+   .. cpp:member:: std::string target_name
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: CommandState final
 
    ``#include <gui_forms/commands/types/command_types.hpp>``
@@ -151,6 +173,45 @@ Related types
    .. cpp:member:: std::uint64_t generation
 
    .. cpp:member:: bool checkable
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: CommandTarget final
+
+   ``#include <gui_forms/commands/command_route/command_route.hpp>``
+
+   The command handlers one place in the chain offers: a document's Save, a tool panel's Refresh. A target holds at most one handler per command identity. Handlers are named delegates: the target neither owns nor extends the life of their objects, so whoever owns a handler's object removes the handler, or the whole target, before that object dies. The owner of a target (usually through a shared_ptr held by a control or a docking workspace) decides its life; a window and its controls' focused route only observe it, and a destroyed target drops out of the chain. A target belongs to the UI thread of the windows that route to it and is not synchronized.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit CommandTarget(std::string name = {})
+
+      :cpp:func:`name <gui_forms::CommandTarget::name>` identifies the target in route results and diagnostics; it may be empty.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const std::string& name() const noexcept
+
+   .. cpp:function:: std::size_t handler_count() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: bool remove_handler(std::string_view command_id)
+
+      Removes the handler for ``command_id``; false when there was none. A handler may remove itself, or any other, while it runs.
+
+   .. cpp:function:: bool handles(std::string_view command_id) const noexcept
+
+   .. cpp:function:: bool invoke(const CommandInvocation& invocation) const
+
+      Runs the handler for ``invocation.command_id`` with ``invocation``; false, running nothing, when there is none. The handler is copied before it runs, so it may change this target's handlers.
+
+   .. cpp:function:: void set_handler(std::string command_id, Delegate<const CommandInvocation&> handler)
+
+      Installs the handler for the command with identity ``command_id``, replacing any it had. An empty identity or an unbound delegate throws std::invalid_argument and changes nothing.
 
 .. cpp:namespace:: gui_forms
 
@@ -244,6 +305,32 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: CommandRouteOutcome
+
+   ``#include <gui_forms/commands/command_route/command_route.hpp>``
+
+   .. cpp:enumerator:: unhandled
+
+   .. cpp:enumerator:: handled
+
+   .. cpp:enumerator:: refused
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CommandRouteStage
+
+   ``#include <gui_forms/commands/command_route/command_route.hpp>``
+
+   .. cpp:enumerator:: focused_route
+
+   .. cpp:enumerator:: active_panel
+
+   .. cpp:enumerator:: active_document
+
+   .. cpp:enumerator:: main_window
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: Event::Slot::CallbackKind
 
    ``#include <gui_forms/event/event/event.hpp>``
@@ -274,6 +361,14 @@ Enumerations
 
 Functions, constants and aliases
 --------------------------------
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/commands/command_route/command_route.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_command_route_depth
+
+   A handler may route another command; a routing nested deeper than this inside handlers is refused, which stops a handler that routes its own command from recursing without end. Value: ``8U``.
 
 .. cpp:namespace:: gui_forms
 

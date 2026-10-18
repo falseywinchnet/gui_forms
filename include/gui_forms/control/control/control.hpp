@@ -39,6 +39,7 @@ namespace gui_forms {
 class Window;
 class Control;
 class ContainerControl;
+class CommandTarget;
 class ErrorProvider;
 class HelpProvider;
 class Binding;
@@ -438,6 +439,10 @@ public:
         std::string_view utf8, FontSpec effective) const;
     [[nodiscard]] double snap_text_baseline(double logical_baseline) const noexcept;
     [[nodiscard]] const Theme& effective_theme() const noexcept;
+    // The attached window's key map (Window::key_map), or the PC
+    // convention's while detached. A control asks it whether a key event is
+    // a named keyboard command instead of naming the keys itself.
+    [[nodiscard]] const KeyMap& effective_key_map() const noexcept;
     [[nodiscard]] std::shared_ptr<const Theme> theme_override() const noexcept {
         return theme_override_;
     }
@@ -560,6 +565,17 @@ public:
         return accessible_description_;
     }
     void set_accessible_description(std::string description);
+    // The command target this control offers its window's command routing
+    // chain while focus is on it or inside it (the focused route, owner
+    // decision DK-29; see gui_forms/commands/command_route). The control
+    // shares ownership, so a docking workspace may also name the same target
+    // as an active panel's or document's. None by default.
+    [[nodiscard]] const std::shared_ptr<CommandTarget>& command_target() const noexcept {
+        return command_target_;
+    }
+    void set_command_target(std::shared_ptr<CommandTarget> target) noexcept {
+        command_target_ = std::move(target);
+    }
     [[nodiscard]] CursorKind effective_cursor() const noexcept;
     [[nodiscard]] bool effectively_visible() const noexcept;
     [[nodiscard]] bool effectively_enabled() const noexcept;
@@ -933,6 +949,7 @@ private:
     ControlVisualStatus visual_status_{ControlVisualStatus::normal};
     std::string accessible_name_;
     std::string accessible_description_;
+    std::shared_ptr<CommandTarget> command_target_;
     // Ordered by provider identity so semantic traces remain byte-for-byte
     // deterministic when multiple nonvisual providers extend one control.
     ProviderTextMap provider_errors_;

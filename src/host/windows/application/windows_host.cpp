@@ -2,6 +2,7 @@
 #include "windows_host.hpp"
 #include "../accessibility/windows_accessibility.hpp"
 #include "../services/windows_clipboard_image.hpp"
+#include "../services/windows_clipboard_open.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../services/windows_notify_icons.hpp"
 #include "../input/windows_key_translation.hpp"
@@ -1353,6 +1354,33 @@ public:
         composite_run((*memo).shaped, font, origin, color, memo);
     }
 
+    // A turned run is rasterized by the shared engine's general placement
+    // (unhinted, as every rotated run is) and blended as an ordinary run. It
+    // keeps no retained coverage.
+    void draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font,
+                               const Color color, const TextOrientation orientation) override {
+        if (orientation == TextOrientation::horizontal) {
+            draw_text_utf8(origin, text, font, color);
+            return;
+        }
+        const PaintTimer timer(timings_[5]);
+        if (text.empty() || !text_engine_ || pixels_ == nullptr || width_ <= 0 || height_ <= 0 ||
+            states_.empty()) return;
+        const text::ShapedText shaped = (*text_engine_).shape(text, font);
+        const State& current = state();
+        // Run space (x along the baseline, y down) to device pixels:
+        // bottom_to_top maps (x, y) to (y, -x) and top_to_bottom to (-y, x).
+        const double turn = orientation == TextOrientation::bottom_to_top ? 1.0 : -1.0;
+        const text::GlyphRunTransform transform{0.0, turn * scale_, -turn * scale_, 0.0};
+        if (!glyph_runs_) glyph_runs_ = std::make_unique<text::GlyphRunRasterizer>(*text_engine_);
+        text::GlyphRunOrigin placement{};
+        const double device_x = (origin.x + current.tx) * scale_;
+        const double device_y = (origin.y + current.ty) * scale_;
+        const text::GlyphRunCoverage coverage =
+            (*glyph_runs_).rasterize_transformed(shaped, font, transform, device_x, device_y, {}, placement);
+        blend_run_coverage(coverage, placement, color);
+    }
+
     Size measure_text_utf8(std::string_view text, FontSpec font) override {
         if (text.empty() || !text_engine_) return {0.0, font.size};
         const text::ShapedText shaped = (*text_engine_).shape(text, font);
@@ -2047,7 +2075,14 @@ private:
                 coverage = &(*memo).coverage;
             }
         }
-        if ((*coverage).pixels.empty()) return;
+        blend_run_coverage(*coverage, placement, color);
+    }
+    // Blends a run's coverage, placed at `placement`, into the DIB under the
+    // current clip.
+    void blend_run_coverage(const text::GlyphRunCoverage& coverage, const text::GlyphRunOrigin placement,
+                            const Color color) {
+        if (coverage.pixels.empty()) return;
+        const State& current = state();
         // Finish batched GDI writes before blending through the CPU pointer.
         GdiFlush();
         const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
@@ -2067,10 +2102,10 @@ private:
             clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
             clip.radius = (*current.rounded_clip).radius * scale_;
         }
-        const gui_forms::detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
-                                          .height = (*coverage).height,
-                                          .left = placement.pixel_x + (*coverage).left,
-                                          .top = placement.pixel_y + (*coverage).top};
+        const gui_forms::detail::TextCoverage source{.pixels = coverage.pixels, .width = coverage.width,
+                                          .height = coverage.height,
+                                          .left = placement.pixel_x + coverage.left,
+                                          .top = placement.pixel_y + coverage.top};
         static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
     }
     void apply_gdi_clip() const {
@@ -2216,6 +2251,7 @@ struct RequestWindowTitle final {
     }
 };
 class WindowsHostState;
+class WindowsApplicationRun;
 // As TitleCallbackState: only the UI thread reads or revokes host. The
 // operation owns no host; it reaches the host only while the window lives.
 struct ClientSizeCallbackState final {
@@ -2420,6 +2456,44 @@ public:
         return true;
     }
 
+    // Application-scope windowing (windows_application_run.inc). Bound before
+    // the native window is created; the run outlives this state.
+    void attach_run(WindowsApplicationRun& run, HostWindowId window) noexcept {
+        run_ = &run;
+        window_id_ = window;
+    }
+    [[nodiscard]] HWND native_window() const noexcept { return hwnd_; }
+    [[nodiscard]] Size minimum_size() const noexcept { return options_.minimum_size; }
+    // Full screen, maximized and minimized windows refuse frame requests, as
+    // they refuse client size requests.
+    [[nodiscard]] bool frame_fixed() const noexcept {
+        const bool fixed = hwnd_ == nullptr || full_screen_ || IsZoomed(hwnd_) || IsIconic(hwnd_);
+        return fixed;
+    }
+    // The native window and its session are gone (WM_NCDESTROY ran).
+    [[nodiscard]] bool destroyed() const noexcept {
+        const bool gone = hwnd_ == nullptr && native_phase_ == NativePhase::shutdown;
+        return gone;
+    }
+    // HostWindowing::destroy_window: closes without asking the closing
+    // handler; WM_DESTROY publishes the closed event with reason application.
+    void destroy_for_application() noexcept {
+        if (hwnd_ == nullptr || closed_) return;
+        destroy_reason_ = HostCloseReason::application;
+        native_phase_ = NativePhase::closing;
+        DestroyWindow(hwnd_);
+    }
+    // Defined in windows_application_run.inc.
+    void report_frame_to_run();
+    void retire_from_run() noexcept;
+    void report_application_active_to_run(bool active);
+    void hidden_on_close_to_run() noexcept;
+    // Shows without activating, for the floating policy.
+    void show_without_activation() noexcept {
+        if (hwnd_ != nullptr && !closed_) ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    }
+    void hide_for_policy() noexcept { hide_window(); }
+
     [[nodiscard]] HANDLE live_frame_clock() const noexcept {
         return live_frame_clock_;
     }
@@ -2461,7 +2535,13 @@ public:
             }
         }
         switch (message) {
-        case WM_SIZE: resize(); return 0;
+        case WM_ACTIVATEAPP:
+            // Sent to every top-level window of the thread; the windowing
+            // ignores repeated reports of the same state.
+            report_application_active_to_run(wparam != FALSE);
+            break;
+        case WM_SIZE: resize(); report_frame_to_run(); return 0;
+        case WM_MOVE: report_frame_to_run(); return 0;
         case WM_DPICHANGED: dpi_changed(wparam, lparam); return 0;
         case WM_ACTIVATE:
             if (LOWORD(wparam) == WA_INACTIVE) { services_.revoke_cursor_interaction(); }
@@ -2618,10 +2698,13 @@ public:
                 const HostLifecyclePhase phase = session_.snapshot().phase;
                 if (phase == HostLifecyclePhase::attached ||
                     phase == HostLifecyclePhase::close_authorized) {
-                    dispatch(HostClosedEvent{HostCloseReason::user});
+                    dispatch(HostClosedEvent{destroy_reason_});
                 }
                 closed_ = true;
                 native_phase_ = NativePhase::closed;
+                // Retired before the closed callback, so the callback may open
+                // a replacement under the same stable id.
+                retire_from_run();
                 if (options_.closed) options_.closed();
             }
             (*model_).set_paint_wake_handler({});
@@ -3531,6 +3614,7 @@ private:
         if (result.accepted() && result.close_allowed) {
             if (options_.hide_on_close) {
                 hide_window();
+                hidden_on_close_to_run();
                 return 0;
             }
             native_phase_ = NativePhase::closing;
@@ -3892,6 +3976,13 @@ private:
     bool frame_capture_saved_{};
     NativePhase native_phase_{NativePhase::creating};
     TooltipPopup tooltip_;
+    // The application run this window belongs to (observing; the run owns
+    // this state) and the window's identity in it. Null for run_windows.
+    WindowsApplicationRun* run_{};
+    HostWindowId window_id_{};
+    // The reason WM_DESTROY reports: user for every native close, application
+    // when the run destroys the window (HostWindowing::destroy_window).
+    HostCloseReason destroy_reason_{HostCloseReason::user};
 };
 
 HostServiceStatus RequestClientSize::operator()(const Size client_size) const {
@@ -3923,6 +4014,8 @@ LRESULT CALLBACK window_procedure(HWND window, UINT message, WPARAM wparam, LPAR
     if (state != nullptr) return (*state).message(message, wparam, lparam);
     return DefWindowProcW(window, message, wparam, lparam);
 }
+
+#include "windows_application_run.inc"
 
 #if defined(GUI_FORMS_DIB_LIFECYCLE_TEST)
 #include "windows_dib_lifecycle_fixture.inc"
@@ -3971,7 +4064,15 @@ HostCapabilities windows_capabilities() {
                 HostCapability::sound_cues |
                 HostCapability::notification_area |
                 HostCapability::notification_area_messages |
-                HostCapability::notification_area_menus};
+                HostCapability::notification_area_menus |
+                HostCapability::runtime_windows |
+                HostCapability::window_frames |
+                HostCapability::screen_pointer |
+                HostCapability::window_at_point |
+                HostCapability::window_ordering,
+            // Windows follows the PC keyboard convention (Ctrl+F4 closes a
+            // document).
+            pc_key_map()};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
@@ -4091,8 +4192,9 @@ int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {
     return static_cast<int>(message.wParam);
 }
 
-int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
-    if (windows.empty()) return 2;
+int run_windows_application(std::vector<WindowsApplicationWindow> windows,
+                            WindowsApplicationOptions application) {
+    if (windows.empty() || windows.size() > HostWindowing::maximum_windows) return 2;
     std::unordered_set<std::string> identities;
     std::size_t primary_count{};
     for (const WindowsApplicationWindow& entry : windows) {
@@ -4129,100 +4231,91 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
         return 3;
     }
 
-    std::vector<std::unique_ptr<WindowsHostState>> states(windows.size());
-    std::vector<HWND> handles(windows.size(), nullptr);
-    std::size_t created_count{};
-    while (created_count < windows.size()) {
-        bool made_progress{};
-        for (std::size_t index = 0; index < windows.size(); ++index) {
-            if (handles[index] != nullptr) continue;
-            WindowsApplicationWindow& entry = windows[index];
-            HWND owner{};
-            if (!entry.owner_id.empty()) {
-                std::size_t owner_index = 0U;
-                while (owner_index < windows.size() &&
-                       windows[owner_index].stable_id != entry.owner_id) {
-                    ++owner_index;
-                }
-                if (owner_index == windows.size()) return 2;
-                owner = handles[owner_index];
-                if (owner == nullptr) continue;
-            }
+    // The run outlives every window state it owns; the open operation it
+    // publishes is revoked (end_run_windowing) before the run is released.
+    std::unique_ptr<WindowsApplicationRun> run = std::make_unique<WindowsApplicationRun>(instance);
+    const std::shared_ptr<WindowsRunOpenState> open_state = std::make_shared<WindowsRunOpenState>();
+    (*open_state).run = run.get();
+    const bool windowing_published = static_cast<bool>(application.windowing_ready);
+    if (windowing_published) application.windowing_ready(*run, WindowsRunOpen{open_state});
 
-            WindowsHostOptions host_options = entry.options;
-            host_options.quit_thread_on_close =
-                entry.owner_id.empty() && !entry.tool_window;
-            std::unique_ptr<WindowsHostState> state =
-                std::make_unique<WindowsHostState>(
-                    std::move(entry.model), std::move(host_options));
-            const DWORD style = entry.options.popup_window
-                ? (WS_POPUP | WS_BORDER) :
-                (entry.options.minimizable ? WS_OVERLAPPEDWINDOW :
-                                            (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
-            const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
-            const double initial_scale = query_scale(owner);
-            const Size initial_size = entry.options.capture_size.has_value()
-                ? *entry.options.capture_size : entry.options.initial_size;
-            RECT frame{0, 0,
-                       static_cast<LONG>(std::ceil(initial_size.width * initial_scale)),
-                       static_cast<LONG>(std::ceil(initial_size.height * initial_scale))};
-            adjust_client_frame(frame, style, ex_style, initial_scale);
-            const std::wstring title = wide_from_utf8(entry.options.title);
-            HWND window = CreateWindowExW(
-                ex_style, window_class_name, title.c_str(), style, CW_USEDEFAULT,
-                CW_USEDEFAULT, frame.right - frame.left, frame.bottom - frame.top,
-                owner, nullptr, instance, state.get());
-            if (window == nullptr || !(*state).initialize(window)) {
-                if (window != nullptr) DestroyWindow(window);
-                for (HWND created : handles) {
-                    if (IsWindow(created)) DestroyWindow(created);
-                }
-                if (SUCCEEDED(com_status)) CoUninitialize();
-                return window == nullptr ? 4 : 5;
+    // Owners are created before the windows they own. A remaining ownership
+    // cycle is invalid even when a separate primary exists; it is rejected
+    // before the message loop starts.
+    std::vector<bool> created(windows.size(), false);
+    // Each listed entry's identity; the entries' ids are moved out on open.
+    std::vector<HostWindowId> listed_ids(windows.size());
+    std::size_t created_count{};
+    int failure{};
+    while (created_count < windows.size() && failure == 0) {
+        bool made_progress{};
+        for (std::size_t index = 0; index < windows.size() && failure == 0; ++index) {
+            if (created[index]) continue;
+            WindowsApplicationWindow& entry = windows[index];
+            if (!entry.owner_id.empty() && !(*run).find(entry.owner_id).has_value()) continue;
+            const WindowsApplicationRun::OpenOutcome outcome = (*run).open(std::move(entry), false);
+            if (!outcome.admission.status.accepted()) {
+                failure = outcome.failure_code == 0 ? 2 : outcome.failure_code;
+                break;
             }
-            states[index] = std::move(state);
-            handles[index] = window;
+            created[index] = true;
+            listed_ids[index] = outcome.admission.window;
             ++created_count;
             made_progress = true;
         }
-        // A remaining ownership cycle is invalid even when a separate primary
-        // exists. Reject it before entering the message loop.
-        if (!made_progress) {
-            for (HWND created : handles) {
-                if (IsWindow(created)) DestroyWindow(created);
+        if (!made_progress && failure == 0) failure = 2;
+    }
+    if (failure == 0) {
+        (*run).mark_started();
+        for (std::size_t index = 0; index < (*run).slot_count() && failure == 0; ++index) {
+            WindowsRunSlot& slot = (*run).slot_at(index);
+            if (slot.initial && !(*slot.state).will_show()) failure = 5;
+        }
+    }
+    if (failure != 0) {
+        end_run_windowing(*open_state, application, windowing_published);
+        (*run).shutdown();
+        for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+            const HWND created_window = (*(*run).slot_at(index).state).native_window();
+            if (IsWindow(created_window)) DestroyWindow(created_window);
+        }
+        run.reset();
+        if (SUCCEEDED(com_status)) CoUninitialize();
+        return failure;
+    }
+    // Initial windows are shown in the order they were listed.
+    for (std::size_t listed = 0; listed < windows.size(); ++listed) {
+        for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+            WindowsRunSlot& slot = (*run).slot_at(index);
+            if (slot.id != listed_ids[listed]) continue;
+            const HWND window = (*slot.state).native_window();
+            const bool visible = windows[listed].options.initially_visible;
+            // A floating window is shown by the floating policy.
+            (*run).window_created(slot.id, visible);
+            if (visible && !slot.floating) {
+                ShowWindow(window, windows[listed].tool_window ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
+                UpdateWindow(window);
             }
-            if (SUCCEEDED(com_status)) CoUninitialize();
-            return 2;
+            if (windows[listed].options.close_after_launch_for_testing) {
+                PostMessageW(window, WM_CLOSE, 0, 0);
+            }
+            break;
         }
     }
 
-    for (std::size_t index = 0; index < windows.size(); ++index) {
-        if (!(*states[index]).will_show()) {
-            for (HWND created : handles) {
-                if (IsWindow(created)) DestroyWindow(created);
-            }
-            if (SUCCEEDED(com_status)) CoUninitialize();
-            return 5;
-        }
-        if (windows[index].options.initially_visible) {
-            ShowWindow(handles[index], windows[index].tool_window ? SW_SHOWNOACTIVATE
-                                                                  : SW_SHOWNORMAL);
-            UpdateWindow(handles[index]);
-        }
-        if (windows[index].options.close_after_launch_for_testing) {
-            PostMessageW(handles[index], WM_CLOSE, 0, 0);
-        }
-    }
+    (*run).report_foreground();
 
     MSG message{};
     bool quit{};
+    std::vector<HANDLE> clocks;
+    clocks.reserve(WindowsApplicationRun::reserved_slots);
     while (!quit) {
-        std::vector<HANDLE> clocks;
-        clocks.reserve(states.size());
-        for (const std::unique_ptr<WindowsHostState>& state : states) {
-            if ((*state).live_frame_clock() != nullptr) {
-                clocks.push_back((*state).live_frame_clock());
-            }
+        // A window opened or closed in the previous turn changes the slots;
+        // their count is read afresh in every pass.
+        clocks.clear();
+        for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+            const HANDLE clock = (*(*run).slot_at(index).state).live_frame_clock();
+            if (clock != nullptr) clocks.push_back(clock);
         }
         if (clocks.size() >= MAXIMUM_WAIT_OBJECTS) {
             clocks.resize(MAXIMUM_WAIT_OBJECTS - 1U);
@@ -4232,12 +4325,12 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
             clocks.empty() ? nullptr : clocks.data(), INFINITE,
             QS_ALLINPUT, MWMO_INPUTAVAILABLE);
         if (wait == WAIT_FAILED) break;
-        if (wait >= WAIT_OBJECT_0 &&
-            wait < WAIT_OBJECT_0 + clocks.size()) {
+        if (wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + clocks.size()) {
             const HANDLE ready = clocks[wait - WAIT_OBJECT_0];
-            for (const std::unique_ptr<WindowsHostState>& state : states) {
-                if ((*state).live_frame_clock() == ready) {
-                    (*state).mark_live_frame_due();
+            for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+                WindowsHostState& state = *(*run).slot_at(index).state;
+                if (state.live_frame_clock() == ready) {
+                    state.mark_live_frame_due();
                     break;
                 }
             }
@@ -4261,42 +4354,40 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows) {
                 break;
             }
         }
-        for (const std::unique_ptr<WindowsHostState>& state : states) {
-            const HANDLE clock = (*state).live_frame_clock();
-            if (clock != nullptr &&
-                WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
-                (*state).mark_live_frame_due();
+        for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+            WindowsHostState& state = *(*run).slot_at(index).state;
+            const HANDLE clock = state.live_frame_clock();
+            if (clock != nullptr && WaitForSingleObject(clock, 0U) == WAIT_OBJECT_0) {
+                state.mark_live_frame_due();
             }
         }
         if (!quit) {
-            for (const std::unique_ptr<WindowsHostState>& state : states) {
-                (*state).present_pending_frame();
+            for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+                (*(*run).slot_at(index).state).present_pending_frame();
             }
+            // The end of the turn: no message of a closed window is on the
+            // stack, so runtime windows closed in it are released.
+            (*run).reclaim();
         }
     }
-    for (HWND window : handles) if (IsWindow(window)) DestroyWindow(window);
-    for (std::size_t index = 0; index < windows.size(); ++index) {
-        const std::string metrics = (*states[index]).metrics_json();
-        const std::string host = (*states[index]).host_json();
-        if (windows[index].options.print_metrics_on_close) {
-            std::fprintf(stdout,
-                         "{\"stable_id\":\"%s\",\"window\":%s,\"host\":%s}\n",
-                         windows[index].stable_id.c_str(), metrics.c_str(),
-                         host.c_str());
-        }
-        if (windows[index].options.final_snapshot) {
-            windows[index].options.final_snapshot(metrics, host);
-        }
+    // The program's handles stop reaching the windowing before the remaining
+    // windows are destroyed, so a closed callback cannot open another.
+    end_run_windowing(*open_state, application, windowing_published);
+    (*run).shutdown();
+    for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+        const HWND window = (*(*run).slot_at(index).state).native_window();
+        if (IsWindow(window)) DestroyWindow(window);
     }
-    std::fflush(stdout);
     bool capture_failed{};
-    for (std::size_t index = 0; index < windows.size(); ++index) {
-        if (!windows[index].options.capture_path.empty() &&
-            !(*states[index]).frame_capture_saved()) {
+    for (std::size_t index = 0; index < (*run).slot_count(); ++index) {
+        WindowsRunSlot& slot = (*run).slot_at(index);
+        WindowsApplicationRun::publish_final_metrics(slot);
+        if (!slot.capture_path.empty() && !(*slot.state).frame_capture_saved()) {
             capture_failed = true;
         }
     }
-    states.clear();
+    std::fflush(stdout);
+    run.reset();
     if (SUCCEEDED(com_status)) CoUninitialize();
     if (capture_failed) return 6;
     return static_cast<int>(message.wParam);

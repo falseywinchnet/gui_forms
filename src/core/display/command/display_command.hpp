@@ -60,6 +60,9 @@ struct DisplayCommand final {
     ImagePatternWrap image_pattern_wrap{ImagePatternWrap::tile};
     ImageSampling image_sampling{ImageSampling::linear};
     std::string text;
+    // The reading direction of draw_text_utf8. A turned run replays through
+    // Painter::draw_turned_text_utf8, without the retained cache.
+    TextOrientation text_orientation{TextOrientation::horizontal};
     // Renderer-derived data shared by every replay copy of this recording.
     std::shared_ptr<RetainedDrawCache> retained_cache{};
 #if defined(GUI_FORMS_PREPARED_TEXT)

@@ -71,10 +71,29 @@ struct LinuxApplicationWindow final {
   std::unique_ptr<Window> model;
   LinuxHostOptions options;
   bool tool_window{};
+  // See ApplicationWindow::floating.
+  HostWindowFloating floating{HostWindowFloating::none};
+};
+
+// Opens one window while the application runs: the same entry, ownership
+// and readiness rules as an initial window, after HostWindowing::admit.
+// Callable on the UI thread while the run lives; afterwards it reports
+// after_shutdown. The window's host_ready and ready callbacks run before it
+// returns.
+using LinuxOpenWindow = std::function<HostWindowAdmission(LinuxApplicationWindow)>;
+
+struct LinuxApplicationOptions final {
+  // Published once on the UI thread before the first window is created.
+  // `windowing` lives until windowing_ended has been called.
+  std::function<void(HostWindowing &windowing, LinuxOpenWindow open)> windowing_ready;
+  // Published once on the UI thread when the event loop ends (or the run
+  // fails), before the windowing is shut down and released.
+  std::function<void()> windowing_ended;
 };
 
 [[nodiscard]] HostCapabilities linux_capabilities();
 int run_linux(std::unique_ptr<Window> window, LinuxHostOptions options = {});
-int run_linux_application(std::vector<LinuxApplicationWindow> linux);
+int run_linux_application(std::vector<LinuxApplicationWindow> linux,
+                          LinuxApplicationOptions application = {});
 
 } // namespace gui_forms::host

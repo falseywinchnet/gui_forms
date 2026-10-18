@@ -46,6 +46,10 @@ commit
     sets the value (raising `value_changed` when it differs), then executes
     the command with the given source. Returns false, changing nothing, while
     the command is disabled or for an empty or invalid ID.
+commit_routed
+    As `commit`, routing the command through a window's command chain
+    (`Command::execute_routed`, decision DK-47); a `RibbonGallery` with a
+    window commits this way.
 preview
     Asks for a preview of an item. Returns false, raising nothing, while the
     command is disabled, for an invalid ID, or when that item is already

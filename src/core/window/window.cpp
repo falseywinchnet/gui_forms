@@ -124,6 +124,8 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.position_in_set = descriptor.position_in_set;
     node.set_size = descriptor.set_size;
     node.has_popup = descriptor.has_popup;
+    node.controlled_panel = descriptor.controlled_panel;
+    node.orientation = descriptor.orientation;
     node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
@@ -217,27 +219,37 @@ void Window::DeferredInputVisitor::operator()(InputEvent&& event) const {
 
 ImageLoadResult Window::load_png(std::span<const std::byte> encoded) {
     require_ui_thread("PNG resource load");
-    return image_resources_.load_png(encoded);
+    return (*resources_).load_png(encoded);
 }
 
 ImageLoadResult Window::load_bgra32_premultiplied(
     std::uint32_t width, std::uint32_t height, std::uint64_t row_bytes,
     std::span<const std::byte> pixels) {
     require_ui_thread("BGRA resource load");
-    return image_resources_.load_bgra32_premultiplied(
+    return (*resources_).load_bgra32_premultiplied(
         width, height, row_bytes, pixels);
 }
 
 ImageLoadResult Window::replace_png(ImageId image,
                                     std::span<const std::byte> encoded) {
     require_ui_thread("PNG resource replacement");
-    ImageLoadResult result = image_resources_.replace_png(image, encoded);
-    if (result) {
-        add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
-        touch_paint();
-        paint_dirty_ = true;
-    }
+    // Repaints every window sharing the registry, this one included.
+    ImageLoadResult result = (*resources_).replace_png(image, encoded);
     return result;
+}
+
+void Window::repaint_for_image_replacement() {
+    add_damage_all_planes({0.0, 0.0, client_size_.width, client_size_.height});
+    touch_paint();
+    paint_dirty_ = true;
+}
+
+void Window::repaint_for_image_removal() {
+    // The unscoped removal API cannot know which retained display chunks
+    // reference this generational ID. Conservatively retire all cached paint
+    // chunks so a dead ImageId is never replayed into any renderer. Scoped
+    // replacement APIs remain available when the caller can name a consumer.
+    mark_subtree_dirty(*root_, Dirty::paint | Dirty::semantics);
 }
 
 ImageLoadResult Window::replace_bgra32_premultiplied(
@@ -249,7 +261,7 @@ ImageLoadResult Window::replace_bgra32_premultiplied(
         throw std::invalid_argument(
             "scoped BGRA replacement requires an attached consumer");
     }
-    ImageLoadResult result = image_resources_.replace_bgra32_premultiplied(
+    ImageLoadResult result = (*resources_).registry().replace_bgra32_premultiplied(
         image, width, height, row_bytes, pixels);
     if (result) {
         mark_dirty(consumer, Dirty::paint | Dirty::semantics);
@@ -266,7 +278,7 @@ ImageLoadResult Window::update_bgra32_premultiplied(
         throw std::invalid_argument(
             "scoped live BGRA update requires an attached consumer");
     }
-    ImageLoadResult result = image_resources_.update_bgra32_premultiplied(
+    ImageLoadResult result = (*resources_).registry().update_bgra32_premultiplied(
         image, width, height, row_bytes, pixels);
     if (result) {
         mark_dirty(consumer, Dirty::paint | Dirty::semantics);
@@ -284,7 +296,7 @@ ImageLoadResult Window::patch_bgra32_premultiplied(
         throw std::invalid_argument(
             "scoped BGRA patch requires an attached consumer");
     }
-    ImageLoadResult result = image_resources_.patch_bgra32_premultiplied(
+    ImageLoadResult result = (*resources_).registry().patch_bgra32_premultiplied(
         image, x, y, width, height, source_row_bytes, pixels);
     if (result) {
         mark_paint_dirty(consumer, local_damage);
@@ -300,7 +312,7 @@ ImageLoadResult Window::replace_png(ImageId image,
         throw std::invalid_argument(
             "scoped PNG replacement requires an attached consumer");
     }
-    ImageLoadResult result = image_resources_.replace_png(image, encoded);
+    ImageLoadResult result = (*resources_).registry().replace_png(image, encoded);
     if (result) {
         mark_dirty(consumer, Dirty::paint | Dirty::semantics);
     }
@@ -309,15 +321,9 @@ ImageLoadResult Window::replace_png(ImageId image,
 
 bool Window::remove_image(ImageId image) {
     require_ui_thread("PNG resource removal");
-    if (!image_resources_.remove(image)) {
-        return false;
-    }
-    // The unscoped removal API cannot know which retained display chunks
-    // reference this generational ID. Conservatively retire all cached paint
-    // chunks so a dead ImageId is never replayed into any renderer. Scoped
-    // replacement APIs remain available when the caller can name a consumer.
-    mark_subtree_dirty(*root_, Dirty::paint | Dirty::semantics);
-    return true;
+    // Retires the paint of every window sharing the registry.
+    const bool removed = (*resources_).remove_image(image);
+    return removed;
 }
 
 
@@ -346,6 +352,12 @@ void Window::close_accelerator(
     if (found == accelerators_.end()) return;
     (*(*found)).revoke();
     accelerators_.erase(found);
+}
+
+bool Window::offer_accelerators(const KeyEvent& event) {
+    require_ui_thread("accelerator offer");
+    const bool taken = dispatch_accelerator(event, false);
+    return taken;
 }
 
 bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
@@ -538,6 +550,14 @@ bool Window::request_focus(const Control::Ptr& control) {
             FocusChangePublication{this, control, true});
     }
     metrics_.record_focus_transition();
+    FocusedControlChange moved{};
+    if (previous) moved.previous_id = (*previous).runtime_id();
+    const Control::Ptr current = focused_.lock();
+    if (current) {
+        moved.current_id = (*current).runtime_id();
+        moved.stable_id = std::string((*current).stable_id().value());
+    }
+    focused_control_changed_.emit(moved);
     return true;
 }
 

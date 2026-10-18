@@ -9,8 +9,9 @@ advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
-`HostCapabilities` carries `protocol_version` (currently 7), a `platform`
-string and a bit set of `HostCapability` flags. `Application::capabilities()`
+`HostCapabilities` carries `protocol_version` (currently 8), a `platform`
+string, a bit set of `HostCapability` flags and the host's keyboard-command
+defaults (`key_map`, below). `Application::capabilities()`
 returns the set for the host your program was linked against, before any
 window exists. `supports(flag)` answers one question; `to_json()` dumps the
 whole record for logs.
@@ -38,9 +39,52 @@ whole record for logs.
 | `font_discovery` | host font enumeration | no, by design | no, by design | no, by design |
 | `accessibility` | native accessibility publication of the semantic tree | not yet advertised | not yet advertised | not yet advertised |
 | `typed_drag_source` | outbound drag initiation | no | no | no |
+| `runtime_windows` | owned windows opened and destroyed while the application runs | yes | yes | yes |
+| `window_frames` | window frames read and requested in desktop logical units, with a report for every move and resize | yes | yes | yes (the window manager decides) |
+| `screen_pointer` | the pointer's desktop position | yes | yes | yes |
+| `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
+| `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
+
+## Keyboard-command defaults
+
+Some keys differ by platform convention: closing a document is Ctrl+F4 on
+Windows and X11 desktops and Cmd+W on macOS. The core names such keys as
+keyboard commands (`KeyCommand`: `close_document`, `next_tab`,
+`previous_tab`, `move_tab_later`, `move_tab_earlier`, `cycle_forward`,
+`cycle_backward`, `context_menu`, and docking's `next_document`,
+`previous_document`, `next_tool_panel`, `previous_tool_panel`,
+`position_menu`, `return_to_document`, `hide_tool_panel`,
+`maximize_document_area`, `move_panel`), and each host reports the keys its convention
+gives them in `HostCapabilities::key_map`; `to_json` lists them as HID usage
+and modifier bits. An application has one set of keys for all its windows
+(`KeyBindings`, `Application::key_bindings`, owner decision DK-44): the
+first host session seeds it with its host's map, and controls ask their
+window (`Control::effective_key_map`) rather than naming keys themselves.
+An application rebinds a command with `Window::rebind_key_command` from any
+of its windows, and the rebinding holds in all of them, over whatever host
+attaches.
+
+| Command | Windows, X11, headless (`pc_key_map`) | macOS |
+|---|---|---|
+| `close_document` | Ctrl+F4 | Cmd+W |
+| `next_tab`, `previous_tab` | Ctrl+PageDown, Ctrl+PageUp | the same |
+| `move_tab_later`, `move_tab_earlier` | Ctrl+Shift+PageDown, Ctrl+Shift+PageUp | the same |
+| `cycle_forward`, `cycle_backward` | Ctrl+Tab, Ctrl+Shift+Tab | the same |
+| `context_menu` | Shift+F10, or the context-menu key | the same |
+| docking's commands | Ctrl+F6, Ctrl+Shift+F6, Alt+F7, Alt+Shift+F7, Alt+Hyphen, Escape, Shift+Escape, Ctrl+Shift+F12, Ctrl+Alt+Shift+M (move) | the same |
+
+The context-menu key is `PhysicalKey::context_menu` (HID "Keyboard
+Application"): `VK_APPS` on Windows and the `Menu` keysym on X11. Apple
+keyboards have no such key; the macOS host maps the virtual key code a PC
+keyboard's key reports (0x6E), which has not been tested on a Mac.
+`PageStrip` and `PageView` use the tab commands, close and the context
+menu; `TabControl` uses the tab and cycle commands and leaves close and the
+context menu to the controls around it; `DockSite` uses docking's
+commands, the cycle commands (its navigator) and the context menu (a
+panel's position menu).
 
 ## The three native hosts and the headless one
 
@@ -102,9 +146,9 @@ change at run time, whether composition exists, which dialogs are native) are
 exposed as capability bits and `HostServiceStatus` results, not as hidden
 behaviour differences.
 
-Two consequences are worth knowing. Coordinate conversion ends at window
-client coordinates; a desktop-screen origin and multi-monitor transform are
-host facts you query through monitor records. And the core never encodes one
+Two consequences are worth knowing. Inside a window, coordinates are the
+window's client coordinates; across windows, the windowing seam (below) uses
+desktop logical units. And the core never encodes one
 platform's assumption about dialogs, paths or menus; a request a host cannot
 honour comes back `unsupported` immediately.
 
@@ -135,6 +179,105 @@ event arrives, as for a user resize. `Window::resize` only reports a size the
 host already has, so calling it from application code leaves the model and
 the screen disagreeing. One window's handlers may mutate another window's
 model and have it present on the next wake.
+
+### Runtime windows and the desktop
+
+`ApplicationWindowHandle::windows()` returns the run's `ApplicationWindows`
+(stage DK decisions 6 and 7). `open_window` opens an owned or tool window
+while the application runs and `destroy_window` destroys one without asking
+its closing handler; at most 64 windows are live at once, and identities
+(`HostWindowId`) are never reused within a run. `ApplicationWindowHandle::
+frame` and `request_frame` read and place a window's client rectangle,
+`frame_changed` reports every move and resize, `pointer_position` and
+`window_at` answer where the pointer is and which of the application's
+windows is under a point, and `bring_to_front` orders a window above the
+application's other windows without activating it and never above other
+applications' windows. Each is a capability bit above; a host that cannot
+do one reports `unsupported`.
+
+These requests use desktop logical units: origin at the top left of the
+primary monitor, y downwards. macOS points are such units already. Windows
+(per-monitor DPI aware) and X11 address their desktops in device pixels;
+there each monitor keeps its device origin and its extent is divided by its
+scale (`gui_forms/host/windowing/desktop_coordinates.hpp`), and
+`ApplicationWindows::monitors` returns the monitors in those units, while
+`HostServices::query_monitors` keeps reporting device units. On X11 a frame
+is a request to the window manager, which may adjust it; whether XWayland
+honours client positions is measured per compositor, not assumed.
+
+The portable rules (identities, bounds, ownership, validation, thread and
+shutdown checks) live in the `HostWindowing` base class, so every adapter
+applies them the same way; the headless reference host
+(`src/host/headless/application/`) implements the same seam on a simulated
+desktop for tests.
+
+### Images and theme across windows
+
+Each `Window` has an image registry and a theme. Windows constructed with
+the same `ApplicationResources` (stage DK decision 8) share both: an
+`ImageId` or an `ImageList` from one is valid in the others, setting the
+theme on one sets it on all, and a control subtree moved from one window to
+another keeps its images. Build a window opened during the run from the main
+window's resources, `Window(root, size, main_window.resources())`. A window
+constructed without resources makes its own, so a single-window program, or
+windows meant to stay separate, behave as before (a `Button` still refuses
+an `ImageList` from a window that does not share its registry). The shared
+registry lives until its last window, or other holder, releases it.
+
+### Changing several windows at once, and dragging a window
+
+`WorkspaceTransaction` makes one coherent change across windows (stage DK
+decision 9): `include` holds an update scope on each window it changes,
+`open_window` creates windows hidden, `destroy_window`, `show_window` and
+`defer_notification` queue their work, and `commit` (or the destructor)
+lays out each window once, shows the new windows, then destroys the emptied
+ones, then runs the notifications once, in order. A panel moving between
+two windows is never invisible and observers see only the finished state.
+
+`WindowFrameDrag` is the framework's own capture drag of a window by a drawn
+caption (decision 12): every pointer move reads the desktop pointer and
+requests the window's frame, so other windows can follow the pointer, and
+`cancel` puts the window back. `WindowFrameDrag::mode_for` gives
+`native_move_loop` on a host without window frames, the desktop pointer or
+pointer capture; the caller then starts the platform's move loop from a
+drag region. The drag's statistics say whether the host kept up; per-host
+measurements belong in `results/2026-10-18-dk-w0-capture-drag/`.
+
+### Floating windows
+
+`ApplicationWindow::floating` makes a window a floating tool panel
+(`HostWindowFloating::tool`) or a document torn out into its own window
+(`HostWindowFloating::document`), owned by the primary window (stage DK
+decisions 1, 10 and 11). One rule on every host, decided by the
+`HostWindowing` base class from `host_window_kind_traits`:
+
+- no taskbar button, minimized and restored with the primary window, above
+  the primary window only and never above other applications' windows;
+- a floating tool hides while the application is inactive and returns when
+  it is activated (the Mac palette convention); a floating document stays
+  visible;
+- both move with the primary window, keeping their offset from it, and are
+  clamped to the work area of the screen they land on; the offset is
+  remembered through clamping, so moving the primary window back restores
+  it, and only the user (or a frame request) moving the floating window
+  changes it;
+- in macOS full screen they join the primary window's space.
+
+`show` and `hide` on a floating window's handle say whether the program
+wants it; the policy decides when it is on screen. At most 32 floating
+windows are live at once.
+
+| Behaviour | Windows | macOS | X11 |
+|---|---|---|---|
+| Native object | owned window (`WS_EX_TOOLWINDOW` for a tool) | child window of the primary (`NSPanel` for a tool, with `hidesOnDeactivate` off: the policy hides it) | transient for the primary, `_NET_WM_WINDOW_TYPE_UTILITY`, `_NET_WM_STATE_SKIP_TASKBAR` |
+| Activation | `WM_ACTIVATEAPP` | application did become or resign active | any window holding the focus after a turn of events (reported once a focus has been seen) |
+| Minimized | `IsIconic` on move and size | did miniaturize and deminiaturize | `_NET_WM_STATE_HIDDEN` |
+| Full-screen space | none | `NSWindowCollectionBehaviorFullScreenAuxiliary` | none |
+
+An existing `tool_window` keeps each host's behaviour: on macOS it is still
+an `NSPanel` that AppKit hides while the application is inactive, and on
+Windows and X11 it does not hide. Decision 11 does apply to it on X11: it is
+now typed as a utility window and kept off the taskbar.
 
 ## Choosing a host at build time
 
