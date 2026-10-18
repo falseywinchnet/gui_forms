@@ -147,10 +147,11 @@ struct DataGridViewRowOrderStatistics final {
 // Edit mode keeps every ID in chunks of at most 2 * chunk_capacity IDs, in
 // order, with a Fenwick tree of the chunks' sizes and an ID-to-chunk index.
 // Finding an ID's position or a position's ID costs O(log chunks +
-// chunk_capacity); inserting or removing r rows at one place costs
-// O(r + chunk_capacity + log chunks), plus O(chunks) when a chunk splits,
-// merges or empties (at most once per chunk_capacity changes to one chunk);
-// a move is a removal and an insertion. A reset builds everything, O(rows).
+// chunk_capacity); inserting or removing one row costs O(chunk_capacity +
+// log chunks) (it shifts at most one chunk's IDs), so r rows cost r times
+// that, plus O(chunks) when a chunk splits, merges or empties (at most once
+// per chunk_capacity changes to one chunk); a move is a removal and an
+// insertion. A reset builds everything, O(rows).
 //
 // Window mode holds the row count and the IDs of one window of positions,
 // [window_first, window_first + window size), each with its position;
