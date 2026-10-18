@@ -382,6 +382,25 @@ void semantics_and_region() {
     require(json.find("\"role\":\"menu_button\"") != std::string::npos, "the snapshot carries the ribbon's nodes");
 }
 
+// A ribbon whose maximum size is narrower than the bounds its parent offers
+// is arranged at its maximum width: its hosted controls sit where its own
+// published parts (and its painting) put their commands.
+void arranged_within_maximum_size() {
+    const Commands commands;
+    std::shared_ptr<Ribbon> ribbon = sample_ribbon(commands);
+    (*ribbon).set_maximum_size({150.0, 0.0});
+    Window window(ribbon, {900.0, 112.0});
+    window.perform_layout();
+    require((*ribbon).committed_arranged_bounds().width == 150.0, "the ribbon is arranged at its maximum width");
+    const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
+    const std::shared_ptr<ComboBox> font = (*ribbon).combo_box("font_name");
+    const Ribbon::CommandItem* item = find_command(items, "font_name");
+    const bool shown = item != nullptr && (*item).parts.command_combo_box.present;
+    require(shown == (*font).effectively_visible(), "a hosted control shows exactly where its command is published");
+    require(!shown || (*item).parts.command_combo_box.bounds == (*font).committed_arranged_bounds(),
+            "a hosted control sits on its published command part");
+}
+
 void refusals() {
     const Commands commands;
     std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("ribbon"));
@@ -425,6 +444,7 @@ int main() {
     hosted_controls();
     menus_and_launchers();
     semantics_and_region();
+    arranged_within_maximum_size();
     refusals();
     std::cout << "Ribbon: geometry, one command path, item repaint, minimizing, hosted controls, menus, launchers, "
                  "semantics, F6 region and refusals passed\n";

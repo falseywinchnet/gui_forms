@@ -625,17 +625,20 @@ Size Ribbon::measure(Size available) {
 
 void Ribbon::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
+    // The bounds as arranged (final_bounds within the minimum and maximum
+    // sizes): the same client paint, hit testing and the published parts
+    // lay out in.
+    const Rect client = client_rectangle();
     // Scrolling starts below the narrowest entry and ends only
     // scroll_hysteresis above it (owner decision 45).
     bool latched = false;
     if (selected_tab_ && !minimized_ && !plane_hidden_ && !tabs_[*selected_tab_].groups.empty()) {
         const double narrowest = tab_scaling(*selected_tab_).ladder.back().width;
-        latched = scroll_latched_ ? final_bounds.width < narrowest + scroll_hysteresis : final_bounds.width < narrowest;
+        latched = scroll_latched_ ? client.width < narrowest + scroll_hysteresis : client.width < narrowest;
     }
     scroll_latched_ = latched;
     // Backstage follows the window's size.
     if (backstage_open_) place_backstage();
-    const Rect client{0.0, 0.0, final_bounds.width, final_bounds.height};
     Layout placed = layout_for(client);
     if (!placed.scrolling) first_group_ = 0U;
     // A popup whose group grew back closes; the keyboard's command in it
