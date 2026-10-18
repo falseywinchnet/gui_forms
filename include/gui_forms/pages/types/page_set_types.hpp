@@ -75,6 +75,10 @@ struct PageRecord final {
     // Kept in the pinned group at the front of the order. Refused unless the
     // set was constructed with pinning enabled.
     bool pinned{false};
+    // The page's content has unsaved changes (a document). Display only: the
+    // presenter shows it (the custom state `modified`, owner decision DK-35)
+    // and the set attaches no meaning to it.
+    bool modified{false};
 };
 
 // The content a presenter attaches to a page; for `PageView`, the page's
@@ -197,7 +201,7 @@ struct PageSetChange final {
     bool membership{};
     // Positions changed (a move, a pin or unpin, or a membership change).
     bool order{};
-    // A title, image key, closable or pinned flag changed.
+    // A title, image key, closable, pinned or modified flag changed.
     bool records{};
     // Content was attached to a page.
     bool content{};

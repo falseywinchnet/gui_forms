@@ -58,6 +58,13 @@ public:
     [[nodiscard]] HostClipboardImageResult read_clipboard_image();
     /// Reads local file references without opening or decoding their contents.
     [[nodiscard]] HostClipboardFilesResult read_clipboard_files();
+    // Completion candidates from a host-owned source (TextBox and ComboBox
+    // auto-complete). No host adapter supplies any yet: the base
+    // implementation reports unsupported. Accepted results are bounded to
+    // the request's maximum and to valid, non-empty UTF-8 strings without
+    // NUL; anything else is reported as backend_failure with no candidates.
+    [[nodiscard]] HostAutoCompleteResult query_auto_complete(
+        const HostAutoCompleteRequest& request);
     /// Copies an image to the native clipboard before returning. Does not retain
     /// the borrowed view. Replaces clipboard contents on successful publication.
     [[nodiscard]] HostServiceStatus write_clipboard_image(HostImageView image);
@@ -118,6 +125,8 @@ protected:
         std::string_view text_utf8) = 0;
     [[nodiscard]] virtual HostClipboardImageResult read_clipboard_image_impl();
     [[nodiscard]] virtual HostClipboardFilesResult read_clipboard_files_impl();
+    [[nodiscard]] virtual HostAutoCompleteResult query_auto_complete_impl(
+        const HostAutoCompleteRequest& request);
     [[nodiscard]] virtual HostServiceStatus write_clipboard_image_impl(HostImageView image);
     [[nodiscard]] virtual HostDialogResult show_dialog_impl(
         const HostDialogRequest& request) = 0;

@@ -124,6 +124,10 @@ Related types
 
       Kept in the pinned group at the front of the order. Refused unless the set was constructed with pinning enabled. Default: ``{false}``.
 
+   .. cpp:member:: bool modified
+
+      The page's content has unsaved changes (a document). Display only: the presenter shows it (the custom state ``modified``, owner decision DK-35) and the set attaches no meaning to it. Default: ``{false}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PageSelectingEvent final
@@ -194,7 +198,7 @@ Related types
 
    .. cpp:member:: bool records
 
-      A title, image key, closable or pinned flag changed.
+      A title, image key, closable, pinned or modified flag changed.
 
    .. cpp:member:: bool content
 

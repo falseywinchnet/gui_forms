@@ -40,13 +40,32 @@ PageRecord page(const char* id, bool pinned = false) {
     return record;
 }
 
+// Counts the content objects that report to it. Each CountedContent keeps a
+// reference to its count, so the count must outlive every one of them,
+// including those a PageSet still owns when the set is destroyed: declare
+// the count before the set. A count destroyed while content is live fails
+// the test, which turns a write through a dangling reference into a
+// deterministic failure in every build, not only under AddressSanitizer.
+struct ContentCount final {
+    int destroyed{};
+    int live{};
+
+    ContentCount() {}
+    ContentCount(const ContentCount&) = delete;
+    ContentCount& operator=(const ContentCount&) = delete;
+    ~ContentCount() { require(live == 0, "a content count must outlive the content that reports to it"); }
+};
+
 class CountedContent final : public PageContent {
 public:
-    explicit CountedContent(int& destroyed) : destroyed_(destroyed) {}
-    ~CountedContent() override { ++destroyed_; }
+    explicit CountedContent(ContentCount& count) : count_(count) { ++count_.live; }
+    ~CountedContent() override {
+        --count_.live;
+        ++count_.destroyed;
+    }
 
 private:
-    int& destroyed_;
+    ContentCount& count_;
 };
 
 // Everything observable about a set, for "unchanged" comparisons.
@@ -283,13 +302,13 @@ void refusals_leave_the_set_unchanged() {
     PageSetOptions options{};
     options.pinning_enabled = true;
     options.capacity = 4U;
+    ContentCount content_count{};
     PageSet set(options);
-    int destroyed = 0;
     require(set.insert(page("p", true), PagePlacement::end_of_group()) == PageEditStatus::applied &&
                 set.insert(page("a"), PagePlacement::end_of_group()) == PageEditStatus::applied &&
                 set.insert(page("b"), PagePlacement::end_of_group()) == PageEditStatus::applied,
             "the fixture inserts");
-    std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(destroyed);
+    std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(content_count);
     require(set.set_content(page_id("a"), content) == PageEditStatus::applied && content == nullptr,
             "late content attaches and leaves the argument null");
     Recorder recorder;
@@ -334,7 +353,7 @@ void refusals_leave_the_set_unchanged() {
                      "titling an unknown page is refused"});
     cases.push_back({set.set_pinned(page_id("zz"), true), PageEditStatus::unknown_page,
                      "pinning an unknown page is refused"});
-    std::unique_ptr<PageContent> second = std::make_unique<CountedContent>(destroyed);
+    std::unique_ptr<PageContent> second = std::make_unique<CountedContent>(content_count);
     const PageContent* const second_address = second.get();
     cases.push_back({set.set_content(page_id("a"), second), PageEditStatus::content_present,
                      "replacing content is refused"});
@@ -357,7 +376,7 @@ void refusals_leave_the_set_unchanged() {
             "a page beyond the capacity is refused");
     TakenPage spare{};
     spare.record = page("d");
-    spare.content = std::make_unique<CountedContent>(destroyed);
+    spare.content = std::make_unique<CountedContent>(content_count);
     const PageContent* const spare_address = spare.content.get();
     require(set.put(spare, PagePlacement::end_of_group()) == PageEditStatus::capacity_reached,
             "a put beyond the capacity is refused");
@@ -380,7 +399,7 @@ void refusals_leave_the_set_unchanged() {
             "pinning is refused where pinning is off");
     require(plain.count() == 1U && !plain.record_at(PagePosition{0U}).pinned,
             "the refused pin left the page ordinary");
-    require(destroyed == 0, "no refusal destroyed content");
+    require(content_count.destroyed == 0, "no refusal destroyed content");
 }
 
 void edits_from_selecting_are_refused() {
@@ -632,7 +651,7 @@ void pinned_boundary_on_every_path() {
 }
 
 void take_and_put_round_trip() {
-    int destroyed = 0;
+    ContentCount content_count{};
     PageSet source;
     PageSet target;
     PageRecord record = page("doc");
@@ -641,7 +660,7 @@ void take_and_put_round_trip() {
     require(source.insert(page("other"), PagePlacement::end_of_group()) == PageEditStatus::applied &&
                 source.insert(record, PagePlacement::end_of_group()) == PageEditStatus::applied,
             "the source fixture inserts");
-    std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(destroyed);
+    std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(content_count);
     const PageContent* const address = content.get();
     require(source.set_content(page_id("doc"), content) == PageEditStatus::applied,
             "the content attaches");
@@ -650,7 +669,7 @@ void take_and_put_round_trip() {
             "pages without content and unknown pages lend nothing");
     PageTakeResult taken = source.take(page_id("doc"));
     require(taken.status == PageEditStatus::applied, "the page is taken");
-    require(taken.page.content.get() == address && destroyed == 0,
+    require(taken.page.content.get() == address && content_count.destroyed == 0,
             "take moves the content out without destroying it");
     require(taken.page.record.id == page_id("doc") && taken.page.record.title == "Title doc" &&
                 taken.page.record.image_key == "text" && taken.page.record.closable,
@@ -661,20 +680,20 @@ void take_and_put_round_trip() {
             "the page is put into another set");
     require(taken.page.content == nullptr && taken.page.record.id.value.empty(),
             "put leaves the taken page empty");
-    require(target.content(page_id("doc")) == address && destroyed == 0,
+    require(target.content(page_id("doc")) == address && content_count.destroyed == 0,
             "the same content arrived");
     require(selected_of(target) == "doc", "the first page put into an empty set is selected");
     require(target.record_at(PagePosition{0U}).image_key == "text", "the record arrived");
-    require(target.remove(page_id("doc")) == PageEditStatus::applied && destroyed == 1,
+    require(target.remove(page_id("doc")) == PageEditStatus::applied && content_count.destroyed == 1,
             "remove destroys the content");
     {
         PageSet scoped;
-        std::unique_ptr<PageContent> owned = std::make_unique<CountedContent>(destroyed);
+        std::unique_ptr<PageContent> owned = std::make_unique<CountedContent>(content_count);
         require(scoped.insert(page("x"), PagePlacement::end_of_group()) == PageEditStatus::applied &&
                     scoped.set_content(page_id("x"), owned) == PageEditStatus::applied,
                 "scoped content attaches");
     }
-    require(destroyed == 2, "destroying the set destroys its content");
+    require(content_count.destroyed == 2, "destroying the set destroys its content");
 }
 
 // Content whose destructor reads the set: it runs after the removal commits.
@@ -770,7 +789,7 @@ struct Generator final {
 void random_edit_sequences() {
     const char* const ids[] = {"a", "b", "c", "d", "e", "f", "g", "h", "", "a"};
     const std::size_t id_count = sizeof(ids) / sizeof(ids[0]);
-    int destroyed = 0;
+    ContentCount content_count{};
     int created = 0;
     int applied = 0;
     int refused = 0;
@@ -829,7 +848,7 @@ void random_edit_sequences() {
                 recorder.cancel_next = false;
                 page_edit = false;
             } else if (operation == 7U) {
-                std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(destroyed);
+                std::unique_ptr<PageContent> content = std::make_unique<CountedContent>(content_count);
                 ++created;
                 status = set.set_content(id, content);
             } else {
@@ -858,7 +877,7 @@ void random_edit_sequences() {
             }
         }
     }
-    require(destroyed == created, "every content object was destroyed exactly once");
+    require(content_count.destroyed == created, "every content object was destroyed exactly once");
     // 24 sequences of 400 steps: both outcomes must be well represented for
     // the invariants above to mean anything.
     require(applied > 2000 && refused > 2000, "the sequences mix applied and refused edits");

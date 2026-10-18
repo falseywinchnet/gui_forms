@@ -1,4 +1,5 @@
 #include "gui_forms/commands/gallery_command/gallery_command.hpp"
+#include "gui_forms/window.hpp"
 
 #include "gui_forms/text.hpp"
 
@@ -30,6 +31,16 @@ void GalleryCommand::set_value(std::optional<std::string> item_id) {
 }
 
 bool GalleryCommand::commit(std::string item_id, std::string_view source_id) {
+    const bool executed = commit_into(std::move(item_id), nullptr, source_id);
+    return executed;
+}
+
+bool GalleryCommand::commit_routed(std::string item_id, Window& window, std::string_view source_id) {
+    const bool executed = commit_into(std::move(item_id), &window, source_id);
+    return executed;
+}
+
+bool GalleryCommand::commit_into(std::string item_id, Window* window, std::string_view source_id) {
     if (!is_alive() || !(*command_).state().enabled || !valid_item_id(item_id)) return false;
     // The committed value replaces the preview: no cancellation is raised.
     previewing_.reset();
@@ -39,6 +50,10 @@ bool GalleryCommand::commit(std::string item_id, std::string_view source_id) {
     }
     // The Command is shared and may outlive a handler's changes; hold it.
     const std::shared_ptr<Command> command = command_;
+    if (window != nullptr) {
+        const bool routed = (*command).execute_routed(*window, source_id);
+        return routed;
+    }
     const bool executed = (*command).execute(source_id);
     return executed;
 }

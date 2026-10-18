@@ -22,6 +22,9 @@ public:
         build_variants(page);
         build_strip(page);
         build_view(page);
+        build_documents(page);
+        build_side_strips(page);
+        build_navigation(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
         on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
@@ -210,6 +213,106 @@ private:
         (*view_group).add_at(view_status_, {640.0, 40.0, 270.0, 44.0});
     }
 
+    // A PageView in the document preset: closable documents with close
+    // buttons on the selected and hot tabs, one pinned page and one
+    // modified, shrinking and then overflowing into the count-and-arrow
+    // list. The demo gives the strip an image list so the pinned page
+    // collapses to its icon; without one it keeps its label.
+    void build_documents(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> documents_group = group(
+            "gallery.tabs.documents.group",
+            "PageView · document preset: close, modified, pinned, shrink then list, drag to reorder",
+            {930.0, 200.0});
+        (*page).add_at(documents_group, {24.0, 1036.0, 930.0, 200.0});
+        PageViewOptions options{};
+        options.preset = PageViewPreset::document;
+        options.pinning_enabled = true;
+        documents_ = make_control<PageView>(StableId("gallery.tabs.documents"), options);
+        (*documents_).set_accessible_name("Open documents");
+        PageItemWidths widths{};
+        widths.minimum = 80.0;
+        (*(*documents_).strip()).set_item_widths(widths);
+        (*documents_group).add_at(documents_, {20.0, 36.0, 600.0, 146.0});
+        for (std::size_t index = 0U; index < document_titles.size(); ++index) {
+            PageRecord record{};
+            record.id = PageId{"doc." + std::to_string(index)};
+            record.title = std::string(document_titles[index]);
+            record.closable = true;
+            record.pinned = index == 0U;
+            record.modified = index == 2U;
+            record.image_key = "folder";
+            std::shared_ptr<Label> body = label(
+                "gallery.tabs.documents.body." + std::to_string(index),
+                std::string(document_titles[index]) + " · middle-click or Ctrl+F4 closes it", 11.0, 400, ink);
+            static_cast<void>((*documents_).add_page(record, body));
+        }
+        static_cast<void>((*documents_).pages().select(PageId{"doc.1"}, PageSelectionCause::programmatic));
+        documents_status_ = label("gallery.tabs.documents.status", "Close a document to see its cause",
+                                  11.0, 600, green);
+        (*documents_group).add_at(documents_status_, {640.0, 40.0, 270.0, 44.0});
+        on((*(*documents_).strip()).page_close_requested(), *this, &TabsPage::on_document_close_requested);
+        on((*(*documents_).strip()).page_context_menu_requested(), *this, &TabsPage::on_document_context_menu);
+        on((*(*documents_).strip()).page_double_clicked(), *this, &TabsPage::on_document_double_clicked);
+    }
+
+    // The document strip shows no menu of its own: the page reports the
+    // request (a docking workspace shows its position menu here).
+    void on_document_context_menu(PageContextMenuRequest& request) {
+        (*documents_status_).set_text("Context menu asked for " + document_title(request.page));
+    }
+
+    void on_document_double_clicked(const PageDoubleClick& event) {
+        (*documents_status_).set_text("Double-clicked " + document_title(event.page) + " (docking floats it)");
+    }
+
+    [[nodiscard]] std::string document_title(const PageId& page) const {
+        const std::optional<PagePosition> found = (*documents_).pages().find(page);
+        if (!found) return page.value;
+        const std::string title = (*documents_).pages().record_at(*found).title;
+        return title;
+    }
+
+    // Two PageViews with side strips (owner decision DK-42): on the left
+    // edge the labels read from bottom to top, on the right edge from top to
+    // bottom; Up and Down move between the tabs.
+    void build_side_strips(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> side_group = group(
+            "gallery.tabs.side.group", "PageView · side strips with turned labels", {930.0, 340.0});
+        (*page).add_at(side_group, {24.0, 1256.0, 930.0, 340.0});
+        const std::array<PageStripPlacement, 2> edges{PageStripPlacement::left, PageStripPlacement::right};
+        const std::array<std::string_view, 2> names{"left", "right"};
+        for (std::size_t edge = 0U; edge < edges.size(); ++edge) {
+            const std::string prefix = "gallery.tabs.side." + std::string(names[edge]);
+            std::shared_ptr<PageView> view = make_control<PageView>(StableId(prefix));
+            (*(*view).strip()).set_placement(edges[edge]);
+            (*view).set_accessible_name(std::string(names[edge]) + " side pages");
+            for (std::size_t index = 0U; index < side_titles.size(); ++index) {
+                PageRecord record{};
+                record.id = PageId{std::string(names[edge]) + "." + std::to_string(index)};
+                record.title = std::string(side_titles[index]);
+                std::shared_ptr<Label> body = label(
+                    prefix + ".body." + std::to_string(index),
+                    std::string(side_titles[index]) + " · " + std::string(names[edge]) + " edge", 11.0, 400, ink);
+                static_cast<void>((*view).add_page(record, body));
+            }
+            (*side_group).add_at(view, {20.0 + 450.0 * static_cast<double>(edge), 36.0, 430.0, 286.0});
+            side_views_[edge] = view;
+        }
+    }
+
+    // The view removes the page after this handler, which leaves the
+    // request unhandled.
+    void on_document_close_requested(PageCloseRequest& request) {
+        const std::optional<PagePosition> found = (*documents_).pages().find(request.page);
+        if (!found) return;
+        const std::string title = (*documents_).pages().record_at(*found).title;
+        std::string_view cause = "close button";
+        if (request.cause == PageCloseCause::middle_button) cause = "middle click";
+        if (request.cause == PageCloseCause::keyboard) cause = "Ctrl+F4";
+        if (request.cause == PageCloseCause::semantic) cause = "accessibility";
+        (*documents_status_).set_text("Closed " + title + " · " + std::string(cause));
+    }
+
     [[nodiscard]] static PageRecord view_record(std::string_view id, std::string_view title) {
         PageRecord record{};
         record.id = PageId{"view." + std::string(id)};
@@ -225,6 +328,51 @@ private:
             "Created when " + request.page.value + " was first selected.", 11.0, 400, ink);
         static_cast<void>((*view_).set_page_content(request.page, made));
         (*view_status_).set_text("Created " + request.page.value + " on its first selection");
+    }
+
+    // A NavigationPane: six pages with content, four large buttons, the
+    // overflow icons and the configure menu; collapsing it shows the bar and
+    // the popup. Its state is shown as the program would save it.
+    void build_navigation(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> navigation_group = group(
+            "gallery.tabs.navigation.group", "NavigationPane · grip, overflow strip, configure menu and collapse",
+            {930.0, 380.0});
+        (*page).add_at(navigation_group, {24.0, 1616.0, 930.0, 380.0});
+        navigation_ = make_control<NavigationPane>(StableId("gallery.tabs.navigation"));
+        (*navigation_).set_accessible_name("Gallery navigation");
+        (*navigation_group).add_at(navigation_, {20.0, 36.0, 240.0, 324.0});
+        (*navigation_).set_expanded_width(240.0);
+        PageSet& pages = (*navigation_).pages();
+        constexpr std::array<std::string_view, 6> ids{"mail", "calendar", "contacts", "tasks", "notes", "folders"};
+        constexpr std::array<std::string_view, 6> titles{"Mail", "Calendar", "Contacts", "Tasks", "Notes", "Folders"};
+        for (std::size_t index = 0U; index < ids.size(); ++index) {
+            PageRecord record{};
+            record.id = PageId{std::string(ids[index])};
+            record.title = std::string(titles[index]);
+            static_cast<void>(pages.insert(record, PagePlacement::end_of_group()));
+            std::shared_ptr<Label> content = label(
+                "gallery.tabs.navigation.content." + std::string(ids[index]),
+                std::string(titles[index]) + " · the selected page's control", 11.0, 400, ink);
+            std::unique_ptr<PageContent> held = std::make_unique<PageControlContent>(content);
+            static_cast<void>(pages.set_content(record.id, held));
+        }
+        static_cast<void>((*navigation_).set_page_hidden(PageId{"notes"}, true));
+        navigation_status_ = label("gallery.tabs.navigation.status",
+                                   "Drag the grip or use the configure menu; Notes is hidden", 11.0, 600, green);
+        (*navigation_group).add_at(navigation_status_, {290.0, 40.0, 620.0, 44.0});
+        on((*navigation_).state_changed(), *this, &TabsPage::on_navigation_state);
+        on((*navigation_).options_requested(), *this, &TabsPage::on_navigation_options);
+    }
+
+    void on_navigation_state(const NavigationPaneState& state) {
+        std::string text = state.collapsed ? "Collapsed" : "Expanded";
+        text += " · " + std::to_string(state.button_count) + " large buttons · " +
+                std::to_string(state.hidden_pages.size()) + " hidden";
+        (*navigation_status_).set_text(text);
+    }
+
+    void on_navigation_options(const NavigationPaneOptionsRequest&) {
+        (*navigation_status_).set_text("Options requested · the program shows its own dialog");
     }
 
     void on_strip_invoked(const PageInvocation& invocation) {
@@ -248,6 +396,12 @@ private:
             : "Activity · keep visible off · bound Value<bool> changed");
     }
 
+    static constexpr std::array<std::string_view, 10> document_titles{
+        "README.md",        "page_view.cpp",  "page_strip.cpp", "page_set.cpp",   "page_view.hpp",
+        "page_strip.hpp",   "CMakeLists.txt", "PLAN.md",        "README.rst",     "tests.cpp"};
+
+    static constexpr std::array<std::string_view, 4> side_titles{"Explorer", "Search", "Outline", "Output"};
+
     static constexpr std::array<std::string_view, 14> strip_titles{
         "Overview", "Activity", "Security", "Diagnostics", "Network", "Storage", "Accounts",
         "Notifications", "Display", "Sound", "Keyboard", "Accessibility", "Updates", "About"};
@@ -260,6 +414,11 @@ private:
     std::shared_ptr<Label> strip_status_;
     std::shared_ptr<PageView> view_;
     std::shared_ptr<Label> view_status_;
+    std::shared_ptr<PageView> documents_;
+    std::shared_ptr<Label> documents_status_;
+    std::array<std::shared_ptr<PageView>, 2> side_views_{};
+    std::shared_ptr<NavigationPane> navigation_;
+    std::shared_ptr<Label> navigation_status_;
     Value<bool> activity_visible_{true};
 };
 

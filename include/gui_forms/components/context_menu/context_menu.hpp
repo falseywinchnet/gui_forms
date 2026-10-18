@@ -47,6 +47,10 @@ struct MenuItemSpec final {
     std::shared_ptr<Command> command;
     std::string text;
     std::vector<MenuItemSpec> children;
+    // The row's text is set in the italic style. A presentational bridge:
+    // no anatomy state names why a row is set apart (PageStrip's list sets
+    // the pages it does not show in italic, owner decision DK-42, PT6).
+    bool italic{};
 };
 
 struct MenuItemInvocation final {

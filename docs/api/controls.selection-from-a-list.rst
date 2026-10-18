@@ -23,6 +23,8 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
      - A view of many items, shown as a grid of icons or as rows with details columns.
    * - :cpp:class:`ListView <gui_forms::ListView>`
      - A list of items shown as details rows, a list, small icons or large icons.
+   * - :cpp:class:`TreeListView <gui_forms::TreeListView>`
+     - A tree with tabular columns: nodes in a hierarchy, each with cells beside it.
    * - :cpp:class:`CorrespondenceView <gui_forms::CorrespondenceView>`
      - A scrolling list of records whose rows expand to show the evidence behind them.
    * - :cpp:class:`DataGridView <gui_forms::DataGridView>`
@@ -41,6 +43,7 @@ Lists, trees, combo boxes, choice groups and breadcrumbs.
    generated/gui_forms.TreeView
    generated/gui_forms.ObjectView
    generated/gui_forms.ListView
+   generated/gui_forms.TreeListView
    generated/gui_forms.CorrespondenceView
    generated/gui_forms.DataGridView
    generated/gui_forms.ChoiceGroup
@@ -205,6 +208,42 @@ Related types
      - ObjectViewItem owns stable identity, primary/secondary text, icon/status metadata, and optional command data for one flat object row.
    * - :cpp:class:`TreeExpansionChange <gui_forms::TreeExpansionChange>`
      - TreeExpansionChange reports the exact node and resulting expanded state.
+   * - :cpp:class:`TreeListActivation <gui_forms::TreeListActivation>`
+     - A node activated by a double click, Enter, or the semantic press action.
+   * - :cpp:class:`TreeListColumn <gui_forms::TreeListColumn>`
+     - One column.
+   * - :cpp:class:`TreeListColumnMove <gui_forms::TreeListColumnMove>`
+     - A column moved to a new display position, by a header drag or move_column().
+   * - :cpp:class:`TreeListColumnWidthChange <gui_forms::TreeListColumnWidthChange>`
+     - A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+   * - :cpp:class:`TreeListExpansionChange <gui_forms::TreeListExpansionChange>`
+     - A node expanded or collapsed, by the user or the program.
+   * - :cpp:class:`TreeListNode <gui_forms::TreeListNode>`
+     - One node of the tree.
+   * - :cpp:class:`TreeListSelectionChange <gui_forms::TreeListSelectionChange>`
+     - A change of the selected node, after it happened.
+   * - :cpp:class:`TreeListSortChange <gui_forms::TreeListSortChange>`
+     - The sibling order after a header click, the semantic press on a header, or set_sort().
+   * - :cpp:class:`TreeListView::Cell <gui_forms::TreeListView::Cell>`
+     -  
+   * - :cpp:class:`TreeListView::CellParts <gui_forms::TreeListView::CellParts>`
+     - The "cell" item system: one visible cell past the tree column.
+   * - :cpp:class:`TreeListView::CellStates <gui_forms::TreeListView::CellStates>`
+     -  
+   * - :cpp:class:`TreeListView::Column <gui_forms::TreeListView::Column>`
+     -  
+   * - :cpp:class:`TreeListView::ColumnParts <gui_forms::TreeListView::ColumnParts>`
+     - The "column" item system, named as ObjectView's and ListView's: one visible column header.
+   * - :cpp:class:`TreeListView::ColumnStates <gui_forms::TreeListView::ColumnStates>`
+     -  
+   * - :cpp:class:`TreeListView::Parts <gui_forms::TreeListView::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`TreeListView::Row <gui_forms::TreeListView::Row>`
+     -  
+   * - :cpp:class:`TreeListView::RowParts <gui_forms::TreeListView::RowParts>`
+     - The "row" item system: one realized row.
+   * - :cpp:class:`TreeListView::RowStates <gui_forms::TreeListView::RowStates>`
+     -  
    * - :cpp:class:`TreeSelectionChange <gui_forms::TreeSelectionChange>`
      - TreeSelectionChange reports previous/current optional node identities and interaction source.
    * - :cpp:class:`TreeView::Item <gui_forms::TreeView::Item>`
@@ -1532,6 +1571,294 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: TreeListActivation final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A node activated by a double click, Enter, or the semantic press action.
+
+   .. cpp:member:: std::string node_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumn final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   One column. ``stable_id`` is unique within the view and names the column in the published anatomy and semantics. ``width`` is in logical units at text scale 1. Column 0 is the tree column: it shows each node's ``text`` with the indentation and the expander, and it always stays first.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: double width
+
+      Default: ``{120.0}``.
+
+   .. cpp:member:: TreeListAlignment alignment
+
+      Default: ``{TreeListAlignment::left}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumnMove final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A column moved to a new display position, by a header drag or move_column(). Display position 0 always holds the tree column.
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::size_t display_position
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListColumnWidthChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A column's new width in logical units, after a divider drag ends or set_column_width() changes it.
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: double width
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListExpansionChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A node expanded or collapsed, by the user or the program.
+
+   .. cpp:member:: std::string node_id
+
+   .. cpp:member:: bool expanded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListNode final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   One node of the tree. Nodes are given in preorder with their depth, as TreeView's items are: a node's children follow it directly, one level deeper. ``text`` is shown in the tree column and ``cells[n]`` in column n + 1; cells past the last column are kept but not shown. A node with children can always be expanded; ``expandable`` shows the expander on a node whose children are not loaded yet. ``expanded`` is ignored on a node that cannot be expanded. ``image_key`` names an image in the image list; an empty or unknown key shows none.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::string text
+
+   .. cpp:member:: std::vector<std::string> cells
+
+   .. cpp:member:: std::size_t depth
+
+   .. cpp:member:: bool expandable
+
+   .. cpp:member:: bool expanded
+
+   .. cpp:member:: bool enabled
+
+      Default: ``{true}``.
+
+   .. cpp:member:: std::string image_key
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListSelectionChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   A change of the selected node, after it happened.
+
+   .. cpp:member:: std::optional<std::string> previous_id
+
+   .. cpp:member:: std::optional<std::string> current_id
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListSortChange final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The sibling order after a header click, the semantic press on a header, or set_sort().
+
+   .. cpp:member:: std::optional<std::size_t> column
+
+   .. cpp:member:: TreeListSortOrder order
+
+      Default: ``{TreeListSortOrder::none}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Cell final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t row
+
+   .. cpp:member:: std::size_t column
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: CellParts parts
+
+   .. cpp:member:: CellStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::CellParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "cell" item system: one visible cell past the tree column. Its identity is the node's ID, ".cell.", and the column's.
+
+   .. cpp:member:: PartGeometry cell
+
+   .. cpp:member:: PartGeometry cell_text
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::CellStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Column final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::size_t display_position
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ColumnParts parts
+
+   .. cpp:member:: ColumnStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::ColumnParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "column" item system, named as ObjectView's and ListView's: one visible column header. Its identity is the view's stable ID, ".column.", and the column's ID.
+
+   .. cpp:member:: PartGeometry column_header
+
+   .. cpp:member:: PartGeometry column_label
+
+   .. cpp:member:: PartGeometry sort_glyph
+
+   .. cpp:member:: PartGeometry column_divider
+
+   .. cpp:member:: PartGeometry column_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::ColumnStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool sorted_ascending
+
+      Application-defined column states.
+
+   .. cpp:member:: bool sorted_descending
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Parts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry well
+
+   .. cpp:member:: PartGeometry header
+
+   .. cpp:member:: PartGeometry vertical_scroll_bar
+
+   .. cpp:member:: PartGeometry horizontal_scroll_bar
+
+   .. cpp:member:: PartGeometry scroll_corner
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::Row final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: std::size_t row
+
+      The row's position among the rows, and the node's model index.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: RowParts parts
+
+   .. cpp:member:: RowStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::RowParts final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   The "row" item system: one realized row. Its identity is the node's.
+
+   .. cpp:member:: PartGeometry row
+
+   .. cpp:member:: PartGeometry row_face
+
+   .. cpp:member:: PartGeometry expander
+
+   .. cpp:member:: PartGeometry icon
+
+   .. cpp:member:: PartGeometry text
+
+   .. cpp:member:: PartGeometry row_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: TreeListView::RowStates final
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool current
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: bool closed
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: TreeSelectionChange final
 
    ``#include <gui_forms/controls/panel/tree_view/tree_view.hpp>``
@@ -1642,6 +1969,28 @@ Enumerations
    .. cpp:enumerator:: plain
 
    .. cpp:enumerator:: raised
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ComboBoxFilter
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: prefix
+
+   .. cpp:enumerator:: substring
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ComboBoxStyle
+
+   ``#include <gui_forms/controls/panel/combo_box/combo_box.hpp>``
+
+   .. cpp:enumerator:: drop_down_list
+
+   .. cpp:enumerator:: drop_down
 
 .. cpp:namespace:: gui_forms
 
@@ -1834,3 +2183,27 @@ Enumerations
    .. cpp:enumerator:: icons
 
    .. cpp:enumerator:: details
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TreeListAlignment
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:enumerator:: left
+
+   .. cpp:enumerator:: center
+
+   .. cpp:enumerator:: right
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: TreeListSortOrder
+
+   ``#include <gui_forms/controls/panel/tree_list_view/tree_list_view.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: ascending
+
+   .. cpp:enumerator:: descending

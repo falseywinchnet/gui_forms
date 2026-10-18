@@ -158,6 +158,8 @@ void click(Window& window, Point point) {
     static_cast<void>(window.dispatch_pointer({PointerAction::up, PointerButton::primary, point}));
 }
 
+// Borrows from `nodes`: the pointer is valid while that vector lives. The
+// deleted overload refuses a temporary (house style section 5).
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == id) return &node;
@@ -166,6 +168,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 bool has_action(const SemanticNode& node, SemanticAction action) {
     for (const SemanticAction offered : node.actions) {
@@ -249,9 +252,10 @@ void anatomy_and_parts() {
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "page_strip",
             "PageStrip publishes a valid anatomy");
     require(anatomy.item_systems.size() == 1U && anatomy.item_systems.front().name == "page" &&
-                anatomy.item_systems.front().custom_states.size() == 1U &&
-                anatomy.item_systems.front().custom_states.front().name == "pinned",
-            "PageStrip's tabs are the page item system with the admitted pinned state");
+                anatomy.item_systems.front().custom_states.size() == 2U &&
+                anatomy.item_systems.front().custom_states[0].name == "pinned" &&
+                anatomy.item_systems.front().custom_states[1].name == "modified",
+            "PageStrip's tabs are the page item system with the admitted pinned and modified states");
     const PageStrip::Parts parts = (*strip).parts();
     require(parts.region.present && parts.rail.present && !parts.scroll_back.present &&
                 !parts.list_button.present,
