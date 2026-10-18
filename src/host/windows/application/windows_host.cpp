@@ -1354,6 +1354,33 @@ public:
         composite_run((*memo).shaped, font, origin, color, memo);
     }
 
+    // A turned run is rasterized by the shared engine's general placement
+    // (unhinted, as every rotated run is) and blended as an ordinary run. It
+    // keeps no retained coverage.
+    void draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font,
+                               const Color color, const TextOrientation orientation) override {
+        if (orientation == TextOrientation::horizontal) {
+            draw_text_utf8(origin, text, font, color);
+            return;
+        }
+        const PaintTimer timer(timings_[5]);
+        if (text.empty() || !text_engine_ || pixels_ == nullptr || width_ <= 0 || height_ <= 0 ||
+            states_.empty()) return;
+        const text::ShapedText shaped = (*text_engine_).shape(text, font);
+        const State& current = state();
+        // Run space (x along the baseline, y down) to device pixels:
+        // bottom_to_top maps (x, y) to (y, -x) and top_to_bottom to (-y, x).
+        const double turn = orientation == TextOrientation::bottom_to_top ? 1.0 : -1.0;
+        const text::GlyphRunTransform transform{0.0, turn * scale_, -turn * scale_, 0.0};
+        if (!glyph_runs_) glyph_runs_ = std::make_unique<text::GlyphRunRasterizer>(*text_engine_);
+        text::GlyphRunOrigin placement{};
+        const double device_x = (origin.x + current.tx) * scale_;
+        const double device_y = (origin.y + current.ty) * scale_;
+        const text::GlyphRunCoverage coverage =
+            (*glyph_runs_).rasterize_transformed(shaped, font, transform, device_x, device_y, {}, placement);
+        blend_run_coverage(coverage, placement, color);
+    }
+
     Size measure_text_utf8(std::string_view text, FontSpec font) override {
         if (text.empty() || !text_engine_) return {0.0, font.size};
         const text::ShapedText shaped = (*text_engine_).shape(text, font);
@@ -2048,7 +2075,14 @@ private:
                 coverage = &(*memo).coverage;
             }
         }
-        if ((*coverage).pixels.empty()) return;
+        blend_run_coverage(*coverage, placement, color);
+    }
+    // Blends a run's coverage, placed at `placement`, into the DIB under the
+    // current clip.
+    void blend_run_coverage(const text::GlyphRunCoverage& coverage, const text::GlyphRunOrigin placement,
+                            const Color color) {
+        if (coverage.pixels.empty()) return;
+        const State& current = state();
         // Finish batched GDI writes before blending through the CPU pointer.
         GdiFlush();
         const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
@@ -2068,10 +2102,10 @@ private:
             clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
             clip.radius = (*current.rounded_clip).radius * scale_;
         }
-        const gui_forms::detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
-                                          .height = (*coverage).height,
-                                          .left = placement.pixel_x + (*coverage).left,
-                                          .top = placement.pixel_y + (*coverage).top};
+        const gui_forms::detail::TextCoverage source{.pixels = coverage.pixels, .width = coverage.width,
+                                          .height = coverage.height,
+                                          .left = placement.pixel_x + coverage.left,
+                                          .top = placement.pixel_y + coverage.top};
         static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
     }
     void apply_gdi_clip() const {
@@ -4035,7 +4069,10 @@ HostCapabilities windows_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering};
+                HostCapability::window_ordering,
+            // Windows follows the PC keyboard convention (Ctrl+F4 closes a
+            // document).
+            pc_key_map()};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {

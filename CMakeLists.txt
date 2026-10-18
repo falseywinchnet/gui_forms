@@ -125,6 +125,8 @@ add_library(gui_forms_core STATIC
     src/core/text/prepared/prepared_storage.cpp
     src/core/text/composite/text_composite.cpp
     src/core/document_view/document_view_state.cpp
+    src/core/pages/page_set/page_set.cpp
+    src/core/events/key_commands/key_commands.cpp
     src/core/text_shaping/validation/text_shaping_validation.cpp
     src/core/text/unicode/unicode_grapheme.cpp
     src/core/typography/resolution/typography_resolution.cpp
@@ -142,6 +144,17 @@ add_library(gui_forms_core STATIC
     src/core/semantics/snapshot/semantic_snapshot.cpp
     src/core/anatomy/types/anatomy_types.cpp
     src/core/schema/types/schema_types.cpp
+    src/core/xml/types/xml_types.cpp
+    src/core/xml/xml_characters/xml_characters.cpp
+    src/core/xml/xml_reader/xml_reader.cpp
+    src/core/xml/xml_writer/xml_writer.cpp
+    src/core/docking/types/dock_types.cpp
+    src/core/docking/dock_split_solver/dock_split_solver.cpp
+    src/core/docking/dock_layout/dock_layout.cpp
+    src/core/docking/dock_layout/dock_layout_edits.cpp
+    src/core/docking/dock_layout/dock_layout_model.cpp
+    src/core/docking/dock_layout/dock_layout_persistence.cpp
+    src/core/docking/dock_drop_targets/dock_drop_targets.cpp
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
@@ -182,6 +195,8 @@ add_library(gui_forms_core STATIC
     src/core/control/stable_id/stable_id.cpp
     src/core/control/static_tree/control_factory/control_factory.cpp
     src/core/window/window.cpp
+    src/core/window/command_route/window_command_route.cpp
+    src/core/commands/command_route/command_route.cpp
 )
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
@@ -433,6 +448,7 @@ add_library(gui_forms_controls STATIC
     src/controls/menu/context_menu/context_menu.cpp
     src/controls/menu/menu_strip/menu_strip.cpp
     src/controls/tool_strip/tool_strip.cpp
+    src/controls/pages/navigation_pane/navigation_pane.cpp
     src/controls/quick_access_toolbar/quick_access_toolbar.cpp
     src/controls/quick_access_toolbar/ribbon_state.cpp
     src/controls/tool_strip_panel/tool_strip_panel.cpp
@@ -446,6 +462,13 @@ add_library(gui_forms_controls STATIC
     src/controls/ribbon/ribbon_group_popup.cpp
     src/controls/ribbon/ribbon_scaling.cpp
     src/controls/status_strip/status_strip.cpp
+    src/controls/pages/page_strip/page_strip.cpp
+    src/controls/pages/page_view/page_view.cpp
+    src/controls/docking/dock_navigator/dock_navigator.cpp
+    src/controls/docking/dock_workspace/dock_workspace.cpp
+    src/controls/docking/dock_site/dock_site.cpp
+    src/controls/docking/dock_site/dock_site_drag.cpp
+    src/controls/docking/dock_site/dock_site_auto_hide.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
@@ -2112,6 +2135,12 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_canvas_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_canvas_tests COMMAND gui_forms_canvas_tests)
     if(GUI_FORMS_ENABLE_WINDOWS_HOST)
+        add_executable(gui_forms_windows_control_snapshot_tests tests/windows_control_snapshot_tests.cpp)
+        target_compile_definitions(gui_forms_windows_control_snapshot_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_control_snapshot_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_control_snapshot_tests COMMAND gui_forms_windows_control_snapshot_tests)
         add_executable(gui_forms_windows_canvas_raster_tests tests/windows_canvas_raster_tests.cpp)
         target_compile_definitions(gui_forms_windows_canvas_raster_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
@@ -2181,6 +2210,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_core_tests tests/core_tests.cpp)
     target_link_libraries(gui_forms_core_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_core_tests COMMAND gui_forms_core_tests)
+
+    add_executable(gui_forms_page_set_tests tests/page_set_tests.cpp)
+    target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
@@ -2273,6 +2306,14 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_document_view_tests tests/document_view_tests.cpp)
     target_link_libraries(gui_forms_document_view_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_document_view_tests COMMAND gui_forms_document_view_tests)
+
+    add_executable(gui_forms_xml_tests tests/xml_tests.cpp)
+    target_link_libraries(gui_forms_xml_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_xml_tests COMMAND gui_forms_xml_tests)
+
+    add_executable(gui_forms_dock_layout_tests tests/dock_layout_tests.cpp)
+    target_link_libraries(gui_forms_dock_layout_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_dock_layout_tests COMMAND gui_forms_dock_layout_tests)
 
     add_executable(gui_forms_grapheme_conformance_tests
         tests/grapheme_conformance_tests.cpp
@@ -2444,6 +2485,33 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_page_strip_tests tests/page_strip_tests.cpp)
+    target_link_libraries(gui_forms_page_strip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_strip_tests COMMAND gui_forms_page_strip_tests)
+    add_executable(gui_forms_page_strip_side_tests tests/page_strip_side_tests.cpp)
+    target_link_libraries(gui_forms_page_strip_side_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_strip_side_tests COMMAND gui_forms_page_strip_side_tests)
+    add_executable(gui_forms_page_strip_drag_tests tests/page_strip_drag_tests.cpp)
+    target_link_libraries(gui_forms_page_strip_drag_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_strip_drag_tests COMMAND gui_forms_page_strip_drag_tests)
+    add_executable(gui_forms_page_view_tests tests/page_view_tests.cpp)
+    target_link_libraries(gui_forms_page_view_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_view_tests COMMAND gui_forms_page_view_tests)
+    add_executable(gui_forms_key_commands_tests tests/key_commands_tests.cpp)
+    target_link_libraries(gui_forms_key_commands_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_key_commands_tests COMMAND gui_forms_key_commands_tests)
+    add_executable(gui_forms_page_view_document_tests tests/page_view_document_tests.cpp)
+    target_link_libraries(gui_forms_page_view_document_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_page_view_document_tests COMMAND gui_forms_page_view_document_tests)
+    add_executable(gui_forms_navigation_pane_tests tests/navigation_pane_tests.cpp)
+    target_link_libraries(gui_forms_navigation_pane_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_navigation_pane_tests COMMAND gui_forms_navigation_pane_tests)
+    add_executable(gui_forms_dock_site_tests tests/dock_site_tests.cpp)
+    target_link_libraries(gui_forms_dock_site_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_site_tests COMMAND gui_forms_dock_site_tests)
+    add_executable(gui_forms_dock_auto_hide_tests tests/dock_auto_hide_tests.cpp)
+    target_link_libraries(gui_forms_dock_auto_hide_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_auto_hide_tests COMMAND gui_forms_dock_auto_hide_tests)
     add_executable(gui_forms_tree_list_view_tests tests/tree_list_view_tests.cpp)
     target_link_libraries(gui_forms_tree_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tree_list_view_tests COMMAND gui_forms_tree_list_view_tests)
@@ -2484,6 +2552,20 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_vocabulary_tests tests/ribbon_vocabulary_tests.cpp)
     target_link_libraries(gui_forms_ribbon_vocabulary_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_vocabulary_tests COMMAND gui_forms_ribbon_vocabulary_tests)
+    add_executable(gui_forms_control_snapshot_tests tests/control_snapshot_tests.cpp)
+    target_include_directories(gui_forms_control_snapshot_tests PRIVATE tests)
+    target_link_libraries(gui_forms_control_snapshot_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_control_snapshot_tests COMMAND gui_forms_control_snapshot_tests)
+    add_executable(gui_forms_dock_drag_tests tests/dock_drag_tests.cpp)
+    target_include_directories(gui_forms_dock_drag_tests PRIVATE tests)
+    target_link_libraries(gui_forms_dock_drag_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_drag_tests COMMAND gui_forms_dock_drag_tests)
+    add_executable(gui_forms_docking_vocabulary_tests tests/docking_vocabulary_tests.cpp)
+    target_link_libraries(gui_forms_docking_vocabulary_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_docking_vocabulary_tests COMMAND gui_forms_docking_vocabulary_tests)
+    add_executable(gui_forms_command_route_tests tests/command_route_tests.cpp)
+    target_link_libraries(gui_forms_command_route_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_command_route_tests COMMAND gui_forms_command_route_tests)
     add_executable(gui_forms_ribbon_tests tests/ribbon_tests.cpp)
     target_link_libraries(gui_forms_ribbon_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_tests COMMAND gui_forms_ribbon_tests)
@@ -2516,6 +2598,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_test(NAME gui_forms_task_dialog_tests COMMAND gui_forms_task_dialog_tests)
     set_tests_properties(gui_forms_background_worker_tests PROPERTIES TIMEOUT 60)
 
+    add_executable(gui_forms_command_chain_tests tests/command_chain_tests.cpp)
+    target_link_libraries(gui_forms_command_chain_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_command_chain_tests COMMAND gui_forms_command_chain_tests)
     add_executable(gui_forms_notify_icon_tests tests/notify_icon_tests.cpp)
     target_link_libraries(gui_forms_notify_icon_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_notify_icon_tests COMMAND gui_forms_notify_icon_tests)
@@ -2577,6 +2662,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_tab_control_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tab_control_tests
              COMMAND gui_forms_tab_control_tests)
+    add_executable(gui_forms_tab_control_strip_tests tests/tab_control_strip_tests.cpp)
+    target_link_libraries(gui_forms_tab_control_strip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_tab_control_strip_tests COMMAND gui_forms_tab_control_strip_tests)
 
     add_executable(gui_forms_focus_scope_tests
         tests/focus_scope_tests.cpp
@@ -2699,6 +2787,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_shared_resources_tests tests/shared_resources_tests.cpp)
     target_link_libraries(gui_forms_shared_resources_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_shared_resources_tests COMMAND gui_forms_shared_resources_tests)
+    add_executable(gui_forms_dock_floating_tests tests/dock_floating_tests.cpp)
+    target_link_libraries(gui_forms_dock_floating_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_dock_floating_tests COMMAND gui_forms_dock_floating_tests)
     add_executable(gui_forms_workspace_transaction_tests tests/workspace_transaction_tests.cpp)
     target_link_libraries(gui_forms_workspace_transaction_tests PRIVATE gui_forms_controls gui_forms_host_headless)
     add_test(NAME gui_forms_workspace_transaction_tests COMMAND gui_forms_workspace_transaction_tests)
@@ -3220,6 +3311,40 @@ if(GUI_FORMS_BUILD_FUZZERS)
             -fno-omit-frame-pointer
         )
         target_link_options(gui_forms_png_registry_fuzz PRIVATE
+            -fsanitize=address,undefined
+        )
+    endif()
+
+    # The layout XML reader (DK decision 43), built from its own sources so
+    # the sanitizers cover exactly the reader and writer.
+    add_executable(gui_forms_xml_reader_fuzz
+        fuzz/xml_reader_fuzz.cpp
+        src/core/xml/types/xml_types.cpp
+        src/core/xml/xml_characters/xml_characters.cpp
+        src/core/xml/xml_reader/xml_reader.cpp
+        src/core/xml/xml_writer/xml_writer.cpp
+    )
+    target_include_directories(gui_forms_xml_reader_fuzz PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+    )
+    target_compile_features(gui_forms_xml_reader_fuzz PRIVATE cxx_std_20)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=fuzzer,address,undefined
+        )
+    else()
+        target_compile_definitions(gui_forms_xml_reader_fuzz PRIVATE
+            GUI_FORMS_FUZZ_STANDALONE=1
+        )
+        target_compile_options(gui_forms_xml_reader_fuzz PRIVATE
+            -fsanitize=address,undefined
+            -fno-omit-frame-pointer
+        )
+        target_link_options(gui_forms_xml_reader_fuzz PRIVATE
             -fsanitize=address,undefined
         )
     endif()

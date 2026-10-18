@@ -6,9 +6,10 @@
 
 namespace gui_forms::host::detail {
 
-// Preserve the current virtual-key-derived vocabulary. VK_OEM_2 is slash on
-// the tested US layout; this is not a layout-independent character shortcut
-// translator or a scan-code-based physical-position normalization.
+// Preserve the current virtual-key-derived vocabulary. VK_OEM_2 is slash and
+// VK_OEM_MINUS is hyphen on the tested US layout; this is not a
+// layout-independent character shortcut translator or a scan-code-based
+// physical-position normalization.
 [[nodiscard]] inline std::uint32_t physical_key_from_virtual_key(WPARAM key) noexcept {
     if (key >= 'A' && key <= 'Z') {
         const WPARAM relative = key - 'A';
@@ -36,9 +37,27 @@ namespace gui_forms::host::detail {
     case VK_END: return PhysicalKey::end;
     case VK_NEXT: return PhysicalKey::page_down;
     case VK_DELETE: return PhysicalKey::delete_forward;
+    // The docking keys (owner decision DK-30): F6 regions, Ctrl+F6, Alt+F7,
+    // Shift+F10, Ctrl+Shift+F12, Alt+Hyphen, the context-menu key, and the
+    // Ctrl release that commits the Ctrl+Tab navigator.
+    case VK_OEM_MINUS: return PhysicalKey::minus;
     case VK_F1: return PhysicalKey::f1;
     case VK_F2: return PhysicalKey::f2;
+    case VK_F3: return PhysicalKey::f3;
     case VK_F4: return PhysicalKey::f4;
+    case VK_F5: return PhysicalKey::f5;
+    case VK_F6: return PhysicalKey::f6;
+    case VK_F7: return PhysicalKey::f7;
+    case VK_F8: return PhysicalKey::f8;
+    case VK_F9: return PhysicalKey::f9;
+    case VK_F10: return PhysicalKey::f10;
+    case VK_F11: return PhysicalKey::f11;
+    case VK_F12: return PhysicalKey::f12;
+    case VK_APPS: return PhysicalKey::context_menu;
+    // WM_KEYDOWN reports the generic VK_CONTROL without its side.
+    case VK_CONTROL: return PhysicalKey::left_control;
+    case VK_LCONTROL: return PhysicalKey::left_control;
+    case VK_RCONTROL: return PhysicalKey::right_control;
     case VK_RIGHT: return PhysicalKey::right;
     case VK_LEFT: return PhysicalKey::left;
     case VK_DOWN: return PhysicalKey::down;

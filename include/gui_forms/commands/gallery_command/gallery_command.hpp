@@ -11,6 +11,8 @@
 
 namespace gui_forms {
 
+class Window;
+
 // A preview a gallery asks the application to show (preview_requested) or to
 // withdraw (preview_cancelled): the gallery item's stable ID and the stable
 // ID of the gallery that asked.
@@ -59,6 +61,10 @@ public:
     // with `source_id`. Returns false, changing nothing, while the Command is
     // disabled or for an empty or invalid ID.
     bool commit(std::string item_id, std::string_view source_id);
+    // As commit, routing the Command through `window`'s command chain
+    // (Command::execute_routed; owner decision DK-47). A control that has a
+    // window commits this way.
+    bool commit_routed(std::string item_id, Window& window, std::string_view source_id);
 
     // The outstanding preview's item, or none.
     [[nodiscard]] const std::optional<std::string>& previewing() const noexcept { return previewing_; }
@@ -78,6 +84,8 @@ protected:
     void on_dispose() noexcept override;
 
 private:
+    bool commit_into(std::string item_id, Window* window, std::string_view source_id);
+
     std::shared_ptr<Command> command_;
     std::optional<std::string> value_{};
     std::optional<std::string> previewing_{};

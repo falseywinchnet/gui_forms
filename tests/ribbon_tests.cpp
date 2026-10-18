@@ -366,7 +366,7 @@ void semantics_and_region() {
                 nodes[1].children[1].set_size == std::size_t{2U},
             "the tab row is a tab list with positioned tabs");
     const SemanticNode& plane = nodes[2];
-    require(plane.role == SemanticRole::group && plane.name == "Home" && plane.children.size() == 2U &&
+    require(plane.role == SemanticRole::tab_panel && plane.name == "Home" && plane.children.size() == 2U &&
                 plane.children[0].name == "Clipboard",
             "the command plane holds the selected tab's groups, named by caption");
     const SemanticNode& clipboard = plane.children[0];

@@ -45,6 +45,8 @@ public:
     // Re-recording a retained command keeps its cache with the new copy.
     void draw_retained_text_utf8(Point origin, std::string_view text, FontSpec font,
                                  Color color, const std::shared_ptr<RetainedDrawCache>& cache) override;
+    void draw_turned_text_utf8(Point origin, std::string_view text, FontSpec font, Color color,
+                               TextOrientation orientation) override;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     [[nodiscard]] PreparedTextPaintResult draw_prepared_text(const PreparedTextLayout& layout,
         const LayoutAuthority expected, const Point baseline, const Color color) override;

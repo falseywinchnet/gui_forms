@@ -1251,7 +1251,11 @@ void Ribbon::click_command(CommandAddress address) {
         (*spec.command).set_checked(!(*spec.command).state().checked);
     }
     const Control::Ptr lifetime = shared_from_this();
-    static_cast<void>((*spec.command).execute(stable_id().value()));
+    if (window() != nullptr) {
+        static_cast<void>((*spec.command).execute_routed(*window(), stable_id().value()));
+    } else {
+        static_cast<void>((*spec.command).execute(stable_id().value()));
+    }
     if (!is_alive()) return;
     const RibbonCommandClick click{std::string(stable_id().value()), spec.stable_id};
     command_clicked_.emit(click);
@@ -2044,6 +2048,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     row.stable_id = ribbon_id + ".tab_row";
     row.role = SemanticRole::tab_group;
     row.name = "Ribbon tabs";
+    row.orientation = SemanticOrientation::horizontal;
     row.bounds = to_window(absolute, placed.tab_rail);
     row.states = base;
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
@@ -2063,7 +2068,11 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
         node.states = base | SemanticState::focusable;
         if (selected_tab_ == tab) node.states |= SemanticState::selected;
         if (focused_ && stop_ && *stop_ == Stop{StopKind::tab, tab, {}}) node.states |= SemanticState::focused;
-        node.actions = {SemanticAction::select, SemanticAction::press};
+        // The selected tab shows the command plane, its panel (owner
+        // decision DK-40). Tabs publish select, not press (DK-35); a press
+        // sent anyway still clicks the tab (on_semantic_child_action).
+        if (selected_tab_ == tab && !placed.plane.empty()) node.controlled_panel = ribbon_id + ".command_plane";
+        node.actions = {SemanticAction::select};
         row.children.push_back(std::move(node));
     }
     nodes.push_back(std::move(row));
@@ -2075,7 +2084,7 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
     // decision 46). Expand and collapse drive the same minimize and restore.
     SemanticNode plane{};
     plane.stable_id = ribbon_id + ".command_plane";
-    plane.role = SemanticRole::group;
+    plane.role = SemanticRole::tab_panel;
     plane.name = parse_mnemonic_text(tabs_[*selected_tab_].text).display_text;
     plane.bounds = to_window(absolute, placed.plane);
     plane.states = base;
