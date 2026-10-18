@@ -1,0 +1,175 @@
+#pragma once
+
+#include "../session/headless_host.hpp"
+#include "gui_forms/application.hpp"
+#include "gui_forms/host/windowing/host_windowing.hpp"
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace gui_forms::detail {
+struct ApplicationRunState;
+struct ApplicationWindowState;
+}
+
+namespace gui_forms::host {
+
+class HeadlessApplication;
+
+// The headless reference adapter's windowing: a simulated desktop with
+// monitors, native window rectangles, visibility, a z-order and a pointer.
+// Every native operation appends one line to trace(), so tests can read the
+// order in which the portable seam asked for things.
+class HeadlessWindowing final : public HostWindowing {
+public:
+    // Decorations the simulated desktop draws around every window, in
+    // logical units: a title bar above the client area and a border on
+    // every side.
+    static constexpr double title_bar_height = 24.0;
+    static constexpr double border_width = 1.0;
+
+    HeadlessWindowing(HeadlessApplication& application, HostCapabilities capabilities);
+
+    // Replaces the simulated monitors (desktop logical units). An empty
+    // list is ignored.
+    void set_monitors(std::vector<HostMonitor> monitors);
+    void set_pointer(Point position) noexcept { pointer_ = position; }
+    // A window of another application covering `outer`, above every window
+    // of this run. window_at reports no window where it lies.
+    void add_foreign_window(Rect outer);
+    void clear_foreign_windows() noexcept { foreign_windows_.clear(); }
+
+    [[nodiscard]] const std::string& trace() const noexcept { return trace_; }
+    void clear_trace() noexcept { trace_.clear(); }
+    void note(std::string_view line);
+    // Native state, for assertions. Empty for an unknown window.
+    [[nodiscard]] std::optional<Rect> native_content(HostWindowId window) const;
+    [[nodiscard]] bool native_visible(HostWindowId window) const;
+    // Live native windows from the front to the back.
+    [[nodiscard]] std::vector<HostWindowId> z_order() const;
+
+    // Native bookkeeping used by HeadlessApplication.
+    void create_native(HostWindowId window, std::string_view stable_id, Rect content,
+                       Size minimum_size);
+    void remove_native(HostWindowId window) noexcept;
+    void set_native_visible(HostWindowId window, bool visible);
+    // Moves or resizes the native window as the user would and reports it.
+    void move_native(HostWindowId window, Rect content);
+    [[nodiscard]] HostWindowFrame native_frame(HostWindowId window) const;
+
+protected:
+    [[nodiscard]] HostWindowFrameResult frame_impl(HostWindowId window) override;
+    [[nodiscard]] HostServiceStatus request_frame_impl(HostWindowId window,
+                                                       Rect content) override;
+    [[nodiscard]] HostScreenPointResult pointer_position_impl() override;
+    [[nodiscard]] HostWindowAtResult window_at_impl(Point point) override;
+    [[nodiscard]] HostServiceStatus bring_to_front_impl(HostWindowId window) override;
+    [[nodiscard]] HostServiceStatus destroy_window_impl(HostWindowId window) override;
+    [[nodiscard]] HostMonitorResult query_monitors_impl() override;
+
+private:
+    struct NativeWindow final {
+        HostWindowId id{};
+        std::string stable_id{};
+        Rect content{};
+        Size minimum_size{};
+        bool visible{};
+    };
+    [[nodiscard]] NativeWindow* native(HostWindowId window) noexcept;
+    [[nodiscard]] const NativeWindow* native(HostWindowId window) const noexcept;
+    void raise_native(HostWindowId window);
+
+    // The owner; outlives this object (it is a member of the owner).
+    HeadlessApplication* application_{};
+    std::vector<HostMonitor> monitors_;
+    Point pointer_{};
+    std::vector<Rect> foreign_windows_;
+    // Live native windows; `order_` holds their identities front to back.
+    std::vector<NativeWindow> natives_;
+    std::vector<HostWindowId> order_;
+    std::string trace_;
+};
+
+// A deterministic multi-window application for tests: Application::run's
+// contract without a native loop. The constructor validates the entries as
+// Application::validate does, opens every window in ownership order and
+// calls each ready callback; the test then drives windows through host()
+// and the simulate_* operations. Programs reach the windowing through
+// ApplicationWindowHandle::windows(), exactly as on a native host.
+class HeadlessApplication final {
+public:
+    // Throws std::invalid_argument when Application::validate refuses the
+    // entries (a test fixture error).
+    explicit HeadlessApplication(std::vector<ApplicationWindow> windows,
+                                 HostCapabilities capabilities = headless_capabilities());
+    // Closes every open window (closed callbacks run) and ends the run.
+    ~HeadlessApplication();
+    HeadlessApplication(const HeadlessApplication&) = delete;
+    HeadlessApplication& operator=(const HeadlessApplication&) = delete;
+
+    [[nodiscard]] HeadlessWindowing& windowing() noexcept { return windowing_; }
+    [[nodiscard]] ApplicationWindows windows() const;
+    // The handle of a live window, or an inactive handle.
+    [[nodiscard]] ApplicationWindowHandle handle(std::string_view stable_id) const;
+    // The protocol adapter and model of a live window, or null.
+    [[nodiscard]] HeadlessHost* host(HostWindowId window) noexcept;
+    [[nodiscard]] Window* model(HostWindowId window) noexcept;
+    [[nodiscard]] HostWindowId id(std::string_view stable_id) const;
+
+    // User actions.
+    void simulate_user_frame(HostWindowId window, Rect content);
+    // The close button: the closing handler decides; an accepted close hides
+    // a hide_on_close window and closes any other. Closing the primary
+    // window ends the run's windows, as on a native host.
+    void simulate_user_close(HostWindowId window);
+    // Releases the models and protocol adapters of windows closed earlier.
+    // A test calls it between steps, as a native host does at the end of a
+    // loop turn, so a window is never released inside one of its own
+    // callbacks; the destructor also runs it.
+    void reclaim();
+
+private:
+    friend class HeadlessWindowing;
+    friend struct HeadlessApplicationAccess;
+    // The run's open operation (ApplicationWindows::open_window).
+    struct HeadlessOpen final {
+        HeadlessApplication* application{};
+        ApplicationWindowOpenResult operator()(ApplicationWindow&& entry) const;
+    };
+    struct WindowEntry final {
+        HostWindowId id{};
+        std::string stable_id{};
+        // Declared before `host`, which borrows it, so the host is destroyed
+        // first.
+        std::unique_ptr<Window> model{};
+        std::unique_ptr<HeadlessHost> host{};
+        ApplicationWindowOptions options{};
+        std::shared_ptr<detail::ApplicationWindowState> state{};
+        bool closed{};
+    };
+
+    [[nodiscard]] ApplicationWindowOpenResult open(ApplicationWindow&& entry, bool runtime);
+    [[nodiscard]] HostServiceStatus destroy(HostWindowId window);
+    void close(WindowEntry& entry, HostCloseReason reason);
+    void request_close(HostWindowId window);
+    void show(HostWindowId window, bool visible);
+    [[nodiscard]] HostServiceStatus resize(HostWindowId window, Size client_size);
+    void native_frame_changed(HostWindowId window, Rect old_content, Rect content);
+    [[nodiscard]] WindowEntry* entry(HostWindowId window) noexcept;
+    [[nodiscard]] Rect default_placement(HostWindowKind kind, HostWindowId owner,
+                                       Size size) const;
+    [[nodiscard]] std::uint64_t next_timestamp() noexcept { return ++timestamp_; }
+
+    std::shared_ptr<detail::ApplicationRunState> run_;
+    HeadlessWindowing windowing_;
+    // Open and not yet reclaimed windows, in opening order.
+    std::vector<std::unique_ptr<WindowEntry>> entries_;
+    std::uint64_t timestamp_{};
+    std::uint32_t placements_{};
+};
+
+} // namespace gui_forms::host

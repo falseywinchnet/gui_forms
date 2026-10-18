@@ -81,8 +81,26 @@ struct WindowsApplicationWindow final {
     bool tool_window{};
 };
 
+// Opens one window while the application runs: the same entry, ownership
+// and readiness rules as an initial window, after HostWindowing::admit.
+// Callable on the UI thread while the run lives; afterwards it reports
+// after_shutdown. The window's host_ready and ready callbacks run before it
+// returns.
+using WindowsOpenWindow = std::function<HostWindowAdmission(WindowsApplicationWindow)>;
+
+struct WindowsApplicationOptions final {
+    // Published once on the UI thread before the first window is created.
+    // `windowing` lives until windowing_ended has been called.
+    std::function<void(HostWindowing& windowing, WindowsOpenWindow open)> windowing_ready;
+    // Published once on the UI thread when the message loop ends, before
+    // the remaining windows are destroyed and before the windowing is shut
+    // down and released.
+    std::function<void()> windowing_ended;
+};
+
 [[nodiscard]] HostCapabilities windows_capabilities();
 int run_windows(std::unique_ptr<Window> window, WindowsHostOptions options = {});
-int run_windows_application(std::vector<WindowsApplicationWindow> windows);
+int run_windows_application(std::vector<WindowsApplicationWindow> windows,
+                            WindowsApplicationOptions application = {});
 
 } // namespace gui_forms::host

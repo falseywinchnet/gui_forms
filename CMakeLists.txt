@@ -152,6 +152,8 @@ add_library(gui_forms_core STATIC
     src/core/host/cursor_interaction/cursor_interaction.cpp
     src/core/types/cursor_image/cursor_image.cpp
     src/core/host/session/host_session.cpp
+    src/core/host/windowing/desktop_coordinates.cpp
+    src/core/host/windowing/host_windowing.cpp
     src/core/feedback/semantic_feedback/semantic_feedback.cpp
     src/core/display/chunk/display_chunk.cpp
     src/core/display/recording_painter/recording_painter.cpp
@@ -390,6 +392,7 @@ add_library(gui_forms_host_headless STATIC
     src/host/headless/capabilities/headless_capabilities.cpp
     src/host/headless/services/headless_host_services.cpp
     src/host/headless/session/headless_host.cpp
+    src/host/headless/application/headless_application.cpp
 )
 target_include_directories(gui_forms_host_headless PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/host/headless
@@ -1018,6 +1021,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
     endif()
     add_library(gui_forms_host_linux STATIC
         src/host/linux/application/linux_host.cpp
+        src/host/linux/application/x11_windowing.cpp
         src/host/linux/accessibility/linux_accessibility.cpp
         src/host/linux/services/linux_services.cpp
         src/host/linux/services/x11_tray_icons.cpp
@@ -2636,6 +2640,9 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_host_headless
     )
     add_test(NAME gui_forms_host_protocol_tests COMMAND gui_forms_host_protocol_tests)
+    add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
+    target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}

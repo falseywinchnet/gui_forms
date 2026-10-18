@@ -17,6 +17,8 @@ Running windows on a native host, host options per platform, and the portable ho
      - A weak handle for asking the host to show, hide, retitle, resize or close a running window.
    * - :cpp:class:`ApplicationWindowOptions <gui_forms::ApplicationWindowOptions>`
      - The title, sizes, behaviour and callbacks of one native application window.
+   * - :cpp:class:`ApplicationWindows <gui_forms::ApplicationWindows>`
+     - A weak handle to the windows of a running application: open and destroy windows while it runs, and ask where things are on the desktop.
 
 .. toctree::
    :hidden:
@@ -24,6 +26,7 @@ Running windows on a native host, host options per platform, and the portable ho
    generated/gui_forms.Application
    generated/gui_forms.ApplicationWindowHandle
    generated/gui_forms.ApplicationWindowOptions
+   generated/gui_forms.ApplicationWindows
 
 Related types
 -------------
@@ -35,6 +38,10 @@ Related types
    * - :cpp:class:`ApplicationResult <gui_forms::ApplicationResult>`
      -  
    * - :cpp:class:`ApplicationWindow <gui_forms::ApplicationWindow>`
+     -  
+   * - :cpp:class:`ApplicationWindowAtResult <gui_forms::ApplicationWindowAtResult>`
+     -  
+   * - :cpp:class:`ApplicationWindowOpenResult <gui_forms::ApplicationWindowOpenResult>`
      -  
    * - :cpp:class:`CursorCapabilities <gui_forms::CursorCapabilities>`
      -  
@@ -108,6 +115,8 @@ Related types
      - HostSaveFileDialogRequest declares portable title/location/name/default extension/filter and overwrite policy.
    * - :cpp:class:`HostScaleEvent <gui_forms::HostScaleEvent>`
      - HostScaleEvent carries a validated positive device scale for an attached session.
+   * - :cpp:class:`HostScreenPointResult <gui_forms::HostScreenPointResult>`
+     -  
    * - :cpp:class:`HostServices <gui_forms::HostServices>`
      - HostServices centralizes portable thread, capability, UTF-8, size, modal-stack, semantic-sound, accounting, adapter-fault, and shutdown policy.
    * - :cpp:class:`HostServicesSnapshot <gui_forms::HostServicesSnapshot>`
@@ -138,9 +147,31 @@ Related types
      - The chosen row's identity, or empty when the menu was dismissed.
    * - :cpp:class:`HostTrayNotificationRequest <gui_forms::HostTrayNotificationRequest>`
      - Notification text from a tray icon: a title of at most 63 bytes and text of at most 255 bytes of UTF-8, shown for about ``timeout_milliseconds`` where the platform honours a timeout (zero leaves it to the platform).
+   * - :cpp:class:`HostWindowAdmission <gui_forms::HostWindowAdmission>`
+     -  
+   * - :cpp:class:`HostWindowAtResult <gui_forms::HostWindowAtResult>`
+     - An accepted result whose ``window`` is invalid means no window of this run is the topmost window at the point (the desktop, or another application's window, is).
+   * - :cpp:class:`HostWindowDescription <gui_forms::HostWindowDescription>`
+     - What an adapter tells the windowing seam about a window it is about to create.
+   * - :cpp:class:`HostWindowFrame <gui_forms::HostWindowFrame>`
+     - A window's rectangle in desktop logical units (desktop_coordinates.hpp).
+   * - :cpp:class:`HostWindowFrameEvent <gui_forms::HostWindowFrameEvent>`
+     - Published once for every native move or resize the adapter reports, whoever caused it (the user, a frame request, the platform).
+   * - :cpp:class:`HostWindowFrameResult <gui_forms::HostWindowFrameResult>`
+     -  
+   * - :cpp:class:`HostWindowId <gui_forms::HostWindowId>`
+     - Identity of one window within one application run.
+   * - :cpp:class:`HostWindowing <gui_forms::HostWindowing>`
+     - Application-scope windowing for one run (stage DK decisions 6 and 7): the table of the run's live windows, runtime destruction, window frames in desktop logical units, the pointer's desktop position, the window under a desktop point and ordering within the application.
+   * - :cpp:class:`HostWindowingSnapshot <gui_forms::HostWindowingSnapshot>`
+     -  
+   * - :cpp:class:`LinuxApplicationOptions <gui_forms::host::LinuxApplicationOptions>`
+     -  
    * - :cpp:class:`LinuxApplicationWindow <gui_forms::host::LinuxApplicationWindow>`
      -  
    * - :cpp:class:`LinuxHostOptions <gui_forms::host::LinuxHostOptions>`
+     -  
+   * - :cpp:class:`MacApplicationOptions <gui_forms::host::MacApplicationOptions>`
      -  
    * - :cpp:class:`MacApplicationWindow <gui_forms::host::MacApplicationWindow>`
      - MacApplicationWindow is the move-only RAII owner of one native AppKit session and its retained Window projection.
@@ -151,6 +182,8 @@ Related types
    * - :cpp:class:`WindowChromeHit <gui_forms::WindowChromeHit>`
      -  
    * - :cpp:class:`WindowChromeRegionValidation <gui_forms::WindowChromeRegionValidation>`
+     -  
+   * - :cpp:class:`WindowsApplicationOptions <gui_forms::host::WindowsApplicationOptions>`
      -  
    * - :cpp:class:`WindowsApplicationWindow <gui_forms::host::WindowsApplicationWindow>`
      - WindowsApplicationWindow is the move-only RAII owner of one native Win32 session and retained Window projection.
@@ -197,6 +230,32 @@ Related types
    .. cpp:member:: ApplicationWindowOptions options
 
    .. cpp:member:: bool tool_window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ApplicationWindowAtResult final
+
+   ``#include <gui_forms/application/application.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: bool found
+
+      False when no window of the run is topmost at the point.
+
+   .. cpp:member:: ApplicationWindowHandle window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ApplicationWindowOpenResult final
+
+   ``#include <gui_forms/application/application.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: ApplicationWindowHandle window
+
+      Active once the window is ready; inactive when the open was refused.
 
 .. cpp:namespace:: gui_forms
 
@@ -783,6 +842,16 @@ Related types
    .. cpp:member:: double scale
 
       Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostScreenPointResult final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: Point position
 
 .. cpp:namespace:: gui_forms
 
@@ -1404,6 +1473,283 @@ Related types
 
    .. cpp:member:: std::uint32_t timeout_milliseconds
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowAdmission final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: HostWindowId window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowAtResult final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   An accepted result whose ``window`` is invalid means no window of this run is the topmost window at the point (the desktop, or another application's window, is).
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: HostWindowId window
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowDescription final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   What an adapter tells the windowing seam about a window it is about to create. ``stable_id`` is borrowed for the call.
+
+   .. cpp:member:: std::string_view stable_id
+
+   .. cpp:member:: HostWindowId owner
+
+      Invalid for a window without an owner.
+
+   .. cpp:member:: HostWindowKind kind
+
+      Default: ``{HostWindowKind::standard}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowFrame final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   A window's rectangle in desktop logical units (desktop_coordinates.hpp).
+
+   .. cpp:member:: Rect content
+
+      The client area: the rectangle the window's model lays out and paints.
+
+   .. cpp:member:: Rect outer
+
+      The whole window including native decorations where the host measures them (outer_measured); equal to ``content`` where it cannot (an X11 window manager that publishes no frame extents).
+
+   .. cpp:member:: bool outer_measured
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowFrameEvent final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   Published once for every native move or resize the adapter reports, whoever caused it (the user, a frame request, the platform).
+
+   .. cpp:member:: HostWindowId window
+
+   .. cpp:member:: HostWindowFrame frame
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowFrameResult final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: HostWindowFrame frame
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowId final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   Identity of one window within one application run. Identities are assigned from 1 in admission order and never reused within a run, so a destroyed window's identity cannot address a later window.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool valid() const noexcept
+
+   .. cpp:member:: std::uint64_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: HostWindowing
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   Application-scope windowing for one run (stage DK decisions 6 and 7): the table of the run's live windows, runtime destruction, window frames in desktop logical units, the pointer's desktop position, the window under a desktop point and ordering within the application. The base class owns the UI-thread check, capability gating, identities, the bounds and validation, so every adapter applies the same rules; an adapter implements the *_impl operations for its platform. A request a host cannot perform reports ``unsupported`` (HostCapability bits runtime_windows, window_frames, screen_pointer, window_at_point and window_ordering). Opening a window is not a member: it needs the window's model and callbacks, which each adapter receives in its own entry type. The adapter calls admit() before it creates the native window and retire() when the native window is gone, whatever closed it. Every member runs on the thread that constructed the object. Requests from another thread report wrong_thread; requests after shutdown() report after_shutdown; unknown or retired identities are invalid_argument.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit HostWindowing(HostCapabilities capabilities)
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: HostWindowId primary() const noexcept
+
+   .. cpp:function:: std::size_t window_count() const noexcept
+
+   .. cpp:function:: const HostCapabilities& capabilities() const noexcept
+
+   .. cpp:function:: HostWindowingSnapshot snapshot() const
+
+
+   .. rubric:: Events
+
+   .. cpp:function:: Event<const HostWindowFrameEvent&>& frame_changed() noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: HostWindowFrameResult frame(HostWindowId window)
+
+      The window's current frame, read from the platform.
+
+   .. cpp:function:: HostServiceStatus request_frame(HostWindowId window, Rect content)
+
+      Asks the platform to give the window's client area the rectangle ``content`` in desktop logical units. Acceptance means the native request was submitted; the new frame arrives through frame_changed, possibly before this returns, possibly on a later event (X11), and the platform or window manager may adjust it. Extents below the window's minimum size are invalid_argument (adapter rule, as ApplicationWindowHandle::request_client_size).
+
+   .. cpp:function:: HostScreenPointResult pointer_position()
+
+   .. cpp:function:: HostWindowAtResult window_at(Point point)
+
+      The run's window that is topmost at ``point`` (desktop logical units), counting native decorations where the host can.
+
+   .. cpp:function:: HostServiceStatus bring_to_front(HostWindowId window)
+
+      Orders ``window`` above every other window of this run, never above other applications' windows, without activating it. Owned windows stay above their owners as each platform keeps them.
+
+   .. cpp:function:: HostServiceStatus destroy_window(HostWindowId window)
+
+      Closes and destroys a window opened by this run without asking its closing handler: the program decided. Its closed callback runs before this returns and its identity is retired. The primary window and a window that still owns live windows are invalid_argument.
+
+   .. cpp:function:: HostMonitorResult query_monitors()
+
+      Monitors in desktop logical units.
+
+   .. cpp:function:: std::optional<HostWindowId> find(std::string_view stable_id) const noexcept
+
+      Table queries (no capability needed).
+
+   .. cpp:function:: bool live(HostWindowId window) const noexcept
+
+   .. cpp:function:: std::optional<HostWindowKind> kind(HostWindowId window) const noexcept
+
+   .. cpp:function:: std::optional<HostWindowId> owner(HostWindowId window) const noexcept
+
+      The owner, or an invalid identity for a window without one. Empty for an unknown window.
+
+   .. cpp:function:: void shutdown() noexcept
+
+      Ends the run's windowing: every later request reports after_shutdown and the table is cleared. Called by the adapter as the run ends.
+
+   .. cpp:function:: HostWindowAdmission admit(const HostWindowDescription& description)
+
+      Validates and records a window before its native creation. Rules: the stable id is 1 to 1024 bytes of UTF-8 without NUL and unique among live windows; at most maximum_windows live windows; the owner, when given, is live; exactly one primary, admitted first, without an owner; a standard window has an owner. After mark_started() an admission needs runtime_windows and may not be primary. A refused admission changes nothing.
+
+   .. cpp:function:: void mark_started() noexcept
+
+      The initial window set is complete; later admissions open windows during the run.
+
+   .. cpp:function:: void retire(HostWindowId window) noexcept
+
+      The native window is gone. Unknown identities are ignored.
+
+   .. cpp:function:: void report_frame(HostWindowId window, const HostWindowFrame& frame)
+
+      A native move or resize happened (or the first frame is known). The frame is recorded and frame_changed is published.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual HostWindowFrameResult frame_impl(HostWindowId window) = 0
+
+      *Protected.*
+
+      Called only after validation: a live identity, a finite request in range, the capability present, the UI thread.
+
+   .. cpp:function:: virtual HostServiceStatus request_frame_impl(HostWindowId window, Rect content) = 0
+
+      *Protected.*
+
+   .. cpp:function:: virtual HostScreenPointResult pointer_position_impl() = 0
+
+      *Protected.*
+
+   .. cpp:function:: virtual HostWindowAtResult window_at_impl(Point point) = 0
+
+      *Protected.*
+
+      May return any native result; the base accepts only a live identity or an invalid one.
+
+   .. cpp:function:: virtual HostServiceStatus bring_to_front_impl(HostWindowId window) = 0
+
+      *Protected.*
+
+   .. cpp:function:: virtual HostServiceStatus destroy_window_impl(HostWindowId window) = 0
+
+      *Protected.*
+
+      Must close the native window, run its closed notification and call retire() before returning accepted.
+
+   .. cpp:function:: virtual HostMonitorResult query_monitors_impl() = 0
+
+      *Protected.*
+
+   .. cpp:member:: constexpr std::size_t maximum_windows
+
+      Default: ``64U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_stable_id_bytes
+
+      Default: ``1024U``.
+
+   .. cpp:member:: constexpr double maximum_desktop_coordinate
+
+      Frame requests: each extent 1 to 32768 logical units, each origin coordinate within plus or minus this bound. Default: ``1000000.0``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowingSnapshot final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::string to_json() const
+
+   .. cpp:member:: HostCapabilities capabilities
+
+   .. cpp:member:: std::size_t live_windows
+
+   .. cpp:member:: std::uint64_t admitted
+
+   .. cpp:member:: std::uint64_t retired
+
+   .. cpp:member:: std::uint64_t frame_requests
+
+   .. cpp:member:: std::uint64_t frame_reports
+
+   .. cpp:member:: std::uint64_t rejected_requests
+
+   .. cpp:member:: bool started
+
+   .. cpp:member:: bool shutdown
+
+.. cpp:namespace:: gui_forms::host
+
+.. cpp:struct:: LinuxApplicationOptions final
+
+   ``#include <gui_forms/platform/linux_host.hpp>``
+
+   .. cpp:member:: std::function<void(HostWindowing &windowing, LinuxOpenWindow open)> windowing_ready
+
+      Published once on the UI thread before the first window is created. ``windowing`` lives until windowing_ended has been called.
+
+   .. cpp:member:: std::function<void()> windowing_ended
+
+      Published once on the UI thread when the event loop ends (or the run fails), before the windowing is shut down and released.
+
 .. cpp:namespace:: gui_forms::host
 
 .. cpp:struct:: LinuxApplicationWindow final
@@ -1479,6 +1825,20 @@ Related types
    .. cpp:member:: std::function<void()> dispatch_pending
 
    .. cpp:member:: std::function<void()> closed
+
+.. cpp:namespace:: gui_forms::host
+
+.. cpp:struct:: MacApplicationOptions final
+
+   ``#include <gui_forms/platform/macos_host.hpp>``
+
+   .. cpp:member:: std::function<void(HostWindowing& windowing, MacOpenWindow open)> windowing_ready
+
+      Published once on the main thread before the first window is created. ``windowing`` lives until windowing_ended has been called.
+
+   .. cpp:member:: std::function<void()> windowing_ended
+
+      Published once on the main thread when the application run ends, before the remaining windows close and before the windowing is shut down and released.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -1629,6 +1989,20 @@ Related types
    .. cpp:member:: std::size_t index
 
    .. cpp:member:: std::string stable_id
+
+.. cpp:namespace:: gui_forms::host
+
+.. cpp:struct:: WindowsApplicationOptions final
+
+   ``#include <gui_forms/platform/windows_host.hpp>``
+
+   .. cpp:member:: std::function<void(HostWindowing& windowing, WindowsOpenWindow open)> windowing_ready
+
+      Published once on the UI thread before the first window is created. ``windowing`` lives until windowing_ended has been called.
+
+   .. cpp:member:: std::function<void()> windowing_ended
+
+      Published once on the UI thread when the message loop ends, before the remaining windows are destroyed and before the windowing is shut down and released.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -1885,6 +2259,16 @@ Enumerations
 
    .. cpp:enumerator:: notification_area_menus
 
+   .. cpp:enumerator:: runtime_windows
+
+   .. cpp:enumerator:: window_frames
+
+   .. cpp:enumerator:: screen_pointer
+
+   .. cpp:enumerator:: window_at_point
+
+   .. cpp:enumerator:: window_ordering
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: HostCloseReason
@@ -2085,6 +2469,18 @@ Enumerations
 
    .. cpp:enumerator:: error
 
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: HostWindowKind
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   .. cpp:enumerator:: primary
+
+   .. cpp:enumerator:: standard
+
+   .. cpp:enumerator:: tool
+
 .. cpp:namespace:: gui_forms::host
 
 .. cpp:enum-class:: MacTitlebarPresentation
@@ -2176,6 +2572,32 @@ Functions, constants and aliases
 
 .. cpp:type:: HostEventPayload = std::variant< HostAttachEvent, HostResizeEvent, HostScaleEvent, HostActivationEvent, HostOcclusionEvent, HostDisplayEvent, DragEvent, PointerEvent, KeyEvent, TextInputEvent, HostCloseRequest, HostClosedEvent, HostShutdownEvent>
 
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/host/windowing/desktop_coordinates.hpp>``
+
+.. cpp:function:: HostMonitor logical_monitor(const HostMonitor& device) noexcept
+
+   The monitor ``device`` in logical units: same id, origin and scale; frame and work area extents divided by the scale. The work area keeps its offset from the monitor origin divided by the scale, so it stays inside the logical frame.
+
+.. cpp:function:: std::size_t nearest_monitor(std::span<const HostMonitor> monitors, Point point) noexcept
+
+   Index of the monitor whose frame contains ``point``, else of the monitor whose frame is nearest to it (squared distance to the rectangle; the first such monitor on a tie). ``monitors`` must not be empty.
+
+.. cpp:function:: Point desktop_logical_point(std::span<const HostMonitor> device_monitors, Point device_point) noexcept
+
+   Converts a device desktop point to desktop logical units through the monitor that contains it (or the nearest one). Returns the point unchanged when ``device_monitors`` is empty.
+
+.. cpp:function:: Point desktop_device_point(std::span<const HostMonitor> device_monitors, Point logical_point, double& scale) noexcept
+
+   The inverse: finds the monitor whose logical frame contains the point (or the nearest logical frame) and maps it back to device units. Returns the point unchanged when ``device_monitors`` is empty. ``scale`` receives that monitor's scale (1 when there is none), which a caller uses to convert an extent placed at that point.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+.. cpp:function:: const char* host_window_kind_name(HostWindowKind kind) noexcept
+
 .. cpp:namespace:: gui_forms::host
 
 ``#include <gui_forms/platform/linux_host.hpp>``
@@ -2184,7 +2606,11 @@ Functions, constants and aliases
 
 .. cpp:function:: int run_linux(std::unique_ptr<Window> window, LinuxHostOptions options = {})
 
-.. cpp:function:: int run_linux_application(std::vector<LinuxApplicationWindow> linux)
+.. cpp:function:: int run_linux_application(std::vector<LinuxApplicationWindow> linux, LinuxApplicationOptions application = {})
+
+.. cpp:type:: LinuxOpenWindow = std::function<HostWindowAdmission(LinuxApplicationWindow)>
+
+   Opens one window while the application runs: the same entry, ownership and readiness rules as an initial window, after HostWindowing::admit. Callable on the UI thread while the run lives; afterwards it reports after_shutdown. The window's host_ready and ready callbacks run before it returns.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -2196,7 +2622,11 @@ Functions, constants and aliases
 
 .. cpp:function:: int run_macos(std::unique_ptr<Window> window, MacHostOptions options = {})
 
-.. cpp:function:: int run_macos_application(std::vector<MacApplicationWindow> windows)
+.. cpp:function:: int run_macos_application(std::vector<MacApplicationWindow> windows, MacApplicationOptions application = {})
+
+.. cpp:type:: MacOpenWindow = std::function<HostWindowAdmission(MacApplicationWindow)>
+
+   Opens one window while the application runs: the same entry, ownership and readiness rules as an initial window, after HostWindowing::admit. Callable on the main thread while the run lives; afterwards it reports after_shutdown. The window's host_ready and ready callbacks run before it returns.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -2206,4 +2636,8 @@ Functions, constants and aliases
 
 .. cpp:function:: int run_windows(std::unique_ptr<Window> window, WindowsHostOptions options = {})
 
-.. cpp:function:: int run_windows_application(std::vector<WindowsApplicationWindow> windows)
+.. cpp:function:: int run_windows_application(std::vector<WindowsApplicationWindow> windows, WindowsApplicationOptions application = {})
+
+.. cpp:type:: WindowsOpenWindow = std::function<HostWindowAdmission(WindowsApplicationWindow)>
+
+   Opens one window while the application runs: the same entry, ownership and readiness rules as an initial window, after HostWindowing::admit. Callable on the UI thread while the run lives; afterwards it reports after_shutdown. The window's host_ready and ready callbacks run before it returns.

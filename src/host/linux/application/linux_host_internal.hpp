@@ -8,11 +8,45 @@
 #include <atomic>
 #include <deque>
 #include <mutex>
+#include <memory>
 #include <optional>
+#include <thread>
 
 namespace gui_forms::host::linux_detail {
 class Runtime;
 class NativeWindow;
+// Application-scope windowing on X11 (stage DK phase W0, decisions 6 and 7;
+// x11_windowing.cpp). The X server's desktop is in device pixels and this
+// host runs at scale 1, so desktop logical units are pixels. Window
+// positions are requests a window manager may adjust; XWayland's handling is
+// measured, not assumed (planning/stages/DK-docking/PLAN.md, W0).
+class X11Windowing final : public HostWindowing {
+public:
+  explicit X11Windowing(Runtime &runtime);
+  // Creates one window: admission, the X window (transient for its owner's),
+  // attachment and, for a runtime window, its ready callbacks. Initial
+  // windows receive ready() from run_linux_application once all exist.
+  HostWindowAdmission open(LinuxApplicationWindow entry, bool runtime);
+  // Reports the window's current frame (ConfigureNotify, first map).
+  void report_native_frame(NativeWindow &window);
+
+protected:
+  HostWindowFrameResult frame_impl(HostWindowId window) override;
+  HostServiceStatus request_frame_impl(HostWindowId window, Rect content) override;
+  HostScreenPointResult pointer_position_impl() override;
+  HostWindowAtResult window_at_impl(Point point) override;
+  HostServiceStatus bring_to_front_impl(HostWindowId window) override;
+  HostServiceStatus destroy_window_impl(HostWindowId window) override;
+  HostMonitorResult query_monitors_impl() override;
+
+private:
+  NativeWindow *native(HostWindowId window) noexcept;
+  // The child of the root window that holds `window` (the window manager's
+  // frame, or the window itself without a reparenting window manager).
+  ::Window top_level(::Window window) const;
+  // Owner of this object (observing).
+  Runtime &runtime_;
+};
 DragFileListData local_files(const std::vector<std::byte>& data);
 class Services final : public HostServices {
 public:
@@ -104,8 +138,20 @@ public:
                         PresentedArea copied);
   HostDispatchResult dispatch(HostEventPayload payload);
   HostDialogResult dialog(const HostDialogRequest &request);
+  // The window's frame in desktop units (pixels): the client area at its
+  // root position, and the outer frame from _NET_FRAME_EXTENTS when the
+  // window manager publishes it.
+  HostWindowFrame frame() const;
+  // Asks the window manager for a client rectangle (static gravity, so the
+  // position is the client area's, not the frame's).
+  HostServiceStatus request_frame(Rect content);
   Runtime &runtime;
   LinuxApplicationWindow entry;
+  // The window's identity in the run (X11Windowing).
+  HostWindowId window_id{};
+  // Initial windows keep their native state until the run returns; runtime
+  // windows are released by Runtime::reclaim after they close.
+  bool initial{true};
   ::Window xid{};
   GC gc{};
   XIC input{};
@@ -164,9 +210,15 @@ class Runtime final {
 public:
   Runtime();
   ~Runtime();
+  // Windows without an identity (retained dialogs, tests) are not part of
+  // the windowing table.
   std::shared_ptr<NativeWindow> add(LinuxApplicationWindow entry,
-                                    ::Window owner = 0);
+                                    ::Window owner = 0,
+                                    HostWindowId window_id = {},
+                                    bool initial = true);
   void step(int maximum_wait = -1);
+  // Releases runtime windows that closed, between loop turns.
+  void reclaim();
   void dispatch(XEvent &event);
   Atom atom(const char *name) const;
   Display *display{};
@@ -175,6 +227,9 @@ public:
   int wake_pipe[2]{-1, -1};
   std::shared_ptr<ActionQueue> actions;
   std::vector<std::shared_ptr<NativeWindow>> windows;
+  // Created by run_linux_application right after the runtime; destroyed
+  // after ~Runtime has closed every window.
+  std::unique_ptr<X11Windowing> windowing;
   ::Window clipboard_owner{};
   std::string clipboard_text;
   HostImage clipboard_image;
@@ -190,4 +245,30 @@ public:
 };
 HostDialogResult retained_dialog(NativeWindow &owner,
                                  const HostDialogRequest &request);
+// The run's open operation (LinuxOpenWindow). Only the UI thread reaches the
+// windowing, and only while the run lives.
+struct RunOpenState final {
+  const std::thread::id thread{std::this_thread::get_id()};
+  X11Windowing *windowing{};
+};
+struct RunOpen final {
+  std::weak_ptr<RunOpenState> owner{};
+  HostWindowAdmission operator()(LinuxApplicationWindow entry) const;
+};
+// Ends the windowing when run_linux_application leaves its run, on every
+// path: revokes the open operation, tells the program, shuts the table down.
+class WindowingEndGuard final {
+public:
+  WindowingEndGuard(RunOpenState *state, LinuxApplicationOptions *options,
+                    X11Windowing *windowing) noexcept
+      : state_(state), options_(options), windowing_(windowing) {}
+  WindowingEndGuard(const WindowingEndGuard &) = delete;
+  WindowingEndGuard &operator=(const WindowingEndGuard &) = delete;
+  ~WindowingEndGuard();
+
+private:
+  RunOpenState *state_;
+  LinuxApplicationOptions *options_;
+  X11Windowing *windowing_;
+};
 } // namespace gui_forms::host::linux_detail

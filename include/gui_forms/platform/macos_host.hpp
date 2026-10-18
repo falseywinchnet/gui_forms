@@ -111,6 +111,24 @@ struct MacApplicationWindow final {
 [[nodiscard]] std::unique_ptr<HostServices> make_macos_host_services(
     MacHostServiceOptions options = {});
 int run_macos(std::unique_ptr<Window> window, MacHostOptions options = {});
-int run_macos_application(std::vector<MacApplicationWindow> windows);
+// Opens one window while the application runs: the same entry, ownership
+// and readiness rules as an initial window, after HostWindowing::admit.
+// Callable on the main thread while the run lives; afterwards it reports
+// after_shutdown. The window's host_ready and ready callbacks run before it
+// returns.
+using MacOpenWindow = std::function<HostWindowAdmission(MacApplicationWindow)>;
+
+struct MacApplicationOptions final {
+    // Published once on the main thread before the first window is created.
+    // `windowing` lives until windowing_ended has been called.
+    std::function<void(HostWindowing& windowing, MacOpenWindow open)> windowing_ready;
+    // Published once on the main thread when the application run ends,
+    // before the remaining windows close and before the windowing is shut
+    // down and released.
+    std::function<void()> windowing_ended;
+};
+
+int run_macos_application(std::vector<MacApplicationWindow> windows,
+                          MacApplicationOptions application = {});
 
 } // namespace gui_forms::host

@@ -2,6 +2,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
@@ -236,6 +237,107 @@ void check_character_normalization() {
     }
 }
 #endif
+// Stage DK W0: a window opened and destroyed during the run, its frame
+// requested and read, the pointer, the window at a point and ordering. The
+// runtime window stays hidden; nothing here needs the desktop's attention.
+struct RuntimeWindowsProbe final {
+    ApplicationWindowHandle floating{};
+    unsigned floating_ready{};
+    unsigned floating_closed{};
+    unsigned frames{};
+    bool supported{};
+    bool ready_before_return{};
+    HostServiceStatus open{};
+    HostServiceStatus request{};
+    HostWindowFrameResult frame{};
+    HostServiceStatus pointer{};
+    HostServiceStatus at_point{};
+    HostServiceStatus raise{};
+    HostServiceStatus destroy{};
+    bool closed_before_return{};
+    bool handle_expired{};
+};
+struct FloatingReady final {
+    RuntimeWindowsProbe* probe{};
+    void operator()(Window&, ApplicationWindowHandle handle) const {
+        (*probe).floating = handle;
+        ++(*probe).floating_ready;
+    }
+};
+struct FloatingClosed final {
+    RuntimeWindowsProbe* probe{};
+    void operator()() const { ++(*probe).floating_closed; }
+};
+struct FloatingFrame final {
+    RuntimeWindowsProbe* probe{};
+    void operator()(const HostWindowFrameEvent&) const { ++(*probe).frames; }
+};
+struct RuntimeMainReady final {
+    RuntimeWindowsProbe* probe{};
+    void operator()(Window&, ApplicationWindowHandle handle) const {
+        const ApplicationWindows windows = handle.windows();
+        RuntimeWindowsProbe& state = *probe;
+        state.supported = windows.capabilities().supports(HostCapability::runtime_windows) &&
+            windows.capabilities().supports(HostCapability::window_frames);
+        if (state.supported) {
+            ApplicationWindow entry{};
+            entry.stable_id = "native.runtime.tool";
+            entry.owner_id = "main";
+            entry.tool_window = true;
+            entry.model = make_window();
+            entry.options.title = "GUI.Forms runtime window fixture";
+            entry.options.initial_size = {200.0, 150.0};
+            entry.options.minimum_size = {100.0, 80.0};
+            entry.options.initially_visible = false;
+            entry.options.print_metrics_on_close = false;
+            entry.options.ready = FloatingReady{probe};
+            entry.options.closed = FloatingClosed{probe};
+            entry.options.frame_changed = FloatingFrame{probe};
+            const ApplicationWindowOpenResult opened = windows.open_window(std::move(entry));
+            state.open = opened.status;
+            state.ready_before_return = state.floating_ready == 1U;
+            if (opened.status.accepted()) {
+                state.request = opened.window.request_frame({120.0, 140.0, 220.0, 160.0});
+                state.frame = opened.window.frame();
+                state.pointer = windows.pointer_position().status;
+                state.at_point = windows.window_at({1.0, 1.0}).status;
+                state.raise = opened.window.bring_to_front();
+                state.destroy = windows.destroy_window(opened.window);
+                state.closed_before_return = state.floating_closed == 1U;
+                state.handle_expired = !opened.window.active() &&
+                    opened.window.show().error == HostServiceError::after_shutdown;
+            }
+        }
+        require(handle.request_close().accepted(), "runtime fixture close failed");
+    }
+};
+void check_runtime_windows() {
+    RuntimeWindowsProbe probe{};
+    ApplicationWindowOptions options{};
+    options.title = "GUI.Forms runtime windows fixture";
+    options.initial_size = {360, 240};
+    options.print_metrics_on_close = false;
+    options.ready = RuntimeMainReady{&probe};
+    const ApplicationResult result = Application::run(make_window(), std::move(options));
+    if (result.callback_exception) std::rethrow_exception(result.callback_exception);
+    require(result.accepted(), "runtime windows fixture failed");
+    if (!probe.supported) return;
+    require(probe.open.accepted() && probe.ready_before_return, "runtime window not ready when open returned");
+    require(probe.request.accepted(), "runtime window frame request refused");
+    require(probe.frame.status.accepted(), "runtime window frame refused");
+#if defined(_WIN32)
+    // Win32 applies the request synchronously; X11 answers on a later event.
+    require(std::fabs(probe.frame.frame.content.width - 220.0) < 1.0 &&
+                std::fabs(probe.frame.frame.content.height - 160.0) < 1.0,
+            "runtime window frame did not follow the request");
+    require(probe.frames >= 1U, "runtime window frame change not reported");
+#endif
+    require(probe.pointer.accepted() && probe.at_point.accepted() && probe.raise.accepted(),
+            "pointer, window-at-point or ordering refused");
+    require(probe.destroy.accepted() && probe.closed_before_return && probe.floating_closed == 1U,
+            "runtime window destroy did not close it once before returning");
+    require(probe.handle_expired, "destroyed runtime window handle still active");
+}
 }
 int main() {
 #if defined(_WIN32)
@@ -276,5 +378,6 @@ int main() {
     const ApplicationResult failed_dispatch = run_dispatch_probe(dispatch_failure);
     require(failed_dispatch.error == ApplicationError::callback_failure && failed_dispatch.callback_exception,
             "dispatch exception escaped the portable application boundary");
-    std::cout << "portable application API: native attach, cancel/retry, close, expiry, recursion and exception containment passed\n";
+    check_runtime_windows();
+    std::cout << "portable application API: native attach, cancel/retry, close, expiry, recursion, exception containment and runtime windows passed\n";
 }

@@ -38,6 +38,11 @@ whole record for logs.
 | `font_discovery` | host font enumeration | no, by design | no, by design | no, by design |
 | `accessibility` | native accessibility publication of the semantic tree | not yet advertised | not yet advertised | not yet advertised |
 | `typed_drag_source` | outbound drag initiation | no | no | no |
+| `runtime_windows` | owned windows opened and destroyed while the application runs | yes | yes | yes |
+| `window_frames` | window frames read and requested in desktop logical units, with a report for every move and resize | yes | yes | yes (the window manager decides) |
+| `screen_pointer` | the pointer's desktop position | yes | yes | yes |
+| `window_at_point` | the application's topmost window at a desktop point | yes | yes | yes |
+| `window_ordering` | bring a window to the front of the application's own windows | yes | yes | yes (the window manager may decline) |
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
@@ -102,9 +107,9 @@ change at run time, whether composition exists, which dialogs are native) are
 exposed as capability bits and `HostServiceStatus` results, not as hidden
 behaviour differences.
 
-Two consequences are worth knowing. Coordinate conversion ends at window
-client coordinates; a desktop-screen origin and multi-monitor transform are
-host facts you query through monitor records. And the core never encodes one
+Two consequences are worth knowing. Inside a window, coordinates are the
+window's client coordinates; across windows, the windowing seam (below) uses
+desktop logical units. And the core never encodes one
 platform's assumption about dialogs, paths or menus; a request a host cannot
 honour comes back `unsupported` immediately.
 
@@ -135,6 +140,37 @@ event arrives, as for a user resize. `Window::resize` only reports a size the
 host already has, so calling it from application code leaves the model and
 the screen disagreeing. One window's handlers may mutate another window's
 model and have it present on the next wake.
+
+### Runtime windows and the desktop
+
+`ApplicationWindowHandle::windows()` returns the run's `ApplicationWindows`
+(stage DK decisions 6 and 7). `open_window` opens an owned or tool window
+while the application runs and `destroy_window` destroys one without asking
+its closing handler; at most 64 windows are live at once, and identities
+(`HostWindowId`) are never reused within a run. `ApplicationWindowHandle::
+frame` and `request_frame` read and place a window's client rectangle,
+`frame_changed` reports every move and resize, `pointer_position` and
+`window_at` answer where the pointer is and which of the application's
+windows is under a point, and `bring_to_front` orders a window above the
+application's other windows without activating it and never above other
+applications' windows. Each is a capability bit above; a host that cannot
+do one reports `unsupported`.
+
+These requests use desktop logical units: origin at the top left of the
+primary monitor, y downwards. macOS points are such units already. Windows
+(per-monitor DPI aware) and X11 address their desktops in device pixels;
+there each monitor keeps its device origin and its extent is divided by its
+scale (`gui_forms/host/windowing/desktop_coordinates.hpp`), and
+`ApplicationWindows::monitors` returns the monitors in those units, while
+`HostServices::query_monitors` keeps reporting device units. On X11 a frame
+is a request to the window manager, which may adjust it; whether XWayland
+honours client positions is measured per compositor, not assumed.
+
+The portable rules (identities, bounds, ownership, validation, thread and
+shutdown checks) live in the `HostWindowing` base class, so every adapter
+applies them the same way; the headless reference host
+(`src/host/headless/application/`) implements the same seam on a simulated
+desktop for tests.
 
 ## Choosing a host at build time
 

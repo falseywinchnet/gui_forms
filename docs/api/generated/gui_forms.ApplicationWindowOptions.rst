@@ -75,6 +75,11 @@ gui_forms::ApplicationWindowOptions
        ``cancel`` to keep it open. If the callback throws, the close goes ahead.
    ``closed``
        Called once after the window has closed.
+   ``frame_changed``
+       Called on the UI thread for every native move or resize of the window
+       once it is ready, with its frame in desktop logical units (see
+       ``ApplicationWindowHandle::frame``). The client size also reaches the
+       model through the host's resize event.
 
    The empty callbacks are simply not called. If any callback throws, the run
    ends with :cpp:enumerator:`ApplicationError::callback_failure <gui_forms::ApplicationError::callback_failure>`; see :cpp:class:`Application <gui_forms::Application>`.
@@ -148,3 +153,7 @@ gui_forms::ApplicationWindowOptions
    .. cpp:member:: std::function<void(HostCloseRequest&)> closing
 
    .. cpp:member:: std::function<void()> closed
+
+   .. cpp:member:: std::function<void(const HostWindowFrameEvent&)> frame_changed
+
+      Published on the UI thread for every native move or resize of this window once it is ready, in desktop logical units (capability window_frames). The client size also reaches the model through the host's resize event, as before.
