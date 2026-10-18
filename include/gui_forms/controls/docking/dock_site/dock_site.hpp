@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/application/window_frame_drag/window_frame_drag.hpp"
 #include "gui_forms/commands.hpp"
 #include "gui_forms/components/context_menu/context_menu.hpp"
 #include "gui_forms/control.hpp"
@@ -24,10 +25,13 @@
 namespace gui_forms {
 
 // The rows of a panel's position menu (owner decision DK-30; docking study
-// 5.7). Float waits for floating windows (phase D4) and is listed, disabled.
-// Auto Hide pins a root-level tool stack out to the nearest window edge; for
-// an auto-hidden panel Dock returns its stack to where it stood. Move starts
-// the keyboard move mode (phase D3, G3-1).
+// 5.7). Float floats the panel into a new floating window (phase D4; enabled
+// while the workspace has windows attached and the panel may float). Auto
+// Hide pins a root-level tool stack out to the nearest window edge; for an
+// auto-hidden panel Dock returns its stack to where it stood, for a floating
+// panel it docks the panel back where it was docked last
+// (DockWorkspace::dock_back). Move starts the keyboard move mode (phase D3,
+// G3-1).
 enum class DockPositionCommand : std::uint8_t {
     float_panel,
     dock,
@@ -45,20 +49,36 @@ enum class DockPositionCommand : std::uint8_t {
 // its old one. Input other than the drag's own is not taken while settling.
 enum class DockDragPhase : std::uint8_t { idle, armed, dragging, settling };
 
-// How a drag ended: dropped on a target (one layout transaction); Escape;
-// the pointer capture lost; the window deactivated; the layout changed
-// under it (by the program, so the drag never applies to a stale tree); or
-// released where nothing accepts it, which snaps back until floating
-// windows exist (D4-1; phase D4 floats instead).
-enum class DockDragEnd : std::uint8_t { dropped, escaped, capture_lost, deactivated, layout_changed, rejected };
+// How a drag ended: dropped on a target (one layout transaction, in this
+// site's window or another's); Escape; the pointer capture lost; the window
+// deactivated; the layout changed under it (by the program, so the drag
+// never applies to a stale tree); released where nothing accepts it, which
+// floats the subject into a new floating window where it may float
+// (`floated`, D4-1) and snaps it back otherwise (`rejected`).
+enum class DockDragEnd : std::uint8_t {
+    dropped,
+    escaped,
+    capture_lost,
+    deactivated,
+    layout_changed,
+    rejected,
+    floated,
+};
 
 struct DockDragOutcome final {
     DockDragEnd end{DockDragEnd::escaped};
     DockSubject subject{};
-    // The target dropped on, for `dropped`.
+    // The target dropped on, for `dropped`, in the coordinates of the site
+    // that showed it.
     std::optional<DockDropTarget> target{};
-    // The layout transaction's result, for `dropped`.
+    // The layout transaction's result, for `dropped` and `floated`.
     DockTransactionResult result{};
+    // For `dropped`: whether the target was in another site's window (a drag
+    // across windows, phase D4).
+    bool across_windows{};
+    // For `floated`: the new floating window's client area, in desktop
+    // logical units.
+    Rect frame{};
 };
 
 // Why a flyout opened or closed (DockFlyoutChange; owner decision DK-27,
@@ -98,20 +118,49 @@ struct DockFlyoutChange final {
     DockFlyoutCause cause{DockFlyoutCause::programmatic};
 };
 
-// The main window's part of a docking layout, in one window (stage DK phase
-// D2; owner decisions DK-18 to DK-23, DK-28 to DK-30, DK-41): binary splits
-// separated by seams, tool stacks with captions, and the one document area
-// with its document stacks, each stack a PageView over the stack's panels.
+// One site of a docking layout in one window (stage DK phase D2; owner
+// decisions DK-18 to DK-23, DK-28 to DK-30, DK-41): binary splits separated
+// by seams, tool stacks with captions and, in the main site, the one
+// document area with its document stacks, each stack a PageView over the
+// stack's panels. A site realizes either the main site (the first
+// constructor) or one floating site (the second; phase D4, normally made by
+// the workspace as the root of that site's floating window).
 //
 // The site borrows its workspace: the workspace must outlive it, or be
 // destroyed first, which unbinds the site (it then shows nothing). The site
-// realizes the main site's tree after every layout change: one PageView per
+// realizes its tree after every layout change (the workspace tells it):
+// one PageView per
 // stack (`<site id>.stack.<node id>`), reused while the stack keeps its node
 // identity, its pages the stack's panels in order with the stack's
 // selection; tool stacks show their tabs at the bottom only when they hold
 // two or more panels, document stacks at the top. A panel's content is its
 // workspace control, created when the panel is first shown selected (lazy
-// creation). Floating sites are not realized until phase D4.
+// creation).
+//
+// A floating site (phase D4; owner decisions DK-1, DK-6 to DK-12, DK-41):
+// no document area, side strips, collapsing, maximizing or window-edge
+// targets; it shows nothing once its site leaves the layout. Its tool
+// stacks keep their drawn captions (the one-stack floating window's caption
+// of T6-3; the host's title bar stays too, since no host offers a frameless
+// owned window yet). A double-click on a floating caption docks the stack
+// back where its panel was docked last. While the site holds exactly one
+// tool stack, dragging its caption moves the window itself with the
+// framework's capture drag (WindowFrameDrag, decision 12) where the host
+// supports it, the targets of the window under the pointer showing as for
+// any drag; elsewhere the caption drags the stack as in the main site. Keys
+// a floating site's window does not take go to the main window's
+// accelerators.
+//
+// Drags across windows (phase D4; decision 41, T8-3): while the workspace
+// has windows attached, a drag follows the desktop pointer: the topmost
+// site under it (ApplicationWindows::window_at) shows the targets, tiles and
+// tint, only over its hovered pane (its window edges too when it is the
+// main site), and the stamp; the other sites show none. A release on a target
+// in another window applies that target's edit, as one user transaction
+// across the windows; a release where nothing accepts floats the subject
+// into a new floating window at the pointer, the panel's size, when it may
+// float (DockWorkspace::can_float), and snaps it back otherwise (the rejected
+// cue shows only then).
 //
 // Auto-hide (stage DK phase D5; owner decisions DK-27, DK-28, DK-41, DK-42):
 // each window edge holding auto-hidden panels shows a side strip, a PageStrip
@@ -208,8 +257,9 @@ struct DockFlyoutChange final {
 // start the subject leaves its place and the place closes up in one layout
 // pass of the site; the layout model is unchanged until the drop (docking
 // study 5.1, invariant 4), so Escape leaves it as it was. A miniature of the
-// panel (its caption or tab, label and content well, drawn by role) is
-// interpolated from the panel's rectangle down to a stamp about 100 units
+// panel (its caption strip by role over a picture of its view, taken with
+// Window::snapshot_control as the drag starts; the content well where the
+// window cannot snapshot) is interpolated from the panel's rectangle down to a stamp about 100 units
 // long over 220 ms and follows the pointer; at the drop it grows into the
 // panel's new place, on Escape back into its old one; reduced motion skips
 // the motion. Targets (DockDropTarget, planned when the drag starts and at
@@ -240,8 +290,12 @@ struct DockFlyoutChange final {
 class DockSite : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
-    // Borrows `workspace` (see the lifetime rule above).
+    // Borrows `workspace` (see the lifetime rule above). Realizes the main
+    // site.
     DockSite(StableId stable_id, DockWorkspace& workspace);
+    // Realizes the floating site `floating_site` (phase D4). A second site
+    // made for the same floating site replaces the first in the workspace.
+    DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floating_site);
     ~DockSite() override;
     // Realizes the workspace's layout. make_control calls it; do not call it
     // yourself.
@@ -249,6 +303,10 @@ public:
 
     // The bound workspace, or null after release_workspace.
     [[nodiscard]] DockWorkspace* workspace() const noexcept { return workspace_; }
+    // Whether the site realizes a floating site, and which (none for the
+    // main site).
+    [[nodiscard]] bool floating() const noexcept { return !(floating_site_ == DockSiteId{}); }
+    [[nodiscard]] DockSiteId floating_site() const noexcept { return floating_site_; }
     // Unbinds the workspace: the site removes its stacks and shows nothing.
     void release_workspace() noexcept;
 
@@ -263,7 +321,7 @@ public:
     [[nodiscard]] bool document_area_maximized() const noexcept { return maximized_; }
     void set_document_area_maximized(bool maximized);
 
-    // The PageView realizing a stack of the main site, or null.
+    // The PageView realizing a stack of this site, or null.
     [[nodiscard]] std::shared_ptr<PageView> stack_view(DockNodeId stack) const;
     // The realized stacks in tree order, collapsed ones included, then the
     // auto-hidden stacks in layout order.
@@ -318,13 +376,18 @@ public:
     [[nodiscard]] DockDragPhase drag_phase() const noexcept { return drag_.phase; }
     // The subject of the drag under way (armed or dragging), or none.
     [[nodiscard]] std::optional<DockSubject> drag_subject() const;
-    // While dragging: the planned targets in keyboard order, the panes they
-    // were planned over (the layout with the subject's place closed up),
-    // and the selected target, or none (between targets, over a refused
-    // zone, outside the site, or with Ctrl held).
+    // While dragging, or while this site shows another site's drag (the
+    // pointer over its window): the planned targets in keyboard order, the
+    // panes they were planned over (the layout with the subject's place
+    // closed up), and the selected target, or none (between targets, over a
+    // refused zone, outside the site, or with Ctrl held).
     [[nodiscard]] std::span<const DockDropTarget> drag_targets() const noexcept;
     [[nodiscard]] std::span<const DockDropPane> drag_panes() const noexcept;
     [[nodiscard]] std::optional<DockDropTarget> drag_target() const;
+    // Whether this site shows a drag that runs in another site (phase D4).
+    [[nodiscard]] bool showing_remote_drag() const noexcept { return drag_.guest; }
+    // While a floating window is moved by its caption (phase D4).
+    [[nodiscard]] bool moving_window() const noexcept { return window_move_.active; }
     // Whether Ctrl suppresses docking now (D6-1).
     [[nodiscard]] bool drag_suppressed() const noexcept { return drag_.suppressed; }
     // The stamp's rectangle in the site's coordinates while dragging or
@@ -339,9 +402,9 @@ public:
     // to 64.
     [[nodiscard]] double drag_threshold() const noexcept { return drag_threshold_; }
     void set_drag_threshold(double threshold);
-    // Starts the keyboard move mode for a panel docked in the main site, on
-    // the first planned target. False, starting nothing, for any other
-    // panel, while a drag runs, or when there is no target.
+    // Starts the keyboard move mode for a panel docked in this site, on the
+    // first planned target. False, starting nothing, for any other panel,
+    // while a drag runs, or when there is no target.
     bool begin_keyboard_move(const DockPanelId& panel);
     // Ends a drag as Escape does. False when none runs.
     bool cancel_drag();
@@ -413,6 +476,10 @@ public:
         // a drop (drop_rejected).
         PartGeometry drag_stamp;
         PartGeometry drag_stamp_label;
+        // The panel's picture in the stamp, below its label, while the
+        // window can snapshot it (Window::snapshot_control); absent where it
+        // cannot, the content well standing in.
+        PartGeometry drag_stamp_image;
         PartGeometry drop_area;
         PartGeometry drop_cue;
         // The open flyout, in the site's coordinates as it stands in its
@@ -659,6 +726,7 @@ private:
     void continue_seam_drag(Point local);
     bool set_seam_first(std::size_t seam, double first);
     bool handle_docking_key(KeyEvent& event);
+    void pass_key_to_main_window(KeyEvent& event);
     void collect_document_steps(std::vector<DockPanelId>& out) const;
     bool step_document(int direction, Modifier release);
     void end_document_steps(const KeyEvent& event) noexcept;
@@ -799,7 +867,59 @@ private:
         Rect settle_to{};
         FrameTime settle_started{};
         std::string announcement{};
+        // The panel's picture, taken as the drag starts (the stamp's image;
+        // none where the window cannot snapshot), and released when the
+        // session ends (reset_drag) by the site that took it. Images are
+        // application-scope, so a guest shows the same image.
+        std::optional<ControlSnapshot> picture{};
+        // Phase D4. `guest`: this site shows another site's drag (no capture,
+        // no picture of its own, never ends it). `stamp_hidden`: no stamp (a
+        // window moved by its caption is its own picture). `may_float`: a
+        // release where nothing accepts floats the subject. `remote`: the
+        // site whose window is under the pointer, while that is another
+        // site, observed.
+        bool guest{};
+        bool stamp_hidden{};
+        bool may_float{};
+        std::weak_ptr<Control> remote{};
     };
+    // Ends the session: its picture's image is released (unless a guest's),
+    // then the session is cleared.
+    void reset_drag() noexcept;
+    // -- across windows (phase D4) --
+    // The desktop point of a point in this site, or none without frames.
+    [[nodiscard]] std::optional<Point> to_desktop(Point local) const;
+    // The site under the desktop pointer for a drag of this site (`excluded`
+    // skipped), or null; this site itself when the pointer is over it.
+    [[nodiscard]] DockSite* remote_site(Point desktop, const DockSite* excluded) const;
+    [[nodiscard]] DockSite* remote_guest() const noexcept;
+    // Shows, follows and stops showing another site's drag.
+    void show_guest_drag(const DragSession& source, Point local, Modifier modifiers);
+    void leave_guest_drag() noexcept;
+    // Moves the drag's targets to the site under `desktop` (another site,
+    // this one, or none).
+    void route_drag(Point desktop, Modifier modifiers, const DockSite* excluded);
+    // The floating frame for a subject released at `local`: the source's
+    // size, held where the pointer grabbed it.
+    [[nodiscard]] std::optional<Rect> float_frame_at(Point local) const;
+    // A floating site's caption drag that moves its window (WindowFrameDrag).
+    struct WindowMove final {
+        bool active{};
+        WindowFrameDrag drag{};
+        DockSubject subject{};
+        std::uint64_t pointer_id{1U};
+        Point grab{};
+        std::weak_ptr<Control> remote{};
+    };
+    [[nodiscard]] bool moves_window_by_caption() const;
+    bool begin_window_move(std::uint64_t pointer_id);
+    void continue_window_move(Modifier modifiers);
+    void end_window_move(bool cancelled);
+    void leave_window_move_guest() noexcept;
+    [[nodiscard]] static std::uint64_t now_nanoseconds() noexcept;
+    // The tree this site lays out: the main root or the floating site's root
+    // (none once that site left the layout).
+    [[nodiscard]] DockNodeId site_root() const;
 
     void create_drag_layer();
     // Whether a tab drag holds `panel` out of `stack`'s view.
@@ -829,6 +949,7 @@ private:
     [[nodiscard]] bool motion_reduced() const noexcept;
     [[nodiscard]] Rect stamp_at(FrameTime now) const;
     [[nodiscard]] Rect drag_label_bounds() const noexcept;
+    [[nodiscard]] Rect drag_image_bounds() const noexcept;
     [[nodiscard]] Rect drop_cue_bounds() const noexcept;
     [[nodiscard]] std::size_t tile_count() const noexcept;
     [[nodiscard]] TileSlot tile_at(std::size_t tile) const;
@@ -846,7 +967,9 @@ private:
     void on_window_active(bool active);
 
     DockWorkspace* workspace_{};
-    SubscriptionToken layout_token_{};
+    // The floating site realized (none: the main site).
+    DockSiteId floating_site_{};
+    WindowMove window_move_{};
     SubscriptionToken activation_token_{};
     SubscriptionToken focus_token_{};
     // The realized stacks in tree order.

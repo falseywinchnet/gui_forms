@@ -876,6 +876,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
                          timestampNanoseconds:(std::uint64_t)timestamp;
 - (BOOL)requestCloseHiding:(BOOL)hiding;
 - (void)notifyClosed;
+- (void)notifyClosedWithReason:(HostCloseReason)reason;
 - (void)notifyActivation:(BOOL)active;
 - (void)notifyOcclusion:(BOOL)occluded;
 - (void)notifyScaleChanged;
@@ -1432,8 +1433,11 @@ private:
     });
 }
 - (void)notifyClosed {
+    [self notifyClosedWithReason:HostCloseReason::user];
+}
+- (void)notifyClosedWithReason:(HostCloseReason)reason {
     if (_hostAttached == NO) return;
-    static_cast<void>([self dispatchHostPayload:HostClosedEvent{HostCloseReason::user}
+    static_cast<void>([self dispatchHostPayload:HostClosedEvent{reason}
                                timestampNanoseconds:host_now_nanoseconds()]);
 }
 
@@ -2777,17 +2781,78 @@ private:
 
 @end
 
+namespace gui_forms::host {
+// Application-scope windowing (macos_application_run.inc). The delegate
+// reaches the run only through these, while the run lives.
+class MacApplicationRun;
+void mac_run_report_frame(MacApplicationRun* run, gui_forms::HostWindowId window);
+void mac_run_retire(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
+void mac_run_close_finished(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
+void mac_run_report_minimized(MacApplicationRun* run, gui_forms::HostWindowId window,
+                              bool minimized);
+void mac_run_hidden_on_close(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
+void mac_run_report_active(MacApplicationRun* run, bool active);
+} // namespace gui_forms::host
+
+// Reports application activation to the run's floating policy
+// (NSApplicationDidBecomeActive and DidResignActive). Registered for the run
+// and removed before the run ends.
+@interface GUIFormsActivationObserver : NSObject {
+    gui_forms::host::MacApplicationRun* _run;
+}
+- (instancetype)initWithRun:(gui_forms::host::MacApplicationRun*)run;
+- (void)applicationDidBecomeActive:(NSNotification*)notification;
+- (void)applicationDidResignActive:(NSNotification*)notification;
+- (void)stopObserving;
+@end
+
+@implementation GUIFormsActivationObserver
+- (instancetype)initWithRun:(gui_forms::host::MacApplicationRun*)run {
+    self = [super init];
+    if (self != nil) {
+        _run = run;
+        NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+        [center addObserver:self selector:@selector(applicationDidBecomeActive:)
+                       name:NSApplicationDidBecomeActiveNotification object:nil];
+        [center addObserver:self selector:@selector(applicationDidResignActive:)
+                       name:NSApplicationDidResignActiveNotification object:nil];
+    }
+    return self;
+}
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_active(_run, true);
+}
+- (void)applicationDidResignActive:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_active(_run, false);
+}
+- (void)stopObserving {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    _run = nullptr;
+}
+@end
+
 @interface GUIFormsWindowDelegate : NSObject <NSWindowDelegate> {
     __weak GUIFormsView* _view;
     BOOL _stopsApplicationOnClose;
     BOOL _hideOnClose;
     std::function<void()> _closedHandler;
+    // The run this window belongs to (observing; the run owns the window and
+    // this delegate) and the window's identity in it. Null for run_macos.
+    gui_forms::host::MacApplicationRun* _run;
+    gui_forms::HostWindowId _windowId;
+    // The reason the closed event reports: user for every native close,
+    // application when the run destroys the window.
+    HostCloseReason _closeReason;
 }
 - (instancetype)initWithView:(GUIFormsView*)view
       stopsApplicationOnClose:(BOOL)stopsApplicationOnClose
                   hideOnClose:(BOOL)hideOnClose
                  closedHandler:(std::function<void()>)closedHandler;
 - (void)prepareForApplicationShutdown;
+- (void)attachRun:(gui_forms::host::MacApplicationRun*)run
+           window:(gui_forms::HostWindowId)window;
+// Closes without asking the closing handler (HostWindowing::destroy_window).
+- (void)closeWindowForApplication:(NSWindow*)window;
 @end
 
 @implementation GUIFormsWindowDelegate
@@ -2801,13 +2866,35 @@ private:
         _stopsApplicationOnClose = stopsApplicationOnClose;
         _hideOnClose = hideOnClose;
         _closedHandler = std::move(closedHandler);
+        _run = nullptr;
+        _windowId = gui_forms::HostWindowId{};
+        _closeReason = HostCloseReason::user;
     }
     return self;
+}
+- (void)attachRun:(gui_forms::host::MacApplicationRun*)run
+           window:(gui_forms::HostWindowId)window {
+    _run = run;
+    _windowId = window;
+}
+- (void)closeWindowForApplication:(NSWindow*)window {
+    _hideOnClose = NO;
+    _closeReason = HostCloseReason::application;
+    // NSWindow close does not ask windowShouldClose:; windowWillClose: runs
+    // before it returns.
+    [window close];
+}
+- (void)windowDidMove:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_frame(_run, _windowId);
+}
+- (void)windowDidResize:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_frame(_run, _windowId);
 }
 - (BOOL)windowShouldClose:(NSWindow*)sender {
     if (_view != nil && ![_view requestCloseHiding:_hideOnClose]) return NO;
     if (_hideOnClose) {
         [sender orderOut:nil];
+        gui_forms::host::mac_run_hidden_on_close(_run, _windowId);
         return NO;
     }
     return YES;
@@ -2816,12 +2903,16 @@ private:
     _hideOnClose = NO;
 }
 - (void)windowWillClose:(NSNotification*)notification {
-    [_view notifyClosed];
+    [_view notifyClosedWithReason:_closeReason];
+    // Retired before the closed callback, so the callback may open a
+    // replacement under the same stable id.
+    gui_forms::host::mac_run_retire(_run, _windowId);
     if (_closedHandler) {
         std::function<void()> callback = std::move(_closedHandler);
         _closedHandler = {};
         callback();
     }
+    gui_forms::host::mac_run_close_finished(_run, _windowId);
     if (!_stopsApplicationOnClose) return;
     [NSApp stop:nil];
     NSEvent* wake = [NSEvent otherEventWithType:NSEventTypeApplicationDefined
@@ -2846,8 +2937,12 @@ private:
     const BOOL visible = (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
     [_view notifyOcclusion:!visible];
 }
+- (void)windowDidMiniaturize:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_minimized(_run, _windowId, true);
+}
 - (void)windowDidDeminiaturize:(NSNotification*)notification {
     [_view setNeedsDisplay:YES];
+    gui_forms::host::mac_run_report_minimized(_run, _windowId, false);
 }
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification {
     [_view notifyScaleChanged];
@@ -2899,7 +2994,12 @@ HostCapabilities macos_capabilities() {
                 HostCapability::dialogs |
                 HostCapability::sound_cues |
                 HostCapability::notification_area |
-                HostCapability::notification_area_menus,
+                HostCapability::notification_area_menus |
+                HostCapability::runtime_windows |
+                HostCapability::window_frames |
+                HostCapability::screen_pointer |
+                HostCapability::window_at_point |
+                HostCapability::window_ordering,
             macos_key_map()};
 }
 
@@ -3261,245 +3361,6 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
     return exitCode;
 }
 
-int run_macos_application(std::vector<MacApplicationWindow> windows) {
-    if (windows.empty()) return 2;
-    int exitCode = 0;
-    std::unordered_set<std::string> identities;
-    std::size_t primary_count{};
-    for (const MacApplicationWindow& entry : windows) {
-        if (!entry.model || entry.stable_id.empty() ||
-            !identities.insert(entry.stable_id).second ||
-            (!entry.owner_id.empty() && entry.owner_id == entry.stable_id)) {
-            return 2;
-        }
-        if (entry.owner_id.empty() && !entry.tool_window) {
-            if (!entry.options.initially_visible || entry.options.hide_on_close) {
-                return 2;
-            }
-            ++primary_count;
-        }
-    }
-    for (const MacApplicationWindow& entry : windows) {
-        if (!entry.owner_id.empty() && !identities.contains(entry.owner_id)) return 2;
-        std::vector<std::string> dragRegionIds;
-        if (!entry.options.window_drag_region_id.empty()) {
-            dragRegionIds.push_back(entry.options.window_drag_region_id);
-        }
-        dragRegionIds.insert(dragRegionIds.end(),
-                             entry.options.window_drag_region_ids.begin(),
-                             entry.options.window_drag_region_ids.end());
-        if (!validate_window_chrome_drag_regions(
-                *entry.model, dragRegionIds).accepted()) {
-            return 2;
-        }
-        std::string_view owner = entry.owner_id;
-        for (std::size_t depth = 0; !owner.empty(); ++depth) {
-            if (depth >= windows.size()) return 2;
-            const std::vector<MacApplicationWindow>::iterator parent =
-                std::find_if(
-                    windows.begin(), windows.end(), StableWindowIdEquals(owner));
-            owner = (*parent).owner_id;
-        }
-    }
-    if (primary_count != 1U) return 2;
-
-    @autoreleasepool {
-        NSApplication* application = [NSApplication sharedApplication];
-        [application setActivationPolicy:NSApplicationActivationPolicyRegular];
-        install_application_menu();
-
-        NSMutableArray<NSWindow*>* nativeWindows =
-            [[NSMutableArray alloc] initWithCapacity:windows.size()];
-        NSMutableArray<GUIFormsView*>* views =
-            [[NSMutableArray alloc] initWithCapacity:windows.size()];
-        NSMutableArray<GUIFormsWindowDelegate*>* delegates =
-            [[NSMutableArray alloc] initWithCapacity:windows.size()];
-
-        for (MacApplicationWindow& entry : windows) {
-            const Size initialSize = entry.options.capture_size.has_value()
-                ? *entry.options.capture_size : entry.options.initial_size;
-            const NSRect frame = NSMakeRect(0.0, 0.0,
-                                            initialSize.width,
-                                            initialSize.height);
-            const bool transparentFullSizeContent =
-                entry.options.titlebar_presentation ==
-                MacTitlebarPresentation::transparent_full_size_content;
-            NSWindowStyleMask style = NSWindowStyleMaskTitled |
-                NSWindowStyleMaskClosable | NSWindowStyleMaskResizable;
-            if (!entry.tool_window && entry.options.minimizable) {
-                style |= NSWindowStyleMaskMiniaturizable;
-            }
-            else style |= NSWindowStyleMaskUtilityWindow;
-            if (transparentFullSizeContent) {
-                style |= NSWindowStyleMaskFullSizeContentView;
-            }
-            NSWindow* nativeWindow = entry.tool_window
-                ? static_cast<NSWindow*>([[NSPanel alloc]
-                      initWithContentRect:frame styleMask:style
-                                  backing:NSBackingStoreBuffered defer:NO])
-                : [[NSWindow alloc]
-                      initWithContentRect:frame styleMask:style
-                                  backing:NSBackingStoreBuffered defer:NO];
-            [nativeWindow setReleasedWhenClosed:NO];
-            std::vector<std::string> windowDragRegionIds;
-            if (!entry.options.window_drag_region_id.empty()) {
-                windowDragRegionIds.push_back(
-                    std::move(entry.options.window_drag_region_id));
-            }
-            for (std::string& regionId : entry.options.window_drag_region_ids) {
-                windowDragRegionIds.push_back(std::move(regionId));
-            }
-            GUIFormsView* view = [[GUIFormsView alloc]
-                initWithModel:std::move(entry.model)
-                transparentFullSizeContent:transparentFullSizeContent
-                windowDragRegionIds:std::move(windowDragRegionIds)];
-            [view installCloseRequestHandler:std::move(entry.options.close_request)];
-            if (!entry.options.capture_path.empty()) {
-                [view installFrameCapturePath:entry.options.capture_path];
-            }
-            const BOOL primary = entry.owner_id.empty() && !entry.tool_window;
-            GUIFormsWindowDelegate* delegate =
-                [[GUIFormsWindowDelegate alloc] initWithView:view
-                                     stopsApplicationOnClose:primary
-                                                 hideOnClose:entry.options.hide_on_close
-                                                closedHandler:std::move(entry.options.closed)];
-            [nativeWindow setDelegate:delegate];
-            [nativeWindow setTitle:native_string(entry.options.title)];
-            if (transparentFullSizeContent) {
-                [nativeWindow setTitlebarAppearsTransparent:YES];
-                [nativeWindow setTitleVisibility:NSWindowTitleHidden];
-            }
-            [nativeWindow setContentMinSize:NSMakeSize(entry.options.minimum_size.width,
-                                                entry.options.minimum_size.height)];
-            [nativeWindow setContentView:view];
-            [nativeWindows addObject:nativeWindow];
-            [views addObject:view];
-            [delegates addObject:delegate];
-        }
-
-        for (std::size_t index = 0; index < windows.size(); ++index) {
-            MacApplicationWindow& entry = windows[index];
-            NSWindow* nativeWindow = nativeWindows[index];
-            if (entry.owner_id.empty()) {
-                [nativeWindow center];
-                continue;
-            }
-            const std::vector<MacApplicationWindow>::iterator owner =
-                std::find_if(
-                    windows.begin(), windows.end(),
-                    StableWindowIdEquals(entry.owner_id));
-            const std::size_t ownerIndex = static_cast<std::size_t>(
-                std::distance(windows.begin(), owner));
-            NSWindow* ownerWindow = nativeWindows[ownerIndex];
-            [ownerWindow addChildWindow:nativeWindow ordered:NSWindowAbove];
-            if (!entry.options.initially_visible) {
-                // addChildWindow:ordered: may order a previously hidden child
-                // onscreen. Preserve the portable initial-visibility contract
-                // after establishing native ownership.
-                [nativeWindow orderOut:nil];
-            }
-            NSScreen* screen = ownerWindow.screen ?: NSScreen.mainScreen;
-            NSRect frame = nativeWindow.frame;
-            const NSRect ownerFrame = ownerWindow.frame;
-            const NSRect work = screen.visibleFrame;
-            frame.origin.x = std::clamp(NSMaxX(ownerFrame) + 10.0,
-                                        NSMinX(work), NSMaxX(work) - frame.size.width);
-            frame.origin.y = std::clamp(NSMaxY(ownerFrame) - frame.size.height,
-                                        NSMinY(work), NSMaxY(work) - frame.size.height);
-            [nativeWindow setFrame:frame display:NO];
-        }
-
-        for (std::size_t index = 0; index < windows.size(); ++index) {
-            MacApplicationWindow& entry = windows[index];
-            NSWindow* nativeWindow = nativeWindows[index];
-            GUIFormsView* view = views[index];
-            if ([view initializeHost] == NO) {
-                for (GUIFormsView* initializedView in views) {
-                    [initializedView prepareForShutdown];
-                }
-                for (NSWindow* createdWindow in nativeWindows) {
-                    [createdWindow setDelegate:nil];
-                    [createdWindow setContentView:nil];
-                }
-                return 5;
-            }
-            if (entry.options.host_ready) {
-                const std::function<void()> dispatchPending =
-                    entry.options.dispatch_pending;
-                entry.options.host_ready(
-                    DispatchAndCollectWake(view, dispatchPending),
-                    RequestNativeClose(nativeWindow),
-                    ShowNativeDialog(view),
-                    ShowNativeTooltip(view),
-                    HideNativeTooltip(view),
-                    ReadNativeClipboard(view),
-                    WriteNativeClipboard(view));
-            }
-            if (entry.options.full_screen_ready) entry.options.full_screen_ready(RequestNativeFullScreen(nativeWindow));
-            if (entry.options.title_ready) entry.options.title_ready(RequestNativeTitle(nativeWindow, view));
-            if (entry.options.client_size_ready)
-                entry.options.client_size_ready(RequestNativeClientSize(nativeWindow, view));
-            if (entry.options.visibility_ready) {
-                entry.options.visibility_ready(
-                    RequestNativeShow(nativeWindow),
-                    RequestNativeHide(nativeWindow));
-            }
-            [view drainPostedWork];
-            if (entry.options.dispatch_pending) entry.options.dispatch_pending();
-            [view collectDamage];
-            if (entry.options.initially_visible) {
-                if (entry.owner_id.empty() && !entry.tool_window) {
-                    [nativeWindow makeKeyAndOrderFront:nil];
-                } else {
-                    [nativeWindow orderFront:nil];
-                }
-            }
-            if (entry.options.close_after_launch_for_testing) {
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    [nativeWindow performClose:nil];
-                });
-            }
-        }
-        [application activateIgnoringOtherApps:YES];
-        [application run];
-
-        // Closing the primary terminates the application session. Close any
-        // surviving owned/tool windows while their independent host sessions
-        // and delegates are still intact, so each root receives one real
-        // HostClosedEvent and its callback observes the actual close point.
-        for (GUIFormsWindowDelegate* delegate in delegates) {
-            [delegate prepareForApplicationShutdown];
-        }
-        for (NSWindow* nativeWindow in nativeWindows) {
-            if (nativeWindow.isVisible || !nativeWindow.isReleasedWhenClosed) {
-                [nativeWindow close];
-            }
-        }
-
-        for (std::size_t index = 0; index < windows.size(); ++index) {
-            MacApplicationWindow& entry = windows[index];
-            GUIFormsView* view = views[index];
-            NSWindow* nativeWindow = nativeWindows[index];
-            const std::string metrics = [view metricsJSON];
-            const std::string host = [view hostJSON];
-            if (entry.options.print_metrics_on_close) {
-                std::fprintf(stdout,
-                             "{\"stable_id\":\"%s\",\"window\":%s,\"host\":%s}\n",
-                             entry.stable_id.c_str(), metrics.c_str(), host.c_str());
-            }
-            if (entry.options.final_snapshot) {
-                entry.options.final_snapshot(metrics, host);
-            }
-            if (!entry.options.capture_path.empty() && [view frameCaptureSaved] == NO) {
-                exitCode = 6;
-            }
-            [view prepareForShutdown];
-            [nativeWindow setDelegate:nil];
-            [nativeWindow setContentView:nil];
-        }
-        std::fflush(stdout);
-    }
-    return exitCode;
-}
+#include "macos_application_run.inc"
 
 } // namespace gui_forms::host

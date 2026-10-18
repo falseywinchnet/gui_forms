@@ -106,6 +106,12 @@ Related types
      - Primitive edits applied together: validated first, then applied all or nothing, publishing one change (DOCKING_STUDY.md section 5.3).
    * - :cpp:class:`DockTransactionResult <gui_forms::DockTransactionResult>`
      -  
+   * - :cpp:class:`DockUnknownChild <gui_forms::DockUnknownChild>`
+     - One unknown child element, whole, and how many of its parent's known children came before it in the file; it is written back after that many known children (or last, when there are fewer now).
+   * - :cpp:class:`DockUnknownFields <gui_forms::DockUnknownFields>`
+     - The unknown attributes (in file order; written after the known ones) and child elements of one known element.
+   * - :cpp:class:`DockUnknownOwner <gui_forms::DockUnknownOwner>`
+     -  
    * - :cpp:class:`DockVisiblePanel <gui_forms::DockVisiblePanel>`
      - A panel in a stack, as the realizing controls need it: lazy creation builds only panels that are selected in a docked or floating stack, and the rest on first show (DK decision 34).
    * - :cpp:class:`DockWindowFrame <gui_forms::DockWindowFrame>`
@@ -492,6 +498,10 @@ Related types
 
       True for the change published by a restore. Default: ``{false}``.
 
+   .. cpp:member:: bool frames_only
+
+      True when every edit was set_floating_frame: a floating window moved or resized and no site's tree changed (phase D4), so realizing controls need not rebuild. Default: ``{false}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: DockLayoutState final
@@ -519,6 +529,10 @@ Related types
    .. cpp:member:: std::uint32_t application_version
 
       The application's own layout version, saved with the layout. Default: ``{0}``.
+
+   .. cpp:member:: std::vector<DockUnknownFields> unknown_fields
+
+      Fields of a newer format this framework does not know, kept from a restore and written back (DK decision 48), one entry per element that had any, in file order. An edit that removes an element drops its entry (DockTransactionResult::diagnostics).
 
 .. cpp:namespace:: gui_forms
 
@@ -852,6 +866,54 @@ Related types
 
       The layout's generation after the transaction.
 
+   .. cpp:member:: std::vector<DockUnknownOwner> dropped_unknown_fields
+
+      The elements whose kept unknown fields (DockLayoutState::unknown_fields) the transaction dropped because it removed the element (a node pruned, a panel hidden, a memory replaced by none); empty almost always.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownChild final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   One unknown child element, whole, and how many of its parent's known children came before it in the file; it is written back after that many known children (or last, when there are fewer now).
+
+   .. cpp:member:: std::size_t after_known
+
+   .. cpp:member:: XmlElement element
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownFields final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   The unknown attributes (in file order; written after the known ones) and child elements of one known element.
+
+   .. cpp:member:: DockUnknownOwner owner
+
+   .. cpp:member:: std::vector<XmlAttribute> attributes
+
+   .. cpp:member:: std::vector<DockUnknownChild> children
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockUnknownOwner final
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   .. cpp:member:: DockUnknownOwnerKind kind
+
+      Default: ``{DockUnknownOwnerKind::layout}``.
+
+   .. cpp:member:: std::uint32_t id
+
+      floating_site: the site's ID; auto_hidden: its stack's; node: the node's; otherwise zero.
+
+   .. cpp:member:: DockPanelId panel
+
+      panel, panel_record and the memories: the panel; otherwise empty.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: DockVisiblePanel final
@@ -900,6 +962,16 @@ Enumerations
    .. cpp:enumerator:: horizontal
 
    .. cpp:enumerator:: vertical
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockDropEdges
+
+   ``#include <gui_forms/docking/dock_drop_targets/dock_drop_targets.hpp>``
+
+   .. cpp:enumerator:: global
+
+   .. cpp:enumerator:: none
 
 .. cpp:namespace:: gui_forms
 
@@ -1133,6 +1205,8 @@ Enumerations
 
    .. cpp:enumerator:: structure_invalid
 
+   .. cpp:enumerator:: unknown_fields_dropped
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: DockRestoreStatus
@@ -1169,6 +1243,34 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: DockUnknownOwnerKind
+
+   ``#include <gui_forms/docking/types/dock_types.hpp>``
+
+   .. cpp:enumerator:: layout
+
+   .. cpp:enumerator:: main_site
+
+   .. cpp:enumerator:: window
+
+   .. cpp:enumerator:: floating_site
+
+   .. cpp:enumerator:: auto_hidden
+
+   .. cpp:enumerator:: node
+
+   .. cpp:enumerator:: panel
+
+   .. cpp:enumerator:: panel_record
+
+   .. cpp:enumerator:: docked_memory
+
+   .. cpp:enumerator:: floating_memory
+
+   .. cpp:enumerator:: auto_hidden_memory
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: DockUpgradeDecision
 
    ``#include <gui_forms/docking/dock_layout/dock_layout.hpp>``
@@ -1200,17 +1302,17 @@ Functions, constants and aliases
 
    The zone of ``pane`` a point selects from its position alone.
 
-.. cpp:function:: DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale) noexcept
+.. cpp:function:: DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale, DockDropEdges edges = DockDropEdges::global) noexcept
 
-   What a point hovers: the site's edge tiles and bands first, then the pane containing it (a cross tile under the point, else its zone).
+   What a point hovers: the site's edge tiles and bands first (unless ``edges`` is none), then the pane containing it (a cross tile under the point, else its zone).
 
 .. cpp:function:: DockEdit dock_drop_edit(const DockSubject& subject, DockDropTargetKind kind, DockNodeId pane, DockDropZone zone)
 
    The edit a target makes for ``subject``: dock_into a stack or the empty document area for the centre, dock_beside a pane for a side, dock_at_edge for an edge.
 
-.. cpp:function:: void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack, Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out)
+.. cpp:function:: void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack, Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out, DockDropEdges edges = DockDropEdges::global)
 
-   Fills ``out`` (cleared first) with every target of a drag of ``subject`` over ``panes`` and the site's edges that ``layout`` accepts as a user edit (DockLayout::check, so the three restriction layers and the user lock decide): each pane's zones in DockDropZone order, panes in the order given (the keyboard's Tab order), then the edges top, left, right, bottom. The centre of ``own_stack`` (where a dragged panel came from) is left out: dropping a panel back into its own stack changes nothing. A side a document stack refuses is tried beside its document area (DockDropPane).
+   Fills ``out`` (cleared first) with every target of a drag of ``subject`` over ``panes`` and the site's edges that ``layout`` accepts as a user edit (DockLayout::check, so the three restriction layers and the user lock decide): each pane's zones in DockDropZone order, panes in the order given (the keyboard's Tab order), then, unless ``edges`` is none, the edges top, left, right, bottom. The centre of ``own_stack`` (where a dragged panel came from) is left out: dropping a panel back into its own stack changes nothing. A side a document stack refuses is tried beside its document area (DockDropPane).
 
 .. cpp:function:: std::optional<std::size_t> find_dock_drop_target(std::span<const DockDropTarget> targets, std::span<const DockDropPane> panes, const DockDropHit& hit) noexcept
 

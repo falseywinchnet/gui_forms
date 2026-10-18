@@ -248,12 +248,29 @@ struct DialogKeySnapshot final {
     std::uint64_t mnemonic_cycles{};
 };
 
+// A control subtree's picture (Window::snapshot_control): the registered
+// image, the logical size it covers and its pixels per logical unit.
+struct ControlSnapshot final {
+    ImageId image{};
+    Size logical_size{};
+    double scale{};
+    std::uint32_t pixel_width{};
+    std::uint32_t pixel_height{};
+};
+
 class Window {
 public:
     explicit Window(Control::Ptr root, Size client_size = {});
     /// Uses explicit per-window image quotas. The two-argument constructor
     /// retains the normal defaults; large-document consumers choose a budget.
     Window(Control::Ptr root, Size client_size, ImageRegistryLimits image_limits);
+    /// Shares an application's image registry and theme with every other
+    /// Window constructed with the same resources (stage DK decision 8): an
+    /// ImageId, an ImageList and the theme hold in all of them, so a control
+    /// subtree moved between them keeps its images. Null resources are
+    /// std::invalid_argument; resources made on another thread are
+    /// std::logic_error. The window takes the resources' current theme.
+    Window(Control::Ptr root, Size client_size, std::shared_ptr<ApplicationResources> resources);
     ~Window();
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
@@ -285,6 +302,25 @@ public:
     // Created framebuffers own their rendering state independently of the host.
     void set_framebuffer_painter(Painter* painter);
     [[nodiscard]] std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale);
+    // A picture of a control and its descendants as the window last laid
+    // them out (stage DK phase D3: the drag stamp, owner decision D1): the
+    // subtree's retained display chunks are replayed, every paint plane in
+    // order, into an offscreen framebuffer of the host's own CPU raster at
+    // `scale` device pixels per logical unit, and the pixels are registered
+    // as one of this window's images (its application's, where it shares
+    // ApplicationResources; premultiplied BGRA). Areas the subtree
+    // does not paint stay transparent; the window's backplane is not drawn.
+    // None, changing nothing, while no framebuffer painter is installed (a
+    // headless window, a host whose fonts are not ready), during a paint,
+    // for a control of another window or not shown, for a scale outside
+    // (0, 8], or when the framebuffer or the image registry refuses.
+    // Cost: one replay of the subtree into ceil(width * scale) by
+    // ceil(height * scale) pixels and one copy of them into the registry;
+    // chunks the replay had to rebuild are marked for the next real paint.
+    // The image lives until release_control_snapshot or the window's end.
+    [[nodiscard]] std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale);
+    // Removes a snapshot's image. False for an image that is not there.
+    bool release_control_snapshot(ImageId image) noexcept;
     [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
         return text_metrics_provider_;
     }
@@ -297,7 +333,18 @@ public:
     [[nodiscard]] std::shared_ptr<const Theme> theme_ptr() const noexcept {
         return theme_;
     }
+    // Sets the theme of this window and of every window sharing its
+    // resources (ApplicationResources::set_theme).
     void set_theme(std::shared_ptr<const Theme> theme);
+    // The image registry and theme this window shares; pass it to another
+    // Window's constructor to share them with that window too.
+    [[nodiscard]] std::shared_ptr<ApplicationResources> resources() const noexcept {
+        return resources_;
+    }
+    [[nodiscard]] bool shares_resources_with(const Window& other) const noexcept {
+        const bool same = resources_ == other.resources_;
+        return same;
+    }
     [[nodiscard]] Event<const Theme&>& theme_changed() noexcept {
         return theme_changed_;
     }
@@ -459,10 +506,10 @@ public:
         Control& consumer, Rect local_damage);
     [[nodiscard]] bool remove_image(ImageId image);
     [[nodiscard]] const ImageRegistry& image_resources() const noexcept {
-        return image_resources_;
+        return (*resources_).images();
     }
     [[nodiscard]] ImageRegistrySnapshot image_resource_snapshot() const noexcept {
-        return image_resources_.snapshot();
+        return (*resources_).images().snapshot();
     }
 
     [[nodiscard]] Control::Ptr find(std::string_view stable_id) const;
@@ -561,6 +608,13 @@ public:
     [[nodiscard]] AcceleratorToken register_accelerator(
         Component& owner, KeyGesture gesture, std::function<bool()> callback,
         AcceleratorOptions options = {});
+    // Offers a key press to this window's accelerators that wait for the
+    // focused route (those not before_focused_route), as a key the window's
+    // own route declined would be: true when one took it. For a window
+    // passing on keys it did not use, as a floating docking window passes
+    // them to its main window (stage DK phase D4, owner decision DK-29:
+    // shortcuts work from a floating tool window). UI thread.
+    bool offer_accelerators(const KeyEvent& event);
     // The command routing chain (owner decision DK-29; the order is in
     // gui_forms/commands/command_route). Names the target of the active
     // panel, active document or main window stage, or clears it with null.
@@ -630,6 +684,11 @@ private:
     friend class ErrorProvider;
     friend class HelpProvider;
     friend class ImageList;
+    friend class ApplicationResources;
+    // Called by ApplicationResources for every window sharing it.
+    void apply_theme(const std::shared_ptr<const Theme>& theme);
+    void repaint_for_image_replacement();
+    void repaint_for_image_removal();
     friend class BindingSource;
     friend class NotifyIcon;
     friend class BindingContext;
@@ -935,7 +994,9 @@ private:
     LiveSurfaceRegistrationMap live_surface_registrations_;
     std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
-    ImageRegistry image_resources_;
+    // Shared with every window constructed with the same resources; this
+    // window is registered with them from construction to destruction.
+    std::shared_ptr<ApplicationResources> resources_;
     std::uint64_t display_generation_{};
     using FrameRequestList =
         std::vector<std::shared_ptr<detail::ScheduledFrameRequest>>;

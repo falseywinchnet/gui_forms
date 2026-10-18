@@ -58,6 +58,8 @@ struct WindowBridge final {
     std::shared_ptr<CallbackFailure> failure{};
     Window* model{};
     ApplicationWindowOptions options{};
+    // A floating window's show and hide go to the run's floating policy.
+    bool floating{};
     bool host_ready{};
     bool visibility_ready{};
     bool notified{};
@@ -66,6 +68,10 @@ struct WindowBridge final {
         if (notified || !host_ready || !visibility_ready) return;
         notified = true;
         (*state).ready = true;
+        try {
+            // The window's identity in the run, for frames and ordering.
+            detail::register_run_window(state);
+        } catch (...) { (*failure).capture(); }
         if ((*failure).exception) { (*failure).stop(); return; }
         try {
             if (options.ready) {
@@ -110,8 +116,13 @@ struct FullScreenReady final {
 struct VisibilityReady final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()(std::function<void()> show, std::function<void()> hide) const noexcept {
-        (*(*bridge).state).show = std::move(show);
-        (*(*bridge).state).hide = std::move(hide);
+        if ((*bridge).floating) {
+            (*(*bridge).state).show = detail::PolicyVisibility{(*bridge).state, true};
+            (*(*bridge).state).hide = detail::PolicyVisibility{(*bridge).state, false};
+        } else {
+            (*(*bridge).state).show = std::move(show);
+            (*(*bridge).state).hide = std::move(hide);
+        }
         (*bridge).visibility_ready = true;
         (*bridge).notify();
     }
@@ -128,6 +139,16 @@ struct ClientSizeReady final {
         (*(*bridge).state).request_client_size = std::move(request);
     }
 };
+// Reached through the run's frame router (detail::attach_run_windowing).
+struct FrameChanged final {
+    std::shared_ptr<WindowBridge> bridge{};
+    void operator()(const HostWindowFrameEvent& event) const noexcept {
+        if ((*(*bridge).state).closed || (*(*bridge).failure).exception) return;
+        try {
+            if ((*bridge).options.frame_changed) (*bridge).options.frame_changed(event);
+        } catch (...) { (*(*bridge).failure).capture(); }
+    }
+};
 struct Closing final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()(HostCloseRequest& request) const noexcept {
@@ -140,18 +161,23 @@ struct Closing final {
         }
     }
 };
+void revoke(detail::ApplicationWindowState& state) noexcept {
+    state.closed = true;
+    state.ready = false;
+    state.request_close = {};
+    state.show = {};
+    state.hide = {};
+    state.toggle_full_screen = {};
+    state.set_title = {};
+    state.request_client_size = {};
+    state.frame_changed = {};
+}
 struct Closed final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()() const noexcept {
         if ((*(*bridge).state).closed) return;
-        (*(*bridge).state).closed = true;
-        (*(*bridge).state).ready = false;
-        (*(*bridge).state).request_close = {};
-        (*(*bridge).state).show = {};
-        (*(*bridge).state).hide = {};
-        (*(*bridge).state).toggle_full_screen = {};
-        (*(*bridge).state).set_title = {};
-        (*(*bridge).state).request_client_size = {};
+        detail::unregister_run_window(*(*bridge).state);
+        revoke(*(*bridge).state);
         try {
             if ((*bridge).options.closed) (*bridge).options.closed();
         } catch (...) { (*(*bridge).failure).capture(); }
@@ -164,65 +190,150 @@ public:
     BridgeScope& operator=(const BridgeScope&) = delete;
     ~BridgeScope() {
         for (std::size_t index = 0U; index < windows.size(); ++index) {
-            detail::ApplicationWindowState& state = *(*windows[index]).state;
-            state.closed = true;
-            state.ready = false;
-            state.request_close = {};
-            state.show = {};
-            state.hide = {};
-            state.toggle_full_screen = {};
-            state.set_title = {};
-            state.request_client_size = {};
+            revoke(*(*windows[index]).state);
+        }
+    }
+    // Drops the bridges of closed windows. Each native callback holds its own
+    // bridge, so a closed window's late callbacks still find theirs.
+    void prune() noexcept {
+        for (std::size_t index = windows.size(); index > 0U; --index) {
+            if (!(*(*windows[index - 1U]).state).closed) continue;
+            windows.erase(windows.begin() + static_cast<std::ptrdiff_t>(index - 1U));
         }
     }
     std::vector<std::shared_ptr<WindowBridge>> windows{};
 };
 
+// Builds the native entry for one window and records its bridge. The model
+// and options are consumed from `source`.
+template <typename NativeWindow>
+NativeWindow prepare_one(ApplicationWindow& source, BridgeScope& scope,
+                         const std::shared_ptr<CallbackFailure>& failure,
+                         const std::shared_ptr<detail::ApplicationRunState>& run) {
+    const bool primary = source.owner_id.empty() && !source.tool_window;
+    const std::shared_ptr<WindowBridge> bridge = std::make_shared<WindowBridge>();
+    (*bridge).state = std::make_shared<detail::ApplicationWindowState>();
+    (*bridge).failure = failure;
+    (*bridge).model = source.model.get();
+    (*bridge).options = std::move(source.options);
+    (*bridge).floating = source.floating != HostWindowFloating::none;
+    detail::ApplicationWindowState& state = *(*bridge).state;
+    state.can_hide = !primary;
+    state.stable_id = source.stable_id;
+    state.run = run;
+    if ((*bridge).options.frame_changed) state.frame_changed = FrameChanged{bridge};
+    if (primary) (*failure).primary = (*bridge).state;
+    scope.windows.push_back(bridge);
+    NativeWindow entry{};
+    entry.stable_id = std::move(source.stable_id);
+    entry.owner_id = std::move(source.owner_id);
+    entry.tool_window = source.tool_window;
+    entry.floating = source.floating;
+    entry.model = std::move(source.model);
+    // One key map for the application's windows, floating ones included
+    // (owner decision DK-44).
+    (*entry.model).set_key_bindings(Application::key_bindings());
+    entry.options.title = (*bridge).options.title;
+    entry.options.initial_size = (*bridge).options.initial_size;
+    entry.options.minimum_size = (*bridge).options.minimum_size;
+    entry.options.initially_visible = (*bridge).options.initially_visible;
+    entry.options.hide_on_close = (*bridge).options.hide_on_close;
+    entry.options.minimizable = (*bridge).options.minimizable;
+    entry.options.print_metrics_on_close = (*bridge).options.print_metrics_on_close;
+    entry.options.host_ready = HostReady{bridge};
+    entry.options.dispatch_pending = DispatchPending{bridge};
+    entry.options.visibility_ready = VisibilityReady{bridge};
+    entry.options.full_screen_ready = FullScreenReady{bridge};
+    entry.options.title_ready = TitleReady{bridge};
+    entry.options.client_size_ready = ClientSizeReady{bridge};
+    entry.options.close_request = Closing{bridge};
+    entry.options.closed = Closed{bridge};
+    return entry;
+}
+
 template <typename NativeWindow>
 void prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
              const std::shared_ptr<CallbackFailure>& failure,
+             const std::shared_ptr<detail::ApplicationRunState>& run,
              std::vector<NativeWindow>& native) {
     // Both destinations are fresh storage owned by this run. The native host
     // owns model lifetimes during dispatch; bridge callbacks borrow those
     // models only while the host is active. BridgeScope revokes handles on exit.
     native.reserve(windows.size());
-    scope.windows.reserve(windows.size());
+    scope.windows.reserve(HostWindowing::maximum_windows);
     for (std::size_t index = 0U; index < windows.size(); ++index) {
-        ApplicationWindow& source = windows[index];
-        const bool primary = source.owner_id.empty() && !source.tool_window;
-        const std::shared_ptr<WindowBridge> bridge = std::make_shared<WindowBridge>();
-        (*bridge).state = std::make_shared<detail::ApplicationWindowState>();
-        (*bridge).failure = failure;
-        (*bridge).model = source.model.get();
-        (*bridge).options = std::move(source.options);
-        (*(*bridge).state).can_hide = !primary;
-        if (primary) (*failure).primary = (*bridge).state;
-        scope.windows.push_back(bridge);
-        NativeWindow entry{};
-        entry.stable_id = std::move(source.stable_id);
-        entry.owner_id = std::move(source.owner_id);
-        entry.tool_window = source.tool_window;
-        entry.model = std::move(source.model);
-        // One key map for the application's windows (owner decision DK-44).
-        (*entry.model).set_key_bindings(Application::key_bindings());
-        entry.options.title = (*bridge).options.title;
-        entry.options.initial_size = (*bridge).options.initial_size;
-        entry.options.minimum_size = (*bridge).options.minimum_size;
-        entry.options.initially_visible = (*bridge).options.initially_visible;
-        entry.options.hide_on_close = (*bridge).options.hide_on_close;
-        entry.options.minimizable = (*bridge).options.minimizable;
-        entry.options.print_metrics_on_close = (*bridge).options.print_metrics_on_close;
-        entry.options.host_ready = HostReady{bridge};
-        entry.options.dispatch_pending = DispatchPending{bridge};
-        entry.options.visibility_ready = VisibilityReady{bridge};
-        entry.options.full_screen_ready = FullScreenReady{bridge};
-        entry.options.title_ready = TitleReady{bridge};
-        entry.options.client_size_ready = ClientSizeReady{bridge};
-        entry.options.close_request = Closing{bridge};
-        entry.options.closed = Closed{bridge};
-        native.push_back(std::move(entry));
+        native.push_back(prepare_one<NativeWindow>(windows[index], scope, failure, run));
     }
 }
+
+// The run's open operation (ApplicationWindows::open_window). Refusals found
+// before the native request leave the entry unchanged; HostWindowing::admit
+// applies the same rules again in the adapter.
+template <typename NativeWindow>
+struct RuntimeOpen final {
+    // Borrowed: BridgeScope lives in Application::run's frame, which outlives
+    // the native run and therefore every call of this operation.
+    BridgeScope* scope{};
+    std::shared_ptr<CallbackFailure> failure{};
+    std::weak_ptr<detail::ApplicationRunState> run{};
+    std::function<HostWindowAdmission(NativeWindow)> native_open{};
+
+    ApplicationWindowOpenResult operator()(ApplicationWindow&& entry) const {
+        ApplicationWindowOpenResult result;
+        const std::shared_ptr<detail::ApplicationRunState> state = run.lock();
+        if (!state || (*state).closed || (*state).windowing == nullptr || !native_open) {
+            result.status.error = HostServiceError::after_shutdown;
+            return result;
+        }
+        const HostWindowing& windowing = *(*state).windowing;
+        const bool primary = entry.owner_id.empty() && !entry.tool_window;
+        const std::optional<HostWindowId> owner = entry.owner_id.empty()
+            ? std::optional<HostWindowId>{} : windowing.find(entry.owner_id);
+        const bool owner_live = entry.owner_id.empty() || owner.has_value();
+        // A floating window is owned by the primary window itself.
+        const bool owner_fits = entry.floating == HostWindowFloating::none ||
+            (owner.has_value() && *owner == windowing.primary());
+        if (!detail::valid_window_entry(entry) || !(*entry.model).check_access() || primary ||
+            !owner_live || !owner_fits || windowing.find(entry.stable_id).has_value()) {
+            result.status.error = HostServiceError::invalid_argument;
+            return result;
+        }
+        const bool floating_full = entry.floating != HostWindowFloating::none &&
+            windowing.floating_window_count() >= HostWindowing::maximum_floating_windows;
+        if (windowing.window_count() >= HostWindowing::maximum_windows || floating_full) {
+            result.status.error = HostServiceError::too_large;
+            return result;
+        }
+        (*scope).prune();
+        NativeWindow native = prepare_one<NativeWindow>(entry, *scope, failure, state);
+        const std::shared_ptr<detail::ApplicationWindowState> window = (*(*scope).windows.back()).state;
+        const HostWindowAdmission admission = native_open(std::move(native));
+        if (!admission.status.accepted()) {
+            revoke(*window);
+            result.status = admission.status;
+            return result;
+        }
+        result.window = detail::ApplicationHandleAccess::make(window);
+        return result;
+    }
+};
+
+// Published by the native host once its windowing exists.
+template <typename NativeWindow>
+struct WindowingReady final {
+    BridgeScope* scope{};
+    std::shared_ptr<CallbackFailure> failure{};
+    std::shared_ptr<detail::ApplicationRunState> run{};
+    void operator()(HostWindowing& windowing,
+                    std::function<HostWindowAdmission(NativeWindow)> open) const {
+        RuntimeOpen<NativeWindow> operation{scope, failure, run, std::move(open)};
+        detail::attach_run_windowing(run, windowing, std::move(operation));
+    }
+};
+struct WindowingEnded final {
+    std::shared_ptr<detail::ApplicationRunState> run{};
+    void operator()() const noexcept { detail::detach_run_windowing(*run); }
+};
 }
 
 HostCapabilities Application::capabilities() {
@@ -259,21 +370,38 @@ ApplicationResult Application::run(std::vector<ApplicationWindow> windows) {
     if (!result.accepted()) return result;
     BridgeScope bridges{};
     const std::shared_ptr<CallbackFailure> failure = std::make_shared<CallbackFailure>();
+    const std::shared_ptr<detail::ApplicationRunState> run_state =
+        std::make_shared<detail::ApplicationRunState>();
 #if defined(GUI_FORMS_APPLICATION_MACOS)
     std::vector<host::MacApplicationWindow> native{};
-    prepare(windows, bridges, failure, native);
-    result.native_exit_code = host::run_macos_application(std::move(native));
+    prepare(windows, bridges, failure, run_state, native);
+    host::MacApplicationOptions application{};
+    application.windowing_ready =
+        WindowingReady<host::MacApplicationWindow>{&bridges, failure, run_state};
+    application.windowing_ended = WindowingEnded{run_state};
+    result.native_exit_code = host::run_macos_application(std::move(native), std::move(application));
 #elif defined(GUI_FORMS_APPLICATION_WINDOWS)
     std::vector<host::WindowsApplicationWindow> native{};
-    prepare(windows, bridges, failure, native);
-    result.native_exit_code = host::run_windows_application(std::move(native));
+    prepare(windows, bridges, failure, run_state, native);
+    host::WindowsApplicationOptions application{};
+    application.windowing_ready =
+        WindowingReady<host::WindowsApplicationWindow>{&bridges, failure, run_state};
+    application.windowing_ended = WindowingEnded{run_state};
+    result.native_exit_code = host::run_windows_application(std::move(native), std::move(application));
 #elif defined(GUI_FORMS_APPLICATION_LINUX)
     std::vector<host::LinuxApplicationWindow> native{};
-    prepare(windows, bridges, failure, native);
-    result.native_exit_code = host::run_linux_application(std::move(native));
+    prepare(windows, bridges, failure, run_state, native);
+    host::LinuxApplicationOptions application{};
+    application.windowing_ready =
+        WindowingReady<host::LinuxApplicationWindow>{&bridges, failure, run_state};
+    application.windowing_ended = WindowingEnded{run_state};
+    result.native_exit_code = host::run_linux_application(std::move(native), std::move(application));
 #else
     result.error = ApplicationError::unsupported;
 #endif
+    // The native host normally ends the windowing itself; this covers a
+    // host that returned early.
+    detail::detach_run_windowing(*run_state);
     if ((*failure).exception) {
         result.error = ApplicationError::callback_failure;
         result.callback_exception = (*failure).exception;

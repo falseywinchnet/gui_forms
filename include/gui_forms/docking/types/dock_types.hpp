@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/types/geometry/geometry.hpp"
+#include "gui_forms/xml/types/xml_types.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -301,6 +302,68 @@ struct DockAutoHideEntry final {
     }
 };
 
+// The known element of a saved layout that unknown fields were found on (DK
+// decision 48): attributes and child elements a newer format added, kept by
+// restore and written back in place.
+enum class DockUnknownOwnerKind : std::uint8_t {
+    // <dock_layout>, <main_site> and the main site's <window>.
+    layout,
+    main_site,
+    window,
+    // <floating_site>, by its ID.
+    floating_site,
+    // An <auto_hidden> entry, by its stack's ID.
+    auto_hidden,
+    // A <split>, stack or <document_area>, by the node's ID.
+    node,
+    // A <panel> in a stack, by the panel: the fields follow the panel to
+    // whichever stack holds it.
+    panel,
+    // A <panel_record> and its <docked>, <floating> and <auto_hidden>
+    // memories, by the panel.
+    panel_record,
+    docked_memory,
+    floating_memory,
+    auto_hidden_memory,
+};
+
+struct DockUnknownOwner final {
+    DockUnknownOwnerKind kind{DockUnknownOwnerKind::layout};
+    // floating_site: the site's ID; auto_hidden: its stack's; node: the
+    // node's; otherwise zero.
+    std::uint32_t id{};
+    // panel, panel_record and the memories: the panel; otherwise empty.
+    DockPanelId panel{};
+
+    friend bool operator==(const DockUnknownOwner& left, const DockUnknownOwner& right) noexcept {
+        return left.kind == right.kind && left.id == right.id && left.panel == right.panel;
+    }
+};
+
+// One unknown child element, whole, and how many of its parent's known
+// children came before it in the file; it is written back after that many
+// known children (or last, when there are fewer now).
+struct DockUnknownChild final {
+    std::size_t after_known{};
+    XmlElement element{};
+
+    friend bool operator==(const DockUnknownChild& left, const DockUnknownChild& right) noexcept {
+        return left.after_known == right.after_known && left.element == right.element;
+    }
+};
+
+// The unknown attributes (in file order; written after the known ones) and
+// child elements of one known element.
+struct DockUnknownFields final {
+    DockUnknownOwner owner{};
+    std::vector<XmlAttribute> attributes{};
+    std::vector<DockUnknownChild> children{};
+
+    friend bool operator==(const DockUnknownFields& left, const DockUnknownFields& right) noexcept {
+        return left.owner == right.owner && left.attributes == right.attributes && left.children == right.children;
+    }
+};
+
 // The whole layout as plain records: one main site (its root is the
 // document area or a split that contains it), floating sites, auto-hidden
 // stacks and panel records. nodes and panels are kept sorted by ID.
@@ -315,6 +378,11 @@ struct DockLayoutState final {
     std::uint32_t next_id{1};
     // The application's own layout version, saved with the layout.
     std::uint32_t application_version{0};
+    // Fields of a newer format this framework does not know, kept from a
+    // restore and written back (DK decision 48), one entry per element that
+    // had any, in file order. An edit that removes an element drops its
+    // entry (DockTransactionResult::diagnostics).
+    std::vector<DockUnknownFields> unknown_fields{};
 
     friend bool operator==(const DockLayoutState& left, const DockLayoutState& right) noexcept {
         return left.nodes == right.nodes && left.main_root == right.main_root &&
@@ -322,7 +390,8 @@ struct DockLayoutState final {
                left.floating_sites == right.floating_sites &&
                left.auto_hidden == right.auto_hidden && left.panels == right.panels &&
                left.next_id == right.next_id &&
-               left.application_version == right.application_version;
+               left.application_version == right.application_version &&
+               left.unknown_fields == right.unknown_fields;
     }
 };
 
@@ -477,6 +546,10 @@ struct DockTransactionResult final {
     DockRefusal refusal{};
     // The layout's generation after the transaction.
     std::uint64_t generation{};
+    // The elements whose kept unknown fields (DockLayoutState::unknown_fields)
+    // the transaction dropped because it removed the element (a node pruned,
+    // a panel hidden, a memory replaced by none); empty almost always.
+    std::vector<DockUnknownOwner> dropped_unknown_fields{};
 
     [[nodiscard]] explicit operator bool() const noexcept { return applied; }
 };
@@ -488,6 +561,10 @@ struct DockLayoutChange final {
     std::size_t edit_count{};
     // True for the change published by a restore.
     bool restored{false};
+    // True when every edit was set_floating_frame: a floating window moved
+    // or resized and no site's tree changed (phase D4), so realizing
+    // controls need not rebuild.
+    bool frames_only{false};
 };
 
 // One node's rectangle from DockLayout::arrange.

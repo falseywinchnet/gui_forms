@@ -127,9 +127,24 @@ is not auto-hidden.
 An unreadable, invalid or rejected record leaves the layout as it was (at
 startup, the program's default layout) and reports why. An older format is
 migrated step by step (format 1 to 2 is built in); a newer one is read as far
-as it is understood. Unknown elements and attributes are reported and
-dropped, not kept: saving afterwards writes the current format. Panels found
-inside a dropped element become placeholders. A different application layout
+as it is understood. Unknown elements and attributes (a newer format's
+additions) are reported and kept (owner decision DK-48), attached to the
+known element they were found on (`DockLayoutState::unknown_fields`), and
+saving writes them back there: the attributes after the known ones, each
+unknown child element whole, after as many known children as came before it
+in the file. A round trip through this framework therefore gives a newer
+file's text back except for these normalizations: the ``format`` attribute
+is the one this framework writes (2), comments are not kept, attributes and
+elements are written in the writer's own layout and indentation, and an
+unknown child is placed by its count of known siblings, so it may move when
+those siblings change. An edit that removes an element (a pruned node, a
+hidden panel's ``<panel>``, a memory no longer held) drops that element's
+unknown fields and lists them in `DockTransactionResult::dropped_unknown_fields`;
+a restore that removes one reports ``unknown_fields_dropped``. The fields of
+a ``<panel>`` follow the panel to the stack that holds it. An unknown
+element that holds ``<panel>`` references is not kept but dropped, and the
+panels in it become placeholders, so that a panel shown again is never
+written twice. A different application layout
 version calls the program's `DockLayoutUpgradeHook`, which may rename panels
 with `rename_dock_panel` or reject the layout. A panel ID with no registered
 descriptor (a removed plugin) is kept as a placeholder, so registering the

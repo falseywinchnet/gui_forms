@@ -9,6 +9,7 @@
 // the pointer reaches; restrictions refusing targets.
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/fake_framebuffer.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -772,6 +773,30 @@ void auto_hide_meets_dragging() {
             "the layout is as it was and the stacks are back");
 }
 
+// The stamp shows the panel's picture where the window can snapshot it, and
+// releases it when the drag ends; elsewhere the content well stands in.
+void stamp_picture() {
+    std::unique_ptr<Fixture> plain = make_fixture();
+    drag_caption(*plain, "output", {400.0, 200.0});
+    require((*(*plain).site).parts().drag_stamp.present && !(*(*plain).site).parts().drag_stamp_image.present,
+            "without a raster the stamp has no picture (the well stands in)");
+    cancel_after(*plain);
+
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    Window& window = *(*fixture).window;
+    test_support::FakeRaster raster{};
+    window.set_framebuffer_painter(&raster);
+    const std::uint64_t images = window.image_resources().snapshot().resource_count;
+    drag_caption(*fixture, "output", {400.0, 200.0});
+    const DockSite::Parts parts = (*(*fixture).site).parts();
+    require(raster.made == 1U && parts.drag_stamp_image.present && parts.drag_stamp.bounds.contains(parts.drag_stamp_image.bounds),
+            "the drag snapshots the panel once and shows the picture in the stamp");
+    require(window.image_resources().snapshot().resource_count == images + 1U, "the picture is one image");
+    cancel_after(*fixture);
+    require(window.image_resources().snapshot().resource_count == images, "the picture is released at the end");
+    window.set_framebuffer_painter(nullptr);
+}
+
 } // namespace
 
 int main() {
@@ -786,6 +811,7 @@ int main() {
     restrictions_refuse_targets();
     documents_by_recent_use();
     auto_hide_meets_dragging();
+    stamp_picture();
     std::cout << "DockSite dragging: geometry, the target table, threshold, Escape, capture loss, deactivation, "
                  "layout changes, invalid drops, Ctrl, one transaction per drop, the stamp, tab drags, the "
                  "keyboard move mode and restrictions passed\n";
