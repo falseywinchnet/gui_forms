@@ -788,7 +788,11 @@ void ToolStrip::click(std::size_t index) {
             invalidate(Dirty::paint | Dirty::semantics);
         }
     }
-    if (item.command) static_cast<void>((*item.command).execute(stable_id().value()));
+    if (item.command && window() != nullptr) {
+        static_cast<void>((*item.command).execute_routed(*window(), stable_id().value()));
+    } else if (item.command) {
+        static_cast<void>((*item.command).execute(stable_id().value()));
+    }
     const ToolStripItemClick clicked{std::string(stable_id().value()), item.stable_id};
     item_clicked_.emit(clicked);
 }

@@ -32,9 +32,41 @@ def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
     return value in ('1', 'true', 'on', 'yes')
 
 
-def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False) -> None:
-    """Build, test, then install only into the explicitly supplied build SDK."""
-    toolkit: Path = build / 'gui-forms'
+SANITIZER_FLAGS: str = '-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
+
+
+def sanitizer_options(lsan_suppressions: Path) -> tuple[list[str], dict[str, str]]:
+    """CMake options and test environment for the sanitized suite.
+
+    Address, undefined-behaviour and (on Linux, with AddressSanitizer) leak
+    sanitizers; every report stops its test, so any finding fails the run.
+    Third-party sources built by CMake (HarfBuzz, FreeType) are instrumented
+    too; the prebuilt Skia archive is not.
+    """
+    options: list[str] = [
+        '-DCMAKE_BUILD_TYPE=RelWithDebInfo',
+        '-DCMAKE_C_FLAGS=' + SANITIZER_FLAGS,
+        '-DCMAKE_CXX_FLAGS=' + SANITIZER_FLAGS,
+        '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined',
+        '-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined',
+    ]
+    environment: dict[str, str] = {
+        'ASAN_OPTIONS': 'detect_leaks=1:halt_on_error=1:abort_on_error=0:print_summary=1',
+        'UBSAN_OPTIONS': 'print_stacktrace=1:halt_on_error=1:print_summary=1',
+        'LSAN_OPTIONS': 'suppressions=' + str(lsan_suppressions) + ':print_suppressions=0',
+    }
+    return options, environment
+
+
+def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
+                  sanitize: bool = False) -> None:
+    """Build, test, then install only into the explicitly supplied build SDK.
+
+    With sanitize, the toolkit is built in its own directory with the
+    sanitizers and only tested: nothing is installed and the installed-SDK
+    examples are not built.
+    """
+    toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
     gallery_option: str = 'ON' if gallery else 'OFF'
     miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
@@ -66,6 +98,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
             run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu.sh', skia_out)
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
                         '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
+    timeout: str = '120'
+    if sanitize:
+        sanitizer_cmake: list[str]
+        sanitizer_environment: dict[str, str]
+        sanitizer_cmake, sanitizer_environment = sanitizer_options(ROOT / 'gui_forms/tools/sanitizer/lsan.supp')
+        options.extend(sanitizer_cmake)
+        os.environ.update(sanitizer_environment)
+        timeout = '900'
     run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
@@ -74,7 +114,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
     run('cmake', '--build', toolkit, '--parallel', jobs)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout)
+    if sanitize:
+        return
     run('cmake', '--install', toolkit)
     examples: Path = build / 'installed-reference-examples'
     run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples,
@@ -87,6 +129,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--sanitize', action='store_true',
+                        help='build in gui-forms-sanitize with ASan, UBSan and LSan and only test')
     parser.add_argument('--gallery', action='store_true',
                         help='also configure GUI_FORMS_BUILD_GALLERY=ON '
                              '(or set GUI_FORMS_CI_BUILD_GALLERY=1); default OFF')
@@ -102,7 +146,7 @@ def main() -> None:
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
-                  gallery_enabled(args.gallery, dict(os.environ)))
+                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize)
 
 
 if __name__ == '__main__':

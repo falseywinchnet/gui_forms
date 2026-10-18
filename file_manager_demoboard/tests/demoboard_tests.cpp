@@ -130,6 +130,7 @@ const gui_forms::SemanticNode* find_semantic(
     }
     return nullptr;
 }
+const gui_forms::SemanticNode* find_semantic(std::vector<gui_forms::SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 gui_forms::Point virtual_item_center(const gui_forms::ObjectView& view,
                                      std::string_view stable_id) {

@@ -1,0 +1,18 @@
+# LeakSanitizer suppressions for the sanitized CI suite (tools/ci_build.py
+# --sanitize). Only system libraries the tests load are listed: their
+# process-lifetime caches are not GUI.Forms leaks. Never add a first-party
+# frame here; a GUI.Forms leak is a defect to fix (house style section 5).
+leak:libX11.so
+leak:libxcb.so
+leak:libXcursor.so
+leak:libXrender.so
+leak:libfontconfig.so
+leak:libglib-2.0.so
+leak:libgobject-2.0.so
+leak:libgio-2.0.so
+leak:libatk-1.0.so
+leak:libatk-bridge-2.0.so
+leak:libatspi.so
+leak:libdbus-1.so
+leak:libasound.so
+leak:libpulse.so

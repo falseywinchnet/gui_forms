@@ -36,6 +36,16 @@ from the repository root. Each Python script prints its full options with
   finding and exits non-zero on any finding or on an empty scope.
   `python3 -B tools/check_house_style.py src/core/image tests/png_writer_tests.cpp`
 
+`tools/check_lifetime_rules.py`
+: The borrow and foreign-type checks the `house-style` job runs (house style
+  sections 5 and 9). Heuristics over masked source, like the spelling
+  scanner; they do not check destruction order.
+  `python3 -B tools/check_lifetime_rules.py tests/semantic_tests.cpp`
+
+`tools/sanitizer/lsan.supp`
+: LeakSanitizer suppressions for the `sanitizers` CI job: system libraries
+  only, never a first-party frame.
+
 `tools/house_policy_check/`
 : A Clang LibTooling checker for the full C++ subset, run over a build's
   compilation database and writing a JSON ledger; it is not linked into any

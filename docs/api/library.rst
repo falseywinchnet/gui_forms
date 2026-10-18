@@ -15,11 +15,14 @@ The rest of the public C++ library, grouped by area: the application and its hos
    library.window
    library.control-and-component
    library.events-values-and-commands
+   library.pages
    library.input-and-semantics
    library.data-binding
    library.geometry-and-appearance
    library.drawing
    library.text
+   library.docking
+   library.xml
    library.images-and-resources
    library.animation-and-threading
    library.audio

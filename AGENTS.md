@@ -70,9 +70,16 @@ finding:
 
 ```text
 python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis
 ```
 
-The check covers spelling only. Ownership, lifetime, initialization and
+The second checks two rules of sections 5 and 9: a function returning a
+borrow of a container or snapshot argument deletes its rvalue overload, and a
+function pointer looked up by name takes its type from the declaration. The
+`sanitizers` CI job runs the whole suite under ASan, UBSan and LSan on Linux
+and fails on any report.
+
+The checks cover spelling and those two rules only. Ownership, lifetime, initialization and
 naming still need review against the full document.
 
 ## Forward programme (read before starting new work)

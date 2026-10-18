@@ -78,6 +78,7 @@ VisualPaintOperationSnapshot inspect_operation(
     result.image_pattern_wrap = command.image_pattern_wrap;
     result.image_sampling = command.image_sampling;
     result.text_byte_count = command.text.size();
+    result.text_orientation = command.text_orientation;
     if (include_text) result.text = command.text;
 #if defined(GUI_FORMS_PREPARED_TEXT)
     if (command.operation == detail::DisplayOperation::draw_prepared_text &&

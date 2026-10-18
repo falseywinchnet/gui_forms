@@ -780,6 +780,27 @@ void scrolling_never_hides() {
     resize(fixture, {1400.0, 400.0});
     require(!ribbon.scrolling() && ribbon.first_visible_group() == 0U && !ribbon.parts().scroll_left.present,
             "widening ends scrolling");
+
+    // Owner decision 45: scrolling starts below the narrowest entry and ends
+    // only 8 units above it.
+    struct Probe final {
+        double offset;
+        bool scrolls;
+    };
+    const Probe probes[] = {{0.0, false}, {-1.0, true}, {0.0, true}, {7.5, true},
+                            {8.0, false}, {0.0, false}, {-0.5, true}, {20.0, false}};
+    for (const Probe& probe : probes) {
+        resize(fixture, {narrowest + probe.offset, 400.0});
+        require(ribbon.scrolling() == probe.scrolls && ribbon.parts().scroll_right.present == probe.scrolls,
+                "the scroll buttons appear below the narrowest entry and leave 8 units above it");
+    }
+    resize(fixture, {narrowest + 4.0, 400.0});
+    require(!ribbon.scrolling(), "approached from wider, the band does not scroll");
+    resize(fixture, {narrowest - 2.0, 400.0});
+    resize(fixture, {narrowest + 4.0, 400.0});
+    require(ribbon.scrolling() && ribbon.ladder_step() == std::size_t{ladder.size() - 1U} &&
+                ribbon.realized_groups().size() < 5U,
+            "approached from narrower, the band keeps scrolling with the right button over the last group");
 }
 
 void hide_rule() {

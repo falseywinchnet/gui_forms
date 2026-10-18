@@ -76,6 +76,7 @@ const VisualControlInspection* find_overlay(const VisualInspectionSnapshot& snap
     }
     return nullptr;
 }
+const VisualControlInspection* find_overlay(VisualInspectionSnapshot&& snapshot, std::string_view suffix) = delete;
 
 std::vector<const VisualPaintOperationSnapshot*> operations_of(const VisualControlInspection& control,
                                                                VisualPaintOperation kind) {

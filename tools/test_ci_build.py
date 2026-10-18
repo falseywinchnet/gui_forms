@@ -1,5 +1,6 @@
 """Unit tests for the option resolution in ci_build.py (no build is run)."""
 from __future__ import annotations
+from pathlib import Path
 import unittest
 
 import ci_build
@@ -25,3 +26,15 @@ class GalleryOptionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SanitizerOptionTests(unittest.TestCase):
+    def test_every_finding_stops_its_test(self) -> None:
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options(Path('lsan.supp'))
+        self.assertIn('-DCMAKE_CXX_FLAGS=' + ci_build.SANITIZER_FLAGS, options)
+        self.assertIn('-fno-sanitize-recover=undefined', ci_build.SANITIZER_FLAGS)
+        self.assertIn('detect_leaks=1', environment['ASAN_OPTIONS'])
+        self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
+        self.assertIn('suppressions=lsan.supp', environment['LSAN_OPTIONS'])

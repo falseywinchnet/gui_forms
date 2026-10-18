@@ -29,6 +29,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 struct Fixture final {
     Fixture() : window(root, {480.0, 260.0}) {
