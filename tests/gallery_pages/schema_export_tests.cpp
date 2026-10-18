@@ -460,6 +460,8 @@ void test_schema_export() {
     // Components, constructed directly.
     const std::shared_ptr<Command> command = std::make_shared<Command>();
     const std::shared_ptr<GalleryCommand> gallery_command = std::make_shared<GalleryCommand>(command);
+    const std::shared_ptr<FontCommand> font_command = std::make_shared<FontCommand>(command);
+    const std::shared_ptr<ColorCommand> color_command = std::make_shared<ColorCommand>(command);
     const std::shared_ptr<ContextMenu> context_menu =
         std::make_shared<ContextMenu>("schema.context-menu");
     const std::shared_ptr<ToolTip> tool_tip = std::make_shared<ToolTip>(window);
@@ -480,6 +482,8 @@ void test_schema_export() {
     require(binding != nullptr, "a binding to an empty source is created");
     record_component("command", *command, records);
     record_component("gallery_command", *gallery_command, records);
+    record_component("font_command", *font_command, records);
+    record_component("color_command", *color_command, records);
     record_component("context_menu", *context_menu, records);
     record_component("tool_tip", *tool_tip, records);
     record_component("ribbon_tool_tip", *ribbon_tool_tip, records);

@@ -36,6 +36,7 @@ public:
         build_ribbon(body);
         build_gallery(body);
         build_scaling_ribbons(body);
+        build_file_area(body);
         status_ = label("gallery.commands.status",
                         "Ready · toggle \"Document modified\" to enable Save on every surface",
                         11.0, 600, green);
@@ -430,6 +431,68 @@ private:
         (*scaling_group).add_at(narrow, {602.0, 36.0, 300.0, 112.0});
     }
 
+    // The ribbon's file area and specialized controls (stage RB, phase 6): a
+    // Ribbon whose Font group hosts a RibbonFontControl and a
+    // RibbonColorPicker bound to value commands, whose File tab opens
+    // Backstage, and a second BackstageView shown in place so that its
+    // column and pages can be seen without opening it.
+    void build_file_area(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> file_group = group(
+            "gallery.commands.ribbon-file-area",
+            "Ribbon · phase 6: font control, colour picker, Backstage (File) and a Backstage in place",
+            {930.0, 230.0});
+        (*body).add_at(file_group, {24.0, 1574.0, 930.0, 230.0});
+        font_command_ = std::make_shared<FontCommand>(
+            make_command("gallery.commands.font", "Font", "Choose the document's font"));
+        (*font_command_).set_value({"Portsmouth Rapids", 11.0});
+        color_command_ = std::make_shared<ColorCommand>(
+            make_command("gallery.commands.colour", "Font colour", "Colour the selected text"));
+        std::shared_ptr<RibbonFontControl> font =
+            make_control<RibbonFontControl>(StableId("gallery.commands.ribbon-file-area.font"));
+        (*font).set_families({"Portsmouth Rapids", "Carlito", "Tahoma"});
+        (*font).set_command(font_command_);
+        std::shared_ptr<RibbonColorPicker> colour =
+            make_control<RibbonColorPicker>(StableId("gallery.commands.ribbon-file-area.colour"));
+        (*colour).set_text("Font &colour");
+        (*colour).set_command(color_command_);
+        std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("gallery.commands.ribbon-file-area.bar"));
+        (*ribbon).set_accessible_name("Ribbon with a file area");
+        RibbonTabSpec home{.stable_id = "file-area.home", .text = "&Home"};
+        RibbonGroupSpec font_group{.stable_id = "file-area.font", .caption = "Font", .dialog_launcher = true};
+        font_group.commands.push_back({.stable_id = "file-area.font-control", .kind = RibbonCommandKind::font_control,
+                                       .text = "Font", .font_control = font});
+        font_group.commands.push_back({.stable_id = "file-area.colour", .kind = RibbonCommandKind::color_picker,
+                                       .text = "Font colour", .color_picker = colour});
+        font_group.commands.push_back({.stable_id = "file-area.wrap", .kind = RibbonCommandKind::toggle,
+                                       .size = RibbonCommandSize::small, .command = wrap_command_});
+        RibbonGroupSpec document{.stable_id = "file-area.document", .caption = "Document"};
+        document.commands.push_back({.stable_id = "file-area.save", .command = save_});
+        home.groups.push_back(std::move(font_group));
+        home.groups.push_back(std::move(document));
+        (*ribbon).set_tabs({std::move(home)});
+        (*ribbon).set_backstage(make_backstage("gallery.commands.ribbon-file-area.backstage"));
+        (*file_group).add_at(ribbon, {22.0, 36.0, 430.0, 112.0});
+        std::shared_ptr<BackstageView> shown = make_backstage("gallery.commands.ribbon-file-area.backstage-in-place");
+        (*shown).set_accessible_name("Backstage in place");
+        (*file_group).add_at(shown, {472.0, 36.0, 430.0, 180.0});
+    }
+
+    // A Backstage column: Save and Save As as fast commands, Info and Recent
+    // as topics with their pages, and About as a definitive command.
+    [[nodiscard]] std::shared_ptr<BackstageView> make_backstage(const std::string& id) const {
+        std::shared_ptr<BackstageView> view = make_control<BackstageView>(StableId(id));
+        std::shared_ptr<Label> info = label(id + ".info", "Fixture document · 2 pages · not saved", 11.0, 400, muted);
+        std::shared_ptr<Label> recent = label(id + ".recent", "Report.txt\nNotes.txt", 11.0, 400, muted);
+        (*view).set_items({{.stable_id = id + ".save", .command = save_},
+                           {.stable_id = id + ".new", .command = new_},
+                           {.stable_id = id + ".info-topic", .kind = BackstageItemKind::topic, .text = "&Info",
+                            .page = info},
+                           {.stable_id = id + ".recent-topic", .kind = BackstageItemKind::topic, .text = "&Recent",
+                            .page = recent},
+                           {.stable_id = id + ".about", .command = about_, .definitive = true}});
+        return view;
+    }
+
     void on_styles_button(ButtonBase&) {
         if ((*drop_down_gallery_).popup_open()) {
             (*drop_down_gallery_).close_popup();
@@ -694,6 +757,8 @@ private:
     std::shared_ptr<Label> status_;
     std::shared_ptr<Label> saves_label_;
     std::shared_ptr<GalleryCommand> styles_;
+    std::shared_ptr<FontCommand> font_command_;
+    std::shared_ptr<ColorCommand> color_command_;
     std::shared_ptr<Button> gallery_button_;
     std::shared_ptr<RibbonGallery> drop_down_gallery_;
     std::shared_ptr<Label> gallery_status_;

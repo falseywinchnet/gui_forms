@@ -261,6 +261,16 @@ Ribbon::CommandMetrics Ribbon::measure_command(const RibbonCommandSpec& command)
     const double scale = effective_text_scale();
     CommandMetrics metrics;
     if (command.kind == RibbonCommandKind::gallery) return metrics;
+    // The application's row controls measure themselves, without text.
+    if (command.kind == RibbonCommandKind::font_control || command.kind == RibbonCommandKind::color_picker) {
+        const Size natural = command.kind == RibbonCommandKind::font_control ? (*command.font_control).natural_size()
+                                                                            : (*command.color_picker).natural_size();
+        double width = natural.width;
+        if (command.width > 0.0) width = command.width * scale;
+        metrics.large_width = width;
+        metrics.small_width = width;
+        return metrics;
+    }
     if (hosted(command.kind)) {
         double width = command.width;
         if (width <= 0.0 && command.kind == RibbonCommandKind::combo_box) width = default_combo_box_width;

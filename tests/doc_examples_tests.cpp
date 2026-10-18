@@ -90,6 +90,18 @@ void example() {
 }
 }  // namespace doc_example_BackgroundWorker_1
 
+namespace doc_example_BackstageView_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "&Save");
+    std::shared_ptr<gf::Label> info = gf::make_control<gf::Label>(gf::StableId("doc.info"), "Two pages");
+    std::shared_ptr<gf::BackstageView> view = gf::make_control<gf::BackstageView>(gf::StableId("doc.backstage"));
+    (*view).set_items({{.stable_id = "save", .command = save},
+                       {.stable_id = "info", .kind = gf::BackstageItemKind::topic, .text = "&Info", .page = info}});
+    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("doc.ribbon"));
+    (*ribbon).set_backstage(view);
+}
+}  // namespace doc_example_BackstageView_1
+
 namespace doc_example_Binding_1 {
 void example() {
     std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("form"));
@@ -522,6 +534,14 @@ void example() {
     (*view.modes).item(0).perform_click();   // shown is 0, choices is 1
 }
 }  // namespace doc_example_ChoiceGroup_2
+
+namespace doc_example_ColorCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> colour = std::make_shared<gf::Command>("doc.colour", "Font colour");
+    std::shared_ptr<gf::ColorCommand> command = std::make_shared<gf::ColorCommand>(colour);
+    (*command).commit(gf::Color::rgba(192, 0, 0), "doc.picker");   // dark red, now the first recent colour
+}
+}  // namespace doc_example_ColorCommand_1
 
 namespace doc_example_ColorValueEditor_1 {
 void example() {
@@ -1327,6 +1347,15 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
 }  // namespace doc_example_FlowLayoutPanel_2
+
+namespace doc_example_FontCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
+    std::shared_ptr<gf::FontCommand> command = std::make_shared<gf::FontCommand>(font);
+    (*command).set_value({"Portsmouth Rapids", 11.0});   // value_changed, no invocation
+    (*command).commit({"Carlito", 11.0}, "doc.font_control");   // value_changed, then font's invoked
+}
+}  // namespace doc_example_FontCommand_1
 
 namespace doc_example_FontDialog_1 {
 void example() {
@@ -2357,6 +2386,28 @@ void example() {
 }
 }  // namespace doc_example_Ribbon_1
 
+namespace doc_example_RibbonColorPicker_1 {
+void example() {
+    std::shared_ptr<gf::ColorCommand> command =
+        std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
+    std::shared_ptr<gf::RibbonColorPicker> picker =
+        gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+    (*picker).set_text("Font &colour");
+    (*picker).set_command(command);
+}
+}  // namespace doc_example_RibbonColorPicker_1
+
+namespace doc_example_RibbonFontControl_1 {
+void example() {
+    std::shared_ptr<gf::FontCommand> command =
+        std::make_shared<gf::FontCommand>(std::make_shared<gf::Command>("doc.font", "Font"));
+    std::shared_ptr<gf::RibbonFontControl> font =
+        gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font_control"));
+    (*font).set_families({"Portsmouth Rapids", "Carlito"});
+    (*font).set_command(command);
+}
+}  // namespace doc_example_RibbonFontControl_1
+
 namespace doc_example_RibbonGallery_1 {
 void example() {
     std::shared_ptr<gf::Command> styles = std::make_shared<gf::Command>("doc.styles", "Styles");
@@ -3381,6 +3432,7 @@ int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
     failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
+    failures += run("BackstageView example 1", &doc_example_BackstageView_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);
@@ -3404,6 +3456,7 @@ int main() {
     failures += run("CheckedListBox example 2", &doc_example_CheckedListBox_2::example);
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
+    failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
@@ -3440,6 +3493,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
@@ -3491,6 +3545,8 @@ int main() {
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
     failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
+    failures += run("RibbonColorPicker example 1", &doc_example_RibbonColorPicker_1::example);
+    failures += run("RibbonFontControl example 1", &doc_example_RibbonFontControl_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);

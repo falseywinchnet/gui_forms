@@ -1,0 +1,98 @@
+A ribbon drop-down colour picker: a split button over a palette popup.
+
+A colour picker (stage RB, phase 6) is a small split button. Its face shows
+an icon over a bar of the current colour and applies that colour again; its
+arrow opens a palette popup below it holding Automatic, a grid of palette
+colours ten to a row, and the recent colours. Bound to a `ColorCommand` the
+picker shows and commits the command's value; without one it keeps its own.
+A `Ribbon` hosts it as `RibbonCommandKind::color_picker` on one row.
+
+Parameters
+----------
+stable_id
+    Identity of the picker. Its palette's content is named
+    ``<stable_id>.palette``.
+
+Properties
+----------
+command
+    The `ColorCommand` it shows and commits to, or null.
+value
+    The colour shown, or none for Automatic: the command's, or the picker's
+    own. `set_value` sets it as the program does.
+palette : default the ten standard colours
+    The palette colours. `set_palette` throws `std::invalid_argument` for an
+    empty palette, a repeated colour, or more than
+    `RibbonColorPicker::maximum_palette` (60).
+image
+    The face's icon, over the colour bar.
+text : default ``"Colour"``
+    The picker's accessible name, with an optional mnemonic.
+natural_size
+    The size the picker measures at the current text scale (34 by 22 units
+    at text scale 1).
+palette_open
+    Whether the palette is open.
+palette_popup
+    The palette's content control, null before the first opening.
+realized_entries
+    The open palette's entries, their parts and states, in the palette's
+    local coordinates.
+
+Events
+------
+value_changed
+    Raised after the value shown changes, by the user or the program.
+palette_open_changed
+    Raised when the palette opens or closes.
+
+Methods
+-------
+open_palette
+    Opens the palette below the picker; false while disabled, already open or
+    not attached to a window. Opened by keyboard, the keyboard starts on the
+    current colour.
+close_palette
+    Closes the palette.
+
+See Also
+--------
+ColorCommand : The value command it commits to.
+Ribbon : The ribbon that hosts it.
+
+Notes
+-----
+A click on the face (or Enter, Space or the press action) applies the
+current colour again. The arrow, Down, F4 or the show-menu action opens the
+palette. In the palette the arrows move through the entries (Up and Down to
+the nearest entry of the row above or below), Home and End go to the ends,
+Enter, Space or a click commits and closes, and Escape or a click away
+closes without a choice; focus returns to the picker.
+
+The picker publishes ``region``, ``face``, ``icon``, ``color_bar``,
+``arrow``, ``arrow_glyph`` and ``focus``, and declares the
+``palette_entry`` item system (``entry_face``, ``entry_sample``,
+``entry_label``, ``entry_focus``; hot, selected, focus_visible) whose entries
+the open palette shows. To accessibility it is a `split_button` whose value
+is the colour (``"#C00000"``, or ``"Automatic"``); the palette's entries are
+positioned buttons, the current one selected.
+
+Vocabulary gap: no part role or paint field carries a content colour, so the
+colour samples themselves (the bar and the palette's entries) are drawn by
+the painter inside wells drawn by role; every other part goes through the
+by-role paint path.
+
+Not yet: theme colour shades, a "More colours" dialog and live preview.
+
+Examples
+--------
+A text colour picker:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::ColorCommand> command =
+       std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
+   std::shared_ptr<gf::RibbonColorPicker> picker =
+       gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+   (*picker).set_text("Font &colour");
+   (*picker).set_command(command);
