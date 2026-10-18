@@ -37,6 +37,7 @@ class UpdateScope;
 class Timer;
 class BackgroundWorker;
 class ToolTip;
+class RibbonToolTip;
 class ImageList;
 class HostServices;
 class HostSession;
@@ -564,6 +565,7 @@ private:
     friend class Timer;
     friend class BackgroundWorker;
     friend class ToolTip;
+    friend class RibbonToolTip;
     friend class ErrorProvider;
     friend class HelpProvider;
     friend class ImageList;

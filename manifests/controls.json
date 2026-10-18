@@ -668,6 +668,17 @@
       "doc": "api/generated/gui_forms.StatusStrip.rst"
     },
     {
+      "id": "quick_access_toolbar",
+      "type": "QuickAccessToolbar",
+      "header": "gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon Quick Access Toolbar: a ToolStrip of flat command buttons with a customize menu that shows or hides each declared command and records the toolbar's placement above or below the ribbon.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.QuickAccessToolbar.rst"
+    },
+    {
       "id": "tool_strip_panel",
       "type": "ToolStripPanel",
       "header": "gui_forms/controls/tool_strip_panel/tool_strip_panel.hpp",
@@ -787,6 +798,17 @@
       "status": "stable",
       "gallery_page": "timing-and-tooltips",
       "doc": "api/generated/gui_forms.ToolTip.rst"
+    },
+    {
+      "id": "ribbon_tool_tip",
+      "type": "RibbonToolTip",
+      "header": "gui_forms/components/ribbon_tool_tip/ribbon_tool_tip.hpp",
+      "category": "Dialogs and popups",
+      "purpose": "Nonvisual provider of enhanced tooltips on controls and ToolStrip items: title, description, shortcut, image, a disabled command's reason, and an F1 help topic reported as an event.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonToolTip.rst"
     },
     {
       "id": "drawing_surface",

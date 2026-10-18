@@ -246,13 +246,32 @@ private:
         (*context_group).add_at(note, {22.0, 84.0, 410.0, 120.0});
     }
 
-    // A ToolStrip over the same Commands with a hosted combo box, narrow
-    // enough that its last buttons overflow, and a StatusStrip with a spring
-    // label and a hosted progress bar.
+    // A QuickAccessToolbar over the same Commands, narrow enough that its
+    // last command overflows; a ToolStrip with a hosted combo box, narrow
+    // enough that its last buttons overflow; and a StatusStrip with a spring
+    // label and a hosted progress bar. The Gallery shell attaches enhanced
+    // tooltips to some of the ToolStrip's items once the Window exists.
     void build_strips(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> strips = group(
-            "gallery.commands.strips", "ToolStrip · StatusStrip · by-role painted items", {930.0, 132.0});
-        (*body).add_at(strips, {24.0, 636.0, 930.0, 132.0});
+            "gallery.commands.strips", "QuickAccessToolbar · ToolStrip · StatusStrip · by-role painted items",
+            {930.0, 170.0});
+        (*body).add_at(strips, {24.0, 636.0, 930.0, 170.0});
+        std::shared_ptr<QuickAccessToolbar> quick_access =
+            make_control<QuickAccessToolbar>(StableId("gallery.commands.quick-access"));
+        (*quick_access).set_commands({
+            {.command = save_},
+            {.command = new_},
+            {.command = delete_, .shown = false},
+            {.command = wrap_command_},
+            {.command = about_},
+        });
+        (*strips).add_at(quick_access, {22.0, 36.0, 250.0, 27.0});
+        quick_access_note_ = label("gallery.commands.quick-access.note",
+                                   "The customize button lists each command with a check · placement: above the ribbon",
+                                   10.0, 400, muted);
+        (*strips).add_at(quick_access_note_, {290.0, 40.0, 610.0, 20.0});
+        on((*quick_access).placement_changed(), *this, &CommandsAndMenusPage::on_quick_access_placement);
+        on((*quick_access).customized(), *this, &CommandsAndMenusPage::on_quick_access_customized);
         std::shared_ptr<ToolStrip> tool = make_control<ToolStrip>(StableId("gallery.commands.tool-strip"));
         (*tool).set_accessible_name("Document tools");
         std::vector<ToolStripItemSpec> tools;
@@ -271,7 +290,7 @@ private:
                                        item("strip.run.watch", run_options_[1])}});
         tools.push_back({.stable_id = "strip.about", .command = about_});
         (*tool).set_items(std::move(tools));
-        (*strips).add_at(tool, {22.0, 36.0, 430.0, 27.0});
+        (*strips).add_at(tool, {22.0, 74.0, 430.0, 27.0});
         std::shared_ptr<StatusStrip> status = make_control<StatusStrip>(StableId("gallery.commands.status-strip"));
         (*status).set_accessible_name("Document status");
         (*status).set_items({
@@ -282,7 +301,7 @@ private:
             {.stable_id = "status.progress", .kind = ToolStripItemKind::progress_bar, .text = "Indexing"},
         });
         (*(*status).progress_bar("status.progress")).set_value(60.0);
-        (*strips).add_at(status, {22.0, 84.0, 880.0, 24.0});
+        (*strips).add_at(status, {22.0, 122.0, 880.0, 24.0});
     }
 
     // A RibbonGallery in the ribbon form, a drop-down gallery under a button,
@@ -292,7 +311,7 @@ private:
         std::shared_ptr<LayoutGroup> gallery_group = group(
             "gallery.commands.gallery", "RibbonGallery · value command, live preview, more button, drop-down form",
             {930.0, 150.0});
-        (*body).add_at(gallery_group, {24.0, 1202.0, 930.0, 150.0});
+        (*body).add_at(gallery_group, {24.0, 1240.0, 930.0, 150.0});
         const std::shared_ptr<Command> styles = std::make_shared<Command>("gallery.commands.styles", "Styles");
         styles_ = std::make_shared<GalleryCommand>(styles);
         std::vector<RibbonGalleryCategory> categories{{"headings", "Headings"}, {"body", "Body text"},
@@ -360,7 +379,7 @@ private:
         std::shared_ptr<LayoutGroup> frame_group = group(
             "gallery.commands.container", "ToolStripContainer · top, left and bottom panels around content",
             {930.0, 230.0});
-        (*body).add_at(frame_group, {24.0, 780.0, 930.0, 230.0});
+        (*body).add_at(frame_group, {24.0, 818.0, 930.0, 230.0});
         std::shared_ptr<ToolStripContainer> frame =
             make_control<ToolStripContainer>(StableId("gallery.commands.container.frame"));
         (*frame).set_accessible_name("Drawing frame");
@@ -402,7 +421,7 @@ private:
     void build_ribbon(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> ribbon_group = group(
             "gallery.commands.ribbon", "Ribbon · phase 1: tabs, groups, launchers, hosted controls", {930.0, 160.0});
-        (*body).add_at(ribbon_group, {24.0, 1030.0, 930.0, 160.0});
+        (*body).add_at(ribbon_group, {24.0, 1068.0, 930.0, 160.0});
         std::shared_ptr<Ribbon> ribbon = make_control<Ribbon>(StableId("gallery.commands.ribbon.bar"));
         (*ribbon).set_accessible_name("Document ribbon");
         std::vector<RibbonTabSpec> tabs;
@@ -506,6 +525,16 @@ private:
                             " · invoked from " + invocation.source_id);
     }
 
+    void on_quick_access_placement(const QuickAccessToolbarPlacementChange& change) {
+        const bool below = change.placement == QuickAccessToolbarPlacement::below_ribbon;
+        (*quick_access_note_).set_text(std::string("The customize button lists each command with a check · placement: ") +
+                                       (below ? "below" : "above") + " the ribbon");
+    }
+
+    void on_quick_access_customized(const QuickAccessToolbarCustomization& change) {
+        (*status_).set_text("Quick Access Toolbar · " + change.command_id + (change.shown ? " shown" : " hidden"));
+    }
+
     void on_about() {
         (*status_).set_text("Commands and menus · MenuStrip, CommandBar, ContextMenu and "
                             "DropDownButton all execute shared Command instances");
@@ -581,6 +610,7 @@ private:
     std::shared_ptr<Button> gallery_button_;
     std::shared_ptr<RibbonGallery> drop_down_gallery_;
     std::shared_ptr<Label> gallery_status_;
+    std::shared_ptr<Label> quick_access_note_;
     Value<bool> dirty_{false};
     Value<bool> wrap_{false};
     unsigned saves_{};

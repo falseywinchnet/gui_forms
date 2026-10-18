@@ -97,6 +97,7 @@ struct PageContext final {
     ComponentContainer components;
     std::shared_ptr<Timer> ui_timer;
     std::shared_ptr<ToolTip> tooltips;
+    std::shared_ptr<RibbonToolTip> ribbon_tooltips;
     std::shared_ptr<ErrorProvider> error_provider;
     std::shared_ptr<HelpProvider> help_provider;
     std::shared_ptr<BindingSource> binding_source;

@@ -19,6 +19,8 @@ Anchored popups and tooltips.
      - A message dialog of pages: heading, text, icon, buttons, choices, details and progress.
    * - :cpp:class:`ToolTip <gui_forms::ToolTip>`
      - A provider of short help text that pops up when the pointer rests on a control or the control receives keyboard focus.
+   * - :cpp:class:`RibbonToolTip <gui_forms::RibbonToolTip>`
+     - A provider of enhanced tooltips: a title, a description, a shortcut, an image, why a command is unavailable, and an F1 help topic.
 
 .. toctree::
    :hidden:
@@ -27,6 +29,7 @@ Anchored popups and tooltips.
    generated/gui_forms.FontDialog
    generated/gui_forms.TaskDialog
    generated/gui_forms.ToolTip
+   generated/gui_forms.RibbonToolTip
 
 Related types
 -------------
@@ -45,6 +48,12 @@ Related types
      - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`FontDialogResult <gui_forms::FontDialogResult>`
      - How a FontDialog closed, and the font it holds then.
+   * - :cpp:class:`RibbonToolTipContent <gui_forms::RibbonToolTipContent>`
+     - What an enhanced tooltip shows (owner decision RB-13, E3-2): a title, a description, the shortcut, an image, the reason a disabled command is unavailable, and a help topic F1 opens while the tooltip shows.
+   * - :cpp:class:`RibbonToolTipEvent <gui_forms::RibbonToolTipEvent>`
+     - The tooltip opened or closed.
+   * - :cpp:class:`RibbonToolTipHelpRequest <gui_forms::RibbonToolTipHelpRequest>`
+     - F1 was pressed while a tooltip with a help topic showed.
    * - :cpp:class:`TaskDialog::Parts <gui_forms::TaskDialog::Parts>`
      - Stage T1 anatomy, as dot members.
    * - :cpp:class:`TaskDialogButton <gui_forms::TaskDialogButton>`
@@ -153,6 +162,60 @@ Related types
       Default: ``{DialogResult::none}``.
 
    .. cpp:member:: FontSpec font
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonToolTipContent final
+
+   ``#include <gui_forms/components/ribbon_tool_tip/ribbon_tool_tip.hpp>``
+
+   What an enhanced tooltip shows (owner decision RB-13, E3-2): a title, a description, the shortcut, an image, the reason a disabled command is unavailable, and a help topic F1 opens while the tooltip shows. With a ``command``, an empty title, description, shortcut or disabled reason is taken from the command's state when the tooltip opens, and the command's enabled state says whether the target is disabled. A ToolStrip item with a command supplies that command when ``command`` is empty.
+
+   .. cpp:member:: std::string title
+
+   .. cpp:member:: std::string description
+
+   .. cpp:member:: std::string shortcut
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: std::string disabled_reason
+
+   .. cpp:member:: std::string help_topic
+
+   .. cpp:member:: std::shared_ptr<Command> command
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonToolTipEvent final
+
+   ``#include <gui_forms/components/ribbon_tool_tip/ribbon_tool_tip.hpp>``
+
+   The tooltip opened or closed. ``item_id`` names the ToolStrip item it describes, or is empty for a whole control. ``content`` is what it shows, resolved from its command; ``disabled_reason`` is empty unless the target was disabled.
+
+   .. cpp:member:: std::string target_stable_id
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: RibbonToolTipContent content
+
+   .. cpp:member:: bool shown
+
+   .. cpp:member:: bool keyboard_initiated
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RibbonToolTipHelpRequest final
+
+   ``#include <gui_forms/components/ribbon_tool_tip/ribbon_tool_tip.hpp>``
+
+   F1 was pressed while a tooltip with a help topic showed. GUI.Forms opens no help viewer: the application handles the topic.
+
+   .. cpp:member:: std::string target_stable_id
+
+   .. cpp:member:: std::string item_id
+
+   .. cpp:member:: std::string help_topic
 
 .. cpp:namespace:: gui_forms
 

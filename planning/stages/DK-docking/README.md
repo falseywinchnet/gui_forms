@@ -1,8 +1,8 @@
 # Stage DK: docking and windowing (study, interview, decisions, plan)
 
 Release: not yet placed on the public roadmap; the plan this stage produces
-proposes where. Depends on: nothing to start. Status 2026-10-14: study under
-way. Authority: this brief, until the owner's decisions are recorded.
+proposes where. Depends on: nothing to start. Status 2026-10-14: study written;
+interview next. Authority: this brief, until the owner's decisions are recorded.
 
 Read [the shared brief](../README.md) first.
 
@@ -38,7 +38,7 @@ them.
 
 ## Sequence
 
-1. **Study** (in progress, 2026-10-14). The canonical docking systems
+1. **Study** (written 2026-10-14: `DOCKING_STUDY.md`, with `PAGEVIEW_STUDY.md`). The canonical docking systems
    (DockPanel Suite, Telerik RadDock, DevExpress, Infragistics, AvalonDock,
    the Visual Studio shell, Qt Advanced Docking System, GIMP's dockables,
    JetBrains tool windows, Eclipse part stacks); the windowing foundation
@@ -53,6 +53,17 @@ them.
    was; mockups where they answer better than words.
 3. **Decisions**, numbered in this brief, including vocabulary additions.
 4. **Plan**, accepted by the owner before anything is built.
+
+## PageView inside this stage
+
+Added 2026-10-14 by the owner: a `PageView` family (the equivalent of
+Telerik's RadPageView) with several tab presentation modes, including
+document tabs, navigation strips and Outlook-style navigation, "a useful
+foundation for several other controls" (matrix row 51). Docking's tab
+stacks, document area and auto-hide strips reuse it rather than growing
+their own tab control, so it is studied here and its questions form the
+tab section of this stage's interview. Its study is
+`PAGEVIEW_STUDY.md` beside the docking study.
 
 ## What exists today
 

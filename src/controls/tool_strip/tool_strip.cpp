@@ -37,6 +37,7 @@ constexpr double vertical_item_extent = 22.0;
 constexpr double default_combo_box_width = 120.0;
 constexpr double default_hosted_width = 100.0;
 constexpr double maximum_hosted_width = 1024.0;
+constexpr double maximum_end_reserve = 64.0;
 
 // Virtual semantic children carry a runtime ID derived from their stable ID,
 // in the high half so it never meets a control's own runtime ID.
@@ -131,8 +132,11 @@ void ToolStrip::on_dispose() noexcept {
 
 // -- items -----------------------------------------------------------------
 
+void ToolStrip::validate_items(const std::vector<ToolStripItemSpec>&) const {}
+
 void ToolStrip::set_items(std::vector<ToolStripItemSpec> items) {
     require_mutable();
+    validate_items(items);
     std::unordered_set<std::string> item_ids{};
     std::unordered_set<std::string> menu_ids{};
     for (const ToolStripItemSpec& item : items) {
@@ -335,6 +339,17 @@ void ToolStrip::set_sizing_grip_visible(bool visible) {
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+void ToolStrip::set_end_reserve(double logical_width) {
+    require_mutable();
+    if (!std::isfinite(logical_width) || logical_width < 0.0 || logical_width > maximum_end_reserve) {
+        throw std::invalid_argument("ToolStrip end reserve must be finite and between 0 and 64");
+    }
+    if (end_reserve_ == logical_width) return;
+    close_drop_down();
+    end_reserve_ = logical_width;
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+}
+
 void ToolStrip::set_font(FontSpec font) {
     require_mutable();
     if (!valid_font_spec(font)) throw std::invalid_argument("ToolStrip font specification is invalid");
@@ -431,6 +446,11 @@ ToolStrip::Layout ToolStrip::layout_for(Rect surface) const {
         const double side = sizing_grip_size * scale;
         result.sizing_grip = {surface.width - side - 1.0, std::max(0.0, surface.height - side - 1.0), side, side};
         end -= side;
+    }
+    if (!status_layout_ && end_reserve_ > 0.0) {
+        const double reserve = end_reserve_ * scale;
+        end -= reserve;
+        result.end_reserve = axis_rect(along_height, end, reserve, inset, item_cross);
     }
     std::vector<double> widths(count, 0.0);
     std::vector<bool> shown(count, false);
@@ -726,6 +746,25 @@ void ToolStrip::set_hot(std::optional<std::size_t> index, ItemZone zone) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
+void ToolStrip::focus_item(std::optional<std::size_t> index) {
+    set_hot(index, ItemZone::main);
+    if (!focused_ || !index) return;
+    const ToolStripItemFocus moved{std::string(stable_id().value()), items_[*index].stable_id};
+    item_focus_changed_.emit(moved);
+}
+
+std::string ToolStrip::item_id_at(Point window_point) const {
+    ItemZone zone{ItemZone::none};
+    const std::optional<std::size_t> index = index_at(window_point, zone);
+    if (!index) return {};
+    return items_[*index].stable_id;
+}
+
+std::string ToolStrip::focused_item_id() const {
+    if (!focused_ || !hot_index_ || *hot_index_ >= items_.size()) return {};
+    return items_[*hot_index_].stable_id;
+}
+
 std::optional<std::size_t> ToolStrip::next_interactive(std::size_t start, int direction) const {
     const Layout placed = layout();
     const std::ptrdiff_t count = static_cast<std::ptrdiff_t>(items_.size());
@@ -822,7 +861,7 @@ void ToolStrip::on_key(KeyEvent& event) {
     if (event.physical_key == previous_key || event.physical_key == next_key) {
         const std::optional<std::size_t> next =
             next_interactive(*current, event.physical_key == next_key ? 1 : -1);
-        if (next) set_hot(next, ItemZone::main);
+        if (next) focus_item(next);
     } else if (event.physical_key == PhysicalKey::enter || event.physical_key == PhysicalKey::space) {
         set_hot(current, ItemZone::main);
         if (item.kind == ToolStripItemKind::drop_down_button) {
@@ -846,6 +885,10 @@ void ToolStrip::on_focus_changed(bool focused) {
         hot_index_ = next_interactive(items_.size() == 0U ? 0U : items_.size() - 1U, 1);
     }
     invalidate(Dirty::paint | Dirty::semantics);
+    if (focused_ && hot_index_) {
+        const ToolStripItemFocus moved{std::string(stable_id().value()), items_[*hot_index_].stable_id};
+        item_focus_changed_.emit(moved);
+    }
 }
 
 // -- menus -------------------------------------------------------------------
@@ -1053,7 +1096,7 @@ bool ToolStrip::on_semantic_child_action(std::string_view id, SemanticAction act
     }
     if (action == SemanticAction::focus) {
         if (window()) static_cast<void>((*window()).request_focus(shared_from_this()));
-        set_hot(index, ItemZone::main);
+        focus_item(index);
         return true;
     }
     if (action == SemanticAction::expand) {
@@ -1250,9 +1293,10 @@ std::vector<ToolStrip::Item> ToolStrip::realized_items() const {
 namespace {
 
 // The events ToolStrip adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 2> tool_strip_interactions{{
+constexpr std::array<InteractionDeclaration, 3> tool_strip_interactions{{
     {.name = "item_clicked", .payload = "ToolStripItemClick", .mutable_payload = false},
     {.name = "drop_down_item_invoked", .payload = "ToolStripDropDownInvocation", .mutable_payload = false},
+    {.name = "item_focus_changed", .payload = "ToolStripItemFocus", .mutable_payload = false},
 }};
 
 } // namespace

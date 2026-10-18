@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gui_forms {
@@ -37,9 +38,12 @@ struct BasicControlStyle final {
     }
 };
 
+// The recipe families a theme supplies. `tool_tip` (owner decision RB-38,
+// design language 12.9) is the face and edge of plain and enhanced
+// tooltips, beside `card` and `menu_item`.
 enum class ControlVisualRole : std::uint8_t {
     window, panel, card, button, accent_button, command_button, choice,
-    editor, menu_item, selection, progress, count,
+    editor, menu_item, selection, progress, tool_tip, count,
 };
 enum class ControlSurfaceState : std::uint8_t {
     normal, hot, pressed, pending, invalid, disabled, deactivated, count,
@@ -101,6 +105,9 @@ struct ControlVisualRecipe final {
 
 inline constexpr std::size_t control_visual_role_count =
     static_cast<std::size_t>(ControlVisualRole::count);
+// Registered (snake_case) name of a recipe family, as the schema's
+// vocabulary lists it; empty for `count`.
+[[nodiscard]] std::string_view control_visual_role_name(ControlVisualRole role) noexcept;
 inline constexpr std::size_t control_surface_state_count =
     static_cast<std::size_t>(ControlSurfaceState::count);
 
@@ -237,6 +244,24 @@ struct ThemeStructureTokens final {
     return ramp;
 }
 
+// The overlay shadow (owner decision RB-37, design language 12.9; the E4
+// level of 3.4 scaled to small overlays): a soft shadow cast down and right,
+// away from the one upper-left light, by surfaces that really overlap
+// content (tooltips, popups, menus). The `shadow` part role paints it around
+// the casting surface. Two layers, in the units of MaterialShadow (blur is
+// a CSS blur radius): a wide soft layer and a close contact layer, each
+// offset right by at most half its drop (3.3). Provisional starting tokens
+// until the default theme (stage T4) owns them.
+[[nodiscard]] inline std::vector<MaterialShadow> provisional_overlay_shadow() {
+    std::vector<MaterialShadow> layers{
+        MaterialShadow{.offset = {2.0, 4.0}, .blur_radius = 10.0, .spread = 0.0,
+                       .color = Color::rgba(20, 30, 42, 64), .inset = false},
+        MaterialShadow{.offset = {0.5, 1.0}, .blur_radius = 3.0, .spread = 0.0,
+                       .color = Color::rgba(20, 30, 42, 56), .inset = false},
+    };
+    return layers;
+}
+
 struct ThemeDefinition final {
     std::string id{"windows-professional"};
     BasicControlStyle compatibility;
@@ -244,6 +269,13 @@ struct ThemeDefinition final {
     ThemeStructureTokens structure;
     // At least one colour; Theme::create refuses an empty ramp.
     std::vector<Color> accent_ramp{provisional_accent_ramp()};
+    // The overlay shadow's layers, outer (not inset) and at most
+    // SurfaceMaterial::maximum_shadows; empty casts none.
+    std::vector<MaterialShadow> overlay_shadow{provisional_overlay_shadow()};
+    // The overlay shadow in high contrast, under the same rules. Empty by
+    // default: high contrast draws no cast shadow, and the overlay's
+    // high-contrast edge separates it from the content below.
+    std::vector<MaterialShadow> high_contrast_overlay_shadow{};
     friend bool operator==(const ThemeDefinition& left,
                            const ThemeDefinition& right) noexcept(noexcept(
         left.id == right.id && left.compatibility == right.compatibility &&
@@ -251,7 +283,9 @@ struct ThemeDefinition final {
         return left.id == right.id &&
                left.compatibility == right.compatibility &&
                left.roles == right.roles && left.structure == right.structure &&
-               left.accent_ramp == right.accent_ramp;
+               left.accent_ramp == right.accent_ramp &&
+               left.overlay_shadow == right.overlay_shadow &&
+               left.high_contrast_overlay_shadow == right.high_contrast_overlay_shadow;
     }
 };
 

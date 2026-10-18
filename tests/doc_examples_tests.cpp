@@ -2102,6 +2102,29 @@ void example() {
 }
 }  // namespace doc_example_PropertyList_2
 
+namespace doc_example_QuickAccessToolbar_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("file.save", "Save");
+    std::shared_ptr<gf::Command> undo = std::make_shared<gf::Command>("edit.undo", "Undo");
+    std::shared_ptr<gf::Command> redo = std::make_shared<gf::Command>("edit.redo", "Redo");
+    std::shared_ptr<gf::Command> quick_print =
+        std::make_shared<gf::Command>("file.quick-print", "Quick Print");
+    std::shared_ptr<gf::QuickAccessToolbar> quick_access =
+        gf::make_control<gf::QuickAccessToolbar>(gf::StableId("editor.quick-access"));
+    (*quick_access).set_commands({
+        {.command = save},
+        {.command = undo},
+        {.command = redo},
+        {.command = quick_print, .shown = false},
+    });
+    gf::Window window(quick_access, {240.0, 25.0});
+    // The customize menu now lists all four with checks; choosing Quick
+    // Print shows it at the toolbar's end and raises customized.
+    (*quick_access).set_command_shown("file.quick-print", true);
+    // shown_command_ids() is {"file.save", "edit.undo", "edit.redo", "file.quick-print"}.
+}
+}  // namespace doc_example_QuickAccessToolbar_1
+
 namespace doc_example_RadioButton_1 {
 void example() {
     std::shared_ptr<gf::GroupBox> orientation =
@@ -2344,6 +2367,29 @@ void example() {
     (*gallery).set_command(command);
 }
 }  // namespace doc_example_RibbonGallery_1
+
+namespace doc_example_RibbonToolTip_1 {
+void example() {
+    std::shared_ptr<gf::Command> bold = std::make_shared<gf::Command>("format.bold", "Bold");
+    (*bold).set_description("Make the selected text bold.");
+    (*bold).set_shortcut("Ctrl+B");
+    std::shared_ptr<gf::Command> paste = std::make_shared<gf::Command>("edit.paste", "Paste");
+    (*paste).set_availability_reason("The Clipboard is empty.");
+    (*paste).set_enabled(false);
+    std::shared_ptr<gf::ToolStrip> strip = gf::make_control<gf::ToolStrip>(gf::StableId("format"));
+    (*strip).set_items({{.stable_id = "bold", .command = bold}, {.stable_id = "paste", .command = paste}});
+    gf::Window window(strip, {320.0, 25.0});
+
+    gf::RibbonToolTip tips(window);
+    tips.set_item_tool_tip(strip, "bold", {.help_topic = "format.bold"});
+    tips.set_item_tool_tip(strip, "paste", {});
+    tips.show(strip, "paste");
+    // tips.shown_content() has the title "Paste" and, because the command is
+    // disabled, the reason "The Clipboard is empty.". F1 now does nothing:
+    // paste has no help topic. Over "bold" it would raise help_requested.
+    tips.hide();
+}
+}  // namespace doc_example_RibbonToolTip_1
 
 namespace doc_example_ScaledGroupBox_1 {
 void example() {
@@ -3411,6 +3457,7 @@ int main() {
     failures += run("PropertyGrid example 2", &doc_example_PropertyGrid_2::example);
     failures += run("PropertyList example 1", &doc_example_PropertyList_1::example);
     failures += run("PropertyList example 2", &doc_example_PropertyList_2::example);
+    failures += run("QuickAccessToolbar example 1", &doc_example_QuickAccessToolbar_1::example);
     failures += run("RadioButton example 1", &doc_example_RadioButton_1::example);
     failures += run("RadioButton example 2", &doc_example_RadioButton_2::example);
     failures += run("RangeControl example 1", &doc_example_RangeControl_1::example);
@@ -3422,6 +3469,7 @@ int main() {
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
     failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
+    failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
     failures += run("ScaledPanel example 1", &doc_example_ScaledPanel_1::example);
     failures += run("ScrollBar example 1", &doc_example_ScrollBar_1::example);

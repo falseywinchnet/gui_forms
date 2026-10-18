@@ -8,6 +8,7 @@
 #include <memory>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace gui_forms {
 
@@ -32,6 +33,12 @@ public:
     [[nodiscard]] Color accent(AccentIndex index) const noexcept {
         const std::size_t position = static_cast<std::size_t>(index.value) % definition_.accent_ramp.size();
         return definition_.accent_ramp[position];
+    }
+    // The overlay shadow's layers (owner decision RB-37) for ordinary or
+    // high-contrast presentation; empty when the theme casts none.
+    [[nodiscard]] const std::vector<MaterialShadow>& overlay_shadow(bool high_contrast) const noexcept {
+        if (high_contrast) return definition_.high_contrast_overlay_shadow;
+        return definition_.overlay_shadow;
     }
 
 private:

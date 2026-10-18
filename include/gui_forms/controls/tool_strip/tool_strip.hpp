@@ -92,6 +92,13 @@ struct ToolStripItemClick final {
     std::string item_id{};
 };
 
+// The item the keyboard is on changed while the strip has focus: the strip
+// took focus, or an arrow key or a semantic focus action moved it.
+struct ToolStripItemFocus final {
+    std::string strip_id{};
+    std::string item_id{};
+};
+
 // A choice from a drop-down or split button's menu, or from the overflow
 // menu's copy of one.
 struct ToolStripDropDownInvocation final {
@@ -150,10 +157,20 @@ public:
     // The IDs of the items currently in the overflow menu, in strip order.
     [[nodiscard]] std::vector<std::string> overflow_item_ids() const;
     bool show_overflow(MenuOpenMode mode = MenuOpenMode::keyboard);
+    // The ID of the laid-out item under a point in window coordinates,
+    // enabled or not; empty when no item is there. For providers that
+    // describe items, such as RibbonToolTip.
+    [[nodiscard]] std::string item_id_at(Point window_point) const;
+    // The ID of the item the keyboard is on while the strip has focus;
+    // empty otherwise.
+    [[nodiscard]] std::string focused_item_id() const;
 
     [[nodiscard]] Event<const ToolStripItemClick&>& item_clicked() noexcept { return item_clicked_; }
     [[nodiscard]] Event<const ToolStripDropDownInvocation&>& drop_down_item_invoked() noexcept {
         return drop_down_item_invoked_;
+    }
+    [[nodiscard]] Event<const ToolStripItemFocus&>& item_focus_changed() noexcept {
+        return item_focus_changed_;
     }
 
     [[nodiscard]] Size measure(Size available) override;
@@ -227,12 +244,24 @@ protected:
         Rect grip{};
         Rect overflow_button{};
         Rect sizing_grip{};
+        // The end reserve (set_end_reserve), at the strip's far end.
+        Rect end_reserve{};
     };
     [[nodiscard]] Layout layout() const;
     [[nodiscard]] Layout layout_for(Rect surface) const;
     [[nodiscard]] bool status_layout() const noexcept { return status_layout_; }
     void set_sizing_grip_visible(bool visible);
     [[nodiscard]] bool sizing_grip_visible() const noexcept { return sizing_grip_visible_; }
+    // For QuickAccessToolbar: logical units kept free at the strip's far end
+    // for a part the derived control paints there (its customize button).
+    // Items and the overflow button sit before it. Zero by default. Throws
+    // std::invalid_argument for a width that is negative, not finite or
+    // over 64.
+    void set_end_reserve(double logical_width);
+    // Checks items before set_items changes anything. ToolStrip accepts every
+    // valid item; a derived strip that admits fewer kinds throws
+    // std::invalid_argument for the others.
+    virtual void validate_items(const std::vector<ToolStripItemSpec>& items) const;
 
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_dispose() noexcept override;
@@ -270,6 +299,7 @@ private:
     [[nodiscard]] std::optional<std::size_t> next_interactive(std::size_t start, int direction) const;
     void click(std::size_t index);
     void set_hot(std::optional<std::size_t> index, ItemZone zone);
+    void focus_item(std::optional<std::size_t> index);
     void paint_item(Painter& painter, std::size_t index, Rect bounds) const;
     void on_popup_item_invoked(const MenuItemInvocation& invocation);
     void on_popup_open_changed(bool open);
@@ -293,6 +323,7 @@ private:
     bool status_layout_{};
     bool sizing_grip_visible_{};
     FontSpec font_{FontRole::control, 10.5, 400, false, 0.12};
+    double end_reserve_{};
     SubscriptionToken popup_invoked_{};
     SubscriptionToken popup_changed_{};
     // One per item command, so a command's enabled, visible, text or
@@ -300,6 +331,7 @@ private:
     std::vector<SubscriptionToken> command_tokens_{};
     Event<const ToolStripItemClick&> item_clicked_{};
     Event<const ToolStripDropDownInvocation&> drop_down_item_invoked_{};
+    Event<const ToolStripItemFocus&> item_focus_changed_{};
 };
 
 } // namespace gui_forms

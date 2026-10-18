@@ -112,8 +112,8 @@ void append_name_list(std::string& out, std::span<const std::string_view> names)
 }
 
 // The atom vocabulary (design language 8.5 and 12.7): every part role,
-// state, mark, value type and semantic role, in enum order. `none` is the
-// absence of a mark, not a mark, and is left out.
+// state, mark, value type, recipe family and semantic role, in enum order.
+// `none` is the absence of a mark, not a mark, and is left out.
 void append_vocabulary(std::string& out) {
     std::vector<std::string_view> names;
     out += "  \"vocabulary\": {\n";
@@ -141,6 +141,13 @@ void append_vocabulary(std::string& out) {
     names.clear();
     names.push_back("accent_index");
     append_key(out, "    ", "values");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    for (std::size_t index = 0; index < control_visual_role_count; ++index) {
+        names.push_back(control_visual_role_name(static_cast<ControlVisualRole>(index)));
+    }
+    append_key(out, "    ", "families");
     append_name_list(out, names);
     out += ",\n";
     names.clear();
@@ -456,6 +463,7 @@ void test_schema_export() {
     const std::shared_ptr<ContextMenu> context_menu =
         std::make_shared<ContextMenu>("schema.context-menu");
     const std::shared_ptr<ToolTip> tool_tip = std::make_shared<ToolTip>(window);
+    const std::shared_ptr<RibbonToolTip> ribbon_tool_tip = std::make_shared<RibbonToolTip>(window);
     const std::shared_ptr<Timer> timer =
         std::make_shared<Timer>(window, std::chrono::milliseconds(1000));
     const std::shared_ptr<BackgroundWorker> background_worker = std::make_shared<BackgroundWorker>(window);
@@ -474,6 +482,7 @@ void test_schema_export() {
     record_component("gallery_command", *gallery_command, records);
     record_component("context_menu", *context_menu, records);
     record_component("tool_tip", *tool_tip, records);
+    record_component("ribbon_tool_tip", *ribbon_tool_tip, records);
     record_component("timer", *timer, records);
     record_component("background_worker", *background_worker, records);
     record_component("notify_icon", *notify_icon, records);

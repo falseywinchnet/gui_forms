@@ -952,6 +952,10 @@ Types
 
       The ramp colour for an accent index; an index past the end of the ramp wraps around it.
 
+   .. cpp:function:: const std::vector<MaterialShadow>& overlay_shadow(bool high_contrast) const noexcept
+
+      The overlay shadow's layers (owner decision RB-37) for ordinary or high-contrast presentation; empty when the theme casts none.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ThemeDefinition final
@@ -973,6 +977,14 @@ Types
    .. cpp:member:: std::vector<Color> accent_ramp
 
       At least one colour; Theme::create refuses an empty ramp. Default: ``{provisional_accent_ramp()}``.
+
+   .. cpp:member:: std::vector<MaterialShadow> overlay_shadow
+
+      The overlay shadow's layers, outer (not inset) and at most SurfaceMaterial::maximum_shadows; empty casts none. Default: ``{provisional_overlay_shadow()}``.
+
+   .. cpp:member:: std::vector<MaterialShadow> high_contrast_overlay_shadow
+
+      The overlay shadow in high contrast, under the same rules. Empty by default: high contrast draws no cast shadow, and the overlay's high-contrast edge separates it from the content below.
 
 .. cpp:namespace:: gui_forms
 
@@ -1206,6 +1218,8 @@ Enumerations
    .. cpp:enumerator:: selection
 
    .. cpp:enumerator:: progress
+
+   .. cpp:enumerator:: tool_tip
 
    .. cpp:enumerator:: count
 
@@ -1442,6 +1456,10 @@ Functions, constants and aliases
 
 .. cpp:function:: Insets surface_material_visual_outsets(const SurfaceMaterial& material) noexcept
 
+.. cpp:function:: Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexcept
+
+   How far the outer (not inset) shadows among ``shadows`` reach outside the rect that casts them: three blur radii plus any positive spread, shifted by each offset.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -1456,11 +1474,15 @@ Functions, constants and aliases
 
 .. cpp:function:: void paint_part(Painter& painter, const Control& control, const PartPaint& part)
 
-   Paints one part of ``control`` by its role (see PartPaint). Roles that draw nothing of their own (region, shadow, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing.
+   Paints one part of ``control`` by its role (see PartPaint). Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
+
+.. cpp:function:: Insets overlay_shadow_outsets(const Control& control) noexcept
+
+   How far ``control``'s theme's overlay shadow reaches outside the casting surface's rect, in the control's presentation (ordinary or high contrast). Zero on every side when the theme casts none.
 
 .. cpp:function:: void paint_part_from_recipe(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe, ControlVisualContext context)
 
-   paint_part's drawing, with the recipe and context already resolved. For helpers that resolve a recipe themselves (the existing controls' focus and default cues), so that every part is drawn by one implementation.
+   paint_part's drawing, with the recipe and context already resolved. For helpers that resolve a recipe themselves (the existing controls' focus and default cues), so that every part is drawn by one implementation. The shadow role paints nothing here: the overlay shadow is the theme's value, not the recipe's, so it is drawn only through paint_part.
 
 .. cpp:var:: constexpr std::size_t part_mark_count
 
@@ -1478,6 +1500,10 @@ Functions, constants and aliases
 
 ``#include <gui_forms/theme/types/theme_types.hpp>``
 
+.. cpp:function:: std::string_view control_visual_role_name(ControlVisualRole role) noexcept
+
+   Registered (snake_case) name of a recipe family, as the schema's vocabulary lists it; empty for ``count``.
+
 .. cpp:function:: bool valid_control_visual_recipe(const ControlVisualRecipe& value) noexcept
 
 .. cpp:function:: bool valid_control_state_recipes(const ControlStateRecipes& value) noexcept
@@ -1485,6 +1511,10 @@ Functions, constants and aliases
 .. cpp:function:: inline std::vector<Color> provisional_accent_ramp()
 
    The accent ramp a theme offers parts that carry an AccentIndex (design language 8.5). Provisional: six translucent tints (amber, green, violet, orange, red, teal) laid over a part's material, until the default theme (stage T4) defines its own ramp and the engine (T2) its tint.
+
+.. cpp:function:: inline std::vector<MaterialShadow> provisional_overlay_shadow()
+
+   The overlay shadow (owner decision RB-37, design language 12.9; the E4 level of 3.4 scaled to small overlays): a soft shadow cast down and right, away from the one upper-left light, by surfaces that really overlap content (tooltips, popups, menus). The ``shadow`` part role paints it around the casting surface. Two layers, in the units of MaterialShadow (blur is a CSS blur radius): a wide soft layer and a close contact layer, each offset right by at most half its drop (3.3). Provisional starting tokens until the default theme (stage T4) owns them.
 
 .. cpp:var:: constexpr std::size_t control_visual_role_count
 

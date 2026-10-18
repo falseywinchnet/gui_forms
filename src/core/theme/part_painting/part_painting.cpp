@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace gui_forms {
 namespace {
@@ -34,6 +35,17 @@ bool surface_role(PartRole role) noexcept {
         return true;
     default:
         return false;
+    }
+}
+
+// The overlay shadow's layers around `part.bounds`, in theme order, before
+// the casting surface is painted over them.
+void paint_overlay_shadow(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe,
+                          const std::vector<MaterialShadow>& layers) {
+    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    for (const MaterialShadow& shadow : layers) {
+        painter.draw_box_shadow(part.bounds, radius, shadow.offset, shadow.blur_radius, shadow.spread,
+                                shadow.color);
     }
 }
 
@@ -336,11 +348,22 @@ std::string_view part_mark_name(PartMark mark) noexcept {
     return {};
 }
 
+Insets overlay_shadow_outsets(const Control& control) noexcept {
+    const ControlVisualContext context = part_visual_context(control, AnatomyStateSet{});
+    const Theme& theme = control.effective_theme();
+    const Insets result = box_shadow_visual_outsets(theme.overlay_shadow(context.high_contrast));
+    return result;
+}
+
 void paint_part(Painter& painter, const Control& control, const PartPaint& part) {
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
     const Theme& theme = control.effective_theme();
     const ControlVisualRecipe& recipe = theme.resolve(part.family, context);
+    if (part.role == PartRole::shadow) {
+        paint_overlay_shadow(painter, part, recipe, theme.overlay_shadow(context.high_contrast));
+        return;
+    }
     paint_part_from_recipe(painter, part, recipe, context);
     if (!part.accent || !surface_role(part.role)) return;
     // Provisional accent (design language 8.5): the ramp colour, which

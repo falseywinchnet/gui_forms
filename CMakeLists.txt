@@ -426,6 +426,8 @@ add_library(gui_forms_controls STATIC
     src/controls/menu/context_menu/context_menu.cpp
     src/controls/menu/menu_strip/menu_strip.cpp
     src/controls/tool_strip/tool_strip.cpp
+    src/controls/quick_access_toolbar/quick_access_toolbar.cpp
+    src/controls/quick_access_toolbar/ribbon_state.cpp
     src/controls/tool_strip_panel/tool_strip_panel.cpp
     src/controls/tool_strip_container/tool_strip_container.cpp
     src/controls/binding_navigator/binding_navigator.cpp
@@ -506,6 +508,8 @@ add_library(gui_forms_controls STATIC
     src/controls/tool_tip/tool_tip_layer/tool_tip_layer.cpp
     src/controls/tool_tip/tool_tip_bubble/tool_tip_bubble.cpp
     src/controls/tool_tip/tool_tip.cpp
+    src/controls/ribbon_tool_tip/ribbon_tool_tip_bubble.cpp
+    src/controls/ribbon_tool_tip/ribbon_tool_tip.cpp
 )
 target_include_directories(gui_forms_controls PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -2417,6 +2421,18 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_ribbon_gallery_tests tests/ribbon_gallery_tests.cpp)
     target_link_libraries(gui_forms_ribbon_gallery_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_ribbon_gallery_tests COMMAND gui_forms_ribbon_gallery_tests)
+    add_executable(gui_forms_quick_access_toolbar_tests tests/quick_access_toolbar_tests.cpp)
+    target_link_libraries(gui_forms_quick_access_toolbar_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_quick_access_toolbar_tests COMMAND gui_forms_quick_access_toolbar_tests)
+    add_executable(gui_forms_ribbon_tool_tip_tests tests/ribbon_tool_tip_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_tool_tip_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_tool_tip_tests COMMAND gui_forms_ribbon_tool_tip_tests)
+    add_executable(gui_forms_overlay_shadow_tests tests/overlay_shadow_tests.cpp)
+    target_link_libraries(gui_forms_overlay_shadow_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_overlay_shadow_tests COMMAND gui_forms_overlay_shadow_tests)
+    add_executable(gui_forms_ribbon_state_tests tests/ribbon_state_tests.cpp)
+    target_link_libraries(gui_forms_ribbon_state_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_ribbon_state_tests COMMAND gui_forms_ribbon_state_tests)
     add_executable(gui_forms_focus_region_tests tests/focus_region_tests.cpp)
     target_link_libraries(gui_forms_focus_region_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_focus_region_tests COMMAND gui_forms_focus_region_tests)
