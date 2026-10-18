@@ -35,6 +35,8 @@ Related types
      - AcceleratorToken is the move-only revocation handle for one Window accelerator registration whose lifetime is also bounded by its Component owner.
    * - :cpp:class:`ControlAvailabilityChange <gui_forms::ControlAvailabilityChange>`
      - ControlAvailabilityChange carries authoritative runtime/stable identity and effective visibility/enabled state after retained lifecycle change.
+   * - :cpp:class:`ControlSnapshot <gui_forms::ControlSnapshot>`
+     - A control subtree's picture (Window::snapshot_control): the registered image, the logical size it covers and its pixels per logical unit.
    * - :cpp:class:`DeferredInputSnapshot <gui_forms::DeferredInputSnapshot>`
      - DeferredInputSnapshot preserves the route, transformed event, and target identity required to resume deferred input safely.
    * - :cpp:class:`DialogKeySnapshot <gui_forms::DialogKeySnapshot>`
@@ -49,6 +51,8 @@ Related types
      - DispatchOperation observes and explicitly cancels one bounded FIFO work record; dropping it does not cancel fire-and-forget work.
    * - :cpp:class:`DisplayChunkInfo <gui_forms::DisplayChunkInfo>`
      - DisplayChunkInfo exposes immutable generation, paint plane, logical bounds, and command count for one retained recording without exposing its private commands.
+   * - :cpp:class:`FocusedControlChange <gui_forms::FocusedControlChange>`
+     - Focus moved from one control to another (or to or from none) through request_focus.
    * - :cpp:class:`FocusScopeChange <gui_forms::FocusScopeChange>`
      - FocusScopeChange publishes exact scope/root identity, depth, close reason, direction, and restoration outcome.
    * - :cpp:class:`FocusScopeId <gui_forms::FocusScopeId>`
@@ -146,6 +150,24 @@ Related types
    .. cpp:member:: bool effectively_visible
 
    .. cpp:member:: bool effectively_enabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ControlSnapshot final
+
+   ``#include <gui_forms/window/window.hpp>``
+
+   A control subtree's picture (Window::snapshot_control): the registered image, the logical size it covers and its pixels per logical unit.
+
+   .. cpp:member:: ImageId image
+
+   .. cpp:member:: Size logical_size
+
+   .. cpp:member:: double scale
+
+   .. cpp:member:: std::uint32_t pixel_width
+
+   .. cpp:member:: std::uint32_t pixel_height
 
 .. cpp:namespace:: gui_forms
 
@@ -338,6 +360,20 @@ Related types
    .. cpp:member:: Rect logical_bounds
 
    .. cpp:member:: std::size_t command_count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: FocusedControlChange final
+
+   ``#include <gui_forms/window/window.hpp>``
+
+   Focus moved from one control to another (or to or from none) through request_focus. ``previous_id`` and ``current_id`` are zero for none; ``stable_id`` is the newly focused control's, or empty.
+
+   .. cpp:member:: RuntimeId previous_id
+
+   .. cpp:member:: RuntimeId current_id
+
+   .. cpp:member:: std::string stable_id
 
 .. cpp:namespace:: gui_forms
 

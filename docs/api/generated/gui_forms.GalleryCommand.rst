@@ -72,6 +72,8 @@ gui_forms::GalleryCommand
 
       * - :cpp:func:`commit <gui_forms::GalleryCommand::commit>`
         - The user's choice: ends any outstanding preview without a cancellation, sets the value (raising :cpp:func:`value_changed <gui_forms::GalleryCommand::value_changed>` when it differs), then executes the command with the given source.
+      * - :cpp:func:`commit_routed <gui_forms::GalleryCommand::commit_routed>`
+        - As :cpp:func:`commit <gui_forms::GalleryCommand::commit>`, routing the command through a window's command chain (``Command::execute_routed``, decision DK-47); a :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>` with a window commits this way.
       * - :cpp:func:`preview <gui_forms::GalleryCommand::preview>`
         - Asks for a preview of an item.
       * - :cpp:func:`cancel_preview <gui_forms::GalleryCommand::cancel_preview>`
@@ -172,6 +174,12 @@ gui_forms::GalleryCommand
       sets the value (raising :cpp:func:`value_changed <gui_forms::GalleryCommand::value_changed>` when it differs), then executes
       the command with the given source. Returns false, changing nothing, while
       the command is disabled or for an empty or invalid ID.
+
+   .. cpp:function:: bool commit_routed(std::string item_id, Window& window, std::string_view source_id)
+
+      As :cpp:func:`commit <gui_forms::GalleryCommand::commit>`, routing the command through a window's command chain
+      (``Command::execute_routed``, decision DK-47); a :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>` with a
+      window commits this way.
 
    .. cpp:function:: bool preview(std::string item_id, std::string_view source_id)
 

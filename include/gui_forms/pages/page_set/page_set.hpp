@@ -119,6 +119,8 @@ public:
     [[nodiscard]] PageEditStatus set_title(const PageId& id, std::string title);
     [[nodiscard]] PageEditStatus set_image_key(const PageId& id, std::string image_key);
     [[nodiscard]] PageEditStatus set_closable(const PageId& id, bool closable);
+    // Sets the display-only `modified` flag (PageRecord::modified).
+    [[nodiscard]] PageEditStatus set_modified(const PageId& id, bool modified);
     // Attaches late content to a page that has none. On success `content` is
     // left null; on a refusal (`unknown_page`, `content_present`,
     // `selecting_in_progress`) it is unchanged and still the caller's. A null
