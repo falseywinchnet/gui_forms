@@ -233,6 +233,11 @@ void Painter::draw_retained_text_utf8(
     draw_text_utf8(origin, text, font, color);
 }
 
+void Painter::draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font,
+                                    const Color color, const TextOrientation) {
+    draw_text_utf8(origin, text, font, color);
+}
+
 void Painter::draw_live_surface(std::shared_ptr<LiveSurface>, Rect, double) {
     // Platform-neutral and deliberately inert. Terminal CPU renderers consume
     // the retained surface resource directly.

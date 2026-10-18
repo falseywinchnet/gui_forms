@@ -84,6 +84,28 @@ public:
         self.assertEqual(len(findings), 1)
         self.assertIn("vocabulary", findings[0])
 
+    def test_the_vocabulary_lists_the_docking_atoms(self) -> None:
+        schema = cs.load_schema()
+        vocabulary = schema["vocabulary"]
+        for mark in ("pin", "dock_shape"):
+            self.assertIn(mark, vocabulary["marks"])
+        for state in ("modified", "pinned"):
+            self.assertIn(state, vocabulary["custom_states"])
+            self.assertNotIn(state, vocabulary["states"])
+        for value in ("text_orientation", "dock_region"):
+            self.assertIn(value, vocabulary["values"])
+        for role in ("pane", "tab_panel"):
+            self.assertIn(role, vocabulary["semantic_roles"])
+        self.assertIn("close", vocabulary["semantic_actions"])
+        for field in ("controlled_panel", "orientation"):
+            self.assertIn(field, vocabulary["semantic_fields"])
+        shortened = dict(vocabulary)
+        del shortened["semantic_actions"]
+        findings = cs.validate({"types": schema["types"], "vocabulary": shortened},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 1)
+        self.assertIn("semantic_actions", findings[0])
+
 
 if __name__ == "__main__":
     unittest.main()

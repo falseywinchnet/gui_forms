@@ -56,7 +56,7 @@ inline constexpr std::array<GalleryPageSpec, 29> gallery_pages {{
      "Sliders, progress bars and scroll bars sharing one retained value.",
      false, "Value setting"},
     {"containers-and-focus", "Containers and focus",
-     "Container controls, split containers and focus scopes.",
+     "Container controls, split containers, focus scopes and a docked workspace.",
      false, "Grouping"},
     {"animation-laboratory", "Animation laboratory",
      "Easing preview and animated progress under the motion policy.",

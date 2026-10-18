@@ -54,12 +54,31 @@ void test_existing_translation_preserved() {
     }
 }
 
+// The keys docking binds (owner decision DK-30).
+void test_docking_keys() {
+    struct Mapping final { WPARAM native{}; std::uint32_t expected{}; };
+    const std::array<Mapping, 15> docking{{
+        {VK_OEM_MINUS, PhysicalKey::minus}, {VK_F3, PhysicalKey::f3}, {VK_F5, PhysicalKey::f5},
+        {VK_F6, PhysicalKey::f6}, {VK_F7, PhysicalKey::f7}, {VK_F8, PhysicalKey::f8},
+        {VK_F9, PhysicalKey::f9}, {VK_F10, PhysicalKey::f10}, {VK_F11, PhysicalKey::f11},
+        {VK_F12, PhysicalKey::f12}, {VK_APPS, PhysicalKey::context_menu},
+        {VK_CONTROL, PhysicalKey::left_control}, {VK_LCONTROL, PhysicalKey::left_control},
+        {VK_RCONTROL, PhysicalKey::right_control}, {VK_SUBTRACT, 0}}};
+    for (std::size_t index = 0; index < docking.size(); ++index) {
+        const Mapping& mapping = docking[index];
+        const std::uint32_t usage = host::detail::physical_key_from_virtual_key(mapping.native);
+        require(usage == mapping.expected, "docking key mapping");
+    }
+    static_assert(PhysicalKey::context_menu == 0x65U, "the context-menu key is HID Keyboard Application");
+}
+
 } // namespace
 
 int main() {
     try {
         test_us_slash_translation();
         test_existing_translation_preserved();
+        test_docking_keys();
         std::cout << "Windows virtual-key translation fixtures passed; native layout/input delivery not exercised\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

@@ -50,6 +50,11 @@ void append_node(std::ostringstream& stream, const SemanticNode& node) {
     if (node.set_size) stream << *node.set_size;
     else stream << "null";
     stream << ",\"has_popup\":" << (node.has_popup ? "true" : "false");
+    stream << ",\"controlled_panel\":";
+    append_json_string(stream, node.controlled_panel);
+    stream << ",\"orientation\":";
+    if (node.orientation) append_json_string(stream, semantic_orientation_name(*node.orientation));
+    else stream << "null";
     stream << ",\"bounds\":[" << node.bounds.x << ',' << node.bounds.y << ','
            << node.bounds.width << ',' << node.bounds.height << "],\"states\":"
            << static_cast<std::uint32_t>(node.states) << ",\"actions\":[";
@@ -105,6 +110,8 @@ const char* semantic_role_name(SemanticRole role) noexcept {
     case SemanticRole::separator: return "separator";
     case SemanticRole::split_button: return "split_button";
     case SemanticRole::menu_button: return "menu_button";
+    case SemanticRole::pane: return "pane";
+    case SemanticRole::tab_panel: return "tab_panel";
     case SemanticRole::count: return "generic";
     }
     return "generic";
@@ -121,8 +128,18 @@ const char* semantic_action_name(SemanticAction action) noexcept {
     case SemanticAction::collapse: return "collapse";
     case SemanticAction::show_menu: return "show_menu";
     case SemanticAction::set_value: return "set_value";
+    case SemanticAction::close: return "close";
+    case SemanticAction::count: return "unknown";
     }
     return "unknown";
+}
+
+const char* semantic_orientation_name(SemanticOrientation orientation) noexcept {
+    switch (orientation) {
+    case SemanticOrientation::horizontal: return "horizontal";
+    case SemanticOrientation::vertical: return "vertical";
+    }
+    return "horizontal";
 }
 
 std::string SemanticSnapshot::to_json() const {

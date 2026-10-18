@@ -246,6 +246,23 @@ void RecordingPainter::draw_retained_text_utf8(
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_turned_text_utf8(const Point origin, const std::string_view text,
+                                             const FontSpec font, const Color color,
+                                             const TextOrientation orientation) {
+    if (orientation == TextOrientation::horizontal) {
+        draw_text_utf8(origin, text, font, color);
+        return;
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_text_utf8;
+    command.first = origin;
+    command.color = color;
+    command.font = font;
+    command.text.assign(text);
+    command.text_orientation = orientation;
+    commands_.push_back(std::move(command));
+}
+
 Size RecordingPainter::measure_text_utf8(std::string_view text,
                                          FontSpec font) {
     return resolve_text_layout_utf8(text, font).logical_size;

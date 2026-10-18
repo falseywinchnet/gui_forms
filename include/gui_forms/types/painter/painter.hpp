@@ -94,6 +94,15 @@ public:
     virtual void draw_retained_text_utf8(
         Point origin, std::string_view text, FontSpec font, Color color,
         const std::shared_ptr<RetainedDrawCache>& cache);
+    // One line of text turned a quarter about `origin` (see TextOrientation).
+    // `origin` is the start of the baseline, as for draw_text_utf8; the run
+    // advances up the surface (bottom_to_top) or down it (top_to_bottom), so
+    // the measured width of the text becomes its height. `horizontal` draws
+    // as draw_text_utf8. The base implementation is a minimal painter's
+    // fallback that draws the run horizontally from `origin`, unturned; the
+    // recording, Windows DIB and Skia painters turn it.
+    virtual void draw_turned_text_utf8(Point origin, std::string_view text, FontSpec font,
+                                       Color color, TextOrientation orientation);
     // Text controls need the same metrics used by the painter for caret hit
     // testing, selection geometry, and horizontal viewport maintenance.  The
     // renderer owns those metrics; controls must not guess a fixed glyph width.

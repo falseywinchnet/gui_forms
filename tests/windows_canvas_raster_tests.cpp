@@ -117,7 +117,31 @@ void disclosure_render() {
         }
     }
 }
+// The clipboard is one per desktop: copies of this test running at the same
+// time (a parallel ctest, other checkouts on the machine) would replace each
+// other's contents between the write and the read. A named mutex serializes
+// them; the adapter's retrying open covers other processes that hold the
+// clipboard open for a moment after it changes.
+class ClipboardTestLock final {
+public:
+    ClipboardTestLock() : mutex_(CreateMutexW(nullptr, FALSE, L"Local\\GUI.Forms.tests.clipboard")) {
+        require(mutex_ != nullptr);
+        const DWORD waited = WaitForSingleObject(mutex_, 120000U);
+        require(waited == WAIT_OBJECT_0 || waited == WAIT_ABANDONED);
+    }
+    ~ClipboardTestLock() {
+        ReleaseMutex(mutex_);
+        CloseHandle(mutex_);
+    }
+    ClipboardTestLock(const ClipboardTestLock&) = delete;
+    ClipboardTestLock& operator=(const ClipboardTestLock&) = delete;
+
+private:
+    HANDLE mutex_;
+};
+
 void clipboard_files() {
+    const ClipboardTestLock lock;
     const std::shared_ptr<Panel> root = make_control<Panel>(StableId("clipboard-root"));
     Window model(root, {1, 1});
     const HWND owner = CreateWindowExW(0, L"STATIC", L"Clipboard file fixture", 0,
@@ -134,7 +158,7 @@ void clipboard_files() {
     (*header).fWide = TRUE;
     std::memcpy(static_cast<std::byte*>(memory) + sizeof(DROPFILES), path, sizeof(path));
     GlobalUnlock(allocation);
-    require(OpenClipboard(owner));
+    require(host::detail::open_clipboard_with_retry(owner));
     require(EmptyClipboard());
     require(SetClipboardData(CF_HDROP, allocation) != nullptr);
     CloseClipboard();
@@ -144,7 +168,7 @@ void clipboard_files() {
     require(files.status.accepted());
     require(files.paths_utf8.size() == 1);
     require(files.paths_utf8.front() == "C:\\Pictures\\Rainstar copied image Ω.png");
-    require(OpenClipboard(owner));
+    require(host::detail::open_clipboard_with_retry(owner));
     require(EmptyClipboard());
     CloseClipboard();
     require(services.read_clipboard_files().paths_utf8.empty());

@@ -303,7 +303,12 @@ void RibbonGallery::commit(std::size_t position) {
     const std::string item_id = items_[order_[position]].stable_id;
     if (command_) {
         const std::shared_ptr<GalleryCommand> command = command_;
-        static_cast<void>((*command).commit(item_id, source_of(*this)));
+        // Through the window's command chain (owner decision DK-47).
+        if (window() != nullptr) {
+            static_cast<void>((*command).commit_routed(item_id, *window(), source_of(*this)));
+        } else {
+            static_cast<void>((*command).commit(item_id, source_of(*this)));
+        }
     } else if (!(own_selection_ && *own_selection_ == item_id)) {
         own_selection_ = item_id;
         invalidate(Dirty::paint | Dirty::semantics);

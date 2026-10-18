@@ -83,7 +83,10 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
                               command.scalar);
             break;
         case DisplayOperation::draw_text_utf8:
-            if (command.retained_cache) {
+            if (command.text_orientation != TextOrientation::horizontal) {
+                painter.draw_turned_text_utf8(command.first, command.text, command.font,
+                                              command.color, command.text_orientation);
+            } else if (command.retained_cache) {
                 painter.draw_retained_text_utf8(command.first, command.text, command.font,
                                                 command.color, command.retained_cache);
             } else {
