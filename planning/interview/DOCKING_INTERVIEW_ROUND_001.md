@@ -68,3 +68,40 @@ objected). The owner, verbatim:
   inactive; only floating tool panels hide.
 - **GIVEN:** a floating panel carried by its main window is clamped to the
   work area of the screen it is on.
+
+## Part 2. Docking scope and the window layer, 2026-10-17
+
+Asked as A1 to A4 and the remaining B questions (B1 to B4, B5a, B6, B7),
+each with its recommendation marked: A1 a DK build stage for the window
+layer (phase 0) and W for the docking controls; A2-1; A3-1; A4-1; B1-1;
+B2-1; B3-1; B4-1; B5a-1; B6-1; B7-1. The owner, verbatim:
+
+> accepted on these.
+
+- **GIVEN A1.** The window layer underneath (study phase 0, host protocol
+  work) is built in a DK build stage of its own; the docking controls are
+  built in W, with DK as their planning ministage, as the ribbon (RB-1).
+- **GIVEN A2-1.** A renderer-free `DockLayout` model, a `DockWorkspace`
+  component that owns it, and controls that realize it.
+- **GIVEN A3-1.** Tool panels and documents are built together from the
+  start.
+- **GIVEN A4-1.** DK writes a small n-ary weighted split solver for the
+  dock site; stage L may adopt or replace it.
+- **GIVEN B1-1.** Owned windows can be opened and destroyed during a run,
+  bounded at 64 windows in all (today's `maximum_windows`) and 32 floating
+  sites.
+- **GIVEN B2-1.** Window frame get and set in screen logical units, the
+  pointer's screen position and the window under a screen point, each a
+  capability reporting `unsupported` where a host cannot.
+- **GIVEN B3-1.** The image registry and the theme become application
+  scope, shared by every window of a run.
+- **GIVEN B4-1.** A workspace transaction opens update scopes on every
+  affected window and orders window creation and destruction (study 5.3).
+- **GIVEN B5a-1.** Floating windows are owned by the main window: above it,
+  minimized with it, no taskbar button.
+- **GIVEN B6-1.** On X11, tool and floating windows are
+  `_NET_WM_WINDOW_TYPE_UTILITY` with skip-taskbar.
+- **GIVEN B7-1.** A floating window is moved by the framework's own capture
+  drag on its caption, setting the native frame per pointer move; phase 0
+  measures smoothness and a host that cannot keep up falls back to the
+  native move loop with progress reports (B7-2).

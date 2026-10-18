@@ -76,6 +76,25 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
    screen they join the main window's space; they stay above their own
    main window only, never above other applications' windows. A panel
    carried by its main window is clamped to its screen's work area.
+2. **Where it is built (A1).** The window layer underneath is a DK build
+   stage of its own; the docking controls are built in W, as the ribbon.
+3. **A separate layout model (A2-1):** renderer-free `DockLayout`, a
+   `DockWorkspace` component, and controls that realize it.
+4. **Tool panels and documents together from the start (A3-1).**
+5. **DK's own small split solver (A4-1),** which stage L may adopt or
+   replace.
+6. **Runtime windows (B1-1):** opened and destroyed during a run, at most
+   64 windows and 32 floating sites.
+7. **Screen coordinates (B2-1):** window frames, the screen pointer and the
+   window under a point, each capability-reported.
+8. **Application-scope images and theme (B3-1).**
+9. **Cross-window transactions (B4-1),** with ordered window creation and
+   destruction.
+10. **Floating windows owned by the main window (B5a-1):** no taskbar
+    button, minimized with it.
+11. **X11 utility windows with skip-taskbar (B6-1).**
+12. **The framework's own capture drag moves floating windows (B7-1),**
+    falling back to the native move loop where a host cannot keep up.
 
 ## What exists today
 
