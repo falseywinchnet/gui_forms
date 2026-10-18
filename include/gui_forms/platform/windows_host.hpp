@@ -79,6 +79,8 @@ struct WindowsApplicationWindow final {
     std::unique_ptr<Window> model;
     WindowsHostOptions options;
     bool tool_window{};
+    // See ApplicationWindow::floating.
+    HostWindowFloating floating{HostWindowFloating::none};
 };
 
 // Opens one window while the application runs: the same entry, ownership

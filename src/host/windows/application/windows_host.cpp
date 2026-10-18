@@ -2451,6 +2451,13 @@ public:
     // Defined in windows_application_run.inc.
     void report_frame_to_run();
     void retire_from_run() noexcept;
+    void report_application_active_to_run(bool active);
+    void hidden_on_close_to_run() noexcept;
+    // Shows without activating, for the floating policy.
+    void show_without_activation() noexcept {
+        if (hwnd_ != nullptr && !closed_) ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    }
+    void hide_for_policy() noexcept { hide_window(); }
 
     [[nodiscard]] HANDLE live_frame_clock() const noexcept {
         return live_frame_clock_;
@@ -2493,6 +2500,11 @@ public:
             }
         }
         switch (message) {
+        case WM_ACTIVATEAPP:
+            // Sent to every top-level window of the thread; the windowing
+            // ignores repeated reports of the same state.
+            report_application_active_to_run(wparam != FALSE);
+            break;
         case WM_SIZE: resize(); report_frame_to_run(); return 0;
         case WM_MOVE: report_frame_to_run(); return 0;
         case WM_DPICHANGED: dpi_changed(wparam, lparam); return 0;
@@ -3567,6 +3579,7 @@ private:
         if (result.accepted() && result.close_allowed) {
             if (options_.hide_on_close) {
                 hide_window();
+                hidden_on_close_to_run();
                 return 0;
             }
             native_phase_ = NativePhase::closing;
@@ -4238,7 +4251,10 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows,
             WindowsRunSlot& slot = (*run).slot_at(index);
             if (slot.id != listed_ids[listed]) continue;
             const HWND window = (*slot.state).native_window();
-            if (windows[listed].options.initially_visible) {
+            const bool visible = windows[listed].options.initially_visible;
+            // A floating window is shown by the floating policy.
+            (*run).window_created(slot.id, visible);
+            if (visible && !slot.floating) {
                 ShowWindow(window, windows[listed].tool_window ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
                 UpdateWindow(window);
             }
@@ -4248,6 +4264,8 @@ int run_windows_application(std::vector<WindowsApplicationWindow> windows,
             break;
         }
     }
+
+    (*run).report_foreground();
 
     MSG message{};
     bool quit{};

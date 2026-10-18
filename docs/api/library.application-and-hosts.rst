@@ -165,6 +165,8 @@ Related types
      - Application-scope windowing for one run (stage DK decisions 6 and 7): the table of the run's live windows, runtime destruction, window frames in desktop logical units, the pointer's desktop position, the window under a desktop point and ordering within the application.
    * - :cpp:class:`HostWindowingSnapshot <gui_forms::HostWindowingSnapshot>`
      -  
+   * - :cpp:class:`HostWindowKindTraits <gui_forms::HostWindowKindTraits>`
+     - What the run does with a window of each kind (stage DK decisions 1, 10 and 11).
    * - :cpp:class:`LinuxApplicationOptions <gui_forms::host::LinuxApplicationOptions>`
      -  
    * - :cpp:class:`LinuxApplicationWindow <gui_forms::host::LinuxApplicationWindow>`
@@ -230,6 +232,10 @@ Related types
    .. cpp:member:: ApplicationWindowOptions options
 
    .. cpp:member:: bool tool_window
+
+   .. cpp:member:: HostWindowFloating floating
+
+      A floating window (stage DK decisions 1, 10 and 11): owned by the primary window (owner_id names it; tool_window stays false), no taskbar button, minimized with it, above it only, moved with it and clamped to the work area of the screen it lands on. A floating tool also hides while the application is inactive; a floating document does not. The policy decides when the window is on screen; show and hide on its handle say whether it is wanted. See HostWindowKindTraits. Default: ``{HostWindowFloating::none}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1574,7 +1580,7 @@ Related types
 
    ``#include <gui_forms/host/windowing/host_windowing.hpp>``
 
-   Application-scope windowing for one run (stage DK decisions 6 and 7): the table of the run's live windows, runtime destruction, window frames in desktop logical units, the pointer's desktop position, the window under a desktop point and ordering within the application. The base class owns the UI-thread check, capability gating, identities, the bounds and validation, so every adapter applies the same rules; an adapter implements the ``*_impl`` operations for its platform. A request a host cannot perform reports ``unsupported`` (HostCapability bits runtime_windows, window_frames, screen_pointer, window_at_point and window_ordering). Opening a window is not a member: it needs the window's model and callbacks, which each adapter receives in its own entry type. The adapter calls admit() before it creates the native window and retire() when the native window is gone, whatever closed it. Every member runs on the thread that constructed the object. Requests from another thread report wrong_thread; requests after shutdown() report after_shutdown; unknown or retired identities are invalid_argument.
+   Application-scope windowing for one run (stage DK decisions 6 and 7): the table of the run's live windows, runtime destruction, window frames in desktop logical units, the pointer's desktop position, the window under a desktop point and ordering within the application. The base class owns the UI-thread check, capability gating, identities, the bounds and validation, so every adapter applies the same rules; an adapter implements the ``*_impl`` operations for its platform. A request a host cannot perform reports ``unsupported`` (HostCapability bits runtime_windows, window_frames, screen_pointer, window_at_point and window_ordering). Opening a window is not a member: it needs the window's model and callbacks, which each adapter receives in its own entry type. The adapter calls admit() before it creates the native window and retire() when the native window is gone, whatever closed it. The floating policy (HostWindowKindTraits) is carried out here too: the adapter reports application activation, the primary window's minimized state and every frame, and the base class decides which floating windows are shown and where they move, calling show_impl, hide_impl and request_frame_impl. Following works the same whether or not the platform also moves owned windows itself (macOS child windows do): a floating window's offset is learnt only from moves of the floating window itself, never from a move the primary window caused. Every member runs on the thread that constructed the object. Requests from another thread report wrong_thread; requests after shutdown() report after_shutdown; unknown or retired identities are invalid_argument.
 
 
    .. rubric:: Construction
@@ -1586,7 +1592,11 @@ Related types
 
    .. cpp:function:: HostWindowId primary() const noexcept
 
+   .. cpp:function:: bool application_active() const noexcept
+
    .. cpp:function:: std::size_t window_count() const noexcept
+
+   .. cpp:function:: std::size_t floating_window_count() const noexcept
 
    .. cpp:function:: const HostCapabilities& capabilities() const noexcept
 
@@ -1638,13 +1648,21 @@ Related types
 
       The owner, or an invalid identity for a window without one. Empty for an unknown window.
 
+   .. cpp:function:: bool policy_visible(HostWindowId window) const noexcept
+
+      Whether the window should be on screen now: what the program asked for, after the floating policy. Adapters show a new window only when this is true. False for an unknown window.
+
    .. cpp:function:: void shutdown() noexcept
 
       Ends the run's windowing: every later request reports after_shutdown and the table is cleared. Called by the adapter as the run ends.
 
    .. cpp:function:: HostWindowAdmission admit(const HostWindowDescription& description)
 
-      Validates and records a window before its native creation. Rules: the stable id is 1 to 1024 bytes of UTF-8 without NUL and unique among live windows; at most maximum_windows live windows; the owner, when given, is live; exactly one primary, admitted first, without an owner; a standard window has an owner. After mark_started() an admission needs runtime_windows and may not be primary. A refused admission changes nothing.
+      Validates and records a window before its native creation. Rules: the stable id is 1 to 1024 bytes of UTF-8 without NUL and unique among live windows; at most maximum_windows live windows; the owner, when given, is live; exactly one primary, admitted first, without an owner; a standard window has an owner; a floating window is owned by the primary window, and at most maximum_floating_windows are live. After mark_started() an admission needs runtime_windows and may not be primary. A refused admission changes nothing.
+
+   .. cpp:function:: void window_created(HostWindowId window, bool initially_visible) noexcept
+
+      The native window exists, hidden. Records whether the program wants it visible; the adapter then shows it if policy_visible() says so.
 
    .. cpp:function:: void mark_started() noexcept
 
@@ -1656,7 +1674,23 @@ Related types
 
    .. cpp:function:: void report_frame(HostWindowId window, const HostWindowFrame& frame)
 
-      A native move or resize happened (or the first frame is known). The frame is recorded and frame_changed is published.
+      A native move or resize happened (or the first frame is known). The frame is recorded and frame_changed is published. A move of the primary window moves the windows that follow it; a move of a following window by anything else sets its offset.
+
+   .. cpp:function:: void report_application_active(bool active)
+
+      The application became active or inactive (all its windows together). Repeated reports of the same state are ignored.
+
+   .. cpp:function:: void report_minimized(HostWindowId window, bool minimized)
+
+      A window was minimized or restored. For the primary window this hides or shows its floating windows.
+
+   .. cpp:function:: void report_hidden_on_close(HostWindowId window) noexcept
+
+      The user closed a hide_on_close window, which the adapter hid: the program no longer wants it visible, so activation does not bring it back.
+
+   .. cpp:function:: HostServiceStatus set_visible(HostWindowId window, bool visible)
+
+      The program shows or hides a window. For a floating window this is the window's wanted visibility; the policy shows it only while the application is active (floating tools) and the primary window is not minimized. Other kinds are shown or hidden directly.
 
 
    .. rubric:: Extension points
@@ -1695,9 +1729,23 @@ Related types
 
       *Protected.*
 
+   .. cpp:function:: virtual HostServiceStatus show_impl(HostWindowId window) = 0
+
+      *Protected.*
+
+      Shows the native window without activating it; hides it. Called for floating windows by the policy and for any window by set_visible.
+
+   .. cpp:function:: virtual HostServiceStatus hide_impl(HostWindowId window) = 0
+
+      *Protected.*
+
    .. cpp:member:: constexpr std::size_t maximum_windows
 
       Default: ``64U``.
+
+   .. cpp:member:: constexpr std::size_t maximum_floating_windows
+
+      Default: ``32U``.
 
    .. cpp:member:: constexpr std::size_t maximum_stable_id_bytes
 
@@ -1732,9 +1780,47 @@ Related types
 
    .. cpp:member:: std::uint64_t rejected_requests
 
+   .. cpp:member:: std::uint64_t policy_hides
+
+      Floating policy: windows hidden and shown by the policy (application activation, the primary window minimized), and follow moves requested, of which some were clamped to a work area.
+
+   .. cpp:member:: std::uint64_t policy_shows
+
+   .. cpp:member:: std::uint64_t follow_moves
+
+   .. cpp:member:: std::uint64_t clamped_follow_moves
+
+   .. cpp:member:: bool application_active
+
+      Default: ``{true}``.
+
    .. cpp:member:: bool started
 
    .. cpp:member:: bool shutdown
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostWindowKindTraits final
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   What the run does with a window of each kind (stage DK decisions 1, 10 and 11). One portable rule on every host; the adapters only carry it out.
+
+   .. cpp:member:: bool floating
+
+      Owned by the primary window, without a taskbar button, minimized with it, and above it only, never above other applications' windows. At most HostWindowing::maximum_floating_windows are live at once.
+
+   .. cpp:member:: bool hides_when_application_inactive
+
+      Hidden while the application is inactive and shown again when it is activated (the Mac palette convention). The program's own show and hide still decide whether the window is wanted at all.
+
+   .. cpp:member:: bool follows_main_window
+
+      Moved with the primary window, keeping its offset from it, and clamped to the work area of the screen it lands on.
+
+   .. cpp:member:: bool joins_main_full_screen
+
+      Joins the primary window's full-screen space where a host has such spaces (macOS); nothing elsewhere.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -1765,6 +1851,10 @@ Related types
    .. cpp:member:: LinuxHostOptions options
 
    .. cpp:member:: bool tool_window
+
+   .. cpp:member:: HostWindowFloating floating
+
+      See ApplicationWindow::floating. Default: ``{HostWindowFloating::none}``.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -1857,6 +1947,10 @@ Related types
    .. cpp:member:: MacHostOptions options
 
    .. cpp:member:: bool tool_window
+
+   .. cpp:member:: HostWindowFloating floating
+
+      See ApplicationWindow::floating. Default: ``{HostWindowFloating::none}``.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -2021,6 +2115,10 @@ Related types
    .. cpp:member:: WindowsHostOptions options
 
    .. cpp:member:: bool tool_window
+
+   .. cpp:member:: HostWindowFloating floating
+
+      See ApplicationWindow::floating. Default: ``{HostWindowFloating::none}``.
 
 .. cpp:namespace:: gui_forms::host
 
@@ -2471,6 +2569,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: HostWindowFloating
+
+   ``#include <gui_forms/host/windowing/host_windowing.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: tool
+
+   .. cpp:enumerator:: document
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: HostWindowKind
 
    ``#include <gui_forms/host/windowing/host_windowing.hpp>``
@@ -2480,6 +2590,10 @@ Enumerations
    .. cpp:enumerator:: standard
 
    .. cpp:enumerator:: tool
+
+   .. cpp:enumerator:: floating_tool
+
+   .. cpp:enumerator:: floating_document
 
 .. cpp:namespace:: gui_forms::host
 
@@ -2597,6 +2711,16 @@ Functions, constants and aliases
 ``#include <gui_forms/host/windowing/host_windowing.hpp>``
 
 .. cpp:function:: const char* host_window_kind_name(HostWindowKind kind) noexcept
+
+.. cpp:function:: HostWindowKindTraits host_window_kind_traits(HostWindowKind kind) noexcept
+
+.. cpp:function:: HostWindowKind host_window_kind(bool has_owner, bool tool_window, HostWindowFloating floating) noexcept
+
+   The kind of a window entry, the one rule every adapter uses: a floating entry is floating_tool or floating_document; else a tool window is tool; else a window with an owner is standard and one without is primary.
+
+.. cpp:function:: Rect clamp_to_work_area(Rect outer, Rect work_area) noexcept
+
+   Moves ``outer`` the least distance that puts it inside ``work_area``; a rectangle wider or taller than the work area is aligned with its left or top edge. The size never changes.
 
 .. cpp:namespace:: gui_forms::host
 

@@ -202,6 +202,39 @@ void HeadlessWindowing::move_native(HostWindowId window, Rect content) {
     NativeWindow* entry = native(window);
     if (entry == nullptr) return;
     const Rect old_content = (*entry).content;
+    if (native_follow_ && window == primary()) {
+        // The platform carries the floating windows first and reports them
+        // before the primary window's own report.
+        const double dx = content.x - old_content.x;
+        const double dy = content.y - old_content.y;
+        std::vector<HostWindowId> carried;
+        carried.reserve(maximum_windows);
+        for (std::size_t index = 0U; index < natives_.size(); ++index) {
+            const HostWindowId candidate = natives_[index].id;
+            const std::optional<HostWindowKind> candidate_kind = kind(candidate);
+            const std::optional<HostWindowId> candidate_owner = owner(candidate);
+            if (!candidate_kind.has_value() || !candidate_owner.has_value()) continue;
+            if (*candidate_owner != window || !host_window_kind_traits(*candidate_kind).floating) continue;
+            carried.push_back(candidate);
+        }
+        // The primary window's native rectangle moves with them, as the
+        // platform's state does, before any report.
+        (*entry).content = content;
+        for (std::size_t index = 0U; index < carried.size(); ++index) {
+            NativeWindow* child = native(carried[index]);
+            if (child == nullptr) continue;
+            const Rect child_old = (*child).content;
+            (*child).content.x += dx;
+            (*child).content.y += dy;
+            std::ostringstream carried_line;
+            carried_line << "carried id=" << carried[index].value << " content=";
+            append_rect(carried_line, (*child).content);
+            note(carried_line.str());
+            (*application_).native_frame_changed(carried[index], child_old, (*child).content);
+        }
+        entry = native(window);
+        if (entry == nullptr) return;
+    }
     (*entry).content = content;
     std::ostringstream line;
     line << "user-frame id=" << window.value << " content=";
@@ -242,10 +275,26 @@ HostServiceStatus HeadlessWindowing::request_frame_impl(HostWindowId window, Rec
     line << "frame id=" << window.value << " content=";
     append_rect(line, content);
     note(line.str());
+    if (deferred_reports_) {
+        deferred_.push_back({window, old_content});
+        return {};
+    }
     // As on Windows, the native frame report arrives before the request
     // returns.
     (*application_).native_frame_changed(window, old_content, content);
     return {};
+}
+
+void HeadlessWindowing::flush_frame_reports() {
+    // Reports raised while flushing (follow moves) are queued behind.
+    for (std::size_t index = 0U; index < deferred_.size(); ++index) {
+        const DeferredReport report = deferred_[index];
+        const NativeWindow* entry = native(report.window);
+        if (entry == nullptr) continue;
+        const Rect content = (*entry).content;
+        (*application_).native_frame_changed(report.window, report.old_content, content);
+    }
+    deferred_.clear();
 }
 
 HostScreenPointResult HeadlessWindowing::pointer_position_impl() {
@@ -303,6 +352,18 @@ HostMonitorResult HeadlessWindowing::query_monitors_impl() {
     HostMonitorResult result;
     result.monitors = monitors_;
     return result;
+}
+
+HostServiceStatus HeadlessWindowing::show_impl(HostWindowId window) {
+    if (native(window) == nullptr) return {HostServiceError::invalid_argument};
+    set_native_visible(window, true);
+    return {};
+}
+
+HostServiceStatus HeadlessWindowing::hide_impl(HostWindowId window) {
+    if (native(window) == nullptr) return {HostServiceError::invalid_argument};
+    set_native_visible(window, false);
+    return {};
 }
 
 // HeadlessApplication -------------------------------------------------------
@@ -432,9 +493,8 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
         }
         owner = *found;
     }
-    HostWindowKind kind = HostWindowKind::standard;
-    if (source.tool_window) kind = HostWindowKind::tool;
-    else if (!owner.valid()) kind = HostWindowKind::primary;
+    const HostWindowKind kind = host_window_kind(owner.valid(), source.tool_window, source.floating);
+    const bool floating = host_window_kind_traits(kind).floating;
     if (kind == HostWindowKind::primary &&
         (runtime || !source.options.initially_visible || source.options.hide_on_close)) {
         result.status.error = HostServiceError::invalid_argument;
@@ -483,8 +543,14 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     state.run = run_;
     state.can_hide = kind != HostWindowKind::primary;
     state.request_close = HeadlessRequestClose{this, window.id};
-    state.show = HeadlessShow{this, window.id, true};
-    state.hide = HeadlessShow{this, window.id, false};
+    if (floating) {
+        // The floating policy decides when the window is on screen.
+        state.show = detail::PolicyVisibility{window.state, true};
+        state.hide = detail::PolicyVisibility{window.state, false};
+    } else {
+        state.show = HeadlessShow{this, window.id, true};
+        state.hide = HeadlessShow{this, window.id, false};
+    }
     state.set_title = HeadlessTitle{&windowing_, window.id};
     state.request_client_size = HeadlessClientSize{this, window.id};
     state.frame_changed = window.options.frame_changed;
@@ -498,8 +564,12 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(opened.state);
     if (opened.options.ready) opened.options.ready(*opened.model, handle);
     WindowEntry* still_open = entry(admission.window);
-    if (still_open != nullptr && (*still_open).options.initially_visible) {
-        show(admission.window, true);
+    if (still_open != nullptr && floating) {
+        // Created hidden; the policy shows it when it may be on screen.
+        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
+    } else if (still_open != nullptr) {
+        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
+        if ((*still_open).options.initially_visible) show(admission.window, true);
     }
     result.window = handle;
     return result;
@@ -551,6 +621,7 @@ void HeadlessApplication::simulate_user_close(HostWindowId window) {
     if (found == nullptr) return;
     if ((*found).options.hide_on_close) {
         show(window, false);
+        windowing_.report_hidden_on_close(window);
         return;
     }
     if (window != windowing_.primary()) {
@@ -565,6 +636,21 @@ void HeadlessApplication::simulate_user_close(HostWindowId window) {
     }
     WindowEntry* primary = entry(window);
     if (primary != nullptr) close(*primary, HostCloseReason::user);
+}
+
+void HeadlessApplication::simulate_application_active(bool active) {
+    std::ostringstream line;
+    line << "application active=" << (active ? 1 : 0);
+    windowing_.note(line.str());
+    windowing_.report_application_active(active);
+}
+
+void HeadlessApplication::simulate_minimized(HostWindowId window, bool minimized) {
+    if (entry(window) == nullptr) return;
+    std::ostringstream line;
+    line << (minimized ? "minimize" : "restore") << " id=" << window.value;
+    windowing_.note(line.str());
+    windowing_.report_minimized(window, minimized);
 }
 
 HostServiceStatus HeadlessApplication::destroy(HostWindowId window) {

@@ -42,6 +42,14 @@ public:
     // of this run. window_at reports no window where it lies.
     void add_foreign_window(Rect outer);
     void clear_foreign_windows() noexcept { foreign_windows_.clear(); }
+    // Platform behaviours the policy must survive. Native follow: moving the
+    // primary window first moves its floating windows by the same distance
+    // and reports them, before the primary window's own report (macOS child
+    // windows). Deferred reports: a frame request changes the native window
+    // at once but its report waits for flush_frame_reports (X11).
+    void set_native_follow(bool enabled) noexcept { native_follow_ = enabled; }
+    void set_deferred_frame_reports(bool enabled) noexcept { deferred_reports_ = enabled; }
+    void flush_frame_reports();
 
     [[nodiscard]] const std::string& trace() const noexcept { return trace_; }
     void clear_trace() noexcept { trace_.clear(); }
@@ -70,6 +78,8 @@ protected:
     [[nodiscard]] HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     [[nodiscard]] HostServiceStatus destroy_window_impl(HostWindowId window) override;
     [[nodiscard]] HostMonitorResult query_monitors_impl() override;
+    [[nodiscard]] HostServiceStatus show_impl(HostWindowId window) override;
+    [[nodiscard]] HostServiceStatus hide_impl(HostWindowId window) override;
 
 private:
     struct NativeWindow final {
@@ -83,8 +93,16 @@ private:
     [[nodiscard]] const NativeWindow* native(HostWindowId window) const noexcept;
     void raise_native(HostWindowId window);
 
+    struct DeferredReport final {
+        HostWindowId window{};
+        Rect old_content{};
+    };
+
     // The owner; outlives this object (it is a member of the owner).
     HeadlessApplication* application_{};
+    bool native_follow_{};
+    bool deferred_reports_{};
+    std::vector<DeferredReport> deferred_;
     std::vector<HostMonitor> monitors_;
     Point pointer_{};
     std::vector<Rect> foreign_windows_;
@@ -126,6 +144,11 @@ public:
     // a hide_on_close window and closes any other. Closing the primary
     // window ends the run's windows, as on a native host.
     void simulate_user_close(HostWindowId window);
+    // The application gains or loses activation (the user switched to or
+    // from another application).
+    void simulate_application_active(bool active);
+    // The user minimizes or restores a window.
+    void simulate_minimized(HostWindowId window, bool minimized);
     // Releases the models and protocol adapters of windows closed earlier.
     // A test calls it between steps, as a native host does at the end of a
     // loop turn, so a window is never released inside one of its own

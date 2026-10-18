@@ -38,6 +38,8 @@ protected:
   HostServiceStatus bring_to_front_impl(HostWindowId window) override;
   HostServiceStatus destroy_window_impl(HostWindowId window) override;
   HostMonitorResult query_monitors_impl() override;
+  HostServiceStatus show_impl(HostWindowId window) override;
+  HostServiceStatus hide_impl(HostWindowId window) override;
 
 private:
   NativeWindow *native(HostWindowId window) noexcept;
@@ -158,6 +160,16 @@ public:
   Size size;
   bool closed{};
   bool visible{};
+  // Holds the X input focus (FocusIn without a grab); the run is active
+  // while any of its windows does.
+  bool focused{};
+  // A utility window for the window manager (decision 11): tool and
+  // floating windows, typed _NET_WM_WINDOW_TYPE_UTILITY and kept off the
+  // taskbar (_NET_WM_STATE_SKIP_TASKBAR).
+  bool utility{};
+  // Where a window hidden by the floating policy was, so mapping it again
+  // puts it back (a window manager may place a remapped window anew).
+  std::optional<Rect> hidden_content;
   bool modal{};
   bool frame_capture_completed{};
   bool frame_capture_saved{};
@@ -219,6 +231,12 @@ public:
   void step(int maximum_wait = -1);
   // Releases runtime windows that closed, between loop turns.
   void reclaim();
+  // Reports application activation to the windowing after a turn's events:
+  // active while any window holds the focus. Nothing is reported before
+  // the first focus is seen (an X server without a window manager may
+  // never give one).
+  void report_activation();
+  bool ever_focused{};
   void dispatch(XEvent &event);
   Atom atom(const char *name) const;
   Display *display{};

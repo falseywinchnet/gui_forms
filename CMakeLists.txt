@@ -2643,6 +2643,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
     target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)
+    add_executable(gui_forms_floating_windows_tests tests/floating_windows_tests.cpp)
+    target_link_libraries(gui_forms_floating_windows_tests PRIVATE gui_forms_host_headless)
+    add_test(NAME gui_forms_floating_windows_tests COMMAND gui_forms_floating_windows_tests)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}

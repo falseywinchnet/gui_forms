@@ -49,11 +49,9 @@ HostWindowAdmission X11Windowing::open(LinuxApplicationWindow entry,
     owner_id = *found;
     owner_xid = (*owner).xid;
   }
-  HostWindowKind kind = HostWindowKind::standard;
-  if (entry.tool_window)
-    kind = HostWindowKind::tool;
-  else if (!owner_id.valid())
-    kind = HostWindowKind::primary;
+  const HostWindowKind kind =
+      host_window_kind(owner_id.valid(), entry.tool_window, entry.floating);
+  const bool floating = host_window_kind_traits(kind).floating;
   HostWindowDescription description;
   description.stable_id = entry.stable_id;
   description.owner = owner_id;
@@ -62,6 +60,10 @@ HostWindowAdmission X11Windowing::open(LinuxApplicationWindow entry,
   if (!admission.status.accepted())
     return admission;
   const HostWindowId id = admission.window;
+  // A floating window is created unmapped; the floating policy maps it.
+  const bool initially_visible = entry.options.initially_visible;
+  if (floating)
+    entry.options.initially_visible = false;
   std::shared_ptr<NativeWindow> window;
   try {
     window = runtime_.add(std::move(entry), owner_xid, id, !runtime);
@@ -73,11 +75,38 @@ HostWindowAdmission X11Windowing::open(LinuxApplicationWindow entry,
     admission.window = {};
     return admission;
   }
-  if (!runtime)
+  if (!runtime) {
+    window_created(id, initially_visible);
     return admission;
+  }
   (*window).ready();
   report_native_frame(*window);
+  window_created(id, initially_visible);
   return admission;
+}
+
+HostServiceStatus X11Windowing::show_impl(HostWindowId window) {
+  NativeWindow *found = native(window);
+  if (found == nullptr)
+    return {HostServiceError::after_shutdown};
+  (*found).action(ActionKind::show);
+  // Put a window the policy hid back where it was.
+  if ((*found).hidden_content.has_value()) {
+    const Rect content = *(*found).hidden_content;
+    (*found).hidden_content.reset();
+    static_cast<void>((*found).request_frame(content));
+  }
+  return {};
+}
+
+HostServiceStatus X11Windowing::hide_impl(HostWindowId window) {
+  NativeWindow *found = native(window);
+  if (found == nullptr)
+    return {HostServiceError::after_shutdown};
+  if ((*found).visible)
+    (*found).hidden_content = (*found).frame().content;
+  (*found).action(ActionKind::hide);
+  return {};
 }
 
 void X11Windowing::report_native_frame(NativeWindow &window) {

@@ -256,6 +256,8 @@ struct RuntimeWindowsProbe final {
     HostServiceStatus destroy{};
     bool closed_before_return{};
     bool handle_expired{};
+    HostServiceStatus floating_open{};
+    HostServiceStatus floating_destroy{};
 };
 struct FloatingReady final {
     RuntimeWindowsProbe* probe{};
@@ -307,6 +309,24 @@ struct RuntimeMainReady final {
                 state.handle_expired = !opened.window.active() &&
                     opened.window.show().error == HostServiceError::after_shutdown;
             }
+            // A floating document (decision 1), opened hidden and destroyed:
+            // its native style and the policy's creation path, without
+            // putting a window on the desktop.
+            ApplicationWindow floating{};
+            floating.stable_id = "native.runtime.floating";
+            floating.owner_id = "main";
+            floating.floating = HostWindowFloating::document;
+            floating.model = make_window();
+            floating.options.title = "GUI.Forms floating window fixture";
+            floating.options.initial_size = {220.0, 160.0};
+            floating.options.minimum_size = {100.0, 80.0};
+            floating.options.initially_visible = false;
+            floating.options.print_metrics_on_close = false;
+            const ApplicationWindowOpenResult floating_window = windows.open_window(std::move(floating));
+            state.floating_open = floating_window.status;
+            if (floating_window.status.accepted()) {
+                state.floating_destroy = windows.destroy_window(floating_window.window);
+            }
         }
         require(handle.request_close().accepted(), "runtime fixture close failed");
     }
@@ -337,6 +357,8 @@ void check_runtime_windows() {
     require(probe.destroy.accepted() && probe.closed_before_return && probe.floating_closed == 1U,
             "runtime window destroy did not close it once before returning");
     require(probe.handle_expired, "destroyed runtime window handle still active");
+    require(probe.floating_open.accepted() && probe.floating_destroy.accepted(),
+            "floating document window not opened and destroyed");
 }
 }
 int main() {

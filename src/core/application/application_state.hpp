@@ -70,6 +70,15 @@ struct ApplicationHandleAccess final {
 
 // Run bookkeeping shared by every adapter, defined in application.cpp.
 
+// ApplicationWindowHandle::show and hide for a floating window: the request
+// goes to the run's floating policy (HostWindowing::set_visible), which
+// decides when the window is on screen.
+struct PolicyVisibility final {
+    std::weak_ptr<ApplicationWindowState> state{};
+    bool visible{};
+    void operator()() const;
+};
+
 // Connects `run` to `windowing`: the frame router subscribes to its
 // frame_changed, and `open_window` becomes the run's open operation.
 void attach_run_windowing(

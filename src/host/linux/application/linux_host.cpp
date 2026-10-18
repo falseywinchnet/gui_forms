@@ -48,6 +48,26 @@ struct WindowTitle final {
     } catch (...) { return {HostServiceError::backend_failure}; }
   }
 };
+// True when the window manager has minimized the window
+// (_NET_WM_STATE_HIDDEN).
+bool window_state_hidden(NativeWindow& window) {
+  Atom type{};
+  int format{};
+  unsigned long count{}, remaining{};
+  unsigned char* data = nullptr;
+  bool hidden = false;
+  if (XGetWindowProperty(window.runtime.display, window.xid, window.runtime.atom("_NET_WM_STATE"),
+                         0, 64, False, XA_ATOM, &type, &format, &count, &remaining,
+                         &data) == Success && type == XA_ATOM && format == 32) {
+    const Atom hidden_atom = window.runtime.atom("_NET_WM_STATE_HIDDEN");
+    const Atom* atoms = reinterpret_cast<const Atom*>(data);
+    for (unsigned long index = 0; index < count; ++index) {
+      if (atoms[index] == hidden_atom) hidden = true;
+    }
+  }
+  if (data != nullptr) XFree(data);
+  return hidden;
+}
 // True when the window manager holds the window full screen or maximized
 // (_NET_WM_STATE); a size request would fight it.
 bool window_state_fixed(NativeWindow& window) {
@@ -587,6 +607,18 @@ std::shared_ptr<NativeWindow> Runtime::add(LinuxApplicationWindow entry,
   (*window).attach();
   return window;
 }
+void Runtime::report_activation() {
+  if (!windowing)
+    return;
+  bool any = false;
+  for (std::size_t i = 0; i < windows.size(); ++i)
+    if (!(*windows[i]).closed && (*windows[i]).focused)
+      any = true;
+  if (any)
+    ever_focused = true;
+  if (ever_focused)
+    (*windowing).report_application_active(any);
+}
 void Runtime::reclaim() {
   for (std::size_t i = windows.size(); i > 0; --i) {
     const NativeWindow &window = *windows[i - 1];
@@ -651,6 +683,20 @@ NativeWindow::NativeWindow(Runtime &host, LinuxApplicationWindow source)
   wm.flags = InputHint;
   wm.input = True;
   XSetWMHints(runtime.display, xid, &wm);
+  utility = entry.tool_window || entry.floating != HostWindowFloating::none;
+  if (utility) {
+    // Set while unmapped, so the window manager reads them when it first
+    // manages the window (EWMH: clients set _NET_WM_STATE directly before
+    // mapping).
+    const Atom type = runtime.atom("_NET_WM_WINDOW_TYPE_UTILITY");
+    XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_WINDOW_TYPE"),
+                    XA_ATOM, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char *>(&type), 1);
+    const Atom skip = runtime.atom("_NET_WM_STATE_SKIP_TASKBAR");
+    XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_STATE"),
+                    XA_ATOM, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char *>(&skip), 1);
+  }
   gc = XCreateGC(runtime.display, xid, 0, nullptr);
   if (runtime.input_method != nullptr)
     input = XCreateIC(runtime.input_method, XNInputStyle,
@@ -727,6 +773,14 @@ void NativeWindow::action(ActionKind kind) {
   }
   if (kind == ActionKind::show) {
     visible = true;
+    if (utility) {
+      // A window manager removes _NET_WM_STATE when a window is withdrawn;
+      // restate skip-taskbar before every map.
+      const Atom skip = runtime.atom("_NET_WM_STATE_SKIP_TASKBAR");
+      XChangeProperty(runtime.display, xid, runtime.atom("_NET_WM_STATE"),
+                      XA_ATOM, 32, PropModeReplace,
+                      reinterpret_cast<const unsigned char *>(&skip), 1);
+    }
     XMapRaised(runtime.display, xid);
     damage.add({0, 0, size.width, size.height});
   }
@@ -810,6 +864,8 @@ void NativeWindow::close(HostCloseReason reason, bool force) {
       return;
     if (entry.options.hide_on_close) {
       action(ActionKind::hide);
+      if (runtime.windowing)
+        (*runtime.windowing).report_hidden_on_close(window_id);
       return;
     }
   }
@@ -867,7 +923,19 @@ void NativeWindow::event(XEvent &event) {
     close(HostCloseReason::user);
     return;
   }
+  if (event.type == PropertyNotify &&
+      event.xproperty.atom == runtime.atom("_NET_WM_STATE")) {
+    // Minimized (iconified) windows carry _NET_WM_STATE_HIDDEN (EWMH).
+    if (runtime.windowing)
+      (*runtime.windowing)
+          .report_minimized(window_id, window_state_hidden(*this));
+    return;
+  }
   if (event.type == FocusIn || event.type == FocusOut) {
+    // Focus moved by a pointer or keyboard grab is not activation.
+    if (event.xfocus.mode == NotifyNormal ||
+        event.xfocus.mode == NotifyWhileGrabbed)
+      focused = event.type == FocusIn;
     if (event.type == FocusOut)
       pressed_keys.fill(false);
     if (input != nullptr) {
@@ -1445,6 +1513,7 @@ int run_linux_application(std::vector<LinuxApplicationWindow> windows,
     bool primary_open = true;
     while (primary_open) {
       runtime.step();
+      runtime.report_activation();
       runtime.reclaim();
       primary_open = false;
       for (std::size_t i = 0; i < runtime.windows.size(); ++i) {

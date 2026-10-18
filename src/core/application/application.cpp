@@ -47,7 +47,9 @@ bool valid_window_entry(const ApplicationWindow& entry) {
         valid_size(entry.options.initial_size) && valid_size(entry.options.minimum_size) &&
         entry.options.minimum_size.width <= entry.options.initial_size.width &&
         entry.options.minimum_size.height <= entry.options.initial_size.height &&
-        entry.owner_id != entry.stable_id;
+        entry.owner_id != entry.stable_id &&
+        (entry.floating == HostWindowFloating::none ||
+         (!entry.tool_window && !entry.owner_id.empty()));
     return valid;
 }
 
@@ -103,6 +105,14 @@ void register_run_window(const std::shared_ptr<ApplicationWindowState>& state) {
     // Bounded by the windowing table: at most maximum_windows identities are
     // live, and closed windows are removed below.
     (*run).windows.push_back({*id, state});
+}
+
+void PolicyVisibility::operator()() const {
+    const std::shared_ptr<ApplicationWindowState> target = state.lock();
+    if (!target || (*target).closed) return;
+    const std::shared_ptr<ApplicationRunState> run = (*target).run.lock();
+    if (!run || (*run).closed || (*run).windowing == nullptr) return;
+    static_cast<void>((*(*run).windowing).set_visible((*target).id, visible));
 }
 
 void unregister_run_window(ApplicationWindowState& state) noexcept {
@@ -170,6 +180,9 @@ ApplicationResult Application::validate(const std::vector<ApplicationWindow>& wi
             std::size_t parent = 0U;
             while (parent < windows.size() && windows[parent].stable_id != owner) ++parent;
             if (parent == windows.size()) return invalid;
+            // A floating window is owned by the primary window itself.
+            const bool parent_primary = windows[parent].owner_id.empty() && !windows[parent].tool_window;
+            if (depth == 0U && entry.floating != HostWindowFloating::none && !parent_primary) return invalid;
             owner = windows[parent].owner_id;
         }
     }

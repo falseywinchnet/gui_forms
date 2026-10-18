@@ -2736,7 +2736,48 @@ class MacApplicationRun;
 void mac_run_report_frame(MacApplicationRun* run, gui_forms::HostWindowId window);
 void mac_run_retire(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
 void mac_run_close_finished(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
+void mac_run_report_minimized(MacApplicationRun* run, gui_forms::HostWindowId window,
+                              bool minimized);
+void mac_run_hidden_on_close(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept;
+void mac_run_report_active(MacApplicationRun* run, bool active);
 } // namespace gui_forms::host
+
+// Reports application activation to the run's floating policy
+// (NSApplicationDidBecomeActive and DidResignActive). Registered for the run
+// and removed before the run ends.
+@interface GUIFormsActivationObserver : NSObject {
+    gui_forms::host::MacApplicationRun* _run;
+}
+- (instancetype)initWithRun:(gui_forms::host::MacApplicationRun*)run;
+- (void)applicationDidBecomeActive:(NSNotification*)notification;
+- (void)applicationDidResignActive:(NSNotification*)notification;
+- (void)stopObserving;
+@end
+
+@implementation GUIFormsActivationObserver
+- (instancetype)initWithRun:(gui_forms::host::MacApplicationRun*)run {
+    self = [super init];
+    if (self != nil) {
+        _run = run;
+        NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+        [center addObserver:self selector:@selector(applicationDidBecomeActive:)
+                       name:NSApplicationDidBecomeActiveNotification object:nil];
+        [center addObserver:self selector:@selector(applicationDidResignActive:)
+                       name:NSApplicationDidResignActiveNotification object:nil];
+    }
+    return self;
+}
+- (void)applicationDidBecomeActive:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_active(_run, true);
+}
+- (void)applicationDidResignActive:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_active(_run, false);
+}
+- (void)stopObserving {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    _run = nullptr;
+}
+@end
 
 @interface GUIFormsWindowDelegate : NSObject <NSWindowDelegate> {
     __weak GUIFormsView* _view;
@@ -2801,6 +2842,7 @@ void mac_run_close_finished(MacApplicationRun* run, gui_forms::HostWindowId wind
     if (_view != nil && ![_view requestCloseHiding:_hideOnClose]) return NO;
     if (_hideOnClose) {
         [sender orderOut:nil];
+        gui_forms::host::mac_run_hidden_on_close(_run, _windowId);
         return NO;
     }
     return YES;
@@ -2843,8 +2885,12 @@ void mac_run_close_finished(MacApplicationRun* run, gui_forms::HostWindowId wind
     const BOOL visible = (window.occlusionState & NSWindowOcclusionStateVisible) != 0;
     [_view notifyOcclusion:!visible];
 }
+- (void)windowDidMiniaturize:(NSNotification*)notification {
+    gui_forms::host::mac_run_report_minimized(_run, _windowId, true);
+}
 - (void)windowDidDeminiaturize:(NSNotification*)notification {
     [_view setNeedsDisplay:YES];
+    gui_forms::host::mac_run_report_minimized(_run, _windowId, false);
 }
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification {
     [_view notifyScaleChanged];

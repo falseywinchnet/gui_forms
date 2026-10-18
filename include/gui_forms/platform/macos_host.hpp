@@ -105,6 +105,8 @@ struct MacApplicationWindow final {
     std::unique_ptr<Window> model;
     MacHostOptions options;
     bool tool_window{};
+    // See ApplicationWindow::floating.
+    HostWindowFloating floating{HostWindowFloating::none};
 };
 
 [[nodiscard]] HostCapabilities macos_capabilities();

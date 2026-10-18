@@ -58,6 +58,8 @@ struct WindowBridge final {
     std::shared_ptr<CallbackFailure> failure{};
     Window* model{};
     ApplicationWindowOptions options{};
+    // A floating window's show and hide go to the run's floating policy.
+    bool floating{};
     bool host_ready{};
     bool visibility_ready{};
     bool notified{};
@@ -114,8 +116,13 @@ struct FullScreenReady final {
 struct VisibilityReady final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()(std::function<void()> show, std::function<void()> hide) const noexcept {
-        (*(*bridge).state).show = std::move(show);
-        (*(*bridge).state).hide = std::move(hide);
+        if ((*bridge).floating) {
+            (*(*bridge).state).show = detail::PolicyVisibility{(*bridge).state, true};
+            (*(*bridge).state).hide = detail::PolicyVisibility{(*bridge).state, false};
+        } else {
+            (*(*bridge).state).show = std::move(show);
+            (*(*bridge).state).hide = std::move(hide);
+        }
         (*bridge).visibility_ready = true;
         (*bridge).notify();
     }
@@ -209,6 +216,7 @@ NativeWindow prepare_one(ApplicationWindow& source, BridgeScope& scope,
     (*bridge).failure = failure;
     (*bridge).model = source.model.get();
     (*bridge).options = std::move(source.options);
+    (*bridge).floating = source.floating != HostWindowFloating::none;
     detail::ApplicationWindowState& state = *(*bridge).state;
     state.can_hide = !primary;
     state.stable_id = source.stable_id;
@@ -220,6 +228,7 @@ NativeWindow prepare_one(ApplicationWindow& source, BridgeScope& scope,
     entry.stable_id = std::move(source.stable_id);
     entry.owner_id = std::move(source.owner_id);
     entry.tool_window = source.tool_window;
+    entry.floating = source.floating;
     entry.model = std::move(source.model);
     entry.options.title = (*bridge).options.title;
     entry.options.initial_size = (*bridge).options.initial_size;
@@ -275,13 +284,20 @@ struct RuntimeOpen final {
         }
         const HostWindowing& windowing = *(*state).windowing;
         const bool primary = entry.owner_id.empty() && !entry.tool_window;
-        const bool owner_live = entry.owner_id.empty() || windowing.find(entry.owner_id).has_value();
+        const std::optional<HostWindowId> owner = entry.owner_id.empty()
+            ? std::optional<HostWindowId>{} : windowing.find(entry.owner_id);
+        const bool owner_live = entry.owner_id.empty() || owner.has_value();
+        // A floating window is owned by the primary window itself.
+        const bool owner_fits = entry.floating == HostWindowFloating::none ||
+            (owner.has_value() && *owner == windowing.primary());
         if (!detail::valid_window_entry(entry) || !(*entry.model).check_access() || primary ||
-            !owner_live || windowing.find(entry.stable_id).has_value()) {
+            !owner_live || !owner_fits || windowing.find(entry.stable_id).has_value()) {
             result.status.error = HostServiceError::invalid_argument;
             return result;
         }
-        if (windowing.window_count() >= HostWindowing::maximum_windows) {
+        const bool floating_full = entry.floating != HostWindowFloating::none &&
+            windowing.floating_window_count() >= HostWindowing::maximum_floating_windows;
+        if (windowing.window_count() >= HostWindowing::maximum_windows || floating_full) {
             result.status.error = HostServiceError::too_large;
             return result;
         }

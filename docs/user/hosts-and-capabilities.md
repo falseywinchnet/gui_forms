@@ -172,6 +172,42 @@ applies them the same way; the headless reference host
 (`src/host/headless/application/`) implements the same seam on a simulated
 desktop for tests.
 
+### Floating windows
+
+`ApplicationWindow::floating` makes a window a floating tool panel
+(`HostWindowFloating::tool`) or a document torn out into its own window
+(`HostWindowFloating::document`), owned by the primary window (stage DK
+decisions 1, 10 and 11). One rule on every host, decided by the
+`HostWindowing` base class from `host_window_kind_traits`:
+
+- no taskbar button, minimized and restored with the primary window, above
+  the primary window only and never above other applications' windows;
+- a floating tool hides while the application is inactive and returns when
+  it is activated (the Mac palette convention); a floating document stays
+  visible;
+- both move with the primary window, keeping their offset from it, and are
+  clamped to the work area of the screen they land on; the offset is
+  remembered through clamping, so moving the primary window back restores
+  it, and only the user (or a frame request) moving the floating window
+  changes it;
+- in macOS full screen they join the primary window's space.
+
+`show` and `hide` on a floating window's handle say whether the program
+wants it; the policy decides when it is on screen. At most 32 floating
+windows are live at once.
+
+| Behaviour | Windows | macOS | X11 |
+|---|---|---|---|
+| Native object | owned window (`WS_EX_TOOLWINDOW` for a tool) | child window of the primary (`NSPanel` for a tool, with `hidesOnDeactivate` off: the policy hides it) | transient for the primary, `_NET_WM_WINDOW_TYPE_UTILITY`, `_NET_WM_STATE_SKIP_TASKBAR` |
+| Activation | `WM_ACTIVATEAPP` | application did become or resign active | any window holding the focus after a turn of events (reported once a focus has been seen) |
+| Minimized | `IsIconic` on move and size | did miniaturize and deminiaturize | `_NET_WM_STATE_HIDDEN` |
+| Full-screen space | none | `NSWindowCollectionBehaviorFullScreenAuxiliary` | none |
+
+An existing `tool_window` keeps each host's behaviour: on macOS it is still
+an `NSPanel` that AppKit hides while the application is inactive, and on
+Windows and X11 it does not hide. Decision 11 does apply to it on X11: it is
+now typed as a utility window and kept off the taskbar.
+
 ## Choosing a host at build time
 
 Enable exactly one native host per build (`GUI_FORMS_ENABLE_MACOS_HOST`,

@@ -19,6 +19,8 @@ struct WindowsRunSlot final {
     HostWindowId id{};
     std::string stable_id{};
     bool initial{};
+    // Shown and hidden by the floating policy (HostWindowKindTraits).
+    bool floating{};
     bool print_metrics_on_close{};
     std::function<void(std::string_view metrics_json, std::string_view host_json)> final_snapshot{};
     std::string capture_path{};
@@ -111,6 +113,9 @@ public:
 
     // Reports the native window's current frame (WM_MOVE, WM_SIZE).
     void report_native_frame(HostWindowId window, HWND native);
+    // Reports whether this process owns the foreground window, once the
+    // initial windows are shown (WM_ACTIVATEAPP reports later changes).
+    void report_foreground();
     // Releases runtime windows that closed during the turn, after printing
     // their metrics as the run prints every window's at exit.
     void reclaim();
@@ -125,6 +130,8 @@ protected:
     HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     HostServiceStatus destroy_window_impl(HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
+    HostServiceStatus show_impl(HostWindowId window) override;
+    HostServiceStatus hide_impl(HostWindowId window) override;
 
 private:
     [[nodiscard]] WindowsRunSlot* slot(HostWindowId window) noexcept;
@@ -208,9 +215,8 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
         owner_id = (*owner_slot).id;
         owner = (*(*owner_slot).state).native_window();
     }
-    HostWindowKind kind = HostWindowKind::standard;
-    if (entry.tool_window) kind = HostWindowKind::tool;
-    else if (!owner_id.valid()) kind = HostWindowKind::primary;
+    const HostWindowKind kind = host_window_kind(owner_id.valid(), entry.tool_window, entry.floating);
+    const bool floating = host_window_kind_traits(kind).floating;
     HostWindowDescription description;
     description.stable_id = entry.stable_id;
     description.owner = owner_id;
@@ -227,6 +233,7 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
     window_slot.id = id;
     window_slot.stable_id = entry.stable_id;
     window_slot.initial = !runtime;
+    window_slot.floating = floating;
     window_slot.print_metrics_on_close = entry.options.print_metrics_on_close;
     window_slot.final_snapshot = entry.options.final_snapshot;
     window_slot.capture_path = entry.options.capture_path;
@@ -237,11 +244,22 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
     const bool close_after_launch = entry.options.close_after_launch_for_testing;
     window_slot.state = std::make_unique<WindowsHostState>(std::move(entry.model), std::move(host_options));
     (*window_slot.state).attach_run(*this, id);
-    const DWORD style = entry.options.popup_window
+    DWORD style = entry.options.popup_window
         ? (WS_POPUP | WS_BORDER)
         : (entry.options.minimizable ? WS_OVERLAPPEDWINDOW
                                      : (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
-    const DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
+    DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
+    // Floating windows (decision 10) are owned by the primary window, which
+    // already keeps them off the taskbar, above the owner only and hidden
+    // while it is minimized; they minimize with it, not on their own. A
+    // floating tool takes the tool caption.
+    if (kind == HostWindowKind::floating_tool) {
+        style = WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        ex_style = WS_EX_TOOLWINDOW;
+    } else if (kind == HostWindowKind::floating_document) {
+        style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
+        ex_style = 0;
+    }
     const double initial_scale = query_scale(owner);
     const Size initial_size = entry.options.capture_size.has_value()
         ? *entry.options.capture_size : entry.options.initial_size;
@@ -274,12 +292,34 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
         outcome.failure_code = 5;
         return outcome;
     }
-    if (initially_visible) {
+    window_created(id, initially_visible);
+    if (initially_visible && !floating) {
         ShowWindow(window, kind == HostWindowKind::tool ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
         UpdateWindow(window);
     }
     if (close_after_launch) PostMessageW(window, WM_CLOSE, 0, 0);
     return outcome;
+}
+
+void WindowsApplicationRun::report_foreground() {
+    const HWND foreground = GetForegroundWindow();
+    DWORD process = 0U;
+    if (foreground != nullptr) GetWindowThreadProcessId(foreground, &process);
+    report_application_active(foreground != nullptr && process == GetCurrentProcessId());
+}
+
+HostServiceStatus WindowsApplicationRun::show_impl(HostWindowId window) {
+    WindowsRunSlot* found = slot(window);
+    if (found == nullptr) return {HostServiceError::after_shutdown};
+    (*(*found).state).show_without_activation();
+    return {};
+}
+
+HostServiceStatus WindowsApplicationRun::hide_impl(HostWindowId window) {
+    WindowsRunSlot* found = slot(window);
+    if (found == nullptr) return {HostServiceError::after_shutdown};
+    (*(*found).state).hide_for_policy();
+    return {};
 }
 
 void WindowsApplicationRun::report_native_frame(HostWindowId window, HWND native_window) {
@@ -441,7 +481,23 @@ HostMonitorResult WindowsApplicationRun::query_monitors_impl() {
 void WindowsHostState::report_frame_to_run() {
     if (run_ == nullptr || hwnd_ == nullptr) return;
     if (native_phase_ != NativePhase::ready && native_phase_ != NativePhase::visible) return;
+    // A minimized window sits at -32000; its frame is not a place to follow.
+    if (IsIconic(hwnd_)) {
+        (*run_).report_minimized(window_id_, true);
+        return;
+    }
+    (*run_).report_minimized(window_id_, false);
     (*run_).report_native_frame(window_id_, hwnd_);
+}
+
+void WindowsHostState::report_application_active_to_run(bool active) {
+    if (run_ == nullptr) return;
+    (*run_).report_application_active(active);
+}
+
+void WindowsHostState::hidden_on_close_to_run() noexcept {
+    if (run_ == nullptr) return;
+    (*run_).report_hidden_on_close(window_id_);
 }
 
 void WindowsHostState::retire_from_run() noexcept {

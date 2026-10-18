@@ -1,6 +1,8 @@
 #include "gui_forms/host/windowing/host_windowing.hpp"
+#include "gui_forms/host/windowing/desktop_coordinates.hpp"
 #include "gui_forms/text/types/text_types.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 
@@ -34,13 +36,79 @@ bool valid_frame(const HostWindowFrame& frame) noexcept {
         frame.outer.width >= 0.0 && frame.outer.height >= 0.0;
     return valid;
 }
+
+// Positions closer than half a logical unit are the same position: hosts
+// round to device pixels.
+bool same_point(Point left, Point right) noexcept {
+    const bool same = std::fabs(left.x - right.x) < 0.5 && std::fabs(left.y - right.y) < 0.5;
+    return same;
+}
+
+Point rect_center(Rect rect) noexcept {
+    const Point center{rect.x + rect.width / 2.0, rect.y + rect.height / 2.0};
+    return center;
+}
+
+// The work area a follow move is clamped to: the screen the window lands
+// on (holding its centre), else the primary window's screen, else the
+// screen nearest to the window's centre. `monitors` must not be empty.
+Rect follow_work_area(const std::vector<HostMonitor>& monitors, Rect target_outer,
+                      Rect primary_outer) noexcept {
+    const Point target_center = rect_center(target_outer);
+    for (std::size_t index = 0U; index < monitors.size(); ++index) {
+        if (monitors[index].work_area.contains(target_center)) return monitors[index].work_area;
+    }
+    const Point primary_center = rect_center(primary_outer);
+    for (std::size_t index = 0U; index < monitors.size(); ++index) {
+        if (monitors[index].work_area.contains(primary_center)) return monitors[index].work_area;
+    }
+    const std::size_t nearest = nearest_monitor(monitors, target_center);
+    return monitors[nearest].work_area;
+}
 } // namespace
+
+HostWindowKindTraits host_window_kind_traits(HostWindowKind kind) noexcept {
+    HostWindowKindTraits traits;
+    if (kind == HostWindowKind::floating_tool || kind == HostWindowKind::floating_document) {
+        traits.floating = true;
+        traits.follows_main_window = true;
+        traits.joins_main_full_screen = true;
+        traits.hides_when_application_inactive = kind == HostWindowKind::floating_tool;
+    }
+    return traits;
+}
+
+HostWindowKind host_window_kind(bool has_owner, bool tool_window,
+                                HostWindowFloating floating) noexcept {
+    if (floating == HostWindowFloating::tool) return HostWindowKind::floating_tool;
+    if (floating == HostWindowFloating::document) return HostWindowKind::floating_document;
+    if (tool_window) return HostWindowKind::tool;
+    if (has_owner) return HostWindowKind::standard;
+    return HostWindowKind::primary;
+}
+
+Rect clamp_to_work_area(Rect outer, Rect work_area) noexcept {
+    Rect result = outer;
+    if (outer.width >= work_area.width) {
+        result.x = work_area.x;
+    } else {
+        result.x = std::clamp(outer.x, work_area.x, work_area.x + work_area.width - outer.width);
+    }
+    if (outer.height >= work_area.height) {
+        result.y = work_area.y;
+    } else {
+        result.y = std::clamp(outer.y, work_area.y, work_area.y + work_area.height - outer.height);
+    }
+    return result;
+}
 
 const char* host_window_kind_name(HostWindowKind kind) noexcept {
     switch (kind) {
     case HostWindowKind::primary: return "primary";
     case HostWindowKind::standard: return "standard";
     case HostWindowKind::tool: return "tool";
+    case HostWindowKind::floating_tool: return "floating_tool";
+    case HostWindowKind::floating_document: return "floating_document";
     }
     return "unknown";
 }
@@ -54,6 +122,11 @@ std::string HostWindowingSnapshot::to_json() const {
            << ",\"frame_requests\":" << frame_requests
            << ",\"frame_reports\":" << frame_reports
            << ",\"rejected_requests\":" << rejected_requests
+           << ",\"policy_hides\":" << policy_hides
+           << ",\"policy_shows\":" << policy_shows
+           << ",\"follow_moves\":" << follow_moves
+           << ",\"clamped_follow_moves\":" << clamped_follow_moves
+           << ",\"application_active\":" << (application_active ? "true" : "false")
            << ",\"started\":" << (started ? "true" : "false")
            << ",\"shutdown\":" << (shutdown ? "true" : "false") << '}';
     return output.str();
@@ -258,11 +331,14 @@ HostWindowAdmission HostWindowing::admit(const HostWindowDescription& descriptio
     if (primary && (has_owner || primary_.valid() || snapshot_.started)) valid = false;
     if (!primary && !primary_.valid()) valid = false;
     if (description.kind == HostWindowKind::standard && !has_owner) valid = false;
+    const bool floating = host_window_kind_traits(description.kind).floating;
+    if (floating && (!primary_.valid() || description.owner != primary_)) valid = false;
     if (!valid) {
         result.status = reject(HostServiceError::invalid_argument);
         return result;
     }
-    if (windows_.size() >= maximum_windows) {
+    if (windows_.size() >= maximum_windows ||
+        (floating && floating_window_count() >= maximum_floating_windows)) {
         result.status = reject(HostServiceError::too_large);
         return result;
     }
@@ -301,6 +377,207 @@ void HostWindowing::report_frame(HostWindowId window, const HostWindowFrame& fra
     ++snapshot_.frame_reports;
     const HostWindowFrameEvent event{window, frame};
     frame_changed_.emit(event);
+    // A handler may have destroyed the window; look it up again.
+    WindowRecord* reported = record(window);
+    if (reported == nullptr || snapshot_.shutdown) return;
+    if (window == primary_) {
+        if (!(*reported).minimized) follow_primary(*reported);
+        return;
+    }
+    if (host_window_kind_traits((*reported).kind).follows_main_window) learn_offset(*reported);
+}
+
+std::size_t HostWindowing::floating_window_count() const noexcept {
+    std::size_t count = 0U;
+    for (std::size_t index = 0U; index < windows_.size(); ++index) {
+        if (host_window_kind_traits(windows_[index].kind).floating) ++count;
+    }
+    return count;
+}
+
+bool HostWindowing::policy_visible(HostWindowId window) const noexcept {
+    const WindowRecord* entry = record(window);
+    if (entry == nullptr) return false;
+    const HostWindowKindTraits traits = host_window_kind_traits((*entry).kind);
+    if (!traits.floating) return (*entry).requested_visible;
+    const WindowRecord* primary = record(primary_);
+    const bool primary_minimized = primary != nullptr && (*primary).minimized;
+    const bool hidden_by_inactivity =
+        traits.hides_when_application_inactive && !snapshot_.application_active;
+    const bool visible = (*entry).requested_visible && !hidden_by_inactivity && !primary_minimized;
+    return visible;
+}
+
+void HostWindowing::apply_visibility(WindowRecord& entry) {
+    if (!host_window_kind_traits(entry.kind).floating) return;
+    const HostWindowId window = entry.id;
+    const bool wanted = policy_visible(window);
+    if (wanted == entry.shown) return;
+    const HostServiceStatus status = wanted ? show_impl(window) : hide_impl(window);
+    WindowRecord* current = record(window);
+    if (current == nullptr || !status.accepted()) return;
+    (*current).shown = wanted;
+    if (wanted) ++snapshot_.policy_shows;
+    else ++snapshot_.policy_hides;
+}
+
+void HostWindowing::apply_floating_visibility() {
+    // A native show or hide may reach handlers that open or destroy windows;
+    // walk a copy of the identities (at most maximum_windows).
+    std::array<HostWindowId, maximum_windows> identities{};
+    std::size_t count = 0U;
+    for (std::size_t index = 0U; index < windows_.size() && count < identities.size(); ++index) {
+        if (host_window_kind_traits(windows_[index].kind).floating) {
+            identities[count] = windows_[index].id;
+            ++count;
+        }
+    }
+    for (std::size_t index = 0U; index < count; ++index) {
+        WindowRecord* entry = record(identities[index]);
+        if (entry != nullptr) apply_visibility(*entry);
+    }
+}
+
+void HostWindowing::window_created(HostWindowId window, bool initially_visible) noexcept {
+    WindowRecord* entry = record(window);
+    if (entry == nullptr) return;
+    (*entry).requested_visible = initially_visible;
+    (*entry).shown = false;
+    try {
+        apply_visibility(*entry);
+    } catch (...) {
+        // The adapter's show failed; the window stays hidden and the next
+        // policy change tries again.
+    }
+}
+
+HostServiceStatus HostWindowing::set_visible(HostWindowId window, bool visible) {
+    if (std::this_thread::get_id() != ui_thread_) return reject(HostServiceError::wrong_thread);
+    if (snapshot_.shutdown) return reject(HostServiceError::after_shutdown);
+    WindowRecord* entry = record(window);
+    if (entry == nullptr) return reject(HostServiceError::invalid_argument);
+    (*entry).requested_visible = visible;
+    if (host_window_kind_traits((*entry).kind).floating) {
+        apply_visibility(*entry);
+        return {};
+    }
+    const HostServiceStatus status = visible ? show_impl(window) : hide_impl(window);
+    WindowRecord* current = record(window);
+    if (current != nullptr && status.accepted()) (*current).shown = visible;
+    if (!status.accepted()) ++snapshot_.rejected_requests;
+    return status;
+}
+
+void HostWindowing::report_application_active(bool active) {
+    if (std::this_thread::get_id() != ui_thread_ || snapshot_.shutdown) return;
+    if (snapshot_.application_active == active) return;
+    snapshot_.application_active = active;
+    apply_floating_visibility();
+}
+
+void HostWindowing::report_minimized(HostWindowId window, bool minimized) {
+    if (std::this_thread::get_id() != ui_thread_ || snapshot_.shutdown) return;
+    WindowRecord* entry = record(window);
+    if (entry == nullptr || (*entry).minimized == minimized) return;
+    (*entry).minimized = minimized;
+    if (window == primary_) apply_floating_visibility();
+}
+
+void HostWindowing::report_hidden_on_close(HostWindowId window) noexcept {
+    WindowRecord* entry = record(window);
+    if (entry == nullptr) return;
+    (*entry).requested_visible = false;
+    (*entry).shown = false;
+}
+
+void HostWindowing::follow_primary(WindowRecord& primary) {
+    const HostWindowId primary_id = primary.id;
+    // The primary window's frame now, from the platform: a report may be
+    // older than the native state (macOS posts move notifications late).
+    const HostWindowFrameResult current = frame_impl(primary_id);
+    WindowRecord* main = record(primary_id);
+    if (main == nullptr) return;
+    const HostWindowFrame main_frame = current.status.accepted() ? current.frame : (*main).frame;
+    const Point main_origin{main_frame.content.x, main_frame.content.y};
+    (*main).followed_origin = main_origin;
+    (*main).followed_known = true;
+
+    std::array<HostWindowId, maximum_floating_windows> followers{};
+    std::size_t count = 0U;
+    for (std::size_t index = 0U; index < windows_.size() && count < followers.size(); ++index) {
+        const WindowRecord& candidate = windows_[index];
+        if (candidate.owner != primary_id || !candidate.frame_known || !candidate.offset_known) continue;
+        if (!host_window_kind_traits(candidate.kind).follows_main_window) continue;
+        followers[count] = candidate.id;
+        ++count;
+    }
+    if (count == 0U) return;
+    const HostMonitorResult monitors = query_monitors_impl();
+    const bool clamp = monitors.status.accepted() && !monitors.monitors.empty();
+    for (std::size_t index = 0U; index < count; ++index) {
+        const HostWindowId follower_id = followers[index];
+        WindowRecord* follower = record(follower_id);
+        if (follower == nullptr) continue;
+        const HostWindowFrameResult fresh = frame_impl(follower_id);
+        follower = record(follower_id);
+        if (follower == nullptr) continue;
+        const HostWindowFrame frame = fresh.status.accepted() ? fresh.frame : (*follower).frame;
+        // The decorations around the client area, kept as they are.
+        const double left = frame.content.x - frame.outer.x;
+        const double top = frame.content.y - frame.outer.y;
+        const Point target{main_origin.x + (*follower).offset.x, main_origin.y + (*follower).offset.y};
+        const Rect target_outer{target.x - left, target.y - top, frame.outer.width, frame.outer.height};
+        Rect placed_outer = target_outer;
+        if (clamp) {
+            const Rect work = follow_work_area(monitors.monitors, target_outer, main_frame.outer);
+            placed_outer = clamp_to_work_area(target_outer, work);
+        }
+        const Rect placed{placed_outer.x + left, placed_outer.y + top, frame.content.width,
+                          frame.content.height};
+        const Point placed_origin{placed.x, placed.y};
+        if (same_point(placed_origin, {frame.content.x, frame.content.y})) continue;
+        // Remember the placement before asking for it: Win32 reports the
+        // move before request_frame_impl returns.
+        for (std::size_t slot = (*follower).recent_targets.size() - 1U; slot > 0U; --slot) {
+            (*follower).recent_targets[slot] = (*follower).recent_targets[slot - 1U];
+        }
+        (*follower).recent_targets[0] = placed_origin;
+        if ((*follower).recent_target_count < (*follower).recent_targets.size()) {
+            ++(*follower).recent_target_count;
+        }
+        ++snapshot_.follow_moves;
+        if (!(placed_outer == target_outer)) ++snapshot_.clamped_follow_moves;
+        static_cast<void>(request_frame_impl(follower_id, placed));
+    }
+}
+
+void HostWindowing::learn_offset(WindowRecord& follower) {
+    const HostWindowId follower_id = follower.id;
+    const WindowRecord* main = record(follower.owner);
+    if (main == nullptr || !(*main).frame_known || (*main).minimized) return;
+    const HostWindowId primary_id = (*main).id;
+    const HostWindowFrameResult main_now = frame_impl(primary_id);
+    main = record(primary_id);
+    if (main == nullptr) return;
+    const Rect main_content = main_now.status.accepted() ? main_now.frame.content : (*main).frame.content;
+    const Point main_origin{main_content.x, main_content.y};
+    // The primary window has moved since its followers were placed: this
+    // move is the platform carrying the follower (macOS child windows), and
+    // the primary window's own report places it.
+    if ((*main).followed_known && !same_point(main_origin, (*main).followed_origin)) return;
+    const HostWindowFrameResult follower_now = frame_impl(follower_id);
+    WindowRecord* entry = record(follower_id);
+    if (entry == nullptr) return;
+    const Rect content = follower_now.status.accepted() ? follower_now.frame.content : (*entry).frame.content;
+    const Point origin{content.x, content.y};
+    for (std::size_t slot = 0U; slot < (*entry).recent_target_count; ++slot) {
+        if (same_point(origin, (*entry).recent_targets[slot])) return;
+    }
+    const Point offset{origin.x - main_origin.x, origin.y - main_origin.y};
+    if ((*entry).offset_known && same_point(offset, (*entry).offset)) return;
+    (*entry).offset = offset;
+    (*entry).offset_known = true;
+    (*entry).recent_target_count = 0U;
 }
 
 } // namespace gui_forms

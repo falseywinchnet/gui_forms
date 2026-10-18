@@ -66,9 +66,14 @@ struct MacRunSlot final {
     gui_forms::HostWindowId id{};
     std::string stable_id{};
     bool initial{};
+    // Shown and hidden by the floating policy (HostWindowKindTraits).
+    bool floating{};
     // windowWillClose: has finished running every callback.
     bool close_finished{};
     NSWindow* window{};
+    // A floating window's parent (the primary window), to re-attach the child
+    // relation if AppKit dropped it while the window was ordered out.
+    __weak NSWindow* parent{};
     GUIFormsView* view{};
     GUIFormsWindowDelegate* delegate{};
     bool print_metrics_on_close{};
@@ -118,6 +123,8 @@ protected:
     HostServiceStatus bring_to_front_impl(gui_forms::HostWindowId window) override;
     HostServiceStatus destroy_window_impl(gui_forms::HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
+    HostServiceStatus show_impl(gui_forms::HostWindowId window) override;
+    HostServiceStatus hide_impl(gui_forms::HostWindowId window) override;
 
 private:
     [[nodiscard]] MacRunSlot* slot(gui_forms::HostWindowId window) noexcept;
@@ -166,9 +173,9 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
         owner_id = (*owner).id;
         ownerWindow = (*owner).window;
     }
-    gui_forms::HostWindowKind kind = gui_forms::HostWindowKind::standard;
-    if (entry.tool_window) kind = gui_forms::HostWindowKind::tool;
-    else if (!owner_id.valid()) kind = gui_forms::HostWindowKind::primary;
+    const gui_forms::HostWindowKind kind =
+        gui_forms::host_window_kind(owner_id.valid(), entry.tool_window, entry.floating);
+    const bool floating = gui_forms::host_window_kind_traits(kind).floating;
     gui_forms::HostWindowDescription description;
     description.stable_id = entry.stable_id;
     description.owner = owner_id;
@@ -187,18 +194,36 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
         MacTitlebarPresentation::transparent_full_size_content;
     NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
         NSWindowStyleMaskResizable;
-    if (!entry.tool_window && entry.options.minimizable) {
-        style |= NSWindowStyleMaskMiniaturizable;
+    // A floating document is an ordinary titled window that minimizes with
+    // its main window, not on its own; a floating tool is a utility panel.
+    const bool panel = entry.tool_window || kind == gui_forms::HostWindowKind::floating_tool;
+    if (kind != gui_forms::HostWindowKind::floating_document) {
+        if (!panel && entry.options.minimizable) style |= NSWindowStyleMaskMiniaturizable;
+        else style |= NSWindowStyleMaskUtilityWindow;
     }
-    else style |= NSWindowStyleMaskUtilityWindow;
     if (transparentFullSizeContent) style |= NSWindowStyleMaskFullSizeContentView;
-    NSWindow* nativeWindow = entry.tool_window
+    NSWindow* nativeWindow = panel
         ? static_cast<NSWindow*>([[NSPanel alloc] initWithContentRect:frame styleMask:style
                                                               backing:NSBackingStoreBuffered
                                                                 defer:NO])
         : [[NSWindow alloc] initWithContentRect:frame styleMask:style
                                         backing:NSBackingStoreBuffered defer:NO];
     [nativeWindow setReleasedWhenClosed:NO];
+    if (floating) {
+        if (kind == gui_forms::HostWindowKind::floating_tool) {
+            // NSPanel hides on deactivation by default; the portable policy
+            // hides floating tools itself (decision 1), and an ordinary
+            // window level keeps it above its main window only.
+            NSPanel* floatingPanel = static_cast<NSPanel*>(nativeWindow);
+            [floatingPanel setHidesOnDeactivate:NO];
+            [floatingPanel setFloatingPanel:NO];
+        }
+        // Joins the main window's full-screen space (decision 1). Unverified
+        // on a machine: that an auxiliary child window follows its parent
+        // into the space; see the pull request.
+        [nativeWindow setCollectionBehavior:([nativeWindow collectionBehavior] |
+                                             NSWindowCollectionBehaviorFullScreenAuxiliary)];
+    }
     std::vector<std::string> windowDragRegionIds = drag_region_ids(entry.options);
     GUIFormsView* view = [[GUIFormsView alloc] initWithModel:std::move(entry.model)
                                   transparentFullSizeContent:transparentFullSizeContent
@@ -228,6 +253,8 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
     (*created).id = id;
     (*created).stable_id = entry.stable_id;
     (*created).initial = !runtime;
+    (*created).floating = floating;
+    (*created).parent = ownerWindow;
     (*created).window = nativeWindow;
     (*created).view = view;
     (*created).delegate = delegate;
@@ -242,7 +269,8 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
         [nativeWindow center];
     } else {
         [ownerWindow addChildWindow:nativeWindow ordered:NSWindowAbove];
-        if (!entry.options.initially_visible) {
+        // A floating window is created hidden; the policy shows it.
+        if (!entry.options.initially_visible || floating) {
             // addChildWindow:ordered: may order a previously hidden child
             // onscreen. Preserve the portable initial-visibility contract
             // after establishing native ownership.
@@ -295,7 +323,8 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
     if (entry.options.dispatch_pending) entry.options.dispatch_pending();
     [view collectDamage];
     report_native_frame(id);
-    if (entry.options.initially_visible) {
+    window_created(id, entry.options.initially_visible);
+    if (entry.options.initially_visible && !floating) {
         if (primary == YES) [nativeWindow makeKeyAndOrderFront:nil];
         else [nativeWindow orderFront:nil];
     }
@@ -454,6 +483,27 @@ HostServiceStatus MacApplicationRun::destroy_window_impl(gui_forms::HostWindowId
     return {};
 }
 
+HostServiceStatus MacApplicationRun::show_impl(gui_forms::HostWindowId window) {
+    MacRunSlot* found = slot(window);
+    if (found == nullptr) return {HostServiceError::after_shutdown};
+    NSWindow* nativeWindow = (*found).window;
+    NSWindow* parentWindow = (*found).parent;
+    // Re-attach the child relation in case ordering out detached it.
+    if (parentWindow != nil && nativeWindow.parentWindow == nil) {
+        [parentWindow addChildWindow:nativeWindow ordered:NSWindowAbove];
+    }
+    // orderFront: shows without making the window key.
+    [nativeWindow orderFront:nil];
+    return {};
+}
+
+HostServiceStatus MacApplicationRun::hide_impl(gui_forms::HostWindowId window) {
+    MacRunSlot* found = slot(window);
+    if (found == nullptr) return {HostServiceError::after_shutdown};
+    [(*found).window orderOut:nil];
+    return {};
+}
+
 HostMonitorResult MacApplicationRun::query_monitors_impl() {
     HostMonitorResult result;
     const double top = desktop_top();
@@ -490,6 +540,22 @@ void mac_run_retire(MacApplicationRun* run, gui_forms::HostWindowId window) noex
 void mac_run_close_finished(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept {
     if (run == nullptr) return;
     (*run).close_finished(window);
+}
+
+void mac_run_report_minimized(MacApplicationRun* run, gui_forms::HostWindowId window,
+                              bool minimized) {
+    if (run == nullptr) return;
+    (*run).report_minimized(window, minimized);
+}
+
+void mac_run_hidden_on_close(MacApplicationRun* run, gui_forms::HostWindowId window) noexcept {
+    if (run == nullptr) return;
+    (*run).report_hidden_on_close(window);
+}
+
+void mac_run_report_active(MacApplicationRun* run, bool active) {
+    if (run == nullptr) return;
+    (*run).report_application_active(active);
 }
 
 // The run's open operation. Only the main thread reaches the run, and only
@@ -554,6 +620,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows,
         install_application_menu();
 
         MacApplicationRun run;
+        GUIFormsActivationObserver* activation = [[GUIFormsActivationObserver alloc] initWithRun:&run];
         const std::shared_ptr<MacRunOpenState> openState = std::make_shared<MacRunOpenState>();
         (*openState).run = &run;
         const bool windowingPublished = static_cast<bool>(application.windowing_ready);
@@ -587,6 +654,7 @@ int run_macos_application(std::vector<MacApplicationWindow> windows,
         // The program's handles stop reaching the windowing first, so a
         // closed callback during shutdown cannot open another window.
         (*openState).run = nullptr;
+        [activation stopObserving];
         if (windowingPublished && application.windowing_ended) application.windowing_ended();
         run.shutdown();
         if (failure != 0) {
