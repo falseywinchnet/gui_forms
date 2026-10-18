@@ -553,6 +553,20 @@ HostClipboardFilesResult HostServices::read_clipboard_files_impl() {
     return {};
 }
 
+namespace {
+// Whether an adapter's accepted candidates keep the contract: at most
+// `maximum` of them, each non-empty UTF-8 without NUL.
+bool valid_auto_complete_candidates(const std::vector<std::string>& candidates, std::size_t maximum) {
+    if (candidates.size() > maximum) return false;
+    for (const std::string& candidate : candidates) {
+        const bool valid = !candidate.empty() && candidate.find('\0') == std::string::npos &&
+            valid_utf8(candidate);
+        if (!valid) return false;
+    }
+    return true;
+}
+} // namespace
+
 HostAutoCompleteResult HostServices::query_auto_complete(const HostAutoCompleteRequest& request) {
     HostAutoCompleteResult result;
     // No capability flag names these sources yet; the adapter's own answer
@@ -570,17 +584,9 @@ HostAutoCompleteResult HostServices::query_auto_complete(const HostAutoCompleteR
     }
     try {
         result = query_auto_complete_impl(request);
-        if (result.status.accepted()) {
-            if (result.candidates_utf8.size() > request.maximum_candidates) {
-                result.status.error = HostServiceError::backend_failure;
-            }
-            for (const std::string& candidate : result.candidates_utf8) {
-                if (candidate.empty() || candidate.find('\0') != std::string::npos ||
-                    !valid_utf8(candidate)) {
-                    result.status.error = HostServiceError::backend_failure;
-                    break;
-                }
-            }
+        if (result.status.accepted() &&
+            !valid_auto_complete_candidates(result.candidates_utf8, request.maximum_candidates)) {
+            result.status.error = HostServiceError::backend_failure;
         }
     } catch (const std::bad_alloc&) {
         result.status.error = HostServiceError::backend_failure;
