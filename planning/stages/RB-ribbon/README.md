@@ -220,6 +220,8 @@ From the docking interview (2026-10-17,
     settings. The ribbon exposes that state (`RibbonState`, with
     `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
     own. Revises decision 12.
+45. **The scroll buttons take 8 units of hysteresis (R4),** as the hide
+    rule does (decision 36); WordPad's are about 9.5.
 
 ## Gate
 

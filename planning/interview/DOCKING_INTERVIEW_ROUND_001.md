@@ -606,3 +606,39 @@ owner, verbatim:
 - **GIVEN:** the plan is accepted; stage DK's gate is closed. Building
   starts with W0 (the window layer) and V0 (vocabulary and the command
   chain), with PageView P1 onward and docking D1 alongside.
+
+## Part 16. Review of the builders' conservative choices, 2026-10-19
+
+The coordinator raised review items R1 to R21 from the build reports
+(R1 the native drag-smoothness probe; R2 sanitizers in CI; R3 the key map
+per window or per application; R4 ribbon scroll-button hysteresis; R5 the
+caption close hides; R6 Ctrl+F6 order; R7 the selected ribbon tab's
+minimize no longer reachable by assistive technology; R8 commands not yet
+routed; R9 a virtual grid republishing its whole order; R10 comments in
+layout XML; R11 unknown fields in newer layouts; R12 to R21 kept as built;
+and the unchecked macOS and Linux behaviours). The owner, verbatim:
+
+> drag smoothness probe is not human auditable remote, local only a mac neo. better technical forensic probe needed. R2: memory bugs in tests or code are not permitted. determine if it was due to disobedience to house style, and if there was a rule that could have prevented it. R3: approved. R4: approved. R5: approved. R6: approved. R7: why did tabs stop publishing press? R8: approved. R9: some kind of floating state machine maybe that adjusts on the fly? R10: approved. R11: approved. unchecked: i can get a sibling model to check these things. we'll need a script we can run and a prompt document to give said sibling and we will use lima for the linux and the m4 for the mac.
+
+- **GIVEN R1.** No human-watched probe: the owner works remotely and the
+  only local machine is a Mac. Drag smoothness is measured by an automated
+  forensic probe (synthetic input, host-confirmed frames and presentation
+  timestamps, a machine-readable verdict).
+- **GIVEN R2.** Memory bugs are not permitted, in tests or in code. The
+  coordinator determines whether each sanitizer finding came from
+  disobeying the house style and which rule would have prevented it.
+- **GIVEN R3-1.** One key map per application, shared by all its windows.
+- **GIVEN R4-1.** The ribbon's scroll buttons take the same 8 units of
+  hysteresis as the hide rule (RB decision 45).
+- **GIVEN R5-1.** The caption's close button hides a tool panel.
+- **GIVEN R6-2.** Ctrl+F6 steps documents in most-recently-used order.
+- **R7 asked back** (why tabs stopped publishing press).
+- **GIVEN R8-1.** Every command path routes through the command chain.
+- **R9, direction:** an adaptive order model that adjusts on the fly
+  instead of republishing the whole order; designed by the coordinator.
+- **GIVEN R10-1.** Layout XML accepts comments.
+- **GIVEN R11-2.** Unknown fields in newer layouts are kept and written
+  back.
+- **GIVEN, unchecked behaviours.** A sibling model verifies the macOS and
+  Linux behaviours on the owner's M4 Mac and a Lima VM, from a script and a
+  prompt document the coordinator prepares.

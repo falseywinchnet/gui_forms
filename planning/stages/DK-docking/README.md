@@ -202,6 +202,21 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     material; side tabs read bottom to top. Both readings confirmed.
 43. **A first-party XML reader and writer** for layouts: the layout's own
     element set, UTF-8 only, no DTDs or external entities, bounded, fuzzed.
+
+From the review of the builders' choices (2026-10-19, interview part 16):
+
+44. **One key map per application (R3),** shared by every window,
+    floating windows included.
+45. **The caption's close hides a tool panel (R5).**
+46. **Ctrl+F6 steps documents in most-recently-used order (R6).**
+47. **Every command path routes through the command chain (R8):** bound
+    buttons, the notification-area icon and gallery commands included.
+48. **Layout XML accepts comments (R10); unknown fields in newer layouts
+    are kept and written back (R11).**
+49. **Drag smoothness is measured by an automated forensic probe (R1),**
+    not by a person watching.
+50. **macOS and Linux behaviours are verified by a sibling model** on the
+    owner's M4 Mac and a Lima VM, from a script and a prompt document.
 26. **Invalid drops float or snap back (D4-1);** threshold 4 units
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
