@@ -563,13 +563,14 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     detail::register_run_window(opened.state);
     const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(opened.state);
     if (opened.options.ready) opened.options.ready(*opened.model, handle);
+    // The ready callback may have closed the window.
     WindowEntry* still_open = entry(admission.window);
-    if (still_open != nullptr && floating) {
-        // Created hidden; the policy shows it when it may be on screen.
-        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
-    } else if (still_open != nullptr) {
-        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
-        if ((*still_open).options.initially_visible) show(admission.window, true);
+    if (still_open != nullptr) {
+        const bool initially_visible = (*still_open).options.initially_visible;
+        // A floating window was created hidden: window_created shows it when
+        // the policy lets it be on screen. Any other window is shown here.
+        windowing_.window_created(admission.window, initially_visible);
+        if (!floating && initially_visible) show(admission.window, true);
     }
     result.window = handle;
     return result;
@@ -665,15 +666,7 @@ void HeadlessApplication::close(WindowEntry& window, HostCloseReason reason) {
     window.closed = true;
     static_cast<void>((*window.host).dispatch(HostClosedEvent{reason}, next_timestamp()));
     detail::ApplicationWindowState& state = *window.state;
-    state.closed = true;
-    state.ready = false;
-    state.request_close = {};
-    state.show = {};
-    state.hide = {};
-    state.toggle_full_screen = {};
-    state.set_title = {};
-    state.request_client_size = {};
-    state.frame_changed = {};
+    detail::revoke_window_state(state);
     detail::unregister_run_window(state);
     windowing_.remove_native(window.id);
     windowing_.retire(window.id);
