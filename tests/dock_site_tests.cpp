@@ -707,6 +707,38 @@ void regions_and_escape_keys() {
             "Ctrl+Shift+F6 goes back");
 }
 
+// The docking keys are the window's named keyboard commands (decision DK-30,
+// G6-1): a rebinding moves them, and the navigator commits on the release of
+// the rebound chord's modifier.
+void rebound_docking_keys() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockWorkspace& workspace = *(*fixture).workspace;
+    DockSite& site = *(*fixture).site;
+    Window& window = *(*fixture).window;
+    require(workspace.activate_panel(DockPanelId("doc.first")) && workspace.activate_panel(DockPanelId("doc.second")),
+            "the documents activate in turn");
+    window.rebind_key_command(KeyCommand::next_document, {{PhysicalKey::f8, Modifier::control}, {}});
+    require(!key(window, PhysicalKey::f6, Modifier::control) && active_is(workspace, "doc.second", "doc.second"),
+            "Ctrl+F6 does nothing once next_document is rebound");
+    require(key(window, PhysicalKey::f8, Modifier::control) && active_is(workspace, "doc.first", "doc.first"),
+            "the rebound chord activates the next document");
+    window.rebind_key_command(KeyCommand::cycle_forward, {{PhysicalKey::q, Modifier::alt}, {}});
+    require(key(window, PhysicalKey::q, Modifier::alt) && site.navigator_open() &&
+                (*site.navigator()).release_modifier() == Modifier::alt,
+            "a rebound cycle_forward opens the navigator, committed by releasing Alt");
+    require(key_up(window, PhysicalKey::q, Modifier::none) && !site.navigator_open() &&
+                active_is(workspace, "doc.second", "doc.second"),
+            "releasing Alt activates the current row");
+    window.rebind_key_command(KeyCommand::position_menu, {});
+    window.rebind_key_command(KeyCommand::context_menu, {{PhysicalKey::m, Modifier::control | Modifier::shift}, {}});
+    static_cast<void>(key(window, PhysicalKey::minus, Modifier::alt));
+    require(!site.position_menu_open(),
+            "an unbound position_menu leaves Alt+Hyphen alone");
+    require(key(window, PhysicalKey::m, Modifier::control | Modifier::shift) && site.position_menu_open(),
+            "the rebound context_menu opens the position menu");
+    site.close_position_menu();
+}
+
 // -- the position menu and the caption buttons ---------------------------------
 
 void position_menu() {
@@ -752,7 +784,7 @@ void position_menu() {
     site.close_position_menu();
     require(key(window, PhysicalKey::f10, Modifier::shift) && site.position_menu_open(), "Shift+F10 opens it");
     site.close_position_menu();
-    require(key(window, PhysicalKey::application) && site.position_menu_open(), "the context-menu key opens it");
+    require(key(window, PhysicalKey::context_menu) && site.position_menu_open(), "the context-menu key opens it");
     site.close_position_menu();
     // The caption's close button hides the panel.
     window.perform_layout();
@@ -898,6 +930,7 @@ int main() {
     activation_and_commands();
     navigator_order_and_keys();
     regions_and_escape_keys();
+    rebound_docking_keys();
     position_menu();
     semantic_snapshot();
     lifetime_and_refusals();

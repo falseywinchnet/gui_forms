@@ -23,6 +23,15 @@ std::string json_escape(const std::string& text) {
     return result;
 }
 
+// One chord as {"key":<HID usage>,"modifiers":<Modifier bits>}; nothing for
+// an empty chord. `first` says whether no chord precedes it in the list.
+void append_chord(std::ostringstream& output, KeyChord chord, bool first) {
+    if (chord.empty()) return;
+    if (!first) output << ',';
+    output << "{\"key\":" << chord.physical_key
+           << ",\"modifiers\":" << static_cast<unsigned>(chord.modifiers) << '}';
+}
+
 } // namespace
 
 std::string HostCapabilities::to_json() const {
@@ -64,7 +73,16 @@ std::string HostCapabilities::to_json() const {
         output << (first ? "\"" : ",\"") << name << '"';
         first = false;
     }
-    output << "]}";
+    output << "],\"key_map\":{";
+    for (std::size_t index = 0; index < key_command_count; ++index) {
+        const KeyCommand command = static_cast<KeyCommand>(index);
+        const KeyBinding& binding = key_map.binding(command);
+        output << (index == 0U ? "\"" : ",\"") << key_command_name(command) << "\":[";
+        append_chord(output, binding.primary, true);
+        append_chord(output, binding.secondary, binding.primary.empty());
+        output << ']';
+    }
+    output << "}}";
     return output.str();
 }
 

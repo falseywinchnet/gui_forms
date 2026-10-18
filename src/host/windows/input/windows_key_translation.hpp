@@ -6,9 +6,10 @@
 
 namespace gui_forms::host::detail {
 
-// Preserve the current virtual-key-derived vocabulary. VK_OEM_2 is slash on
-// the tested US layout; this is not a layout-independent character shortcut
-// translator or a scan-code-based physical-position normalization.
+// Preserve the current virtual-key-derived vocabulary. VK_OEM_2 is slash and
+// VK_OEM_MINUS is hyphen on the tested US layout; this is not a
+// layout-independent character shortcut translator or a scan-code-based
+// physical-position normalization.
 [[nodiscard]] inline std::uint32_t physical_key_from_virtual_key(WPARAM key) noexcept {
     if (key >= 'A' && key <= 'Z') {
         const WPARAM relative = key - 'A';
@@ -52,7 +53,7 @@ namespace gui_forms::host::detail {
     case VK_F10: return PhysicalKey::f10;
     case VK_F11: return PhysicalKey::f11;
     case VK_F12: return PhysicalKey::f12;
-    case VK_APPS: return PhysicalKey::application;
+    case VK_APPS: return PhysicalKey::context_menu;
     // WM_KEYDOWN reports the generic VK_CONTROL without its side.
     case VK_CONTROL: return PhysicalKey::left_control;
     case VK_LCONTROL: return PhysicalKey::left_control;

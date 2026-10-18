@@ -75,6 +75,15 @@ gui_forms::Window
       **host_services** : ``HostServices*``, read-only
          The services of the attached native host, or null when none is attached.
 
+      **key_map** : ``KeyMap``, read-only
+         The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`) in this window:
+         the host's defaults with the application's rebindings over them. A
+         window starts with the PC convention (``pc_key_map``: Ctrl+F4 closes a
+         document, Shift+F10 or the context-menu key opens a context menu); a
+         host session installs the defaults its host reports
+         (``HostCapabilities::key_map``), so under the macOS host Cmd+W closes a
+         document. Controls ask it through ``Control::effective_key_map``.
+
       **paint_lease_snapshot** : ``PaintLeaseSnapshot``, read-only
          Returns revision, epoch, lease, wake, deferral, and receipt counters plus current lease state.
 
@@ -233,6 +242,10 @@ gui_forms::Window
         -  
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
+      * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
+        - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in this window, over the host's default; an empty binding leaves the command without keys.
+      * - :cpp:func:`restore_key_command <gui_forms::Window::restore_key_command>`
+        - Returns a command to the host's default.
       * - :cpp:func:`begin_update <gui_forms::Window::begin_update>`
         - Opens an update scope and returns its :cpp:class:`UpdateScope <gui_forms::UpdateScope>` token.
       * - :cpp:func:`perform_layout <gui_forms::Window::perform_layout>`
@@ -555,6 +568,16 @@ gui_forms::Window
 
       The services of the attached native host, or null when none is attached.
 
+   .. cpp:function:: const KeyMap& key_map() const noexcept
+
+      The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`) in this window:
+      the host's defaults with the application's rebindings over them. A
+      window starts with the PC convention (``pc_key_map``: Ctrl+F4 closes a
+      document, Shift+F10 or the context-menu key opens a context menu); a
+      host session installs the defaults its host reports
+      (``HostCapabilities::key_map``), so under the macOS host Cmd+W closes a
+      document. Controls ask it through ``Control::effective_key_map``.
+
    .. cpp:function:: PaintLeaseSnapshot paint_lease_snapshot() const noexcept
 
    .. cpp:function:: PresentationAvailability presentation_availability() const noexcept
@@ -753,6 +776,19 @@ gui_forms::Window
    .. cpp:function:: std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
 
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
+
+   .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
+
+      Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in this
+      window, over the host's default; an empty binding leaves the command
+      without keys. The rebinding is kept when a host attaches later. A
+      command outside the enumeration, or a chord with unknown modifier bits
+      or modifiers without a key, throws ``std::invalid_argument`` and binds
+      nothing.
+
+   .. cpp:function:: void restore_key_command(KeyCommand command)
+
+      Returns a command to the host's default.
 
    .. cpp:function:: UpdateScope begin_update()
 

@@ -87,6 +87,14 @@ invoke_required
     `begin_invoke` or `invoke` instead of touching the window directly.
 host_services
     The services of the attached native host, or null when none is attached.
+key_map
+    The keys of the named keyboard commands (`KeyCommand`) in this window:
+    the host's defaults with the application's rebindings over them. A
+    window starts with the PC convention (`pc_key_map`: Ctrl+F4 closes a
+    document, Shift+F10 or the context-menu key opens a context menu); a
+    host session installs the defaults its host reports
+    (`HostCapabilities::key_map`), so under the macOS host Cmd+W closes a
+    document. Controls ask it through `Control::effective_key_map`.
 needs_frame
     Whether painting is pending.
 occluded : default ``false``
@@ -193,6 +201,15 @@ dispatch_key
 dispatch_text
     Delivers text input to the focused control and returns whether it was
     handled.
+rebind_key_command
+    Binds a `KeyCommand` to a `KeyBinding` (up to two chords) in this
+    window, over the host's default; an empty binding leaves the command
+    without keys. The rebinding is kept when a host attaches later. A
+    command outside the enumeration, or a chord with unknown modifier bits
+    or modifiers without a key, throws `std::invalid_argument` and binds
+    nothing.
+restore_key_command
+    Returns a command to the host's default.
 begin_invoke
     Queues a callback to run on the UI thread in a later dispatch turn and
     returns a `DispatchOperation`; it may be called from any thread. The

@@ -9,8 +9,9 @@ advertised protocol surface; some native integrations are not advertised yet.
 
 ## The host protocol
 
-`HostCapabilities` carries `protocol_version` (currently 7), a `platform`
-string and a bit set of `HostCapability` flags. `Application::capabilities()`
+`HostCapabilities` carries `protocol_version` (currently 8), a `platform`
+string, a bit set of `HostCapability` flags and the host's keyboard-command
+defaults (`key_map`, below). `Application::capabilities()`
 returns the set for the host your program was linked against, before any
 window exists. `supports(flag)` answers one question; `to_json()` dumps the
 whole record for logs.
@@ -41,6 +42,40 @@ whole record for logs.
 
 The table reflects the bits each adapter currently advertises; read
 `Application::capabilities()` rather than this page in code.
+
+## Keyboard-command defaults
+
+Some keys differ by platform convention: closing a document is Ctrl+F4 on
+Windows and X11 desktops and Cmd+W on macOS. The core names such keys as
+keyboard commands (`KeyCommand`: `close_document`, `next_tab`,
+`previous_tab`, `move_tab_later`, `move_tab_earlier`, `cycle_forward`,
+`cycle_backward`, `context_menu`, and docking's `next_document`,
+`previous_document`, `next_tool_panel`, `previous_tool_panel`,
+`position_menu`, `return_to_document`, `hide_tool_panel`,
+`maximize_document_area`), and each host reports the keys its convention
+gives them in `HostCapabilities::key_map`; `to_json` lists them as HID usage
+and modifier bits. A host session installs that map in its window, and
+controls ask the window (`Control::effective_key_map`) rather than naming
+keys themselves. An application rebinds a command with
+`Window::rebind_key_command`; the rebinding stays over whatever host
+attaches.
+
+| Command | Windows, X11, headless (`pc_key_map`) | macOS |
+|---|---|---|
+| `close_document` | Ctrl+F4 | Cmd+W |
+| `next_tab`, `previous_tab` | Ctrl+PageDown, Ctrl+PageUp | the same |
+| `move_tab_later`, `move_tab_earlier` | Ctrl+Shift+PageDown, Ctrl+Shift+PageUp | the same |
+| `cycle_forward`, `cycle_backward` | Ctrl+Tab, Ctrl+Shift+Tab | the same |
+| `context_menu` | Shift+F10, or the context-menu key | the same |
+| docking's commands | Ctrl+F6, Ctrl+Shift+F6, Alt+F7, Alt+Shift+F7, Alt+Hyphen, Escape, Shift+Escape, Ctrl+Shift+F12 | the same |
+
+The context-menu key is `PhysicalKey::context_menu` (HID "Keyboard
+Application"): `VK_APPS` on Windows and the `Menu` keysym on X11. Apple
+keyboards have no such key; the macOS host maps the virtual key code a PC
+keyboard's key reports (0x6E), which has not been tested on a Mac.
+`PageStrip` and `PageView` use the tab commands, close and the context
+menu; `DockSite` uses docking's commands, the cycle commands (its
+navigator) and the context menu (a panel's position menu).
 
 ## The three native hosts and the headless one
 

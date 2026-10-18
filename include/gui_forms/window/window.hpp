@@ -312,6 +312,20 @@ public:
     [[nodiscard]] HostServices* host_services() const noexcept {
         return host_services_;
     }
+    // The keys of the named keyboard commands in this window (owner decision
+    // DK-30, interview G5-1 and G6-1): the host's defaults, which a
+    // HostSession installs from HostCapabilities::key_map when it attaches
+    // (pc_key_map until then), with the application's rebindings over them.
+    // A rebinding is kept when a host attaches later. Controls ask through
+    // Control::effective_key_map.
+    [[nodiscard]] const KeyMap& key_map() const noexcept { return key_map_; }
+    // Binds `command` to `binding` in this window, over the host's default.
+    // An empty binding leaves the command without keys. Throws
+    // std::invalid_argument as KeyMap::set_binding does, binding nothing.
+    void rebind_key_command(KeyCommand command, KeyBinding binding);
+    // Returns `command` to the host's default. Throws std::invalid_argument
+    // for a command outside the enumeration.
+    void restore_key_command(KeyCommand command);
 
     [[nodiscard]] UpdateScope begin_update();
     void perform_layout();
@@ -600,6 +614,8 @@ public:
 
 private:
     friend class HostSession;
+    // Called by HostSession: the host's defaults under the rebindings.
+    void install_host_key_map(const KeyMap& defaults);
     void initialize_cursor_identity() noexcept;
     void invalidate_cursor_interaction(CursorError cause) noexcept;
     friend class Control;
@@ -966,6 +982,12 @@ private:
     std::uint64_t semantic_generation_{1U};
     bool in_semantic_snapshot_{};
     HostServices* host_services_{};
+    // The host's defaults, the effective map, and which commands the
+    // application rebound (those keep their binding in `key_map_` when the
+    // host's defaults change).
+    KeyMap host_key_map_{pc_key_map()};
+    KeyMap key_map_{pc_key_map()};
+    std::array<bool, key_command_count> key_command_rebound_{};
 };
 
 } // namespace gui_forms

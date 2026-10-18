@@ -144,8 +144,11 @@ gui_forms::PageView
    Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab are taken in the bubble phase, so
    when views are nested the innermost view around the focus answers first; a
    view whose :cpp:func:`ctrl_tab <gui_forms::PageView::ctrl_tab>` is ``pass`` leaves Ctrl+Tab to the views around it.
-   Ctrl+F4 (close the selected closable page) and Ctrl+Shift+PageDown and
-   Ctrl+Shift+PageUp (move it within its group) are taken the same way.
+   Ctrl+F4 (close the selected closable page; Cmd+W on macOS) and
+   Ctrl+Shift+PageDown and Ctrl+Shift+PageUp (move it within its group) are
+   taken the same way. All of these are the window's named keyboard commands
+   (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), so a host's convention and an application's rebinding reach
+   the view.
 
    Closing a page: the strip raises one ``page_close_requested`` per cause (the
    close button, a middle click, Ctrl+F4, the accessibility action). A handler

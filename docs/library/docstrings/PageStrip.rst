@@ -106,8 +106,9 @@ page_invoked
 page_close_requested
     Raised once when a closable page's close is asked for: by its close
     button (cause ``pointer``), a middle click released over the tab it
-    pressed (``middle_button``), Ctrl+F4 on the selected page (``keyboard``)
-    or the accessibility ``close`` action (``semantic``). The strip never
+    pressed (``middle_button``), Ctrl+F4 (Cmd+W on macOS) on the selected
+    page (``keyboard``) or the accessibility ``close`` action
+    (``semantic``). The strip never
     removes the page: the set's owner decides, and sets ``handled`` when it
     acts or refuses. A `PageView` removes a page nobody handled unless its
     close policy is ``request_only``.
@@ -123,8 +124,9 @@ page_drag_started
     press; it never reorders.
 page_context_menu_requested
     Raised when a secondary click is released over the tab it pressed (at
-    the pointer, selecting nothing) or Shift+F10 is pressed on the keyboard's
-    tab (at the tab's corner on the content's side where reading starts).
+    the pointer, selecting nothing) or Shift+F10 or the context-menu key is
+    pressed on the keyboard's tab (at the tab's corner on the content's side
+    where reading starts).
     The strip shows no menu of its own; a handler that shows one sets
     ``handled``.
 page_double_clicked
@@ -220,17 +222,21 @@ pointer leaves the strip, so the next tab's close button arrives under the
 pointer; a resize or a setting also thaws them. A pinned page with an image
 shows only its icon until the pointer is over it, then its full width with
 its pin in the close button's place; a pinned page without an image keeps
-its label. Ctrl+F4 asks to close the selected page; Delete closes nothing.
+its label. Ctrl+F4 (Cmd+W on macOS) asks to close the selected page; Delete
+closes nothing.
 
 A press on a tab selects first and then focuses the strip. The order of
 events is the set's ``selecting``, its ``selected_page_changed``, then
 `page_invoked`; a cancelled selection raises nothing more and leaves the
 keyboard's tab where it was. Ctrl+PageDown and Ctrl+PageUp select the next
 and previous page while the strip has focus, and Ctrl+Shift+PageDown and
-Ctrl+Shift+PageUp move the selected page within its group, and Shift+F10
-asks for the keyboard's tab's context menu (there is no context-menu key in
-the physical key vocabulary yet). The macOS
-Command+W is not bound: the framework has no host keymap defaults yet.
+Ctrl+Shift+PageUp move the selected page within its group, and Shift+F10 or
+the context-menu key asks for the keyboard's tab's context menu. These keys
+are the window's named keyboard commands (`KeyCommand`: ``close_document``,
+``next_tab``, ``previous_tab``, ``move_tab_later``, ``move_tab_earlier``,
+``context_menu``), so they follow the host's convention and an
+application's `Window::rebind_key_command`; the arrows, Home, End, Space,
+Enter and Escape are the strip's own.
 
 Every page is published to accessibility as a tab of the strip's tab list
 (role ``tab_group``, horizontal, or vertical on a side strip): those scrolled out of view are published

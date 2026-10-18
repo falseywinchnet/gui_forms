@@ -81,7 +81,10 @@ enum class DockPositionCommand : std::uint8_t {
 // (every tool stack hidden, as by collapsing, and restored); Alt+Hyphen,
 // Shift+F10 and the context-menu key open the active panel's position menu.
 // A focused TabControl keeps Ctrl+Tab (PageView's Ctrl+Tab policy is `pass`
-// inside the site).
+// inside the site). Every key but F6 is a named keyboard command
+// (KeyCommand, G6-1), so the window's key map, as the host reports it and
+// the application rebinds it, decides the chords; the navigator commits on
+// the release of the chord's Ctrl, Alt or Meta.
 //
 // Activation: focus entering a stack (a click, Tab, F6, a tab chosen)
 // makes its selected panel the workspace's active panel; a press on a

@@ -569,6 +569,9 @@ static std::uint32_t physical_key_for(unsigned short key_code) {
     case 106: return 0x6BU; // F16
     case 107: return 0x69U; // F14
     case 109: return 0x43U; // F10
+    // Apple keyboards have no context-menu key; a PC keyboard's reports this
+    // code (kVK_ContextualMenu in recent SDKs).
+    case 110: return 0x65U; // Context menu
     case 111: return 0x45U; // F12
     case 113: return 0x6AU; // F15
     case 114: return 0x49U; // Help/Insert
@@ -2867,6 +2870,15 @@ static void install_application_menu() {
 
 namespace gui_forms::host {
 
+// The macOS convention for the named keyboard commands (owner decision
+// DK-30, interview G5-1): Cmd+W closes a document; every other command keeps
+// the PC convention's keys, Ctrl among them (Ctrl+Tab, Ctrl+PageDown).
+static KeyMap macos_key_map() {
+    KeyMap map = pc_key_map();
+    map.set_binding(KeyCommand::close_document, {{PhysicalKey::w, Modifier::meta}, {}});
+    return map;
+}
+
 HostCapabilities macos_capabilities() {
     return {HostCapabilities::current_protocol_version,
             "appkit-macos",
@@ -2887,7 +2899,8 @@ HostCapabilities macos_capabilities() {
                 HostCapability::dialogs |
                 HostCapability::sound_cues |
                 HostCapability::notification_area |
-                HostCapability::notification_area_menus};
+                HostCapability::notification_area_menus,
+            macos_key_map()};
 }
 
 class DispatchAndCollectWake final {

@@ -338,7 +338,7 @@ Related types
 
    .. cpp:member:: constexpr std::uint32_t current_protocol_version
 
-      Default: ``7``.
+      8: the host's keyboard-command defaults (``key_map``). Default: ``8``.
 
    .. cpp:member:: std::uint32_t protocol_version
 
@@ -351,6 +351,10 @@ Related types
    .. cpp:member:: HostCapability available
 
       Default: ``{HostCapability::none}``.
+
+   .. cpp:member:: KeyMap key_map
+
+      The keys this host's convention gives the named keyboard commands (owner decision DK-30, interview G5-1): host data, not core policy. HostSession installs it as the window's defaults; an application's rebindings (Window::rebind_key_command) stay over it. Default: ``{pc_key_map()}``.
 
 .. cpp:namespace:: gui_forms
 

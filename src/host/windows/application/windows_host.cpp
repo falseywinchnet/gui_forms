@@ -4005,7 +4005,10 @@ HostCapabilities windows_capabilities() {
                 HostCapability::sound_cues |
                 HostCapability::notification_area |
                 HostCapability::notification_area_messages |
-                HostCapability::notification_area_menus};
+                HostCapability::notification_area_menus,
+            // Windows follows the PC keyboard convention (Ctrl+F4 closes a
+            // document).
+            pc_key_map()};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {

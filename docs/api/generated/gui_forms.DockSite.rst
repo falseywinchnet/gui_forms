@@ -176,7 +176,13 @@ gui_forms::DockSite
    returns to the active document; Shift+Escape hides the active tool panel;
    Ctrl+Shift+F12 toggles the maximized document area; Alt+Hyphen, Shift+F10
    and the context-menu key open the active panel's position menu. A focused
-   :cpp:class:`TabControl <gui_forms::TabControl>` keeps Ctrl+Tab: the stacks pass it on.
+   :cpp:class:`TabControl <gui_forms::TabControl>` keeps Ctrl+Tab: the stacks pass it on. Every key but F6 is a
+   named keyboard command (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`: ``cycle_forward``,
+   ``cycle_backward``, ``next_tool_panel``, ``previous_tool_panel``,
+   ``next_document``, ``previous_document``, ``return_to_document``,
+   ``hide_tool_panel``, ``maximize_document_area``, ``position_menu`` and
+   ``context_menu``), so ``Window::rebind_key_command`` changes it and the
+   navigator commits on the release of the new chord's Ctrl, Alt or Meta.
 
    Activation: focus entering a stack (a click, Tab, F6, a tab chosen) makes
    its selected panel the workspace's active panel; a press on a caption, or

@@ -1385,43 +1385,61 @@ bool DockSite::handle_seam_key(KeyEvent& event) {
     return true;
 }
 
+namespace {
+
+// The modifier whose release commits the navigator a key command opened: the
+// first of Ctrl, Alt and Meta the chord holds (Ctrl after Ctrl+Tab, Alt after
+// Alt+F7), or none for a chord rebound to hold none of them.
+[[nodiscard]] Modifier navigator_release(Modifier held) noexcept {
+    if (has_modifier(held, Modifier::control)) return Modifier::control;
+    if (has_modifier(held, Modifier::alt)) return Modifier::alt;
+    if (has_modifier(held, Modifier::meta)) return Modifier::meta;
+    return Modifier::none;
+}
+
+} // namespace
+
 // The docking keys (owner decision DK-30), wherever focus is in the site.
+// They are the window's named keyboard commands (G6-1: an application may
+// rebind them): cycle_forward and cycle_backward (Ctrl+Tab) open the
+// documents' navigator, next_tool_panel and previous_tool_panel (Alt+F7) the
+// tools', next_document and previous_document (Ctrl+F6) step the documents,
+// maximize_document_area (Ctrl+Shift+F12), return_to_document (Escape in a
+// tool stack), hide_tool_panel (Shift+Escape in a tool stack), and
+// position_menu (Alt+Hyphen) or context_menu (Shift+F10, the context-menu
+// key) open the focused panel's position menu.
 bool DockSite::handle_docking_key(KeyEvent& event) {
     if (event.handled || event.action != KeyAction::down || workspace_ == nullptr) return false;
-    const std::uint32_t key = event.physical_key;
-    const Modifier modifiers = event.modifiers;
-    const bool shift = has_modifier(modifiers, Modifier::shift);
-    const Modifier without_shift = shift ? static_cast<Modifier>(static_cast<std::uint8_t>(modifiers) &
-                                                                 ~static_cast<std::uint8_t>(Modifier::shift))
-                                         : modifiers;
-    const int direction = shift ? -1 : 1;
+    const KeyMap& keys = effective_key_map();
+    const Modifier release = navigator_release(event.modifiers);
     bool handled = false;
-    if (key == PhysicalKey::tab && without_shift == Modifier::control) {
-        handled = open_navigator(DockNavigatorList::documents, direction, Modifier::control);
-    } else if (key == PhysicalKey::f7 && without_shift == Modifier::alt) {
-        handled = open_navigator(DockNavigatorList::tools, direction, Modifier::alt);
-    } else if (key == PhysicalKey::f6 && without_shift == Modifier::control) {
-        handled = activate_relative_document(direction);
-    } else if (key == PhysicalKey::f12 && modifiers == (Modifier::control | Modifier::shift)) {
+    if (keys.matches(KeyCommand::cycle_forward, event)) {
+        handled = open_navigator(DockNavigatorList::documents, 1, release);
+    } else if (keys.matches(KeyCommand::cycle_backward, event)) {
+        handled = open_navigator(DockNavigatorList::documents, -1, release);
+    } else if (keys.matches(KeyCommand::next_tool_panel, event)) {
+        handled = open_navigator(DockNavigatorList::tools, 1, release);
+    } else if (keys.matches(KeyCommand::previous_tool_panel, event)) {
+        handled = open_navigator(DockNavigatorList::tools, -1, release);
+    } else if (keys.matches(KeyCommand::next_document, event)) {
+        handled = activate_relative_document(1);
+    } else if (keys.matches(KeyCommand::previous_document, event)) {
+        handled = activate_relative_document(-1);
+    } else if (keys.matches(KeyCommand::maximize_document_area, event)) {
         set_document_area_maximized(!maximized_);
         handled = true;
-    } else if (key == PhysicalKey::escape && modifiers == Modifier::none) {
+    } else if (keys.matches(KeyCommand::return_to_document, event)) {
         const std::optional<DockPanelId>& document = (*workspace_).active_document();
         if (focus_in_tool_stack() && document) {
             handled = (*workspace_).activate_panel(*document, DockActivationCause::keyboard);
         }
-    } else if (key == PhysicalKey::escape && modifiers == Modifier::shift) {
+    } else if (keys.matches(KeyCommand::hide_tool_panel, event)) {
         const std::optional<DockPanelId> panel = focused_panel();
         if (focus_in_tool_stack() && panel) handled = run_position_command(*panel, DockPositionCommand::hide);
-    } else {
-        const bool menu_key = (key == PhysicalKey::minus && modifiers == Modifier::alt) ||
-                              (key == PhysicalKey::f10 && modifiers == Modifier::shift) ||
-                              (key == PhysicalKey::application && modifiers == Modifier::none);
-        if (menu_key) {
-            std::optional<DockPanelId> panel = focused_panel();
-            if (!panel) panel = (*workspace_).active_panel();
-            if (panel) handled = show_position_menu(*panel, MenuOpenMode::keyboard);
-        }
+    } else if (keys.matches(KeyCommand::position_menu, event) || keys.matches(KeyCommand::context_menu, event)) {
+        std::optional<DockPanelId> panel = focused_panel();
+        if (!panel) panel = (*workspace_).active_panel();
+        if (panel) handled = show_position_menu(*panel, MenuOpenMode::keyboard);
     }
     if (handled) event.handled = true;
     return handled;
