@@ -163,8 +163,11 @@ std::optional<ControlSnapshot> Window::snapshot_control(const Control::Ptr& cont
     return snapshot;
 }
 
-bool Window::release_control_snapshot(ImageId image) noexcept {
-    const bool removed = (*resources_).registry().remove(image);
+bool Window::release_control_snapshot(ImageId image) {
+    require_ui_thread("release_control_snapshot");
+    // The repainting removal: a stamp that showed the picture may still be
+    // in a retained chunk.
+    const bool removed = (*resources_).remove_image(image);
     return removed;
 }
 

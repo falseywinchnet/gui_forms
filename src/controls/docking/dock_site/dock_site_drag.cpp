@@ -150,7 +150,12 @@ void DockSite::set_drag_threshold(double threshold) {
 void DockSite::reset_drag() noexcept {
     if (drag_.picture && !drag_.guest) {
         Window* const host = attached_window();
-        if (host != nullptr) static_cast<void>((*host).release_control_snapshot((*drag_.picture).image));
+        // A release that fails (allocation while marking the repaint) leaves
+        // the image to the window's end.
+        try {
+            if (host != nullptr) static_cast<void>((*host).release_control_snapshot((*drag_.picture).image));
+        } catch (...) {
+        }
     }
     drag_ = DragSession{};
 }

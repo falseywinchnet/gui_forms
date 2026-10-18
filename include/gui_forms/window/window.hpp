@@ -319,8 +319,11 @@ public:
     // chunks the replay had to rebuild are marked for the next real paint.
     // The image lives until release_control_snapshot or the window's end.
     [[nodiscard]] std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale);
-    // Removes a snapshot's image. False for an image that is not there.
-    bool release_control_snapshot(ImageId image) noexcept;
+    // Removes a snapshot's image as remove_image does: every window sharing
+    // the registry retires its retained paint, so no chunk replays the dead
+    // image. False, changing nothing, for an image that is not there.
+    // std::logic_error off the UI thread.
+    bool release_control_snapshot(ImageId image);
     [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
         return text_metrics_provider_;
     }
