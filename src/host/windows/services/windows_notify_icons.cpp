@@ -150,9 +150,12 @@ LRESULT CALLBACK WindowsNotifyIcons::window_procedure(HWND window, UINT message,
 void WindowsNotifyIcons::handle_callback(WPARAM, LPARAM l_parameter) {
     const UINT event = LOWORD(static_cast<DWORD>(l_parameter));
     const UINT shell_id = HIWORD(static_cast<DWORD>(l_parameter));
+    // Shell identities are unique among live icons (next_shell_id).
     const Icon* icon = nullptr;
     for (const Icon& candidate : icons_) {
-        if (candidate.shell_id == shell_id) icon = &candidate;
+        if (candidate.shell_id != shell_id) continue;
+        icon = &candidate;
+        break;
     }
     if (icon == nullptr) return;
     HostTrayIconEvent published{};
@@ -192,7 +195,9 @@ UINT WindowsNotifyIcons::next_shell_id() const noexcept {
     for (UINT candidate = 1U; candidate < 0xFFFFU; ++candidate) {
         bool used = false;
         for (const Icon& icon : icons_) {
-            if (icon.shell_id == candidate) used = true;
+            if (icon.shell_id != candidate) continue;
+            used = true;
+            break;
         }
         if (!used) return candidate;
     }
@@ -283,7 +288,8 @@ HostServiceStatus WindowsNotifyIcons::notify(std::uint64_t icon_id, const HostTr
         data.dwInfoFlags = NIIF_NONE;
     }
     const BOOL shown = Shell_NotifyIconW(NIM_MODIFY, &data);
-    return shown ? HostServiceStatus{} : HostServiceStatus{HostServiceError::backend_failure};
+    if (!shown) return {HostServiceError::backend_failure};
+    return {};
 }
 
 HostTrayMenuResult WindowsNotifyIcons::show_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request) {
