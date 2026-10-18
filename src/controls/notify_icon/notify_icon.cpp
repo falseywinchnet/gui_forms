@@ -226,7 +226,14 @@ void NotifyIcon::show_menu() {
     for (const MenuItemSpec& spec : (*context_menu_).items()) {
         if (spec.stable_id != chosen.chosen_id || !spec.command) continue;
         const std::shared_ptr<Command> command = spec.command;
-        const bool executed = (*command).execute(notify_icon_source);
+        // Through the bound window's command chain (owner decision DK-47).
+        Window* const routing = bound_window();
+        bool executed = false;
+        if (routing != nullptr) {
+            executed = (*command).execute_routed(*routing, notify_icon_source);
+        } else {
+            executed = (*command).execute(notify_icon_source);
+        }
         if (!executed || !is_alive()) return;
         const MenuItemInvocation invocation{(*context_menu_).stable_id(), spec.stable_id, (*command).stable_id(),
                                             std::string(notify_icon_source)};

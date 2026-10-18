@@ -204,10 +204,11 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
                         "or the order differs)")
     vocabulary: object = schema.get("vocabulary")
     if not isinstance(vocabulary, dict):
-        findings.append("the schema has no vocabulary (part roles, states, marks, values, families, "
-                        "semantic roles)")
+        findings.append("the schema has no vocabulary (part roles, states, custom states, marks, values, "
+                        "families, semantic roles, actions and fields)")
     else:
-        for key in ("part_roles", "states", "marks", "values", "families", "semantic_roles"):
+        for key in ("part_roles", "states", "custom_states", "marks", "values", "families",
+                    "semantic_roles", "semantic_actions", "semantic_fields"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
                 findings.append(f"vocabulary: {key} is missing or empty")
@@ -311,9 +312,12 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("The atoms controls declare and themes address (design language §8.5 and §12.7).")
         lines.append("")
         titles: list[tuple[str, str]] = [("part_roles", "Part roles"), ("states", "States"),
+                                         ("custom_states", "Admitted custom states"),
                                          ("marks", "Marks"), ("values", "Values"),
                                          ("families", "Recipe families"),
-                                         ("semantic_roles", "Semantic roles")]
+                                         ("semantic_roles", "Semantic roles"),
+                                         ("semantic_actions", "Semantic actions"),
+                                         ("semantic_fields", "Semantic node fields")]
         for key, title in titles:
             names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]
             lines.append(f"{title}: " + ", ".join(_code(str(name)) for name in names) + ".")

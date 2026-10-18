@@ -152,13 +152,14 @@ public:
         (*body).add_at(label("gallery.tree-and-object-views.heading", "TREES AND OBJECT VIEWS",
                              22.0, 700, shell_blue_dark), {24.0, 18.0, 620.0, 34.0});
         (*body).add_at(label("gallery.tree-and-object-views.lead",
-                             "One project fixture: the TreeView selects a folder, the BreadcrumbTrail follows it, the ObjectView lists its children, the CorrespondenceView ledgers its files and the DataGridView edits them.",
+                             "One project fixture: the TreeView selects a folder, the BreadcrumbTrail follows it, the ObjectView lists its children, the CorrespondenceView ledgers its files, the DataGridView edits them and the TreeListView shows the whole tree with columns.",
                              12.0, 400, muted), {26.0, 52.0, 920.0, 24.0});
         build_location(body);
         build_tree(body);
         build_objects(body);
         build_ledger(body);
         build_grid(body);
+        build_tree_list(body);
         status_ = label("gallery.tree.status", "Ready", 11.0, 600, green);
         (*body).add_at(status_, {24.0, 634.0, 930.0, 22.0});
         on(view_mode_.changed(), *this, &TreeAndObjectViewsPage::on_view_mode_changed);
@@ -281,6 +282,49 @@ private:
         on((*grid_).cell_value_changed(), *this, &TreeAndObjectViewsPage::on_grid_value_changed);
         on((*grid_).cell_content_click(), *this, &TreeAndObjectViewsPage::on_grid_content_click);
         on((*grid_).column_header_click(), *this, &TreeAndObjectViewsPage::on_grid_header_click);
+    }
+
+    // A TreeListView over the whole fixture: folders and files in one tree
+    // with Kind, Size and Modified columns. A header click sorts siblings;
+    // dragging a header moves its column.
+    void build_tree_list(const std::shared_ptr<Surface>& body) {
+        std::shared_ptr<LayoutGroup> tree_list_group = group(
+            "gallery.tree.tree-list-group",
+            "TreeListView · the whole project as a tree with columns, sorted within siblings",
+            {930.0, 300.0});
+        (*body).add_at(tree_list_group, {24.0, 918.0, 930.0, 300.0});
+        tree_list_ = make_control<TreeListView>(StableId("gallery.tree.tree-list"));
+        (*tree_list_).set_accessible_name("Project tree with details");
+        (*tree_list_).set_columns({
+            {.stable_id = std::string(column_name), .text = "Name", .width = 260.0},
+            {.stable_id = std::string(column_kind), .text = "Kind", .width = 120.0},
+            {.stable_id = std::string(column_size), .text = "Size", .width = 80.0,
+             .alignment = TreeListAlignment::right},
+            {.stable_id = std::string(column_modified), .text = "Modified", .width = 110.0},
+        });
+        std::vector<TreeListNode> nodes;
+        for (std::size_t index = 0; index < project.size(); ++index) {
+            const ProjectNode& node = project[index];
+            TreeListNode item;
+            item.stable_id = std::string(node.id);
+            item.text = std::string(node.name);
+            item.depth = depth_of(index);
+            item.cells = {std::string(node.kind), std::string(node.size), std::string(node.modified)};
+            item.expanded = node.id == "root" || node.id == "src" || node.id == "controls";
+            nodes.push_back(std::move(item));
+        }
+        (*tree_list_).set_nodes(std::move(nodes));
+        (*tree_list_group).add_at(tree_list_, {18.0, 36.0, 640.0, 248.0});
+        on((*tree_list_).selection_changed(), *this, &TreeAndObjectViewsPage::on_tree_list_selected);
+        on((*tree_list_).sort_changed(), *this, &TreeAndObjectViewsPage::on_tree_list_sorted);
+        on((*tree_list_).column_moved(), *this, &TreeAndObjectViewsPage::on_tree_list_column_moved);
+        std::shared_ptr<Label> note = label(
+            "gallery.tree.tree-list.note",
+            "Click a header to sort each folder's children; drag a header to move its column or a divider to resize. Left and Right collapse and expand; * expands a whole folder.",
+            10.0, 400, muted);
+        (*note).set_text_wrapping(TextWrapping::word);
+        (*note).set_vertical_alignment(VerticalAlignment::near);
+        (*tree_list_group).add_at(note, {680.0, 36.0, 228.0, 140.0});
     }
 
     [[nodiscard]] static std::size_t depth_of(std::size_t index) {
@@ -553,6 +597,29 @@ private:
                             (next == DataGridViewSortDirection::ascending ? " ascending" : " descending"));
     }
 
+    // TreeListView
+    void on_tree_list_selected(const TreeListSelectionChange& change) {
+        if (!change.current_id) return;
+        (*status_).set_text("TreeListView node " + *change.current_id + " selected · " +
+                            node_path(node_index(*change.current_id)));
+    }
+
+    void on_tree_list_sorted(const TreeListSortChange& change) {
+        if (!change.column) {
+            (*status_).set_text("TreeListView back in fixture order");
+            return;
+        }
+        (*status_).set_text("TreeListView siblings sorted by " +
+                            (*tree_list_).columns()[*change.column].text +
+                            (change.order == TreeListSortOrder::ascending ? " ascending" : " descending") +
+                            " · every folder keeps its children");
+    }
+
+    void on_tree_list_column_moved(const TreeListColumnMove& change) {
+        (*status_).set_text("TreeListView column " + (*tree_list_).columns()[change.column].text +
+                            " moved to position " + std::to_string(change.display_position + 1U));
+    }
+
     // Value
     void on_view_mode_changed(const int mode) {
         (*objects_).set_view_mode(mode == 0 ? ObjectViewMode::icons : ObjectViewMode::details);
@@ -567,6 +634,7 @@ private:
     std::shared_ptr<DataGridView> grid_;
     // Shared with grid_, which asks it for values while it shows the rows.
     std::shared_ptr<ProjectFileRows> grid_rows_;
+    std::shared_ptr<TreeListView> tree_list_;
     std::shared_ptr<Label> status_;
     Value<int> view_mode_{1};
     ObjectDetailsSort sort_{};

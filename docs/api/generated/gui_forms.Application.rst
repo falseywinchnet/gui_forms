@@ -31,6 +31,8 @@ gui_forms::Application
         - Checks a set of windows against the rules :cpp:func:`run <gui_forms::Application::run>` applies, without presenting anything, and returns the first problem as an :cpp:class:`ApplicationResult <gui_forms::ApplicationResult>`.
       * - :cpp:func:`capabilities <gui_forms::Application::capabilities>`
         - The capability record of the linked native host: its name and the services it offers, such as dialogs, clipboard and cursors.
+      * - :cpp:func:`key_bindings <gui_forms::Application::key_bindings>`
+        - The application's one set of keyboard-command keys (owner decision DK-44): :cpp:func:`run <gui_forms::Application::run>` gives it to every window it runs, before the host attaches, so the host seeds it once and a rebinding in any window holds in all.
       * - :cpp:func:`run <gui_forms::Application::run>`
         - ``run(std::unique_ptr<Window>, ApplicationWindowOptions)`` presents one window, with the stable ID ``"main"``.
 
@@ -135,6 +137,10 @@ gui_forms::Application
       services it offers, such as dialogs, clipboard and cursors. A build
       without a native host reports the name ``"unsupported"`` and no
       capabilities.
+
+   .. cpp:function:: static const std::shared_ptr<KeyBindings>& key_bindings()
+
+      The application's one set of keyboard-command keys (owner decision DK-44): :cpp:func:`run <gui_forms::Application::run>` gives it to every window it runs, before the host attaches, so the host seeds it once and a rebinding in any window holds in all. Made on first use; lives as long as the process. UI thread only.
 
    .. cpp:function:: static ApplicationResult run(std::unique_ptr<Window> window, ApplicationWindowOptions options = {})
 

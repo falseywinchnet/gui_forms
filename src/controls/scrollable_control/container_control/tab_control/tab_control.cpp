@@ -1,17 +1,17 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_control.hpp"
+#include "gui_forms/controls/pages/page_strip/page_strip.hpp"
+#include "gui_forms/delegate.hpp"
+#include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window.hpp"
 #include "../../scrollable_anatomy.hpp"
 
-#include <vector>
-#include <array>
 #include <algorithm>
+#include <array>
 #include <cmath>
-#include <limits>
-#include <numeric>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 #include <utility>
+#include <vector>
 
 namespace gui_forms {
 
@@ -26,19 +26,108 @@ namespace {
     return value | (std::uint64_t{1} << 63U);
 }
 
+// A page's record in the strip's set is named by the page's stable ID.
+[[nodiscard]] PageId tab_page_id(const TabPage& page) {
+    const PageId id{std::string(page.stable_id().value())};
+    return id;
+}
+
+// The tab strip of a TabControl: a PageStrip that takes no focus (the
+// control holds it, and passes the strip its focus and keys), publishes no
+// semantics (the control publishes the tabs), and draws its tabs in the
+// family the control's appearance names.
+class TabControlStrip final : public PageStrip {
+public:
+    TabControlStrip(StableId stable_id, PageSet& pages) : PageStrip(std::move(stable_id), pages) {
+        set_focusable(false);
+    }
+
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor{};
+        descriptor.exposed = false;
+        descriptor.include_descendants = false;
+        return descriptor;
+    }
+
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        const std::vector<SemanticNode> none;
+        return none;
+    }
+
+protected:
+    [[nodiscard]] ControlVisualRole tab_family() const noexcept override {
+        const std::shared_ptr<TabControl> owner = std::dynamic_pointer_cast<TabControl>(parent());
+        if (!owner) return ControlVisualRole::menu_item;
+        if ((*owner).appearance() == TabAppearance::buttons) return ControlVisualRole::button;
+        if ((*owner).appearance() == TabAppearance::flat_buttons) return ControlVisualRole::command_button;
+        return ControlVisualRole::menu_item;
+    }
+};
+
+// Marks the control's own edits of its strip's set for their duration, on
+// every exit.
+class TabSetEditScope final {
+public:
+    explicit TabSetEditScope(bool& editing) noexcept : editing_(editing), outer_(editing) { editing_ = true; }
+    ~TabSetEditScope() { editing_ = outer_; }
+    TabSetEditScope(const TabSetEditScope&) = delete;
+    TabSetEditScope& operator=(const TabSetEditScope&) = delete;
+
+private:
+    bool& editing_;
+    bool outer_{};
+};
+
+[[nodiscard]] PageSetOptions tab_set_options() noexcept {
+    PageSetOptions options{};
+    options.capacity = TabControl::maximum_pages;
+    options.fallback = PageSelectionFallback::neighbour;
+    return options;
+}
+
 } // namespace
 
 TabControl::TabControl(StableId stable_id)
-    : ContainerControl(std::move(stable_id)) {
+    : ContainerControl(std::move(stable_id)), tab_set_(tab_set_options()) {
     set_focusable(true);
+    // Registered before the strip's handlers: the control shows the page
+    // before the strip relays out.
+    selecting_token_ = tab_set_.selecting().subscribe(
+        *this, Delegate<PageSelectingEvent&>::bind<TabControl, &TabControl::on_set_selecting>(*this));
+    selection_token_ = tab_set_.selected_page_changed().subscribe(
+        *this,
+        Delegate<const PageSelectionChange&>::bind<TabControl, &TabControl::on_set_selection_changed>(*this));
+}
+
+void TabControl::initialize_control_tree() {
+    const std::string prefix(stable_id().value());
+    strip_ = make_control<TabControlStrip>(StableId(prefix + ".strip"), tab_set_);
+    // Captions are shown as written: `&` has no mnemonic meaning here.
+    (*strip_).set_mnemonics_enabled(false);
+    configure_strip();
+    invoked_token_ = (*strip_).page_invoked().subscribe(
+        *this, Delegate<const PageInvocation&>::bind<TabControl, &TabControl::on_strip_invoked>(*this));
+    add_child(strip_);
+}
+
+TabControl::~TabControl() {
+    if (strip_) (*strip_).release_page_set();
+}
+
+void TabControl::on_dispose() noexcept {
+    if (strip_) (*strip_).release_page_set();
+    selecting_token_.disconnect();
+    selection_token_.disconnect();
+    invoked_token_.disconnect();
+    ContainerControl::on_dispose();
 }
 
 std::vector<std::shared_ptr<TabPage>> TabControl::pages() const {
     std::vector<std::shared_ptr<TabPage>> result;
     result.reserve(pages_.size());
     for (const std::weak_ptr<TabPage>& weak : pages_) {
-        if (const std::shared_ptr<gui_forms::TabPage> page = weak.lock();
-            page && (*page).is_alive() && (*page).parent().get() == this) {
+        const std::shared_ptr<TabPage> page = weak.lock();
+        if (page && (*page).is_alive() && (*page).parent().get() == this) {
             result.push_back(page);
         }
     }
@@ -69,18 +158,51 @@ std::optional<std::size_t> TabControl::selected_index() const {
     return index_of(selected_page_.lock());
 }
 
+// The page's record joins the strip's set before the page is added, so a
+// refusal (a stable ID another page has, the page limit) leaves the control
+// unchanged.
 void TabControl::add_page(std::shared_ptr<TabPage> page) {
     require_mutable();
     if (!page) throw std::invalid_argument("TabControl page may not be null");
     if (index_of(page)) return;
+    synchronize_tab_set();
+    PageRecord record{};
+    record.id = tab_page_id(*page);
+    record.title = (*page).text();
+    PageEditStatus inserted = PageEditStatus::applied;
+    {
+        const TabSetEditScope editing(editing_tab_set_);
+        inserted = tab_set_.insert(record, PagePlacement::end_of_group());
+    }
+    if (inserted == PageEditStatus::duplicate_page) {
+        throw std::invalid_argument("TabControl pages need distinct stable IDs");
+    }
+    if (inserted == PageEditStatus::capacity_reached) {
+        throw std::length_error("TabControl holds at most maximum_pages pages");
+    }
+    if (inserted != PageEditStatus::applied) {
+        throw std::logic_error("TabControl could not add the page's tab");
+    }
     (*page).set_visible(false);
-    add_child(page);
+    try {
+        add_child(page);
+    } catch (...) {
+        const TabSetEditScope editing(editing_tab_set_);
+        static_cast<void>(tab_set_.remove(record.id));
+        throw;
+    }
     pages_.push_back(page);
+    // The strip paints over the pages' top edge, where the selected tab
+    // joins its page.
+    if (strip_) (*strip_).bring_to_front();
     if (!selected_page_.lock()) {
         selected_page_ = page;
         (*page).set_visible(true);
+        select_in_tab_set(page);
         const TabSelectionChange change{std::nullopt, 0U};
         publish_change(selected_index_changed_, change);
+    } else {
+        select_in_tab_set(selected_page_.lock());
     }
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
@@ -118,6 +240,7 @@ std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
             (*live_after[next]).set_visible(true);
         }
     }
+    synchronize_tab_set();
     const std::optional<std::size_t> new_selected = selected_index();
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
@@ -146,8 +269,8 @@ void TabControl::restore_page_focus(const std::shared_ptr<TabPage>& page,
     const RememberedFocusMap::iterator found =
         remembered_focus_.find((*page).runtime_id().value);
     if (found != remembered_focus_.end()) {
-        if (const Control::Ptr candidate = (*found).second.lock();
-            candidate && (*candidate).eligible_for_input()) {
+        const Control::Ptr candidate = (*found).second.lock();
+        if (candidate && (*candidate).eligible_for_input()) {
             for (Control::Ptr current = candidate; current; current = (*current).parent()) {
                 if (current == page) {
                     if ((*window()).request_focus(candidate)) return;
@@ -159,13 +282,12 @@ void TabControl::restore_page_focus(const std::shared_ptr<TabPage>& page,
     static_cast<void>((*window()).request_focus(shared_from_this()));
 }
 
-void TabControl::set_selected_index(std::size_t index) {
-    require_mutable();
-    const std::vector<std::shared_ptr<TabPage>> live = pages();
-    if (index >= live.size()) throw std::out_of_range("TabControl selected index");
+// Hides the old page and shows the new one, remembering the focus the old
+// page held, makes the strip's set agree, moves the focus into the new page
+// when the old page held it, then raises selected_index_changed.
+void TabControl::show_selected(std::size_t index, const std::vector<std::shared_ptr<TabPage>>& live) {
     const std::optional<std::size_t> old_index = selected_index();
-    if (old_index && *old_index == index) return;
-    const std::shared_ptr<gui_forms::TabPage> old_page = selected_page_.lock();
+    const std::shared_ptr<TabPage> old_page = selected_page_.lock();
     bool selection_owned_focus{};
     if (old_page && window() != nullptr) {
         const Control::Ptr focused = (*window()).focused_control();
@@ -180,11 +302,21 @@ void TabControl::set_selected_index(std::size_t index) {
     }
     selected_page_ = live[index];
     (*live[index]).set_visible(true);
+    select_in_tab_set(live[index]);
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test |
                Dirty::semantics);
     restore_page_focus(live[index], selection_owned_focus);
     const TabSelectionChange change{old_index, index};
     publish_change(selected_index_changed_, change);
+}
+
+void TabControl::set_selected_index(std::size_t index) {
+    require_mutable();
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    if (index >= live.size()) throw std::out_of_range("TabControl selected index");
+    const std::optional<std::size_t> old_index = selected_index();
+    if (old_index && *old_index == index) return;
+    show_selected(index, live);
 }
 
 void TabControl::set_selected_tab(const std::shared_ptr<TabPage>& page) {
@@ -197,6 +329,7 @@ void TabControl::set_alignment(TabAlignment alignment) {
     require_mutable();
     if (alignment_ == alignment) return;
     alignment_ = alignment;
+    configure_strip();
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
 }
@@ -205,18 +338,32 @@ void TabControl::set_appearance(TabAppearance appearance) {
     require_mutable();
     if (appearance_ == appearance) return;
     appearance_ = appearance;
+    if (strip_) (*strip_).invalidate(Dirty::paint);
     invalidate(Dirty::paint | Dirty::semantics);
+}
+
+void TabControl::set_size_mode(TabSizeMode mode) {
+    require_mutable();
+    if (mode != TabSizeMode::normal && mode != TabSizeMode::fill_to_right && mode != TabSizeMode::fixed) {
+        throw std::invalid_argument("TabControl size mode is invalid");
+    }
+    if (size_mode_ == mode) return;
+    size_mode_ = mode;
+    configure_strip();
+    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
 void TabControl::set_item_size(Size size) {
     require_mutable();
     if (!std::isfinite(size.width) || !std::isfinite(size.height) ||
-        size.width < 24.0 || size.height < 18.0) {
+        size.width < 24.0 || size.height < 18.0 ||
+        size.width > PageItemWidths::maximum_width || size.height > PageItemWidths::maximum_width) {
         throw std::invalid_argument(
-            "TabControl item size must be finite and at least 24 by 18");
+            "TabControl item size must be finite, at least 24 by 18 and at most 1024 by 1024");
     }
     if (item_size_ == size) return;
     item_size_ = size;
+    configure_strip();
     invalidate(Dirty::measure | Dirty::arrange | Dirty::paint |
                Dirty::hit_test | Dirty::semantics);
 }
@@ -228,22 +375,154 @@ void TabControl::set_style(BasicControlStyle style) {
     invalidate(Dirty::paint | Dirty::semantics);
 }
 
-Rect TabControl::tab_bounds(std::size_t index) const {
-    if (index >= page_count()) throw std::out_of_range("TabControl tab index");
+// -- the strip -----------------------------------------------------------------
+
+// The strip's edge, sizing and fixed width follow the control's alignment,
+// size mode and item size. A fixed tab is `item_size` as the control lays it
+// out: its width along a top or bottom row, its height down a side column.
+void TabControl::configure_strip() {
+    if (!strip_) return;
+    PageStripPlacement placement = PageStripPlacement::top;
+    if (alignment_ == TabAlignment::bottom) placement = PageStripPlacement::bottom;
+    if (alignment_ == TabAlignment::left) placement = PageStripPlacement::left;
+    if (alignment_ == TabAlignment::right) placement = PageStripPlacement::right;
+    PageItemSizing sizing = PageItemSizing::content;
+    if (size_mode_ == TabSizeMode::fill_to_right) sizing = PageItemSizing::fill;
+    if (size_mode_ == TabSizeMode::fixed) sizing = PageItemSizing::fixed;
+    const bool row = alignment_ == TabAlignment::top || alignment_ == TabAlignment::bottom;
+    PageItemWidths widths = (*strip_).item_widths();
+    widths.fixed = row ? item_size_.width : item_size_.height;
+    (*strip_).set_placement(placement);
+    (*strip_).set_item_sizing(sizing);
+    (*strip_).set_item_widths(widths);
+}
+
+// The band the strip occupies: `item_size`'s height across a top or bottom
+// row, its width across a side column, at the window's text scale.
+Rect TabControl::header_bounds() const noexcept {
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
                       committed_arranged_bounds().height};
-    const Size item{item_size_.width * effective_text_scale(),
-                    item_size_.height * effective_text_scale()};
-    if (alignment_ == TabAlignment::top || alignment_ == TabAlignment::bottom) {
-        const double y = alignment_ == TabAlignment::top
-            ? 0.0 : std::max(0.0, bounds.height - item.height);
-        return {static_cast<double>(index) * item.width, y,
-                item.width, std::min(item.height, bounds.height)};
+    const double scale = effective_text_scale();
+    const double row = std::min(item_size_.height * scale, bounds.height);
+    const double column = std::min(item_size_.width * scale, bounds.width);
+    switch (alignment_) {
+    case TabAlignment::top:
+        return {0.0, 0.0, bounds.width, row};
+    case TabAlignment::bottom:
+        return {0.0, bounds.height - row, bounds.width, row};
+    case TabAlignment::left:
+        return {0.0, 0.0, column, bounds.height};
+    case TabAlignment::right:
+        return {bounds.width - column, 0.0, column, bounds.height};
     }
-    const double x = alignment_ == TabAlignment::left
-        ? 0.0 : std::max(0.0, bounds.width - item.width);
-    return {x, static_cast<double>(index) * item.height,
-            std::min(item.width, bounds.width), item.height};
+    return bounds;
+}
+
+// Brings the strip's set in line with the live pages: the records of pages
+// that left (a page disposed directly, or removed with remove_child) go,
+// titles follow the pages' text, and the set selects the control's page.
+//
+// The set's order is the pages' order (pages are only appended and removed),
+// so the records of departed pages are the ones that do not match the live
+// page at the same position; the common case, nothing departed, is one pass.
+void TabControl::synchronize_tab_set() {
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    const TabSetEditScope editing(editing_tab_set_);
+    std::size_t position = 0U;
+    while (position < tab_set_.count()) {
+        const PageId id = tab_set_.record_at(PagePosition{position}).id;
+        const bool matches = position < live.size() && (*live[position]).stable_id().value() == id.value;
+        if (matches) {
+            ++position;
+            continue;
+        }
+        const PageEditStatus removed = tab_set_.remove(id);
+        // A refusal (the set busy selecting) leaves the record for the next
+        // layout; stepping past it keeps the loop finite.
+        if (removed != PageEditStatus::applied) ++position;
+    }
+    for (std::size_t index = 0; index < live.size() && index < tab_set_.count(); ++index) {
+        const PageRecord& record = tab_set_.record_at(PagePosition{index});
+        if (record.title == (*live[index]).text()) continue;
+        static_cast<void>(tab_set_.set_title(record.id, (*live[index]).text()));
+    }
+    select_in_tab_set(selected_page_.lock());
+}
+
+void TabControl::select_in_tab_set(const std::shared_ptr<TabPage>& page) {
+    if (!page) return;
+    const PageId id = tab_page_id(*page);
+    const std::optional<PageId> current = tab_set_.selected_page();
+    if (current && *current == id) return;
+    const TabSetEditScope editing(editing_tab_set_);
+    static_cast<void>(tab_set_.select(id, PageSelectionCause::programmatic));
+}
+
+// A press on a tab focuses the control before the page changes, so the old
+// page's focus is not remembered (the order Windows Forms users know).
+void TabControl::on_set_selecting(PageSelectingEvent& event) {
+    if (editing_tab_set_ || event.cause != PageSelectionCause::pointer || window() == nullptr) return;
+    static_cast<void>((*window()).request_focus(shared_from_this()));
+}
+
+// The strip selected a page (a click, a key, the page list): show it. A
+// change that agrees with the control's selection (its own edits, published
+// late) does nothing.
+void TabControl::on_set_selection_changed(const PageSelectionChange& change) {
+    if (editing_tab_set_ || !change.new_page || !is_alive()) return;
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    for (std::size_t index = 0; index < live.size(); ++index) {
+        if (tab_page_id(*live[index]) != *change.new_page) continue;
+        if (live[index] == selected_page_.lock()) return;
+        show_selected(index, live);
+        return;
+    }
+}
+
+// A click on the selected tab (or a page chosen from the list) focuses the
+// control too.
+void TabControl::on_strip_invoked(const PageInvocation& invocation) {
+    if (invocation.cause != PageSelectionCause::pointer || window() == nullptr || !is_alive()) return;
+    static_cast<void>((*window()).request_focus(shared_from_this()));
+}
+
+// -- geometry ------------------------------------------------------------------
+
+TabControl::ItemParts TabControl::tab_parts(const TabPage& page) const {
+    ItemParts record;
+    if (!strip_) return record;
+    const PageStrip::ItemParts strip_parts = (*strip_).tab_parts_of(tab_page_id(page));
+    // The strip's parts are in its coordinates; the control's lie one
+    // offset away.
+    const Rect strip_bounds = (*strip_).absolute_bounds();
+    const Rect own = absolute_bounds();
+    const double dx = strip_bounds.x - own.x;
+    const double dy = strip_bounds.y - own.y;
+    const std::array<const PartGeometry*, 4> sources{&strip_parts.tab, &strip_parts.tab_label,
+                                                     &strip_parts.tab_focus, &strip_parts.tab_seam};
+    const std::array<PartGeometry*, 4> targets{&record.tab, &record.tab_label, &record.tab_focus,
+                                               &record.tab_seam};
+    for (std::size_t part = 0; part < sources.size(); ++part) {
+        if (!(*sources[part]).present) continue;
+        const Rect bounds = (*sources[part]).bounds;
+        const Rect moved{bounds.x + dx, bounds.y + dy, bounds.width, bounds.height};
+        *targets[part] = PartGeometry::from_bounds(moved);
+    }
+    return record;
+}
+
+// Empty for a tab the strip has not laid out (scrolled out of view).
+Rect TabControl::tab_bounds(std::size_t index) const {
+    const std::vector<std::shared_ptr<TabPage>> live = pages();
+    if (index >= live.size()) throw std::out_of_range("TabControl tab index");
+    const ItemParts parts = tab_parts(*live[index]);
+    return parts.tab.bounds;
+}
+
+bool TabControl::overflowing() const {
+    if (!strip_) return false;
+    const bool result = (*strip_).overflowing();
+    return result;
 }
 
 Rect TabControl::display_bounds() const noexcept {
@@ -289,7 +568,7 @@ void TabControl::reconcile_pages() {
             ++candidate;
         }
     }
-    std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
+    const std::shared_ptr<TabPage> selected = selected_page_.lock();
     if (selected && (*selected).is_alive() && (*selected).parent().get() == this) return;
     selected_page_.reset();
     const std::vector<std::shared_ptr<TabPage>> live = pages();
@@ -302,99 +581,42 @@ void TabControl::reconcile_pages() {
 void TabControl::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     reconcile_pages();
+    synchronize_tab_set();
+    if (strip_) set_child_layout(strip_, header_bounds());
     const Rect display = display_bounds();
-    const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
-    for (const std::shared_ptr<gui_forms::TabPage>& page : pages()) {
+    const std::shared_ptr<TabPage> selected = selected_page_.lock();
+    for (const std::shared_ptr<TabPage>& page : pages()) {
         set_child_layout(page, display);
         (*page).set_visible(page == selected);
     }
 }
 
+// The control paints its face and the display the pages sit on; the strip,
+// a child, paints the tabs. The display is a card's surface until stage T4
+// gives the tab page its own material.
 void TabControl::on_paint(Painter& painter, Rect) {
-    const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
-                      committed_arranged_bounds().height};
-    painter.fill_rect(bounds, style_.face);
-    const Rect display = display_bounds();
-    painter.fill_rect(display, style_.paper);
-    painter.stroke_rect({display.x + 0.5, display.y + 0.5,
-                         std::max(0.0, display.width - 1.0),
-                         std::max(0.0, display.height - 1.0)},
-                        style_.border, 1.0);
-    const std::vector<std::shared_ptr<TabPage>> live = pages();
-    const FontSpec font = effective_font(font_);
-    const std::optional<std::size_t> selected = selected_index();
-    for (std::size_t index = 0U; index < live.size(); ++index) {
-        Rect tab = tab_bounds(index);
-        const bool active = selected && *selected == index;
-        if (appearance_ == TabAppearance::buttons && !active) {
-            tab = {tab.x + 2.0, tab.y + 2.0,
-                   std::max(0.0, tab.width - 4.0),
-                   std::max(0.0, tab.height - 4.0)};
-        }
-        const Color face = active ? style_.paper
-            : appearance_ == TabAppearance::flat_buttons ? style_.face_light
-                                                         : style_.face;
-        painter.fill_rect(tab, face);
-        painter.stroke_rect({tab.x + 0.5, tab.y + 0.5,
-                             std::max(0.0, tab.width - 1.0),
-                             std::max(0.0, tab.height - 1.0)},
-                            active ? style_.dark_border : style_.border, 1.0);
-        if (active && appearance_ == TabAppearance::normal) {
-            if (alignment_ == TabAlignment::top) {
-                painter.fill_rect({tab.x + 1.0, tab.y + tab.height - 2.0,
-                                   std::max(0.0, tab.width - 2.0), 3.0},
-                                  style_.paper);
-            } else if (alignment_ == TabAlignment::bottom) {
-                painter.fill_rect({tab.x + 1.0, tab.y - 1.0,
-                                   std::max(0.0, tab.width - 2.0), 3.0},
-                                  style_.paper);
-            } else if (alignment_ == TabAlignment::left) {
-                painter.fill_rect({tab.x + tab.width - 2.0, tab.y + 1.0, 3.0,
-                                   std::max(0.0, tab.height - 2.0)}, style_.paper);
-            } else {
-                painter.fill_rect({tab.x - 1.0, tab.y + 1.0, 3.0,
-                                   std::max(0.0, tab.height - 2.0)}, style_.paper);
-            }
-        }
-        const double text_width = static_cast<double>((*live[index]).text().size()) *
-                                  font.size * 0.55;
-        painter.draw_text_utf8(
-            {tab.x + std::max(5.0, (tab.width - text_width) * 0.5),
-             tab.y + (tab.height + font.size) * 0.5 - 2.0},
-            (*live[index]).text(), font, enabled() ? style_.text
-                                                  : style_.disabled_text);
-        if (active && focused_) {
-            painter.stroke_rect({tab.x + 4.5, tab.y + 4.5,
-                                 std::max(0.0, tab.width - 9.0),
-                                 std::max(0.0, tab.height - 9.0)},
-                                style_.accent, 1.0);
-        }
-    }
+    PartPaint part;
+    part.family = ControlVisualRole::panel;
+    part.role = PartRole::face;
+    part.bounds = client_rectangle();
+    paint_part(painter, *this, part);
+    part.family = ControlVisualRole::card;
+    part.bounds = display_bounds();
+    paint_part(painter, *this, part);
 }
 
-void TabControl::on_pointer(PointerEvent& event) {
-    if (!eligible_for_input()) return;
-    if (event.action == PointerAction::up &&
-        event.button == PointerButton::primary && pointer_engaged_) {
-        pointer_engaged_ = false;
-        event.handled = true;
-        return;
+// -- keys ----------------------------------------------------------------------
+
+// Whether the focus lies inside another TabControl inside this one: that
+// control is more local and takes the tab keys (owner decision DK-30, G1-2).
+bool TabControl::nested_tab_control_has_focus() const {
+    if (window() == nullptr) return false;
+    const Control::Ptr focused = (*window()).focused_control();
+    for (Control::Ptr current = focused; current; current = (*current).parent()) {
+        if (current.get() == this) return false;
+        if (std::dynamic_pointer_cast<TabControl>(current)) return true;
     }
-    if (event.action != PointerAction::down ||
-        event.button != PointerButton::primary) return;
-    const Rect absolute = absolute_bounds();
-    const Point local{event.position.x - absolute.x, event.position.y - absolute.y};
-    const std::vector<std::shared_ptr<TabPage>> live = pages();
-    for (std::size_t index = 0U; index < live.size(); ++index) {
-        if (!tab_bounds(index).contains(local)) continue;
-        if (window() != nullptr) {
-            static_cast<void>((*window()).request_focus(shared_from_this()));
-        }
-        pointer_engaged_ = true;
-        set_selected_index(index);
-        event.handled = true;
-        return;
-    }
+    return false;
 }
 
 void TabControl::select_relative(int delta) {
@@ -406,84 +628,93 @@ void TabControl::select_relative(int delta) {
     set_selected_index(static_cast<std::size_t>(next));
 }
 
+// From anywhere inside the control, before the focused control sees them:
+// cycle_forward and cycle_backward (Ctrl+Tab, Ctrl+Shift+Tab; a focused
+// TabControl keeps them, owner decision DK-30, G1-2) and next_tab and
+// previous_tab (Ctrl+PageDown, Ctrl+PageUp) select the next or previous page,
+// wrapping. A TabControl nested inside this one, holding the focus, takes
+// them instead.
 void TabControl::on_key_preview(KeyEvent& event) {
     if (event.action != KeyAction::down || !enabled() || page_count() == 0U ||
         window() == nullptr) return;
-    const std::uint8_t modifiers = static_cast<std::uint8_t>(event.modifiers);
-    const bool command =
-        (modifiers & static_cast<std::uint8_t>(Modifier::control)) != 0U ||
-        (modifiers & static_cast<std::uint8_t>(Modifier::meta)) != 0U;
-    if (event.physical_key == PhysicalKey::tab && command) {
-        const bool reverse =
-            (modifiers & static_cast<std::uint8_t>(Modifier::shift)) != 0U;
-        select_relative(reverse ? -1 : 1);
-        event.handled = true;
-        return;
+    if (nested_tab_control_has_focus()) return;
+    const KeyMap& keys = effective_key_map();
+    int direction = 0;
+    if (keys.matches(KeyCommand::cycle_forward, event) || keys.matches(KeyCommand::next_tab, event)) {
+        direction = 1;
+    } else if (keys.matches(KeyCommand::cycle_backward, event) || keys.matches(KeyCommand::previous_tab, event)) {
+        direction = -1;
     }
-    if ((*window()).focused_control().get() != this) return;
-    if (event.physical_key == PhysicalKey::home) {
-        set_selected_index(0U);
-    } else if (event.physical_key == PhysicalKey::end) {
-        set_selected_index(page_count() - 1U);
-    } else if ((alignment_ == TabAlignment::top ||
-                alignment_ == TabAlignment::bottom) &&
-               event.physical_key == PhysicalKey::left) {
-        select_relative(-1);
-    } else if ((alignment_ == TabAlignment::top ||
-                alignment_ == TabAlignment::bottom) &&
-               event.physical_key == PhysicalKey::right) {
-        select_relative(1);
-    } else if ((alignment_ == TabAlignment::left ||
-                alignment_ == TabAlignment::right) &&
-               event.physical_key == PhysicalKey::up) {
-        select_relative(-1);
-    } else if ((alignment_ == TabAlignment::left ||
-                alignment_ == TabAlignment::right) &&
-               event.physical_key == PhysicalKey::down) {
-        select_relative(1);
-    } else {
-        return;
-    }
+    if (direction == 0) return;
+    select_relative(direction);
     event.handled = true;
 }
 
+// While the control has focus its strip has the keyboard: the arrows along
+// the row, Home and End select (the strip's automatic activation). The
+// commands a tab control does not offer (closing, moving a tab, a tab's
+// context menu) are left to the controls around it.
+void TabControl::on_key(KeyEvent& event) {
+    if (event.handled || !strip_ || window() == nullptr ||
+        (*window()).focused_control().get() != this) return;
+    const KeyMap& keys = effective_key_map();
+    const bool not_offered = keys.matches(KeyCommand::close_document, event) ||
+                             keys.matches(KeyCommand::move_tab_later, event) ||
+                             keys.matches(KeyCommand::move_tab_earlier, event) ||
+                             keys.matches(KeyCommand::context_menu, event);
+    if (not_offered) return;
+    (*strip_).on_key(event);
+}
+
+// The strip shows the keyboard's tab while the control has focus.
 void TabControl::on_focus_changed(bool focused) {
-    focused_ = focused;
-    if (!focused) pointer_engaged_ = false;
+    if (strip_) (*strip_).on_focus_changed(focused);
     invalidate(Dirty::paint | Dirty::semantics);
 }
+
+// -- semantics -----------------------------------------------------------------
 
 SemanticDescriptor TabControl::semantic_descriptor() const {
     SemanticDescriptor descriptor;
     descriptor.role = SemanticRole::tab_group;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
-    if (const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock()) descriptor.value = (*selected).text();
+    const std::shared_ptr<TabPage> selected = selected_page_.lock();
+    if (selected) descriptor.value = (*selected).text();
+    const bool row = alignment_ == TabAlignment::top || alignment_ == TabAlignment::bottom;
+    descriptor.orientation = row ? SemanticOrientation::horizontal : SemanticOrientation::vertical;
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
     return descriptor;
 }
 
+// A tab scrolled out of view is published without bounds and without the
+// visible state, so every tab can still be reached.
 std::vector<SemanticNode> TabControl::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes;
     const std::vector<std::shared_ptr<TabPage>> live = pages();
     nodes.reserve(live.size());
     const Rect absolute = absolute_bounds();
-    const std::shared_ptr<gui_forms::TabPage> selected = selected_page_.lock();
+    const std::shared_ptr<TabPage> selected = selected_page_.lock();
     for (std::size_t index = 0U; index < live.size(); ++index) {
         SemanticNode node;
         node.stable_id = std::string((*live[index]).stable_id().value()) + ".tab";
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
         node.name = (*live[index]).text();
-        const Rect local = tab_bounds(index);
-        node.bounds = {absolute.x + local.x, absolute.y + local.y,
-                       local.width, local.height};
+        const Rect local = tab_parts(*live[index]).tab.bounds;
+        if (!local.empty()) {
+            node.bounds = {absolute.x + local.x, absolute.y + local.y,
+                           local.width, local.height};
+            node.states |= SemanticState::visible;
+        }
         if (effectively_enabled()) node.states |= SemanticState::enabled;
-        node.states |= SemanticState::visible | SemanticState::focusable;
+        node.states |= SemanticState::focusable;
         if (live[index] == selected) node.states |= SemanticState::selected;
-        node.actions = {SemanticAction::focus, SemanticAction::select,
-                        SemanticAction::press};
+        // The page is the tab's panel (owner decision DK-40). Tabs publish
+        // select, not press (DK-35); a press sent anyway still selects.
+        node.controlled_panel = std::string((*live[index]).stable_id().value());
+        node.actions = {SemanticAction::focus, SemanticAction::select};
         nodes.push_back(std::move(node));
     }
     return nodes;
@@ -582,6 +813,8 @@ TabControl::Parts TabControl::parts() const {
     return record;
 }
 
+// Every page is an item, as before the strip; a tab scrolled out of view
+// publishes no parts.
 std::size_t TabControl::realized_item_count() const {
     return page_count();
 }
@@ -594,39 +827,8 @@ std::string TabControl::realized_item_stable_id(std::size_t item) const {
 
 void TabControl::publish_realized_item_geometry(std::size_t item,
                                           std::span<PartGeometry> geometry) const {
-    ItemParts record;
-
     const std::shared_ptr<TabPage> page = page_at(item);
-    const std::optional<std::size_t> selected = selected_index();
-    const bool active = selected && *selected == item;
-    Rect tab = tab_bounds(item);
-    if (appearance_ == TabAppearance::buttons && !active) {
-        tab = {tab.x + 2.0, tab.y + 2.0, std::max(0.0, tab.width - 4.0),
-               std::max(0.0, tab.height - 4.0)};
-    }
-    // on_paint centres the label by an estimated width.
-    const FontSpec font = effective_font(font_);
-    const double text_width = static_cast<double>((*page).text().size()) * font.size * 0.55;
-    const double text_x = tab.x + std::max(5.0, (tab.width - text_width) * 0.5);
-    const Rect label{text_x, tab.y, std::max(0.0, std::min(text_width, tab.right() - text_x)),
-                     tab.height};
-    record.tab = PartGeometry::from_bounds(tab);
-    record.tab_label = PartGeometry::from_bounds(Rect::intersection(label, tab));
-    record.tab_focus = PartGeometry::from_bounds(tab);
-    // The selected tab's join with the display, which on_paint opens.
-    if (active && appearance_ == TabAppearance::normal) {
-        Rect seam{};
-        if (alignment_ == TabAlignment::top) {
-            seam = {tab.x + 1.0, tab.y + tab.height - 2.0, std::max(0.0, tab.width - 2.0), 3.0};
-        } else if (alignment_ == TabAlignment::bottom) {
-            seam = {tab.x + 1.0, tab.y - 1.0, std::max(0.0, tab.width - 2.0), 3.0};
-        } else if (alignment_ == TabAlignment::left) {
-            seam = {tab.x + tab.width - 2.0, tab.y + 1.0, 3.0, std::max(0.0, tab.height - 2.0)};
-        } else {
-            seam = {tab.x - 1.0, tab.y + 1.0, 3.0, std::max(0.0, tab.height - 2.0)};
-        }
-        record.tab_seam = PartGeometry::from_bounds(seam);
-    }
+    const ItemParts record = tab_parts(*page);
     write_item_parts(anatomy().item_systems.front(), tab_control_item_part_fields, record, geometry);
 }
 

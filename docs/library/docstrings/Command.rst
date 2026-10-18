@@ -48,8 +48,17 @@ Methods
 execute
     `execute(source_id)` runs the command: it raises `invoked` and returns
     true. When the command is disabled or disposed, or `source_id` is not
-    valid UTF-8, nothing is raised and it returns false. Buttons, menus and
-    shortcuts all run the command through `execute`.
+    valid UTF-8, nothing is raised and it returns false. Bound buttons run
+    the command through `execute`.
+execute_routed
+    `execute_routed(window, source_id)` runs the command through
+    `window`'s command routing chain: the first `CommandTarget` with a
+    handler for the command's identity runs it, and when none has one,
+    `invoked` is raised as `execute` raises it. Menus, the ribbon, tool
+    strips and shortcuts run their commands this way, so a window with no
+    targets behaves as `execute` does. Returns false, running nothing, when
+    the command is disabled or disposed, `source_id` is not valid UTF-8, or
+    the window refused a routing nested too deeply.
 bind_shortcut
     `bind_shortcut(window, gesture)` makes a key gesture in `window` run the
     command and returns an `AcceleratorToken`; the shortcut lasts as long as
@@ -112,6 +121,13 @@ new state in your `invoked` handler.
 bound `CheckBox` follows `checked` while the command is checkable, and a
 `Button` shows `checked` as its selected state. Clicking the button runs the
 command once. A disposed command is never run through a surviving button.
+
+A command's identity also selects its handler in a window's command routing
+chain (`Window::route_command`): a focused control and its containers, the
+active panel, the active document and the main window may each hold a
+`CommandTarget` with a handler for it, so Save typed in a tool panel reaches
+the active document. A handler that takes the command replaces `invoked`
+for that run.
 
 A shortcut is tried only after the focused control and its containers have
 declined the key, so text boxes and open menus get the first chance at it.

@@ -894,6 +894,10 @@ Related types
 
    .. cpp:member:: std::string text
 
+   .. cpp:member:: TextOrientation text_orientation
+
+      The reading direction of a draw_text operation. Default: ``{TextOrientation::horizontal}``.
+
 Enumerations
 ------------
 

@@ -102,6 +102,45 @@ static void check_cross_platform_identity() {
     require_text(!mismatch, "Windows text differs from the cross-platform expectation");
 }
 
+// Turned text (owner decision DK-35, J4): the DIB painter draws a run
+// turned a quarter about its origin, its ink taller than wide and on the
+// side of the baseline the glyph tops face.
+static void check_turned_text() {
+    const FontSpec font{FontRole::control, 14, 400, false, 0.0};
+    for (const TextOrientation orientation : {TextOrientation::bottom_to_top, TextOrientation::top_to_bottom}) {
+        host::DibPainter painter;
+        painter.set_bundled_fonts(fixture_fonts);
+        const std::unique_ptr<PaintFramebuffer> framebuffer = painter.create_framebuffer({80, 200}, 1.0);
+        require_text(framebuffer != nullptr, "Turned-text framebuffer allocation failed");
+        Painter& target = (*framebuffer).painter();
+        target.fill_rect({0, 0, 80, 200}, Color::rgba(255, 255, 255));
+        const bool up = orientation == TextOrientation::bottom_to_top;
+        const Point origin{40, up ? 180.0 : 20.0};
+        target.draw_turned_text_utf8(origin, "Solution Explorer", font, Color::rgba(0, 0, 0), orientation);
+        (*framebuffer).end();
+        const std::uint8_t* const bytes = reinterpret_cast<const std::uint8_t*>((*framebuffer).pixels().data());
+        std::uint32_t left = (*framebuffer).width(), top = (*framebuffer).height(), right = 0, bottom = 0;
+        std::size_t ink = 0;
+        for (std::uint32_t y = 0; y < (*framebuffer).height(); ++y) {
+            for (std::uint32_t x = 0; x < (*framebuffer).width(); ++x) {
+                const std::uint8_t blue = bytes[static_cast<std::size_t>(y) * (*framebuffer).row_bytes() + x * 4U];
+                if (blue >= 128) continue;
+                ++ink;
+                left = std::min(left, x); right = std::max(right, x + 1U);
+                top = std::min(top, y); bottom = std::max(bottom, y + 1U);
+            }
+        }
+        require_text(ink >= 40, "Turned text drew no ink");
+        require_text(bottom - top > 3U * (right - left), "Turned text is not taller than wide");
+        const double centre = (static_cast<double>(left) + static_cast<double>(right)) * 0.5;
+        if (up) {
+            require_text(bottom <= 182U && centre < 40.0, "Bottom-to-top text must read up from its origin, tops left");
+        } else {
+            require_text(top >= 18U && centre > 40.0, "Top-to-bottom text must read down from its origin, tops right");
+        }
+    }
+}
+
 static void check_cache_lifetime() {
     const DWORD before = GetGuiResources(GetCurrentProcess(), GR_GDIOBJECTS);
     {
@@ -174,6 +213,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         check_cross_platform_identity();
+        check_turned_text();
         check_cache_lifetime();
         for (const double scale : {1.0, 1.5, 2.0}) {
             for (const std::uint16_t weight : {400, 700}) {

@@ -64,6 +64,8 @@ gui_forms::Command
         - ``bind_shortcut(window, gesture)`` makes a key gesture in ``window`` run the command and returns an :cpp:class:`AcceleratorToken <gui_forms::AcceleratorToken>`; the shortcut lasts as long as you keep the token, and destroying the command or the window removes it.
       * - :cpp:func:`execute <gui_forms::Command::execute>`
         - ``execute(source_id)`` runs the command: it raises :cpp:func:`invoked <gui_forms::Command::invoked>` and returns true.
+      * - :cpp:func:`execute_routed <gui_forms::Command::execute_routed>`
+        - ``execute_routed(window, source_id)`` runs the command through ``window``'s command routing chain: the first :cpp:class:`CommandTarget <gui_forms::CommandTarget>` with a handler for the command's identity runs it, and when none has one, :cpp:func:`invoked <gui_forms::Command::invoked>` is raised as :cpp:func:`execute <gui_forms::Command::execute>` raises it.
       * - :cpp:func:`set_text <gui_forms::Command::set_text>`
         - Changes ``state().text``.
       * - :cpp:func:`set_description <gui_forms::Command::set_description>`
@@ -115,6 +117,13 @@ gui_forms::Command
    bound :cpp:class:`CheckBox <gui_forms::CheckBox>` follows ``checked`` while the command is checkable, and a
    :cpp:class:`Button <gui_forms::Button>` shows ``checked`` as its selected state. Clicking the button runs the
    command once. A disposed command is never run through a surviving button.
+
+   A command's identity also selects its handler in a window's command routing
+   chain (``Window::route_command``): a focused control and its containers, the
+   active panel, the active document and the main window may each hold a
+   :cpp:class:`CommandTarget <gui_forms::CommandTarget>` with a handler for it, so Save typed in a tool panel reaches
+   the active document. A handler that takes the command replaces :cpp:func:`invoked <gui_forms::Command::invoked>`
+   for that run.
 
    A shortcut is tried only after the focused control and its containers have
    declined the key, so text boxes and open menus get the first chance at it.
@@ -226,8 +235,19 @@ gui_forms::Command
 
       ``execute(source_id)`` runs the command: it raises :cpp:func:`invoked <gui_forms::Command::invoked>` and returns
       true. When the command is disabled or disposed, or ``source_id`` is not
-      valid UTF-8, nothing is raised and it returns false. Buttons, menus and
-      shortcuts all run the command through :cpp:func:`execute <gui_forms::Command::execute>`.
+      valid UTF-8, nothing is raised and it returns false. Bound buttons run
+      the command through :cpp:func:`execute <gui_forms::Command::execute>`.
+
+   .. cpp:function:: bool execute_routed(Window& window, std::string_view source_id = {})
+
+      ``execute_routed(window, source_id)`` runs the command through
+      ``window``'s command routing chain: the first :cpp:class:`CommandTarget <gui_forms::CommandTarget>` with a
+      handler for the command's identity runs it, and when none has one,
+      :cpp:func:`invoked <gui_forms::Command::invoked>` is raised as :cpp:func:`execute <gui_forms::Command::execute>` raises it. Menus, the ribbon, tool
+      strips and shortcuts run their commands this way, so a window with no
+      targets behaves as :cpp:func:`execute <gui_forms::Command::execute>` does. Returns false, running nothing, when
+      the command is disabled or disposed, ``source_id`` is not valid UTF-8, or
+      the window refused a routing nested too deeply.
 
    .. cpp:function:: void set_text(std::string text)
 

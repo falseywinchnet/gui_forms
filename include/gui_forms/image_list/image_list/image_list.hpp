@@ -67,7 +67,12 @@ public:
     explicit ImageList(Window& window, Size image_size = {16.0, 16.0});
     ~ImageList() override;
 
+    // The window the list was created for, while it lives.
     [[nodiscard]] Window* bound_window() const noexcept;
+    // True for every window sharing the creating window's resources
+    // (ApplicationResources): the list's images are valid in all of them.
+    // The list keeps working after the creating window closes, as long as
+    // the resources live.
     [[nodiscard]] bool belongs_to(const Window& window) const noexcept;
     [[nodiscard]] Size image_size() const noexcept { return image_size_; }
     void set_image_size(Size image_size);
@@ -146,6 +151,8 @@ private:
                      std::string_view key);
 
     std::weak_ptr<detail::WindowLifetime> window_lifetime_;
+    // The registry the list's images live in (observing: the windows own it).
+    std::weak_ptr<ApplicationResources> resources_;
     Size image_size_{16.0, 16.0};
     std::vector<Entry> entries_;
     std::any tag_;

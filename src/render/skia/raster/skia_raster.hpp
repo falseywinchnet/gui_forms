@@ -109,6 +109,10 @@ public:
     // this raster's registered faces change.
     void draw_retained_text_utf8(Point origin, std::string_view text, FontSpec font,
                                  Color color, const std::shared_ptr<RetainedDrawCache>& cache) override;
+    // Turns the canvas a quarter about `origin` and draws the run through
+    // the engine's general (unhinted) placement. No coverage is retained.
+    void draw_turned_text_utf8(Point origin, std::string_view text, FontSpec font, Color color,
+                               TextOrientation orientation) override;
     [[nodiscard]] Size measure_text_utf8(std::string_view text,
                                          FontSpec font) override;
     [[nodiscard]] ResolvedTextLayout resolve_text_layout_utf8(
