@@ -540,6 +540,14 @@ bool Window::request_focus(const Control::Ptr& control) {
             FocusChangePublication{this, control, true});
     }
     metrics_.record_focus_transition();
+    FocusedControlChange moved{};
+    if (previous) moved.previous_id = (*previous).runtime_id();
+    const Control::Ptr current = focused_.lock();
+    if (current) {
+        moved.current_id = (*current).runtime_id();
+        moved.stable_id = std::string((*current).stable_id().value());
+    }
+    focused_control_changed_.emit(moved);
     return true;
 }
 

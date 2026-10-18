@@ -26,7 +26,8 @@ pages
     The view's set: add, remove, move, select, take and put pages through it.
 strip
     The child strip that shows the tabs; its placement, sizing, activation
-    and mnemonics are set on it.
+    and mnemonics are set on it. Hiding it (as a docking tool stack with one
+    panel does) gives the whole view to the content.
 ctrl_tab : default ``PageViewCtrlTab::select_next``
     What Ctrl+Tab and Ctrl+Shift+Tab do while focus is inside the view:
     select the next or previous page, or pass the key on, as a view inside a

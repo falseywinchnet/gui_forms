@@ -126,6 +126,14 @@ pointer_capture_changed
     it.
 focus_scope_changed
     Raised when a focus scope opens or closes.
+focused_control_changed
+    Raised after `request_focus` moved focus to another control (or to
+    none), once the controls' own focus notifications ran, with the old and
+    new controls' runtime identities and the new one's stable identity. It is
+    not raised when focus is dropped because the focused control left the
+    window. A handler may request focus again; that move raises its own
+    event afterwards. A `DockSite` follows it to keep its workspace's active
+    panel.
 
 Methods
 -------

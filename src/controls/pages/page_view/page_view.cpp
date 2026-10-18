@@ -309,7 +309,9 @@ void PageView::on_selection_changed(const PageSelectionChange& change) {
 
 PageView::Areas PageView::areas_for(Size surface) const {
     Areas areas;
-    if (!strip_) {
+    // A hidden strip (a docking tool stack holding one panel hides it)
+    // leaves the whole surface to the content.
+    if (!strip_ || !(*strip_).visible()) {
         areas.content = {0.0, 0.0, surface.width, surface.height};
         return areas;
     }

@@ -143,6 +143,10 @@ struct PhysicalKey final {
     static constexpr std::uint32_t up = 0x52U;
     static constexpr std::uint32_t keypad_minus = 0x56U;
     static constexpr std::uint32_t keypad_plus = 0x57U;
+    // The context-menu key (HID "Keyboard Application").
+    static constexpr std::uint32_t application = 0x65U;
+    static constexpr std::uint32_t left_control = 0xE0U;
+    static constexpr std::uint32_t right_control = 0xE4U;
 };
 
 struct TextInputEvent {

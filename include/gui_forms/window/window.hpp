@@ -159,6 +159,15 @@ struct PointerCaptureChange final {
     std::uint64_t pointer_id{};
 };
 
+// Focus moved from one control to another (or to or from none) through
+// request_focus. `previous_id` and `current_id` are zero for none;
+// `stable_id` is the newly focused control's, or empty.
+struct FocusedControlChange final {
+    RuntimeId previous_id{};
+    RuntimeId current_id{};
+    std::string stable_id;
+};
+
 struct ControlAvailabilityChange final {
     RuntimeId control_id{};
     std::string stable_id;
@@ -444,6 +453,14 @@ public:
     [[nodiscard]] Control::Ptr hit_test(Point position);
     bool request_focus(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr focused_control() const noexcept { return focused_.lock(); }
+    // Raised by request_focus after focus moved, once the controls' own
+    // focus notifications (on_focus_changed, focus_observed) ran; not raised
+    // when focus is dropped because the focused control left the window. A
+    // docking site follows it to keep its workspace's active panel. A handler
+    // may request focus again; that move raises its own event afterwards.
+    [[nodiscard]] Event<const FocusedControlChange&>& focused_control_changed() noexcept {
+        return focused_control_changed_;
+    }
     // Browser-style focus-visible modality: keyboard and semantic navigation
     // expose a cue; primary-pointer focus suppresses it without losing focus.
     [[nodiscard]] bool focus_cue_visible() const noexcept {
@@ -841,6 +858,7 @@ private:
     Control::WeakPtr captured_;
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
+    Event<const FocusedControlChange&> focused_control_changed_;
     Event<const ControlAvailabilityChange&> control_availability_changed_;
     PopupList popups_;
     AcceleratorList accelerators_;
