@@ -131,6 +131,7 @@ add_library(gui_forms_core STATIC
     src/core/visual_inspection/snapshot/visual_inspection_snapshot.cpp
     src/core/window/inspection/window_visual_inspection.cpp
     src/core/resources/image_registry/image_registry.cpp
+    src/core/resources/application_resources/application_resources.cpp
     src/core/live_surface/buffer/live_surface_buffer.cpp
     src/core/live_surface/frame/live_surface_frame.cpp
     src/core/live_surface/surface/live_surface.cpp
@@ -2646,6 +2647,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_floating_windows_tests tests/floating_windows_tests.cpp)
     target_link_libraries(gui_forms_floating_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_floating_windows_tests COMMAND gui_forms_floating_windows_tests)
+    add_executable(gui_forms_shared_resources_tests tests/shared_resources_tests.cpp)
+    target_link_libraries(gui_forms_shared_resources_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_shared_resources_tests COMMAND gui_forms_shared_resources_tests)
     add_test(
         NAME gui_forms_host_boundary_audit
         COMMAND ${CMAKE_COMMAND}

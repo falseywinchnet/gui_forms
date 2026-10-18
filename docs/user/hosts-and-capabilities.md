@@ -172,6 +172,19 @@ applies them the same way; the headless reference host
 (`src/host/headless/application/`) implements the same seam on a simulated
 desktop for tests.
 
+### Images and theme across windows
+
+Each `Window` has an image registry and a theme. Windows constructed with
+the same `ApplicationResources` (stage DK decision 8) share both: an
+`ImageId` or an `ImageList` from one is valid in the others, setting the
+theme on one sets it on all, and a control subtree moved from one window to
+another keeps its images. Build a window opened during the run from the main
+window's resources, `Window(root, size, main_window.resources())`. A window
+constructed without resources makes its own, so a single-window program, or
+windows meant to stay separate, behave as before (a `Button` still refuses
+an `ImageList` from a window that does not share its registry). The shared
+registry lives until its last window, or other holder, releases it.
+
 ### Floating windows
 
 `ApplicationWindow::floating` makes a window a floating tool panel
