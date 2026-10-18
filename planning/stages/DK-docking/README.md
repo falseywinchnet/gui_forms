@@ -192,6 +192,13 @@ From interview round 001 (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`):
     (D5-1); Ctrl suppresses docking (D6-1); caption drags move the stack,
     tab drags one panel (D7-1).
 
+## The look studies
+
+The taste questions (T1 to T8, PT1 to PT8) are answered on a published
+look-and-feel page, https://claude.ai/artifact/YYGbZoWDipuGFwHxeU8Dqk
+(private to the owner); its source is copied in
+`docking_look_studies_source.html`.
+
 ## What exists today
 
 - Multi-window applications (`ApplicationWindow` with owner IDs and tool
