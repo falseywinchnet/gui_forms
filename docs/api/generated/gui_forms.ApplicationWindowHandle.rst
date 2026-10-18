@@ -27,6 +27,22 @@ gui_forms::ApplicationWindowHandle
          thread. It is false on any other thread than the one that called
          ``Application::run``.
 
+      **id** : ``HostWindowId``, read-only
+         The window's :cpp:class:`HostWindowId <gui_forms::HostWindowId>` in this run: assigned in opening order and
+         never reused, so it identifies the window in frame reports and in
+         ``ApplicationWindows::window_at``. Invalid before ``ready``, after the
+         window closes, and for a host without application windowing.
+
+      **windows** : ``ApplicationWindows``, read-only
+         The run's :cpp:class:`ApplicationWindows <gui_forms::ApplicationWindows>`, for opening and destroying windows
+         while the application runs and for the pointer and the window under a
+         desktop point. Inactive when this handle is inactive.
+
+      **frame** : ``HostWindowFrameResult``, read-only
+         The window's frame in desktop logical units: the client area and, where
+         the host measures it, the outer frame with its decorations. A host
+         without window frames returns :cpp:enumerator:`HostServiceError::unsupported <gui_forms::HostServiceError::unsupported>`.
+
    .. rubric:: Methods
 
    .. list-table::
@@ -43,6 +59,10 @@ gui_forms::ApplicationWindowHandle
         - Asks the host to enter or leave full-screen presentation.
       * - :cpp:func:`request_client_size <gui_forms::ApplicationWindowHandle::request_client_size>`
         - Asks the host to make the window's client area a given size in logical units, as if the user had dragged its edge.
+      * - :cpp:func:`request_frame <gui_forms::ApplicationWindowHandle::request_frame>`
+        - Asks the host to place the window's client area at a rectangle in desktop logical units: the position and the size together.
+      * - :cpp:func:`bring_to_front <gui_forms::ApplicationWindowHandle::bring_to_front>`
+        - Orders the window above the run's other windows without activating it.
       * - :cpp:func:`set_title <gui_forms::ApplicationWindowHandle::set_title>`
         - Changes the native title bar text.
 
@@ -50,6 +70,9 @@ gui_forms::ApplicationWindowHandle
 
       :cpp:class:`ApplicationWindowOptions <gui_forms::ApplicationWindowOptions>`
          Delivers the handle through its ``ready`` callback.
+
+      :cpp:class:`ApplicationWindows <gui_forms::ApplicationWindows>`
+         The run's windowing, reached through ``windows``.
 
       :cpp:class:`Application <gui_forms::Application>`
          Runs the windows the handles refer to.
@@ -131,6 +154,25 @@ gui_forms::ApplicationWindowHandle
       thread. It is false on any other thread than the one that called
       ``Application::run``.
 
+   .. cpp:function:: HostWindowId id() const noexcept
+
+      The window's :cpp:class:`HostWindowId <gui_forms::HostWindowId>` in this run: assigned in opening order and
+      never reused, so it identifies the window in frame reports and in
+      ``ApplicationWindows::window_at``. Invalid before ``ready``, after the
+      window closes, and for a host without application windowing.
+
+   .. cpp:function:: ApplicationWindows windows() const noexcept
+
+      The run's :cpp:class:`ApplicationWindows <gui_forms::ApplicationWindows>`, for opening and destroying windows
+      while the application runs and for the pointer and the window under a
+      desktop point. Inactive when this handle is inactive.
+
+   .. cpp:function:: HostWindowFrameResult frame() const
+
+      The window's frame in desktop logical units: the client area and, where
+      the host measures it, the outer frame with its decorations. A host
+      without window frames returns :cpp:enumerator:`HostServiceError::unsupported <gui_forms::HostServiceError::unsupported>`.
+
 
    .. rubric:: Methods
 
@@ -167,6 +209,21 @@ gui_forms::ApplicationWindowHandle
       ``Window::client_size`` afterwards rather than assuming the request's size.
       ``Window::resize`` is the host's side of this and does not resize the native
       window.
+
+   .. cpp:function:: HostServiceStatus request_frame(Rect content) const
+
+      Asks the host to place the window's client area at a rectangle in
+      desktop logical units: the position and the size together. The size
+      follows the rules of :cpp:func:`request_client_size <gui_forms::ApplicationWindowHandle::request_client_size>`; each origin coordinate must
+      be within plus or minus 1000000. The new frame arrives through the
+      ``frame_changed`` callback, on Windows before the request returns and on
+      X11 with a later event, and a window manager may adjust it.
+
+   .. cpp:function:: HostServiceStatus bring_to_front() const
+
+      Orders the window above the run's other windows without activating it.
+      It never moves the window above other applications' windows, and owned
+      windows stay above their owners.
 
    .. cpp:function:: HostServiceStatus set_title(const std::string_view title) const
 

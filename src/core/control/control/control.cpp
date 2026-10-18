@@ -580,6 +580,13 @@ const Theme& Control::effective_theme() const noexcept {
     return *default_theme();
 }
 
+const KeyMap& Control::effective_key_map() const noexcept {
+    // Made once, on first use; never modified.
+    static const KeyMap detached_key_map = pc_key_map();
+    if (window_ != nullptr) return (*window_).key_map();
+    return detached_key_map;
+}
+
 void Control::set_theme_override(std::shared_ptr<const Theme> theme) {
     require_mutable();
     if (!theme) {

@@ -1,8 +1,9 @@
 A row of tabs over the selected page's content, in the strip or the document preset.
 
 A page view owns a `PageSet` and shows it through a child `PageStrip`, with
-the selected page's control in the content area below (or, with the strip at
-the bottom, above). Each page's content is an ordinary control the
+the selected page's control in the content area beside it: below a strip at
+the top, above one at the bottom, and to the right or left of a strip on
+the left or right edge. Each page's content is an ordinary control the
 application supplies, either when it adds the page or later, the first time
 the page is selected. The view remembers which control had focus in each
 page, and Ctrl+PageDown and Ctrl+PageUp move between pages from anywhere
@@ -33,13 +34,15 @@ pages
     The view's set: add, remove, move, select, take and put pages through it.
 strip
     The child strip that shows the tabs; its placement, sizing, activation,
-    overflow, close buttons and mnemonics are set on it.
+    overflow, close buttons and mnemonics are set on it. Hiding it (as a
+    docking tool stack with one panel does) gives the whole view to the
+    content.
 preset
     ``PageViewPreset::strip`` or ``document``, fixed when the view is made.
     The document preset sets the strip's close buttons to
-    ``selected_and_hot``, its overflow to ``shrink_then_list`` and turns its
-    mnemonics off (document titles are data); these may be changed on the
-    strip afterwards.
+    ``selected_and_hot``, its overflow to ``shrink_then_list``, turns its
+    mnemonics off (document titles are data) and its live reorder on; these
+    may be changed on the strip afterwards.
 close_policy : default ``PageViewClosePolicy::remove_when_unhandled``
     What the view does with a close request that no handler of the strip's
     ``page_close_requested`` handled: remove the page, or, under
@@ -106,8 +109,11 @@ page added to an empty set is selected at once, subscribe to
 Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab are taken in the bubble phase, so
 when views are nested the innermost view around the focus answers first; a
 view whose `ctrl_tab` is ``pass`` leaves Ctrl+Tab to the views around it.
-Ctrl+F4 (close the selected closable page) and Ctrl+Shift+PageDown and
-Ctrl+Shift+PageUp (move it within its group) are taken the same way.
+Ctrl+F4 (close the selected closable page; Cmd+W on macOS) and
+Ctrl+Shift+PageDown and Ctrl+Shift+PageUp (move it within its group) are
+taken the same way. All of these are the window's named keyboard commands
+(`KeyCommand`), so a host's convention and an application's rebinding reach
+the view.
 
 Closing a page: the strip raises one ``page_close_requested`` per cause (the
 close button, a middle click, Ctrl+F4, the accessibility action). A handler
