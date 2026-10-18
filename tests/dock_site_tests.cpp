@@ -40,6 +40,11 @@ Point centre(Rect bounds) {
     return point;
 }
 
+// The finders return pointers that borrow from the vector they search, so
+// the vector must outlive them: realized_stack_items() and
+// semantic_snapshot() return new values, and a pointer into a temporary
+// dangles at the end of the statement. The deleted rvalue overloads refuse
+// temporaries.
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view stable_id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == stable_id) return &node;
@@ -47,6 +52,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticRole role, std::string_view name) {
     for (const SemanticNode& node : nodes) {
@@ -55,6 +61,7 @@ const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticR
     }
     return nullptr;
 }
+const SemanticNode* find_named(std::vector<SemanticNode>&& nodes, SemanticRole role, std::string_view name) = delete;
 
 bool key(Window& window, std::uint32_t physical_key, Modifier modifiers = Modifier::none) {
     KeyEvent event{KeyAction::down, physical_key};
@@ -213,6 +220,7 @@ const DockSite::Stack* find_stack(const std::vector<DockSite::Stack>& stacks, Do
     }
     return nullptr;
 }
+const DockSite::Stack* find_stack(std::vector<DockSite::Stack>&& stacks, DockNodeId stack) = delete;
 
 Control::Ptr content_edit(Window& window, std::string_view panel) {
     const Control::Ptr edit = window.find("content." + std::string(panel) + ".edit");
@@ -796,7 +804,8 @@ void position_menu() {
     site.close_position_menu();
     // The caption's close button hides the panel.
     window.perform_layout();
-    const DockSite::Stack* output = find_stack(site.realized_stack_items(), stack_of(workspace, "output"));
+    const std::vector<DockSite::Stack> caption_stacks = site.realized_stack_items();
+    const DockSite::Stack* output = find_stack(caption_stacks, stack_of(workspace, "output"));
     require(output != nullptr && (*output).parts.caption_close.present, "Output's caption has a close button");
     const Rect absolute = site.absolute_bounds();
     const Rect close = (*output).parts.caption_close.bounds;
