@@ -4344,6 +4344,10 @@
         {"name": "application_button", "role": "face", "composed_from": "button", "states": ["hot", "pressed", "open", "focus_visible"]},
         {"name": "application_label", "role": "label", "composed_from": null, "states": ["hot", "pressed", "open", "focus_visible"]},
         {"name": "command_plane", "role": "face", "composed_from": null, "states": []},
+        {"name": "scroll_left", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed"]},
+        {"name": "scroll_left_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed"]},
+        {"name": "scroll_right", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed"]},
+        {"name": "scroll_right_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed"]},
         {"name": "focus", "role": "focus", "composed_from": null, "states": []}
       ],
       "states": ["normal", "enabled", "disabled", "focused", "focus_visible"],
@@ -4367,7 +4371,12 @@
             {"name": "group_divider", "role": "divider", "composed_from": null, "states": []},
             {"name": "group_launcher", "role": "actuator", "composed_from": "button", "states": ["hot", "pressed", "focus_visible"]},
             {"name": "group_launcher_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed", "focus_visible"]},
-            {"name": "group_launcher_focus", "role": "focus", "composed_from": null, "states": ["hot", "pressed", "focus_visible"]}
+            {"name": "group_launcher_focus", "role": "focus", "composed_from": null, "states": ["hot", "pressed", "focus_visible"]},
+            {"name": "group_button", "role": "face", "composed_from": "button", "states": ["hot", "pressed", "open", "focus_visible"]},
+            {"name": "group_button_icon", "role": "icon", "composed_from": null, "states": ["hot", "pressed", "open", "focus_visible"]},
+            {"name": "group_button_label", "role": "label", "composed_from": null, "states": ["hot", "pressed", "open", "focus_visible"]},
+            {"name": "group_button_glyph", "role": "glyph", "composed_from": null, "states": ["hot", "pressed", "open", "focus_visible"]},
+            {"name": "group_button_focus", "role": "focus", "composed_from": null, "states": ["hot", "pressed", "open", "focus_visible"]}
           ],
           "states": [],
           "custom_states": []
@@ -4384,7 +4393,8 @@
             {"name": "command_combo_box", "role": "well", "composed_from": "combo_box", "states": []},
             {"name": "command_numeric_up_down", "role": "well", "composed_from": "numeric_up_down", "states": []},
             {"name": "command_check_box", "role": "indicator", "composed_from": "check_box", "states": []},
-            {"name": "command_text_box", "role": "well", "composed_from": "text_box", "states": []}
+            {"name": "command_text_box", "role": "well", "composed_from": "text_box", "states": []},
+            {"name": "command_gallery", "role": "well", "composed_from": "ribbon_gallery", "states": []}
           ],
           "states": ["hot", "pressed", "checked", "open", "disabled", "focus_visible"],
           "custom_states": []
