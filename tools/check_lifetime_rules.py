@@ -163,13 +163,30 @@ def borrowed_parameter(return_type: str, parameter: str) -> str:
     return ""
 
 
-def check_borrows(path: Path, text: str) -> list[Finding]:
-    findings: list[Finding] = []
+def deleted_overloads(text: str) -> set[str]:
     deleted: set[str] = set()
     match: re.Match[str]
     for match in HEAD.finditer(text):
         if match.group("end").startswith("=") and "&&" in match.group("params"):
             deleted.add(match.group("name"))
+    return deleted
+
+
+def included_names(source: str) -> set[str]:
+    names: set[str] = set()
+    match: re.Match[str]
+    for match in re.finditer(r'#\s*include\s*"([^"]+)"', source):
+        names.add(Path(match.group(1)).name)
+    return names
+
+
+def check_borrows(path: Path, text: str, inherited: set[str] | None = None) -> list[Finding]:
+    """inherited: deleted overloads declared in headers the file includes."""
+    findings: list[Finding] = []
+    deleted: set[str] = deleted_overloads(text)
+    if inherited is not None:
+        deleted |= inherited
+    match: re.Match[str]
     reported: set[str] = set()
     for match in HEAD.finditer(text):
         name: str = match.group("name")
@@ -280,9 +297,19 @@ def inspect_paths(paths: list[Path]) -> list[Finding]:
     for path in paths:
         texts[path] = masked_source(path)
     helpers: set[str] = lookup_helpers(texts)
+    # A definition's deleted overload may sit in a header it includes (by
+    # quoted include, matched on the file name).
+    deleted_by_header: dict[str, set[str]] = {}
+    for path in paths:
+        if path.suffix in (".hpp", ".hh", ".h", ".inc"):
+            deleted_by_header.setdefault(path.name, set()).update(deleted_overloads(texts[path]))
     findings: list[Finding] = []
     for path in paths:
-        findings.extend(check_borrows(path, texts[path]))
+        inherited: set[str] = set()
+        name: str
+        for name in included_names(path.read_text(encoding="utf-8-sig")):
+            inherited |= deleted_by_header.get(name, set())
+        findings.extend(check_borrows(path, texts[path], inherited))
         findings.extend(check_foreign_types(path, texts[path], helpers))
     return findings
 

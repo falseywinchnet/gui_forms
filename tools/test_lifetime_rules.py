@@ -63,6 +63,12 @@ class BorrowTests(unittest.TestCase):
         source: str = "SemanticNode copy_node(const std::vector<SemanticNode>& nodes) { return nodes[0]; }\n"
         self.assertEqual(borrows(source), [])
 
+    def test_deleted_overload_in_an_included_header(self) -> None:
+        source: str = FIND.replace("find_node", "find_descriptor")
+        self.assertEqual(len(borrows(source)), 1)
+        findings: list[rules.Finding] = rules.check_borrows(Path("fixture.cpp"), masked(source), {"find_descriptor"})
+        self.assertEqual(findings, [])
+
     def test_comments_are_ignored(self) -> None:
         source: str = "// const Row* first(const std::vector<Row>& rows) { return nullptr; }\n"
         self.assertEqual(borrows(source), [])
