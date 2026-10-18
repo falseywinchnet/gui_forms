@@ -595,3 +595,14 @@ verbatim:
   tab; strip tabs are Plan Paint's tab stack.
 - **GIVEN PT5-2 with hover (confirmed).** Pinned tabs are icon-only and
   expand to full width on hover.
+
+### Note, 2026-10-17: the plan accepted
+
+Asked whether the owner accepts `planning/stages/DK-docking/PLAN.md`. The
+owner, verbatim:
+
+> yes. lets start building and work.
+
+- **GIVEN:** the plan is accepted; stage DK's gate is closed. Building
+  starts with W0 (the window layer) and V0 (vocabulary and the command
+  chain), with PageView P1 onward and docking D1 alongside.

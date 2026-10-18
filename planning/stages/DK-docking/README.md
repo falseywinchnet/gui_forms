@@ -1,8 +1,8 @@
 # Stage DK: docking and windowing (study, interview, decisions, plan)
 
 Release: not yet placed on the public roadmap; the plan this stage produces
-proposes where. Depends on: nothing to start. Status 2026-10-17: interview round 001
-complete; the plan (`PLAN.md`) awaits the owner's acceptance. Authority: this brief, until the owner's decisions are recorded.
+proposes where. Depends on: nothing to start. Status 2026-10-17: complete; the plan
+(`PLAN.md`) is accepted and building has started (W0, V0, P1, D1). Authority: this brief, until the owner's decisions are recorded.
 
 Read [the shared brief](../README.md) first.
 

@@ -1,7 +1,7 @@
 # Docking and PageView: plan
 
-Date: 2026-10-17. Status: **proposed, awaiting the owner's acceptance**,
-which closes stage DK's gate. Sources: decisions 1 to 43 in `README.md`
+Date: 2026-10-17. Status: **accepted by the owner on 2026-10-17** ("yes.
+lets start building and work."), closing stage DK's gate. Sources: decisions 1 to 43 in `README.md`
 (from interview round 001, `planning/interview/DOCKING_INTERVIEW_ROUND_001.md`),
 the studies `DOCKING_STUDY.md` and `PAGEVIEW_STUDY.md`, and the look studies
 (`docking_look_studies_source.html`). Where this plan and a recorded decision
