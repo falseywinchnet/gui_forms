@@ -75,6 +75,11 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+// Borrows from `nodes`: the pointer is valid while that vector lives.
+// semantic_snapshot() returns a new snapshot, so a pointer into the roots of
+// a temporary would dangle after the statement; the deleted overload refuses
+// one.
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 struct TakeClose final {
     std::vector<std::string>* closes{};
@@ -247,7 +252,8 @@ void turned_labels_and_semantics() {
             require(painter.level == 3U && painter.upward == 0U && painter.downward == 0U,
                     "labels on a top strip are not turned");
         }
-        const SemanticNode* const list = find_node(window.semantic_snapshot().roots, "strip");
+        const SemanticSnapshot list_snapshot = window.semantic_snapshot();
+        const SemanticNode* const list = find_node(list_snapshot.roots, "strip");
         require(list != nullptr && (*list).orientation &&
                     *(*list).orientation == (side ? SemanticOrientation::vertical : SemanticOrientation::horizontal),
                 "the tab list's orientation follows the edge");
