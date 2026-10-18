@@ -20,8 +20,10 @@ gui_forms::Ribbon
    Commands are :cpp:class:`RibbonCommandSpec <gui_forms::RibbonCommandSpec>` records bound to shared :cpp:class:`Command <gui_forms::Command>` objects:
    buttons, toggles, split buttons and drop-down buttons at a large or small
    size, hosted combo boxes, numeric spinners, check boxes and text boxes, and
-   in-ribbon :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>` controls, which are real child controls the ribbon
-   places. As the ribbon narrows its groups shrink through their layouts in the
+   in-ribbon :cpp:class:`RibbonGallery <gui_forms::RibbonGallery>` controls, `RibbonFontControl`s and
+   `RibbonColorPicker`s, which are real child controls the ribbon places. The
+   File tab opens the application menu (in two panes beside recent items) or,
+   when the ribbon has one, a :cpp:class:`BackstageView <gui_forms::BackstageView>`. As the ribbon narrows its groups shrink through their layouts in the
    tab's reduction order, down to collapsed group buttons that open the group in
    a popup, and below the narrowest layout the plane scrolls. Every part is
    painted through the by-role paint path.
@@ -104,10 +106,35 @@ gui_forms::Ribbon
 
       **application_menu** : ``std::vector<MenuItemSpec>``
          The File tab's menu. :cpp:func:`set_application_menu <gui_forms::Ribbon::set_application_menu>` throws
-         ``std::invalid_argument`` for an invalid menu.
+         ``std::invalid_argument`` for an invalid menu, or for items other than
+         commands and separators beside recent items.
+
+      **recent_items** : ``std::span<const RibbonRecentItem>``
+         The application menu's recent pane (:cpp:class:`RibbonRecentItem <gui_forms::RibbonRecentItem>`: ID, text and a
+         description such as its folder), numbered under :cpp:func:`recent_caption <gui_forms::Ribbon::recent_caption>`. While
+         there are recent items the File tab opens a two-pane menu: the
+         application menu's commands on the left, the recent items on the right.
+         :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for an empty or
+         repeated ID, invalid or multi-line UTF-8, more than
+         ``Ribbon::maximum_recent_items`` (50), or an application menu holding other
+         kinds than commands and separators.
+
+      **recent_caption** : ``std::string``, default ``"Recent documents"``
+         The recent pane's caption.
+
+      **application_menu_popup** : ``Control::Ptr``, read-only
+         The two-pane menu's content control, null before its first opening.
+
+      **backstage** : ``std::shared_ptr<BackstageView>``
+         The :cpp:class:`BackstageView <gui_forms::BackstageView>` the File tab opens instead of the application menu,
+         or null. :cpp:func:`set_backstage <gui_forms::Ribbon::set_backstage>` throws ``std::invalid_argument`` for a view that
+         already has a parent.
+
+      **backstage_open** : ``bool``, read-only
+         Whether Backstage is open.
 
       **menu_open** : ``bool``, read-only
-         Whether the application menu or a command's menu is open.
+         Whether the application menu (either form) or a command's menu is open.
 
       **popup_group** : ``std::optional<std::string>``, read-only
          The ID of the group whose popup is open, or none.
@@ -159,7 +186,14 @@ gui_forms::Ribbon
          Raised after the command plane is hidden or shown.
 
       **application_menu_item_invoked** : ``Event<const MenuItemInvocation&>``
-         Raised when the user chooses from the application menu.
+         Raised when the user chooses from the application menu (either form),
+         after the item's command ran.
+
+      **recent_item_invoked** : ``Event<const RibbonRecentItemInvocation&>``
+         Raised when the user chooses a recent item.
+
+      **backstage_open_changed** : ``Event<bool>``
+         Raised when Backstage opens or closes.
 
    :Inherited:
 
@@ -182,7 +216,11 @@ gui_forms::Ribbon
       * - :cpp:func:`reduction_ladder <gui_forms::Ribbon::reduction_ladder>`
         - A tab's :cpp:class:`RibbonLadderEntry <gui_forms::RibbonLadderEntry>` list from the widest to the narrowest, built if needed.
       * - :cpp:func:`show_application_menu <gui_forms::Ribbon::show_application_menu>`
-        - Opens the application menu over the ribbon, below the File tab.
+        - Opens the File tab's file area: Backstage when the ribbon has one, otherwise the application menu over the ribbon, below the File tab (in two panes beside recent items).
+      * - :cpp:func:`show_backstage <gui_forms::Ribbon::show_backstage>`
+        - Opens Backstage over everything below the tab row, with focus in it.
+      * - :cpp:func:`close_backstage <gui_forms::Ribbon::close_backstage>`
+        - Closes Backstage; focus returns to where it was.
       * - :cpp:func:`show_drop_down <gui_forms::Ribbon::show_drop_down>`
         - Opens a split or drop-down command's menu below it.
       * - :cpp:func:`close_menus <gui_forms::Ribbon::close_menus>`
@@ -279,8 +317,9 @@ gui_forms::Ribbon
    (``command_face``, ``command_icon``, ``command_label``, ``command_arrow``,
    ``command_arrow_glyph``, ``command_focus`` and the hosted
    ``command_combo_box``, ``command_numeric_up_down``, ``command_check_box``,
-   ``command_text_box`` and ``command_gallery``; hot, pressed, checked, open,
-   disabled, focus_visible).
+   ``command_text_box``, ``command_gallery``, ``command_font_control`` and
+   ``command_color_picker``; hot, pressed, checked, open, disabled,
+   focus_visible).
    Until the default theme (T4), command faces use the menu-item family (flat
    at rest), the plane and tab row the panel family and the File tab the
    accent-button family. A command whose enabled or checked state changes
@@ -329,9 +368,18 @@ gui_forms::Ribbon
    replaces the tabs shown at once; a selected tab that no longer shows gives
    way as above, and groups that leave take no room and no ladder steps.
 
-   Not yet: the Quick Access Toolbar, the minimized popup,
-   Backstage, the application menu's recent-items pane (the File tab opens a
-   :cpp:class:`ContextMenu <gui_forms::ContextMenu>`), right-to-left mirroring of the cycle, two-line large labels
+   The file area (phase 6; owner decisions 3, 23, 26). Without recent items or
+   Backstage the File tab opens a :cpp:class:`ContextMenu <gui_forms::ContextMenu>`. With recent items it opens a
+   two-pane menu below the File tab, over the ribbon: Up and Down move within a
+   pane, Left and Right between them, Enter, Space or a click activates (after
+   which the menu closes), and Escape or a press away closes it. With a
+   :cpp:class:`BackstageView <gui_forms::BackstageView>` it opens Backstage over everything below the tab row: Escape
+   or a definitive command closes it, a press on the File tab closes it, a
+   press on a tab closes it and selects that tab, and it follows the window's
+   size.
+
+   Not yet: the Quick Access Toolbar, the minimized popup, icons in the
+   two-pane menu, right-to-left mirroring of the cycle, two-line large labels
    and ellipsized tab labels (decision 30 allows them; tabs past the row's end
    are clipped).
 
@@ -465,15 +513,57 @@ gui_forms::Ribbon
    .. cpp:function:: const std::vector<MenuItemSpec>& application_menu() const noexcept
 
       The File tab's menu. :cpp:func:`set_application_menu <gui_forms::Ribbon::set_application_menu>` throws
-      ``std::invalid_argument`` for an invalid menu.
+      ``std::invalid_argument`` for an invalid menu, or for items other than
+      commands and separators beside recent items.
 
    .. cpp:function:: void set_application_menu(std::vector<MenuItemSpec> items)
 
       Sets :cpp:func:`application_menu <gui_forms::Ribbon::application_menu>`; see the property's description above.
 
+   .. cpp:function:: std::span<const RibbonRecentItem> recent_items() const noexcept
+
+      The application menu's recent pane (:cpp:class:`RibbonRecentItem <gui_forms::RibbonRecentItem>`: ID, text and a
+      description such as its folder), numbered under :cpp:func:`recent_caption <gui_forms::Ribbon::recent_caption>`. While
+      there are recent items the File tab opens a two-pane menu: the
+      application menu's commands on the left, the recent items on the right.
+      :cpp:func:`set_recent_items <gui_forms::Ribbon::set_recent_items>` throws ``std::invalid_argument`` for an empty or
+      repeated ID, invalid or multi-line UTF-8, more than
+      ``Ribbon::maximum_recent_items`` (50), or an application menu holding other
+      kinds than commands and separators.
+
+   .. cpp:function:: void set_recent_items(std::vector<RibbonRecentItem> items)
+
+      Sets :cpp:func:`recent_items <gui_forms::Ribbon::recent_items>`; see the property's description above.
+
+   .. cpp:function:: const std::string& recent_caption() const noexcept
+
+      The recent pane's caption.
+
+   .. cpp:function:: void set_recent_caption(std::string caption)
+
+      Sets :cpp:func:`recent_caption <gui_forms::Ribbon::recent_caption>`; see the property's description above.
+
+   .. cpp:function:: Control::Ptr application_menu_popup() const noexcept
+
+      The two-pane menu's content control, null before its first opening.
+
+   .. cpp:function:: std::shared_ptr<BackstageView> backstage() const noexcept
+
+      The :cpp:class:`BackstageView <gui_forms::BackstageView>` the File tab opens instead of the application menu,
+      or null. :cpp:func:`set_backstage <gui_forms::Ribbon::set_backstage>` throws ``std::invalid_argument`` for a view that
+      already has a parent.
+
+   .. cpp:function:: void set_backstage(std::shared_ptr<BackstageView> view)
+
+      Sets :cpp:func:`backstage <gui_forms::Ribbon::backstage>`; see the property's description above.
+
+   .. cpp:function:: bool backstage_open() const noexcept
+
+      Whether Backstage is open.
+
    .. cpp:function:: bool menu_open() const noexcept
 
-      Whether the application menu or a command's menu is open.
+      Whether the application menu (either form) or a command's menu is open.
 
    .. cpp:function:: std::optional<std::string> popup_group() const
 
@@ -549,7 +639,16 @@ gui_forms::Ribbon
 
    .. cpp:function:: Event<const MenuItemInvocation&>& application_menu_item_invoked() noexcept
 
-      Raised when the user chooses from the application menu.
+      Raised when the user chooses from the application menu (either form),
+      after the item's command ran.
+
+   .. cpp:function:: Event<const RibbonRecentItemInvocation&>& recent_item_invoked() noexcept
+
+      Raised when the user chooses a recent item.
+
+   .. cpp:function:: Event<bool>& backstage_open_changed() noexcept
+
+      Raised when Backstage opens or closes.
 
 
    .. rubric:: Methods
@@ -582,8 +681,19 @@ gui_forms::Ribbon
 
    .. cpp:function:: bool show_application_menu(MenuOpenMode mode = MenuOpenMode::keyboard)
 
-      Opens the application menu over the ribbon, below the File tab. Returns
-      false without items or a window.
+      Opens the File tab's file area: Backstage when the ribbon has one,
+      otherwise the application menu over the ribbon, below the File tab (in
+      two panes beside recent items). Returns false without items (or
+      Backstage) or a window.
+
+   .. cpp:function:: bool show_backstage()
+
+      Opens Backstage over everything below the tab row, with focus in it.
+      Returns false without a view or a window.
+
+   .. cpp:function:: void close_backstage() noexcept
+
+      Closes Backstage; focus returns to where it was.
 
    .. cpp:function:: bool show_drop_down(std::string_view command_id, MenuOpenMode mode = MenuOpenMode::keyboard)
 
@@ -709,3 +819,7 @@ gui_forms::Ribbon
    .. cpp:member:: constexpr double scroll_hysteresis
 
       How far, in logical units, the plane must clear the narrowest ladder entry before scrolling ends (owner decision 45). Default: ``8.0``.
+
+   .. cpp:member:: constexpr std::size_t maximum_recent_items
+
+      The application menu's recent pane (phase 6): its items and caption ("Recent documents"). While there are recent items the application menu takes only command and separator items. Throws std::invalid_argument for an empty or repeated ID, invalid or multi-line UTF-8, more than maximum_recent_items, or recent items beside an application menu with other kinds (and set_application_menu likewise for such items beside recent ones). Default: ``50U``.

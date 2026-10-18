@@ -881,7 +881,9 @@ Besides part roles (§8.1) and states (§8.4), the atom vocabulary (§12.7)
 names the marks a glyph or indicator part shows, the values a part carries,
 and the semantic roles and node fields controls publish to accessibility.
 Their machine forms are `PartMark` (`gui_forms/theme/part_painting`),
-`AccentIndex` (`gui_forms/anatomy/types`) and `SemanticRole` and
+`AccentIndex` (`gui_forms/anatomy/types`), the content colour
+(`PartPaint::content_color` and `PartGeometry::content_color`) and
+`SemanticRole` and
 `SemanticNode` (`gui_forms/semantics/types`); the schema export lists the
 marks, values and roles under `vocabulary`, beside the recipe families a
 theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
@@ -914,6 +916,23 @@ with an accent is tinted from the ramp. Until the default theme (T4) defines
 the ramp and the engine (T2) the tint, the theme records carry a
 provisional six-colour ramp of translucent tints laid over the part's
 material.
+
+**Content colour** (owner decision W-7, §12.10). A value, not a state: the
+colour a part shows as its content, such as a colour picker's sample, which
+is data the user chose and not a look the theme supplies. Only the `fill`
+role honours it: a fill with a content colour is painted that colour, flat,
+in the part's shape, in place of the recipe's material; every other role
+ignores it. A swatch is therefore a `fill` part inside a `well` part that
+frames it. The colour is drawn as given in ordinary and high-contrast
+presentation alike, as an image is (the framing well follows the
+high-contrast recipe, so the sample stays outlined), and at 45 % opacity on
+a disabled part, as a disabled icon is. A part publishes it in its geometry
+record and a painter receives it with the part.
+
+| Value | Carried by | Honoured by | Used by |
+|---|---|---|---|
+| accent index | any part | surface roles (tint over the material) | a ribbon's contextual tab sets (RB-22) |
+| content colour | any part | `fill` only (the colour in place of the material) | a colour picker's bar and palette swatches (W-7) |
 
 **Semantic roles and node fields.** Besides the roles controls published
 before 2026-10-14, `split_button` (a button whose primary press acts, with a
@@ -1357,6 +1376,15 @@ enum and the schema as §12.7 requires (§8.5):
   button stays `button` with `checked`); and the semantic node fields
   position in set, set size and has-popup. No access-key or keytip field:
   the ribbon has no KeyTips (RB-16).
+
+### 12.10 Owner decision W-7 (content colour)
+
+- **A content-colour value joins the vocabulary (W-7, option 1).** Raised by
+  the ribbon's colour picker (stage RB, phase 6), whose samples could not be
+  painted by role: `PartPaint` and `PartGeometry` carry an optional content
+  colour, honoured by the `fill` role only (§8.5), so that a swatch is a
+  fill inside a well and every part of a colour picker paints by role. The
+  schema export lists it under `vocabulary.values` as `content_color`.
 
 ### 12.9 Owner decisions, seventh round, 2026-10-14 (tooltips and help)
 

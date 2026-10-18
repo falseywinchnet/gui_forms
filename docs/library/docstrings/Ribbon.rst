@@ -7,8 +7,10 @@ beneath and, when authored, a dialog launcher in the caption's corner.
 Commands are `RibbonCommandSpec` records bound to shared `Command` objects:
 buttons, toggles, split buttons and drop-down buttons at a large or small
 size, hosted combo boxes, numeric spinners, check boxes and text boxes, and
-in-ribbon `RibbonGallery` controls, which are real child controls the ribbon
-places. As the ribbon narrows its groups shrink through their layouts in the
+in-ribbon `RibbonGallery` controls, `RibbonFontControl`s and
+`RibbonColorPicker`s, which are real child controls the ribbon places. The
+File tab opens the application menu (in two panes beside recent items) or,
+when the ribbon has one, a `BackstageView`. As the ribbon narrows its groups shrink through their layouts in the
 tab's reduction order, down to collapsed group buttons that open the group in
 a popup, and below the narrowest layout the plane scrolls. Every part is
 painted through the by-role paint path.
@@ -82,9 +84,29 @@ application_text : default ``"File"``
     The File tab's text, with an optional mnemonic.
 application_menu
     The File tab's menu. `set_application_menu` throws
-    `std::invalid_argument` for an invalid menu.
+    `std::invalid_argument` for an invalid menu, or for items other than
+    commands and separators beside recent items.
+recent_items
+    The application menu's recent pane (`RibbonRecentItem`: ID, text and a
+    description such as its folder), numbered under `recent_caption`. While
+    there are recent items the File tab opens a two-pane menu: the
+    application menu's commands on the left, the recent items on the right.
+    `set_recent_items` throws `std::invalid_argument` for an empty or
+    repeated ID, invalid or multi-line UTF-8, more than
+    `Ribbon::maximum_recent_items` (50), or an application menu holding other
+    kinds than commands and separators.
+recent_caption : default ``"Recent documents"``
+    The recent pane's caption.
+application_menu_popup
+    The two-pane menu's content control, null before its first opening.
+backstage
+    The `BackstageView` the File tab opens instead of the application menu,
+    or null. `set_backstage` throws `std::invalid_argument` for a view that
+    already has a parent.
+backstage_open
+    Whether Backstage is open.
 menu_open
-    Whether the application menu or a command's menu is open.
+    Whether the application menu (either form) or a command's menu is open.
 focus_region : default ``true``
     Whether the ribbon adds itself to its window's F6 regions when it is
     attached.
@@ -115,13 +137,25 @@ selected_tab_changed
 minimized_changed
     Raised after the command plane is hidden or shown.
 application_menu_item_invoked
-    Raised when the user chooses from the application menu.
+    Raised when the user chooses from the application menu (either form),
+    after the item's command ran.
+recent_item_invoked
+    Raised when the user chooses a recent item.
+backstage_open_changed
+    Raised when Backstage opens or closes.
 
 Methods
 -------
 show_application_menu
-    Opens the application menu over the ribbon, below the File tab. Returns
-    false without items or a window.
+    Opens the File tab's file area: Backstage when the ribbon has one,
+    otherwise the application menu over the ribbon, below the File tab (in
+    two panes beside recent items). Returns false without items (or
+    Backstage) or a window.
+show_backstage
+    Opens Backstage over everything below the tab row, with focus in it.
+    Returns false without a view or a window.
+close_backstage
+    Closes Backstage; focus returns to where it was.
 show_drop_down
     Opens a split or drop-down command's menu below it. Returns false for
     another kind, a disabled command or one not on the selected tab.
@@ -227,8 +261,9 @@ The ribbon publishes ``region``, ``tab_rail``, ``application_button``,
 (``command_face``, ``command_icon``, ``command_label``, ``command_arrow``,
 ``command_arrow_glyph``, ``command_focus`` and the hosted
 ``command_combo_box``, ``command_numeric_up_down``, ``command_check_box``,
-``command_text_box`` and ``command_gallery``; hot, pressed, checked, open,
-disabled, focus_visible).
+``command_text_box``, ``command_gallery``, ``command_font_control`` and
+``command_color_picker``; hot, pressed, checked, open, disabled,
+focus_visible).
 Until the default theme (T4), command faces use the menu-item family (flat
 at rest), the plane and tab row the panel family and the File tab the
 accent-button family. A command whose enabled or checked state changes
@@ -277,9 +312,18 @@ and shows while one of them is in `application_modes`. A mode switch
 replaces the tabs shown at once; a selected tab that no longer shows gives
 way as above, and groups that leave take no room and no ladder steps.
 
-Not yet: the Quick Access Toolbar, the minimized popup,
-Backstage, the application menu's recent-items pane (the File tab opens a
-`ContextMenu`), right-to-left mirroring of the cycle, two-line large labels
+The file area (phase 6; owner decisions 3, 23, 26). Without recent items or
+Backstage the File tab opens a `ContextMenu`. With recent items it opens a
+two-pane menu below the File tab, over the ribbon: Up and Down move within a
+pane, Left and Right between them, Enter, Space or a click activates (after
+which the menu closes), and Escape or a press away closes it. With a
+`BackstageView` it opens Backstage over everything below the tab row: Escape
+or a definitive command closes it, a press on the File tab closes it, a
+press on a tab closes it and selects that tab, and it follows the window's
+size.
+
+Not yet: the Quick Access Toolbar, the minimized popup, icons in the
+two-pane menu, right-to-left mirroring of the cycle, two-line large labels
 and ellipsized tab labels (decision 30 allows them; tabs past the row's end
 are clipped).
 

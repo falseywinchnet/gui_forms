@@ -657,6 +657,39 @@
       "doc": "api/generated/gui_forms.ToolStrip.rst"
     },
     {
+      "id": "ribbon_font_control",
+      "type": "RibbonFontControl",
+      "header": "gui_forms/controls/ribbon_font_control/ribbon_font_control.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon font control: a family list and a size list choosing one font through a FontCommand, hosted in a Ribbon or standalone.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonFontControl.rst"
+    },
+    {
+      "id": "ribbon_color_picker",
+      "type": "RibbonColorPicker",
+      "header": "gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp",
+      "category": "Menus and commands",
+      "purpose": "Ribbon drop-down colour picker: a split button that applies its colour, and a palette popup of Automatic, palette and recent colours, through a ColorCommand.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.RibbonColorPicker.rst"
+    },
+    {
+      "id": "backstage_view",
+      "type": "BackstageView",
+      "header": "gui_forms/controls/backstage_view/backstage_view.hpp",
+      "category": "Menus and commands",
+      "purpose": "The File tab's full page: a column of fast commands and topics beside the selected topic's page, opened by a Ribbon over everything below its tab row.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.BackstageView.rst"
+    },
+    {
       "id": "ribbon_gallery",
       "type": "RibbonGallery",
       "header": "gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp",
@@ -754,6 +787,28 @@
       "status": "stable",
       "gallery_page": "commands-and-menus",
       "doc": "api/generated/gui_forms.Command.rst"
+    },
+    {
+      "id": "font_command",
+      "type": "FontCommand",
+      "header": "gui_forms/commands/font_command/font_command.hpp",
+      "category": "Menus and commands",
+      "purpose": "Value command of a font control: shares identity and state with a Command and carries a font family and size.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.FontCommand.rst"
+    },
+    {
+      "id": "color_command",
+      "type": "ColorCommand",
+      "header": "gui_forms/commands/color_command/color_command.hpp",
+      "category": "Menus and commands",
+      "purpose": "Value command of a colour picker: shares identity and state with a Command and carries a colour, or Automatic, and the recent colours.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "commands-and-menus",
+      "doc": "api/generated/gui_forms.ColorCommand.rst"
     },
     {
       "id": "gallery_command",

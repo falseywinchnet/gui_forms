@@ -3,10 +3,13 @@
 #include "gui_forms/commands.hpp"
 #include "gui_forms/components/context_menu/context_menu.hpp"
 #include "gui_forms/control.hpp"
+#include "gui_forms/controls/backstage_view/backstage_view.hpp"
 #include "gui_forms/controls/button_base/check_box/check_box.hpp"
 #include "gui_forms/controls/panel/combo_box/combo_box.hpp"
 #include "gui_forms/controls/panel/numeric_up_down/numeric_up_down.hpp"
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
+#include "gui_forms/controls/ribbon_color_picker/ribbon_color_picker.hpp"
+#include "gui_forms/controls/ribbon_font_control/ribbon_font_control.hpp"
 #include "gui_forms/controls/ribbon_gallery/ribbon_gallery.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/window.hpp"
@@ -23,6 +26,7 @@
 namespace gui_forms {
 
 class RibbonGroupPopup;
+class RibbonApplicationMenu;
 
 // The kinds of ribbon command (stage RB, owner decision 2: commands are
 // records in a command item system, hosted editors are child controls).
@@ -33,7 +37,9 @@ class RibbonGroupPopup;
 // - combo_box, numeric_up_down, check_box and text_box hold a real
 //   ComboBox, NumericUpDown, CheckBox or TextBox child control;
 // - gallery holds the application's in-ribbon RibbonGallery, which gives up
-//   one column at a time as the ribbon narrows (decision 8).
+//   one column at a time as the ribbon narrows (decision 8);
+// - font_control and color_picker hold the application's RibbonFontControl
+//   or RibbonColorPicker, each bound to its value command (phase 6).
 enum class RibbonCommandKind : std::uint8_t {
     button,
     toggle,
@@ -44,6 +50,8 @@ enum class RibbonCommandKind : std::uint8_t {
     check_box,
     text_box,
     gallery,
+    font_control,
+    color_picker,
 };
 
 // A button-family command's image size: large (a 32-unit icon over its
@@ -66,7 +74,10 @@ enum class RibbonCommandSize : std::uint8_t { large, small };
 // name (and a check box's caption); `choices` are a combo box's items and
 // `width` its width in logical units (zero for the default). A gallery
 // command's `gallery` is an in-ribbon RibbonGallery the application made and
-// configured; the ribbon adds it as its child and sets its column count.
+// configured; the ribbon adds it as its child and sets its column count. A
+// font control's `font_control` and a colour picker's `color_picker` are,
+// likewise, the application's controls, which the ribbon adds and places on
+// one row.
 struct RibbonCommandSpec final {
     std::string stable_id{};
     RibbonCommandKind kind{RibbonCommandKind::button};
@@ -79,6 +90,8 @@ struct RibbonCommandSpec final {
     std::vector<std::string> choices{};
     double width{};
     std::shared_ptr<RibbonGallery> gallery{};
+    std::shared_ptr<RibbonFontControl> font_control{};
+    std::shared_ptr<RibbonColorPicker> color_picker{};
 };
 
 // A group's size in one of its layouts, named after the Windows Ribbon
@@ -210,6 +223,21 @@ struct RibbonDropDownInvocation final {
     std::string ribbon_id{};
     std::string command_id{};
     MenuItemInvocation choice{};
+};
+
+// One item of the application menu's recent pane (stage RB, phase 6): a
+// recently used document, shown numbered under the pane's caption, with its
+// `description` (a folder, say) for accessibility.
+struct RibbonRecentItem final {
+    std::string stable_id{};
+    std::string text{};
+    std::string description{};
+};
+
+// A choice from the recent pane.
+struct RibbonRecentItemInvocation final {
+    std::string ribbon_id{};
+    std::string item_id{};
 };
 
 // A click on a group's dialog launcher.
@@ -355,9 +383,34 @@ public:
     [[nodiscard]] const std::vector<MenuItemSpec>& application_menu() const noexcept { return application_menu_; }
     // Throws std::invalid_argument for an invalid menu.
     void set_application_menu(std::vector<MenuItemSpec> items);
-    // Opens the application menu below the File tab; false without items or
-    // a window.
+    // Opens the File tab's file area: Backstage when the ribbon has one;
+    // otherwise the application menu below the File tab, in two panes while
+    // there are recent items. False without items (or Backstage) or a window.
     bool show_application_menu(MenuOpenMode mode = MenuOpenMode::keyboard);
+    // The application menu's recent pane (phase 6): its items and caption
+    // ("Recent documents"). While there are recent items the application
+    // menu takes only command and separator items. Throws
+    // std::invalid_argument for an empty or repeated ID, invalid or
+    // multi-line UTF-8, more than maximum_recent_items, or recent items
+    // beside an application menu with other kinds (and set_application_menu
+    // likewise for such items beside recent ones).
+    static constexpr std::size_t maximum_recent_items = 50U;
+    [[nodiscard]] std::span<const RibbonRecentItem> recent_items() const noexcept { return recent_items_; }
+    void set_recent_items(std::vector<RibbonRecentItem> items);
+    [[nodiscard]] const std::string& recent_caption() const noexcept { return recent_caption_; }
+    void set_recent_caption(std::string caption);
+    // The two-pane menu's content control, null before its first opening.
+    [[nodiscard]] Control::Ptr application_menu_popup() const noexcept;
+    // Backstage (phase 6; owner decisions 3, 26): a BackstageView the File
+    // tab opens over everything below the tab row, instead of the
+    // application menu. Escape, the File tab, another tab or a definitive
+    // command closes it and returns to the document. Throws
+    // std::invalid_argument for a view that already has a parent.
+    [[nodiscard]] std::shared_ptr<BackstageView> backstage() const noexcept { return backstage_; }
+    void set_backstage(std::shared_ptr<BackstageView> view);
+    bool show_backstage();
+    void close_backstage() noexcept;
+    [[nodiscard]] bool backstage_open() const noexcept { return backstage_open_; }
     // Opens a split or drop-down command's menu; false for another kind, a
     // disabled command or one not on the selected tab.
     bool show_drop_down(std::string_view command_id, MenuOpenMode mode = MenuOpenMode::keyboard);
@@ -404,6 +457,10 @@ public:
     [[nodiscard]] Event<const MenuItemInvocation&>& application_menu_item_invoked() noexcept {
         return application_menu_item_invoked_;
     }
+    [[nodiscard]] Event<const RibbonRecentItemInvocation&>& recent_item_invoked() noexcept {
+        return recent_item_invoked_;
+    }
+    [[nodiscard]] Event<bool>& backstage_open_changed() noexcept { return backstage_open_changed_; }
 
     [[nodiscard]] Size measure(Size available) override;
     void arrange(Rect final_bounds) override;
@@ -492,6 +549,8 @@ public:
         PartGeometry command_check_box;
         PartGeometry command_text_box;
         PartGeometry command_gallery;
+        PartGeometry command_font_control;
+        PartGeometry command_color_picker;
     };
     struct CommandStates final {
         bool hot{};
@@ -526,6 +585,7 @@ protected:
 
 private:
     friend class RibbonGroupPopup;
+    friend class RibbonApplicationMenu;
 
     // A command's position in the selected tab: its group and its place.
     struct CommandAddress final {
@@ -785,6 +845,17 @@ private:
     void on_group_layer_dismissed(PopupDismissReason reason);
     void on_group_popup_revoked();
 
+    // The file area (ribbon_file_area.cpp): the two-pane application menu
+    // and Backstage.
+    [[nodiscard]] bool file_area_open() const noexcept;
+    bool show_application_popup(MenuOpenMode mode);
+    void close_application_popup() noexcept;
+    void on_application_popup_revoked();
+    void place_backstage();
+    void on_backstage_close_requested();
+    void on_backstage_revoked();
+    void validate_two_pane(const std::vector<MenuItemSpec>& items, std::size_t recent) const;
+
     std::vector<RibbonTabSpec> tabs_{};
     // One record per command, indexed [tab][group][command] as tabs_.
     std::vector<std::vector<std::vector<CommandRecord>>> records_{};
@@ -852,6 +923,23 @@ private:
     Event<const RibbonTabChange&> selected_tab_changed_{};
     Event<bool> minimized_changed_{};
     Event<const MenuItemInvocation&> application_menu_item_invoked_{};
+
+    // The file area: recent items, the two-pane menu while open, Backstage.
+    std::vector<RibbonRecentItem> recent_items_{};
+    std::string recent_caption_{"Recent documents"};
+    std::shared_ptr<RibbonApplicationMenu> application_popup_{};
+    PopupToken application_popup_token_{};
+    FocusScopeId application_scope_{};
+    SubscriptionToken application_popup_revoked_{};
+    bool application_popup_open_{};
+    std::shared_ptr<BackstageView> backstage_{};
+    SubscriptionToken backstage_close_{};
+    PopupToken backstage_token_{};
+    FocusScopeId backstage_scope_{};
+    SubscriptionToken backstage_revoked_{};
+    bool backstage_open_{};
+    Event<const RibbonRecentItemInvocation&> recent_item_invoked_{};
+    Event<bool> backstage_open_changed_{};
 };
 
 } // namespace gui_forms
