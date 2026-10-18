@@ -565,3 +565,14 @@ option drawn in the default theme with an ID. The owner, verbatim:
   rail-blue grip.
 - **GIVEN PT8-1.** Rotated side-tab labels read bottom to top on the left
   edge.
+
+### Note, 2026-10-17: the plan
+
+Asked to confirm the two readings above (the notched document tab; "pt4-2"
+as PT5) and whether to draft the stage plan. The owner, verbatim:
+
+> yes
+
+Recorded reading: yes to drafting the plan; the two readings stay listed
+as open items in `planning/stages/DK-docking/PLAN.md` until the owner
+confirms them explicitly.
