@@ -493,6 +493,10 @@ Types
 
    .. cpp:member:: bool has_popup
 
+   .. cpp:member:: std::string controlled_panel
+
+   .. cpp:member:: std::optional<SemanticOrientation> orientation
+
    .. cpp:member:: SemanticState states
 
       Default: ``{SemanticState::none}``.
@@ -538,6 +542,10 @@ Types
    .. cpp:member:: std::optional<std::size_t> set_size
 
    .. cpp:member:: bool has_popup
+
+   .. cpp:member:: std::string controlled_panel
+
+   .. cpp:member:: std::optional<SemanticOrientation> orientation
 
    .. cpp:member:: Rect bounds
 
@@ -715,6 +723,20 @@ Enumerations
 
    .. cpp:enumerator:: set_value
 
+   .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SemanticOrientation
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   .. cpp:enumerator:: horizontal
+
+   .. cpp:enumerator:: vertical
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: SemanticRole
@@ -793,6 +815,10 @@ Enumerations
 
    .. cpp:enumerator:: menu_button
 
+   .. cpp:enumerator:: pane
+
+   .. cpp:enumerator:: tab_panel
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
@@ -850,6 +876,12 @@ Functions, constants and aliases
 
 .. cpp:function:: const char* semantic_action_name(SemanticAction action) noexcept
 
+.. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
+
 .. cpp:var:: constexpr std::size_t semantic_role_count
 
    Value: ``static_cast<std::size_t>(SemanticRole::count)``.
+
+.. cpp:var:: constexpr std::size_t semantic_action_count
+
+   Value: ``static_cast<std::size_t>(SemanticAction::count)``.

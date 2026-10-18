@@ -234,6 +234,9 @@ gui_forms::Control
       **accessible_description** : ``std::string``
          A longer description for assistive technology. Empty by default.
 
+      **command_target** : ``std::shared_ptr<CommandTarget>``
+         The command target this control offers its window's command routing chain while focus is on it or inside it (the focused route, owner decision DK-29; see gui_forms/commands/command_route). The control shares ownership, so a docking workspace may also name the same target as an active panel's or document's. None by default.
+
       **effective_cursor** : ``CursorKind``, read-only
          The cursor in use: the :cpp:func:`cursor <gui_forms::Control::cursor>` of this control or of its nearest
          ancestor that sets one, else :cpp:enumerator:`CursorKind::arrow <gui_forms::CursorKind::arrow>`.
@@ -911,6 +914,12 @@ gui_forms::Control
    .. cpp:function:: void set_accessible_description(std::string description)
 
       Sets :cpp:func:`accessible_description <gui_forms::Control::accessible_description>`; see the property's description above.
+
+   .. cpp:function:: const std::shared_ptr<CommandTarget>& command_target() const noexcept
+
+      The command target this control offers its window's command routing chain while focus is on it or inside it (the focused route, owner decision DK-29; see gui_forms/commands/command_route). The control shares ownership, so a docking workspace may also name the same target as an active panel's or document's. None by default.
+
+   .. cpp:function:: void set_command_target(std::shared_ptr<CommandTarget> target) noexcept
 
    .. cpp:function:: CursorKind effective_cursor() const noexcept
 

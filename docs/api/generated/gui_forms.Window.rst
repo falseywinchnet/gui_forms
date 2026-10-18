@@ -306,6 +306,12 @@ gui_forms::Window
         - Shows a detached control as an overlay owned by another control, such as a menu or a drop-down, and returns a :cpp:class:`PopupToken <gui_forms::PopupToken>` that closes it.
       * - :cpp:func:`register_accelerator <gui_forms::Window::register_accelerator>`
         - Installs a window-wide keyboard shortcut owned by a :cpp:class:`Component <gui_forms::Component>`.
+      * - :cpp:func:`command_target <gui_forms::Window::command_target>`
+        -  
+      * - :cpp:func:`resolve_command <gui_forms::Window::resolve_command>`
+        - Where the chain would run a command with a given identity now, without running it: a :cpp:class:`CommandRouteResult <gui_forms::CommandRouteResult>` whose outcome is handled, with the stage and target name, or unhandled.
+      * - :cpp:func:`route_command <gui_forms::Window::route_command>`
+        - Offers an invocation to the chain in order (the focused control and its ancestors, the active panel, the active document, the main window) and runs the first handler for its command identity.
       * - :cpp:func:`dispatch_pointer <gui_forms::Window::dispatch_pointer>`
         - Delivers a pointer event, as the host does for mouse, pen and touch input, and returns whether a control handled it.
       * - :cpp:func:`dispatch_key <gui_forms::Window::dispatch_key>`
@@ -338,6 +344,8 @@ gui_forms::Window
         - Host adapters install a thread-safe wake primitive.
       * - :cpp:func:`set_paint_wake_handler <gui_forms::Window::set_paint_wake_handler>`
         - Host adapters also install a paint wake seam.
+      * - :cpp:func:`set_command_target <gui_forms::Window::set_command_target>`
+        - Names the :cpp:class:`CommandTarget <gui_forms::CommandTarget>` of one stage of the command routing chain: the active panel, the active document or the main window, or clears it with null.
 
    .. seealso::
 
@@ -943,6 +951,22 @@ gui_forms::Window
       ``AcceleratorOptions::before_focused_route`` is set. The returned token,
       or disposing the owner, removes it.
 
+   .. cpp:function:: std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const
+
+   .. cpp:function:: CommandRouteResult resolve_command(std::string_view command_id) const
+
+      Where the chain would run a command with a given identity now, without
+      running it: a :cpp:class:`CommandRouteResult <gui_forms::CommandRouteResult>` whose outcome is handled, with the
+      stage and target name, or unhandled.
+
+   .. cpp:function:: CommandRouteResult route_command(const CommandInvocation& invocation)
+
+      Offers an invocation to the chain in order (the focused control and its
+      ancestors, the active panel, the active document, the main window) and
+      runs the first handler for its command identity. Exactly one handler
+      runs, or none; a routing nested more than eight deep inside handlers is
+      refused. ``Command::execute_routed`` is the usual caller.
+
    .. cpp:function:: bool dispatch_pointer(PointerEvent event)
 
       Delivers a pointer event, as the host does for mouse, pen and touch
@@ -1006,3 +1030,14 @@ gui_forms::Window
    .. cpp:function:: void set_paint_wake_handler(std::function<void()> wake)
 
       Host adapters also install a paint wake seam. Retained invalidation may originate from another Window's callback, so relying only on the host currently dispatching input can strand valid dirty state indefinitely. Wakes coalesce until the host consumes damage and remain suppressed while the model is explicitly occluded.
+
+   .. cpp:function:: void set_command_target(CommandRouteStage stage, const std::shared_ptr<CommandTarget>& target)
+
+      Names the :cpp:class:`CommandTarget <gui_forms::CommandTarget>` of one stage of the command routing chain:
+      the active panel, the active document or the main window, or clears it
+      with null. The window only observes the target; once its owner
+      destroys it, it drops out of the chain. The focused route has no
+      single target, since controls carry its targets
+      (``Control::set_command_target``), and naming it throws
+      ``std::invalid_argument``. ``command_target(stage)`` returns the named
+      target while it lives.
