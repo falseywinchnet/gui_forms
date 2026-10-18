@@ -150,6 +150,11 @@ from it. Record under `results/`.
    pass on to the window's cancel and accept buttons unless the box has
    something to cancel or accept; editors that need them opt in with
    `accepts_escape`/`accepts_enter`. An empty `TokenBox` passes Enter on.
+7. **Content colour in the paint path (owner, 2026-10-19, C1-1).** A
+   content-colour value on `PartPaint` (for a swatch, a colour field, a
+   palette or a chart series) so such parts paint by role; the ribbon colour
+   picker's direct-paint bridge is replaced by it. Admitted to the design
+   language and schema vocabulary with the field.
 
 ## Advanced candidates, 2026-10-14
 
