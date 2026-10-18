@@ -112,19 +112,23 @@ Related types
    * - :cpp:class:`DataGridView::States <gui_forms::DataGridView::States>`
      -  
    * - :cpp:class:`DataGridViewCellAddress <gui_forms::DataGridViewCellAddress>`
-     - A cell by row and column position.
+     - A cell by row position and column index, as the rows are presented now.
    * - :cpp:class:`DataGridViewCellCancelEvent <gui_forms::DataGridViewCellCancelEvent>`
      - Raised before an edit begins; setting ``cancel`` keeps the cell out of edit.
    * - :cpp:class:`DataGridViewCellEvent <gui_forms::DataGridViewCellEvent>`
-     - The cell an event concerns.
+     - The cell an event concerns: its row's identity, the row's position when the event is raised (the position it had, for a row just removed), and the column.
    * - :cpp:class:`DataGridViewCellValidatingEvent <gui_forms::DataGridViewCellValidatingEvent>`
      - Raised before an edited text cell commits, with the text as typed.
    * - :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
-     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed).
+     - The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID.
    * - :cpp:class:`DataGridViewColumn <gui_forms::DataGridViewColumn>`
      - One column.
    * - :cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>`
      - One unbound row.
+   * - :cpp:class:`DataGridViewRowId <gui_forms::DataGridViewRowId>`
+     - A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves.
+   * - :cpp:class:`DataGridViewRowPosition <gui_forms::DataGridViewRowPosition>`
+     - A row's presentation position: its index in the grid's current row order, 0 at the top.
    * - :cpp:class:`ItemCheckEvent <gui_forms::ItemCheckEvent>`
      - ItemCheckEvent carries item index, current state, and mutable proposed state before a CheckedListBox commit.
    * - :cpp:class:`ListBox::Item <gui_forms::ListBox::Item>`
@@ -692,7 +696,7 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   .. cpp:member:: std::size_t index
+   .. cpp:member:: DataGridViewRowPosition position
 
    .. cpp:member:: std::string stable_id
 
@@ -752,9 +756,9 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   A cell by row and column position. Positions are indices into the current rows and columns, not identities: inserting, removing or sorting rows moves them.
+   A cell by row position and column index, as the rows are presented now. Inserting, removing or sorting rows moves the row a position names.
 
-   .. cpp:member:: std::size_t row
+   .. cpp:member:: DataGridViewRowPosition row
 
    .. cpp:member:: std::size_t column
 
@@ -766,7 +770,9 @@ Related types
 
    Raised before an edit begins; setting ``cancel`` keeps the cell out of edit.
 
-   .. cpp:member:: std::size_t row
+   .. cpp:member:: DataGridViewRowId row_id
+
+   .. cpp:member:: DataGridViewRowPosition row
 
    .. cpp:member:: std::size_t column
 
@@ -778,9 +784,11 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   The cell an event concerns.
+   The cell an event concerns: its row's identity, the row's position when the event is raised (the position it had, for a row just removed), and the column.
 
-   .. cpp:member:: std::size_t row
+   .. cpp:member:: DataGridViewRowId row_id
+
+   .. cpp:member:: DataGridViewRowPosition row
 
    .. cpp:member:: std::size_t column
 
@@ -792,7 +800,9 @@ Related types
 
    Raised before an edited text cell commits, with the text as typed. Setting ``cancel`` refuses the text: the cell stays in edit and is marked invalid.
 
-   .. cpp:member:: std::size_t row
+   .. cpp:member:: DataGridViewRowId row_id
+
+   .. cpp:member:: DataGridViewRowPosition row
 
    .. cpp:member:: std::size_t column
 
@@ -806,22 +816,18 @@ Related types
 
    ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
 
-   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed). The grid asks for the values of the cells it shows, of the current cell and of cells semantics or the application read; it never asks for a row it does not show. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
+   The application side of virtual mode (Windows Forms' CellValueNeeded and CellValuePushed), on ObjectView's stable-ID model: the application owns the rows and their order and publishes the order to the grid as row IDs (set_virtual_rows, set_virtual_row_order); the grid asks for values by ID. It asks for the cells it shows, the current cell, and cells semantics or the application read through the grid; it never asks for any other row. Calls arrive on the grid's UI thread, from paint, layout, input and the grid's own methods. The provider may not mutate the grid from inside a call.
 
 
    .. rubric:: Extension points
 
-   .. cpp:function:: virtual BindingValue cell_value(std::size_t row, std::size_t column) const = 0
+   .. cpp:function:: virtual BindingValue cell_value(const DataGridViewRowId& row, std::size_t column) const = 0
 
-      The value of one cell; ``row`` is below the grid's row count.
+      The value of one cell; ``row`` is in the grid's current order.
 
-   .. cpp:function:: virtual bool push_cell_value(std::size_t row, std::size_t column, const BindingValue& value) = 0
+   .. cpp:function:: virtual bool push_cell_value(const DataGridViewRowId& row, std::size_t column, const BindingValue& value) = 0
 
       Stores a committed value. Returning false refuses it: the cell keeps its old value and no cell_value_changed is raised.
-
-   .. cpp:function:: virtual std::string row_stable_id(std::size_t row) const
-
-      The stable ID of a row, for selection, events and accessibility. The default names row n "row.n"; a provider whose rows move overrides it.
 
 .. cpp:namespace:: gui_forms
 
@@ -875,13 +881,33 @@ Related types
 
    One unbound row. ``stable_id`` is unique within the grid; an empty ID is replaced by a generated one ("row.1", "row.2", ...). ``cells`` holds one value per column in column order; a shorter list is padded with empty values.
 
-   .. cpp:member:: std::string stable_id
+   .. cpp:member:: DataGridViewRowId stable_id
 
    .. cpp:member:: std::vector<BindingValue> cells
 
    .. cpp:member:: std::string header_text
 
    .. cpp:member:: bool read_only
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowId final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   A row's stable identity: not empty, unique among the grid's rows, and kept while the row moves. Unbound rows, virtual rows and BindingSource records each carry one. The selection, the current cell, an edit in progress and a pressed button cell are kept by it, so inserting, removing and sorting rows never moves them onto other rows. It is also the row's semantic stable ID, and a cell's is the row's, '.' and the column's name.
+
+   .. cpp:member:: std::string value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DataGridViewRowPosition final
+
+   ``#include <gui_forms/controls/data_grid_view/data_grid_view.hpp>``
+
+   A row's presentation position: its index in the grid's current row order, 0 at the top. A position is not an identity: inserting, removing or sorting rows changes which row holds it. row_id and row_position convert between the two.
+
+   .. cpp:member:: std::size_t value
 
 .. cpp:namespace:: gui_forms
 

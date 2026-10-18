@@ -942,15 +942,37 @@ void example() {
         {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
          .width = 90.0, .items = {"AM", "FM", "USB"}},
     });
-    (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
-                                                    gf::BindingValue{true},
-                                                    gf::BindingValue{std::string("FM")}}});
-    (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
-                                                    gf::BindingValue{false},
-                                                    gf::BindingValue{std::string("AM")}}});
+    (*grid).add_row({.stable_id = {"wqxr"}, .cells = {gf::BindingValue{std::string("WQXR")},
+                                                      gf::BindingValue{true},
+                                                      gf::BindingValue{std::string("FM")}}});
+    (*grid).add_row({.stable_id = {"bbc4"}, .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                      gf::BindingValue{false},
+                                                      gf::BindingValue{std::string("AM")}}});
     (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+    // row_position({"wqxr"}) is now position 1
 }
 }  // namespace doc_example_DataGridView_1
+
+namespace doc_example_DataGridView_2 {
+struct Stations final : gf::DataGridViewCellValueProvider {
+    gf::BindingValue cell_value(const gf::DataGridViewRowId& row, std::size_t) const override {
+        return gf::BindingValue{"Station " + row.value};
+    }
+    bool push_cell_value(const gf::DataGridViewRowId&, std::size_t, const gf::BindingValue&) override {
+        return false;
+    }
+};
+
+void example() {
+    std::shared_ptr<gf::DataGridView> grid =
+        gf::make_control<gf::DataGridView>(gf::StableId("radio.virtual"));
+    (*grid).set_columns({{.name = "name", .header_text = "Station", .width = 160.0}});
+    (*grid).set_virtual_rows(std::make_shared<Stations>(), {{"a"}, {"b"}, {"c"}});
+    (*grid).set_current_cell(gf::DataGridViewCellAddress{gf::DataGridViewRowPosition{1U}, 0U});
+    (*grid).set_virtual_row_order({{"c"}, {"d"}, {"b"}, {"a"}});   // the application sorted and added
+    // current_row_id() is still {"b"}, now at position 2
+}
+}  // namespace doc_example_DataGridView_2
 
 namespace doc_example_DateTimePicker_1 {
 void example() {
@@ -3400,6 +3422,7 @@ int main() {
     failures += run("CorrespondenceView example 1", &doc_example_CorrespondenceView_1::example);
     failures += run("CorrespondenceView example 2", &doc_example_CorrespondenceView_2::example);
     failures += run("DataGridView example 1", &doc_example_DataGridView_1::example);
+    failures += run("DataGridView example 2", &doc_example_DataGridView_2::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
     failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);

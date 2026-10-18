@@ -5,10 +5,14 @@ optional column of row headers at the left. Each `DataGridViewColumn` is a
 text, check box, combo box or button column with a name, header text, width,
 read-only flag and alignment. The rows come from one of three sources: unbound
 rows the grid owns (`DataGridViewRow` records with stable IDs and
-`BindingValue` cells), virtual rows whose values an application
-`DataGridViewCellValueProvider` supplies as they are shown, or the records of
-a `BindingSource`. Use it for tabular data the user reads, selects and edits
-in place; use an `ObjectView` for a list of objects with icons.
+`BindingValue` cells), virtual rows whose order the application publishes as
+stable row IDs and whose values an application `DataGridViewCellValueProvider`
+supplies by ID as they are shown, or the records of a `BindingSource`. Every
+row has a stable ID (`DataGridViewRowId`), and the grid keeps its selection,
+current cell and edit by ID; a row number in the API is a presentation
+position (`DataGridViewRowPosition`), which inserting, removing and sorting
+rows change. Use it for tabular data the user reads, selects and edits in
+place; use an `ObjectView` for a list of objects with icons.
 
 Parameters
 ----------
@@ -32,7 +36,9 @@ row_source : default unbound
     `virtual_rows` or `binding_source`.
 row_count
     The number of rows. `set_row_count` grows unbound rows with generated
-    rows or cuts them from the end, and sets the count of virtual rows.
+    rows or cuts them from the end; virtual rows are counted by their order
+    and bound rows by their source, so both refuse it with
+    `std::logic_error`.
 data_source
     The `BindingSource` whose records are the rows, or none.
     `set_data_source` shows a source's records as rows, or returns to empty
@@ -54,8 +60,9 @@ read_only : default ``false``
 allow_user_to_resize_columns : default ``true``
     Whether dragging a column header's divider resizes the column.
 first_displayed_row
-    The first row shown under the column headers. `set_first_displayed_row`
-    scrolls to a row; layout keeps the last rows filling the grid.
+    The position of the first row shown under the column headers.
+    `set_first_displayed_row` scrolls to a position; layout keeps the last
+    rows filling the grid.
 horizontal_scroll_offset
     How far the cells are scrolled left, in logical units at text scale 1.
 displayed_row_end
@@ -71,15 +78,18 @@ selection_mode : default cell_select
 multi_select : default ``true``
     Whether Ctrl and Shift add to the selection.
 current_cell
-    The cell keyboard input acts on, or none. `set_current_cell` moves it,
-    committing any edit first, and selects it alone; it returns false and
-    changes nothing when the edit does not commit.
+    The cell keyboard input acts on, at its row's present position, or none.
+    `set_current_cell` moves it, committing any edit first, and selects it
+    alone; it returns false and changes nothing when the edit does not
+    commit.
+current_row_id
+    The current cell's row ID, or none.
 selected_cells
-    The selected cells by row, then column; in full-row mode every cell of
-    every selected row.
+    The selected cells at their rows' present positions, by row, then
+    column; in full-row mode every cell of every selected row.
 selected_rows
-    The selected rows: in full-row mode the selected rows, in cell mode the
-    rows whose every cell is selected.
+    The positions of the selected rows: in full-row mode the selected rows,
+    in cell mode the rows whose every cell is selected.
 is_current_cell_in_edit_mode
     Whether a text cell is in edit or a combo box cell's choices are open.
 editing_control
@@ -93,7 +103,8 @@ Events
 selection_changed
     Raised once after an operation changes which cells or rows are selected.
 current_cell_changed
-    Raised after the current cell moves, with the new cell or none.
+    Raised after the current cell moves to another cell, with the new cell or
+    none; not when only its row's position changes.
 cell_begin_edit
     Raised before an edit begins, by F2, typing, a double click, a combo box
     cell opening, or `begin_edit`. Setting ``cancel`` keeps the cell out of
@@ -126,27 +137,28 @@ set_column_sort_glyph
 set_column_read_only
     Makes a column's cells read-only, ending an edit in that column.
 add_row
-    Appends an unbound row and returns its index. An empty stable ID is
+    Appends an unbound row and returns its position. An empty stable ID is
     replaced by a generated one (``row.1``, ``row.2``, ...); a repeated ID,
     invalid UTF-8 or more values than columns throws `std::invalid_argument`.
     Virtual and bound rows refuse it with `std::logic_error`, as they do
     `insert_row`, `set_rows` and `remove_row_at`.
 insert_row
-    Inserts an unbound row before an index. The current cell and the
-    selection follow their rows.
+    Inserts an unbound row before a position. The current cell and the
+    selection stay on their rows.
 set_rows
     Replaces the unbound rows, ending any edit and clearing the selection.
 remove_row_at
-    Removes an unbound row. When it held the current cell, the row that takes
-    its place becomes current.
+    Removes an unbound row. A selected row leaves the selection; when it held
+    the current cell, the row that takes its position, or the new last row,
+    becomes current.
 clear_rows
     Removes every row of any source and returns to unbound rows.
-row_stable_id
-    A row's stable ID: an unbound row's own, the provider's for a virtual row,
-    the record's for a bound row.
-row_index
-    The row with a stable ID, or none. For virtual rows only the displayed
-    rows and the current row are searched.
+row_id
+    The stable ID of the row at a position: an unbound row's own, the
+    application's for a virtual row, the record's for a bound row. A position
+    past the end throws `std::out_of_range`.
+row_position
+    The present position of the row with a stable ID, or none.
 cell_value
     A cell's value. A cell past the rows or columns throws
     `std::out_of_range`.
@@ -160,12 +172,24 @@ set_cell_value
 sort
     Orders unbound rows stably by a column: empty values first, then
     booleans, numbers and text. The column shows the sort glyph and the
-    others none; the current cell and the selection follow their rows.
+    others none; the current cell and the selection stay on their rows.
     Returns false for virtual or bound rows, or when an edit in progress does
     not commit.
 set_virtual_rows
-    Switches to virtual rows asked of a provider, discarding unbound rows. A
-    null provider throws `std::invalid_argument`.
+    Switches to virtual rows: the application's row IDs in presentation
+    order, with values asked of a provider by ID. Unbound rows are discarded,
+    and any edit, the selection and the current cell end. A null provider,
+    or an empty, repeated or invalid UTF-8 ID, throws `std::invalid_argument`
+    and changes nothing.
+set_virtual_row_order
+    Replaces the virtual rows' order after the application inserted, removed,
+    filtered or sorted rows. The selection, the current cell, an edit in
+    progress and the first displayed row stay on their IDs. A selected row
+    that is gone leaves the selection; when the current row is gone, its
+    edit is discarded and the row now at its position, or the new last row,
+    becomes current. Rows that are not virtual refuse it with
+    `std::logic_error`; an invalid ID throws `std::invalid_argument` and
+    changes nothing.
 refresh_rows
     Repaints after the provider's values changed outside the grid.
 is_cell_selected
@@ -223,9 +247,16 @@ application-defined ``sorted_ascending`` and ``sorted_descending``. The
 column header row and the row header column stay in place while the cells
 scroll beneath them.
 
-A virtual grid asks its provider only for the cells it shows, the current
-cell, and cells the program or accessibility reads; a million rows cost no
-more to show than ten. A bound grid shows the field each column's
+Rows are identified as in `ObjectView`: by stable ID, with no second
+row-ownership model. A virtual grid holds the application's order of row
+IDs and an index from ID to position; the application owns the rows and their
+values, sorts and filters them itself, and publishes each new order with
+`set_virtual_row_order`. The grid asks its provider, by ID, only for the
+cells it shows, the current cell, and cells the program or accessibility
+reads, and realizes only the rows in view: painting a window of a million
+rows asks for the values of that window alone (the tests check it). Cell
+events carry the row's ID beside its position. A bound grid shows the field
+each column's
 `data_property_name` names. Its current row follows the source's position
 and moves it, and a committed edit moves the position to its row and sets
 the field; a record the source does not allow to be edited is read-only.
@@ -271,10 +302,35 @@ A grid of stations with a check box and a combo box column, sorted by name:
        {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
         .width = 90.0, .items = {"AM", "FM", "USB"}},
    });
-   (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
-                                                   gf::BindingValue{true},
-                                                   gf::BindingValue{std::string("FM")}}});
-   (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
-                                                   gf::BindingValue{false},
-                                                   gf::BindingValue{std::string("AM")}}});
+   (*grid).add_row({.stable_id = {"wqxr"}, .cells = {gf::BindingValue{std::string("WQXR")},
+                                                     gf::BindingValue{true},
+                                                     gf::BindingValue{std::string("FM")}}});
+   (*grid).add_row({.stable_id = {"bbc4"}, .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                     gf::BindingValue{false},
+                                                     gf::BindingValue{std::string("AM")}}});
    (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+   // row_position({"wqxr"}) is now position 1
+
+Virtual rows: the application owns the rows and their order, and the grid
+asks for the values it shows by row ID:
+
+.. code-block:: cpp
+
+   struct Stations final : gf::DataGridViewCellValueProvider {
+       gf::BindingValue cell_value(const gf::DataGridViewRowId& row, std::size_t) const override {
+           return gf::BindingValue{"Station " + row.value};
+       }
+       bool push_cell_value(const gf::DataGridViewRowId&, std::size_t, const gf::BindingValue&) override {
+           return false;
+       }
+   };
+
+   void example() {
+       std::shared_ptr<gf::DataGridView> grid =
+           gf::make_control<gf::DataGridView>(gf::StableId("radio.virtual"));
+       (*grid).set_columns({{.name = "name", .header_text = "Station", .width = 160.0}});
+       (*grid).set_virtual_rows(std::make_shared<Stations>(), {{"a"}, {"b"}, {"c"}});
+       (*grid).set_current_cell(gf::DataGridViewCellAddress{gf::DataGridViewRowPosition{1U}, 0U});
+       (*grid).set_virtual_row_order({{"c"}, {"d"}, {"b"}, {"a"}});   // the application sorted and added
+       // current_row_id() is still {"b"}, now at position 2
+   }

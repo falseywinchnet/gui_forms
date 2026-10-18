@@ -18,10 +18,14 @@ gui_forms::DataGridView
    text, check box, combo box or button column with a name, header text, width,
    read-only flag and alignment. The rows come from one of three sources: unbound
    rows the grid owns (:cpp:class:`DataGridViewRow <gui_forms::DataGridViewRow>` records with stable IDs and
-   ``BindingValue`` cells), virtual rows whose values an application
-   :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>` supplies as they are shown, or the records of
-   a :cpp:class:`BindingSource <gui_forms::BindingSource>`. Use it for tabular data the user reads, selects and edits
-   in place; use an :cpp:class:`ObjectView <gui_forms::ObjectView>` for a list of objects with icons.
+   ``BindingValue`` cells), virtual rows whose order the application publishes as
+   stable row IDs and whose values an application :cpp:class:`DataGridViewCellValueProvider <gui_forms::DataGridViewCellValueProvider>`
+   supplies by ID as they are shown, or the records of a :cpp:class:`BindingSource <gui_forms::BindingSource>`. Every
+   row has a stable ID (:cpp:class:`DataGridViewRowId <gui_forms::DataGridViewRowId>`), and the grid keeps its selection,
+   current cell and edit by ID; a row number in the API is a presentation
+   position (:cpp:class:`DataGridViewRowPosition <gui_forms::DataGridViewRowPosition>`), which inserting, removing and sorting
+   rows change. Use it for tabular data the user reads, selects and edits in
+   place; use an :cpp:class:`ObjectView <gui_forms::ObjectView>` for a list of objects with icons.
 
    *Status:* provisional. *Windows Forms counterpart:* ``DataGridView``.
 
@@ -49,7 +53,9 @@ gui_forms::DataGridView
 
       **row_count** : ``std::size_t``
          The number of rows. :cpp:func:`set_row_count <gui_forms::DataGridView::set_row_count>` grows unbound rows with generated
-         rows or cuts them from the end, and sets the count of virtual rows.
+         rows or cuts them from the end; virtual rows are counted by their order
+         and bound rows by their source, so both refuse it with
+         ``std::logic_error``.
 
       **data_source** : ``std::shared_ptr<BindingSource>``
          The :cpp:class:`BindingSource <gui_forms::BindingSource>` whose records are the rows, or none.
@@ -80,14 +86,15 @@ gui_forms::DataGridView
       **allow_user_to_resize_columns** : ``bool``, default ``true``
          Whether dragging a column header's divider resizes the column.
 
-      **first_displayed_row** : ``std::size_t``
-         The first row shown under the column headers. :cpp:func:`set_first_displayed_row <gui_forms::DataGridView::set_first_displayed_row>`
-         scrolls to a row; layout keeps the last rows filling the grid.
+      **first_displayed_row** : ``DataGridViewRowPosition``
+         The position of the first row shown under the column headers.
+         :cpp:func:`set_first_displayed_row <gui_forms::DataGridView::set_first_displayed_row>` scrolls to a position; layout keeps the last
+         rows filling the grid.
 
       **horizontal_scroll_offset** : ``double``
          How far the cells are scrolled left, in logical units at text scale 1.
 
-      **displayed_row_end** : ``std::size_t``, read-only
+      **displayed_row_end** : ``DataGridViewRowPosition``, read-only
          One past the last row shown, partly shown rows included.
 
       **vertical_scroll_bar** : ``std::shared_ptr<VScrollBar>``, read-only
@@ -105,17 +112,21 @@ gui_forms::DataGridView
          Whether Ctrl and Shift add to the selection.
 
       **current_cell** : ``std::optional<DataGridViewCellAddress>``
-         The cell keyboard input acts on, or none. :cpp:func:`set_current_cell <gui_forms::DataGridView::set_current_cell>` moves it,
-         committing any edit first, and selects it alone; it returns false and
-         changes nothing when the edit does not commit.
+         The cell keyboard input acts on, at its row's present position, or none.
+         :cpp:func:`set_current_cell <gui_forms::DataGridView::set_current_cell>` moves it, committing any edit first, and selects it
+         alone; it returns false and changes nothing when the edit does not
+         commit.
+
+      **current_row_id** : ``std::optional<DataGridViewRowId>``, read-only
+         The current cell's row ID, or none.
 
       **selected_cells** : ``std::vector<DataGridViewCellAddress>``, read-only
-         The selected cells by row, then column; in full-row mode every cell of
-         every selected row.
+         The selected cells at their rows' present positions, by row, then
+         column; in full-row mode every cell of every selected row.
 
-      **selected_rows** : ``std::vector<std::size_t>``, read-only
-         The selected rows: in full-row mode the selected rows, in cell mode the
-         rows whose every cell is selected.
+      **selected_rows** : ``std::vector<DataGridViewRowPosition>``, read-only
+         The positions of the selected rows: in full-row mode the selected rows,
+         in cell mode the rows whose every cell is selected.
 
       **is_current_cell_in_edit_mode** : ``bool``, read-only
          Whether a text cell is in edit or a combo box cell's choices are open.
@@ -143,7 +154,8 @@ gui_forms::DataGridView
          Raised once after an operation changes which cells or rows are selected.
 
       **current_cell_changed** : ``Event<std::optional<DataGridViewCellAddress>>``
-         Raised after the current cell moves, with the new cell or none.
+         Raised after the current cell moves to another cell, with the new cell or
+         none; not when only its row's position changes.
 
       **cell_begin_edit** : ``Event<DataGridViewCellCancelEvent&>``
          Raised before an edit begins, by F2, typing, a double click, a combo box
@@ -190,17 +202,17 @@ gui_forms::DataGridView
       * - :cpp:func:`column_index <gui_forms::DataGridView::column_index>`
         - The position of the column with a name, or none.
       * - :cpp:func:`add_row <gui_forms::DataGridView::add_row>`
-        - Appends an unbound row and returns its index.
+        - Appends an unbound row and returns its position.
       * - :cpp:func:`insert_row <gui_forms::DataGridView::insert_row>`
-        - Inserts an unbound row before an index.
+        - Inserts an unbound row before a position.
       * - :cpp:func:`remove_row_at <gui_forms::DataGridView::remove_row_at>`
         - Removes an unbound row.
       * - :cpp:func:`clear_rows <gui_forms::DataGridView::clear_rows>`
         - Removes every row of any source and returns to unbound rows.
-      * - :cpp:func:`row_stable_id <gui_forms::DataGridView::row_stable_id>`
-        - A row's stable ID: an unbound row's own, the provider's for a virtual row, the record's for a bound row.
-      * - :cpp:func:`row_index <gui_forms::DataGridView::row_index>`
-        - The row with a stable ID, or none.
+      * - :cpp:func:`row_id <gui_forms::DataGridView::row_id>`
+        - The stable ID of the row at a position: an unbound row's own, the application's for a virtual row, the record's for a bound row.
+      * - :cpp:func:`row_position <gui_forms::DataGridView::row_position>`
+        - The present position of the row with a stable ID, or none.
       * - :cpp:func:`cell_value <gui_forms::DataGridView::cell_value>`
         - A cell's value.
       * - :cpp:func:`cell_text <gui_forms::DataGridView::cell_text>`
@@ -236,7 +248,9 @@ gui_forms::DataGridView
       * - :cpp:func:`set_cell_value <gui_forms::DataGridView::set_cell_value>`
         - Stores a value from the program, read-only or not, and raises :cpp:func:`cell_value_changed <gui_forms::DataGridView::cell_value_changed>` when it differs.
       * - :cpp:func:`set_virtual_rows <gui_forms::DataGridView::set_virtual_rows>`
-        - Switches to virtual rows asked of a provider, discarding unbound rows.
+        - Switches to virtual rows: the application's row IDs in presentation order, with values asked of a provider by ID.
+      * - :cpp:func:`set_virtual_row_order <gui_forms::DataGridView::set_virtual_row_order>`
+        - Replaces the virtual rows' order after the application inserted, removed, filtered or sorted rows.
       * - :cpp:func:`set_cell_selected <gui_forms::DataGridView::set_cell_selected>`
         - Selects or deselects a cell (its row in full-row mode).
       * - :cpp:func:`set_row_selected <gui_forms::DataGridView::set_row_selected>`
@@ -274,9 +288,16 @@ gui_forms::DataGridView
    column header row and the row header column stay in place while the cells
    scroll beneath them.
 
-   A virtual grid asks its provider only for the cells it shows, the current
-   cell, and cells the program or accessibility reads; a million rows cost no
-   more to show than ten. A bound grid shows the field each column's
+   Rows are identified as in :cpp:class:`ObjectView <gui_forms::ObjectView>`: by stable ID, with no second
+   row-ownership model. A virtual grid holds the application's order of row
+   IDs and an index from ID to position; the application owns the rows and their
+   values, sorts and filters them itself, and publishes each new order with
+   :cpp:func:`set_virtual_row_order <gui_forms::DataGridView::set_virtual_row_order>`. The grid asks its provider, by ID, only for the
+   cells it shows, the current cell, and cells the program or accessibility
+   reads, and realizes only the rows in view: painting a window of a million
+   rows asks for the values of that window alone (the tests check it). Cell
+   events carry the row's ID beside its position. A bound grid shows the field
+   each column's
    ``data_property_name`` names. Its current row follows the source's position
    and moves it, and a committed edit moves the position to its row and sets
    the field; a record the source does not allow to be edited is read-only.
@@ -322,13 +343,38 @@ gui_forms::DataGridView
           {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
            .width = 90.0, .items = {"AM", "FM", "USB"}},
       });
-      (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
-                                                      gf::BindingValue{true},
-                                                      gf::BindingValue{std::string("FM")}}});
-      (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
-                                                      gf::BindingValue{false},
-                                                      gf::BindingValue{std::string("AM")}}});
+      (*grid).add_row({.stable_id = {"wqxr"}, .cells = {gf::BindingValue{std::string("WQXR")},
+                                                        gf::BindingValue{true},
+                                                        gf::BindingValue{std::string("FM")}}});
+      (*grid).add_row({.stable_id = {"bbc4"}, .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                        gf::BindingValue{false},
+                                                        gf::BindingValue{std::string("AM")}}});
       (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+      // row_position({"wqxr"}) is now position 1
+
+   Virtual rows: the application owns the rows and their order, and the grid
+   asks for the values it shows by row ID:
+
+   .. code-block:: cpp
+
+      struct Stations final : gf::DataGridViewCellValueProvider {
+          gf::BindingValue cell_value(const gf::DataGridViewRowId& row, std::size_t) const override {
+              return gf::BindingValue{"Station " + row.value};
+          }
+          bool push_cell_value(const gf::DataGridViewRowId&, std::size_t, const gf::BindingValue&) override {
+              return false;
+          }
+      };
+
+      void example() {
+          std::shared_ptr<gf::DataGridView> grid =
+              gf::make_control<gf::DataGridView>(gf::StableId("radio.virtual"));
+          (*grid).set_columns({{.name = "name", .header_text = "Station", .width = 160.0}});
+          (*grid).set_virtual_rows(std::make_shared<Stations>(), {{"a"}, {"b"}, {"c"}});
+          (*grid).set_current_cell(gf::DataGridViewCellAddress{gf::DataGridViewRowPosition{1U}, 0U});
+          (*grid).set_virtual_row_order({{"c"}, {"d"}, {"b"}, {"a"}});   // the application sorted and added
+          // current_row_id() is still {"b"}, now at position 2
+      }
 
 
    .. rubric:: Construction
@@ -359,7 +405,9 @@ gui_forms::DataGridView
    .. cpp:function:: std::size_t row_count() const noexcept
 
       The number of rows. :cpp:func:`set_row_count <gui_forms::DataGridView::set_row_count>` grows unbound rows with generated
-      rows or cuts them from the end, and sets the count of virtual rows.
+      rows or cuts them from the end; virtual rows are counted by their order
+      and bound rows by their source, so both refuse it with
+      ``std::logic_error``.
 
    .. cpp:function:: void set_row_count(std::size_t count)
 
@@ -439,12 +487,13 @@ gui_forms::DataGridView
 
       Sets :cpp:func:`allow_user_to_resize_columns <gui_forms::DataGridView::allow_user_to_resize_columns>`; see the property's description above.
 
-   .. cpp:function:: std::size_t first_displayed_row() const noexcept
+   .. cpp:function:: DataGridViewRowPosition first_displayed_row() const noexcept
 
-      The first row shown under the column headers. :cpp:func:`set_first_displayed_row <gui_forms::DataGridView::set_first_displayed_row>`
-      scrolls to a row; layout keeps the last rows filling the grid.
+      The position of the first row shown under the column headers.
+      :cpp:func:`set_first_displayed_row <gui_forms::DataGridView::set_first_displayed_row>` scrolls to a position; layout keeps the last
+      rows filling the grid.
 
-   .. cpp:function:: void set_first_displayed_row(std::size_t row)
+   .. cpp:function:: void set_first_displayed_row(DataGridViewRowPosition row)
 
       Sets :cpp:func:`first_displayed_row <gui_forms::DataGridView::first_displayed_row>`; see the property's description above.
 
@@ -456,7 +505,7 @@ gui_forms::DataGridView
 
       Sets :cpp:func:`horizontal_scroll_offset <gui_forms::DataGridView::horizontal_scroll_offset>`; see the property's description above.
 
-   .. cpp:function:: std::size_t displayed_row_end() const
+   .. cpp:function:: DataGridViewRowPosition displayed_row_end() const
 
       One past the last row shown, partly shown rows included.
 
@@ -486,25 +535,30 @@ gui_forms::DataGridView
 
       Sets :cpp:func:`multi_select <gui_forms::DataGridView::multi_select>`; see the property's description above.
 
-   .. cpp:function:: std::optional<DataGridViewCellAddress> current_cell() const noexcept
+   .. cpp:function:: std::optional<DataGridViewCellAddress> current_cell() const
 
-      The cell keyboard input acts on, or none. :cpp:func:`set_current_cell <gui_forms::DataGridView::set_current_cell>` moves it,
-      committing any edit first, and selects it alone; it returns false and
-      changes nothing when the edit does not commit.
+      The cell keyboard input acts on, at its row's present position, or none.
+      :cpp:func:`set_current_cell <gui_forms::DataGridView::set_current_cell>` moves it, committing any edit first, and selects it
+      alone; it returns false and changes nothing when the edit does not
+      commit.
 
    .. cpp:function:: bool set_current_cell(std::optional<DataGridViewCellAddress> cell)
 
       Sets :cpp:func:`current_cell <gui_forms::DataGridView::current_cell>`; see the property's description above.
 
+   .. cpp:function:: std::optional<DataGridViewRowId> current_row_id() const
+
+      The current cell's row ID, or none.
+
    .. cpp:function:: std::vector<DataGridViewCellAddress> selected_cells() const
 
-      The selected cells by row, then column; in full-row mode every cell of
-      every selected row.
+      The selected cells at their rows' present positions, by row, then
+      column; in full-row mode every cell of every selected row.
 
-   .. cpp:function:: std::vector<std::size_t> selected_rows() const
+   .. cpp:function:: std::vector<DataGridViewRowPosition> selected_rows() const
 
-      The selected rows: in full-row mode the selected rows, in cell mode the
-      rows whose every cell is selected.
+      The positions of the selected rows: in full-row mode the selected rows,
+      in cell mode the rows whose every cell is selected.
 
    .. cpp:function:: bool is_current_cell_in_edit_mode() const noexcept
 
@@ -538,7 +592,8 @@ gui_forms::DataGridView
 
    .. cpp:function:: Event<std::optional<DataGridViewCellAddress>>& current_cell_changed() noexcept
 
-      Raised after the current cell moves, with the new cell or none.
+      Raised after the current cell moves to another cell, with the new cell or
+      none; not when only its row's position changes.
 
    .. cpp:function:: Event<DataGridViewCellCancelEvent&>& cell_begin_edit() noexcept
 
@@ -591,44 +646,45 @@ gui_forms::DataGridView
 
       The position of the column with a name, or none.
 
-   .. cpp:function:: std::size_t add_row(DataGridViewRow row)
+   .. cpp:function:: DataGridViewRowPosition add_row(DataGridViewRow row)
 
-      Appends an unbound row and returns its index. An empty stable ID is
+      Appends an unbound row and returns its position. An empty stable ID is
       replaced by a generated one (``row.1``, ``row.2``, ...); a repeated ID,
       invalid UTF-8 or more values than columns throws ``std::invalid_argument``.
       Virtual and bound rows refuse it with ``std::logic_error``, as they do
       :cpp:func:`insert_row <gui_forms::DataGridView::insert_row>`, :cpp:func:`set_rows <gui_forms::DataGridView::set_rows>` and :cpp:func:`remove_row_at <gui_forms::DataGridView::remove_row_at>`.
 
-   .. cpp:function:: void insert_row(std::size_t index, DataGridViewRow row)
+   .. cpp:function:: void insert_row(DataGridViewRowPosition position, DataGridViewRow row)
 
-      Inserts an unbound row before an index. The current cell and the
-      selection follow their rows.
+      Inserts an unbound row before a position. The current cell and the
+      selection stay on their rows.
 
-   .. cpp:function:: void remove_row_at(std::size_t row)
+   .. cpp:function:: void remove_row_at(DataGridViewRowPosition position)
 
-      Removes an unbound row. When it held the current cell, the row that takes
-      its place becomes current.
+      Removes an unbound row. A selected row leaves the selection; when it held
+      the current cell, the row that takes its position, or the new last row,
+      becomes current.
 
    .. cpp:function:: void clear_rows()
 
       Removes every row of any source and returns to unbound rows.
 
-   .. cpp:function:: std::string row_stable_id(std::size_t row) const
+   .. cpp:function:: DataGridViewRowId row_id(DataGridViewRowPosition position) const
 
-      A row's stable ID: an unbound row's own, the provider's for a virtual row,
-      the record's for a bound row.
+      The stable ID of the row at a position: an unbound row's own, the
+      application's for a virtual row, the record's for a bound row. A position
+      past the end throws ``std::out_of_range``.
 
-   .. cpp:function:: std::optional<std::size_t> row_index(std::string_view stable_id) const
+   .. cpp:function:: std::optional<DataGridViewRowPosition> row_position(const DataGridViewRowId& row) const
 
-      The row with a stable ID, or none. For virtual rows only the displayed
-      rows and the current row are searched.
+      The present position of the row with a stable ID, or none.
 
-   .. cpp:function:: BindingValue cell_value(std::size_t row, std::size_t column) const
+   .. cpp:function:: BindingValue cell_value(DataGridViewRowPosition row, std::size_t column) const
 
       A cell's value. A cell past the rows or columns throws
       ``std::out_of_range``.
 
-   .. cpp:function:: std::string cell_text(std::size_t row, std::size_t column) const
+   .. cpp:function:: std::string cell_text(DataGridViewRowPosition row, std::size_t column) const
 
       The text a cell shows: numbers in their shortest exact form, and a button
       column's ``button_text`` for an empty button cell.
@@ -637,7 +693,7 @@ gui_forms::DataGridView
 
       Orders unbound rows stably by a column: empty values first, then
       booleans, numbers and text. The column shows the sort glyph and the
-      others none; the current cell and the selection follow their rows.
+      others none; the current cell and the selection stay on their rows.
       Returns false for virtual or bound rows, or when an edit in progress does
       not commit.
 
@@ -645,11 +701,11 @@ gui_forms::DataGridView
 
       Repaints after the provider's values changed outside the grid.
 
-   .. cpp:function:: bool is_cell_selected(std::size_t row, std::size_t column) const noexcept
+   .. cpp:function:: bool is_cell_selected(DataGridViewRowPosition row, std::size_t column) const
 
       Whether a cell is selected; in full-row mode, whether its row is.
 
-   .. cpp:function:: bool is_row_selected(std::size_t row) const noexcept
+   .. cpp:function:: bool is_row_selected(DataGridViewRowPosition row) const
 
       Whether a row is selected; in cell mode, whether all its cells are.
 
@@ -699,23 +755,37 @@ gui_forms::DataGridView
 
       Replaces the unbound rows, ending any edit and clearing the selection.
 
-   .. cpp:function:: bool set_cell_value(std::size_t row, std::size_t column, BindingValue value)
+   .. cpp:function:: bool set_cell_value(DataGridViewRowPosition row, std::size_t column, BindingValue value)
 
       Stores a value from the program, read-only or not, and raises
       :cpp:func:`cell_value_changed <gui_forms::DataGridView::cell_value_changed>` when it differs. Returns false when a provider or
       binding source refuses it.
 
-   .. cpp:function:: void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider, std::size_t count)
+   .. cpp:function:: void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider, std::vector<DataGridViewRowId> order)
 
-      Switches to virtual rows asked of a provider, discarding unbound rows. A
-      null provider throws ``std::invalid_argument``.
+      Switches to virtual rows: the application's row IDs in presentation
+      order, with values asked of a provider by ID. Unbound rows are discarded,
+      and any edit, the selection and the current cell end. A null provider,
+      or an empty, repeated or invalid UTF-8 ID, throws ``std::invalid_argument``
+      and changes nothing.
 
-   .. cpp:function:: void set_cell_selected(std::size_t row, std::size_t column, bool selected)
+   .. cpp:function:: void set_virtual_row_order(std::vector<DataGridViewRowId> order)
+
+      Replaces the virtual rows' order after the application inserted, removed,
+      filtered or sorted rows. The selection, the current cell, an edit in
+      progress and the first displayed row stay on their IDs. A selected row
+      that is gone leaves the selection; when the current row is gone, its
+      edit is discarded and the row now at its position, or the new last row,
+      becomes current. Rows that are not virtual refuse it with
+      ``std::logic_error``; an invalid ID throws ``std::invalid_argument`` and
+      changes nothing.
+
+   .. cpp:function:: void set_cell_selected(DataGridViewRowPosition row, std::size_t column, bool selected)
 
       Selects or deselects a cell (its row in full-row mode). Without
       :cpp:func:`multi_select <gui_forms::DataGridView::multi_select>`, selecting clears the rest.
 
-   .. cpp:function:: void set_row_selected(std::size_t row, bool selected)
+   .. cpp:function:: void set_row_selected(DataGridViewRowPosition row, bool selected)
 
       Selects or deselects a row, or all its cells in cell mode.
 
