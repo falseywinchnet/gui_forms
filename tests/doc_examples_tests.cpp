@@ -1987,6 +1987,24 @@ void example() {
 }
 }  // namespace doc_example_PageSet_2
 
+namespace doc_example_PageStrip_1 {
+void example() {
+    gf::PageSet pages{};
+    const std::array<std::string_view, 3> titles{"&General", "&Advanced", "Ab&out"};
+    for (std::size_t index = 0; index < titles.size(); ++index) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{"settings." + std::to_string(index)};
+        record.title = std::string(titles[index]);
+        static_cast<void>(pages.insert(record, gf::PagePlacement::end_of_group()));
+    }
+    std::shared_ptr<gf::PageStrip> strip =
+        gf::make_control<gf::PageStrip>(gf::StableId("settings.tabs"), pages);
+    (*strip).set_activation(gf::PageStripActivation::manual);
+    static_cast<void>((*strip).select_relative(1, gf::PageSelectionCause::programmatic));
+    // pages.selected_page() is now "settings.1", titled "&Advanced".
+}
+}  // namespace doc_example_PageStrip_1
+
 namespace doc_example_Panel_1 {
 void example() {
     std::shared_ptr<gf::Panel> shell = gf::make_control<gf::Panel>(gf::StableId("shell"));
@@ -3495,6 +3513,7 @@ int main() {
     failures += run("ObjectView example 2", &doc_example_ObjectView_2::example);
     failures += run("PageSet example 1", &doc_example_PageSet_1::example);
     failures += run("PageSet example 2", &doc_example_PageSet_2::example);
+    failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
     failures += run("Panel example 1", &doc_example_Panel_1::example);
     failures += run("Panel example 2", &doc_example_Panel_2::example);
     failures += run("PictureBox example 1", &doc_example_PictureBox_1::example);

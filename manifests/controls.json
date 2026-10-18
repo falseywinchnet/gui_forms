@@ -481,6 +481,17 @@
       "doc": "api/generated/gui_forms.TabControl.rst"
     },
     {
+      "id": "page_strip",
+      "type": "PageStrip",
+      "header": "gui_forms/controls/pages/page_strip/page_strip.hpp",
+      "category": "Grouping",
+      "purpose": "The tab headers of a borrowed PageSet in one row at the top or bottom: content-sized, fixed or fill tabs with minimum and maximum widths, scroll and list buttons when they overflow, automatic or manual keyboard selection, mnemonics, and tab-list semantics without press.",
+      "winforms": "GUI.Forms-only",
+      "status": "provisional",
+      "gallery_page": "tabs-and-pages",
+      "doc": "api/generated/gui_forms.PageStrip.rst"
+    },
+    {
       "id": "tab_page",
       "type": "TabPage",
       "header": "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp",

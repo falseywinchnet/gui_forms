@@ -20,8 +20,16 @@ public:
                        {26.0, 52.0, 920.0, 24.0});
         build_primary(page);
         build_variants(page);
+        build_strip(page);
         on((*primary_).selected_index_changed(), *this, &TabsPage::on_primary_selected);
         on(activity_visible_.changed(), *this, &TabsPage::on_activity_visible_changed);
+        on((*strip_).page_invoked(), *this, &TabsPage::on_strip_invoked);
+    }
+
+    // The strip borrows this page's set; it is released before the set dies
+    // in case the control tree outlives the page owner.
+    ~TabsPage() override {
+        if (strip_) (*strip_).release_page_set();
     }
 
 private:
@@ -150,6 +158,32 @@ private:
         }
     }
 
+    // A PageStrip over a set the page owns: more content-sized tabs than
+    // fit, so the scroll and list buttons show.
+    void build_strip(const std::shared_ptr<Surface>& page) {
+        std::shared_ptr<LayoutGroup> strip_group = group(
+            "gallery.tabs.strip.group", "PageStrip · content-sized tabs, scroll and list overflow",
+            {930.0, 100.0});
+        (*page).add_at(strip_group, {24.0, 646.0, 930.0, 100.0});
+        for (std::size_t index = 0U; index < strip_titles.size(); ++index) {
+            PageRecord record{};
+            record.id = PageId{"strip." + std::to_string(index)};
+            record.title = std::string(strip_titles[index]);
+            static_cast<void>(strip_pages_.insert(record, PagePlacement::end_of_group()));
+        }
+        strip_ = make_control<PageStrip>(StableId("gallery.tabs.strip"), strip_pages_);
+        (*strip_).set_accessible_name("Section tabs");
+        (*strip_group).add_at(strip_, {20.0, 40.0, 620.0, 28.0});
+        strip_status_ = label("gallery.tabs.strip.status", "Strip · Overview selected", 11.0, 600, green);
+        (*strip_group).add_at(strip_status_, {660.0, 42.0, 250.0, 24.0});
+    }
+
+    void on_strip_invoked(const PageInvocation& invocation) {
+        const std::optional<PagePosition> found = strip_pages_.find(invocation.page);
+        if (!found) return;
+        (*strip_status_).set_text("Strip · " + strip_pages_.record_at(*found).title + " selected");
+    }
+
     // State event: fires for pointer, keyboard, semantic and programmatic
     // selection alike, so the status line never needs a second route.
     void on_primary_selected(const TabSelectionChange&) {
@@ -165,8 +199,16 @@ private:
             : "Activity · keep visible off · bound Value<bool> changed");
     }
 
+    static constexpr std::array<std::string_view, 14> strip_titles{
+        "Overview", "Activity", "Security", "Diagnostics", "Network", "Storage", "Accounts",
+        "Notifications", "Display", "Sound", "Keyboard", "Accessibility", "Updates", "About"};
+
     std::shared_ptr<TabControl> primary_;
     std::shared_ptr<Label> status_;
+    // Declared before the strip that borrows it.
+    PageSet strip_pages_{};
+    std::shared_ptr<PageStrip> strip_;
+    std::shared_ptr<Label> strip_status_;
     Value<bool> activity_visible_{true};
 };
 

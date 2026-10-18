@@ -1468,6 +1468,41 @@ Properties beyond every control's: none.
 | `auto_validate_changed` | `AutoValidate` |
 | `selected_index_changed` | `TabSelectionChange` |
 
+## `page_strip` (PageStrip, control)
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `region` | region |  |  |
+| `rail` | face |  |  |
+| `scroll_back` | actuator | `button` | hot, pressed, disabled |
+| `scroll_back_glyph` | glyph |  | hot, pressed, disabled |
+| `scroll_forward` | actuator | `button` | hot, pressed, disabled |
+| `scroll_forward_glyph` | glyph |  | hot, pressed, disabled |
+| `list_button` | actuator | `button` | hot, pressed, open |
+| `list_glyph` | glyph |  | hot, pressed, open |
+| `focus` | focus |  |  |
+
+States: `normal`, `enabled`, `disabled`, `focused`, `focus_visible`.
+
+Item system `page`:
+
+| Part | Role | Reuses | Own states |
+|---|---|---|---|
+| `tab` | face |  |  |
+| `tab_icon` | icon |  |  |
+| `tab_label` | label |  |  |
+| `tab_seam` | seam |  |  |
+| `tab_focus` | focus |  |  |
+
+Item states: `hot`, `pressed`, `selected`, `disabled`, `focus_visible`. Application-defined: `pinned`.
+
+Properties beyond every control's: none.
+
+| Interaction | Payload |
+|---|---|
+| `page_invoked` | `PageInvocation` |
+| `page_close_requested` | `PageCloseRequest`, by reference |
+
 ## `tab_page` (TabPage, control)
 
 | Part | Role | Reuses | Own states |

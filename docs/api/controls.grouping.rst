@@ -29,6 +29,8 @@ Panels, group boxes, cards, tabs and expandable sections.
      - A container for building your own reusable composite control.
    * - :cpp:class:`TabControl <gui_forms::TabControl>`
      - A set of pages shown one at a time, chosen from a row of tabs.
+   * - :cpp:class:`PageStrip <gui_forms::PageStrip>`
+     - The tab headers of a page set in one row, at the top or the bottom of their content.
    * - :cpp:class:`TabPage <gui_forms::TabPage>`
      - One page of a tab control, with the caption shown on its tab.
 
@@ -44,6 +46,7 @@ Panels, group boxes, cards, tabs and expandable sections.
    generated/gui_forms.ContainerControl
    generated/gui_forms.UserControl
    generated/gui_forms.TabControl
+   generated/gui_forms.PageStrip
    generated/gui_forms.TabPage
 
 Related types
@@ -59,6 +62,20 @@ Related types
      - CardLayout defines validated logical padding, section gaps, and footer/header allocation used by Card measurement and arrangement.
    * - :cpp:class:`GroupBox::Parts <gui_forms::GroupBox::Parts>`
      - Stage T1 anatomy, as dot members: a face, the frame and the caption.
+   * - :cpp:class:`PageCloseRequest <gui_forms::PageCloseRequest>`
+     - A request to close a closable page.
+   * - :cpp:class:`PageInvocation <gui_forms::PageInvocation>`
+     - A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already).
+   * - :cpp:class:`PageItemWidths <gui_forms::PageItemWidths>`
+     - Tab widths in logical units at text scale 1.
+   * - :cpp:class:`PageStrip::Item <gui_forms::PageStrip::Item>`
+     -  
+   * - :cpp:class:`PageStrip::ItemParts <gui_forms::PageStrip::ItemParts>`
+     - Item part names start with tab: an item part may not repeat one of the strip's own part names.
+   * - :cpp:class:`PageStrip::ItemStates <gui_forms::PageStrip::ItemStates>`
+     -  
+   * - :cpp:class:`PageStrip::Parts <gui_forms::PageStrip::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
    * - :cpp:class:`Panel::Parts <gui_forms::Panel::Parts>`
      - Stage T1 anatomy, as dot members: the scrollable parts, a face and an edge.
    * - :cpp:class:`TabControl::Item <gui_forms::TabControl::Item>`
@@ -137,6 +154,146 @@ Related types
    .. cpp:member:: PartGeometry edge
 
    .. cpp:member:: PartGeometry caption
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageCloseRequest final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   A request to close a closable page. The strip never removes a page itself: whoever owns the set decides (owner decision DK-38). A handler that acts on the request sets ``handled``.
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: PageCloseCause cause
+
+      Default: ``{PageCloseCause::semantic}``.
+
+   .. cpp:member:: bool handled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageInvocation final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   A tab was clicked, chosen with the keyboard, by its mnemonic, from the page list or through accessibility, and its page is now selected (it may have been selected already). Raised after the selection and its ``selected_page_changed``; never for a programmatic selection and never when a ``selecting`` handler cancelled. Whoever decides activation (a docking workspace) listens to it; the strip attaches no meaning (owner decision DK-37).
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: PageSelectionCause cause
+
+      Default: ``{PageSelectionCause::pointer}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageItemWidths final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   Tab widths in logical units at text scale 1. 0 < minimum <= maximum <= ``maximum_width``, and 0 < fixed <= ``maximum_width``.
+
+   .. cpp:member:: constexpr double maximum_width
+
+      Default: ``1024.0``.
+
+   .. cpp:member:: double minimum
+
+      Default: ``{40.0}``.
+
+   .. cpp:member:: double maximum
+
+      Default: ``{240.0}``.
+
+   .. cpp:member:: double fixed
+
+      Default: ``{120.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageStrip::Item final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:member:: PagePosition position
+
+      The page's position in the set.
+
+   .. cpp:member:: PageId page
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageStrip::ItemParts final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   Item part names start with tab: an item part may not repeat one of the strip's own part names. Phase P4 adds the close and pin actuators and the modified mark in the space after the label.
+
+   .. cpp:member:: PartGeometry tab
+
+   .. cpp:member:: PartGeometry tab_icon
+
+   .. cpp:member:: PartGeometry tab_label
+
+   .. cpp:member:: PartGeometry tab_seam
+
+      The selected tab's join with the content, on the content's side.
+
+   .. cpp:member:: PartGeometry tab_focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageStrip::ItemStates final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool pressed
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool pinned
+
+      The admitted custom state (DK-40): the page is in the pinned group.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PageStrip::Parts final
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry rail
+
+      The band behind the tabs.
+
+   .. cpp:member:: PartGeometry scroll_back
+
+   .. cpp:member:: PartGeometry scroll_back_glyph
+
+   .. cpp:member:: PartGeometry scroll_forward
+
+   .. cpp:member:: PartGeometry scroll_forward_glyph
+
+   .. cpp:member:: PartGeometry list_button
+
+   .. cpp:member:: PartGeometry list_glyph
+
+   .. cpp:member:: PartGeometry focus
 
 .. cpp:namespace:: gui_forms
 
@@ -242,6 +399,50 @@ Enumerations
    .. cpp:enumerator:: select_on_activation
 
    .. cpp:enumerator:: toggle_on_activation
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageCloseCause
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: semantic
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageItemSizing
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: content
+
+   .. cpp:enumerator:: fixed
+
+   .. cpp:enumerator:: fill
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageStripActivation
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: automatic
+
+   .. cpp:enumerator:: manual
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PageStripPlacement
+
+   ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
+
+   .. cpp:enumerator:: top
+
+   .. cpp:enumerator:: bottom
 
 .. cpp:namespace:: gui_forms
 

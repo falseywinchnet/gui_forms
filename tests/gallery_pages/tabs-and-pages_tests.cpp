@@ -40,6 +40,19 @@ void test_tabs_and_pages(gui_forms::Window& window) {
     require((*tabs).selected_index() == 0U &&
                 (*status).text().find("Overview selected") != std::string::npos,
             "programmatic selection must reach the same state event as user input");
+
+    std::shared_ptr<gui_forms::PageStrip> strip = std::dynamic_pointer_cast<PageStrip>(
+        window.find("gallery.tabs.strip"));
+    std::shared_ptr<gui_forms::Label> strip_status = std::dynamic_pointer_cast<Label>(
+        window.find("gallery.tabs.strip.status"));
+    require(strip && strip_status && (*strip).page_set() != nullptr &&
+                (*(*strip).page_set()).count() == 14U && (*strip).overflowing() &&
+                (*strip).parts().list_button.present,
+            "the gallery's PageStrip overflows into scroll and list buttons");
+    require(window.perform_semantic_action("gallery.tabs.strip.tab.strip.13", SemanticAction::select) &&
+                (*strip_status).text().find("About selected") != std::string::npos &&
+                (*strip).visible_pages().back().value == "strip.13",
+            "selecting the gallery strip's last page scrolls it into view and reports it");
 }
 
 } // namespace gallery_pages_tests
