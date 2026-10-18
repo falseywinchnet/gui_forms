@@ -17,14 +17,30 @@ bool valid_size(Size size) noexcept {
         size.width <= 32768.0 && size.height <= 32768.0;
     return valid;
 }
+
+// The window's state when it is ready and open on this thread; otherwise
+// empty, with the reason in `status`: after_shutdown once the state is gone
+// or closed, wrong_thread off its thread, backend_failure before ready.
+std::shared_ptr<detail::ApplicationWindowState> ready_state(
+    const std::weak_ptr<detail::ApplicationWindowState>& weak, HostServiceStatus& status) {
+    status = {};
+    std::shared_ptr<detail::ApplicationWindowState> state = weak.lock();
+    if (!state) { status.error = HostServiceError::after_shutdown; return {}; }
+    if ((*state).thread != std::this_thread::get_id()) {
+        status.error = HostServiceError::wrong_thread;
+        return {};
+    }
+    if ((*state).closed) { status.error = HostServiceError::after_shutdown; return {}; }
+    if (!(*state).ready) { status.error = HostServiceError::backend_failure; return {}; }
+    return state;
+}
+
 HostServiceStatus request(const std::weak_ptr<detail::ApplicationWindowState>& weak,
                           std::function<void()> detail::ApplicationWindowState::* operation,
                           bool hiding) {
-    const std::shared_ptr<detail::ApplicationWindowState> state = weak.lock();
-    if (!state) return {HostServiceError::after_shutdown};
-    if ((*state).thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
-    if ((*state).closed) return {HostServiceError::after_shutdown};
-    if (!(*state).ready) return {HostServiceError::backend_failure};
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(weak, status);
+    if (!state) return status;
     if (hiding && !(*state).can_hide) return {HostServiceError::invalid_argument};
     if (!((*state).*operation)) return {HostServiceError::unsupported};
     try {
@@ -37,20 +53,68 @@ HostServiceStatus request(const std::weak_ptr<detail::ApplicationWindowState>& w
     }
     return {};
 }
+
+// The index of the entry named `stable_id`, or windows.size() when no entry
+// has it.
+std::size_t entry_index(const std::vector<ApplicationWindow>& windows, std::string_view stable_id) {
+    std::size_t index = 0U;
+    while (index < windows.size() && windows[index].stable_id != stable_id) ++index;
+    return index;
+}
+
+// Whether the owners of windows[index] form a chain of listed entries that
+// ends at an entry without an owner, and a floating entry's own owner is the
+// primary window. A chain longer than the list repeats an entry: an
+// ownership cycle, refused.
+bool owner_chain_valid(const std::vector<ApplicationWindow>& windows, std::size_t index) {
+    const ApplicationWindow& entry = windows[index];
+    std::string_view owner = entry.owner_id;
+    for (std::size_t depth = 0U; !owner.empty(); ++depth) {
+        if (depth >= windows.size()) return false;
+        const std::size_t parent = entry_index(windows, owner);
+        if (parent == windows.size()) return false;
+        const bool floating_owner = depth == 0U && entry.floating != HostWindowFloating::none;
+        if (floating_owner && !detail::primary_window_entry(windows[parent])) return false;
+        owner = windows[parent].owner_id;
+    }
+    return true;
+}
 }
 
 namespace detail {
 bool valid_window_entry(const ApplicationWindow& entry) {
-    const bool valid = entry.model && valid_text(entry.stable_id, 1024U, false) &&
+    if (!entry.model) return false;
+    // UTF-8 without NUL; the stable id is not empty and is not its owner's.
+    const bool texts_valid = valid_text(entry.stable_id, 1024U, false) &&
         valid_text(entry.owner_id, 1024U, true) &&
-        valid_text(entry.options.title, 65536U, true) &&
-        valid_size(entry.options.initial_size) && valid_size(entry.options.minimum_size) &&
-        entry.options.minimum_size.width <= entry.options.initial_size.width &&
-        entry.options.minimum_size.height <= entry.options.initial_size.height &&
-        entry.owner_id != entry.stable_id &&
-        (entry.floating == HostWindowFloating::none ||
-         (!entry.tool_window && !entry.owner_id.empty()));
-    return valid;
+        valid_text(entry.options.title, 65536U, true);
+    if (!texts_valid || entry.owner_id == entry.stable_id) return false;
+    const Size initial = entry.options.initial_size;
+    const Size minimum = entry.options.minimum_size;
+    if (!valid_size(initial) || !valid_size(minimum)) return false;
+    if (minimum.width > initial.width || minimum.height > initial.height) return false;
+    // A floating window has an owner and is not a tool window in the host's
+    // sense (HostWindowFloating).
+    if (entry.floating == HostWindowFloating::none) return true;
+    const bool floating_valid = !entry.tool_window && !entry.owner_id.empty();
+    return floating_valid;
+}
+
+bool primary_window_entry(const ApplicationWindow& entry) noexcept {
+    const bool primary = entry.owner_id.empty() && !entry.tool_window;
+    return primary;
+}
+
+void revoke_window_state(ApplicationWindowState& state) noexcept {
+    state.closed = true;
+    state.ready = false;
+    state.request_close = {};
+    state.show = {};
+    state.hide = {};
+    state.toggle_full_screen = {};
+    state.set_title = {};
+    state.request_client_size = {};
+    state.frame_changed = {};
 }
 
 namespace {
@@ -107,14 +171,6 @@ void register_run_window(const std::shared_ptr<ApplicationWindowState>& state) {
     (*run).windows.push_back({*id, state});
 }
 
-void PolicyVisibility::operator()() const {
-    const std::shared_ptr<ApplicationWindowState> target = state.lock();
-    if (!target || (*target).closed) return;
-    const std::shared_ptr<ApplicationRunState> run = (*target).run.lock();
-    if (!run || (*run).closed || (*run).windowing == nullptr) return;
-    static_cast<void>((*(*run).windowing).set_visible((*target).id, visible));
-}
-
 void unregister_run_window(ApplicationWindowState& state) noexcept {
     const std::shared_ptr<ApplicationRunState> run = state.run.lock();
     if (!run) return;
@@ -123,6 +179,14 @@ void unregister_run_window(ApplicationWindowState& state) noexcept {
         (*run).windows.erase((*run).windows.begin() + static_cast<std::ptrdiff_t>(index));
         break;
     }
+}
+
+void PolicyVisibility::operator()() const {
+    const std::shared_ptr<ApplicationWindowState> target = state.lock();
+    if (!target || (*target).closed) return;
+    const std::shared_ptr<ApplicationRunState> run = (*target).run.lock();
+    if (!run || (*run).closed || (*run).windowing == nullptr) return;
+    static_cast<void>((*(*run).windowing).set_visible((*target).id, visible));
 }
 } // namespace detail
 
@@ -172,34 +236,21 @@ ApplicationResult Application::validate(const std::vector<ApplicationWindow>& wi
             invalid.error = ApplicationError::wrong_thread;
             return invalid;
         }
-        if (entry.owner_id.empty() && !entry.tool_window) {
+        if (detail::primary_window_entry(entry)) {
             ++primary_count;
             if (!entry.options.initially_visible || entry.options.hide_on_close) return invalid;
         }
-        for (std::size_t other = 0U; other < index; ++other) {
-            if (windows[other].stable_id == entry.stable_id) return invalid;
-        }
-        std::string_view owner = entry.owner_id;
-        for (std::size_t depth = 0U; !owner.empty(); ++depth) {
-            if (depth >= windows.size()) return invalid;
-            std::size_t parent = 0U;
-            while (parent < windows.size() && windows[parent].stable_id != owner) ++parent;
-            if (parent == windows.size()) return invalid;
-            // A floating window is owned by the primary window itself.
-            const bool parent_primary = windows[parent].owner_id.empty() && !windows[parent].tool_window;
-            if (depth == 0U && entry.floating != HostWindowFloating::none && !parent_primary) return invalid;
-            owner = windows[parent].owner_id;
-        }
+        // Stable ids are unique: an earlier entry with this one refuses it.
+        if (entry_index(windows, entry.stable_id) < index) return invalid;
+        if (!owner_chain_valid(windows, index)) return invalid;
     }
     if (primary_count != 1U) return {ApplicationError::invalid_argument};
     return {};
 }
 HostServiceStatus ApplicationWindowHandle::set_title(const std::string_view title) const {
-    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    if (!state) return {HostServiceError::after_shutdown};
-    if ((*state).thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
-    if ((*state).closed) return {HostServiceError::after_shutdown};
-    if (!(*state).ready) return {HostServiceError::backend_failure};
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(state_, status);
+    if (!state) return status;
     if (!valid_text(title, 65536U, true)) return {HostServiceError::invalid_argument};
     if (!(*state).set_title) return {HostServiceError::unsupported};
     try {
@@ -209,11 +260,9 @@ HostServiceStatus ApplicationWindowHandle::set_title(const std::string_view titl
     } catch (...) { return {HostServiceError::backend_failure}; }
 }
 HostServiceStatus ApplicationWindowHandle::request_client_size(const Size client_size) const {
-    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    if (!state) return {HostServiceError::after_shutdown};
-    if ((*state).thread != std::this_thread::get_id()) return {HostServiceError::wrong_thread};
-    if ((*state).closed) return {HostServiceError::after_shutdown};
-    if (!(*state).ready) return {HostServiceError::backend_failure};
+    HostServiceStatus status;
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(state_, status);
+    if (!state) return status;
     if (!valid_size(client_size)) return {HostServiceError::invalid_argument};
     if (!(*state).request_client_size) return {HostServiceError::unsupported};
     try {
@@ -226,21 +275,15 @@ HostServiceStatus ApplicationWindowHandle::request_client_size(const Size client
 }
 
 namespace {
-// The run's windowing when `state` is a ready, open window of a live run on
-// this thread; otherwise null, with the reason in `status`.
-HostWindowing* run_windowing(const std::shared_ptr<detail::ApplicationWindowState>& state,
-                             HostServiceStatus& status) {
+// The windowing of the run a ready window `state` belongs to; null, with the
+// reason in `status`, when that run has ended (after_shutdown) or the window
+// has no identity in a run with windowing (unsupported). The pointer is the
+// run's borrow of its adapter's windowing, valid until the run detaches it.
+HostWindowing* run_windowing(const detail::ApplicationWindowState& state, HostServiceStatus& status) {
     status = {};
-    if (!state) { status.error = HostServiceError::after_shutdown; return nullptr; }
-    if ((*state).thread != std::this_thread::get_id()) {
-        status.error = HostServiceError::wrong_thread;
-        return nullptr;
-    }
-    if ((*state).closed) { status.error = HostServiceError::after_shutdown; return nullptr; }
-    if (!(*state).ready) { status.error = HostServiceError::backend_failure; return nullptr; }
-    const std::shared_ptr<detail::ApplicationRunState> run = (*state).run.lock();
+    const std::shared_ptr<detail::ApplicationRunState> run = state.run.lock();
     if (run && (*run).closed) { status.error = HostServiceError::after_shutdown; return nullptr; }
-    if (!run || (*run).windowing == nullptr || !(*state).id.valid()) {
+    if (!run || (*run).windowing == nullptr || !state.id.valid()) {
         status.error = HostServiceError::unsupported;
         return nullptr;
     }
@@ -281,8 +324,9 @@ ApplicationWindows ApplicationWindowHandle::windows() const noexcept {
 
 HostWindowFrameResult ApplicationWindowHandle::frame() const {
     HostWindowFrameResult result;
-    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    HostWindowing* windowing = run_windowing(state, result.status);
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(state_, result.status);
+    if (!state) return result;
+    HostWindowing* windowing = run_windowing(*state, result.status);
     if (windowing == nullptr) return result;
     try {
         result = (*windowing).frame((*state).id);
@@ -295,8 +339,9 @@ HostWindowFrameResult ApplicationWindowHandle::frame() const {
 
 HostServiceStatus ApplicationWindowHandle::request_frame(const Rect content) const {
     HostServiceStatus status;
-    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    HostWindowing* windowing = run_windowing(state, status);
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(state_, status);
+    if (!state) return status;
+    HostWindowing* windowing = run_windowing(*state, status);
     if (windowing == nullptr) return status;
     try {
         // A native request may report the new frame synchronously and its
@@ -308,8 +353,9 @@ HostServiceStatus ApplicationWindowHandle::request_frame(const Rect content) con
 
 HostServiceStatus ApplicationWindowHandle::bring_to_front() const {
     HostServiceStatus status;
-    const std::shared_ptr<detail::ApplicationWindowState> state = state_.lock();
-    HostWindowing* windowing = run_windowing(state, status);
+    const std::shared_ptr<detail::ApplicationWindowState> state = ready_state(state_, status);
+    if (!state) return status;
+    HostWindowing* windowing = run_windowing(*state, status);
     if (windowing == nullptr) return status;
     try {
         status = (*windowing).bring_to_front((*state).id);
