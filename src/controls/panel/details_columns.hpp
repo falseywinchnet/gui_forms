@@ -11,9 +11,9 @@
 
 // Pieces shared by the details views of ObjectView, ListView and
 // TreeListView: the layout of one column header, the order of a column sort
-// and the elision of cell text. Both controls publish
-// their column headers as a "column" item system with the same part names;
-// this is the one geometry function for those parts.
+// and the elision of cell text. All three publish their column headers as a
+// "column" item system with the same part names; column_header_geometry is
+// the one geometry function for those parts.
 namespace gui_forms::details_detail {
 
 // One column header's parts in the control's local coordinates. `cell` is
@@ -60,14 +60,16 @@ inline ColumnHeaderGeometry column_header_geometry(Rect cell, Rect clip, bool so
     return result;
 }
 
-// The order of a column sort: ASCII case folded, then byte order, so
-// "apple" and "Apple" keep a fixed order.
+// `byte` with ASCII upper case folded to lower case; every other byte as is.
 inline unsigned char folded_byte(unsigned char byte) noexcept {
     const bool upper = byte >= 'A' && byte <= 'Z';
     const unsigned char result = upper ? static_cast<unsigned char>(byte - 'A' + 'a') : byte;
     return result;
 }
 
+// The order of a column sort: ASCII case folded, then byte order, so
+// "apple" and "Apple" keep a fixed order. A shorter text that is a folded
+// prefix of a longer one sorts first.
 inline bool folded_text_less(std::string_view left, std::string_view right) noexcept {
     const std::size_t shared = std::min(left.size(), right.size());
     for (std::size_t index = 0; index < shared; ++index) {
@@ -88,11 +90,11 @@ inline bool folded_text_less(std::string_view left, std::string_view right) noex
 // the longest fitting prefix.
 inline void elide_to_width(Painter& painter, std::string_view text, FontSpec font, double width,
                            std::string& out) {
-    out.assign(text);
     if (width <= 0.0) {
         out.clear();
         return;
     }
+    out.assign(text);
     if (painter.measure_text_utf8(text, font).width <= width) return;
     constexpr std::string_view ellipsis = "…";
     if (painter.measure_text_utf8(ellipsis, font).width > width) {
