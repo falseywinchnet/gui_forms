@@ -303,12 +303,12 @@ Size RibbonColorPicker::palette_size() const {
     return size;
 }
 
-// The entry the value matches: Automatic for none, else the first palette
-// or recent entry of that colour, or none when the colour is not offered.
-std::optional<std::size_t> RibbonColorPicker::current_entry() const {
+// The entry of `all` the value matches: Automatic for none, else the first
+// palette or recent entry of that colour, or none when the colour is not
+// offered.
+std::optional<std::size_t> RibbonColorPicker::current_entry(const std::vector<Cell>& all) const {
     const std::optional<Color> shown = value();
     if (!shown) return 0U;
-    const std::vector<Cell> all = cells();
     for (std::size_t entry = 1; entry < all.size(); ++entry) {
         if (all[entry].color == shown) return entry;
     }
@@ -347,10 +347,10 @@ RibbonColorPicker::PaletteEntryParts RibbonColorPicker::entry_parts(const std::v
     return parts;
 }
 
-AnatomyStateSet RibbonColorPicker::entry_states(const std::vector<Cell>&, std::size_t entry) const {
+AnatomyStateSet RibbonColorPicker::entry_states(const std::vector<Cell>& all, std::size_t entry) const {
     AnatomyStateSet states;
     if (hot_entry_ == entry) states.insert(AnatomyState::hot);
-    if (current_entry() == entry) states.insert(AnatomyState::selected);
+    if (current_entry(all) == entry) states.insert(AnatomyState::selected);
     const Window* const host = attached_window();
     if (palette_focused_ && focus_entry_ == entry && host != nullptr && (*host).focus_cue_visible()) {
         states.insert(AnatomyState::focus_visible);
@@ -409,7 +409,10 @@ void RibbonColorPicker::on_paint(Painter& painter, Rect) {
     paint_part(painter, *this, part);
 }
 
+// Paints the palette on its content control, `surface`, whose theme and
+// text scale the parts take.
 void RibbonColorPicker::palette_paint(Painter& painter) const {
+    const Control& surface = *palette_popup_;
     const std::vector<Cell> all = cells();
     const Size size = palette_size();
     PartPaint part;
@@ -417,36 +420,36 @@ void RibbonColorPicker::palette_paint(Painter& painter) const {
     part.family = ControlVisualRole::panel;
     part.role = PartRole::shadow;
     part.bounds = {0.0, 0.0, size.width, size.height};
-    paint_part(painter, *(*this).palette_popup_, part);
+    paint_part(painter, surface, part);
     part.role = PartRole::face;
-    paint_part(painter, *(*this).palette_popup_, part);
+    paint_part(painter, surface, part);
     for (std::size_t entry = 0; entry < all.size(); ++entry) {
         const PaletteEntryParts parts = entry_parts(all, entry);
         part.family = ControlVisualRole::menu_item;
         part.role = PartRole::face;
         part.states = parts.entry_face.states;
         part.bounds = parts.entry_face.bounds;
-        paint_part(painter, *(*this).palette_popup_, part);
+        paint_part(painter, surface, part);
         part.role = PartRole::well;
         part.bounds = parts.entry_well.bounds;
-        paint_part(painter, *(*this).palette_popup_, part);
+        paint_part(painter, surface, part);
         if (parts.entry_sample.present) {
             part.role = PartRole::fill;
             part.bounds = parts.entry_sample.bounds;
             part.content_color = parts.entry_sample.content_color;
-            paint_part(painter, *(*this).palette_popup_, part);
+            paint_part(painter, surface, part);
             part.content_color.reset();
         }
         if (parts.entry_label.present) {
             part.role = PartRole::label;
             part.bounds = parts.entry_label.bounds;
             part.text = "Automatic";
-            paint_part(painter, *(*this).palette_popup_, part);
+            paint_part(painter, surface, part);
             part.text = {};
         }
         part.role = PartRole::focus;
         part.bounds = parts.entry_focus.bounds;
-        paint_part(painter, *(*this).palette_popup_, part);
+        paint_part(painter, surface, part);
     }
 }
 
@@ -607,8 +610,15 @@ bool RibbonColorPicker::open_palette(MenuOpenMode mode) {
     const Size client = (*window).client_size();
     (*layer_).set_requested_bounds({0.0, 0.0, client.width, client.height});
     hot_entry_.reset();
-    focus_entry_ = current_entry().value_or(0U);
-    if (mode == MenuOpenMode::pointer) focus_entry_ = current_entry();
+    // By keyboard the keyboard starts on the current colour, or on Automatic
+    // when the colour is not offered; by pointer only on the current colour.
+    const std::vector<Cell> all = cells();
+    const std::optional<std::size_t> current = current_entry(all);
+    if (mode == MenuOpenMode::pointer) {
+        focus_entry_ = current;
+    } else {
+        focus_entry_ = current.value_or(0U);
+    }
     popup_ = (*window).open_popup(self, layer_);
     palette_open_ = true;
     if (Event<>* closed = popup_.closed_event()) {
@@ -726,7 +736,7 @@ std::vector<SemanticNode> RibbonColorPicker::palette_semantic_children() const {
     if (!palette_open_ || !palette_popup_) return nodes;
     const std::vector<Cell> all = cells();
     const Rect absolute = (*palette_popup_).absolute_bounds();
-    const std::optional<std::size_t> current = current_entry();
+    const std::optional<std::size_t> current = current_entry(all);
     const std::string prefix(stable_id().value());
     for (std::size_t entry = 0; entry < all.size(); ++entry) {
         SemanticNode node{};
@@ -803,14 +813,12 @@ constexpr std::array<PartField<RibbonColorPicker::PaletteEntryParts>, 5> entry_p
 
 constexpr std::array<PartDeclaration, 8> picker_parts = part_declarations(picker_part_fields);
 constexpr std::array<PartDeclaration, 5> entry_parts_declared = part_declarations(entry_part_fields);
-constexpr std::array<AnatomyState, 3> entry_states_declared{
-    {AnatomyState::hot, AnatomyState::selected, AnatomyState::focus_visible}};
 constexpr std::array<AnatomyState, 6> picker_states{
     AnatomyState::normal, AnatomyState::enabled, AnatomyState::disabled,
     AnatomyState::focused, AnatomyState::focus_visible, AnatomyState::open,
 };
 constexpr std::array<ItemSystemDeclaration, 1> picker_item_systems{{
-    {.name = "palette_entry", .parts = entry_parts_declared, .states = entry_states_declared, .custom_states = {}},
+    {.name = "palette_entry", .parts = entry_parts_declared, .states = entry_part_states, .custom_states = {}},
 }};
 
 constexpr ControlAnatomy picker_anatomy{
