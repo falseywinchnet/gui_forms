@@ -28,6 +28,8 @@ Types
      - DragTextData owns one validated UTF-8 text payload.
    * - :cpp:class:`KeyBinding <gui_forms::KeyBinding>`
      - The chords that invoke one command: at most two (Shift+F10 and the context-menu key).
+   * - :cpp:class:`KeyBindings <gui_forms::KeyBindings>`
+     - The keys of an application's named keyboard commands (owner decision DK-44, review R3): one object shared by every window of the application, floating windows included (Window::set_key_bindings), so a rebinding made in one window holds in all of them.
    * - :cpp:class:`KeyChord <gui_forms::KeyChord>`
      - One key with the exact modifiers held: Ctrl+F4 is {PhysicalKey::f4, Modifier::control}.
    * - :cpp:class:`KeyEvent <gui_forms::KeyEvent>`
@@ -183,6 +185,47 @@ Types
    .. cpp:member:: KeyChord primary
 
    .. cpp:member:: KeyChord secondary
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: KeyBindings final
+
+   ``#include <gui_forms/events/key_commands/key_commands.hpp>``
+
+   The keys of an application's named keyboard commands (owner decision DK-44, review R3): one object shared by every window of the application, floating windows included (Window::set_key_bindings), so a rebinding made in one window holds in all of them. The host's defaults seed it once, when the first host session attaches (later sessions leave it as it is); the application's rebindings stay over them. Until a host seeds it, the defaults are the PC convention's. Execution: the UI thread of the windows sharing it; not synchronized.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: KeyBindings()
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const KeyMap& map() const noexcept
+
+      The defaults with the rebindings over them.
+
+   .. cpp:function:: const KeyMap& defaults() const noexcept
+
+      The host's defaults (the PC convention until seeded).
+
+   .. cpp:function:: bool seeded() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void rebind(KeyCommand command, KeyBinding binding)
+
+      Throws std::invalid_argument as KeyMap::set_binding does, binding nothing.
+
+   .. cpp:function:: void restore(KeyCommand command)
+
+      Returns a command to the default. Throws std::invalid_argument for a command outside the enumeration.
+
+   .. cpp:function:: bool seed(const KeyMap& defaults)
+
+      The host's defaults, taken the first time only; false, changing nothing, once seeded.
 
 .. cpp:namespace:: gui_forms
 
@@ -765,6 +808,8 @@ Enumerations
    .. cpp:enumerator:: hide_tool_panel
 
    .. cpp:enumerator:: maximize_document_area
+
+   .. cpp:enumerator:: move_panel
 
    .. cpp:enumerator:: count
 

@@ -873,6 +873,18 @@ PageStrip::ItemParts PageStrip::tab_parts(std::size_t position) const {
     return parts;
 }
 
+PageStrip::ItemParts PageStrip::tab_parts_of(const PageId& page) const {
+    if (pages_ == nullptr) return {};
+    const std::optional<PagePosition> found = (*pages_).find(page);
+    if (!found) return {};
+    const ItemParts parts = tab_parts((*found).value);
+    return parts;
+}
+
+ControlVisualRole PageStrip::tab_family() const noexcept {
+    return ControlVisualRole::menu_item;
+}
+
 // A button's glyph: a square centred in it, on whole units.
 Rect PageStrip::glyph_bounds(Rect button) const {
     const double side = glyph_size * item_extent_scale();
@@ -1013,10 +1025,11 @@ void PageStrip::on_paint(Painter& painter, Rect) {
     part.bounds = placed.rail;
     paint_part(painter, *this, part);
     // Tabs: flat at rest, a plate when hot or selected (the menu-item
-    // family) until T4 draws Plan Paint's tab stack and the notched document
-    // tab (owner decisions DK-40, DK-42). The close button and pin use the
-    // same family for their own plate, shown only while they are hot.
-    part.family = ControlVisualRole::menu_item;
+    // family, tab_family) until T4 draws Plan Paint's tab stack and the
+    // notched document tab (owner decisions DK-40, DK-42). The close button
+    // and pin use the same family for their own plate, shown only while
+    // they are hot.
+    part.family = tab_family();
     part.alignment = PartTextAlignment::center;
     // Labels and the hidden count turn on a side strip (owner decision
     // DK-42); every other part reads the orientation not at all.

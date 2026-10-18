@@ -110,6 +110,10 @@ enum class DockRestoreDiagnosticKind : std::uint8_t {
     monitor_fallback,
     frame_clamped,
     structure_invalid,
+    // Unknown fields kept from the file whose element the restore itself
+    // removed (an unregistered panel made a placeholder, a stack left
+    // empty); they are not written back.
+    unknown_fields_dropped,
 };
 
 struct DockRestoreDiagnostic final {
@@ -212,6 +216,8 @@ public:
     // Reads and validates a whole saved layout before changing anything,
     // then replaces the layout with it as one transaction (one generation,
     // one change). Registered descriptors and restrictions are kept.
+    // Unknown attributes and elements are kept and written back by
+    // write_xml (DockLayoutState::unknown_fields; DK decision 48).
     DockRestoreResult restore_xml(std::string_view xml, const DockRestoreOptions& options);
 
     [[nodiscard]] Event<const DockLayoutChange&>& changed() noexcept;
@@ -220,7 +226,7 @@ private:
     [[nodiscard]] DockTransactionResult run(const DockTransaction& transaction,
                                             DockLayoutState& scratch) const;
     void commit(DockLayoutState&& replacement, DockEditOrigin origin, std::size_t edit_count,
-                bool restored);
+                bool restored, bool frames_only);
 
     DockLayoutState state_{};
     std::vector<DockPanelDescriptor> descriptors_{};

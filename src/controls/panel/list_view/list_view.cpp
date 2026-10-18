@@ -98,25 +98,6 @@ std::string_view column_text(const ListViewItem& item, std::size_t column) noexc
     return {};
 }
 
-unsigned char folded(unsigned char byte) noexcept {
-    const bool upper = byte >= 'A' && byte <= 'Z';
-    const unsigned char result = upper ? static_cast<unsigned char>(byte - 'A' + 'a') : byte;
-    return result;
-}
-
-// ASCII case folded, then byte order, so "apple" and "Apple" keep a fixed
-// order.
-bool folded_less(std::string_view left, std::string_view right) noexcept {
-    const std::size_t shared = std::min(left.size(), right.size());
-    for (std::size_t index = 0; index < shared; ++index) {
-        const unsigned char a = folded(static_cast<unsigned char>(left[index]));
-        const unsigned char b = folded(static_cast<unsigned char>(right[index]));
-        if (a != b) return a < b;
-    }
-    if (left.size() != right.size()) return left.size() < right.size();
-    return left < right;
-}
-
 // The order sort_items applies to item positions: by one column's text,
 // ascending or descending. Equal texts keep their order (stable sort).
 struct ColumnTextOrder final {
@@ -127,8 +108,8 @@ struct ColumnTextOrder final {
     bool operator()(std::size_t left, std::size_t right) const noexcept {
         const std::string_view a = column_text((*items)[left], column);
         const std::string_view b = column_text((*items)[right], column);
-        if (descending) return folded_less(b, a);
-        return folded_less(a, b);
+        if (descending) return details_detail::folded_text_less(b, a);
+        return details_detail::folded_text_less(a, b);
     }
 };
 

@@ -15,9 +15,11 @@ gui_forms::TabControl
 
    A tab control holds :cpp:class:`TabPage <gui_forms::TabPage>` controls and shows the selected one in its
    display area, with a tab for every page along one edge. The user selects a
-   page by clicking its tab, with the arrow keys, Home and End while the tab
-   strip has focus, or with Ctrl+Tab and Ctrl+Shift+Tab from anywhere inside
-   the control. Use :cpp:class:`ExpandableSections <gui_forms::ExpandableSections>` when several parts should be visible
+   page by clicking its tab, with the arrow keys, Home and End while the
+   control has focus, or with Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PageDown and
+   Ctrl+PageUp from anywhere inside the control. The tabs are a :cpp:class:`PageStrip <gui_forms::PageStrip>`:
+   they are as wide as their captions, and when they do not fit the strip's
+   scroll and list buttons appear. Use :cpp:class:`ExpandableSections <gui_forms::ExpandableSections>` when several parts should be visible
    at once, and a :cpp:class:`SplitContainer <gui_forms::SplitContainer>` to show two panes side by side.
 
    *Status:* stable. *Windows Forms counterpart:* ``TabControl``.
@@ -52,24 +54,35 @@ gui_forms::TabControl
          or right with tabs stacked. The display area takes the rest.
 
       **appearance** : ``TabAppearance``, default ``TabAppearance::normal``
-         How tabs are drawn: :cpp:enumerator:`TabAppearance::normal <gui_forms::TabAppearance::normal>` joins the selected tab to
-         the page, :cpp:enumerator:`TabAppearance::buttons <gui_forms::TabAppearance::buttons>` insets the unselected tabs like
-         buttons, and :cpp:enumerator:`TabAppearance::flat_buttons <gui_forms::TabAppearance::flat_buttons>` gives the unselected tabs a
-         lighter face.
+         How tabs are drawn, through the theme's recipes until the tab stack has
+         its own look: :cpp:enumerator:`TabAppearance::normal <gui_forms::TabAppearance::normal>` flat at rest with a plate when hot
+         or selected, the selected tab joined to the page; :cpp:enumerator:`TabAppearance::buttons <gui_forms::TabAppearance::buttons>`
+         a button's plate on every tab; :cpp:enumerator:`TabAppearance::flat_buttons <gui_forms::TabAppearance::flat_buttons>` a command
+         button's lighter plate on every tab.
+
+      **size_mode** : ``TabSizeMode``, default ``TabSizeMode::normal``
+         How wide each tab is: :cpp:enumerator:`TabSizeMode::normal <gui_forms::TabSizeMode::normal>` its caption plus padding,
+         :cpp:enumerator:`TabSizeMode::fill_to_right <gui_forms::TabSizeMode::fill_to_right>` the row shared equally, :cpp:enumerator:`TabSizeMode::fixed <gui_forms::TabSizeMode::fixed>`
+         :cpp:func:`item_size <gui_forms::TabControl::item_size>` whatever the caption.
 
       **item_size** : ``Size``, default ``{120.0, 30.0}``
-         The size of every tab, in logical pixels before the window's text
-         scale. Smaller than 24 by 18, or not finite, throws
-         ``std::invalid_argument``.
+         In logical units before the window's text scale. Its height is the
+         thickness of a top or bottom tab row, its width the thickness of a left
+         or right column, in every size mode. Under :cpp:enumerator:`TabSizeMode::fixed <gui_forms::TabSizeMode::fixed>` it is
+         every tab's size. Smaller than 24 by 18, larger than 1024 by 1024, or
+         not finite, throws ``std::invalid_argument``.
 
       **style** : ``BasicControlStyle``
-         The colours of the tab strip and the page frame. The default is the
-         built-in :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`; it does not follow the window's theme.
+         Kept for compatibility: the control paints by role from the window's
+         theme and no longer reads it.
 
       **display_bounds** : ``Rect``, read-only
          The area given to the selected page, in the control's coordinates. With
          the default alignment it starts one pixel above the bottom of the tab
          strip.
+
+      **overflowing** : ``bool``, read-only
+         Whether the tabs do not all fit, so the scroll and list buttons show.
 
       **parts** : ``Parts``, read-only
 
@@ -103,6 +116,8 @@ gui_forms::TabControl
       :class: autosummary longtable
       :widths: 35 65
 
+      * - :cpp:func:`initialize_control_tree <gui_forms::TabControl::initialize_control_tree>`
+        - Creates the tab strip.
       * - :cpp:func:`add_page <gui_forms::TabControl::add_page>`
         - Adds a page at the end, making it a child of the control.
       * - :cpp:func:`remove_page <gui_forms::TabControl::remove_page>`
@@ -110,7 +125,7 @@ gui_forms::TabControl
       * - :cpp:func:`page_at <gui_forms::TabControl::page_at>`
         - The page at an index; an index outside the pages throws ``std::out_of_range``.
       * - :cpp:func:`tab_bounds <gui_forms::TabControl::tab_bounds>`
-        - The rectangle of the tab at an index, in the control's coordinates; an index outside the pages throws ``std::out_of_range``.
+        - The rectangle of the tab at an index, in the control's coordinates, or an empty rectangle while the tab is scrolled out of view; an index outside the pages throws ``std::out_of_range``.
 
    .. seealso::
 
@@ -122,6 +137,12 @@ gui_forms::TabControl
 
       :cpp:enum:`TabAppearance <gui_forms::TabAppearance>`
          How the tabs are drawn.
+
+      :cpp:enum:`TabSizeMode <gui_forms::TabSizeMode>`
+         How wide each tab is.
+
+      :cpp:class:`PageStrip <gui_forms::PageStrip>`
+         The tab strip a tab control is built on.
 
       :cpp:class:`ExpandableSections <gui_forms::ExpandableSections>`
          Several collapsible parts visible at once.
@@ -135,27 +156,42 @@ gui_forms::TabControl
    with ``add_child``
    instead of :cpp:func:`add_page <gui_forms::TabControl::add_page>` are not arranged.
 
-   Every tab is :cpp:func:`item_size <gui_forms::TabControl::item_size>` wide (or tall, for left and right alignment), and
-   the tabs do not wrap or scroll: tabs beyond the control's edge are cut off.
-   Captions are drawn as written; ``&`` has no mnemonic meaning here.
+   The tabs are an internal :cpp:class:`PageStrip <gui_forms::PageStrip>` child (``<stable id>.strip``) over one
+   record per page: its layout, its painting by role and its overflow serve
+   the control. When the tabs do not fit, they keep their widths and the strip
+   shows scroll buttons and a list button; the selected tab is always scrolled
+   into view. On the left and right the captions turn, reading bottom to top
+   on the left and top to bottom on the right. The strip takes no focus and
+   publishes nothing to accessibility; the control does both. Captions are
+   drawn as written; ``&`` has no mnemonic meaning here.
 
    A primary press on a tab focuses the control and selects the tab
    immediately. The control takes focus as one tab stop. While it has focus,
    Left and Right (top and bottom alignment) or Up and Down (left and right
    alignment) select the previous or next tab, wrapping around, and Home and
-   End select the first and last. Ctrl+Tab and Ctrl+Shift+Tab (Meta works in
-   place of Ctrl) cycle forwards and backwards, wrapping around, while focus is
-   anywhere inside the control. When the selection changes while focus is
-   inside the old page, the control remembers that focused control and moves
-   focus to the control last focused in the new page, or else to the tab
-   strip. A click on a tab moves focus to the tab strip before it selects, so
-   it does not remember the old page's focus.
+   End select the first and last. Ctrl+Tab and Ctrl+Shift+Tab, and
+   Ctrl+PageDown and Ctrl+PageUp, cycle forwards and backwards, wrapping
+   around, while focus is anywhere inside the control and before the focused
+   control sees the key; when tab controls are nested, the innermost one
+   around the focus takes them. These are the window's named keyboard
+   commands (``cycle_forward``, ``cycle_backward``, ``next_tab``,
+   ``previous_tab``), so ``Window::rebind_key_command`` changes them. The
+   commands a tab control does not offer (``close_document``, Ctrl+F4 or Cmd+W;
+   ``context_menu``, Shift+F10 or the context-menu key; moving a tab) pass to
+   the controls around it, such as a :cpp:class:`PageView <gui_forms::PageView>` holding the tab control in a
+   document. When the selection changes while focus is inside the old page,
+   the control remembers that focused control and moves focus to the control
+   last focused in the new page, or else to the control itself. A click on a
+   tab moves focus to the control before it selects, so it does not remember
+   the old page's focus.
 
    The control is published to accessibility as a ``tab_group`` whose value is
    the selected page's caption. Each page has a virtual ``tab`` child named by
-   its caption, with the selected state; its focus, select and press actions
-   all focus the control and select that tab. The selected page is published
-   as a ``group`` named by its caption.
+   its caption, with the selected state, naming its page as the panel it
+   controls; a tab scrolled out of view has no bounds and is not visible. Its
+   focus and select actions (and press, which tabs no longer publish) focus the
+   control and select that tab. The selected page is published as a
+   ``tab_panel`` named by its caption.
 
    The control does not scroll; leave ``auto_scroll`` off and scroll the pages
    instead.
@@ -261,20 +297,33 @@ gui_forms::TabControl
 
    .. cpp:function:: TabAppearance appearance() const noexcept
 
-      How tabs are drawn: :cpp:enumerator:`TabAppearance::normal <gui_forms::TabAppearance::normal>` joins the selected tab to
-      the page, :cpp:enumerator:`TabAppearance::buttons <gui_forms::TabAppearance::buttons>` insets the unselected tabs like
-      buttons, and :cpp:enumerator:`TabAppearance::flat_buttons <gui_forms::TabAppearance::flat_buttons>` gives the unselected tabs a
-      lighter face.
+      How tabs are drawn, through the theme's recipes until the tab stack has
+      its own look: :cpp:enumerator:`TabAppearance::normal <gui_forms::TabAppearance::normal>` flat at rest with a plate when hot
+      or selected, the selected tab joined to the page; :cpp:enumerator:`TabAppearance::buttons <gui_forms::TabAppearance::buttons>`
+      a button's plate on every tab; :cpp:enumerator:`TabAppearance::flat_buttons <gui_forms::TabAppearance::flat_buttons>` a command
+      button's lighter plate on every tab.
 
    .. cpp:function:: void set_appearance(TabAppearance appearance)
 
       Sets :cpp:func:`appearance <gui_forms::TabControl::appearance>`; see the property's description above.
 
+   .. cpp:function:: TabSizeMode size_mode() const noexcept
+
+      How wide each tab is: :cpp:enumerator:`TabSizeMode::normal <gui_forms::TabSizeMode::normal>` its caption plus padding,
+      :cpp:enumerator:`TabSizeMode::fill_to_right <gui_forms::TabSizeMode::fill_to_right>` the row shared equally, :cpp:enumerator:`TabSizeMode::fixed <gui_forms::TabSizeMode::fixed>`
+      :cpp:func:`item_size <gui_forms::TabControl::item_size>` whatever the caption.
+
+   .. cpp:function:: void set_size_mode(TabSizeMode mode)
+
+      Sets :cpp:func:`size_mode <gui_forms::TabControl::size_mode>`; see the property's description above.
+
    .. cpp:function:: Size item_size() const noexcept
 
-      The size of every tab, in logical pixels before the window's text
-      scale. Smaller than 24 by 18, or not finite, throws
-      ``std::invalid_argument``.
+      In logical units before the window's text scale. Its height is the
+      thickness of a top or bottom tab row, its width the thickness of a left
+      or right column, in every size mode. Under :cpp:enumerator:`TabSizeMode::fixed <gui_forms::TabSizeMode::fixed>` it is
+      every tab's size. Smaller than 24 by 18, larger than 1024 by 1024, or
+      not finite, throws ``std::invalid_argument``.
 
    .. cpp:function:: void set_item_size(Size size)
 
@@ -282,8 +331,8 @@ gui_forms::TabControl
 
    .. cpp:function:: const BasicControlStyle& style() const noexcept
 
-      The colours of the tab strip and the page frame. The default is the
-      built-in :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`; it does not follow the window's theme.
+      Kept for compatibility: the control paints by role from the window's
+      theme and no longer reads it.
 
    .. cpp:function:: void set_style(BasicControlStyle style)
 
@@ -294,6 +343,10 @@ gui_forms::TabControl
       The area given to the selected page, in the control's coordinates. With
       the default alignment it starts one pixel above the bottom of the tab
       strip.
+
+   .. cpp:function:: bool overflowing() const
+
+      Whether the tabs do not all fit, so the scroll and list buttons show.
 
    .. cpp:function:: Parts parts() const
 
@@ -319,12 +372,19 @@ gui_forms::TabControl
 
    .. rubric:: Methods
 
+   .. cpp:function:: void initialize_control_tree()
+
+      Creates the tab strip. ``make_control`` calls it; do not call it yourself.
+
    .. cpp:function:: void add_page(std::shared_ptr<TabPage> page)
 
       Adds a page at the end, making it a child of the control. The first
       page added is selected; later pages are hidden until selected. Adding a
-      page that is already here does nothing; a null page throws
-      ``std::invalid_argument``; the errors of ``add_child`` also apply.
+      page that is already here does nothing; a null page, or one whose stable
+      ID another page of the control has, throws ``std::invalid_argument``; a
+      page beyond ``TabControl::maximum_pages`` (4096) throws
+      ``std::length_error``; the errors of ``add_child`` also apply. A refused page
+      leaves the control unchanged.
 
    .. cpp:function:: std::shared_ptr<TabPage> remove_page(const TabPage& page)
 
@@ -339,8 +399,9 @@ gui_forms::TabControl
 
    .. cpp:function:: Rect tab_bounds(std::size_t index) const
 
-      The rectangle of the tab at an index, in the control's coordinates; an
-      index outside the pages throws ``std::out_of_range``.
+      The rectangle of the tab at an index, in the control's coordinates, or
+      an empty rectangle while the tab is scrolled out of view; an index
+      outside the pages throws ``std::out_of_range``.
 
 
    .. rubric:: Extension points
@@ -351,9 +412,9 @@ gui_forms::TabControl
 
    .. cpp:function:: void on_paint(Painter& painter, Rect local_damage) override
 
-   .. cpp:function:: void on_pointer(PointerEvent& event) override
-
    .. cpp:function:: void on_key_preview(KeyEvent& event) override
+
+   .. cpp:function:: void on_key(KeyEvent& event) override
 
    .. cpp:function:: void on_focus_changed(bool focused) override
 
@@ -382,3 +443,15 @@ gui_forms::TabControl
    .. cpp:function:: void publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const override
 
       *Protected.*
+
+   .. cpp:function:: void on_dispose() noexcept override
+
+      *Protected.*
+
+   .. cpp:member:: constexpr bool initialize_tree_after_construction
+
+      Default: ``true``.
+
+   .. cpp:member:: constexpr std::size_t maximum_pages
+
+      The most pages a tab control holds: its strip's set's capacity. Default: ``PageSetLimits::maximum_capacity``.

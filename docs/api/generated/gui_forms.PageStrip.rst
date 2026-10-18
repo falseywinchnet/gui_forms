@@ -216,6 +216,8 @@ gui_forms::PageStrip
         - Shows the insertion mark at a gap until it is cleared or the set's pages or order change; false, showing nothing, for a gap beyond the set or not between laid-out tabs.
       * - :cpp:func:`clear_insertion_mark <gui_forms::PageStrip::clear_insertion_mark>`
         - Removes the insertion mark.
+      * - :cpp:func:`tab_parts_of <gui_forms::PageStrip::tab_parts_of>`
+        - One page's tab parts, in the strip's coordinates and with their part states, as :cpp:func:`realized_items <gui_forms::PageStrip::realized_items>` publishes them; all absent when the page is not in the set or its tab is not laid out.
       * - :cpp:func:`tab_identity <gui_forms::PageStrip::tab_identity>`
         - The accessibility identity of a page's tab.
 
@@ -618,6 +620,10 @@ gui_forms::PageStrip
 
       Removes the insertion mark.
 
+   .. cpp:function:: ItemParts tab_parts_of(const PageId& page) const
+
+      One page's tab parts, in the strip's coordinates and with their part states, as :cpp:func:`realized_items <gui_forms::PageStrip::realized_items>` publishes them; all absent when the page is not in the set or its tab is not laid out. For an owner that publishes the tabs under its own anatomy (TabControl).
+
    .. cpp:function:: std::string tab_identity(const PageId& page) const
 
       The accessibility identity of a page's tab.
@@ -662,6 +668,12 @@ gui_forms::PageStrip
       *Protected.*
 
       Called by :cpp:func:`request_close <gui_forms::PageStrip::request_close>` after the handlers when none set ``handled``. A strip alone does nothing; PageView's strip applies the view's close policy and sets ``handled`` when it removed the page.
+
+   .. cpp:function:: virtual ControlVisualRole tab_family() const noexcept
+
+      *Protected.*
+
+      The recipe family the tabs and their buttons are painted in: ``menu_item`` (flat at rest) until stage T4 draws the tab stack. TabControl's strip answers its appearance (buttons, flat buttons).
 
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override
 

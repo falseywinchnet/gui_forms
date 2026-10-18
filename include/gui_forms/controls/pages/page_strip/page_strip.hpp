@@ -401,6 +401,11 @@ public:
     // The tabs laid out (not those scrolled out of view or hidden), in the
     // order they are shown.
     [[nodiscard]] std::vector<Item> realized_items() const;
+    // One page's tab parts, in the strip's coordinates and with their part
+    // states, as `realized_items` publishes them; all absent when the page is
+    // not in the set or its tab is not laid out. For an owner that publishes
+    // the tabs under its own anatomy (TabControl).
+    [[nodiscard]] ItemParts tab_parts_of(const PageId& page) const;
 
     // The semantic identity of a page's tab: `<strip id>.tab.<page id>`.
     [[nodiscard]] std::string tab_identity(const PageId& page) const;
@@ -414,6 +419,10 @@ protected:
     // A strip alone does nothing; PageView's strip applies the view's close
     // policy and sets `handled` when it removed the page.
     virtual void close_unhandled(PageCloseRequest& request);
+    // The recipe family the tabs and their buttons are painted in:
+    // `menu_item` (flat at rest) until stage T4 draws the tab stack.
+    // TabControl's strip answers its appearance (buttons, flat buttons).
+    [[nodiscard]] virtual ControlVisualRole tab_family() const noexcept;
 
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
     void on_attached_to_window() override;
