@@ -74,6 +74,40 @@ Native host tests that open real windows run in CI on each platform. On a
 development machine without a display, configure with the host option off
 and the renderer-free tests still cover the retained engine.
 
+## Sanitized test runs
+
+`tools/run_sanitizer_suite.sh <build-directory>` builds the toolkit, the
+Gallery and every test with AddressSanitizer and UndefinedBehaviorSanitizer
+(`-fsanitize=address,undefined -fno-omit-frame-pointer`, RelWithDebInfo)
+and runs the whole suite. Use a build directory of its own; sanitized
+objects do not mix with a normal build. It is a local procedure; CI does not
+run it.
+
+```sh
+sh tools/run_sanitizer_suite.sh .build/sanitize
+```
+
+Both sanitizers link on the pinned Windows toolchain (MSYS2 CLANG64, LLVM
+22.1.8). The defaults are the Windows native configuration, and further
+CMake arguments after the directory reach the first configure; only the
+Windows configuration has been run so far. ASan stops a test at its first
+report. UBSan reports without stopping, so a UBSan report does not fail its
+test: the script reads ctest's `Testing/Temporary/LastTest.log`, prints
+every sanitizer report it finds and exits non-zero on a report or a failed
+test. LeakSanitizer is not available on Windows, so leaks are not checked
+there.
+
+On a Windows 11 machine with 8 cores, a full sanitized build took 30 to 40
+minutes (6 and 3 compile jobs) and the suite about 140 seconds, three tests
+at a time (`GUI_FORMS_SANITIZER_JOBS`, default 3). Some sanitized tests run
+much longer than normal (`gui_forms_windows_gdi_compat_shim_tests` took 85
+seconds), and a test that overlaps them can exceed its own fixed timeout.
+`gui_forms_live_surface_idle_wake_tests` (15-second limit) passes alone in
+about 0.1 seconds, takes 4.5 to 7 seconds while the shim test runs (about 5
+seconds in a normal build too) and timed out once. Rerun a test that fails
+only under parallel load on its own (`ctest --test-dir <dir> -R <name>`)
+before treating it as a finding.
+
 ## Windows builds and Wine
 
 Use the native MSYS2 CLANG64 instructions in [Installation](../user/install). The older
