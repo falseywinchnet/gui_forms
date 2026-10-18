@@ -31,6 +31,10 @@ Point centre(Rect bounds) {
     return point;
 }
 
+// The returned pointer borrows from `nodes`, so the vector must outlive it:
+// semantic_snapshot() returns a new snapshot, and a pointer into the roots of
+// that temporary dangles at the end of the statement. The deleted overload
+// refuses a temporary.
 const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view stable_id) {
     for (const SemanticNode& node : nodes) {
         if (node.stable_id == stable_id) return &node;
@@ -38,6 +42,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::strin
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticRole role, std::string_view name) {
     for (const SemanticNode& node : nodes) {
@@ -46,6 +51,8 @@ const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, SemanticR
     }
     return nullptr;
 }
+// Borrows from `nodes` as find_node does; temporaries are refused.
+const SemanticNode* find_named(std::vector<SemanticNode>&& nodes, SemanticRole role, std::string_view name) = delete;
 
 const NavigationPane::Item* find_item(const std::vector<NavigationPane::Item>& items, std::string_view page) {
     for (const NavigationPane::Item& item : items) {
@@ -53,6 +60,8 @@ const NavigationPane::Item* find_item(const std::vector<NavigationPane::Item>& i
     }
     return nullptr;
 }
+// Borrows from `items` as find_node does; temporaries are refused.
+const NavigationPane::Item* find_item(std::vector<NavigationPane::Item>&& items, std::string_view page) = delete;
 
 void click(Window& window, Point point) {
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary, point}));
@@ -215,7 +224,8 @@ void grip_steps() {
     require(pane.show_more_buttons() && pane.visible_button_count() == 5U && pane.button_count() == 5U,
             "show more buttons adds one large button");
     require(states.size() == 1U && states.back().button_count == 5U, "the step reports the new state");
-    const SemanticNode* grip = find_node(window.semantic_snapshot().roots, "nav.grip");
+    SemanticSnapshot grip_snapshot = window.semantic_snapshot();
+    const SemanticNode* grip = find_node(grip_snapshot.roots, "nav.grip");
     require(grip != nullptr && (*grip).role == SemanticRole::split_pane && (*grip).numeric_value == 5.0 &&
                 (*grip).minimum_value == 0.0 && (*grip).maximum_value == 6.0 && (*grip).value == "5",
             "the grip publishes the large-button count as its value, from none to every page");
@@ -231,7 +241,8 @@ void grip_steps() {
     key(window, PhysicalKey::up);
     key(window, PhysicalKey::up);
     require(pane.visible_button_count() == 6U, "Up on the grip shows one more");
-    grip = find_node(window.semantic_snapshot().roots, "nav.grip");
+    grip_snapshot = window.semantic_snapshot();
+    grip = find_node(grip_snapshot.roots, "nav.grip");
     require(grip != nullptr && has_semantic_state((*grip).states, SemanticState::focused),
             "the grip is the focused stop");
 
@@ -312,8 +323,9 @@ void hidden_pages_and_menu() {
             "a page with a button is not listed");
     require(window.perform_semantic_action((*row).stable_id, SemanticAction::press), "the hidden page's row is chosen");
     window.perform_layout();
+    const std::vector<NavigationPane::Item> shown_items = pane.realized_items();
     require(!pane.configure_menu_open() && !pane.page_hidden(PageId{"calendar"}) &&
-                (*pane.pages().selected_page()).value == "calendar" && find_item(pane.realized_items(), "calendar"),
+                (*pane.pages().selected_page()).value == "calendar" && find_item(shown_items, "calendar"),
             "choosing a hidden page shows it again and selects it");
 
     require(pane.show_configure_menu(), "the configure menu opens again");

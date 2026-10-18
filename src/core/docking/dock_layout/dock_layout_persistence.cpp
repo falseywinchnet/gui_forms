@@ -1157,7 +1157,7 @@ DockRestoreResult DockLayout::restore_xml(std::string_view xml, const DockRestor
         report(diagnostics, DockRestoreDiagnosticKind::unknown_fields_dropped, unknown_owner_text(owner));
     }
     // 7. Apply as one change.
-    commit(std::move(state), DockEditOrigin::program, 0, true);
+    commit(std::move(state), DockEditOrigin::program, 0, true, false);
     result.status = DockRestoreStatus::restored;
     return result;
 }

@@ -109,7 +109,7 @@ std::optional<ControlSnapshot> Window::snapshot_control(const Control::Ptr& cont
         candidate.finish(display_generation_, PaintPlane::control, local);
     // Rebuilt chunks consumed their paint dirt without reaching the screen.
     if (consumed_invalidations > 0U && (*control).is_alive()) mark_subtree_dirty(*control, Dirty::paint);
-    if (!(*framebuffer).begin(image_resources_, local)) return std::nullopt;
+    if (!(*framebuffer).begin(image_resources(), local)) return std::nullopt;
     static_cast<void>(detail::replay_display_chunk(*recorded, (*framebuffer).painter()));
     (*framebuffer).end();
     const std::uint32_t width = (*framebuffer).width();
@@ -129,7 +129,7 @@ std::optional<ControlSnapshot> Window::snapshot_control(const Control::Ptr& cont
         if (!swap) continue;
         for (std::size_t x = 0; x < width; ++x) std::swap(to[x * 4U], to[x * 4U + 2U]);
     }
-    const ImageLoadResult loaded = image_resources_.load_bgra32_premultiplied(width, height, row, bgra);
+    const ImageLoadResult loaded = (*resources_).registry().load_bgra32_premultiplied(width, height, row, bgra);
     if (!loaded) return std::nullopt;
     ControlSnapshot snapshot{};
     snapshot.image = loaded.image;
@@ -141,7 +141,7 @@ std::optional<ControlSnapshot> Window::snapshot_control(const Control::Ptr& cont
 }
 
 bool Window::release_control_snapshot(ImageId image) noexcept {
-    const bool removed = image_resources_.remove(image);
+    const bool removed = (*resources_).registry().remove(image);
     return removed;
 }
 

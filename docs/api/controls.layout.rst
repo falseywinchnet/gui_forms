@@ -190,11 +190,19 @@ Related types
 
    .. cpp:member:: std::optional<DockDropTarget> target
 
-      The target dropped on, for ``dropped``.
+      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
 
    .. cpp:member:: DockTransactionResult result
 
-      The layout transaction's result, for ``dropped``.
+      The layout transaction's result, for ``dropped`` and ``floated``.
+
+   .. cpp:member:: bool across_windows
+
+      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:member:: Rect frame
+
+      For ``floated``: the new floating window's client area, in desktop logical units.
 
 .. cpp:namespace:: gui_forms
 
@@ -853,6 +861,8 @@ Enumerations
    .. cpp:enumerator:: layout_changed
 
    .. cpp:enumerator:: rejected
+
+   .. cpp:enumerator:: floated
 
 .. cpp:namespace:: gui_forms
 

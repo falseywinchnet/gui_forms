@@ -62,11 +62,17 @@ gui_forms::Window
 
       **theme** : ``Theme``
          The theme every control inherits unless it has its own override.
-         Setting it raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>`; a null theme throws
+         Setting it sets the theme of every window sharing this window's
+         :cpp:func:`resources <gui_forms::Window::resources>` and raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>` in each; a null theme throws
          ``std::invalid_argument``.
 
       **theme_ptr** : ``std::shared_ptr<const Theme>``, read-only
          Returns shared ownership of the active immutable theme.
+
+      **resources** : ``std::shared_ptr<ApplicationResources>``, read-only
+         The :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>` this window uses, its own unless it was
+         constructed with shared ones. Pass it to another window's constructor to
+         share the image registry and the theme with that window.
 
       **active** : ``bool``, default ``true``
          Whether the window is the active top-level window. Controls paint their
@@ -254,6 +260,8 @@ gui_forms::Window
         - Removes a snapshot's image; false when it is not there.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
+      * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
+        -  
       * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
         - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the window's key bindings, so in every window sharing them, over the host's default; an empty binding leaves the command without keys.
       * - :cpp:func:`restore_key_command <gui_forms::Window::restore_key_command>`
@@ -340,6 +348,8 @@ gui_forms::Window
         - Shows a detached control as an overlay owned by another control, such as a menu or a drop-down, and returns a :cpp:class:`PopupToken <gui_forms::PopupToken>` that closes it.
       * - :cpp:func:`register_accelerator <gui_forms::Window::register_accelerator>`
         - Installs a window-wide keyboard shortcut owned by a :cpp:class:`Component <gui_forms::Component>`.
+      * - :cpp:func:`offer_accelerators <gui_forms::Window::offer_accelerators>`
+        - Offers a key press to the accelerators that wait for the focused route, as a key the window's own route declined; true when one took it.
       * - :cpp:func:`command_target <gui_forms::Window::command_target>`
         -  
       * - :cpp:func:`resolve_command <gui_forms::Window::resolve_command>`
@@ -514,6 +524,10 @@ gui_forms::Window
 
       Uses explicit per-window image quotas. The two-argument constructor retains the normal defaults; large-document consumers choose a budget.
 
+   .. cpp:function:: Window(Control::Ptr root, Size client_size, std::shared_ptr<ApplicationResources> resources)
+
+      Shares an application's image registry and theme with every other Window constructed with the same resources (stage DK decision 8): an ImageId, an ImageList and the theme hold in all of them, so a control subtree moved between them keeps its images. Null resources are std::invalid_argument; resources made on another thread are std::logic_error. The window takes the resources' current theme.
+
 
    .. rubric:: Properties
 
@@ -558,7 +572,8 @@ gui_forms::Window
    .. cpp:function:: const Theme& theme() const noexcept
 
       The theme every control inherits unless it has its own override.
-      Setting it raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>`; a null theme throws
+      Setting it sets the theme of every window sharing this window's
+      :cpp:func:`resources <gui_forms::Window::resources>` and raises :cpp:func:`theme_changed <gui_forms::Window::theme_changed>` in each; a null theme throws
       ``std::invalid_argument``.
 
    .. cpp:function:: void set_theme(std::shared_ptr<const Theme> theme)
@@ -566,6 +581,12 @@ gui_forms::Window
       Sets :cpp:func:`theme <gui_forms::Window::theme>`; see the property's description above.
 
    .. cpp:function:: std::shared_ptr<const Theme> theme_ptr() const noexcept
+
+   .. cpp:function:: std::shared_ptr<ApplicationResources> resources() const noexcept
+
+      The :cpp:class:`ApplicationResources <gui_forms::ApplicationResources>` this window uses, its own unless it was
+      constructed with shared ones. Pass it to another window's constructor to
+      share the image registry and the theme with that window.
 
    .. cpp:function:: bool active() const noexcept
 
@@ -820,6 +841,8 @@ gui_forms::Window
 
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
 
+   .. cpp:function:: bool shares_resources_with(const Window& other) const noexcept
+
    .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
 
       Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the
@@ -1049,6 +1072,13 @@ gui_forms::Window
       after the focused control declines a key, unless
       ``AcceleratorOptions::before_focused_route`` is set. The returned token,
       or disposing the owner, removes it.
+
+   .. cpp:function:: bool offer_accelerators(const KeyEvent& event)
+
+      Offers a key press to the accelerators that wait for the focused route,
+      as a key the window's own route declined; true when one took it. A
+      floating docking window passes the keys it did not use to its main
+      window this way (stage DK phase D4), so shortcuts work from it.
 
    .. cpp:function:: std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const
 

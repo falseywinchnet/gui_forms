@@ -121,28 +121,32 @@ DockDropZone dock_zone_at(Rect pane, Point point) noexcept {
     return nearest;
 }
 
-DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale) noexcept {
+DockDropHit hit_dock_drop(Point point, Rect site, std::span<const DockDropPane> panes, double scale,
+                          DockDropEdges edges) noexcept {
     DockDropHit hit{};
     if (!site.contains(point)) return hit;
     hit.over_site = true;
-    const std::array<Rect, dock_drop_zone_count> edges = dock_edge_tiles(site, scale);
-    for (const DockDropZone zone : edge_order) {
-        if (!within_tile(edges[zone_index(zone)], point)) continue;
-        hit.edge = true;
-        hit.zone = zone;
-        return hit;
-    }
-    // The bands along the edges; a corner belongs to the left or right band.
-    const double band = DockDropMetrics::edge_band * scale;
-    std::optional<DockDropZone> banded{};
-    if (point.y >= site.y + site.height - band) banded = DockDropZone::bottom;
-    if (point.y < site.y + band) banded = DockDropZone::top;
-    if (point.x >= site.x + site.width - band) banded = DockDropZone::right;
-    if (point.x < site.x + band) banded = DockDropZone::left;
-    if (banded) {
-        hit.edge = true;
-        hit.zone = *banded;
-        return hit;
+    if (edges == DockDropEdges::global) {
+        const std::array<Rect, dock_drop_zone_count> edge_tiles = dock_edge_tiles(site, scale);
+        for (const DockDropZone zone : edge_order) {
+            if (!within_tile(edge_tiles[zone_index(zone)], point)) continue;
+            hit.edge = true;
+            hit.zone = zone;
+            return hit;
+        }
+        // The bands along the edges; a corner belongs to the left or right
+        // band.
+        const double band = DockDropMetrics::edge_band * scale;
+        std::optional<DockDropZone> banded{};
+        if (point.y >= site.y + site.height - band) banded = DockDropZone::bottom;
+        if (point.y < site.y + band) banded = DockDropZone::top;
+        if (point.x >= site.x + site.width - band) banded = DockDropZone::right;
+        if (point.x < site.x + band) banded = DockDropZone::left;
+        if (banded) {
+            hit.edge = true;
+            hit.zone = *banded;
+            return hit;
+        }
     }
     for (std::size_t index = 0; index < panes.size(); ++index) {
         const Rect bounds = panes[index].bounds;
@@ -172,7 +176,8 @@ DockEdit dock_drop_edit(const DockSubject& subject, DockDropTargetKind kind, Doc
 }
 
 void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject, DockNodeId own_stack,
-                            Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out) {
+                            Rect site, std::span<const DockDropPane> panes, std::vector<DockDropTarget>& out,
+                            DockDropEdges edges) {
     out.clear();
     DockTransaction trial{};
     trial.origin = DockEditOrigin::user;
@@ -199,6 +204,7 @@ void plan_dock_drop_targets(const DockLayout& layout, const DockSubject& subject
             out.push_back(target);
         }
     }
+    if (edges == DockDropEdges::none) return;
     for (const DockDropZone zone : edge_order) {
         trial.edits[0] = dock_drop_edit(subject, DockDropTargetKind::edge, DockNodeId{}, zone);
         if (!layout.check(trial).applied) continue;

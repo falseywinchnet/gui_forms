@@ -553,6 +553,51 @@ HostClipboardFilesResult HostServices::read_clipboard_files_impl() {
     return {};
 }
 
+HostAutoCompleteResult HostServices::query_auto_complete(const HostAutoCompleteRequest& request) {
+    HostAutoCompleteResult result;
+    // No capability flag names these sources yet; the adapter's own answer
+    // (unsupported by default) is the capability report.
+    if (std::this_thread::get_id() != ui_thread_) {
+        result.status.error = HostServiceError::wrong_thread;
+    } else if (snapshot_.shutdown) {
+        result.status.error = HostServiceError::after_shutdown;
+    } else if (!valid_utf8(request.prefix_utf8)) {
+        result.status.error = HostServiceError::invalid_utf8;
+    }
+    if (!result.status.accepted()) {
+        ++snapshot_.rejected_requests;
+        return result;
+    }
+    try {
+        result = query_auto_complete_impl(request);
+        if (result.status.accepted()) {
+            if (result.candidates_utf8.size() > request.maximum_candidates) {
+                result.status.error = HostServiceError::backend_failure;
+            }
+            for (const std::string& candidate : result.candidates_utf8) {
+                if (candidate.empty() || candidate.find('\0') != std::string::npos ||
+                    !valid_utf8(candidate)) {
+                    result.status.error = HostServiceError::backend_failure;
+                    break;
+                }
+            }
+        }
+    } catch (const std::bad_alloc&) {
+        result.status.error = HostServiceError::backend_failure;
+    }
+    if (!result.status.accepted()) {
+        result.candidates_utf8.clear();
+        ++snapshot_.rejected_requests;
+    }
+    return result;
+}
+
+HostAutoCompleteResult HostServices::query_auto_complete_impl(const HostAutoCompleteRequest&) {
+    HostAutoCompleteResult result;
+    result.status.error = HostServiceError::unsupported;
+    return result;
+}
+
 HostServiceStatus HostServices::write_clipboard_image(HostImageView image) {
     HostServiceStatus status = validate_request(HostCapability::clipboard_images);
     if (!status.accepted()) return status;

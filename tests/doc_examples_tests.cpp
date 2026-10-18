@@ -67,6 +67,21 @@ void example() {
 }
 }  // namespace doc_example_AnchoredPopupLayer_1
 
+namespace doc_example_AutoCompleteStringCollection_1 {
+void example() {
+    std::shared_ptr<gf::AutoCompleteStringCollection> towns =
+        std::make_shared<gf::AutoCompleteStringCollection>();
+    (*towns).add_range({"Dartmouth", "Dover", "Durham"});
+    std::shared_ptr<gf::TextBox> from =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.from"));
+    std::shared_ptr<gf::TextBox> to =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.to"));
+    (*from).set_auto_complete_custom_source(towns);
+    (*to).set_auto_complete_custom_source(towns);
+    (*towns).add("Derby");   // both fields offer it from now on
+}
+}  // namespace doc_example_AutoCompleteStringCollection_1
+
 namespace doc_example_BackgroundWorker_1 {
 struct Sums final {
     void work(gf::BackgroundWorkerTask& task) {
@@ -89,6 +104,18 @@ void example() {
     // run_worker_completed reports 5050 when the window's dispatcher runs.
 }
 }  // namespace doc_example_BackgroundWorker_1
+
+namespace doc_example_BackstageView_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "&Save");
+    std::shared_ptr<gf::Label> info = gf::make_control<gf::Label>(gf::StableId("doc.info"), "Two pages");
+    std::shared_ptr<gf::BackstageView> view = gf::make_control<gf::BackstageView>(gf::StableId("doc.backstage"));
+    (*view).set_items({{.stable_id = "save", .command = save},
+                       {.stable_id = "info", .kind = gf::BackstageItemKind::topic, .text = "&Info", .page = info}});
+    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("doc.ribbon"));
+    (*ribbon).set_backstage(view);
+}
+}  // namespace doc_example_BackstageView_1
 
 namespace doc_example_Binding_1 {
 void example() {
@@ -523,6 +550,14 @@ void example() {
 }
 }  // namespace doc_example_ChoiceGroup_2
 
+namespace doc_example_ColorCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> colour = std::make_shared<gf::Command>("doc.colour", "Font colour");
+    std::shared_ptr<gf::ColorCommand> command = std::make_shared<gf::ColorCommand>(colour);
+    (*command).commit(gf::Color::rgba(192, 0, 0), "doc.picker");   // dark red, now the first recent colour
+}
+}  // namespace doc_example_ColorCommand_1
+
 namespace doc_example_ColorValueEditor_1 {
 void example() {
     std::shared_ptr<gf::ColorValueEditor> tint =
@@ -600,6 +635,37 @@ void example() {
     (*field.combo).set_items({"Compact", "Comfortable"});  // and now ""
 }
 }  // namespace doc_example_ComboBox_2
+
+namespace doc_example_ComboBox_3 {
+void example() {
+    std::shared_ptr<gf::ComboBox> band =
+        gf::make_control<gf::ComboBox>(gf::StableId("radio.band"));
+    (*band).set_items({"Long wave", "Medium wave", "Short wave"});
+    (*band).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*band).set_auto_complete_source(gf::AutoCompleteSource::list_items);
+    (*band).set_auto_complete_mode(gf::AutoCompleteMode::append);
+    gf::Window window(band, gf::Size{220.0, 30.0});
+    window.request_focus((*band).editor());
+    window.dispatch_text(gf::TextInputEvent{"m"});
+    // The field shows "medium wave" with "edium wave" selected, and the
+    // text equals the second item, so (*band).selected_index() is 1.
+}
+}  // namespace doc_example_ComboBox_3
+
+namespace doc_example_ComboBox_4 {
+void example() {
+    std::shared_ptr<gf::ComboBox> station =
+        gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+    (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+    (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+    gf::Window window(station, gf::Size{240.0, 200.0});
+    window.request_focus((*station).editor());
+    window.dispatch_text(gf::TextInputEvent{"hb"});
+    // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+    // (*station).drop_down_items() is {0, 1, 3}.
+}
+}  // namespace doc_example_ComboBox_4
 
 namespace doc_example_Command_1 {
 struct Document final : gf::Component {
@@ -1506,6 +1572,15 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
 }  // namespace doc_example_FlowLayoutPanel_2
+
+namespace doc_example_FontCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
+    std::shared_ptr<gf::FontCommand> command = std::make_shared<gf::FontCommand>(font);
+    (*command).set_value({"Portsmouth Rapids", 11.0});   // value_changed, no invocation
+    (*command).commit({"Carlito", 11.0}, "doc.font_control");   // value_changed, then font's invoked
+}
+}  // namespace doc_example_FontCommand_1
 
 namespace doc_example_FontDialog_1 {
 void example() {
@@ -2667,11 +2742,37 @@ void example() {
     std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("main.ribbon"));
     gf::RibbonGroupSpec clipboard{.stable_id = "clipboard", .caption = "Clipboard", .dialog_launcher = true};
     clipboard.commands.push_back({.stable_id = "paste", .command = paste});
+    clipboard.commands.push_back({.stable_id = "copy", .size = gf::RibbonCommandSize::small, .command = paste});
+    clipboard.layouts = {{.size = gf::RibbonGroupSize::large}, {.size = gf::RibbonGroupSize::collapsed}};
     gf::RibbonTabSpec home{.stable_id = "home", .text = "&Home"};
     home.groups.push_back(std::move(clipboard));
+    home.reduction_order = {{.group = "clipboard"}};
     (*ribbon).set_tabs({std::move(home)});
+    (*ribbon).set_document_minimum_height(120.0);
 }
 }  // namespace doc_example_Ribbon_1
+
+namespace doc_example_RibbonColorPicker_1 {
+void example() {
+    std::shared_ptr<gf::ColorCommand> command =
+        std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
+    std::shared_ptr<gf::RibbonColorPicker> picker =
+        gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+    (*picker).set_text("Font &colour");
+    (*picker).set_command(command);
+}
+}  // namespace doc_example_RibbonColorPicker_1
+
+namespace doc_example_RibbonFontControl_1 {
+void example() {
+    std::shared_ptr<gf::FontCommand> command =
+        std::make_shared<gf::FontCommand>(std::make_shared<gf::Command>("doc.font", "Font"));
+    std::shared_ptr<gf::RibbonFontControl> font =
+        gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font_control"));
+    (*font).set_families({"Portsmouth Rapids", "Carlito"});
+    (*font).set_command(command);
+}
+}  // namespace doc_example_RibbonFontControl_1
 
 namespace doc_example_RibbonGallery_1 {
 void example() {
@@ -3125,6 +3226,7 @@ struct Search final : gf::Component {
     Search() {
         (*field).set_placeholder_text("Search");
         (*field).set_accessible_name("Search");
+        (*field).set_accepts_enter(true);
         gf::on((*field).committed(), *this, &Search::on_commit);
     }
     void on_commit(const std::string& text) { query = text; }
@@ -3151,6 +3253,23 @@ void example() {
     (*note).undo();   // the text is "Draft" again, and can_redo() is true
 }
 }  // namespace doc_example_TextBox_2
+
+namespace doc_example_TextBox_3 {
+void example() {
+    std::shared_ptr<gf::TextBox> city =
+        gf::make_control<gf::TextBox>(gf::StableId("address.city"));
+    (*(*city).auto_complete_custom_source()).add_range({"Calgary", "Cambridge", "Edmonton"});
+    (*city).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*city).set_auto_complete_mode(gf::AutoCompleteMode::suggest_append);
+    gf::Window window(city, gf::Size{240.0, 200.0});
+    window.request_focus(city);
+    window.dispatch_text(gf::TextInputEvent{"ca"});
+    // The box shows "calgary" with "lgary" selected, and the list offers
+    // Calgary and Cambridge.
+    window.dispatch_key(gf::KeyEvent{gf::KeyAction::down, gf::PhysicalKey::tab});
+    // Tab accepted the completion: the text is "calgary", the caret at its end.
+}
+}  // namespace doc_example_TextBox_3
 
 namespace doc_example_Timer_1 {
 struct Clock final : gf::Component {
@@ -3199,6 +3318,22 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_TokenBox_1 {
+void example() {
+    std::shared_ptr<gf::TokenBox> recipients =
+        gf::make_control<gf::TokenBox>(gf::StableId("mail.to"));
+    (*(*recipients).auto_complete_custom_source()).add_range({"Ada Lovelace", "Alan Turing"});
+    (*recipients).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*recipients).set_auto_complete_mode(gf::AutoCompleteMode::suggest);
+    const gf::TokenId grace = (*recipients).add_token("Grace Hopper");
+    gf::Window window(recipients, gf::Size{400.0, 60.0});
+    window.request_focus((*recipients).editor());
+    window.dispatch_text(gf::TextInputEvent{"Barbara Liskov,"});
+    // The box holds "Grace Hopper" and "Barbara Liskov"; the editor is empty.
+    (*recipients).remove_token(grace);   // now only "Barbara Liskov"
+}
+}  // namespace doc_example_TokenBox_1
 
 namespace doc_example_ToolStrip_1 {
 void example() {
@@ -3327,6 +3462,25 @@ void example() {
     // level is 31, user_moves is 1 and last_action is small_increment
 }
 }  // namespace doc_example_TrackBar_2
+
+namespace doc_example_TreeListView_1 {
+void example() {
+    std::shared_ptr<gf::TreeListView> tree =
+        gf::make_control<gf::TreeListView>(gf::StableId("project"));
+    (*tree).set_columns({
+        {.stable_id = "name", .text = "Name", .width = 220.0},
+        {.stable_id = "size", .text = "Size", .width = 80.0,
+         .alignment = gf::TreeListAlignment::right},
+    });
+    (*tree).set_nodes({
+        {.stable_id = "src", .text = "src", .depth = 0U, .expanded = true},
+        {.stable_id = "main", .text = "main.cpp", .cells = {"4 KB"}, .depth = 1U},
+        {.stable_id = "app", .text = "app.cpp", .cells = {"9 KB"}, .depth = 1U},
+    });
+    (*tree).set_sort(std::size_t{0U}, gf::TreeListSortOrder::ascending);
+    // The rows are now src, app.cpp, main.cpp; the nodes keep their order.
+}
+}  // namespace doc_example_TreeListView_1
 
 namespace doc_example_TreeView_1 {
 void example() {
@@ -3729,7 +3883,9 @@ int run(const char* name, void (*example)()) {
 int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
+    failures += run("AutoCompleteStringCollection example 1", &doc_example_AutoCompleteStringCollection_1::example);
     failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
+    failures += run("BackstageView example 1", &doc_example_BackstageView_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);
@@ -3753,10 +3909,13 @@ int main() {
     failures += run("CheckedListBox example 2", &doc_example_CheckedListBox_2::example);
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
+    failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
     failures += run("ComboBox example 2", &doc_example_ComboBox_2::example);
+    failures += run("ComboBox example 3", &doc_example_ComboBox_3::example);
+    failures += run("ComboBox example 4", &doc_example_ComboBox_4::example);
     failures += run("Command example 1", &doc_example_Command_1::example);
     failures += run("Command example 2", &doc_example_Command_2::example);
     failures += run("CommandBar example 1", &doc_example_CommandBar_1::example);
@@ -3796,6 +3955,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
@@ -3853,6 +4013,8 @@ int main() {
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
     failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
+    failures += run("RibbonColorPicker example 1", &doc_example_RibbonColorPicker_1::example);
+    failures += run("RibbonFontControl example 1", &doc_example_RibbonFontControl_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
@@ -3877,8 +4039,10 @@ int main() {
     failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
+    failures += run("TextBox example 3", &doc_example_TextBox_3::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("TokenBox example 1", &doc_example_TokenBox_1::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
     failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
     failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);
@@ -3886,6 +4050,7 @@ int main() {
     failures += run("ToolTip example 2", &doc_example_ToolTip_2::example);
     failures += run("TrackBar example 1", &doc_example_TrackBar_1::example);
     failures += run("TrackBar example 2", &doc_example_TrackBar_2::example);
+    failures += run("TreeListView example 1", &doc_example_TreeListView_1::example);
     failures += run("TreeView example 1", &doc_example_TreeView_1::example);
     failures += run("TreeView example 2", &doc_example_TreeView_2::example);
     failures += run("TypographySpecimen example 1", &doc_example_TypographySpecimen_1::example);
