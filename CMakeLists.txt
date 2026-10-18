@@ -449,6 +449,9 @@ add_library(gui_forms_controls STATIC
     src/controls/status_strip/status_strip.cpp
     src/controls/pages/page_strip/page_strip.cpp
     src/controls/pages/page_view/page_view.cpp
+    src/controls/docking/dock_navigator/dock_navigator.cpp
+    src/controls/docking/dock_workspace/dock_workspace.cpp
+    src/controls/docking/dock_site/dock_site.cpp
     src/controls/data_grid_view/data_grid_view.cpp
     src/controls/data_grid_view/data_grid_view_parts.cpp
     src/controls/task_dialog/task_dialog.cpp
@@ -2448,6 +2451,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_navigation_pane_tests tests/navigation_pane_tests.cpp)
     target_link_libraries(gui_forms_navigation_pane_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_navigation_pane_tests COMMAND gui_forms_navigation_pane_tests)
+    add_executable(gui_forms_dock_site_tests tests/dock_site_tests.cpp)
+    target_link_libraries(gui_forms_dock_site_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_dock_site_tests COMMAND gui_forms_dock_site_tests)
     add_executable(gui_forms_list_view_tests tests/list_view_tests.cpp)
     target_link_libraries(gui_forms_list_view_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_list_view_tests COMMAND gui_forms_list_view_tests)
