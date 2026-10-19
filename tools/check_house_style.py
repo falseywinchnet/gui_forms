@@ -51,19 +51,7 @@ def mask_literal(match: re.Match[str]) -> str:
     return result
 
 
-# A block literal on a line carrying this comment is admitted: an AppKit API
-# that takes only a block, isolated in one named adapter (owner decision
-# V2-1). Every admission is listed in the pull request for the owner.
-ADMITTED_BLOCK: str = "house-style: admitted block"
-
-
 def inspect(source: str) -> list[Finding]:
-    admitted_lines: set[int] = set()
-    number: int = 0
-    text: str = ""
-    for number, text in enumerate(source.split("\n"), start=1):
-        if ADMITTED_BLOCK in text:
-            admitted_lines.add(number)
     masked: str = LEXEMES.sub(mask_literal, source)
     findings: list[Finding] = []
     rule: str = ""
@@ -80,8 +68,6 @@ def inspect(source: str) -> list[Finding]:
                 if previous is not None and previous.group(0) != "return":
                     continue
             line: int = masked.count("\n", 0, match.start()) + 1
-            if rule == "objective-c-block" and line in admitted_lines:
-                continue
             findings.append(Finding(line, rule))
     return findings
 
