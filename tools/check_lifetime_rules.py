@@ -50,7 +50,7 @@ FUNCTION_ALIAS: re.Pattern[str] = re.compile(r"\busing\s+(\w+)\s*=\s*([^;]*\(\s*
 
 
 # Included implementation fragments (.inc) hold host code too.
-SOURCES: tuple[str, ...] = EXTENSIONS + (".inc",)
+SOURCES: tuple[str, ...] = EXTENSIONS
 
 
 def collect(paths: list[str]) -> list[Path]:

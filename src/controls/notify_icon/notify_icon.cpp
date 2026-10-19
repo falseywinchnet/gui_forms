@@ -115,7 +115,7 @@ void NotifyIcon::forget_icon() noexcept {
     }
     tray_events_.disconnect();
     services_ = nullptr;
-    icon_id_ = 0U;
+    icon_id_ = {};
 }
 
 HostServiceStatus NotifyIcon::synchronize(bool content_changed) {

@@ -72,12 +72,20 @@ ApplicationWindowOpenResult WorkspaceTransaction::open_window(ApplicationWindow&
     entry.options.initially_visible = false;
     ApplicationWindowOpenResult result = windows_.open_window(std::move(entry));
     if (!result.status.accepted()) {
-        // A refusal before the native request left the entry, and its model,
-        // with the caller: release the scope now, so the transaction holds
-        // no model it does not share with a host.
-        entry.options.initially_visible = visible;
+        // A refusal before the native request leaves the entry, and its
+        // model, with the caller: the scope is closed now, so the
+        // transaction holds no model it does not share with a host. A
+        // refusal after the host took the entry (a native creation that
+        // failed) may already have destroyed the model: that scope is
+        // abandoned, never closed, so nothing touches the model again.
+        const bool consumed = !entry.model;
+        if (!consumed) entry.options.initially_visible = visible;
         if (included_.size() > included_before) {
-            scopes_.back().close();
+            if (consumed) {
+                scopes_.back().abandon();
+            } else {
+                scopes_.back().close();
+            }
             scopes_.pop_back();
             included_.pop_back();
         }

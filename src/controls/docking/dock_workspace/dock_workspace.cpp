@@ -982,7 +982,9 @@ bool DockWorkspace::site_contains(const DockSite& site, Point desktop) const {
 
 DockSite* DockWorkspace::site_at(Point desktop, const DockSite* excluded) const {
     if (!windows_attached()) return nullptr;
-    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop);
+    // The docking controls keep desktop positions as Point in logical units.
+    const DesktopLogicalPoint desktop_point{desktop.x, desktop.y};
+    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop_point);
     if (!at.status.accepted() || !at.found) return nullptr;
     const HostWindowId topmost = at.window.id();
     const std::vector<DockSite*> sites = bound_sites();

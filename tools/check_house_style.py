@@ -34,7 +34,8 @@ RULES: tuple[tuple[str, str], ...] = (
     ("defaulted-comparison", r"\boperator\s*(?:==|!=|<=>|<=|>=|<|>)\s*\([^;{}]*?=\s*default\b"),
     ("lambda-review", r"\[(?:\s*|[^\[\];]*?)\]\s*(?:<[^;{}]+>\s*)?(?:\([^;{}]*?\)\s*)?(?:mutable\s*)?(?:noexcept\s*)?(?:->[^{};]+)?\{"),
 )
-EXTENSIONS: tuple[str, ...] = (".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h", ".mm")
+# ".inc" holds C++ included into a translation unit (the hosts' run files).
+EXTENSIONS: tuple[str, ...] = (".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h", ".mm", ".inc")
 EXCLUDED: tuple[str, ...] = (".git", ".build", "build", "third_party", "vendor", "node_modules")
 
 

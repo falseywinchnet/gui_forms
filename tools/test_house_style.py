@@ -1,7 +1,9 @@
 """Focused scanner tests: excluded literals, physical lines, and forbidden forms."""
 
+import tempfile
 import unittest
-from check_house_style import Finding, inspect
+from pathlib import Path
+from check_house_style import Finding, collect, inspect
 
 
 class HouseStyleTests(unittest.TestCase):
@@ -54,6 +56,14 @@ class HouseStyleTests(unittest.TestCase):
     def test_defaulted_spaceship(self) -> None:
         source: str = 'Order operator<=>(const Item&) const\n noexcept = default;'
         self.assertEqual(inspect(source), [Finding(1, "defaulted-comparison")])
+
+    def test_included_sources_are_scanned(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run: Path = Path(directory) / "host_run.inc"
+            run.write_text("auto x = 1;\n", encoding="utf-8")
+            note: Path = Path(directory) / "notes.txt"
+            note.write_text("auto\n", encoding="utf-8")
+            self.assertEqual(collect([directory]), [run])
 
 
 if __name__ == "__main__":
