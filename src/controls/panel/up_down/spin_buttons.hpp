@@ -12,8 +12,8 @@ namespace gui_forms {
 // control's published anatomy both take their rectangles from spin_halves and
 // spin_glyph, so they describe the same parts.
 struct SpinHalves final {
-    Rect upper;
-    Rect lower;
+    Rect upper{};
+    Rect lower{};
 };
 
 // Splits `column` where its halves meet: the upper half takes the floor of
@@ -25,6 +25,22 @@ struct SpinHalves final {
 [[nodiscard]] Rect spin_glyph(Rect half) noexcept;
 
 enum class SpinHalf : std::uint8_t { none, upper, lower };
+
+class SpinButtons;
+
+// The four parts an up-down control publishes for its spin column, in the
+// owning control's coordinates: each half's actuator and its glyph, the glyph
+// carrying its half's states.
+struct SpinPartGeometry final {
+    PartGeometry upper_arrow{};
+    PartGeometry lower_arrow{};
+    PartGeometry upper_glyph{};
+    PartGeometry lower_glyph{};
+};
+
+// The published spin parts of `spin`, from its committed arranged bounds
+// (its rectangle in the owning control) and the halves' current states.
+[[nodiscard]] SpinPartGeometry spin_part_geometry(const SpinButtons& spin);
 
 class SpinButtons final : public Control {
 public:

@@ -431,6 +431,31 @@ void context_menu_and_double_click() {
             "a double click on the close button is a close, not a double click on the tab");
 }
 
+// Shift+F10 on a tab the scroll buttons moved out of view scrolls it back
+// and anchors its menu at its corner by the content.
+void keyboard_menu_on_a_scrolled_out_tab() {
+    PageSet pages{};
+    add_pages(pages, 8U);
+    std::shared_ptr<PageStrip> strip = fixed_strip(pages);
+    Window window(strip, {400.0, 26.0});
+    window.perform_layout();
+    std::vector<PageContextMenuRequest> menus;
+    SubscriptionToken menu_token = (*strip).page_context_menu_requested().subscribe(RecordContextMenu{&menus});
+    require(window.request_focus(strip), "the strip takes focus");
+    require((*strip).scroll_forward() && (*strip).scroll_forward(), "the strip scrolls forward twice");
+    window.perform_layout();
+    const std::vector<PageId> before = (*strip).visible_pages();
+    require(!before.empty() && before.front().value != "p0", "the keyboard's tab p0 is scrolled out of view");
+    require(window.dispatch_key(key(PhysicalKey::f10, Modifier::shift)), "Shift+F10 is taken");
+    window.perform_layout();
+    const std::vector<PageId> after = (*strip).visible_pages();
+    require(!after.empty() && after.front().value == "p0", "the tab is scrolled back into view");
+    const Rect tab = tab_bounds(*strip, "p0");
+    require(menus.size() == 1U && menus[0].page.value == "p0" && near(menus[0].anchor.x, tab.x) &&
+                near(menus[0].anchor.y, tab.y + tab.height),
+            "the menu is anchored at the tab's corner by the content");
+}
+
 } // namespace
 
 int main() {
@@ -441,6 +466,7 @@ int main() {
     reorder_by_view_preset();
     insertion_tables();
     context_menu_and_double_click();
+    keyboard_menu_on_a_scrolled_out_tab();
     std::cout << "PageStrip drag hook tests passed\n";
     return 0;
 }

@@ -27,7 +27,8 @@ public:
     void reset(bool keyboard);
 
     // One row of either pane as laid out: its bounds in local coordinates,
-    // whether it is a recent item, and its index in its list.
+    // whether it is a recent item, its index in its list (the application
+    // menu's items or the recent items), and whether it is a separator.
     struct Row final {
         Rect bounds{};
         bool recent{};

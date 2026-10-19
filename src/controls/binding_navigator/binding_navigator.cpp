@@ -45,13 +45,14 @@ bool has_text_box(const std::vector<ToolStripItemSpec>& items, std::string_view 
 // A one-based position typed into the position box, or none when the text
 // is not a whole number in [1, count].
 std::optional<std::size_t> typed_position(std::string_view text, std::size_t count) noexcept {
+    if (text.empty()) return std::nullopt;
+    // from_chars reads the borrowed characters [first, last) of `text`.
     std::size_t value{};
     const char* const first = text.data();
-    const char* const last = text.data() + text.size();
+    const char* const last = first + text.size();
     const std::from_chars_result parsed = std::from_chars(first, last, value);
-    if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != last || value == 0U || value > count) {
-        return std::nullopt;
-    }
+    const bool whole_number = parsed.ec == std::errc{} && parsed.ptr == last;
+    if (!whole_number || value == 0U || value > count) return std::nullopt;
     return value;
 }
 
@@ -82,20 +83,19 @@ void BindingNavigator::initialize_control_tree() {
     items.push_back({.stable_id = "add_new", .command = add_new_});
     items.push_back({.stable_id = "delete", .command = delete_});
     set_items(std::move(items));
-    action_tokens_.push_back((*move_first_).invoked().subscribe(
-        *this, Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_move_first>(*this)));
-    action_tokens_.push_back((*move_previous_).invoked().subscribe(
-        *this,
-        Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_move_previous>(*this)));
-    action_tokens_.push_back((*move_next_).invoked().subscribe(
-        *this, Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_move_next>(*this)));
-    action_tokens_.push_back((*move_last_).invoked().subscribe(
-        *this, Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_move_last>(*this)));
-    action_tokens_.push_back((*add_new_).invoked().subscribe(
-        *this, Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_add_new>(*this)));
-    action_tokens_.push_back((*delete_).invoked().subscribe(
-        *this, Delegate<const CommandInvocation&>::bind<BindingNavigator, &BindingNavigator::on_delete>(*this)));
+    using Action = Delegate<const CommandInvocation&>;
+    connect_action(*move_first_, Action::bind<BindingNavigator, &BindingNavigator::on_move_first>(*this));
+    connect_action(*move_previous_, Action::bind<BindingNavigator, &BindingNavigator::on_move_previous>(*this));
+    connect_action(*move_next_, Action::bind<BindingNavigator, &BindingNavigator::on_move_next>(*this));
+    connect_action(*move_last_, Action::bind<BindingNavigator, &BindingNavigator::on_move_last>(*this));
+    connect_action(*add_new_, Action::bind<BindingNavigator, &BindingNavigator::on_add_new>(*this));
+    connect_action(*delete_, Action::bind<BindingNavigator, &BindingNavigator::on_delete>(*this));
     refresh();
+}
+
+void BindingNavigator::connect_action(Command& command, Delegate<const CommandInvocation&> target) {
+    SubscriptionToken token = command.invoked().subscribe(*this, target);
+    action_tokens_.push_back(std::move(token));
 }
 
 void BindingNavigator::set_binding_source(std::shared_ptr<BindingSource> source) {
@@ -143,9 +143,12 @@ void BindingNavigator::refresh() {
     const std::vector<ToolStripItemSpec>& shown = items();
     if (has_item(shown, count_item)) set_item_text(count_item, "of " + std::to_string(count));
     if (has_text_box(shown, position_item)) {
-        TextBox& box = *text_box(position_item);
-        box.set_text(current ? std::to_string(position + 1) : std::string("0"));
-        box.set_enabled(count != 0U);
+        const std::shared_ptr<TextBox> box = text_box(position_item);
+        // The box shows the one-based position, or 0 with no current record.
+        std::string shown_position("0");
+        if (current) shown_position = std::to_string(position + 1);
+        (*box).set_text(std::move(shown_position));
+        (*box).set_enabled(count != 0U);
     }
 }
 
@@ -165,9 +168,10 @@ void BindingNavigator::on_key_preview(KeyEvent& event) {
     ToolStrip::on_key_preview(event);
     if (event.handled || event.action != KeyAction::down) return;
     if (event.physical_key != PhysicalKey::enter && event.physical_key != PhysicalKey::escape) return;
-    if (!has_text_box(items(), position_item) || window() == nullptr) return;
+    Window* const host = window();
+    if (!has_text_box(items(), position_item) || host == nullptr) return;
     const std::shared_ptr<TextBox> box = text_box(position_item);
-    if ((*window()).focused_control() != box) return;
+    if ((*host).focused_control() != box) return;
     if (event.physical_key == PhysicalKey::enter) {
         commit_position();
     } else {

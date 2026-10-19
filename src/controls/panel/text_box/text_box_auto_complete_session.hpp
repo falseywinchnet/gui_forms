@@ -30,11 +30,18 @@ struct TextBoxAutoCompleteSession final {
     std::vector<std::string> suggestions{};
     std::optional<std::size_t> highlighted{};
     std::uint64_t shown_revision{};
+    // The box shows completion text (shown_revision is valid).
     bool shown{};
+    // The shown text is an appended completion, selected as
+    // completion_selection, that Enter or Tab accepts.
     bool appended{};
     TextSelection completion_selection{};
     bool open{};
+    // Set while the box moves the list's selection itself, so the list's
+    // selection event is not taken as the user's.
     bool synchronizing{};
+    // Set while the box closes the list, so the revocation the close raises
+    // is not taken as the window closing it.
     bool closing{};
     std::shared_ptr<AnchoredPopupLayer> layer{};
     std::shared_ptr<DropDownList> list{};

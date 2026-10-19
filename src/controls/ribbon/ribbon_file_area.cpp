@@ -5,19 +5,17 @@
 #include "gui_forms/controls/ribbon/ribbon.hpp"
 
 #include "ribbon_application_menu.hpp"
-#include "ribbon_geometry.hpp"
 
 #include "gui_forms/delegate.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/window.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
 
 namespace gui_forms {
-
-using namespace ribbon_detail;
 
 bool Ribbon::file_area_open() const noexcept {
     const bool result = application_open_ || application_popup_open_ || backstage_open_;

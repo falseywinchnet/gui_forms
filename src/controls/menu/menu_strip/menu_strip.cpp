@@ -27,16 +27,6 @@ namespace {
 
 constexpr double menu_strip_height = 24.0;
 
-std::uint64_t menu_virtual_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 } // namespace
 
 MenuStrip::MenuStrip(StableId stable_id)
@@ -438,7 +428,7 @@ std::vector<SemanticNode> MenuStrip::semantic_virtual_children() const {
         if (!items_[index].visible) continue;
         SemanticNode node{};
         node.stable_id = items_[index].stable_id;
-        node.runtime_id = menu_virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::menu_bar_item;
         node.name = use_mnemonic_
             ? menu_display_text(items_[index].text) : items_[index].text;

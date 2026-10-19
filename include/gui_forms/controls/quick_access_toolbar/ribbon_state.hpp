@@ -10,15 +10,15 @@
 
 namespace gui_forms {
 
-// What a ribbon window keeps between sessions (owner decision RB-12, D4-1):
-// the Quick Access Toolbar's command IDs in order, its placement, and whether
-// the ribbon is minimized. The last selected tab is not kept.
+// What a ribbon window keeps between sessions: the Quick Access Toolbar's
+// command IDs in order, its placement, and whether the ribbon is minimized.
+// The last selected tab is not kept.
 //
-// GUI.Forms has no runtime layout or session store yet (the resources and
-// configuration interview, §2.4 and §7, leaves its syntax open), so the
-// state is saved and loaded explicitly as text: serialize_ribbon_state and
-// parse_ribbon_state. When the store exists, the Ribbon saves this value
-// through it.
+// The ribbon is not a layout (owner decision RB-44, revising RB-12): these
+// are a settings permutation the program saves with its own settings; the
+// ribbon never saves them on its own. The program captures and applies the
+// state (capture_ribbon_state, apply_ribbon_state) and stores it as text
+// (serialize_ribbon_state, parse_ribbon_state).
 struct RibbonState final {
     std::vector<std::string> quick_access_command_ids{};
     QuickAccessToolbarPlacement quick_access_placement{QuickAccessToolbarPlacement::above_ribbon};

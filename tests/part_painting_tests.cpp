@@ -195,6 +195,60 @@ void marks_and_text(const Control& control) {
     }
 }
 
+// The strips of a solid arrow as the by-role path first drew them (pinned
+// before the arrow kernel was split by direction): `half` one-unit strips,
+// strip `row` reaching `row` units either side of the centre, the tip strip
+// at the box's centre plus or minus half the depth.
+std::vector<Rect> reference_arrow_strips(Rect bounds, PartMark direction) {
+    std::vector<Rect> strips;
+    const double side = std::min(bounds.width, bounds.height);
+    const double half = std::floor(side * 0.5);
+    if (half < 1.0) return strips;
+    const double centre_x = std::floor(bounds.x + bounds.width * 0.5);
+    const double centre_y = std::floor(bounds.y + bounds.height * 0.5);
+    const int rows = static_cast<int>(half);
+    for (int row = 0; row < rows; ++row) {
+        const double extent = static_cast<double>(row);
+        const double offset = static_cast<double>(row) - std::floor(half * 0.5);
+        const double length = extent * 2.0 + 1.0;
+        if (direction == PartMark::arrow_down) {
+            strips.push_back({centre_x - extent, centre_y - offset, length, 1.0});
+        } else if (direction == PartMark::arrow_up) {
+            strips.push_back({centre_x - extent, centre_y + offset - 1.0, length, 1.0});
+        } else if (direction == PartMark::arrow_right) {
+            strips.push_back({centre_x - offset, centre_y - extent, 1.0, length});
+        } else {
+            strips.push_back({centre_x + offset - 1.0, centre_y - extent, 1.0, length});
+        }
+    }
+    return strips;
+}
+
+// Every arrow direction, in a square box and in an off-grid oblong one,
+// fills exactly the pinned strips in order.
+void arrow_strips(const Control& control) {
+    const PartMark directions[] = {PartMark::arrow_up, PartMark::arrow_down, PartMark::arrow_left,
+                                   PartMark::arrow_right};
+    const Rect boxes[] = {{0.0, 0.0, 9.0, 9.0}, {3.5, 2.25, 13.0, 10.0}, {1.0, 1.0, 1.0, 1.0}};
+    for (const PartMark direction : directions) {
+        for (const Rect box : boxes) {
+            PartPaint arrow;
+            arrow.role = PartRole::glyph;
+            arrow.bounds = box;
+            arrow.mark = direction;
+            RecordingPainter painter;
+            paint_part(painter, control, arrow);
+            const std::vector<Rect> expected = reference_arrow_strips(box, direction);
+            require(painter.operations.size() == expected.size(), "an arrow fills its pinned strip count");
+            for (std::size_t index = 0; index < expected.size(); ++index) {
+                const Operation& strip = painter.operations[index];
+                require(strip.kind == "fill" && strip.bounds == expected[index],
+                        "an arrow fills its pinned strips in order");
+            }
+        }
+    }
+}
+
 void state_context(const Control& control) {
     require(part_visual_context(control, states_of(AnatomyState::hot)).surface ==
                 ControlSurfaceState::hot,
@@ -385,6 +439,7 @@ int main() {
     silent_roles(*control);
     surfaces_and_cues(*control);
     marks_and_text(*control);
+    arrow_strips(*control);
     state_context(*control);
     overlay_shadow(*control);
     theme_without_overlay_shadow();

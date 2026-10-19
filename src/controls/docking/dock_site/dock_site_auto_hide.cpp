@@ -18,6 +18,7 @@ namespace {
 
 using dock_site_detail::focus_candidate;
 using dock_site_detail::moved;
+using dock_site_detail::seam_bar_thickness;
 using dock_site_detail::strip_extent;
 
 // The flyout's grip along its inner edge, its smallest extent, and the
@@ -28,14 +29,11 @@ constexpr double flyout_minimum_extent = 48.0;
 constexpr double flyout_fallback_extent = 240.0;
 // The slide's frame interval.
 constexpr std::chrono::milliseconds slide_interval{16};
+// The repeat interval of a timer that fires once: its target disconnects it
+// when it fires, so the repeat is never reached.
+constexpr std::chrono::hours one_shot_interval{24};
 
 constexpr std::array<std::string_view, 4> edge_names{"left", "top", "right", "bottom"};
-
-// The events DockSite adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 2> site_interactions{{
-    {.name = "drag_ended", .payload = "DockDragOutcome", .mutable_payload = false},
-    {.name = "flyout_changed", .payload = "DockFlyoutChange", .mutable_payload = false},
-}};
 
 std::size_t edge_index(DockSide edge) noexcept {
     const std::size_t index = static_cast<std::size_t>(edge);
@@ -56,11 +54,6 @@ PageStripPlacement placement_for(DockSide edge) noexcept {
 
 } // namespace
 
-void DockSite::append_interactions(std::vector<InteractionDeclaration>& interactions) const {
-    Control::append_interactions(interactions);
-    interactions.insert(interactions.end(), site_interactions.begin(), site_interactions.end());
-}
-
 // -- timer targets ---------------------------------------------------------------
 
 // Each fires on the window's UI timer and finds the site through a weak
@@ -77,7 +70,7 @@ struct DockSite::SlideTick final {
 
 struct DockSite::HoverElapsed final {
     std::weak_ptr<Control> target;
-    DockPanelId panel;
+    DockPanelId panel{};
 
     void operator()(FrameTime) const {
         const std::shared_ptr<Control> control = target.lock();
@@ -237,25 +230,32 @@ double DockSite::side_band_thickness() const {
     return thickness;
 }
 
-// Each edge's tabs: the auto-hidden stacks on it in layout order, then the
+// An edge's tabs: the auto-hidden stacks on it in layout order, then the
 // stacks collapsed onto it in tree order, each stack's panels in its order.
+// A site without a workspace shows no side tabs.
+void DockSite::collect_side_panels(DockSide edge, std::vector<DockPanelId>& out) const {
+    out.clear();
+    if (workspace_ == nullptr) return;
+    const DockLayout& layout = (*workspace_).layout();
+    for (int pass = 0; pass < 2; ++pass) {
+        for (const StackSlot& slot : stacks_) {
+            const bool behind = pass == 0 ? slot.auto_hidden : (slot.side_tabbed && !slot.auto_hidden);
+            if (!behind || slot.edge != edge) continue;
+            const DockNode* const node = layout.find_node(slot.stack);
+            if (node != nullptr) out.insert(out.end(), (*node).panels.begin(), (*node).panels.end());
+        }
+    }
+}
+
+// Each edge's strip is made on first use and kept (collapsed while empty);
+// its pages follow collect_side_panels, the open flyout's tab selected.
 void DockSite::sync_side_strips() {
     if (!is_alive()) return;
     bool membership_changed = false;
     std::vector<DockPanelId> wanted{};
     for (std::size_t edge = 0; edge < sides_.size(); ++edge) {
-        wanted.clear();
         const DockSide side_edge = static_cast<DockSide>(edge);
-        // A site without a workspace shows no side tabs.
-        for (int pass = 0; pass < 2 && workspace_ != nullptr; ++pass) {
-            const DockLayout& layout = (*workspace_).layout();
-            for (const StackSlot& slot : stacks_) {
-                const bool behind = pass == 0 ? slot.auto_hidden : (slot.side_tabbed && !slot.auto_hidden);
-                if (!behind || slot.edge != side_edge) continue;
-                const DockNode* const node = layout.find_node(slot.stack);
-                if (node != nullptr) wanted.insert(wanted.end(), (*node).panels.begin(), (*node).panels.end());
-            }
-        }
+        collect_side_panels(side_edge, wanted);
         SideStrip& entry = sides_[edge];
         if (wanted.empty() && !entry.strip) continue;
         ensure_side_strip(side_edge);
@@ -329,7 +329,7 @@ DockSide DockSite::nearest_edge(Rect bounds, Rect area) noexcept {
 void DockSite::assign_collapsed_edges(Rect area, std::span<const DockNodeId> collapsed) {
     if (collapsed.empty() || workspace_ == nullptr) return;
     const DockLayout& layout = (*workspace_).layout();
-    layout.arrange(layout.state().main_root, area, seam_thickness(), arranged_scratch_);
+    layout.arrange(layout.state().main_root, area, seam_bar_thickness, arranged_scratch_);
     for (StackSlot& slot : stacks_) {
         if (slot.auto_hidden || !dock_site_detail::contains_node(collapsed, slot.stack)) continue;
         for (const DockArrangedNode& placed : arranged_scratch_) {
@@ -647,7 +647,7 @@ void DockSite::slide_tick(FrameTime now) {
 void DockSite::schedule_stale_check() {
     if (stale_timer_.connected() || attached_window() == nullptr) return;
     const std::weak_ptr<Control> weak = shared_from_this();
-    stale_timer_ = (*attached_window()).schedule_ui_timer(*this, std::chrono::hours(24), FrameClock::now(),
+    stale_timer_ = (*attached_window()).schedule_ui_timer(*this, one_shot_interval, FrameClock::now(),
                                                           StaleFlyout{weak});
 }
 
@@ -668,7 +668,7 @@ void DockSite::start_hover(const DockPanelId& panel) {
     if (host == nullptr) return;
     hover_panel_ = panel;
     const std::weak_ptr<Control> weak = shared_from_this();
-    hover_timer_ = (*host).schedule_ui_timer(*this, std::chrono::hours(24), FrameClock::now() + flyout_hover_delay,
+    hover_timer_ = (*host).schedule_ui_timer(*this, one_shot_interval, FrameClock::now() + flyout_hover_delay,
                                              HoverElapsed{weak, panel});
 }
 
@@ -682,7 +682,7 @@ void DockSite::start_leave() {
     Window* const host = attached_window();
     if (host == nullptr) return;
     const std::weak_ptr<Control> weak = shared_from_this();
-    leave_timer_ = (*host).schedule_ui_timer(*this, std::chrono::hours(24), FrameClock::now() + flyout_leave_delay,
+    leave_timer_ = (*host).schedule_ui_timer(*this, one_shot_interval, FrameClock::now() + flyout_leave_delay,
                                              LeaveElapsed{weak});
 }
 
@@ -701,10 +701,6 @@ void DockSite::leave_elapsed() {
     close_flyout(DockFlyoutCause::pointer_left);
 }
 
-// Every pointer event outside the window's overlays. Moves start the hover
-// delay over a side tab and the leave delay elsewhere; a press outside the
-// flyout and the side strips closes the flyout and goes on (owner decision
-// DK-27, E2-1), so the event is observed, never handled.
 // Whether a window point is on a side strip, and the panel of the side tab
 // under it, if any.
 bool DockSite::side_tab_at(Point point, std::optional<DockPanelId>& tab) const {
@@ -725,6 +721,10 @@ void DockSite::close_on_outside_press(const PointerEvent& event) {
     close_flyout(DockFlyoutCause::outside_press);
 }
 
+// Every pointer event outside the window's overlays. Moves start the hover
+// delay over a side tab and the leave delay elsewhere; a press outside the
+// flyout and the side strips closes the flyout and goes on (owner decision
+// DK-27, E2-1), so the event is observed, never handled.
 void DockSite::on_root_pointer(const PointerEvent& event) {
     if (workspace_ == nullptr) return;
     std::optional<DockPanelId> tab{};
@@ -915,7 +915,7 @@ void DockSite::paint_flyout(Painter& painter, const Control& surface) const {
     if (index >= stacks_.size()) return;
     const FlyoutGeometry placed = flyout_geometry();
     const Point offset{-placed.revealed.x, -placed.revealed.y};
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     part.role = PartRole::shadow;
     part.bounds = moved(placed.full, offset);
@@ -925,7 +925,7 @@ void DockSite::paint_flyout(Painter& painter, const Control& surface) const {
     part.role = PartRole::face;
     paint_part(painter, surface, part);
     paint_caption(painter, surface, stacks_[index], index, offset);
-    PartPaint grip;
+    PartPaint grip{};
     grip.family = ControlVisualRole::panel;
     grip.role = PartRole::grip;
     grip.mark = PartMark::grip_dots;

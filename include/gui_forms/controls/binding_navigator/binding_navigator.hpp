@@ -56,6 +56,10 @@ protected:
     void append_interactions(std::vector<InteractionDeclaration>& interactions) const override;
 
 private:
+    // Subscribes `target` to one action command's invocations; the token
+    // joins action_tokens_, so the subscription lives as long as the
+    // navigator.
+    void connect_action(Command& command, Delegate<const CommandInvocation&> target);
     void refresh();
     void commit_position();
     void on_move_first(const CommandInvocation& invocation);

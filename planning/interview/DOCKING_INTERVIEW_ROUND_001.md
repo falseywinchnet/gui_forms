@@ -698,3 +698,75 @@ colour, (3) keep the documented exception. The owner, verbatim:
 > accepted.
 
 - **GIVEN C1-1.** A content-colour field on `PartPaint` (W decision 7).
+
+### Note, 2026-10-19: the cleanup reviews' findings (V1 to V4)
+
+From the house-style cleanup review of the window layer (#172) and of PageView
+and docking (#173): (V1) a use-after-free in `WorkspaceTransaction::open_window`
+when macOS or X11 refuses an entry after taking ownership of it; fix by adding
+a way to abandon an `UpdateScope` without closing it (recommended), or by a
+liveness check in the transaction; (V2) Objective-C blocks in the macOS host
+are anonymous callbacks, which §2 forbids: replace them with named functions
+and explicit context (`dispatch_async_f`) and teach the checker to flag blocks
+(recommended), or admit them as an AppKit-adapter exception; (V3) tray icon
+ids and device versus logical desktop points are plain types: add wrapper
+types while the APIs are provisional (recommended); (V4) fixes needing no
+decision: a Windows runtime window whose creation fails is never released;
+releasing a control snapshot lacks the UI-thread check and the repaint; the
+house-style checker skips `.inc` files; a floating window cancels its own
+close when no main site is bound; `PageSetBatch`'s destructor lets a
+handler's exception end the program; the keyboard context menu of a
+scrolled-out tab opens at the strip's corner; the runtime-ID hash is copied in
+ten sources; `DockSite::arrange` is not split into stages. The owner,
+verbatim:
+
+> v1: approved. v2: approved. v3: approved. v4: understood.
+
+- **GIVEN V1-1.** `UpdateScope` gains a way to be abandoned without closing;
+  the transaction uses it when a host refuses an entry after taking it.
+- **GIVEN V2-1.** No Objective-C blocks: the macOS host uses named functions
+  with explicit context; the checker flags blocks.
+- **GIVEN V3-1.** Wrapper types for tray icon identities and for device and
+  logical desktop points.
+- **GIVEN V4.** The listed fixes go ahead.
+
+### Note, 2026-10-19: V2a, the one AppKit block (open)
+
+V2's change (#181) removed every Objective-C block from the macOS host but
+one: `add_escape_stops_modal_monitor` in
+`src/host/macos/services/appkit_host_services.mm`, which installs
+`[NSEvent addLocalMonitorForEventsMatchingMask:handler:]`, an API that takes
+only a block. The owner did not admit it ("you can merge other standout work
+except v2a"), so #181 is held.
+
+What the monitor intercepts: key-down events only, only while the host's
+message dialog runs `[alert runModal]`, and of those only Escape (key code
+53): Escape ends the alert with the cancel choice's response and is
+consumed; every other key passes on. It and the cancel button's Escape key
+equivalent arrived together (e42bab4a, 2026-08-06), beside setting the
+window's default button cell for the declared default choice. The likely
+reason, unverified: when Cancel is also the declared default, making it the
+default button cell gives it Return as its key equivalent and displaces
+Escape, so the monitor keeps Escape reaching the cancel choice.
+
+Replacements without a block, for the owner:
+
+1. **The alert's own modal session** (recommended). Lay out the alert, begin
+   a modal session for its window, and pump it: take each event with
+   `nextEventMatchingMask:untilDate:inMode:dequeue:` in
+   `NSModalPanelRunLoopMode`, end the session with the cancel response on
+   Escape, and send every other event with `sendEvent:`; `runModalSession:`
+   reports the button's response. This sees exactly the events the local
+   monitor sees, before dispatch, and changes nothing outside this one
+   function.
+2. **An `NSApplication` subclass overriding `sendEvent:`** (a sibling's
+   suggestion). Not recommended: it changes the whole application for one
+   dialog and fails when the embedding application has its own
+   `NSApplication` class.
+3. **No monitor at all.** If AppKit still cancels on Escape when Cancel is
+   also the default (or the default cell can be kept off the Cancel button
+   without losing Return), the monitor can simply go. One test on the Mac
+   decides this.
+
+Checking 3 first is cheapest, then 1 if the monitor proves necessary. Both
+need the M4: a local instance runs them and reports back.

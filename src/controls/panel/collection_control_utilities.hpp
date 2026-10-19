@@ -11,15 +11,6 @@ namespace gui_forms::collection_detail {
 
 inline constexpr std::chrono::milliseconds type_timeout{850};
 
-inline std::uint64_t virtual_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    return hash | (1ULL << 63U);
-}
-
 inline std::string fold_ascii(std::string_view text) {
     std::string result(text);
     for (char& character : result) {
@@ -28,6 +19,20 @@ inline std::string fold_ascii(std::string_view text) {
         }
     }
     return result;
+}
+
+// Whether `text`, ASCII case folded, starts with `folded_prefix` (already
+// folded, as fold_ascii returns it). The same answer as
+// fold_ascii(text).starts_with(folded_prefix), without allocating a folded
+// copy, so a type-ahead search allocates nothing per item.
+inline bool starts_with_folded(std::string_view text, std::string_view folded_prefix) noexcept {
+    if (text.size() < folded_prefix.size()) return false;
+    for (std::size_t index = 0; index < folded_prefix.size(); ++index) {
+        char character = text[index];
+        if (character >= 'A' && character <= 'Z') character = static_cast<char>(character - 'A' + 'a');
+        if (character != folded_prefix[index]) return false;
+    }
+    return true;
 }
 
 inline void validate_identity_text(std::string_view id,

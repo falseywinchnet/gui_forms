@@ -158,6 +158,9 @@ struct App final {
     PanelFactory factory{};
     std::unique_ptr<DockWorkspace> workspace{};
     std::shared_ptr<DockSite> site{};
+    // The main window's root when the site is held in a panel (make_app's
+    // `in_panel`), else null.
+    std::shared_ptr<Panel> root{};
     ApplicationWindowHandle main{};
     Window* main_model{};
     std::unique_ptr<host::HeadlessApplication> application{};
@@ -165,7 +168,7 @@ struct App final {
     SubscriptionToken ended{};
 };
 
-std::unique_ptr<App> make_app(bool show = true, const std::string* restored = nullptr) {
+std::unique_ptr<App> make_app(bool show = true, const std::string* restored = nullptr, bool in_panel = false) {
     std::unique_ptr<App> app = std::make_unique<App>();
     (*app).workspace = std::make_unique<DockWorkspace>("workspace");
     DockWorkspace& workspace = *(*app).workspace;
@@ -177,10 +180,17 @@ std::unique_ptr<App> make_app(bool show = true, const std::string* restored = nu
         show_panels(workspace);
     }
     (*app).site = make_control<DockSite>(StableId("site"), workspace);
+    Control::Ptr root = (*app).site;
+    if (in_panel) {
+        (*app).root = make_control<Panel>(StableId("root"));
+        (*(*app).site).set_requested_bounds({0.0, 0.0, 900.0, 600.0});
+        (*(*app).root).add_child((*app).site);
+        root = (*app).root;
+    }
     std::vector<ApplicationWindow> windows{};
     ApplicationWindow primary{};
     primary.stable_id = "main";
-    primary.model = std::make_unique<Window>((*app).site, Size{900.0, 600.0});
+    primary.model = std::make_unique<Window>(root, Size{900.0, 600.0});
     primary.options.title = "main";
     primary.options.initial_size = {900.0, 600.0};
     primary.options.minimum_size = {150.0, 150.0};
@@ -576,6 +586,24 @@ void close_button_hides_panels() {
             "the close button hides the panel and the window closes");
 }
 
+// The main site leaves its window while a floating window is open: the
+// floating window's close button still closes it. With no main window to
+// post the close to, the window's panels are hidden at once, inside the
+// close request, and the host closes the window.
+void close_button_without_a_main_site() {
+    std::unique_ptr<App> app = make_app(true, nullptr, true);
+    DockWorkspace& workspace = *(*app).workspace;
+    const DockSiteId floating = float_properties(*app);
+    static_cast<void>((*(*app).root).remove_child((*(*app).site).runtime_id()));
+    require((*(*app).site).attached_window() == nullptr && workspace.floating_window_count() == 1U,
+            "the main site leaves its window and the floating window stays");
+    (*(*app).application).simulate_user_close(workspace.floating_window(floating).id());
+    (*(*app).application).reclaim();
+    require(workspace.layout().locate(DockPanelId("properties")).placement == DockPlacementKind::hidden &&
+                workspace.layout().state().floating_sites.empty() && workspace.floating_window_count() == 0U,
+            "without a main site the close button hides the panel and the window closes");
+}
+
 } // namespace
 
 int main() {
@@ -588,6 +616,7 @@ int main() {
     ctrl_s_reaches_the_active_document();
     restored_window_lands_in_a_work_area();
     close_button_hides_panels();
+    close_button_without_a_main_site();
     std::cout << "Floating windows: the Float trace, floating on release and at the limit, docking back, drags "
                  "across windows, moving by the caption, frames saved, Ctrl+S, restore and closing passed\n";
     return EXIT_SUCCESS;

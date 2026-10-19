@@ -56,6 +56,37 @@ void add_match(std::string_view candidate, std::string_view typed, bool case_sen
     matches.emplace_back(candidate);
 }
 
+// Whether `ancestor` is `control` itself or a control that contains it.
+bool contains_or_is(const Control& ancestor, const Control& control) {
+    if (&ancestor == &control) return true;
+    Control::Ptr current = control.parent();
+    while (current) {
+        if (current.get() == &ancestor) return true;
+        current = (*current).parent();
+    }
+    return false;
+}
+
+// How a session lets go of its open popup: closing it (the box closes the
+// list, so the token is disconnected and its revocation with it), or after
+// the window already closed it (the token is spent and its revocation is
+// the callback running).
+enum class PopupRelease : std::uint8_t { close, already_closed };
+
+// Disconnects the open list's subscriptions in the order they were made (the
+// list's events, the revocation, the collection change), then the token,
+// and drops the session's references to the list and its layer.
+void release_popup(detail::TextBoxAutoCompleteSession& session, PopupRelease release) noexcept {
+    session.list_selection.disconnect();
+    session.list_activation.disconnect();
+    session.dismissal.disconnect();
+    if (release == PopupRelease::close) session.revocation.disconnect();
+    session.collection_change.disconnect();
+    if (release == PopupRelease::close) session.token.disconnect();
+    session.list.reset();
+    session.layer.reset();
+}
+
 // Each suggestion's typed prefix, highlighted in the list: a prefix match
 // is the typed text's bytes from the start.
 std::vector<TextMatchRange> prefix_matches(std::size_t count, std::size_t typed_bytes) {
@@ -108,13 +139,15 @@ HostServiceStatus TextBox::auto_complete_source_status() {
     const std::optional<HostAutoCompleteSource> host_source =
         host_auto_complete_source(auto_complete_source_);
     if (!host_source) return status;
-    if (window() == nullptr || (*window()).host_services() == nullptr) {
+    Window* const host = window();
+    HostServices* const services = host != nullptr ? (*host).host_services() : nullptr;
+    if (services == nullptr) {
         status.error = HostServiceError::unsupported;
         return status;
     }
     const HostAutoCompleteRequest request{.source = *host_source, .prefix_utf8 = {},
                                           .maximum_candidates = 0U};
-    const HostAutoCompleteResult result = (*(*window()).host_services()).query_auto_complete(request);
+    const HostAutoCompleteResult result = (*services).query_auto_complete(request);
     status = result.status;
     return status;
 }
@@ -170,10 +203,13 @@ void TextBox::collect_auto_complete_candidates(std::string_view typed,
     }
     const std::optional<HostAutoCompleteSource> host_source =
         host_auto_complete_source(auto_complete_source_);
-    if (!host_source || window() == nullptr || (*window()).host_services() == nullptr) return;
+    if (!host_source) return;
+    Window* const host = window();
+    HostServices* const services = host != nullptr ? (*host).host_services() : nullptr;
+    if (services == nullptr) return;
     const HostAutoCompleteRequest request{.source = *host_source, .prefix_utf8 = typed,
                                           .maximum_candidates = maximum_auto_complete_suggestions};
-    const HostAutoCompleteResult result = (*(*window()).host_services()).query_auto_complete(request);
+    const HostAutoCompleteResult result = (*services).query_auto_complete(request);
     if (!result.status.accepted()) return;
     for (const std::string& candidate : result.candidates_utf8) {
         add_match(candidate, typed, auto_complete_case_sensitive_, matches);
@@ -369,16 +405,10 @@ void TextBox::open_auto_complete_list() {
         return;
     }
     if (!attached() || window() == nullptr || !effectively_visible() || !effectively_enabled()) return;
-    // The anchor is this box or a control that contains it.
+    // The anchor is this box or a control that contains it; a stale or
+    // unrelated anchor falls back to this box.
     Control::Ptr anchor = auto_complete_anchor_.lock();
-    bool contains_this = false;
-    for (const Control* current = this; current != nullptr && anchor; current = (*current).parent().get()) {
-        if (current == anchor.get()) {
-            contains_this = true;
-            break;
-        }
-    }
-    if (!contains_this) anchor = shared_from_this();
+    if (!anchor || !contains_or_is(*anchor, *this)) anchor = shared_from_this();
     const std::string prefix(stable_id().value());
     std::shared_ptr<AnchoredPopupLayer> layer =
         make_control<AnchoredPopupLayer>(StableId(prefix + ".auto_complete"), anchor);
@@ -432,14 +462,7 @@ void TextBox::close_auto_complete_list() {
     detail::TextBoxAutoCompleteSession& session = *auto_complete_session_;
     if (!session.open && !session.layer) return;
     session.closing = true;
-    session.list_selection.disconnect();
-    session.list_activation.disconnect();
-    session.dismissal.disconnect();
-    session.revocation.disconnect();
-    session.collection_change.disconnect();
-    session.token.disconnect();
-    session.list.reset();
-    session.layer.reset();
+    release_popup(session, PopupRelease::close);
     const bool changed = session.open;
     session.open = false;
     session.closing = false;
@@ -452,14 +475,7 @@ void TextBox::discard_auto_complete_list() noexcept {
     if (!auto_complete_session_) return;
     detail::TextBoxAutoCompleteSession& session = *auto_complete_session_;
     session.closing = true;
-    session.list_selection.disconnect();
-    session.list_activation.disconnect();
-    session.dismissal.disconnect();
-    session.revocation.disconnect();
-    session.collection_change.disconnect();
-    session.token.disconnect();
-    session.list.reset();
-    session.layer.reset();
+    release_popup(session, PopupRelease::close);
     session.open = false;
     session.shown = false;
     session.appended = false;
@@ -491,12 +507,7 @@ void TextBox::auto_complete_popup_revoked() {
     detail::TextBoxAutoCompleteSession& session = auto_complete_session();
     if (session.closing) return;
     // The window closed the list (this box was hidden, disabled or removed).
-    session.list_selection.disconnect();
-    session.list_activation.disconnect();
-    session.dismissal.disconnect();
-    session.collection_change.disconnect();
-    session.list.reset();
-    session.layer.reset();
+    release_popup(session, PopupRelease::already_closed);
     const bool changed = session.open;
     session.open = false;
     session.highlighted.reset();

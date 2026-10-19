@@ -736,7 +736,7 @@ void ScrollableControl::append_semantic_axis(
     node.stable_id = std::string(stable_id().value()) +
         (orientation == ScrollOrientation::horizontal
              ? ".horizontal-scroll" : ".vertical-scroll");
-    node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+    node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
     node.role = SemanticRole::scroll_bar;
     node.name = orientation == ScrollOrientation::horizontal
         ? "Horizontal scroll bar" : "Vertical scroll bar";

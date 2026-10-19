@@ -27,8 +27,22 @@ if [ -n "$changes" ]; then
   echo "Refusing to replace modified libunibreak source" >&2
   exit 1
 fi
+# Three rounds, ten and twenty seconds apart, outlast a short host outage.
 if ! git -C "$destination" cat-file -e "$revision^{commit}" 2>/dev/null; then
-  git -C "$destination" fetch --depth=1 origin "$revision"
+  fetched=0
+  for round in 1 2 3; do
+    if git -C "$destination" fetch --depth=1 origin "$revision"; then
+      fetched=1
+      break
+    fi
+    if [ "$round" != 3 ]; then
+      sleep $((round * 10))
+    fi
+  done
+  if [ "$fetched" != 1 ]; then
+    echo "No host served libunibreak $revision" >&2
+    exit 1
+  fi
 fi
 git -C "$destination" checkout --detach "$revision"
 test "$(git -C "$destination" rev-parse HEAD)" = "$revision"

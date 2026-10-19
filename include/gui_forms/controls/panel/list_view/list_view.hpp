@@ -432,8 +432,19 @@ private:
     // or the model changes.
     [[nodiscard]] const ListViewItem& item_at(std::size_t index, ListViewItem& scratch) const;
     [[nodiscard]] Hit hit_test(const Layout& placed, Point local) const;
-    // The realized row of a realized-item position, and the sub-item and
-    // column positions after the rows.
+    // What one realized-item position names. The realized items are the
+    // visible rows (item system "item"), then each row's visible sub-item
+    // cells, row by row (item system "sub_item"), then the visible column
+    // headers (item system "column"). `index` is the model index of a row or
+    // sub-item's item; `column` the column of a sub-item or header.
+    struct RealizedSlot final {
+        ItemSystemIndex system{};
+        std::size_t index{};
+        std::size_t column{};
+    };
+    [[nodiscard]] RealizedSlot realized_slot(const Layout& placed, std::size_t item) const;
+    // The counts of the first two runs of realized items, and the column of
+    // the sub-item at `position` within one row's run.
     [[nodiscard]] std::size_t realized_row_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_sub_item_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_sub_item_column(const Layout& placed, std::size_t position) const noexcept;
@@ -447,6 +458,11 @@ private:
     void on_vertical_scroll(double value);
     void on_horizontal_scroll(double value);
     void image_list_changed(const ImageListChange& change);
+    // Replaces the image list in `slot` (small_images_ or large_images_) and
+    // its change subscription `subscription`, after the checks the public
+    // setters state.
+    void set_image_list(std::shared_ptr<ImageList> images, std::shared_ptr<ImageList>& slot,
+                        SubscriptionToken& subscription);
 
     // Selection operations. Each returns whether the selected set changed.
     [[nodiscard]] bool select_only(std::size_t index);

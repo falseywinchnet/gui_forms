@@ -41,8 +41,8 @@ void ToolTipBubble::apply_family_text_colour() {
 }
 
 void ToolTipBubble::on_paint(Painter& painter, Rect) {
-    const Rect face{0.0, 0.0, committed_arranged_bounds().width,
-                    committed_arranged_bounds().height};
+    const Rect arranged = committed_arranged_bounds();
+    const Rect face{0.0, 0.0, arranged.width, arranged.height};
     PartPaint part;
     part.family = ControlVisualRole::tool_tip;
     part.role = PartRole::shadow;

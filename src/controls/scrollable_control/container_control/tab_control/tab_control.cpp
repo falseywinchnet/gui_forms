@@ -16,14 +16,14 @@
 namespace gui_forms {
 
 namespace {
-[[nodiscard]] std::uint64_t virtual_semantic_runtime_id(
-    std::string_view stable_id) noexcept {
-    std::uint64_t value = 1469598103934665603ULL;
-    for (const unsigned char byte : stable_id) {
-        value ^= byte;
-        value *= 1099511628211ULL;
+
+// Whether `control` is `ancestor` or inside it.
+[[nodiscard]] bool within(const Control::Ptr& control, const Control::Ptr& ancestor) {
+    if (!control || !ancestor) return false;
+    for (Control::Ptr current = control; current; current = (*current).parent()) {
+        if (current == ancestor) return true;
     }
-    return value | (std::uint64_t{1} << 63U);
+    return false;
 }
 
 // A page's record in the strip's set is named by the page's stable ID.
@@ -123,7 +123,7 @@ void TabControl::on_dispose() noexcept {
 }
 
 std::vector<std::shared_ptr<TabPage>> TabControl::pages() const {
-    std::vector<std::shared_ptr<TabPage>> result;
+    std::vector<std::shared_ptr<TabPage>> result{};
     result.reserve(pages_.size());
     for (const std::weak_ptr<TabPage>& weak : pages_) {
         const std::shared_ptr<TabPage> page = weak.lock();
@@ -254,13 +254,7 @@ std::shared_ptr<TabPage> TabControl::remove_page(const TabPage& page) {
 void TabControl::remember_page_focus(const std::shared_ptr<TabPage>& page) {
     if (!page || window() == nullptr) return;
     const Control::Ptr focused = (*window()).focused_control();
-    if (!focused) return;
-    for (Control::Ptr current = focused; current; current = (*current).parent()) {
-        if (current == page) {
-            remembered_focus_[(*page).runtime_id().value] = focused;
-            return;
-        }
-    }
+    if (within(focused, page)) remembered_focus_[(*page).runtime_id().value] = focused;
 }
 
 void TabControl::restore_page_focus(const std::shared_ptr<TabPage>& page,
@@ -270,13 +264,9 @@ void TabControl::restore_page_focus(const std::shared_ptr<TabPage>& page,
         remembered_focus_.find((*page).runtime_id().value);
     if (found != remembered_focus_.end()) {
         const Control::Ptr candidate = (*found).second.lock();
-        if (candidate && (*candidate).eligible_for_input()) {
-            for (Control::Ptr current = candidate; current; current = (*current).parent()) {
-                if (current == page) {
-                    if ((*window()).request_focus(candidate)) return;
-                    break;
-                }
-            }
+        if (candidate && (*candidate).eligible_for_input() && within(candidate, page) &&
+            (*window()).request_focus(candidate)) {
+            return;
         }
     }
     static_cast<void>((*window()).request_focus(shared_from_this()));
@@ -291,12 +281,7 @@ void TabControl::show_selected(std::size_t index, const std::vector<std::shared_
     bool selection_owned_focus{};
     if (old_page && window() != nullptr) {
         const Control::Ptr focused = (*window()).focused_control();
-        for (Control::Ptr current = focused; current; current = (*current).parent()) {
-            if (current == old_page) {
-                selection_owned_focus = true;
-                break;
-            }
-        }
+        selection_owned_focus = within(focused, old_page);
         remember_page_focus(old_page);
         (*old_page).set_visible(false);
     }
@@ -489,7 +474,7 @@ void TabControl::on_strip_invoked(const PageInvocation& invocation) {
 // -- geometry ------------------------------------------------------------------
 
 TabControl::ItemParts TabControl::tab_parts(const TabPage& page) const {
-    ItemParts record;
+    ItemParts record{};
     if (!strip_) return record;
     const PageStrip::ItemParts strip_parts = (*strip_).tab_parts_of(tab_page_id(page));
     // The strip's parts are in its coordinates; the control's lie one
@@ -550,12 +535,13 @@ Rect TabControl::display_bounds() const noexcept {
     return bounds;
 }
 
+// The requested size where one is set, else all there is.
 Size TabControl::measure(Size available) {
     const Rect requested = requested_bounds();
-    return {std::min(available.width,
-                     requested.width > 0.0 ? requested.width : available.width),
-            std::min(available.height,
-                     requested.height > 0.0 ? requested.height : available.height)};
+    const double width = requested.width > 0.0 ? requested.width : available.width;
+    const double height = requested.height > 0.0 ? requested.height : available.height;
+    const Size wanted{std::min(available.width, width), std::min(available.height, height)};
+    return wanted;
 }
 
 void TabControl::reconcile_pages() {
@@ -595,7 +581,7 @@ void TabControl::arrange(Rect final_bounds) {
 // a child, paints the tabs. The display is a card's surface until stage T4
 // gives the tab page its own material.
 void TabControl::on_paint(Painter& painter, Rect) {
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     part.role = PartRole::face;
     part.bounds = client_rectangle();
@@ -675,7 +661,7 @@ void TabControl::on_focus_changed(bool focused) {
 // -- semantics -----------------------------------------------------------------
 
 SemanticDescriptor TabControl::semantic_descriptor() const {
-    SemanticDescriptor descriptor;
+    SemanticDescriptor descriptor{};
     descriptor.role = SemanticRole::tab_group;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
@@ -691,13 +677,13 @@ SemanticDescriptor TabControl::semantic_descriptor() const {
 // A tab scrolled out of view is published without bounds and without the
 // visible state, so every tab can still be reached.
 std::vector<SemanticNode> TabControl::semantic_virtual_children() const {
-    std::vector<SemanticNode> nodes;
+    std::vector<SemanticNode> nodes{};
     const std::vector<std::shared_ptr<TabPage>> live = pages();
     nodes.reserve(live.size());
     const Rect absolute = absolute_bounds();
     const std::shared_ptr<TabPage> selected = selected_page_.lock();
     for (std::size_t index = 0U; index < live.size(); ++index) {
-        SemanticNode node;
+        SemanticNode node{};
         node.stable_id = std::string((*live[index]).stable_id().value()) + ".tab";
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
@@ -792,7 +778,7 @@ const ControlAnatomy& TabControl::anatomy() const noexcept {
 }
 
 void TabControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
-    Parts record;
+    Parts record{};
     record.scrollable = scrollable_parts();
 
     const Rect bounds{0.0, 0.0, committed_arranged_bounds().width,
@@ -806,7 +792,7 @@ void TabControl::publish_part_geometry(std::span<PartGeometry> geometry) const {
 
 TabControl::Parts TabControl::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), scrollable_detail::part_fields, published.parts(),
                record.scrollable);
     read_parts(anatomy(), tab_control_extra_part_fields, published.parts(), record);
@@ -833,7 +819,7 @@ void TabControl::publish_realized_item_geometry(std::size_t item,
 }
 
 AnatomyStateSet TabControl::realized_item_anatomy_states(std::size_t item) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     const std::optional<std::size_t> selected = selected_index();
     if (selected && *selected == item) {
         states.insert(AnatomyState::selected);
@@ -843,11 +829,11 @@ AnatomyStateSet TabControl::realized_item_anatomy_states(std::size_t item) const
 
 std::vector<TabControl::Item> TabControl::realized_items() const {
     const std::size_t count = realized_item_count();
-    std::vector<Item> records;
+    std::vector<Item> records{};
     records.reserve(count);
     for (std::size_t item = 0; item < count; ++item) {
         const PartGeometryBuffer published = published_realized_item_geometry(item);
-        Item record;
+        Item record{};
         record.index = item;
         record.stable_id = realized_item_stable_id(item);
         read_item_parts(anatomy().item_systems.front(), tab_control_item_part_fields, published.parts(), record.parts);

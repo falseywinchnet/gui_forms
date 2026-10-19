@@ -38,11 +38,21 @@ bool surface_role(PartRole role) noexcept {
     }
 }
 
+// The corner radius a surface part is drawn with: its own, when set (never
+// negative), else its recipe's material's.
+double part_corner_radius(const PartPaint& part, const ControlVisualRecipe& recipe) noexcept {
+    if (part.corner_radius) {
+        const double result = std::max(0.0, *part.corner_radius);
+        return result;
+    }
+    return recipe.material.corner_radius;
+}
+
 // The overlay shadow's layers around `part.bounds`, in theme order, before
 // the casting surface is painted over them.
 void paint_overlay_shadow(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe,
                           const std::vector<MaterialShadow>& layers) {
-    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    const double radius = part_corner_radius(part, recipe);
     for (const MaterialShadow& shadow : layers) {
         painter.draw_box_shadow(part.bounds, radius, shadow.offset, shadow.blur_radius, shadow.spread,
                                 shadow.color);
@@ -109,32 +119,53 @@ void paint_focus_ring(Painter& painter, Rect bounds, const ControlVisualRecipe& 
                                 recipe.focus_ring, recipe.focus_width);
 }
 
-// A solid triangle pointing `direction`, filled one device-independent row
-// at a time so every host rasterizes the same spans.
+// One arrow kernel: `rows` one-unit strips across the arrow's axis, strip
+// `row` at `first + step * row` along it and spanning `row` units either side
+// of `centre` across it. `horizontal_strips` lays the strips along x (an
+// arrow pointing up or down); otherwise along y. Every value is a whole
+// number, so the strips land on whole units on every host.
+void fill_arrow_strips(Painter& painter, bool horizontal_strips, double centre, double first,
+                       double step, int rows, Color color) {
+    for (int row = 0; row < rows; ++row) {
+        const double extent = static_cast<double>(row);
+        const double position = first + step * static_cast<double>(row);
+        const double length = extent * 2.0 + 1.0;
+        if (horizontal_strips) {
+            painter.fill_rect({centre - extent, position, length, 1.0}, color);
+        } else {
+            painter.fill_rect({position, centre - extent, 1.0, length}, color);
+        }
+    }
+}
+
+// A solid triangle pointing `direction`, filled one device-independent strip
+// at a time so every host rasterizes the same spans. The tip is the one-unit
+// strip; each strip after it reaches one unit further on either side. The
+// triangle is `half` strips deep, with its middle strip at the box's centre.
 void fill_arrow(Painter& painter, Rect bounds, PartMark direction, Color color) {
     const double side = std::min(bounds.width, bounds.height);
     const double half = std::floor(side * 0.5);
     if (half < 1.0) return;
     const double centre_x = std::floor(bounds.x + bounds.width * 0.5);
     const double centre_y = std::floor(bounds.y + bounds.height * 0.5);
-    // `half` rows (or columns), each one unit longer than the last from the tip.
     const int rows = static_cast<int>(half);
-    for (int row = 0; row < rows; ++row) {
-        const double extent = static_cast<double>(row);
-        const double offset = static_cast<double>(row) - std::floor(half * 0.5);
-        if (direction == PartMark::arrow_down) {
-            const double y = centre_y - offset + 0.5;
-            painter.fill_rect({centre_x - extent, y - 0.5, extent * 2.0 + 1.0, 1.0}, color);
-        } else if (direction == PartMark::arrow_up) {
-            const double y = centre_y + offset - 0.5;
-            painter.fill_rect({centre_x - extent, y - 0.5, extent * 2.0 + 1.0, 1.0}, color);
-        } else if (direction == PartMark::arrow_right) {
-            const double x = centre_x - offset + 0.5;
-            painter.fill_rect({x - 0.5, centre_y - extent, 1.0, extent * 2.0 + 1.0}, color);
-        } else {
-            const double x = centre_x + offset - 0.5;
-            painter.fill_rect({x - 0.5, centre_y - extent, 1.0, extent * 2.0 + 1.0}, color);
-        }
+    const double middle_row = std::floor(half * 0.5);
+    switch (direction) {
+    case PartMark::arrow_down:
+        // Tip at the bottom: strips climb from centre_y + middle_row.
+        fill_arrow_strips(painter, true, centre_x, centre_y + middle_row, -1.0, rows, color);
+        return;
+    case PartMark::arrow_up:
+        // Tip at the top: strips descend from centre_y - middle_row - 1.
+        fill_arrow_strips(painter, true, centre_x, centre_y - middle_row - 1.0, 1.0, rows, color);
+        return;
+    case PartMark::arrow_right:
+        fill_arrow_strips(painter, false, centre_y, centre_x + middle_row, -1.0, rows, color);
+        return;
+    default:
+        // arrow_left, the one direction left.
+        fill_arrow_strips(painter, false, centre_y, centre_x - middle_row - 1.0, 1.0, rows, color);
+        return;
     }
 }
 
@@ -416,6 +447,23 @@ void paint_text(Painter& painter, const PartPaint& part, Color color) {
     painter.restore();
 }
 
+// A fill part's content colour (owner decision W-7): flat, in the part's
+// shape, as given; a disabled part's at 45 % of its opacity, as a disabled
+// icon is drawn.
+void paint_content_color(Painter& painter, const PartPaint& part, Color color, bool disabled) {
+    Color shown = color;
+    if (disabled) {
+        const double faded = static_cast<double>(color.alpha) * 0.45;
+        shown.alpha = static_cast<std::uint8_t>(std::lround(faded));
+    }
+    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : 0.0;
+    if (radius > 0.0) {
+        painter.fill_rounded_rect(part.bounds, radius, shown);
+        return;
+    }
+    painter.fill_rect(part.bounds, shown);
+}
+
 } // namespace
 
 ControlVisualContext part_visual_context(const Control& control, AnatomyStateSet states) noexcept {
@@ -466,24 +514,6 @@ Insets overlay_shadow_outsets(const Control& control) noexcept {
     return result;
 }
 
-namespace {
-
-// A fill part's content colour (owner decision W-7): flat, in the part's
-// shape, as given; a disabled part's at 45 % of its opacity, as a disabled
-// icon is drawn.
-void paint_content_color(Painter& painter, const PartPaint& part, Color color, bool disabled) {
-    Color shown = color;
-    if (disabled) shown.alpha = static_cast<std::uint8_t>(std::lround(static_cast<double>(color.alpha) * 0.45));
-    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : 0.0;
-    if (radius > 0.0) {
-        painter.fill_rounded_rect(part.bounds, radius, shown);
-        return;
-    }
-    painter.fill_rect(part.bounds, shown);
-}
-
-} // namespace
-
 void paint_part(Painter& painter, const Control& control, const PartPaint& part) {
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
@@ -495,11 +525,11 @@ void paint_part(Painter& painter, const Control& control, const PartPaint& part)
     }
     paint_part_from_recipe(painter, part, recipe, context);
     if (!part.accent || !surface_role(part.role)) return;
-    // Provisional accent (design language 8.5): the ramp colour, which
+    // Provisional accent (design language §8.5): the ramp colour, which
     // carries its own translucency, laid over the part's material in the
     // part's shape. T4 replaces this with the engine's tint.
     const Color tint = theme.accent(*part.accent);
-    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    const double radius = part_corner_radius(part, recipe);
     painter.fill_rounded_rect(part.bounds, radius, tint);
 }
 

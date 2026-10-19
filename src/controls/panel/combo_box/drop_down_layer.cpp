@@ -76,7 +76,9 @@ Rect DropDownList::match_bounds(std::size_t index, Rect row) const {
     const TextMatchRange match = matches_[index];
     const std::string_view text = items()[index];
     if (match.length == 0U || match.offset >= text.size()) return {};
-    const bool selected = std::binary_search(selected_indices().begin(), selected_indices().end(), index);
+    // ListBox keeps its selected indices sorted.
+    const std::span<const std::size_t> chosen = selected_indices();
+    const bool selected = std::binary_search(chosen.begin(), chosen.end(), index);
     if (selected) return {};
     const std::size_t end = std::min(text.size(), match.offset + match.length);
     // The run's edges are the widths of the text before them, measured as

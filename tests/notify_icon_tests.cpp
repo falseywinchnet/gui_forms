@@ -260,6 +260,38 @@ void component() {
     require(services.snapshot().tray_icons == 0U, "disposal removes the icon");
 }
 
+// A menu command that takes the icon's context menu away while it runs.
+struct DropIconMenu final {
+    NotifyIcon* icon{};
+    void operator()(const CommandInvocation&) const { (*icon).set_context_menu(nullptr); }
+};
+
+// The chosen row's command may replace or remove the icon's context menu;
+// the invocation is still reported, with the menu and row it ran from.
+void menu_removed_by_its_command() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("notify.menu-removed"));
+    Window window(root, {320.0, 200.0});
+    host::HeadlessHost headless(window);
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(headless.services());
+    NotifyIcon icon(window);
+    icon.set_icon({solid_image(16U)});
+    require(icon.set_visible(true).accepted() && icon.shown(), "the icon shows");
+    ClickLog log;
+    SubscriptionToken invoked = icon.menu_item_invoked().subscribe(
+        Delegate<const MenuItemInvocation&>::bind<ClickLog, &ClickLog::on_menu>(log));
+    const std::shared_ptr<Command> quit = std::make_shared<Command>("tray.quit", "Quit");
+    SubscriptionToken dropping = (*quit).invoked().subscribe(DropIconMenu{&icon});
+    std::shared_ptr<ContextMenu> menu = std::make_shared<ContextMenu>("tray.menu");
+    (*menu).set_items({MenuItemSpec("tray.menu.quit", MenuItemKind::command, quit)});
+    icon.set_context_menu(menu);
+    services.queue_tray_menu_choice("tray.menu.quit");
+    services.simulate_tray_icon_event({1U, HostTrayIconAction::context});
+    require(!icon.context_menu(), "the command removed the icon's menu");
+    require(log.invocations.size() == 1U && log.invocations[0].menu_id == "tray.menu" &&
+                log.invocations[0].item_id == "tray.menu.quit" && log.invocations[0].command_id == "tray.quit",
+            "the invocation is reported from the menu the row ran in");
+}
+
 void session_end() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("notify.session"));
     Window window(root, {320.0, 200.0});
@@ -279,6 +311,7 @@ int main() {
     image_selection();
     contract();
     component();
+    menu_removed_by_its_command();
     session_end();
     std::cout << "NotifyIcon: image choice, tray contract, headless host, clicks, menu, notifications, "
                  "visibility, disposal and session end passed\n";

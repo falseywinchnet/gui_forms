@@ -91,17 +91,19 @@ public:
     FaultScope& operator=(const FaultScope&) = delete;
 };
 
-// Whether live_allocations balances over a region. A Windows DLL does not
-// see this executable's replacement operator new, so a block that the C++
-// runtime DLL allocates and this executable frees decrements the count
-// without having incremented it. Ordinary builds keep those calls balanced
-// within the region; under AddressSanitizer on Windows they do not (each
-// short-lived Button frees 24 blocks that libc++.dll allocated, the strings
-// of its property registrations among them), so the balance assertion is
-// skipped there and the subscription assertions remain. This hides no leak
-// finding: LeakSanitizer is not available on Windows, and normal builds
-// still run the assertion.
-#if defined(_WIN32) && defined(__has_feature)
+// Whether live_allocations balances over a region. A block that the C++
+// runtime library allocates without this executable's replacement operator
+// new, and this executable frees, decrements the count without having
+// incremented it. Ordinary builds keep those calls balanced within the
+// region. Under AddressSanitizer they do not, on Windows (a DLL does not see
+// the replacement) or on macOS with the pinned libc++ dylib: each
+// short-lived Button frees 24 blocks that the runtime allocated, the strings
+// of its property registrations among them (-24000 over the 1000 buttons
+// below on both). The balance assertion is skipped there and the
+// subscription assertions remain. This hides no leak finding: LeakSanitizer
+// checks the macOS run and found none here, it is not available on Windows,
+// and normal builds still run the assertion.
+#if (defined(_WIN32) || defined(__APPLE__)) && defined(__has_feature)
 #if __has_feature(address_sanitizer)
 constexpr bool balance_is_observable = false;
 #else
