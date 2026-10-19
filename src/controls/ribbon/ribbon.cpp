@@ -119,18 +119,21 @@ void Ribbon::set_focus_region(bool region) {
 
 // -- model ---------------------------------------------------------------------
 
-void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets) {
-    require_mutable();
-    if (tabs.size() > maximum_tabs) throw std::invalid_argument("Ribbon has more tabs than maximum_tabs");
-    std::unordered_set<std::string> identities{};
+namespace {
+
+// Checks the tab sets (their IDs join `identities`) and where each tab sits:
+// core tabs first, then each set's tabs together, in the sets' order, every
+// set with tabs and every tab with a mode. Returns each tab's set, none for a
+// core tab. Throws std::invalid_argument and changes nothing else.
+std::vector<std::optional<std::size_t>> validate_tab_sets(const std::vector<RibbonTabSpec>& tabs,
+                                                          const std::vector<RibbonTabSetSpec>& sets,
+                                                          std::unordered_set<std::string>& identities) {
     for (const RibbonTabSetSpec& set : sets) {
         if (set.stable_id.empty() || !validate_utf8(set.stable_id).valid() || !validate_utf8(set.caption).valid() ||
             !identities.insert(set.stable_id).second) {
             throw std::invalid_argument("Ribbon tab sets require unique stable IDs and valid UTF-8");
         }
     }
-    // Each tab's set, in order: core tabs first, then each set's tabs
-    // together, in the sets' order.
     std::vector<std::optional<std::size_t>> tab_set_of(tabs.size());
     std::vector<std::size_t> set_tab_counts(sets.size(), 0U);
     std::optional<std::size_t> current_set{};
@@ -159,9 +162,82 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
     for (const std::size_t count : set_tab_counts) {
         if (count == 0U) throw std::invalid_argument("Ribbon tab set has no tabs");
     }
+    return tab_set_of;
+}
+
+// Checks one command record: its ID (joining `identities`), its Command, menu,
+// label, choices and width by kind, and the application's control it holds
+// (joining `authored`), which must be unowned or already the ribbon's
+// (`ribbon`) or its group popup's (`popup`). Throws std::invalid_argument.
+void validate_command(const RibbonCommandSpec& command, std::unordered_set<std::string>& identities,
+                      std::unordered_set<const Control*>& authored, const Control* ribbon, const Control* popup) {
+    if (command.stable_id.empty() || !validate_utf8(command.stable_id).valid() ||
+        !validate_utf8(command.text).valid() || !identities.insert(command.stable_id).second) {
+        throw std::invalid_argument("Ribbon commands require unique stable IDs and valid UTF-8");
+    }
+    if (needs_command(command.kind) && !command.command) {
+        throw std::invalid_argument("Ribbon buttons, toggles and splits require a Command");
+    }
+    if (hosted(command.kind) && command.command) {
+        throw std::invalid_argument("Ribbon hosted commands take no Command");
+    }
+    if (has_menu(command.kind) != !command.drop_down.empty()) {
+        throw std::invalid_argument("Ribbon split and drop-down commands require a menu, and others have none");
+    }
+    if (!command.show_label && (command.size != RibbonCommandSize::small || command.image.value == 0U ||
+                                hosted(command.kind))) {
+        throw std::invalid_argument("Ribbon icon-only commands must be small and have an image");
+    }
+    if (command.kind != RibbonCommandKind::combo_box && !command.choices.empty()) {
+        throw std::invalid_argument("Ribbon choices belong to combo box commands only");
+    }
+    for (const std::string& choice : command.choices) {
+        if (!validate_utf8(choice).valid()) throw std::invalid_argument("Ribbon choices must be valid UTF-8");
+    }
+    if (!std::isfinite(command.width) || command.width < 0.0 || command.width > maximum_hosted_width) {
+        throw std::invalid_argument("Ribbon command width must be finite and between 0 and 1024");
+    }
+    // A gallery, font control or colour picker command holds exactly its own
+    // kind's control; every other kind holds none.
+    const std::size_t controls = static_cast<std::size_t>(static_cast<bool>(command.gallery)) +
+                                 static_cast<std::size_t>(static_cast<bool>(command.font_control)) +
+                                 static_cast<std::size_t>(static_cast<bool>(command.color_picker));
+    const Control::Ptr own = authored_control(command);
+    if (authored_kind(command.kind) != static_cast<bool>(own) || controls > (own ? 1U : 0U)) {
+        throw std::invalid_argument(
+            "Ribbon gallery, font control and colour picker commands hold their control, and others none");
+    }
+    if (own) {
+        const Control::Ptr parent = (*own).parent();
+        const bool ours = !parent || parent.get() == ribbon || parent.get() == popup;
+        if (!ours || !authored.insert(own.get()).second) {
+            throw std::invalid_argument("Ribbon hosted controls must be used once and not owned elsewhere");
+        }
+    }
+    if (command.gallery && (*command.gallery).form() != RibbonGalleryForm::in_ribbon) {
+        throw std::invalid_argument("Ribbon galleries must be in-ribbon, used once and not owned by another parent");
+    }
+    if (!command.drop_down.empty()) {
+        std::unordered_set<std::string> menu_identities{};
+        std::size_t count{};
+        menu_detail::validate_specs(command.drop_down, menu_identities, 1U, count);
+    }
+}
+
+} // namespace
+
+// Validates the whole definition before anything changes (house style §9)
+// and prepares what set_tabs commits: each tab's set and every group's
+// layouts, authored (validated) or generated. Throws std::invalid_argument.
+Ribbon::PreparedTabs Ribbon::prepare_tabs(const std::vector<RibbonTabSpec>& tabs,
+                                          const std::vector<RibbonTabSetSpec>& sets) const {
+    if (tabs.size() > maximum_tabs) throw std::invalid_argument("Ribbon has more tabs than maximum_tabs");
+    // One ID namespace across sets, tabs, groups and commands.
+    std::unordered_set<std::string> identities{};
+    PreparedTabs prepared;
+    prepared.tab_set_of = validate_tab_sets(tabs, sets, identities);
     std::unordered_set<const Control*> authored{};
-    // Every group's layouts, validated or generated before anything changes.
-    std::vector<std::vector<std::vector<RibbonGroupLayout>>> prepared(tabs.size());
+    prepared.layouts.resize(tabs.size());
     for (std::size_t tab_index = 0; tab_index < tabs.size(); ++tab_index) {
         const RibbonTabSpec& tab = tabs[tab_index];
         if (tab.stable_id.empty() || !validate_utf8(tab.stable_id).valid() || !validate_utf8(tab.text).valid() ||
@@ -171,7 +247,7 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
         if (tab.groups.size() > maximum_groups_per_tab) {
             throw std::invalid_argument("Ribbon tab has more groups than maximum_groups_per_tab");
         }
-        prepared[tab_index].reserve(tab.groups.size());
+        prepared.layouts[tab_index].reserve(tab.groups.size());
         for (const RibbonGroupSpec& group : tab.groups) {
             if (group.stable_id.empty() || !validate_utf8(group.stable_id).valid() ||
                 !validate_utf8(group.caption).valid() || !identities.insert(group.stable_id).second) {
@@ -183,72 +259,22 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
             if (group.modes == 0U) throw std::invalid_argument("Ribbon groups need at least one application mode");
             std::size_t group_galleries = 0U;
             for (const RibbonCommandSpec& command : group.commands) {
-                if (command.stable_id.empty() || !validate_utf8(command.stable_id).valid() ||
-                    !validate_utf8(command.text).valid() || !identities.insert(command.stable_id).second) {
-                    throw std::invalid_argument("Ribbon commands require unique stable IDs and valid UTF-8");
-                }
-                if (needs_command(command.kind) && !command.command) {
-                    throw std::invalid_argument("Ribbon buttons, toggles and splits require a Command");
-                }
-                if (hosted(command.kind) && command.command) {
-                    throw std::invalid_argument("Ribbon hosted commands take no Command");
-                }
-                if (has_menu(command.kind) != !command.drop_down.empty()) {
-                    throw std::invalid_argument("Ribbon split and drop-down commands require a menu, and others have none");
-                }
-                if (!command.show_label && (command.size != RibbonCommandSize::small || command.image.value == 0U ||
-                                            hosted(command.kind))) {
-                    throw std::invalid_argument("Ribbon icon-only commands must be small and have an image");
-                }
-                if (command.kind != RibbonCommandKind::combo_box && !command.choices.empty()) {
-                    throw std::invalid_argument("Ribbon choices belong to combo box commands only");
-                }
-                for (const std::string& choice : command.choices) {
-                    if (!validate_utf8(choice).valid()) throw std::invalid_argument("Ribbon choices must be valid UTF-8");
-                }
-                if (!std::isfinite(command.width) || command.width < 0.0 || command.width > maximum_hosted_width) {
-                    throw std::invalid_argument("Ribbon command width must be finite and between 0 and 1024");
-                }
-                const std::size_t controls = static_cast<std::size_t>(static_cast<bool>(command.gallery)) +
-                                             static_cast<std::size_t>(static_cast<bool>(command.font_control)) +
-                                             static_cast<std::size_t>(static_cast<bool>(command.color_picker));
-                const Control::Ptr own = authored_control(command);
-                if (authored_kind(command.kind) != static_cast<bool>(own) || controls > (own ? 1U : 0U)) {
-                    throw std::invalid_argument(
-                        "Ribbon gallery, font control and colour picker commands hold their control, and others none");
-                }
-                if (own) {
-                    const Control::Ptr parent = (*own).parent();
-                    const bool ours = !parent || parent.get() == this || parent.get() == group_popup_.get();
-                    if (!ours || !authored.insert(own.get()).second) {
-                        throw std::invalid_argument("Ribbon hosted controls must be used once and not owned elsewhere");
-                    }
-                }
-                if (command.gallery) {
-                    if ((*command.gallery).form() != RibbonGalleryForm::in_ribbon) {
-                        throw std::invalid_argument(
-                            "Ribbon galleries must be in-ribbon, used once and not owned by another parent");
-                    }
-                    ++group_galleries;
-                }
-                if (!command.drop_down.empty()) {
-                    std::unordered_set<std::string> menu_identities{};
-                    std::size_t count{};
-                    menu_detail::validate_specs(command.drop_down, menu_identities, 1U, count);
-                }
+                validate_command(command, identities, authored, this, group_popup_.get());
+                if (command.gallery) ++group_galleries;
             }
             if (group_galleries > 1U) throw std::invalid_argument("Ribbon group holds more than one gallery");
-            prepared[tab_index].push_back(prepare_group_layouts(group));
+            prepared.layouts[tab_index].push_back(prepare_group_layouts(group));
         }
-        validate_reduction_order(tab, prepared[tab_index]);
+        validate_reduction_order(tab, prepared.layouts[tab_index]);
     }
-    close_menus();
-    close_group_popup();
-    // Hosted controls carry over to a command of the same ID and kind, and
-    // the application's controls (galleries, font controls, colour pickers)
-    // to a command holding the same control.
-    std::vector<std::pair<std::string, CommandRecord>> previous;
-    std::vector<Control::Ptr> previous_galleries;
+    return prepared;
+}
+
+// Takes the hosted controls out of the current records, leaving those
+// records without them: ribbon-made controls with their records, keyed by
+// their command's ID and kind; the application's controls by identity.
+Ribbon::HostedCarryOver Ribbon::take_hosted_controls() {
+    HostedCarryOver carried;
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
         for (std::size_t group = 0; group < tabs_[tab].groups.size(); ++group) {
             for (std::size_t command = 0; command < tabs_[tab].groups[group].commands.size(); ++command) {
@@ -256,17 +282,20 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
                 if (!record.hosted) continue;
                 const RibbonCommandSpec& spec = tabs_[tab].groups[group].commands[command];
                 if (authored_kind(spec.kind)) {
-                    previous_galleries.push_back(std::move(record.hosted));
+                    carried.authored.push_back(std::move(record.hosted));
                     continue;
                 }
-                previous.emplace_back(hosted_key(spec), std::move(record));
+                carried.made.emplace_back(hosted_key(spec), std::move(record));
             }
         }
     }
-    const std::optional<std::size_t> old_selection = selected_tab_;
-    std::string selected_id;
-    if (old_selection) selected_id = tabs_[*old_selection].stable_id;
-    // Sets keep their availability and last accent by ID.
+    return carried;
+}
+
+// The new sets' states: availability and last accent carried over by set ID,
+// and each set's range of tabs from `tab_set_of`.
+std::vector<Ribbon::TabSetState> Ribbon::carried_set_states(
+    const std::vector<RibbonTabSetSpec>& sets, const std::vector<std::optional<std::size_t>>& tab_set_of) const {
     std::vector<TabSetState> states(sets.size());
     for (std::size_t set = 0; set < sets.size(); ++set) {
         for (std::size_t old = 0; old < tab_sets_.size(); ++old) {
@@ -281,11 +310,14 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
         if (state.tab_count == 0U) state.first_tab = tab;
         ++state.tab_count;
     }
-    tabs_ = std::move(tabs);
-    tab_sets_ = std::move(sets);
-    set_states_ = std::move(states);
-    tab_set_of_ = std::move(tab_set_of);
-    layouts_ = std::move(prepared);
+    return states;
+}
+
+// Makes one record per command of tabs_: its hosted control, carried over
+// (a ribbon-made one by ID and kind, the application's by identity) or made
+// and added, configured from its command; and a watch on its Command. Takes
+// what it reuses out of `carried`.
+void Ribbon::rebuild_records(HostedCarryOver& carried) {
     records_.clear();
     records_.resize(tabs_.size());
     for (std::size_t tab = 0; tab < tabs_.size(); ++tab) {
@@ -298,7 +330,7 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
                 CommandRecord& record = records_[tab][group][command];
                 if (authored_kind(spec.kind)) {
                     const Control::Ptr own = authored_control(spec);
-                    for (Control::Ptr& old : previous_galleries) {
+                    for (Control::Ptr& old : carried.authored) {
                         if (old.get() != own.get()) continue;
                         record.hosted = std::move(old);
                         break;
@@ -309,7 +341,7 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
                     }
                 } else if (hosted(spec.kind)) {
                     const std::string key = hosted_key(spec);
-                    for (std::pair<std::string, CommandRecord>& old : previous) {
+                    for (std::pair<std::string, CommandRecord>& old : carried.made) {
                         if (old.first != key || !old.second.hosted) continue;
                         record.hosted = std::move(old.second.hosted);
                         break;
@@ -329,12 +361,38 @@ void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetS
             }
         }
     }
-    for (std::pair<std::string, CommandRecord>& old : previous) {
+}
+
+// Removes the hosted controls no new command took.
+void Ribbon::release_carried(const HostedCarryOver& carried) {
+    for (const std::pair<std::string, CommandRecord>& old : carried.made) {
         if (old.second.hosted) static_cast<void>(remove_child((*old.second.hosted).runtime_id()));
     }
-    for (const Control::Ptr& old : previous_galleries) {
+    for (const Control::Ptr& old : carried.authored) {
         if (old && (*old).parent().get() == this) static_cast<void>(remove_child((*old).runtime_id()));
     }
+}
+
+// Validates and prepares everything first (prepare_tabs), so that a refusal
+// leaves the ribbon as it was; then closes the popups, carries the hosted
+// controls and the sets' states over, commits, and restores the selection.
+void Ribbon::set_tabs(std::vector<RibbonTabSpec> tabs, std::vector<RibbonTabSetSpec> sets) {
+    require_mutable();
+    PreparedTabs prepared = prepare_tabs(tabs, sets);
+    close_menus();
+    close_group_popup();
+    // Lives to the end: its records keep their Command watches until then.
+    HostedCarryOver carried = take_hosted_controls();
+    std::string selected_id;
+    if (selected_tab_) selected_id = tabs_[*selected_tab_].stable_id;
+    std::vector<TabSetState> states = carried_set_states(sets, prepared.tab_set_of);
+    tabs_ = std::move(tabs);
+    tab_sets_ = std::move(sets);
+    set_states_ = std::move(states);
+    tab_set_of_ = std::move(prepared.tab_set_of);
+    layouts_ = std::move(prepared.layouts);
+    rebuild_records(carried);
+    release_carried(carried);
     refresh_accents();
     selected_tab_.reset();
     last_core_tab_.reset();
@@ -1245,6 +1303,8 @@ void Ribbon::click_tab(std::size_t tab) {
 void Ribbon::click_command(CommandAddress address) {
     const RibbonCommandSpec* const found = selected_command(address);
     if (found == nullptr || hosted((*found).kind) || !command_enabled(*found)) return;
+    // A copy: running the command, or a handler of its events, may replace
+    // the tabs and so the record `found` points into.
     const RibbonCommandSpec spec = *found;
     if (spec.kind == RibbonCommandKind::drop_down) {
         static_cast<void>(show_drop_down(spec.stable_id));
@@ -1605,6 +1665,12 @@ void Ribbon::popup_key(KeyEvent& event) {
         if (all[index] == *popup_stop_) position = index;
     }
     const Stop current = all[position];
+    // The current stop's command when it has a menu (a split or drop-down).
+    const RibbonCommandSpec* current_menu = nullptr;
+    if (current.kind == StopKind::command) {
+        const RibbonCommandSpec* const spec = selected_command(current.command);
+        if (spec != nullptr && has_menu((*spec).kind)) current_menu = spec;
+    }
     const std::uint32_t key = event.physical_key;
     const bool shift = has_modifier(event.modifiers, Modifier::shift);
     std::optional<Stop> next{};
@@ -1616,9 +1682,8 @@ void Ribbon::popup_key(KeyEvent& event) {
         } else {
             return;
         }
-    } else if (key == PhysicalKey::down && current.kind == StopKind::command &&
-               has_menu((*selected_command(current.command)).kind)) {
-        static_cast<void>(show_drop_down((*selected_command(current.command)).stable_id));
+    } else if (key == PhysicalKey::down && current_menu != nullptr) {
+        static_cast<void>(show_drop_down((*current_menu).stable_id));
     } else if (key == PhysicalKey::right || key == PhysicalKey::down) {
         next = all[(position + 1U) % all.size()];
     } else if (key == PhysicalKey::left || key == PhysicalKey::up) {
@@ -2058,15 +2123,14 @@ std::vector<SemanticNode> Ribbon::semantic_virtual_children() const {
         if (!shown(tab)) continue;
         // Core tabs count their place among the core tabs shown, and a
         // contextual tab among its set's; its set's caption describes it.
-        std::size_t count = 0U;
-        const std::size_t position = position_among_shown(tab, count);
+        const TabPosition place = position_among_shown(tab);
         SemanticNode node{};
         node.stable_id = node_identity(ribbon_id, "tab", tabs_[tab].stable_id);
         node.role = SemanticRole::tab;
         node.name = parse_mnemonic_text(tabs_[tab].text).display_text;
         if (tab_set_of_[tab]) node.description = tab_sets_[*tab_set_of_[tab]].caption;
-        node.position_in_set = position;
-        node.set_size = count;
+        node.position_in_set = place.position;
+        node.set_size = place.count;
         node.bounds = to_window(absolute, placed.tabs[tab]);
         node.states = base | SemanticState::focusable;
         if (selected_tab_ == tab) node.states |= SemanticState::selected;
