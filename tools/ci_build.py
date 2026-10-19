@@ -35,29 +35,47 @@ def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
 SANITIZER_FLAGS: str = '-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
 
 
+SANITIZER_LINK_FLAGS: str = '-fsanitize=address,undefined'
+
+
 def sanitizer_options(host: str, lsan_suppressions: Path) -> tuple[list[str], dict[str, str]]:
-    """CMake options and test environment for the sanitized suite on host.
+    """CMake options and the configure and test environment for the sanitized suite on host.
 
     Address and undefined-behaviour sanitizers everywhere, and the leak
     sanitizer where it runs inside AddressSanitizer: Linux and macOS (the
     MinGW runtime on Windows has none). Every report stops its test, so any
     finding fails the run. Third-party sources built by CMake (HarfBuzz,
     FreeType) are instrumented too; the prebuilt Skia archive is not.
+
+    On macOS cmake/llvm22.cmake puts the pinned libc++ headers and runtime
+    link flags in CMAKE_<LANG>_FLAGS_INIT, which a -DCMAKE_<LANG>_FLAGS on
+    the command line replaces (the tree then compiles against Homebrew's
+    libc++ headers). There the flags go through CFLAGS, CXXFLAGS,
+    OBJCXXFLAGS and LDFLAGS instead, which CMake joins with the _INIT values
+    when it first configures the tree; OBJCXXFLAGS also instruments the
+    Objective-C++ host. Being read at the first configure only, they reach a
+    macOS tree configured earlier only after that tree is deleted.
     """
     detect_leaks: str = '0'
     if host in ('linux', 'macos'):
         detect_leaks = '1'
-    options: list[str] = [
-        '-DCMAKE_BUILD_TYPE=RelWithDebInfo',
-        '-DCMAKE_C_FLAGS=' + SANITIZER_FLAGS,
-        '-DCMAKE_CXX_FLAGS=' + SANITIZER_FLAGS,
-        '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined',
-        '-DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address,undefined',
-    ]
+    options: list[str] = ['-DCMAKE_BUILD_TYPE=RelWithDebInfo']
     environment: dict[str, str] = {
         'ASAN_OPTIONS': 'detect_leaks=' + detect_leaks + ':halt_on_error=1:abort_on_error=0:print_summary=1',
         'UBSAN_OPTIONS': 'print_stacktrace=1:halt_on_error=1:print_summary=1',
     }
+    if host == 'macos':
+        environment['CFLAGS'] = SANITIZER_FLAGS
+        environment['CXXFLAGS'] = SANITIZER_FLAGS
+        environment['OBJCXXFLAGS'] = SANITIZER_FLAGS
+        environment['LDFLAGS'] = SANITIZER_LINK_FLAGS
+    else:
+        options.extend([
+            '-DCMAKE_C_FLAGS=' + SANITIZER_FLAGS,
+            '-DCMAKE_CXX_FLAGS=' + SANITIZER_FLAGS,
+            '-DCMAKE_EXE_LINKER_FLAGS=' + SANITIZER_LINK_FLAGS,
+            '-DCMAKE_SHARED_LINKER_FLAGS=' + SANITIZER_LINK_FLAGS,
+        ])
     if detect_leaks == '1':
         environment['LSAN_OPTIONS'] = 'suppressions=' + str(lsan_suppressions) + ':print_suppressions=0'
     return options, environment

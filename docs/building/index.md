@@ -76,6 +76,34 @@ and the renderer-free tests still cover the retained engine.
 
 ## Sanitized test runs
 
+`python3 -B tools/ci_build.py --sanitize [--tests REGEX]` is the standard
+sanitized tree on every platform: AddressSanitizer and
+UndefinedBehaviorSanitizer everywhere, LeakSanitizer on Linux and macOS,
+every report stopping its test ([Contributing](../dev/contributing.md) has
+the details). On macOS the sanitizer flags reach CMake through `CFLAGS`,
+`CXXFLAGS`, `OBJCXXFLAGS` and `LDFLAGS` rather than `-DCMAKE_<LANG>_FLAGS`.
+`cmake/llvm22.cmake` puts the pinned libc++ headers and runtime link flags
+in `CMAKE_<LANG>_FLAGS_INIT`, which a command-line `-DCMAKE_<LANG>_FLAGS`
+replaces: the tree then compiles against Homebrew's libc++ headers (the
+first macOS attempt failed in `dock_site.cpp` with "'from_chars' is
+unavailable: introduced in macOS 26.0") and leaves the Objective-C++ host
+uninstrumented. CMake reads those variables only when it first configures a
+tree, so delete a macOS `gui-forms-sanitize` tree configured before this
+change.
+
+The first macOS run (2026-10-19, Apple M4, macOS 26.5, Xcode 26.5, `--tests macos`, 7 tests) found no
+AddressSanitizer or UndefinedBehaviorSanitizer report, but every test
+failed on LeakSanitizer reports, between 23 and about 900 per test. Every
+reported allocation is made inside AppKit, CoreFoundation, CoreGraphics,
+ImageIO or the Objective-C runtime (`NSApplication`, `NSWindow`,
+`NSAlert`, `CGContextDrawImage`, `NSBitmapImageRep`, class
+initialisation); none is made directly by GUI.Forms code. With
+`detect_leaks=0` all seven pass. `gui_forms_macos_idle_visibility_tests`
+also exceeded its own 15-second limit once while LeakSanitizer scanned at
+exit. Whether macOS gets a suppression baseline for these system
+allocations or runs without leak detection is an open owner decision; until
+it is made, the macOS sanitized tests fail.
+
 `tools/run_sanitizer_suite.sh <build-directory>` builds the toolkit, the
 Gallery and every test with AddressSanitizer and UndefinedBehaviorSanitizer
 (`-fsanitize=address,undefined -fno-omit-frame-pointer`, RelWithDebInfo)
@@ -90,7 +118,9 @@ sh tools/run_sanitizer_suite.sh .build/sanitize
 Both sanitizers link on the pinned Windows toolchain (MSYS2 CLANG64, LLVM
 22.1.8). The defaults are the Windows native configuration, and further
 CMake arguments after the directory reach the first configure; only the
-Windows configuration has been run so far. ASan stops a test at its first
+Windows configuration has been run so far. Its `-DCMAKE_<LANG>_FLAGS`
+replace the macOS toolchain flags as described above, so on macOS use
+`ci_build.py --sanitize`. ASan stops a test at its first
 report. UBSan reports without stopping, so a UBSan report does not fail its
 test: the script reads ctest's `Testing/Temporary/LastTest.log`, prints
 every sanitizer report it finds and exits non-zero on a report or a failed

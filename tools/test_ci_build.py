@@ -24,10 +24,6 @@ class GalleryOptionTests(unittest.TestCase):
             self.assertFalse(ci_build.gallery_enabled(False, {'GUI_FORMS_CI_BUILD_GALLERY': value}), value)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 class SanitizerOptionTests(unittest.TestCase):
     def test_every_finding_stops_its_test(self) -> None:
         options: list[str]
@@ -52,3 +48,29 @@ class SanitizerOptionTests(unittest.TestCase):
         self.assertIn('detect_leaks=0', environment['ASAN_OPTIONS'])
         self.assertNotIn('LSAN_OPTIONS', environment)
         self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
+
+    def test_macos_flags_join_the_toolchain_flags(self) -> None:
+        options: list[str]
+        environment: dict[str, str]
+        options, environment = ci_build.sanitizer_options('macos', Path('lsan.supp'))
+        self.assertEqual(options, ['-DCMAKE_BUILD_TYPE=RelWithDebInfo'])
+        name: str
+        for name in ('CFLAGS', 'CXXFLAGS', 'OBJCXXFLAGS'):
+            self.assertEqual(environment[name], ci_build.SANITIZER_FLAGS, name)
+        self.assertEqual(environment['LDFLAGS'], ci_build.SANITIZER_LINK_FLAGS)
+
+    def test_linux_and_windows_keep_command_line_flags(self) -> None:
+        options: list[str]
+        environment: dict[str, str]
+        host: str
+        for host in ('linux', 'windows'):
+            options, environment = ci_build.sanitizer_options(host, Path('lsan.supp'))
+            self.assertIn('-DCMAKE_C_FLAGS=' + ci_build.SANITIZER_FLAGS, options, host)
+            self.assertIn('-DCMAKE_EXE_LINKER_FLAGS=' + ci_build.SANITIZER_LINK_FLAGS, options, host)
+            self.assertIn('-DCMAKE_SHARED_LINKER_FLAGS=' + ci_build.SANITIZER_LINK_FLAGS, options, host)
+            self.assertNotIn('CXXFLAGS', environment, host)
+            self.assertNotIn('LDFLAGS', environment, host)
+
+
+if __name__ == '__main__':
+    unittest.main()
