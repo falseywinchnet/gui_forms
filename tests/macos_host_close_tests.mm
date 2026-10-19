@@ -6,6 +6,9 @@
 
 #include <array>
 #include <chrono>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -205,6 +208,35 @@ private:
     std::string& snapshot_;
 };
 
+// Main-queue work after a delay without Objective-C blocks (owner decision
+// V2-1): `function` adopts the heap `context` and deletes it.
+void post_after(std::int64_t delay_nanoseconds, void* context, dispatch_function_t function) {
+    const dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay_nanoseconds);
+    dispatch_after_f(when, dispatch_get_main_queue(), context, function);
+}
+
+// The window probe's two delayed steps, with what the replaced blocks
+// captured: the probe state, the window (kept alive) and the close request.
+struct NativeWindowProbeWork final {
+    std::shared_ptr<NativeWindowProbeState> probe;
+    NSWindow* window;
+    std::function<void()> request_close;
+};
+
+void probe_restored(void* context) {
+    const std::unique_ptr<NativeWindowProbeWork> work(static_cast<NativeWindowProbeWork*>(context));
+    (*(*work).probe).restored = !(*work).window.isMiniaturized;
+    (*work).request_close();
+    (*work).request_close();
+}
+
+void probe_minimized(void* context) {
+    std::unique_ptr<NativeWindowProbeWork> work(static_cast<NativeWindowProbeWork*>(context));
+    (*(*work).probe).minimized = (*work).window.isMiniaturized;
+    [(*work).window deminiaturize:nil];
+    post_after(80 * NSEC_PER_MSEC, work.release(), &probe_restored);
+}
+
 class ProbeNativeWindow final {
 public:
     ProbeNativeWindow(
@@ -214,8 +246,8 @@ public:
           request_close_(std::move(request_close)) {}
 
     void operator()() const {
-        // Blocks below copy these locals, so the scheduled work does not
-        // depend on this callable outliving the dispatch.
+        // The scheduled work copies these locals, so it does not depend on
+        // this callable outliving the dispatch.
         const std::shared_ptr<NativeWindowProbeState> nativeWindowProbe =
             native_window_probe_;
         const std::function<void()> requestClose = request_close_;
@@ -248,26 +280,78 @@ public:
             !NSEqualRects(nativeWindow.frame, committed);
         [nativeWindow zoom:nil];
         [nativeWindow miniaturize:nil];
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-            dispatch_get_main_queue(), ^{
-                (*nativeWindowProbe).minimized = nativeWindow.isMiniaturized;
-                [nativeWindow deminiaturize:nil];
-                dispatch_after(
-                    dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-                    dispatch_get_main_queue(), ^{
-                        (*nativeWindowProbe).restored =
-                            !nativeWindow.isMiniaturized;
-                        requestClose();
-                        requestClose();
-                    });
-            });
+        NativeWindowProbeWork* const work = new NativeWindowProbeWork{nativeWindowProbe, nativeWindow, requestClose};
+        post_after(80 * NSEC_PER_MSEC, work, &probe_minimized);
     }
 
 private:
     std::shared_ptr<NativeWindowProbeState> native_window_probe_;
     std::function<void()> request_close_;
 };
+
+// The re-arm probe's delayed steps, with what the replaced blocks captured.
+struct RearmStartWork final {
+    std::shared_ptr<RearmProbeState> state;
+    std::shared_ptr<FrameProbe> surface;
+};
+
+struct RearmCycleWork final {
+    std::shared_ptr<RearmProbeState> state;
+    std::size_t cycle;
+};
+
+void rearm_first_cycle(void* context) {
+    const std::unique_ptr<RearmStartWork> work(static_cast<RearmStartWork*>(context));
+    run_rearm_cycle((*work).state);
+}
+
+void rearm_show_and_wake(void* context) {
+    std::unique_ptr<RearmStartWork> work(static_cast<RearmStartWork*>(context));
+    (*(*work).surface).set_visible(true);
+    (*(*work).state).wake();
+    post_after(80 * NSEC_PER_MSEC, work.release(), &rearm_first_cycle);
+}
+
+void rearm_next_cycle(void* context) {
+    const std::unique_ptr<RearmCycleWork> work(static_cast<RearmCycleWork*>(context));
+    run_rearm_cycle((*work).state);
+}
+
+void rearm_measure(void* context) {
+    std::unique_ptr<RearmCycleWork> work(static_cast<RearmCycleWork*>(context));
+    RearmProbeState& state = *(*work).state;
+    const std::size_t current = (*work).cycle;
+    state.ticks_after[current] = (*state.root).ticks;
+    if (state.ticks_after[current] > state.ticks_at_rearm[current]) {
+        ++state.successful_cycles;
+    }
+    ++state.cycle;
+    if (state.cycle == state.ticks_before.size()) {
+        if (state.finish) {
+            state.finish();
+        } else {
+            state.request_close();
+            state.request_close();
+        }
+        return;
+    }
+    post_after(10 * NSEC_PER_MSEC, work.release(), &rearm_next_cycle);
+}
+
+void rearm_after_disconnect(void* context) {
+    std::unique_ptr<RearmCycleWork> work(static_cast<RearmCycleWork*>(context));
+    RearmProbeState& state = *(*work).state;
+    const std::size_t current = (*work).cycle;
+    state.ticks_at_rearm[current] = (*state.root).ticks;
+    if (state.ticks_at_rearm[current] != state.ticks_before[current]) {
+        ++state.quiescent_gap_failures;
+    }
+    state.replacement = (*state.window).activate_surface(
+        state.root, std::chrono::milliseconds(10),
+        gui_forms::FrameClock::now() + std::chrono::milliseconds(10));
+    state.wake();
+    post_after(70 * NSEC_PER_MSEC, work.release(), &rearm_measure);
+}
 
 class PrepareCloseTestHost final {
 public:
@@ -313,19 +397,8 @@ public:
             (*rearm_state_).request_close;
         (*rearm_state_).finish =
             ProbeNativeWindow(nativeWindowProbe, requestClose);
-        const std::shared_ptr<RearmProbeState> scheduled_state = rearm_state_;
-        const std::shared_ptr<FrameProbe> scheduled_surface = surface_;
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-            dispatch_get_main_queue(), ^{
-                (*scheduled_surface).set_visible(true);
-                (*scheduled_state).wake();
-                dispatch_after(
-                    dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC),
-                    dispatch_get_main_queue(), ^{
-                        run_rearm_cycle(scheduled_state);
-                    });
-            });
+        RearmStartWork* const work = new RearmStartWork{rearm_state_, surface_};
+        post_after(80 * NSEC_PER_MSEC, work, &rearm_show_and_wake);
     }
 
 private:
@@ -346,49 +419,8 @@ void run_rearm_cycle(const std::shared_ptr<RearmProbeState>& state) {
         (*state).replacement.disconnect();
     }
     (*state).wake();
-    const std::shared_ptr<RearmProbeState> retained_state = state;
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, 12 * NSEC_PER_MSEC),
-        dispatch_get_main_queue(), ^{
-            (*retained_state).ticks_at_rearm[current] =
-                (*(*retained_state).root).ticks;
-            if ((*retained_state).ticks_at_rearm[current] !=
-                (*retained_state).ticks_before[current]) {
-                ++(*retained_state).quiescent_gap_failures;
-            }
-            (*retained_state).replacement =
-                (*(*retained_state).window).activate_surface(
-                    (*retained_state).root, std::chrono::milliseconds(10),
-                    gui_forms::FrameClock::now() +
-                        std::chrono::milliseconds(10));
-            (*retained_state).wake();
-            dispatch_after(
-                dispatch_time(DISPATCH_TIME_NOW, 70 * NSEC_PER_MSEC),
-                dispatch_get_main_queue(), ^{
-                    (*retained_state).ticks_after[current] =
-                        (*(*retained_state).root).ticks;
-                    if ((*retained_state).ticks_after[current] >
-                        (*retained_state).ticks_at_rearm[current]) {
-                        ++(*retained_state).successful_cycles;
-                    }
-                    ++(*retained_state).cycle;
-                    if ((*retained_state).cycle ==
-                        (*retained_state).ticks_before.size()) {
-                        if ((*retained_state).finish) {
-                            (*retained_state).finish();
-                        } else {
-                            (*retained_state).request_close();
-                            (*retained_state).request_close();
-                        }
-                        return;
-                    }
-                    dispatch_after(
-                        dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
-                        dispatch_get_main_queue(), ^{
-                            run_rearm_cycle(retained_state);
-                        });
-                });
-        });
+    RearmCycleWork* const work = new RearmCycleWork{state, current};
+    post_after(12 * NSEC_PER_MSEC, work, &rearm_after_disconnect);
 }
 
 bool test_isolated_macos_services() {

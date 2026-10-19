@@ -72,6 +72,17 @@ private:
     std::string& snapshot_;
 };
 
+// A close callback run later on the main queue without an Objective-C
+// block (owner decision V2-1); close_on_main adopts and deletes it.
+struct CloseCallbackWork final {
+    std::function<void()> close;
+};
+
+void close_on_main(void* context) {
+    const std::unique_ptr<CloseCallbackWork> work(static_cast<CloseCallbackWork*>(context));
+    if ((*work).close) (*work).close();
+}
+
 class ExerciseReusableWindow final {
 public:
     ExerciseReusableWindow(const std::function<void()>& close_controller,
@@ -83,16 +94,12 @@ public:
     void operator()(VoidHostCallback show, VoidHostCallback) const {
         ++visibility_ready_;
         show();
-        const std::function<void()> close_controller = close_controller_;
-        const std::function<void()> close_product = close_product_;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC),
-                       dispatch_get_main_queue(), ^{
-                           if (close_controller) close_controller();
-                       });
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC),
-                       dispatch_get_main_queue(), ^{
-                           if (close_product) close_product();
-                       });
+        CloseCallbackWork* const controller = new CloseCallbackWork{close_controller_};
+        dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_MSEC), dispatch_get_main_queue(),
+                         controller, &close_on_main);
+        CloseCallbackWork* const product = new CloseCallbackWork{close_product_};
+        dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, 20 * NSEC_PER_MSEC), dispatch_get_main_queue(),
+                         product, &close_on_main);
     }
 
 private:
