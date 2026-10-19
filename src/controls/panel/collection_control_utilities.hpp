@@ -11,15 +11,6 @@ namespace gui_forms::collection_detail {
 
 inline constexpr std::chrono::milliseconds type_timeout{850};
 
-inline std::uint64_t virtual_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    return hash | (1ULL << 63U);
-}
-
 inline std::string fold_ascii(std::string_view text) {
     std::string result(text);
     for (char& character : result) {

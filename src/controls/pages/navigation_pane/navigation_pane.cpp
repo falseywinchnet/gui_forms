@@ -58,18 +58,6 @@ constexpr std::string_view show_fewer_text = "Show fewer buttons";
 constexpr std::string_view hidden_heading_text = "Hidden pages";
 constexpr std::string_view options_text = "Navigation pane options\xE2\x80\xA6";
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 // A square of `side` centred in `area`, on whole units; empty when it does
 // not fit.
 Rect centred_square(Rect area, double side) noexcept {
@@ -87,7 +75,7 @@ Rect offset_rect(Rect bounds, double dx, double dy) noexcept {
 // The states of `all` that `declared` lists, so a published part carries only
 // the states its declaration names.
 AnatomyStateSet declared_states(AnatomyStateSet all, std::span<const AnatomyState> declared) noexcept {
-    AnatomyStateSet kept;
+    AnatomyStateSet kept{};
     for (const AnatomyState state : declared) {
         if (all.contains(state)) kept.insert(state);
     }
@@ -393,7 +381,7 @@ bool NavigationPane::set_page_hidden(const PageId& page, bool hidden) {
 }
 
 std::vector<PageId> NavigationPane::hidden_pages() const {
-    std::vector<PageId> ordered;
+    std::vector<PageId> ordered{};
     ordered.reserve(hidden_.size());
     for (std::size_t position = 0; position < pages_.count(); ++position) {
         const PageId& id = pages_.record_at(PagePosition{position}).id;
@@ -439,7 +427,7 @@ void NavigationPane::on_image_list_changed(const ImageListChange&) {
 // -- state ---------------------------------------------------------------------
 
 NavigationPaneState NavigationPane::state() const {
-    NavigationPaneState saved;
+    NavigationPaneState saved{};
     saved.collapsed = collapsed_;
     saved.button_count = button_count_;
     saved.hidden_pages = hidden_pages();
@@ -468,7 +456,7 @@ NavigationPaneRestore NavigationPane::apply_state(const NavigationPaneState& sav
         }
     }
     // Validated: from here the state is applied.
-    NavigationPaneRestore restore;
+    NavigationPaneRestore restore{};
     std::unordered_set<std::string> unknown{};
     for (const PageId& id : saved.page_order) {
         if (!pages_.find(id)) unknown.insert(id.value);
@@ -526,7 +514,7 @@ void NavigationPane::on_selected_page_changed(const PageSelectionChange&) {
 void NavigationPane::on_pages_changed(const PageSetChange& change) {
     if (change.membership) {
         // A page that left the set is no longer hidden.
-        std::vector<PageId> kept;
+        std::vector<PageId> kept{};
         kept.reserve(hidden_.size());
         for (const PageId& id : hidden_) {
             if (pages_.find(id)) kept.push_back(id);
@@ -633,50 +621,61 @@ NavigationPane::Layout NavigationPane::layout() const {
     return layout_for(client_rectangle());
 }
 
+// One layout pass: the pages the buttons and icons show (every page not
+// hidden, in order), then the collapsed bar or the expanded pane.
 NavigationPane::Layout NavigationPane::layout_for(Rect surface) const {
-    const double scale = effective_text_scale();
-    const double width = surface.width;
-    const double height = surface.height;
-    Layout placed;
+    Layout placed{};
     placed.collapsed = collapsed_;
-    // The pages the buttons and icons show: every page not hidden, in order.
-    std::vector<std::size_t> shown;
+    std::vector<std::size_t> shown{};
     shown.reserve(pages_.count());
     for (std::size_t position = 0; position < pages_.count(); ++position) {
         if (!hidden_at(position)) shown.push_back(position);
     }
     placed.shown_count = shown.size();
     if (surface.empty()) return placed;
-    const double side = icon_side();
-
     if (collapsed_) {
-        // The bar: the expand button at the top, the large buttons' pages as
-        // icons at the bottom, and the turned title between.
-        placed.collapsed_bar = surface;
-        placed.collapse_button = {0.0, 0.0, width, collapsed_button_height * scale};
-        placed.collapse_glyph = centred_square(placed.collapse_button, arrow_glyph_side * scale);
-        const double icon_extent = collapsed_icon_height * scale;
-        const double room = height - placed.collapse_button.height - minimum_caption_height * scale;
-        const std::size_t fit = room > 0.0 ? static_cast<std::size_t>(std::floor(room / icon_extent)) : 0U;
-        const std::size_t wanted = std::min(button_count_, shown.size());
-        const std::size_t icons = std::min(wanted, fit);
-        placed.button_capacity = fit;
-        const double icons_top = height - static_cast<double>(icons) * icon_extent;
-        placed.tabs.reserve(icons);
-        for (std::size_t index = 0; index < icons; ++index) {
-            TabSlot slot;
-            slot.kind = NavigationPaneItemKind::icon;
-            slot.position = shown[index];
-            slot.bounds = {0.0, icons_top + static_cast<double>(index) * icon_extent, width, icon_extent};
-            placed.tabs.push_back(slot);
-        }
-        for (std::size_t index = icons; index < shown.size(); ++index) placed.unfit.push_back(shown[index]);
-        const double caption_top = placed.collapse_button.height + caption_padding * scale;
-        const double caption_height = std::max(0.0, icons_top - caption_top - caption_padding * scale);
-        placed.collapsed_label = {0.0, caption_top, width, caption_height};
-        return placed;
+        layout_collapsed(surface, shown, placed);
+    } else {
+        layout_expanded(surface, shown, placed);
     }
+    return placed;
+}
 
+// The bar: the expand button at the top, the large buttons' pages as icons
+// at the bottom, and the turned title between.
+void NavigationPane::layout_collapsed(Rect surface, std::span<const std::size_t> shown, Layout& placed) const {
+    const double scale = effective_text_scale();
+    const double width = surface.width;
+    const double height = surface.height;
+    placed.collapsed_bar = surface;
+    placed.collapse_button = {0.0, 0.0, width, collapsed_button_height * scale};
+    placed.collapse_glyph = centred_square(placed.collapse_button, arrow_glyph_side * scale);
+    const double icon_extent = collapsed_icon_height * scale;
+    const double room = height - placed.collapse_button.height - minimum_caption_height * scale;
+    const std::size_t fit = room > 0.0 ? static_cast<std::size_t>(std::floor(room / icon_extent)) : 0U;
+    const std::size_t wanted = std::min(button_count_, shown.size());
+    const std::size_t icons = std::min(wanted, fit);
+    placed.button_capacity = fit;
+    const double icons_top = height - static_cast<double>(icons) * icon_extent;
+    placed.tabs.reserve(icons);
+    for (std::size_t index = 0; index < icons; ++index) {
+        TabSlot slot{};
+        slot.kind = NavigationPaneItemKind::icon;
+        slot.position = shown[index];
+        slot.bounds = {0.0, icons_top + static_cast<double>(index) * icon_extent, width, icon_extent};
+        placed.tabs.push_back(slot);
+    }
+    for (std::size_t index = icons; index < shown.size(); ++index) placed.unfit.push_back(shown[index]);
+    const double caption_top = placed.collapse_button.height + caption_padding * scale;
+    const double caption_height = std::max(0.0, icons_top - caption_top - caption_padding * scale);
+    placed.collapsed_label = {0.0, caption_top, width, caption_height};
+}
+
+void NavigationPane::layout_expanded(Rect surface, std::span<const std::size_t> shown, Layout& placed) const {
+    const double scale = effective_text_scale();
+    const double width = surface.width;
+    const double height = surface.height;
+    const double side = icon_side();
     // Expanded, from the top: the header; from the bottom: the overflow strip,
     // the large buttons and the grip; the content takes what is left.
     const double header_extent = header_height * scale;
@@ -689,9 +688,8 @@ NavigationPane::Layout NavigationPane::layout_for(Rect surface) const {
     double label_x = header_padding * scale;
     const std::optional<std::size_t> selected = selected_position();
     if (selected && page_image(*selected).value != 0U) {
-        const double icon_side = side;
-        placed.header_icon = {label_x, std::floor((header_extent - icon_side) * 0.5), icon_side, icon_side};
-        label_x += icon_side + icon_label_gap * scale * 0.5;
+        placed.header_icon = {label_x, std::floor((header_extent - side) * 0.5), side, side};
+        label_x += side + icon_label_gap * scale * 0.5;
     }
     const double label_end = placed.collapse_button.empty() ? width - header_padding * scale
                                                             : placed.collapse_button.x - header_button_inset * scale;
@@ -718,7 +716,7 @@ NavigationPane::Layout NavigationPane::layout_for(Rect surface) const {
     placed.button_area = {0.0, buttons_top, width, static_cast<double>(large) * large_extent};
     placed.tabs.reserve(shown.size());
     for (std::size_t index = 0; index < large; ++index) {
-        TabSlot slot;
+        TabSlot slot{};
         slot.kind = NavigationPaneItemKind::large_button;
         slot.position = shown[index];
         slot.bounds = {0.0, buttons_top + static_cast<double>(index) * large_extent, width, large_extent};
@@ -745,19 +743,18 @@ NavigationPane::Layout NavigationPane::layout_for(Rect surface) const {
     const double icons_left = strip_end - static_cast<double>(icons) * cell;
     const double icons_top = placed.overflow_area.y + std::floor((strip_extent - cell) * 0.5);
     for (std::size_t index = 0; index < icons; ++index) {
-        TabSlot slot;
+        TabSlot slot{};
         slot.kind = NavigationPaneItemKind::icon;
         slot.position = shown[large + index];
         slot.bounds = {icons_left + static_cast<double>(index) * cell, icons_top, cell, cell};
         placed.tabs.push_back(slot);
     }
     for (std::size_t index = large + icons; index < shown.size(); ++index) placed.unfit.push_back(shown[index]);
-    return placed;
 }
 
 NavigationPane::PageButtonParts NavigationPane::button_parts(const TabSlot& slot) const {
     const double scale = effective_text_scale();
-    PageButtonParts parts;
+    PageButtonParts parts{};
     const Rect bounds = slot.bounds;
     if (bounds.empty()) return parts;
     parts.nav_page_face = PartGeometry::from_bounds(bounds);
@@ -775,7 +772,7 @@ NavigationPane::PageButtonParts NavigationPane::button_parts(const TabSlot& slot
 }
 
 NavigationPane::PageIconParts NavigationPane::icon_parts(const TabSlot& slot) const {
-    PageIconParts parts;
+    PageIconParts parts{};
     const Rect bounds = slot.bounds;
     if (bounds.empty()) return parts;
     parts.nav_overflow_face = PartGeometry::from_bounds(bounds);
@@ -788,7 +785,7 @@ NavigationPane::PageIconParts NavigationPane::icon_parts(const TabSlot& slot) co
 }
 
 NavigationPane::FlyoutLayout NavigationPane::flyout_layout() const {
-    FlyoutLayout placed;
+    FlyoutLayout placed{};
     const Window* const host = attached_window();
     if (host == nullptr) return placed;
     const double scale = effective_text_scale();
@@ -849,7 +846,7 @@ Rect NavigationPane::target_bounds(const Layout& placed, const Target& target) c
 }
 
 NavigationPane::Target NavigationPane::target_at(const Layout& placed, Point local) const {
-    Target found;
+    Target found{};
     for (const TabSlot& slot : placed.tabs) {
         if (!slot.bounds.contains(local)) continue;
         found.kind = TargetKind::tab;
@@ -869,7 +866,7 @@ NavigationPane::Target NavigationPane::target_at(const Layout& placed, Point loc
 }
 
 AnatomyStateSet NavigationPane::target_states(const Target& target) const {
-    AnatomyStateSet states;
+    AnatomyStateSet states{};
     if (target.kind == TargetKind::none) return states;
     if (hot_ == target) states.insert(AnatomyState::hot);
     if (pressed_ == target && target.kind != TargetKind::grip) states.insert(AnatomyState::pressed);
@@ -884,7 +881,7 @@ AnatomyStateSet NavigationPane::target_states(const Target& target) const {
 }
 
 AnatomyStateSet NavigationPane::tab_states(std::size_t position) const {
-    Target target;
+    Target target{};
     target.kind = TargetKind::tab;
     target.page = pages_.record_at(PagePosition{position}).id;
     AnatomyStateSet states = target_states(target);
@@ -909,7 +906,7 @@ void NavigationPane::set_stop(const Target& target) {
 void NavigationPane::paint_tab(Painter& painter, const TabSlot& slot) const {
     const AnatomyStateSet states = tab_states(slot.position);
     const std::string text = page_text(slot.position);
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::menu_item;
     part.states = states;
     part.font = label_font();
@@ -953,7 +950,7 @@ void NavigationPane::paint_tab(Painter& painter, const TabSlot& slot) const {
 void NavigationPane::on_paint(Painter& painter, Rect) {
     const Layout placed = layout();
     const std::string title = selected_text();
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     if (placed.collapsed) {
         part.role = PartRole::face;
@@ -980,7 +977,7 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
         part.role = PartRole::well;
         part.bounds = placed.content;
         paint_part(painter, *this, part);
-        Target grip_target;
+        Target grip_target{};
         grip_target.kind = TargetKind::grip;
         part.role = PartRole::face;
         part.bounds = placed.grip_bar;
@@ -999,9 +996,9 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
     for (const TabSlot& slot : placed.tabs) paint_tab(painter, slot);
 
     // The header's collapse button (the bar's expand button when collapsed).
-    Target collapse_target;
+    Target collapse_target{};
     collapse_target.kind = TargetKind::collapse;
-    PartPaint button;
+    PartPaint button{};
     button.family = ControlVisualRole::menu_item;
     button.role = PartRole::actuator;
     button.bounds = placed.collapse_button;
@@ -1014,9 +1011,9 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
     if (placed.collapsed) {
         // The title, turned to read bottom to top (owner decision DK-42),
         // ending at the top of its space.
-        Target caption_target;
+        Target caption_target{};
         caption_target.kind = TargetKind::caption;
-        PartPaint caption;
+        PartPaint caption{};
         caption.family = ControlVisualRole::menu_item;
         caption.role = PartRole::label;
         caption.bounds = placed.collapsed_label;
@@ -1027,7 +1024,7 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
         caption.alignment = PartTextAlignment::end;
         paint_part(painter, *this, caption);
     } else {
-        Target configure_target;
+        Target configure_target{};
         configure_target.kind = TargetKind::configure;
         button.role = PartRole::actuator;
         button.bounds = placed.configure_button;
@@ -1040,7 +1037,7 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
         paint_part(painter, *this, button);
     }
     const Target stop = stop_.kind == TargetKind::none ? default_stop(placed) : stop_;
-    PartPaint focus;
+    PartPaint focus{};
     focus.family = ControlVisualRole::panel;
     focus.role = PartRole::focus;
     focus.bounds = target_bounds(placed, stop);
@@ -1053,7 +1050,7 @@ void NavigationPane::on_paint(Painter& painter, Rect) {
 // itself above.
 void NavigationPane::paint_flyout(Painter& painter, const Control& surface) const {
     const FlyoutLayout placed = flyout_layout();
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     part.role = PartRole::shadow;
     part.bounds = placed.face;
@@ -1201,9 +1198,9 @@ void NavigationPane::activate(const Target& target) {
 // the tab list (one stop; the arrows move inside it) and the configure
 // button. Collapsed: the expand button, the title and the tab list.
 std::vector<NavigationPane::Target> NavigationPane::stops(const Layout& placed) const {
-    std::vector<Target> result;
+    std::vector<Target> result{};
     result.reserve(4U);
-    Target target;
+    Target target{};
     if (!placed.collapse_button.empty()) {
         target.kind = TargetKind::collapse;
         result.push_back(target);
@@ -1234,7 +1231,7 @@ std::vector<NavigationPane::Target> NavigationPane::stops(const Layout& placed) 
 // The tab of the selected page when it is realized, else the first tab, else
 // the collapse button.
 NavigationPane::Target NavigationPane::default_stop(const Layout& placed) const {
-    Target target;
+    Target target{};
     const std::optional<std::size_t> selected = selected_position();
     for (const TabSlot& slot : placed.tabs) {
         if (selected && slot.position == *selected) {
@@ -1267,7 +1264,7 @@ void NavigationPane::move_along_tabs(const Layout& placed, int direction, bool t
     } else {
         next = current + 1U == count ? 0U : current + 1U;
     }
-    Target target;
+    Target target{};
     target.kind = TargetKind::tab;
     target.page = pages_.record_at(PagePosition{placed.tabs[next].position}).id;
     set_stop(target);
@@ -1384,40 +1381,28 @@ bool NavigationPane::open_popup() {
     return true;
 }
 
-// Closing order: focus leaves the popup (the scope restores it), the content
-// panel returns to the pane, the window drops the popup, then
-// popup_open_changed(false) is raised.
 void NavigationPane::close_popup() noexcept {
     if (!popup_open_ || popup_closing_) return;
-    popup_closing_ = true;
-    Window* const host = attached_window();
-    if (host != nullptr && popup_scope_) {
-        try {
-            static_cast<void>((*host).end_focus_scope(popup_scope_));
-        } catch (...) {
-        }
-    }
-    popup_scope_ = {};
-    popup_revoked_.disconnect();
-    if (flyout_) {
-        try {
-            move_host_to_pane();
-        } catch (...) {
-        }
-    }
-    popup_token_.disconnect();
-    finish_popup_close();
+    release_popup(FocusScopeCloseReason::explicit_close);
 }
 
 // The window dropped the popup (its owner became unavailable): the content
 // panel comes back and the pane forgets the popup.
 void NavigationPane::on_popup_revoked() {
     if (!popup_open_ || popup_closing_) return;
+    release_popup(FocusScopeCloseReason::owner_unavailable);
+}
+
+// Closing order, for either cause: focus leaves the popup (the scope
+// restores it), the content panel returns to the pane, the window drops the
+// popup (a revoked popup's window has already dropped it), then
+// popup_open_changed(false) is raised.
+void NavigationPane::release_popup(FocusScopeCloseReason reason) noexcept {
     popup_closing_ = true;
     Window* const host = attached_window();
     if (host != nullptr && popup_scope_) {
         try {
-            static_cast<void>((*host).end_focus_scope(popup_scope_, FocusScopeCloseReason::owner_unavailable));
+            static_cast<void>((*host).end_focus_scope(popup_scope_, reason));
         } catch (...) {
         }
     }
@@ -1429,6 +1414,7 @@ void NavigationPane::on_popup_revoked() {
         } catch (...) {
         }
     }
+    if (reason == FocusScopeCloseReason::explicit_close) popup_token_.disconnect();
     finish_popup_close();
 }
 
@@ -1466,7 +1452,7 @@ bool NavigationPane::show_configure_menu(MenuOpenMode mode) {
     const std::size_t maximum = std::min(placed.shown_count, placed.button_capacity);
     (*show_more_command_).set_enabled(placed.large_count < maximum);
     (*show_fewer_command_).set_enabled(placed.large_count > 0U);
-    std::vector<MenuItemSpec> items;
+    std::vector<MenuItemSpec> items{};
     items.emplace_back(prefix + ".show_more", MenuItemKind::command, show_more_command_, std::string(show_more_text));
     items.emplace_back(prefix + ".show_fewer", MenuItemKind::command, show_fewer_command_,
                        std::string(show_fewer_text));
@@ -1556,11 +1542,11 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
     if (effectively_enabled()) base |= SemanticState::enabled;
 
     if (!placed.collapse_button.empty()) {
-        Target target;
+        Target target{};
         target.kind = TargetKind::collapse;
         SemanticNode node{};
         node.stable_id = prefix + ".collapse";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = placed.collapsed ? "Expand navigation pane" : "Collapse navigation pane";
         node.bounds = window_rect(absolute, placed.collapse_button);
@@ -1571,11 +1557,11 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         nodes.push_back(std::move(node));
     }
     if (placed.collapsed && !placed.collapsed_label.empty()) {
-        Target target;
+        Target target{};
         target.kind = TargetKind::caption;
         SemanticNode node{};
         node.stable_id = prefix + ".caption";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = selected_text();
         node.has_popup = true;
@@ -1587,11 +1573,11 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         nodes.push_back(std::move(node));
     }
     if (!placed.collapsed && !placed.grip_bar.empty()) {
-        Target target;
+        Target target{};
         target.kind = TargetKind::grip;
         SemanticNode node{};
         node.stable_id = prefix + ".grip";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::split_pane;
         node.name = "Large buttons";
         node.value = std::to_string(placed.large_count);
@@ -1608,7 +1594,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
     if (!placed.tabs.empty()) {
         SemanticNode list{};
         list.stable_id = prefix + ".tabs";
-        list.runtime_id = node_runtime_id(list.stable_id);
+        list.runtime_id = virtual_semantic_runtime_id(list.stable_id);
         list.role = SemanticRole::tab_group;
         list.name = "Pages";
         list.orientation = SemanticOrientation::vertical;
@@ -1620,12 +1606,12 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         const std::string panel_id = host_ ? std::string((*host_).stable_id().value()) : std::string();
         for (std::size_t index = 0; index < placed.tabs.size(); ++index) {
             const TabSlot& slot = placed.tabs[index];
-            Target target;
+            Target target{};
             target.kind = TargetKind::tab;
             target.page = pages_.record_at(PagePosition{slot.position}).id;
             SemanticNode tab{};
             tab.stable_id = prefix + ".tab." + target.page.value;
-            tab.runtime_id = node_runtime_id(tab.stable_id);
+            tab.runtime_id = virtual_semantic_runtime_id(tab.stable_id);
             tab.role = SemanticRole::tab;
             tab.name = page_text(slot.position);
             tab.bounds = window_rect(absolute, slot.bounds);
@@ -1645,11 +1631,11 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         nodes.push_back(std::move(list));
     }
     if (!placed.collapsed && !placed.configure_button.empty()) {
-        Target target;
+        Target target{};
         target.kind = TargetKind::configure;
         SemanticNode node{};
         node.stable_id = prefix + ".configure";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::menu_button;
         node.name = "Configure buttons";
         node.has_popup = true;
@@ -1666,7 +1652,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
 bool NavigationPane::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view value) {
     const std::string prefix(stable_id().value());
     const Layout placed = layout();
-    Target target;
+    Target target{};
     if (id == prefix + ".collapse") {
         target.kind = TargetKind::collapse;
         if (action == SemanticAction::press) {
@@ -1864,8 +1850,8 @@ const ControlAnatomy& NavigationPane::anatomy() const noexcept {
 void NavigationPane::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Layout placed = layout();
     const Rect surface = client_rectangle();
-    Target target;
-    Parts record;
+    Target target{};
+    Parts record{};
     record.region = PartGeometry::from_bounds(surface);
     record.header = PartGeometry::from_bounds(placed.header);
     record.header_icon = PartGeometry::from_bounds(placed.header_icon);
@@ -1903,7 +1889,7 @@ void NavigationPane::publish_part_geometry(std::span<PartGeometry> geometry) con
 
 NavigationPane::Parts NavigationPane::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), navigation_pane_part_fields, published.parts(), record);
     return record;
 }
@@ -1947,13 +1933,13 @@ AnatomyStateSet NavigationPane::realized_item_anatomy_states(std::size_t item) c
 
 std::vector<NavigationPane::Item> NavigationPane::realized_items() const {
     const std::size_t count = realized_item_count();
-    std::vector<Item> records;
+    std::vector<Item> records{};
     records.reserve(count);
     const Layout placed = layout();
     for (std::size_t item = 0; item < count; ++item) {
         const TabSlot& slot = placed.tabs[item];
         const PartGeometryBuffer published = published_realized_item_geometry(item);
-        Item record;
+        Item record{};
         record.kind = slot.kind;
         record.position = PagePosition{slot.position};
         record.page = pages_.record_at(PagePosition{slot.position}).id;

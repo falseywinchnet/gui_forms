@@ -160,6 +160,8 @@ private:
 
     [[nodiscard]] Layout layout_for(Size surface) const;
     [[nodiscard]] Rect row_bounds(const Layout& placed, DockNavigatorList list, std::size_t index) const;
+    // A row's label: the row less the label inset at each end.
+    [[nodiscard]] Rect entry_label_bounds(Rect row) const;
     [[nodiscard]] std::optional<Row> row_at(Point local) const;
     [[nodiscard]] Row realized_row(std::size_t item) const;
     [[nodiscard]] AnatomyStateSet row_states(DockNavigatorList list, std::size_t index) const;

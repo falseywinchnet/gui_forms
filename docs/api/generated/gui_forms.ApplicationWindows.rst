@@ -181,7 +181,7 @@ gui_forms::ApplicationWindows
       window, and a window that still owns open windows, are refused with
       :cpp:enumerator:`HostServiceError::invalid_argument <gui_forms::HostServiceError::invalid_argument>`.
 
-   .. cpp:function:: ApplicationWindowAtResult window_at(Point point) const
+   .. cpp:function:: ApplicationWindowAtResult window_at(DesktopLogicalPoint point) const
 
       The application's window that is topmost at a desktop point, counting
       its title bar and borders where the host can. ``found`` is false when the

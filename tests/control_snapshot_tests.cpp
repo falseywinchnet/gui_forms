@@ -12,6 +12,8 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <stdexcept>
+#include <thread>
 
 namespace {
 using namespace gui_forms;
@@ -22,6 +24,20 @@ void require(bool condition, const char* message) {
     std::exit(1);
 }
 
+// Releases a snapshot from another thread, recording whether it was refused.
+struct OtherThreadRelease final {
+    Window* window{};
+    ImageId image{};
+    bool* refused{};
+    void operator()() const {
+        try {
+            static_cast<void>((*window).release_control_snapshot(image));
+        } catch (const std::logic_error&) {
+            *refused = true;
+        }
+    }
+};
+
 void snapshots() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
     std::shared_ptr<Panel> card = make_control<Panel>(StableId("card"));
@@ -31,11 +47,12 @@ void snapshots() {
     (*button).set_requested_bounds({8.0, 8.0, 60.0, 24.0});
     (*card).add_child(button);
     (*root).add_child(card);
+    // Declared before the window that borrows it, so it outlives the window.
+    test_support::FakeRaster raster(FramebufferChannelOrder::rgba);
     Window window(root, {200.0, 120.0});
     window.perform_layout();
     require(!window.snapshot_control(card, 1.0), "without a framebuffer painter there is no snapshot");
 
-    test_support::FakeRaster raster(FramebufferChannelOrder::rgba);
     window.set_framebuffer_painter(&raster);
     const std::uint64_t images = window.image_resources().snapshot().resource_count;
     const std::optional<ControlSnapshot> snapshot = window.snapshot_control(card, 0.5);
@@ -64,9 +81,18 @@ void snapshots() {
     (*card).set_visible(true);
     window.perform_layout();
 
+    // Finding V4: the release is UI-thread only and repaints as remove_image.
+    bool refused = false;
+    std::thread releaser(OtherThreadRelease{&window, (*snapshot).image, &refused});
+    releaser.join();
+    require(refused && window.image_resources().find((*snapshot).image).has_value(),
+            "a release off the UI thread is refused and keeps the image");
+    const std::uint64_t marks = window.metrics_snapshot().dirty_marks;
     require(window.release_control_snapshot((*snapshot).image) && !window.image_resources().find((*snapshot).image) &&
                 !window.release_control_snapshot((*snapshot).image),
             "releasing removes the image once");
+    require(window.metrics_snapshot().dirty_marks > marks,
+            "releasing a snapshot retires the window's retained paint, as remove_image does");
     window.set_framebuffer_painter(nullptr);
 }
 

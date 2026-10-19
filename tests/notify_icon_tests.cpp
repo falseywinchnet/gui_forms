@@ -103,34 +103,34 @@ void contract() {
     SubscriptionToken token = services.tray_icon_events().subscribe(
         Delegate<const HostTrayIconEvent&>::bind<EventLog, &EventLog::on_event>(log));
     const HostTrayIconResult added = services.add_tray_icon(icon_request("Radio"));
-    require(added.status.accepted() && added.icon_id == 1U && services.tray_icon_live(1U) &&
+    require(added.status.accepted() && added.icon_id == HostTrayIconId{1U} && services.tray_icon_live(HostTrayIconId{1U}) &&
                 services.snapshot().tray_icons == 1U,
             "an icon is added with the first identity");
-    require(services.tray_icon(1U) != nullptr && (*services.tray_icon(1U)).images.size() == 2U,
+    require(services.tray_icon(HostTrayIconId{1U}) != nullptr && (*services.tray_icon(HostTrayIconId{1U})).images.size() == 2U,
             "the host receives every image size");
-    require(services.update_tray_icon(9U, icon_request("x")).error == HostServiceError::invalid_argument,
+    require(services.update_tray_icon(HostTrayIconId{9U}, icon_request("x")).error == HostServiceError::invalid_argument,
             "an unknown identity is refused");
-    require(services.update_tray_icon(1U, icon_request("Radio, muted")).accepted() &&
+    require(services.update_tray_icon(HostTrayIconId{1U}, icon_request("Radio, muted")).accepted() &&
                 services.snapshot().tray_icon_updates == 1U,
             "a live icon updates");
-    require(services.show_tray_notification(1U, {"Scan", "", HostTrayNotificationIcon::none, 0U}).error ==
+    require(services.show_tray_notification(HostTrayIconId{1U}, {"Scan", "", HostTrayNotificationIcon::none, 0U}).error ==
                 HostServiceError::invalid_argument,
             "a notification without text is refused");
-    require(services.show_tray_notification(1U, {"Scan", "42 stations", HostTrayNotificationIcon::information, 0U})
+    require(services.show_tray_notification(HostTrayIconId{1U}, {"Scan", "42 stations", HostTrayNotificationIcon::information, 0U})
                 .accepted(),
             "a notification is shown");
     services.queue_tray_menu_choice("quit");
     HostTrayMenuRequest menu;
     menu.items = {{"open", "Open"}, {"", "", true, false, true}, {"quit", "Quit"}};
-    const HostTrayMenuResult chosen = services.show_tray_menu(1U, menu);
+    const HostTrayMenuResult chosen = services.show_tray_menu(HostTrayIconId{1U}, menu);
     require(chosen.status.accepted() && chosen.chosen_id == "quit", "a native menu returns the chosen row");
     HostTrayMenuRequest unnamed;
     unnamed.items = {{"", "Nameless"}};
-    require(services.show_tray_menu(1U, unnamed).status.error == HostServiceError::invalid_argument,
+    require(services.show_tray_menu(HostTrayIconId{1U}, unnamed).status.error == HostServiceError::invalid_argument,
             "a menu row without an identity is refused");
 
     services.simulate_tray_icon_event({1U, HostTrayIconAction::double_click});
-    services.simulate_tray_icon_event({7U, HostTrayIconAction::click});
+    services.simulate_tray_icon_event({HostTrayIconId{7U}, HostTrayIconAction::click});
     require(log.events.size() == 1U && log.events[0].action == HostTrayIconAction::double_click &&
                 services.snapshot().tray_events == 1U,
             "events reach observers only for live icons");
@@ -145,8 +145,8 @@ void contract() {
     }
     require(services.add_tray_icon(icon_request("one too many")).status.error == HostServiceError::too_large,
             "icons past the bound are refused");
-    require(services.remove_tray_icon(1U).accepted() && !services.tray_icon_live(1U) &&
-                services.remove_tray_icon(1U).error == HostServiceError::invalid_argument,
+    require(services.remove_tray_icon(HostTrayIconId{1U}).accepted() && !services.tray_icon_live(HostTrayIconId{1U}) &&
+                services.remove_tray_icon(HostTrayIconId{1U}).error == HostServiceError::invalid_argument,
             "a removed identity is gone and not reused");
     services.shutdown();
     require(services.snapshot().tray_icons == 0U &&
@@ -219,7 +219,7 @@ void component() {
         Delegate<const MenuItemInvocation&>::bind<ClickLog, &ClickLog::on_menu>(log)));
 
     // This host's first icon: identity 1.
-    const std::uint64_t id = 1U;
+    const HostTrayIconId id{1U};
     services.simulate_tray_icon_event({id, HostTrayIconAction::click});
     services.simulate_tray_icon_event({id, HostTrayIconAction::double_click});
     require(log.clicks.size() == 1U && log.clicks[0] == PointerButton::primary && log.double_clicks == 1,

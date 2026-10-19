@@ -197,7 +197,7 @@ public:
         if (!check_tables()) return result_;
         visited_.assign(state_.nodes.size(), false);
         if (!check_tree(state_.main_root, DockNodeId{}, DockRegion::main_tools)) return result_;
-        if (document_areas_ != 1U) return broken("the main site holds no document area");
+        if (document_areas_ != 1U) return broken("the main site does not hold exactly one document area");
         for (const DockFloatingSite& site : state_.floating_sites) {
             if (!check_tree(site.root, DockNodeId{}, DockRegion::floating)) return result_;
         }
@@ -218,16 +218,17 @@ public:
     }
 
 private:
-    DockInvariantResult broken(std::string problem) {
-        result_.valid = false;
-        result_.problem = std::move(problem);
-        return result_;
-    }
-
+    // Records the first broken rule; `fail` answers the checks below,
+    // `broken` the result run() returns.
     bool fail(std::string problem) {
         result_.valid = false;
         result_.problem = std::move(problem);
         return false;
+    }
+
+    DockInvariantResult broken(std::string problem) {
+        static_cast<void>(fail(std::move(problem)));
+        return result_;
     }
 
     bool check_tables() {

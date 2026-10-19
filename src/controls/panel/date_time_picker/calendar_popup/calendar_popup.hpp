@@ -226,7 +226,7 @@ public:
             SemanticNode node;
             node.stable_id = std::string(stable_id().value()) +
                 (direction < 0 ? ".previous_month" : ".next_month");
-            node.runtime_id = virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::button;
             node.name = direction < 0 ? "Previous month" : "Next month";
             node.bounds = direction < 0
@@ -245,7 +245,7 @@ public:
             const DateTimeValue date = dates[cell];
             SemanticNode node;
             node.stable_id = date_stable_id(date);
-            node.runtime_id = virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::date_cell;
             node.name = format_date_time(date, provider_.long_date_pattern, provider_);
             node.value = iso_date(date);

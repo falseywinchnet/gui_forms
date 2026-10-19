@@ -356,9 +356,7 @@ std::vector<SemanticNode> QuickAccessToolbar::semantic_virtual_children() const 
     const Rect absolute = absolute_bounds();
     SemanticNode node{};
     node.stable_id = std::string(stable_id().value()) + ".customize";
-    // A runtime ID derived from the stable ID, in the high half, as
-    // ToolStrip's item nodes carry (the same hash).
-    node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+    node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
     node.name = "Customize Quick Access Toolbar";
     node.role = SemanticRole::menu_button;
     node.has_popup = true;

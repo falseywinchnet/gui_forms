@@ -7,6 +7,15 @@
 #include <utility>
 
 namespace gui_forms {
+namespace {
+// Whether `window` is in `windows`.
+bool listed(const std::vector<Window*>& windows, const Window* window) noexcept {
+    for (std::size_t index = 0U; index < windows.size(); ++index) {
+        if (windows[index] == window) return true;
+    }
+    return false;
+}
+} // namespace
 
 ApplicationResources::ApplicationResources(ImageRegistryLimits limits)
     : ui_thread_(std::this_thread::get_id()), images_(limits), theme_(default_theme()) {}
@@ -43,11 +52,7 @@ void ApplicationResources::set_theme(std::shared_ptr<const Theme> theme) {
     // copy of the list and skip windows that left it meanwhile.
     const std::vector<Window*> windows = windows_;
     for (std::size_t index = 0U; index < windows.size(); ++index) {
-        bool still_attached = false;
-        for (std::size_t current = 0U; current < windows_.size(); ++current) {
-            if (windows_[current] == windows[index]) still_attached = true;
-        }
-        if (still_attached) (*windows[index]).apply_theme(theme_);
+        if (listed(windows_, windows[index])) (*windows[index]).apply_theme(theme_);
     }
 }
 

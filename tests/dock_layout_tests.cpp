@@ -1081,6 +1081,24 @@ void test_restore_corrupt() {
     }
 }
 
+// A main site with two document areas is refused, and the diagnostic names
+// what is wrong: not "no document area" but not exactly one.
+void test_restore_two_document_areas() {
+    DockLayout layout{};
+    const DockRestoreResult result = layout.restore_xml(
+        "<dock_layout format=\"2\"><main_site><split id=\"1\" axis=\"horizontal\" ratio=\"0.5\">"
+        "<document_area id=\"2\"/><document_area id=\"3\"/></split></main_site></dock_layout>",
+        DockRestoreOptions{});
+    bool named = false;
+    for (const DockRestoreDiagnostic& diagnostic : result.diagnostics) {
+        if (diagnostic.kind != DockRestoreDiagnosticKind::structure_invalid) continue;
+        named = diagnostic.detail == "the main site does not hold exactly one document area";
+    }
+    if (result.status != DockRestoreStatus::kept_current || !named) print_diagnostics(result);
+    require(result.status == DockRestoreStatus::kept_current && named,
+            "two document areas are refused as not exactly one");
+}
+
 struct RenameUpgrade final {
     std::uint32_t seen_version{0};
     bool reject{false};
@@ -1385,6 +1403,7 @@ int main() {
     test_restore_newer_format();
     test_unknown_fields_kept();
     test_restore_corrupt();
+    test_restore_two_document_areas();
     test_restore_application_upgrade();
     test_lazy_creation_report();
     test_random_edit_sequences();

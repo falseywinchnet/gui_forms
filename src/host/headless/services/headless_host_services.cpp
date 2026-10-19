@@ -114,7 +114,7 @@ HostServiceStatus HeadlessHostServices::play_sound_cue_impl(
     return {};
 }
 
-const HostTrayIconRequest* HeadlessHostServices::tray_icon(std::uint64_t icon_id) const noexcept {
+const HostTrayIconRequest* HeadlessHostServices::tray_icon(HostTrayIconId icon_id) const noexcept {
     for (const TrayIcon& icon : tray_icons_) {
         if (icon.id == icon_id) return &icon.request;
     }
@@ -129,28 +129,28 @@ void HeadlessHostServices::queue_tray_menu_choice(std::string chosen_id) {
     tray_menu_choices_.push_back(std::move(chosen_id));
 }
 
-HostServiceStatus HeadlessHostServices::add_tray_icon_impl(std::uint64_t icon_id,
+HostServiceStatus HeadlessHostServices::add_tray_icon_impl(HostTrayIconId icon_id,
                                                            const HostTrayIconRequest& request) {
     tray_icons_.push_back({icon_id, request});
     std::ostringstream line;
-    line << "tray add id=" << icon_id << " images=" << request.images.size()
+    line << "tray add id=" << icon_id.value << " images=" << request.images.size()
          << " tooltip=" << request.tooltip << '\n';
     tray_trace_ += line.str();
     return {};
 }
 
-HostServiceStatus HeadlessHostServices::update_tray_icon_impl(std::uint64_t icon_id,
+HostServiceStatus HeadlessHostServices::update_tray_icon_impl(HostTrayIconId icon_id,
                                                               const HostTrayIconRequest& request) {
     for (TrayIcon& icon : tray_icons_) {
         if (icon.id == icon_id) icon.request = request;
     }
     std::ostringstream line;
-    line << "tray update id=" << icon_id << " tooltip=" << request.tooltip << '\n';
+    line << "tray update id=" << icon_id.value << " tooltip=" << request.tooltip << '\n';
     tray_trace_ += line.str();
     return {};
 }
 
-void HeadlessHostServices::remove_tray_icon_impl(std::uint64_t icon_id) noexcept {
+void HeadlessHostServices::remove_tray_icon_impl(HostTrayIconId icon_id) noexcept {
     for (std::size_t index = 0; index < tray_icons_.size(); ++index) {
         if (tray_icons_[index].id == icon_id) {
             tray_icons_.erase(tray_icons_.begin() + static_cast<std::ptrdiff_t>(index));
@@ -158,24 +158,24 @@ void HeadlessHostServices::remove_tray_icon_impl(std::uint64_t icon_id) noexcept
         }
     }
     try {
-        tray_trace_ += "tray remove id=" + std::to_string(icon_id) + '\n';
+        tray_trace_ += "tray remove id=" + std::to_string(icon_id.value) + '\n';
     } catch (...) {
     }
 }
 
 HostServiceStatus HeadlessHostServices::show_tray_notification_impl(
-    std::uint64_t icon_id, const HostTrayNotificationRequest& request) {
+    HostTrayIconId icon_id, const HostTrayNotificationRequest& request) {
     std::ostringstream line;
-    line << "tray notify id=" << icon_id << " title=" << request.title << " text=" << request.text << '\n';
+    line << "tray notify id=" << icon_id.value << " title=" << request.title << " text=" << request.text << '\n';
     tray_trace_ += line.str();
     return {};
 }
 
-HostTrayMenuResult HeadlessHostServices::show_tray_menu_impl(std::uint64_t icon_id,
+HostTrayMenuResult HeadlessHostServices::show_tray_menu_impl(HostTrayIconId icon_id,
                                                              const HostTrayMenuRequest& request) {
     HostTrayMenuResult result;
     std::ostringstream line;
-    line << "tray menu id=" << icon_id << " items=" << request.items.size() << '\n';
+    line << "tray menu id=" << icon_id.value << " items=" << request.items.size() << '\n';
     tray_trace_ += line.str();
     if (tray_menu_choices_.empty()) return result;
     result.chosen_id = std::move(tray_menu_choices_.front());

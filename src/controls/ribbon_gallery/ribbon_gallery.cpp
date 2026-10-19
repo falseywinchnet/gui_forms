@@ -690,7 +690,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         if (entry.kind == LineKind::caption) {
             SemanticNode group{};
             group.stable_id = prefix + ".category." + categories_[entry.category].stable_id;
-            group.runtime_id = scrolling_detail::virtual_runtime_id(group.stable_id);
+            group.runtime_id = virtual_semantic_runtime_id(group.stable_id);
             group.role = SemanticRole::group;
             group.name = categories_[entry.category].caption;
             group.states = SemanticState::visible | SemanticState::enabled;
@@ -704,7 +704,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
             const RibbonGalleryItem& item = items_[order_[position]];
             SemanticNode node{};
             node.stable_id = item.stable_id;
-            node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::list_item;
             node.name = item.label.empty() ? item.stable_id : item.label;
             if (in_view) {
@@ -736,7 +736,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
     if (placed.scroll_up.present) {
         SemanticNode up{};
         up.stable_id = prefix + ".scroll_up";
-        up.runtime_id = scrolling_detail::virtual_runtime_id(up.stable_id);
+        up.runtime_id = virtual_semantic_runtime_id(up.stable_id);
         up.role = SemanticRole::button;
         up.name = "Scroll up";
         up.bounds = {absolute.x + placed.scroll_up.bounds.x, absolute.y + placed.scroll_up.bounds.y,
@@ -747,7 +747,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         nodes.push_back(std::move(up));
         SemanticNode down{};
         down.stable_id = prefix + ".scroll_down";
-        down.runtime_id = scrolling_detail::virtual_runtime_id(down.stable_id);
+        down.runtime_id = virtual_semantic_runtime_id(down.stable_id);
         down.role = SemanticRole::button;
         down.name = "Scroll down";
         down.bounds = {absolute.x + placed.scroll_down.bounds.x, absolute.y + placed.scroll_down.bounds.y,
@@ -760,7 +760,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
     if (placed.more_button.present) {
         SemanticNode more{};
         more.stable_id = prefix + ".more_button";
-        more.runtime_id = scrolling_detail::virtual_runtime_id(more.stable_id);
+        more.runtime_id = virtual_semantic_runtime_id(more.stable_id);
         more.role = SemanticRole::menu_button;
         more.name = "More";
         more.has_popup = true;

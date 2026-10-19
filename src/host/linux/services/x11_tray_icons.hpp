@@ -30,15 +30,15 @@ public:
     // Whether a system tray owns the screen's tray selection now.
     [[nodiscard]] static bool tray_present(Display* display) noexcept;
 
-    [[nodiscard]] HostServiceStatus add(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    [[nodiscard]] HostServiceStatus update(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    void remove(std::uint64_t icon_id) noexcept;
+    [[nodiscard]] HostServiceStatus add(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    [[nodiscard]] HostServiceStatus update(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    void remove(HostTrayIconId icon_id) noexcept;
     // Returns true when `event` belonged to an icon window and was handled.
     bool handle_event(const XEvent& event);
 
 private:
     struct Icon final {
-        std::uint64_t id{};
+        HostTrayIconId id{};
         ::Window window{};
         std::vector<HostImage> images;
         // The window's current size, as the tray laid it out.

@@ -112,10 +112,12 @@ gui_forms::XmlElement
 
    .. rubric:: Methods
 
-   .. cpp:function:: const XmlAttribute* find_attribute(std::string_view attribute_name) const noexcept
+   .. cpp:function:: const XmlAttribute* find_attribute(std::string_view attribute_name) const& noexcept
 
       The attribute with the given name, or null. The pointer borrows from the
-      element and is invalidated by any change to its attributes.
+      element and is invalidated by any change to its attributes. It may not be
+      called on a temporary element (the overload is deleted): hold the element
+      in a named variable first.
 
    .. cpp:member:: std::string name
 

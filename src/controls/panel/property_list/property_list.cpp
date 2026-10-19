@@ -23,7 +23,6 @@ using detail::property_group_height;
 using detail::property_padding;
 using detail::property_row_height;
 using detail::property_validation_height;
-using detail::property_virtual_runtime_id;
 using detail::require_property_text;
 
 struct PropertyList::Impl final {
@@ -1091,7 +1090,7 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
         const PropertyGroupSpec& group = (*impl_).groups[group_index];
         SemanticNode header;
         header.stable_id = group.stable_id;
-        header.runtime_id = property_virtual_runtime_id(header.stable_id);
+        header.runtime_id = virtual_semantic_runtime_id(header.stable_id);
         header.role = SemanticRole::property_group;
         header.name = group.title;
         header.bounds = {absolute.x, absolute.y + y, absolute.width,
@@ -1111,7 +1110,7 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
             if (row.editor == PropertyEditorKind::read_only) {
                 SemanticNode node;
                 node.stable_id = row.stable_id;
-                node.runtime_id = property_virtual_runtime_id(node.stable_id);
+                node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
                 node.role = SemanticRole::property_row;
                 node.name = row.name;
                 node.value = row.value;

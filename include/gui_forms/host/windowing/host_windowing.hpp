@@ -2,6 +2,7 @@
 
 #include "gui_forms/event.hpp"
 #include "gui_forms/host/types/host_types.hpp"
+#include "gui_forms/host/windowing/desktop_coordinates.hpp"
 
 #include <array>
 #include <cstddef>
@@ -139,7 +140,7 @@ struct HostWindowFrameEvent final {
 
 struct HostScreenPointResult final {
     HostServiceStatus status{};
-    Point position{};
+    DesktopLogicalPoint position{};
 };
 
 // An accepted result whose `window` is invalid means no window of this run
@@ -231,7 +232,7 @@ public:
     [[nodiscard]] HostScreenPointResult pointer_position();
     // The run's window that is topmost at `point` (desktop logical units),
     // counting native decorations where the host can.
-    [[nodiscard]] HostWindowAtResult window_at(Point point);
+    [[nodiscard]] HostWindowAtResult window_at(DesktopLogicalPoint point);
     // Orders `window` above every other window of this run, never above
     // other applications' windows, without activating it. Owned windows
     // stay above their owners as each platform keeps them.
@@ -320,7 +321,7 @@ protected:
     [[nodiscard]] virtual HostScreenPointResult pointer_position_impl() = 0;
     // May return any native result; the base accepts only a live identity
     // or an invalid one.
-    [[nodiscard]] virtual HostWindowAtResult window_at_impl(Point point) = 0;
+    [[nodiscard]] virtual HostWindowAtResult window_at_impl(DesktopLogicalPoint point) = 0;
     [[nodiscard]] virtual HostServiceStatus bring_to_front_impl(HostWindowId window) = 0;
     // Must close the native window, run its closed notification and call
     // retire() before returning accepted.
@@ -362,8 +363,15 @@ private:
 
     void apply_visibility(WindowRecord& entry);
     void apply_floating_visibility();
+    // Moves the primary window's followers after it moved (report_frame).
     void follow_primary(WindowRecord& primary);
+    // Records `origin` as the newest of the follower's policy placements.
+    static void remember_policy_target(WindowRecord& follower, Point origin) noexcept;
+    // Takes a follower's offset from a move of its own (report_frame).
     void learn_offset(WindowRecord& follower);
+    // The admission rules of admit(), without its thread, shutdown,
+    // capability and count checks.
+    [[nodiscard]] bool admission_valid(const HostWindowDescription& description) const noexcept;
 
     [[nodiscard]] HostServiceStatus validate_request(HostCapability capability) noexcept;
     [[nodiscard]] HostServiceStatus validate_window_request(HostCapability capability,

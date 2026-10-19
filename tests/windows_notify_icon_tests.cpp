@@ -67,15 +67,17 @@ void shell_icons() {
     request.images.push_back(solid_image(16U));
     request.images.push_back(solid_image(32U));
     request.tooltip = "GUI.Forms notify icon test";
-    const HostServiceStatus added = icons.add(7U, request);
+    // The base class would assign this identity; the adapter is driven directly.
+    const HostTrayIconId icon{7U};
+    const HostServiceStatus added = icons.add(icon, request);
     if (!added.accepted()) {
         require(added.error == HostServiceError::backend_failure, "a shell refusal is a backend failure");
         std::cout << "Shell_NotifyIconW refused the icon (no interactive shell): routing checks skipped\n";
         return;
     }
-    require(icons.message_window() != nullptr && icons.shell_id(7U).has_value(),
+    require(icons.message_window() != nullptr && icons.shell_id(icon).has_value(),
             "a shown icon has a window and a shell identity");
-    const UINT shell_id = *icons.shell_id(7U);
+    const UINT shell_id = *icons.shell_id(icon);
     HWND window = icons.message_window();
     SendMessageW(window, WindowsNotifyIcons::callback_message, 0, callback(NIN_SELECT, shell_id));
     SendMessageW(window, WindowsNotifyIcons::callback_message, 0, callback(WM_LBUTTONDBLCLK, shell_id));
@@ -84,7 +86,7 @@ void shell_icons() {
     SendMessageW(window, WindowsNotifyIcons::callback_message, 0, callback(NIN_BALLOONTIMEOUT, shell_id));
     SendMessageW(window, WindowsNotifyIcons::callback_message, 0, callback(WM_MOUSEMOVE, shell_id));
     SendMessageW(window, WindowsNotifyIcons::callback_message, 0, callback(NIN_SELECT, shell_id + 1U));
-    require(recorder.events.size() == 5U && recorder.events[0].icon_id == 7U &&
+    require(recorder.events.size() == 5U && recorder.events[0].icon_id == icon &&
                 recorder.events[0].action == HostTrayIconAction::click &&
                 recorder.events[1].action == HostTrayIconAction::double_click &&
                 recorder.events[2].action == HostTrayIconAction::context &&
@@ -93,17 +95,17 @@ void shell_icons() {
             "shell callbacks become portable events; others and unknown icons are ignored");
 
     request.tooltip = "GUI.Forms notify icon test, updated";
-    require(icons.update(7U, request).accepted(), "the icon updates");
+    require(icons.update(icon, request).accepted(), "the icon updates");
     HostTrayNotificationRequest notification;
     notification.title = "GUI.Forms";
     notification.text = "Notification text from a test";
     notification.icon = HostTrayNotificationIcon::information;
-    require(icons.notify(7U, notification).accepted(), "notification text is shown");
+    require(icons.notify(icon, notification).accepted(), "notification text is shown");
     // A restarted shell broadcasts TaskbarCreated; the icon is shown again.
     SendMessageW(window, icons.taskbar_created_message(), 0, 0);
-    require(icons.shell_id(7U).has_value(), "the icon survives a shell restart");
-    icons.remove(7U);
-    require(!icons.shell_id(7U).has_value(), "a removed icon is gone");
+    require(icons.shell_id(icon).has_value(), "the icon survives a shell restart");
+    icons.remove(icon);
+    require(!icons.shell_id(icon).has_value(), "a removed icon is gone");
     std::cout << "Shell_NotifyIconW accepted the icon: routing, update, notification and restart checked\n";
 }
 

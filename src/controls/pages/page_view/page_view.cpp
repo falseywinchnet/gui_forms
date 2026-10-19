@@ -314,12 +314,12 @@ void PageView::restore_focus(const PageId& page) {
 void PageView::on_selection_changed(const PageSelectionChange& change) {
     Window* const host = window();
     const Control::Ptr focused = host != nullptr ? (*host).focused_control() : Control::Ptr{};
-    bool selection_owned_focus = false;
+    bool focus_was_in_old_page = false;
     if (change.old_page) {
         const std::size_t old_index = slot_index(*change.old_page);
         if (old_index < slots_.size() && within(focused, slots_[old_index].panel)) {
             slots_[old_index].remembered_focus = focused;
-            selection_owned_focus = true;
+            focus_was_in_old_page = true;
         }
     }
     if (change.new_page && !pages_.content(*change.new_page)) {
@@ -339,7 +339,7 @@ void PageView::on_selection_changed(const PageSelectionChange& change) {
     }
     reconcile_panels();
     // A click on a tab focuses the strip itself after selecting.
-    if (selection_owned_focus && change.new_page && change.cause != PageSelectionCause::pointer) {
+    if (focus_was_in_old_page && change.new_page && change.cause != PageSelectionCause::pointer) {
         restore_focus(*change.new_page);
     }
 }
@@ -347,7 +347,7 @@ void PageView::on_selection_changed(const PageSelectionChange& change) {
 // -- layout and paint ----------------------------------------------------------
 
 PageView::Areas PageView::areas_for(Size surface) const {
-    Areas areas;
+    Areas areas{};
     // A hidden strip (a docking tool stack holding one panel hides it)
     // leaves the whole surface to the content.
     if (!strip_ || !(*strip_).visible()) {
@@ -404,7 +404,7 @@ void PageView::arrange(Rect final_bounds) {
 void PageView::on_paint(Painter& painter, Rect) {
     const Rect surface = client_rectangle();
     const Areas areas = areas_for(Size{surface.width, surface.height});
-    PartPaint part;
+    PartPaint part{};
     part.family = ControlVisualRole::panel;
     part.role = PartRole::well;
     part.bounds = areas.content;
@@ -502,7 +502,7 @@ const ControlAnatomy& PageView::anatomy() const noexcept {
 void PageView::publish_part_geometry(std::span<PartGeometry> geometry) const {
     const Rect surface = client_rectangle();
     const Areas areas = areas_for(Size{surface.width, surface.height});
-    Parts record;
+    Parts record{};
     record.region = PartGeometry::from_bounds(surface);
     record.strip = PartGeometry::from_bounds(areas.strip);
     record.content = PartGeometry::from_bounds(areas.content);
@@ -512,7 +512,7 @@ void PageView::publish_part_geometry(std::span<PartGeometry> geometry) const {
 
 PageView::Parts PageView::parts() const {
     const PartGeometryBuffer published = published_part_geometry();
-    Parts record;
+    Parts record{};
     read_parts(anatomy(), page_view_part_fields, published.parts(), record);
     return record;
 }
