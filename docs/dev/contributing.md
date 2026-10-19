@@ -67,6 +67,14 @@ rvalue overload, and a function pointer obtained with `GetProcAddress` or
 suite on Linux under AddressSanitizer, UndefinedBehaviorSanitizer and
 LeakSanitizer (`python tools/ci_build.py --sanitize`); any report fails it.
 
+The same command is the standard local sanitizer tree, kept by every build
+tree on every platform: it builds `.build/native-<host>-<arch>/gui-forms-sanitize`
+with CI's flags and runs the suite, or with `--tests REGEX` only the matching
+tests, incrementally after the first build. AddressSanitizer and
+UndefinedBehaviorSanitizer run everywhere; LeakSanitizer runs on Linux and
+macOS, since the Windows MinGW runtime has none. Host code is sanitized only
+where it builds, so the Windows and macOS hosts depend on these local trees.
+
 ## Tests and evidence
 
 Every behavioural change ships with a test. Core and control behaviour is

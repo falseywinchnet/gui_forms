@@ -32,9 +32,23 @@ class SanitizerOptionTests(unittest.TestCase):
     def test_every_finding_stops_its_test(self) -> None:
         options: list[str]
         environment: dict[str, str]
-        options, environment = ci_build.sanitizer_options(Path('lsan.supp'))
+        options, environment = ci_build.sanitizer_options('linux', Path('lsan.supp'))
         self.assertIn('-DCMAKE_CXX_FLAGS=' + ci_build.SANITIZER_FLAGS, options)
         self.assertIn('-fno-sanitize-recover=undefined', ci_build.SANITIZER_FLAGS)
         self.assertIn('detect_leaks=1', environment['ASAN_OPTIONS'])
         self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
         self.assertIn('suppressions=lsan.supp', environment['LSAN_OPTIONS'])
+
+    def test_leaks_are_detected_where_the_runtime_has_a_leak_sanitizer(self) -> None:
+        options: list[str]
+        environment: dict[str, str]
+        host: str
+        for host in ('linux', 'macos'):
+            options, environment = ci_build.sanitizer_options(host, Path('lsan.supp'))
+            self.assertIn('detect_leaks=1', environment['ASAN_OPTIONS'], host)
+            self.assertIn('LSAN_OPTIONS', environment, host)
+        options, environment = ci_build.sanitizer_options('windows', Path('lsan.supp'))
+        self.assertIn('-DCMAKE_CXX_FLAGS=' + ci_build.SANITIZER_FLAGS, options)
+        self.assertIn('detect_leaks=0', environment['ASAN_OPTIONS'])
+        self.assertNotIn('LSAN_OPTIONS', environment)
+        self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
