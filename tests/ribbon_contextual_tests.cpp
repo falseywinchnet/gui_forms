@@ -91,6 +91,15 @@ const Ribbon::Tab* realized(const std::vector<Ribbon::Tab>& tabs, std::string_vi
 }
 const Ribbon::Tab* realized(std::vector<Ribbon::Tab>&& tabs, std::string_view id) = delete;
 
+// The item `id` names, which must be there: a missing one ends the test
+// rather than dereferencing null. A borrow into `items`, as realized is.
+const Ribbon::Tab& tab_named(const std::vector<Ribbon::Tab>& items, std::string_view id) {
+    const Ribbon::Tab* const found = realized(items, id);
+    require(found != nullptr, "the item the test names is realized");
+    return *found;
+}
+const Ribbon::Tab& tab_named(std::vector<Ribbon::Tab>&& items, std::string_view id) = delete;
+
 struct Fixture final {
     std::shared_ptr<Ribbon> ribbon;
     std::unique_ptr<Window> window;
@@ -185,10 +194,10 @@ void accents() {
     const std::optional<AccentIndex> table = ribbon.tab_set_accent("table");
     require(picture && table && !(*picture == *table), "shown sets take different accents");
     const std::vector<Ribbon::Tab> tabs = ribbon.realized_tabs();
-    require((*realized(tabs, "format")).parts.tab.accent == picture &&
-                (*realized(tabs, "arrange")).parts.tab.accent == picture &&
-                (*realized(tabs, "design")).parts.tab.accent == table &&
-                !(*realized(tabs, "home")).parts.tab.accent,
+    require(tab_named(tabs, "format").parts.tab.accent == picture &&
+                tab_named(tabs, "arrange").parts.tab.accent == picture &&
+                tab_named(tabs, "design").parts.tab.accent == table &&
+                !tab_named(tabs, "home").parts.tab.accent,
             "a set's tint is on its tabs, and core tabs have none");
     require(ribbon.parts().command_plane.accent == picture, "the selected contextual tab's plane carries its tint");
     click_tab(fixture, "home");

@@ -117,6 +117,15 @@ const Ribbon::CommandItem* find_command(const std::vector<Ribbon::CommandItem>& 
 }
 const Ribbon::CommandItem* find_command(std::vector<Ribbon::CommandItem>&& items, std::string_view id) = delete;
 
+// The item `id` names, which must be there: a missing one ends the test
+// rather than dereferencing null. A borrow into `items`, as find_command is.
+const Ribbon::CommandItem& command_named(const std::vector<Ribbon::CommandItem>& items, std::string_view id) {
+    const Ribbon::CommandItem* const found = find_command(items, id);
+    require(found != nullptr, "the item the test names is realized");
+    return *found;
+}
+const Ribbon::CommandItem& command_named(std::vector<Ribbon::CommandItem>&& items, std::string_view id) = delete;
+
 Point centre(Rect bounds) {
     const Point point{bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5};
     return point;
@@ -200,7 +209,7 @@ void one_command_path() {
     std::vector<std::string> clicks;
     SubscriptionToken clicked = (*ribbon).command_clicked().subscribe(RecordClick{&clicks});
     std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
-    click(window, centre((*find_command(items, "paste")).parts.command_face.bounds));
+    click(window, centre(command_named(items, "paste").parts.command_face.bounds));
     require(pastes == 1 && clicks.size() == 1U && clicks[0] == "paste",
             "a pointer click runs the command and reports it");
 
@@ -210,7 +219,7 @@ void one_command_path() {
     require(key(window, PhysicalKey::right) && key(window, PhysicalKey::space) && cuts == 1,
             "Right moves to the next command and Space runs it");
     const std::vector<Ribbon::CommandItem> focused = (*ribbon).realized_commands();
-    require((*find_command(focused, "cut")).states.focus_visible, "the keyboard's command shows the focus cue");
+    require(command_named(focused, "cut").states.focus_visible, "the keyboard's command shows the focus cue");
     require((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}) && cuts == 2,
             "the semantic press runs the command");
     require(key(window, PhysicalKey::c, Modifier::alt) && copies == 1, "a command's mnemonic runs it");
@@ -220,11 +229,11 @@ void one_command_path() {
                 (*commands.bold).state().checked,
             "a toggle's semantic press flips its command's checked state");
     const std::vector<Ribbon::CommandItem> toggled = (*ribbon).realized_commands();
-    require((*find_command(toggled, "bold")).states.checked, "and the toggle shows checked");
+    require(command_named(toggled, "bold").states.checked, "and the toggle shows checked");
     (*commands.cut).set_enabled(false);
     static_cast<void>((*ribbon).on_semantic_child_action("ribbon.command.cut", SemanticAction::press, {}));
     const std::vector<Ribbon::CommandItem> disabled = (*ribbon).realized_commands();
-    require(cuts == 2 && (*find_command(disabled, "cut")).states.disabled,
+    require(cuts == 2 && command_named(disabled, "cut").states.disabled,
             "a disabled command does not run and shows disabled");
 }
 
@@ -260,7 +269,7 @@ void state_repaints_only_its_command() {
     window.perform_layout();
     static_cast<void>(window.take_damage());
     const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
-    const Rect cut = (*find_command(items, "cut")).parts.command_face.bounds;
+    const Rect cut = command_named(items, "cut").parts.command_face.bounds;
     (*commands.cut).set_enabled(false);
     const DamageRegion damage = window.take_damage();
     const Rect bounds = damage.bounds();
@@ -306,10 +315,10 @@ void hosted_controls() {
     const std::shared_ptr<CheckBox> strike = (*ribbon).check_box("strike");
     const std::vector<Ribbon::CommandItem> items = (*ribbon).realized_commands();
     require((*font).items().size() == 2U && (*strike).text() == "Strike" &&
-                (*find_command(items, "font_name")).parts.command_combo_box.bounds ==
+                command_named(items, "font_name").parts.command_combo_box.bounds ==
                     (*font).committed_arranged_bounds() &&
-                (*find_command(items, "font_size")).parts.command_numeric_up_down.present &&
-                (*find_command(items, "strike")).parts.command_check_box.present,
+                command_named(items, "font_size").parts.command_numeric_up_down.present &&
+                command_named(items, "strike").parts.command_check_box.present,
             "hosted controls sit where the ribbon's layout puts their commands");
     require(window.request_focus(font) && window.focused_control() == font, "a hosted control is focusable");
     require((*size).effectively_visible() && !(*(*ribbon).text_box("find")).effectively_visible(),
@@ -335,7 +344,7 @@ void menus_and_launchers() {
     static_cast<void>(window.dispatch_pointer({PointerAction::down, PointerButton::primary,
                                                centre(paste.parts.command_arrow.bounds)}));
     const std::vector<Ribbon::CommandItem> opened = (*ribbon).realized_commands();
-    require((*ribbon).menu_open() && (*find_command(opened, "paste")).states.open,
+    require((*ribbon).menu_open() && command_named(opened, "paste").states.open,
             "a split's arrow opens its menu over the ribbon");
     (*ribbon).close_menus();
     click(window, centre((*ribbon).parts().application_button.bounds));
