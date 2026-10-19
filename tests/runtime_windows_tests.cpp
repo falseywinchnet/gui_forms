@@ -109,21 +109,21 @@ void test_desktop_mapping() {
     require(left.work_area == Rect{0.0, 0.0, 1920.0, 1040.0}, "scaled work area not divided");
     const HostMonitor right = logical_monitor(device[1]);
     require(right.frame == Rect{3840.0, 0.0, 1920.0, 1080.0}, "unscaled monitor changed");
-    const Point inside = desktop_logical_point(device, {1000.0, 500.0});
+    const DesktopLogicalPoint inside = desktop_logical_point(device, {1000.0, 500.0});
     require(inside.x == 500.0 && inside.y == 250.0, "device point on a scaled monitor not mapped");
-    const Point beside = desktop_logical_point(device, {4000.0, 100.0});
+    const DesktopLogicalPoint beside = desktop_logical_point(device, {4000.0, 100.0});
     require(beside.x == 4000.0 && beside.y == 100.0, "device point on an unscaled monitor changed");
     double scale = 0.0;
-    const Point back = desktop_device_point(device, {500.0, 250.0}, scale);
+    const DesktopDevicePoint back = desktop_device_point(device, {500.0, 250.0}, scale);
     require(back.x == 1000.0 && back.y == 500.0 && scale == 2.0, "logical point did not map back");
     // A logical point in the gap between the two logical monitors maps
     // through the nearest one.
-    const Point gap = desktop_device_point(device, {3000.0, 100.0}, scale);
+    const DesktopDevicePoint gap = desktop_device_point(device, {3000.0, 100.0}, scale);
     require(scale == 1.0 && gap.x == 3000.0, "gap point did not use the nearest monitor");
-    require(nearest_monitor(device, {-50.0, 10.0}) == 0U, "nearest monitor wrong left of the desktop");
-    require(nearest_monitor(device, {9000.0, 10.0}) == 1U, "nearest monitor wrong right of the desktop");
+    require(nearest_device_monitor(device, {-50.0, 10.0}) == 0U, "nearest monitor wrong left of the desktop");
+    require(nearest_device_monitor(device, {9000.0, 10.0}) == 1U, "nearest monitor wrong right of the desktop");
     const std::vector<HostMonitor> none;
-    require(desktop_logical_point(none, {7.0, 9.0}) == Point{7.0, 9.0}, "empty monitor list changed a point");
+    require(desktop_logical_point(none, {7.0, 9.0}) == DesktopLogicalPoint{7.0, 9.0}, "empty monitor list changed a point");
 }
 
 void test_initial_windows_are_admitted_in_ownership_order() {
@@ -318,7 +318,7 @@ void test_pointer_window_at_and_ordering() {
 
     application.windowing().set_pointer({123.0, 456.0});
     const HostScreenPointResult pointer = windows.pointer_position();
-    require(pointer.status.accepted() && pointer.position == Point{123.0, 456.0}, "pointer position wrong");
+    require(pointer.status.accepted() && pointer.position == DesktopLogicalPoint{123.0, 456.0}, "pointer position wrong");
 
     // Over the main window's client area and its title bar.
     ApplicationWindowAtResult hit = windows.window_at({150.0, 150.0});

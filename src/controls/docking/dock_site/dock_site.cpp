@@ -757,8 +757,15 @@ void DockSite::on_detaching_from_window(Window& former_window) noexcept {
     drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
-    // The stamp's picture is the former window's image.
-    if (drag_.picture && !drag_.guest) static_cast<void>(former_window.release_control_snapshot((*drag_.picture).image));
+    // The stamp's picture is the former window's image. A release that
+    // fails (allocation while marking the repaint) leaves the image to the
+    // window's end.
+    if (drag_.picture && !drag_.guest) {
+        try {
+            static_cast<void>(former_window.release_control_snapshot((*drag_.picture).image));
+        } catch (...) {
+        }
+    }
     drag_.picture.reset();
     reset_drag();
     focus_token_.disconnect();

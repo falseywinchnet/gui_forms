@@ -779,7 +779,7 @@ HostServiceStatus HostServices::validate_tray_icon_request(const HostTrayIconReq
     return {};
 }
 
-bool HostServices::tray_icon_live(std::uint64_t icon_id) const noexcept {
+bool HostServices::tray_icon_live(HostTrayIconId icon_id) const noexcept {
     const bool live = std::find(tray_icons_.begin(), tray_icons_.end(), icon_id) != tray_icons_.end();
     return live;
 }
@@ -797,7 +797,7 @@ HostTrayIconResult HostServices::add_tray_icon(const HostTrayIconRequest& reques
         result.status = reject(HostServiceError::too_large);
         return result;
     }
-    const std::uint64_t icon_id = next_tray_icon_id_;
+    const HostTrayIconId icon_id{next_tray_icon_id_};
     HostServiceStatus added{HostServiceError::backend_failure};
     try {
         added = add_tray_icon_impl(icon_id, request);
@@ -815,7 +815,7 @@ HostTrayIconResult HostServices::add_tray_icon(const HostTrayIconRequest& reques
     return result;
 }
 
-HostServiceStatus HostServices::update_tray_icon(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus HostServices::update_tray_icon(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     const HostServiceStatus status = validate_request(HostCapability::notification_area);
     if (!status.accepted()) return status;
     if (!tray_icon_live(icon_id)) return reject(HostServiceError::invalid_argument);
@@ -832,10 +832,10 @@ HostServiceStatus HostServices::update_tray_icon(std::uint64_t icon_id, const Ho
     return updated;
 }
 
-HostServiceStatus HostServices::remove_tray_icon(std::uint64_t icon_id) {
+HostServiceStatus HostServices::remove_tray_icon(HostTrayIconId icon_id) {
     const HostServiceStatus status = validate_request(HostCapability::notification_area);
     if (!status.accepted()) return status;
-    const std::vector<std::uint64_t>::iterator found = std::find(tray_icons_.begin(), tray_icons_.end(), icon_id);
+    const std::vector<HostTrayIconId>::iterator found = std::find(tray_icons_.begin(), tray_icons_.end(), icon_id);
     if (found == tray_icons_.end()) return reject(HostServiceError::invalid_argument);
     tray_icons_.erase(found);
     snapshot_.tray_icons = tray_icons_.size();
@@ -843,7 +843,7 @@ HostServiceStatus HostServices::remove_tray_icon(std::uint64_t icon_id) {
     return status;
 }
 
-HostServiceStatus HostServices::show_tray_notification(std::uint64_t icon_id,
+HostServiceStatus HostServices::show_tray_notification(HostTrayIconId icon_id,
                                                        const HostTrayNotificationRequest& request) {
     const HostServiceStatus status = validate_request(HostCapability::notification_area_messages);
     if (!status.accepted()) return status;
@@ -864,7 +864,7 @@ HostServiceStatus HostServices::show_tray_notification(std::uint64_t icon_id,
     return shown;
 }
 
-HostTrayMenuResult HostServices::show_tray_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request) {
+HostTrayMenuResult HostServices::show_tray_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request) {
     HostTrayMenuResult result;
     result.status = validate_request(HostCapability::notification_area_menus);
     if (!result.status.accepted()) return result;
@@ -907,21 +907,21 @@ void HostServices::publish_tray_icon_event(const HostTrayIconEvent& event) {
     tray_icon_events_.emit(event);
 }
 
-HostServiceStatus HostServices::add_tray_icon_impl(std::uint64_t, const HostTrayIconRequest&) {
+HostServiceStatus HostServices::add_tray_icon_impl(HostTrayIconId, const HostTrayIconRequest&) {
     return {HostServiceError::unsupported};
 }
 
-HostServiceStatus HostServices::update_tray_icon_impl(std::uint64_t, const HostTrayIconRequest&) {
+HostServiceStatus HostServices::update_tray_icon_impl(HostTrayIconId, const HostTrayIconRequest&) {
     return {HostServiceError::unsupported};
 }
 
-void HostServices::remove_tray_icon_impl(std::uint64_t) noexcept {}
+void HostServices::remove_tray_icon_impl(HostTrayIconId) noexcept {}
 
-HostServiceStatus HostServices::show_tray_notification_impl(std::uint64_t, const HostTrayNotificationRequest&) {
+HostServiceStatus HostServices::show_tray_notification_impl(HostTrayIconId, const HostTrayNotificationRequest&) {
     return {HostServiceError::unsupported};
 }
 
-HostTrayMenuResult HostServices::show_tray_menu_impl(std::uint64_t, const HostTrayMenuRequest&) {
+HostTrayMenuResult HostServices::show_tray_menu_impl(HostTrayIconId, const HostTrayMenuRequest&) {
     HostTrayMenuResult result;
     result.status = {HostServiceError::unsupported};
     return result;
@@ -933,7 +933,7 @@ void HostServices::shutdown() noexcept {
     }
     revoke_cursor_interaction(CursorError::closing);
     // No icon outlives the services that showed it.
-    for (const std::uint64_t icon_id : tray_icons_) remove_tray_icon_impl(icon_id);
+    for (const HostTrayIconId icon_id : tray_icons_) remove_tray_icon_impl(icon_id);
     tray_icons_.clear();
     snapshot_.tray_icons = 0U;
     snapshot_.shutdown = true;

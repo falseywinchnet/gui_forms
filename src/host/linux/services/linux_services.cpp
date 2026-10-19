@@ -56,7 +56,7 @@ bool Services::tray_event(const XEvent &event) {
     return false;
   return (*tray_).handle_event(event);
 }
-HostServiceStatus Services::add_tray_icon_impl(std::uint64_t icon_id,
+HostServiceStatus Services::add_tray_icon_impl(HostTrayIconId icon_id,
                                                const HostTrayIconRequest &request) {
   if (!tray_)
     tray_ = std::make_unique<X11TrayIcons>(
@@ -64,13 +64,13 @@ HostServiceStatus Services::add_tray_icon_impl(std::uint64_t icon_id,
         Delegate<const HostTrayIconEvent &>::bind<Services, &Services::forward_tray_event>(*this));
   return (*tray_).add(icon_id, request);
 }
-HostServiceStatus Services::update_tray_icon_impl(std::uint64_t icon_id,
+HostServiceStatus Services::update_tray_icon_impl(HostTrayIconId icon_id,
                                                   const HostTrayIconRequest &request) {
   if (!tray_)
     return {HostServiceError::backend_failure};
   return (*tray_).update(icon_id, request);
 }
-void Services::remove_tray_icon_impl(std::uint64_t icon_id) noexcept {
+void Services::remove_tray_icon_impl(HostTrayIconId icon_id) noexcept {
   if (tray_)
     (*tray_).remove(icon_id);
 }

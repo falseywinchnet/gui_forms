@@ -303,16 +303,18 @@ HostScreenPointResult HeadlessWindowing::pointer_position_impl() {
     return result;
 }
 
-HostWindowAtResult HeadlessWindowing::window_at_impl(Point point) {
+HostWindowAtResult HeadlessWindowing::window_at_impl(DesktopLogicalPoint point) {
     HostWindowAtResult result;
+    // The simulated desktop's rectangles are logical, as the point is.
+    const Point desktop{point.x, point.y};
     for (std::size_t index = 0U; index < foreign_windows_.size(); ++index) {
-        if (foreign_windows_[index].contains(point)) return result;
+        if (foreign_windows_[index].contains(desktop)) return result;
     }
     for (std::size_t index = 0U; index < order_.size(); ++index) {
         const NativeWindow* entry = native(order_[index]);
         if (entry == nullptr || !(*entry).visible) continue;
         const HostWindowFrame frame = native_frame(order_[index]);
-        if (!frame.outer.contains(point)) continue;
+        if (!frame.outer.contains(desktop)) continue;
         result.window = order_[index];
         return result;
     }
@@ -517,6 +519,15 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     window.stable_id = std::move(source.stable_id);
     window.model = std::move(source.model);
     window.options = std::move(source.options);
+    if (runtime && open_fault_ != HeadlessOpenFault::none) {
+        // An injected native creation failure, after the entry was taken.
+        const HeadlessOpenFault fault = open_fault_;
+        open_fault_ = HeadlessOpenFault::none;
+        windowing_.retire(window.id);
+        if (fault == HeadlessOpenFault::refuse_and_keep) refused_models_.push_back(std::move(window.model));
+        result.status.error = HostServiceError::backend_failure;
+        return result;
+    }
     window.host = std::make_unique<HeadlessHost>(*window.model);
     const HostDispatchResult attached = (*window.host).dispatch(
         HostAttachEvent{window.options.initial_size, 1.0}, next_timestamp());

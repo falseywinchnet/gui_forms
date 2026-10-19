@@ -436,7 +436,7 @@ HostScreenPointResult ApplicationWindows::pointer_position() const {
     return result;
 }
 
-ApplicationWindowAtResult ApplicationWindows::window_at(const Point point) const {
+ApplicationWindowAtResult ApplicationWindows::window_at(const DesktopLogicalPoint point) const {
     ApplicationWindowAtResult result;
     const std::shared_ptr<detail::ApplicationRunState> run = live_run(run_, result.status);
     if (!run) return result;

@@ -21,6 +21,9 @@ struct WindowsRunSlot final {
     bool initial{};
     // Shown and hidden by the floating policy (HostWindowKindTraits).
     bool floating{};
+    // CreateWindowExW failed: the state never had a native window, so it
+    // never reaches destroyed(); reclaim releases it all the same.
+    bool never_created{};
     bool print_metrics_on_close{};
     std::function<void(std::string_view metrics_json, std::string_view host_json)> final_snapshot{};
     std::string capture_path{};
@@ -156,7 +159,8 @@ public:
     // initial windows are shown (WM_ACTIVATEAPP reports later changes).
     void report_foreground();
     // Releases runtime windows that closed during the turn, after printing
-    // their metrics as the run prints every window's at exit.
+    // their metrics as the run prints every window's at exit, and runtime
+    // windows whose native creation failed.
     void reclaim();
     // Prints one window's final metrics and snapshot.
     static void publish_final_metrics(WindowsRunSlot& slot);
@@ -165,7 +169,7 @@ protected:
     HostWindowFrameResult frame_impl(HostWindowId window) override;
     HostServiceStatus request_frame_impl(HostWindowId window, Rect content) override;
     HostScreenPointResult pointer_position_impl() override;
-    HostWindowAtResult window_at_impl(Point point) override;
+    HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
     HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     HostServiceStatus destroy_window_impl(HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
@@ -191,15 +195,15 @@ HostWindowFrame native_window_frame(HWND window) {
     if (!GetClientRect(window, &client) || !ClientToScreen(window, &origin)) return frame;
     const std::vector<HostMonitor> monitors = device_monitors();
     const double scale = query_scale(window);
-    const Point content_origin = desktop_logical_point(
-        monitors, {static_cast<double>(origin.x), static_cast<double>(origin.y)});
+    const DesktopLogicalPoint content_origin = desktop_logical_point(
+        monitors, DesktopDevicePoint{static_cast<double>(origin.x), static_cast<double>(origin.y)});
     frame.content = {content_origin.x, content_origin.y,
                      static_cast<double>(client.right - client.left) / scale,
                      static_cast<double>(client.bottom - client.top) / scale};
     RECT outer{};
     if (visible_window_bounds(window, outer)) {
-        const Point outer_origin = desktop_logical_point(
-            monitors, {static_cast<double>(outer.left), static_cast<double>(outer.top)});
+        const DesktopLogicalPoint outer_origin = desktop_logical_point(
+            monitors, DesktopDevicePoint{static_cast<double>(outer.left), static_cast<double>(outer.top)});
         frame.outer = {outer_origin.x, outer_origin.y,
                        static_cast<double>(outer.right - outer.left) / scale,
                        static_cast<double>(outer.bottom - outer.top) / scale};
@@ -302,6 +306,7 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
                                   owner, nullptr, instance_, &state);
     if (window == nullptr || !state.initialize(window)) {
         if (window != nullptr) DestroyWindow(window);
+        if (window == nullptr) window_slot.never_created = true;
         retire(id);
         outcome.admission.status.error = HostServiceError::backend_failure;
         outcome.admission.window = {};
@@ -368,8 +373,11 @@ void WindowsApplicationRun::publish_final_metrics(WindowsRunSlot& run_slot) {
 void WindowsApplicationRun::reclaim() {
     for (std::size_t index = slots_.size(); index > 0U; --index) {
         WindowsRunSlot& candidate = *slots_[index - 1U];
-        if (candidate.initial || !candidate.state || !(*candidate.state).destroyed()) continue;
-        publish_final_metrics(candidate);
+        if (candidate.initial || !candidate.state) continue;
+        const bool closed = (*candidate.state).destroyed();
+        if (!closed && !candidate.never_created) continue;
+        // A window that was never created has no metrics to publish.
+        if (closed) publish_final_metrics(candidate);
         slots_.erase(slots_.begin() + static_cast<std::ptrdiff_t>(index - 1U));
     }
 }
@@ -398,7 +406,8 @@ HostServiceStatus WindowsApplicationRun::request_frame_impl(HostWindowId window,
     if (state.frame_fixed()) return {HostServiceError::unsupported};
     const std::vector<HostMonitor> monitors = device_monitors();
     double target_scale = 1.0;
-    const Point device_origin = desktop_device_point(monitors, {content.x, content.y}, target_scale);
+    const DesktopDevicePoint device_origin =
+        desktop_device_point(monitors, DesktopLogicalPoint{content.x, content.y}, target_scale);
     RECT frame{0, 0, static_cast<LONG>(std::lround(content.width * target_scale)),
                static_cast<LONG>(std::lround(content.height * target_scale))};
     adjust_client_frame(frame, static_cast<DWORD>(GetWindowLongPtrW(native_window, GWL_STYLE)),
@@ -425,15 +434,15 @@ HostScreenPointResult WindowsApplicationRun::pointer_position_impl() {
     }
     const std::vector<HostMonitor> monitors = device_monitors();
     result.position = desktop_logical_point(
-        monitors, {static_cast<double>(device.x), static_cast<double>(device.y)});
+        monitors, DesktopDevicePoint{static_cast<double>(device.x), static_cast<double>(device.y)});
     return result;
 }
 
-HostWindowAtResult WindowsApplicationRun::window_at_impl(Point point) {
+HostWindowAtResult WindowsApplicationRun::window_at_impl(DesktopLogicalPoint point) {
     HostWindowAtResult result;
     const std::vector<HostMonitor> monitors = device_monitors();
     double scale = 1.0;
-    const Point device = desktop_device_point(monitors, point, scale);
+    const DesktopDevicePoint device = desktop_device_point(monitors, point, scale);
     const POINT native_point{static_cast<LONG>(std::lround(device.x)),
                              static_cast<LONG>(std::lround(device.y))};
     // WindowFromPoint skips hidden and disabled windows; its result may be a

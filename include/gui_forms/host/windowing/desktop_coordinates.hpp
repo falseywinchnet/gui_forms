@@ -31,6 +31,44 @@ namespace gui_forms {
 // Monitor records from HostServices::query_monitors stay in the host's
 // device desktop units, as they always were; HostWindowing::query_monitors
 // returns the same monitors in logical units.
+//
+// The two spaces are different types (house style section 1, owner decision
+// V3-1), so a device point cannot be passed where a logical one is meant.
+// Neither converts implicitly from or to Point; the functions below are the
+// conversions, and `Point{p.x, p.y}` spells a deliberate change of view
+// (a point tested against a Rect in the same space).
+
+// A point on the host's device desktop: Win32 screen pixels of a
+// per-monitor-aware process, X11 root-window pixels.
+struct DesktopDevicePoint final {
+    double x{};
+    double y{};
+
+    friend bool operator==(DesktopDevicePoint left, DesktopDevicePoint right) noexcept {
+        const bool equal = left.x == right.x && left.y == right.y;
+        return equal;
+    }
+    friend bool operator!=(DesktopDevicePoint left, DesktopDevicePoint right) noexcept {
+        const bool different = !(left == right);
+        return different;
+    }
+};
+
+// A point in desktop logical units: where window frames, the pointer's
+// desktop position and logical work areas are published.
+struct DesktopLogicalPoint final {
+    double x{};
+    double y{};
+
+    friend bool operator==(DesktopLogicalPoint left, DesktopLogicalPoint right) noexcept {
+        const bool equal = left.x == right.x && left.y == right.y;
+        return equal;
+    }
+    friend bool operator!=(DesktopLogicalPoint left, DesktopLogicalPoint right) noexcept {
+        const bool different = !(left == right);
+        return different;
+    }
+};
 
 // The monitor `device` in logical units: same id, origin and scale; frame
 // and work area extents divided by the scale. The work area keeps its
@@ -40,22 +78,26 @@ namespace gui_forms {
 
 // Index of the monitor whose frame contains `point`, else of the monitor
 // whose frame is nearest to it (squared distance to the rectangle; the
-// first such monitor on a tie). `monitors` must not be empty.
-[[nodiscard]] std::size_t nearest_monitor(std::span<const HostMonitor> monitors,
-                                          Point point) noexcept;
+// first such monitor on a tie). `monitors` must not be empty. The device
+// form reads device monitor records (HostServices::query_monitors), the
+// logical form logical ones (HostWindowing::query_monitors).
+[[nodiscard]] std::size_t nearest_device_monitor(std::span<const HostMonitor> device_monitors,
+                                                 DesktopDevicePoint point) noexcept;
+[[nodiscard]] std::size_t nearest_logical_monitor(std::span<const HostMonitor> logical_monitors,
+                                                  DesktopLogicalPoint point) noexcept;
 
 // Converts a device desktop point to desktop logical units through the
 // monitor that contains it (or the nearest one). Returns the point
 // unchanged when `device_monitors` is empty.
-[[nodiscard]] Point desktop_logical_point(std::span<const HostMonitor> device_monitors,
-                                          Point device_point) noexcept;
+[[nodiscard]] DesktopLogicalPoint desktop_logical_point(std::span<const HostMonitor> device_monitors,
+                                                        DesktopDevicePoint device_point) noexcept;
 
 // The inverse: finds the monitor whose logical frame contains the point (or
 // the nearest logical frame) and maps it back to device units. Returns the
 // point unchanged when `device_monitors` is empty. `scale` receives that
 // monitor's scale (1 when there is none), which a caller uses to convert an
 // extent placed at that point.
-[[nodiscard]] Point desktop_device_point(std::span<const HostMonitor> device_monitors,
-                                         Point logical_point, double& scale) noexcept;
+[[nodiscard]] DesktopDevicePoint desktop_device_point(std::span<const HostMonitor> device_monitors,
+                                                      DesktopLogicalPoint logical_point, double& scale) noexcept;
 
 } // namespace gui_forms

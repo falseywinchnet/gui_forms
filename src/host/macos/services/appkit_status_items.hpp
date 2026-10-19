@@ -24,11 +24,11 @@ public:
     AppKitStatusItems(const AppKitStatusItems&) = delete;
     AppKitStatusItems& operator=(const AppKitStatusItems&) = delete;
 
-    [[nodiscard]] HostServiceStatus add(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    [[nodiscard]] HostServiceStatus update(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    void remove(std::uint64_t icon_id) noexcept;
+    [[nodiscard]] HostServiceStatus add(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    [[nodiscard]] HostServiceStatus update(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    void remove(HostTrayIconId icon_id) noexcept;
     // Pops a native menu under the item and returns when it closes.
-    [[nodiscard]] HostTrayMenuResult show_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request);
+    [[nodiscard]] HostTrayMenuResult show_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request);
 
 private:
     struct Impl;

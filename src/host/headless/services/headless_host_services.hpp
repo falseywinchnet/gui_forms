@@ -27,7 +27,7 @@ public:
     }
     // Tray icons, kept as requested so tests can read what an application
     // asked to show, and driven by simulated user actions.
-    [[nodiscard]] const HostTrayIconRequest* tray_icon(std::uint64_t icon_id) const noexcept;
+    [[nodiscard]] const HostTrayIconRequest* tray_icon(HostTrayIconId icon_id) const noexcept;
     [[nodiscard]] const std::string& tray_trace() const noexcept { return tray_trace_; }
     // Raises a tray event as a user action would; dropped for icons that are
     // not live.
@@ -51,18 +51,18 @@ protected:
         const HostSoundCueRequest& request) override;
     void shutdown_impl() noexcept override;
     [[nodiscard]] HostServiceStatus add_tray_icon_impl(
-        std::uint64_t icon_id, const HostTrayIconRequest& request) override;
+        HostTrayIconId icon_id, const HostTrayIconRequest& request) override;
     [[nodiscard]] HostServiceStatus update_tray_icon_impl(
-        std::uint64_t icon_id, const HostTrayIconRequest& request) override;
-    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override;
+        HostTrayIconId icon_id, const HostTrayIconRequest& request) override;
+    void remove_tray_icon_impl(HostTrayIconId icon_id) noexcept override;
     [[nodiscard]] HostServiceStatus show_tray_notification_impl(
-        std::uint64_t icon_id, const HostTrayNotificationRequest& request) override;
+        HostTrayIconId icon_id, const HostTrayNotificationRequest& request) override;
     [[nodiscard]] HostTrayMenuResult show_tray_menu_impl(
-        std::uint64_t icon_id, const HostTrayMenuRequest& request) override;
+        HostTrayIconId icon_id, const HostTrayMenuRequest& request) override;
 
 private:
     struct TrayIcon final {
-        std::uint64_t id{};
+        HostTrayIconId id{};
         HostTrayIconRequest request;
     };
     std::vector<HostMonitor> monitors_;

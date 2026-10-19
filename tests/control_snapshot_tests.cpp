@@ -12,6 +12,8 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <stdexcept>
+#include <thread>
 
 namespace {
 using namespace gui_forms;
@@ -21,6 +23,20 @@ void require(bool condition, const char* message) {
     std::cerr << "gui_forms_control_snapshot_tests: " << message << '\n';
     std::exit(1);
 }
+
+// Releases a snapshot from another thread, recording whether it was refused.
+struct OtherThreadRelease final {
+    Window* window{};
+    ImageId image{};
+    bool* refused{};
+    void operator()() const {
+        try {
+            static_cast<void>((*window).release_control_snapshot(image));
+        } catch (const std::logic_error&) {
+            *refused = true;
+        }
+    }
+};
 
 void snapshots() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("root"));
@@ -65,9 +81,18 @@ void snapshots() {
     (*card).set_visible(true);
     window.perform_layout();
 
+    // Finding V4: the release is UI-thread only and repaints as remove_image.
+    bool refused = false;
+    std::thread releaser(OtherThreadRelease{&window, (*snapshot).image, &refused});
+    releaser.join();
+    require(refused && window.image_resources().find((*snapshot).image).has_value(),
+            "a release off the UI thread is refused and keeps the image");
+    const std::uint64_t marks = window.metrics_snapshot().dirty_marks;
     require(window.release_control_snapshot((*snapshot).image) && !window.image_resources().find((*snapshot).image) &&
                 !window.release_control_snapshot((*snapshot).image),
             "releasing removes the image once");
+    require(window.metrics_snapshot().dirty_marks > marks,
+            "releasing a snapshot retires the window's retained paint, as remove_image does");
     window.set_framebuffer_painter(nullptr);
 }
 
