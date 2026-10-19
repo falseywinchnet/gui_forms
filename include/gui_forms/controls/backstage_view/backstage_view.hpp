@@ -150,6 +150,11 @@ private:
     [[nodiscard]] Geometry geometry() const;
     [[nodiscard]] ItemParts item_parts(const Geometry& placed, std::size_t item) const;
     [[nodiscard]] AnatomyStateSet item_states(std::size_t item) const;
+    // An item's text as authored, mnemonic marker included: its own, or its
+    // Command's when it has none. A borrow of the argument (or of its
+    // Command's state): temporaries are refused (house style §5).
+    [[nodiscard]] static const std::string& authored_text(const BackstageItemSpec& item) noexcept;
+    static const std::string& authored_text(BackstageItemSpec&& item) = delete;
     [[nodiscard]] std::string item_text(const BackstageItemSpec& item) const;
     [[nodiscard]] bool item_enabled(const BackstageItemSpec& item) const;
     [[nodiscard]] std::optional<std::size_t> item_at(Point local) const;

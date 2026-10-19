@@ -5,6 +5,8 @@
 #include "gui_forms/window.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <string>
 #include <utility>
 
 namespace gui_forms {
@@ -195,6 +197,7 @@ void RibbonApplicationMenu::activate(const Row& row) {
         ribbon.recent_item_invoked_.emit(invoked);
         return;
     }
+    // A copy: running the command may replace the application menu.
     const MenuItemSpec item = ribbon.application_menu_[row.index];
     std::string command_id;
     if (item.command) {

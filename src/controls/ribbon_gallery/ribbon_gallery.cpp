@@ -329,6 +329,8 @@ void RibbonGallery::start_dwell(std::size_t position) {
     if (previewing && *previewing == item_id) return;
     dwell_item_ = item_id;
     const std::weak_ptr<Control> weak = shared_from_this();
+    // A UI timer repeats at its interval; a day's interval makes it fire
+    // once, at the dwell's end, and dwell_elapsed disconnects it then.
     dwell_timer_ = (*attached_window()).schedule_ui_timer(
         *this, std::chrono::hours(24), FrameClock::now() + preview_dwell, DwellCallback{weak, item_id});
 }
@@ -497,7 +499,12 @@ void RibbonGallery::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::wheel) {
         const double delta = event.wheel_delta.y;
         if (delta == 0.0) return;
-        const std::size_t lines = static_cast<std::size_t>(std::max(1.0, std::abs(delta) <= 8.0 ? std::abs(delta) : 1.0));
+        // A delta of up to 8 counts lines (whole lines, at least one); a
+        // larger one, such as a pixel delta, scrolls one line.
+        const double magnitude = std::abs(delta);
+        double counted = 1.0;
+        if (magnitude <= 8.0) counted = std::max(1.0, magnitude);
+        const std::size_t lines = static_cast<std::size_t>(counted);
         if (delta > 0.0) {
             scroll_to_line(first_line_ > lines ? first_line_ - lines : 0U);
         } else if (can_scroll_down()) {
@@ -738,14 +745,16 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         if (can_scroll_up()) up.states |= SemanticState::enabled;
         up.actions = {SemanticAction::press};
         nodes.push_back(std::move(up));
-        SemanticNode down = nodes.back();
+        SemanticNode down{};
         down.stable_id = prefix + ".scroll_down";
         down.runtime_id = virtual_semantic_runtime_id(down.stable_id);
+        down.role = SemanticRole::button;
         down.name = "Scroll down";
         down.bounds = {absolute.x + placed.scroll_down.bounds.x, absolute.y + placed.scroll_down.bounds.y,
                        placed.scroll_down.bounds.width, placed.scroll_down.bounds.height};
         down.states = SemanticState::visible;
         if (can_scroll_down()) down.states |= SemanticState::enabled;
+        down.actions = {SemanticAction::press};
         nodes.push_back(std::move(down));
     }
     if (placed.more_button.present) {

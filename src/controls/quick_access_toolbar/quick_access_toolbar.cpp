@@ -1,5 +1,7 @@
 #include "gui_forms/controls/quick_access_toolbar/quick_access_toolbar.hpp"
 
+#include "../scrollable_control/scrolling_utilities.hpp"
+
 #include "gui_forms/delegate.hpp"
 #include "gui_forms/text.hpp"
 #include "gui_forms/theme/part_painting/part_painting.hpp"
@@ -40,7 +42,7 @@ QuickAccessToolbar::QuickAccessToolbar(StableId stable_id) : ToolStrip(std::move
     set_grip_visible(false);
     set_end_reserve(customize_button_width);
     const std::string prefix((*this).stable_id().value());
-    menu_ =std::make_unique<ContextMenu>(prefix + ".customize.menu");
+    menu_ = std::make_unique<ContextMenu>(prefix + ".customize.menu");
     menu_invoked_ = (*menu_).item_invoked().subscribe(
         *this, Delegate<const MenuItemInvocation&>::bind<QuickAccessToolbar, &QuickAccessToolbar::on_menu_invoked>(
                    *this));
@@ -311,8 +313,11 @@ void QuickAccessToolbar::on_pointer(PointerEvent& event) {
         invalidate(Dirty::paint);
     }
     if (on_customize && event.action == PointerAction::down && event.button == PointerButton::primary) {
-        if (customize_menu_open()) close_customize_menu();
-        else static_cast<void>(show_customize_menu(MenuOpenMode::pointer));
+        if (customize_menu_open()) {
+            close_customize_menu();
+        } else {
+            static_cast<void>(show_customize_menu(MenuOpenMode::pointer));
+        }
         event.handled = true;
         return;
     }

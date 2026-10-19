@@ -57,18 +57,17 @@ std::optional<std::size_t> Ribbon::fallback_tab() const noexcept {
     return std::nullopt;
 }
 
-// A shown tab's 1-based place among the shown tabs of its own kind: the core
-// tabs, or its set's tabs; `count` receives how many there are.
-std::size_t Ribbon::position_among_shown(std::size_t tab, std::size_t& count) const noexcept {
+// A shown tab's 1-based place among the shown tabs of its own kind (the core
+// tabs, or its set's tabs) and how many there are.
+Ribbon::TabPosition Ribbon::position_among_shown(std::size_t tab) const noexcept {
     const std::optional<std::size_t> set = tab_set_of_[tab];
-    std::size_t position = 0U;
-    count = 0U;
+    TabPosition result;
     for (std::size_t other = 0; other < tabs_.size(); ++other) {
         if (tab_set_of_[other] != set || !shown(other)) continue;
-        ++count;
-        if (other <= tab) position = count;
+        ++result.count;
+        if (other <= tab) result.position = result.count;
     }
-    return position;
+    return result;
 }
 
 // -- availability and modes ------------------------------------------------------
