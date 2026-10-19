@@ -90,7 +90,7 @@ private:
     HostWindowId window_id_{};
     bool active_{};
     Rect start_content_{};
-    Point start_pointer_{};
+    DesktopLogicalPoint start_pointer_{};
     Point last_target_{};
     WindowFrameDragStatistics statistics_{};
     SubscriptionToken reports_{};

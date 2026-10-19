@@ -58,18 +58,6 @@ constexpr std::string_view show_fewer_text = "Show fewer buttons";
 constexpr std::string_view hidden_heading_text = "Hidden pages";
 constexpr std::string_view options_text = "Navigation pane options\xE2\x80\xA6";
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 // A square of `side` centred in `area`, on whole units; empty when it does
 // not fit.
 Rect centred_square(Rect area, double side) noexcept {
@@ -1558,7 +1546,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         target.kind = TargetKind::collapse;
         SemanticNode node{};
         node.stable_id = prefix + ".collapse";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = placed.collapsed ? "Expand navigation pane" : "Collapse navigation pane";
         node.bounds = window_rect(absolute, placed.collapse_button);
@@ -1573,7 +1561,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         target.kind = TargetKind::caption;
         SemanticNode node{};
         node.stable_id = prefix + ".caption";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = selected_text();
         node.has_popup = true;
@@ -1589,7 +1577,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         target.kind = TargetKind::grip;
         SemanticNode node{};
         node.stable_id = prefix + ".grip";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::split_pane;
         node.name = "Large buttons";
         node.value = std::to_string(placed.large_count);
@@ -1606,7 +1594,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
     if (!placed.tabs.empty()) {
         SemanticNode list{};
         list.stable_id = prefix + ".tabs";
-        list.runtime_id = node_runtime_id(list.stable_id);
+        list.runtime_id = virtual_semantic_runtime_id(list.stable_id);
         list.role = SemanticRole::tab_group;
         list.name = "Pages";
         list.orientation = SemanticOrientation::vertical;
@@ -1623,7 +1611,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
             target.page = pages_.record_at(PagePosition{slot.position}).id;
             SemanticNode tab{};
             tab.stable_id = prefix + ".tab." + target.page.value;
-            tab.runtime_id = node_runtime_id(tab.stable_id);
+            tab.runtime_id = virtual_semantic_runtime_id(tab.stable_id);
             tab.role = SemanticRole::tab;
             tab.name = page_text(slot.position);
             tab.bounds = window_rect(absolute, slot.bounds);
@@ -1647,7 +1635,7 @@ std::vector<SemanticNode> NavigationPane::semantic_virtual_children() const {
         target.kind = TargetKind::configure;
         SemanticNode node{};
         node.stable_id = prefix + ".configure";
-        node.runtime_id = node_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::menu_button;
         node.name = "Configure buttons";
         node.has_popup = true;

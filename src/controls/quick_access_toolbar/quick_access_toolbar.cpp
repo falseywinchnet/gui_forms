@@ -21,18 +21,6 @@ namespace {
 constexpr double customize_button_width = 13.0;
 constexpr double customize_glyph_size = 7.0;
 
-// The customize button's semantic node carries a runtime ID derived from its
-// stable ID, in the high half as ToolStrip's item nodes do.
-std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 // A square glyph of `side` centred in `area`, on whole units.
 Rect centred_glyph(Rect area, double side) noexcept {
     if (area.width < side || area.height < side) return {};
@@ -363,7 +351,7 @@ std::vector<SemanticNode> QuickAccessToolbar::semantic_virtual_children() const 
     const Rect absolute = absolute_bounds();
     SemanticNode node{};
     node.stable_id = std::string(stable_id().value()) + ".customize";
-    node.runtime_id = node_runtime_id(node.stable_id);
+    node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
     node.name = "Customize Quick Access Toolbar";
     node.role = SemanticRole::menu_button;
     node.has_popup = true;

@@ -27,6 +27,10 @@ void UpdateScope::perform_layout() {
     }
 }
 
+void UpdateScope::abandon() noexcept {
+    window_ = nullptr;
+}
+
 void UpdateScope::close() {
     if (window_) {
         Window* closing = std::exchange(window_, nullptr);

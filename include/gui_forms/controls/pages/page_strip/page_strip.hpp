@@ -124,7 +124,9 @@ enum class PageContextMenuCause : std::uint8_t { pointer, keyboard };
 // A request for a tab's context menu (PageView study I11). The strip shows
 // no menu of its own; a handler that shows one sets `handled`. `anchor` is
 // in window coordinates: the pointer, or for the keyboard the corner of the
-// tab on the content's side where reading starts.
+// tab on the content's side where reading starts (a tab scrolled out of view
+// is scrolled back first; one that cannot be shown anchors at the list
+// button, or the strip, the same way).
 struct PageContextMenuRequest final {
     PageId page{};
     Point anchor{};
@@ -624,6 +626,7 @@ private:
     [[nodiscard]] double main_length(Rect bounds) const noexcept;
     [[nodiscard]] double local_main(Point window_point) const;
     [[nodiscard]] Rect insertion_mark_bounds() const;
+    [[nodiscard]] Point keyboard_menu_anchor(std::size_t position);
     void request_context_menu(std::size_t position, Point anchor, PageContextMenuCause cause);
     void on_secondary_button(PointerEvent& event, Hit hit);
     void paint_tab(Painter& painter, PartPaint& part, std::size_t position, double scale);

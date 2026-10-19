@@ -707,6 +707,18 @@ private:
     [[nodiscard]] std::optional<DockPanelId> selected_panel(const StackSlot& slot) const;
 
     // -- layout --
+    // The stages of arrange (one layout pass), in order.
+    struct PreviousPass final {
+        Rect document_area{};
+        Rect tree_area{};
+    };
+    [[nodiscard]] PreviousPass begin_layout_pass();
+    void hold_out_dragged_page();
+    [[nodiscard]] Rect plan_bands_and_collapse(Size surface, std::array<bool, 4>& edges, std::array<Rect, 4>& bands);
+    void arrange_stack_views();
+    void arrange_side_strips(const std::array<bool, 4>& edges, const std::array<Rect, 4>& bands);
+    void follow_flyout_after_pass();
+    void finish_layout_pass(const PreviousPass& previous, Size surface, bool focus_was_inside);
     [[nodiscard]] Extent extent_of(DockNodeId node, std::span<const DockNodeId> collapsed) const;
     [[nodiscard]] Size stack_minimum(const DockNode& node) const;
     [[nodiscard]] std::vector<DockNodeId> plan_collapse(Size available) const;

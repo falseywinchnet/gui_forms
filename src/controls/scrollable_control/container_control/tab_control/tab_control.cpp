@@ -16,18 +16,6 @@
 namespace gui_forms {
 
 namespace {
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-[[nodiscard]] std::uint64_t virtual_semantic_runtime_id(
-    std::string_view stable_id) noexcept {
-    std::uint64_t value = 1469598103934665603ULL;
-    for (const unsigned char byte : stable_id) {
-        value ^= byte;
-        value *= 1099511628211ULL;
-    }
-    const std::uint64_t result = value | (std::uint64_t{1} << 63U);
-    return result;
-}
 
 // Whether `control` is `ancestor` or inside it.
 [[nodiscard]] bool within(const Control::Ptr& control, const Control::Ptr& ancestor) {

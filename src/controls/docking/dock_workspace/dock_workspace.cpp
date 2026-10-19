@@ -745,11 +745,23 @@ void DockWorkspace::on_window_ready(DockSiteId site, Window& window, const Appli
     publish_command_targets();
 }
 
-// The close button: the window stays; its panels go first, which closes it.
+// The close button. With a main site bound, the window stays for now: its
+// panels go first, in a transaction posted to the main window (so it runs
+// after this request returns), and that transaction destroys the window.
+// Without one (no main site is bound, or it is in no window) there is no
+// main window to post to and no transaction would destroy the window: the
+// panels go at once, as close_floating_site does, and the close goes ahead,
+// so the host closes the window and on_window_closed forgets it. If that
+// transaction is refused (the docking lock), the window still closes and
+// its site stays in the layout without a window, as after a refused opening;
+// the next attach opens it again.
 void DockWorkspace::on_window_closing(DockSiteId site, HostCloseRequest& request) {
-    request.cancel = true;
     Window* const main = main_model();
-    if (main == nullptr || site_ == nullptr) return;
+    if (main == nullptr) {
+        close_floating_site(site);
+        return;
+    }
+    request.cancel = true;
     static_cast<void>((*main).begin_invoke((*site_).shared_from_this(), CloseFloatingSite{liaison_, site}));
 }
 
@@ -970,7 +982,9 @@ bool DockWorkspace::site_contains(const DockSite& site, Point desktop) const {
 
 DockSite* DockWorkspace::site_at(Point desktop, const DockSite* excluded) const {
     if (!windows_attached()) return nullptr;
-    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop);
+    // The docking controls keep desktop positions as Point in logical units.
+    const DesktopLogicalPoint desktop_point{desktop.x, desktop.y};
+    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop_point);
     if (!at.status.accepted() || !at.found) return nullptr;
     const HostWindowId topmost = at.window.id();
     const std::vector<DockSite*> sites = bound_sites();

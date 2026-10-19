@@ -109,7 +109,7 @@ private:
     // The services the icon is shown through and its identity there. The
     // pointer is used only while the window still has these services.
     HostServices* services_{};
-    std::uint64_t icon_id_{};
+    HostTrayIconId icon_id_{};
     SubscriptionToken tray_events_{};
     HostServiceStatus status_{};
     Event<const NotifyIconClick&> click_{};

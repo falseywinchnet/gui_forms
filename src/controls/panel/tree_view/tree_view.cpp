@@ -460,7 +460,7 @@ std::vector<SemanticNode> TreeView::semantic_virtual_children() const {
         const TreeViewItem& item = items_[visible_[row]];
         SemanticNode node;
         node.stable_id = item.stable_id;
-        node.runtime_id = virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         node.name = item.text;
         node.description = "level " + std::to_string(item.depth + 1U);

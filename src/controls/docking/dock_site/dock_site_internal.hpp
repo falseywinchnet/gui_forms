@@ -21,18 +21,6 @@ inline constexpr double strip_preferred_height = 26.0;
 // T7-1).
 inline constexpr double seam_bar_thickness = 3.0;
 
-// Virtual semantic children carry a runtime ID derived from their stable ID,
-// in the high half so it never meets a control's own runtime ID.
-inline std::uint64_t node_runtime_id(std::string_view id) noexcept {
-    std::uint64_t hash = 1469598103934665603ULL;
-    for (const unsigned char byte : id) {
-        hash ^= byte;
-        hash *= 1099511628211ULL;
-    }
-    const std::uint64_t result = hash | (1ULL << 63U);
-    return result;
-}
-
 inline Rect to_window(Rect absolute, Rect local) noexcept {
     const Rect result{absolute.x + local.x, absolute.y + local.y, local.width, local.height};
     return result;

@@ -832,7 +832,7 @@ void CorrespondenceView::add_semantic_text_child(
     std::string name, std::string value, SemanticRole role) {
     SemanticNode child;
     child.stable_id = node.stable_id + std::move(suffix);
-    child.runtime_id = virtual_runtime_id(child.stable_id);
+    child.runtime_id = virtual_semantic_runtime_id(child.stable_id);
     child.role = role;
     child.name = std::move(name);
     child.value = std::move(value);
@@ -854,7 +854,7 @@ CorrespondenceView::semantic_virtual_children() const {
         const Rect local = item_bounds(index);
         SemanticNode node;
         node.stable_id = item.stable_id;
-        node.runtime_id = virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         node.name = item.title;
         node.value = item.metric;
@@ -880,7 +880,7 @@ CorrespondenceView::semantic_virtual_children() const {
                                     : SemanticAction::expand};
         SemanticNode activate;
         activate.stable_id = node.stable_id + ".activate";
-        activate.runtime_id = virtual_runtime_id(activate.stable_id);
+        activate.runtime_id = virtual_semantic_runtime_id(activate.stable_id);
         activate.role = SemanticRole::button;
         activate.name = "Open " + item.title;
         activate.description = item.unavailable
