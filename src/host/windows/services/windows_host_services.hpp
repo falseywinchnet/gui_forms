@@ -117,7 +117,7 @@ protected:
     // Notification-area icons: one WindowsNotifyIcons, created with the first
     // icon, whose hidden window reports shell events back through
     // forward_tray_event on the UI thread.
-    HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request) override {
+    HostServiceStatus add_tray_icon_impl(HostTrayIconId icon_id, const HostTrayIconRequest& request) override {
         if (!notify_icons_) {
             notify_icons_ = std::make_unique<gui_forms::host::detail::WindowsNotifyIcons>(
                 Delegate<const HostTrayIconEvent&>::bind<WindowsHostServices, &WindowsHostServices::forward_tray_event>(
@@ -125,19 +125,19 @@ protected:
         }
         return (*notify_icons_).add(icon_id, request);
     }
-    HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request) override {
+    HostServiceStatus update_tray_icon_impl(HostTrayIconId icon_id, const HostTrayIconRequest& request) override {
         if (!notify_icons_) return {HostServiceError::backend_failure};
         return (*notify_icons_).update(icon_id, request);
     }
-    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override {
+    void remove_tray_icon_impl(HostTrayIconId icon_id) noexcept override {
         if (notify_icons_) (*notify_icons_).remove(icon_id);
     }
-    HostServiceStatus show_tray_notification_impl(std::uint64_t icon_id,
+    HostServiceStatus show_tray_notification_impl(HostTrayIconId icon_id,
                                                   const HostTrayNotificationRequest& request) override {
         if (!notify_icons_) return {HostServiceError::backend_failure};
         return (*notify_icons_).notify(icon_id, request);
     }
-    HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id, const HostTrayMenuRequest& request) override {
+    HostTrayMenuResult show_tray_menu_impl(HostTrayIconId icon_id, const HostTrayMenuRequest& request) override {
         if (!notify_icons_) {
             HostTrayMenuResult refused;
             refused.status = {HostServiceError::backend_failure};

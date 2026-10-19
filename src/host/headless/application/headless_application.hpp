@@ -50,7 +50,7 @@ public:
     // Replaces the simulated monitors (desktop logical units). An empty
     // list is ignored.
     void set_monitors(std::vector<HostMonitor> monitors);
-    void set_pointer(Point position) noexcept { pointer_ = position; }
+    void set_pointer(DesktopLogicalPoint position) noexcept { pointer_ = position; }
     // A window of another application covering `outer`, above every window
     // of this run. window_at reports no window where it lies.
     void add_foreign_window(Rect outer);
@@ -87,7 +87,7 @@ protected:
     [[nodiscard]] HostServiceStatus request_frame_impl(HostWindowId window,
                                                        Rect content) override;
     [[nodiscard]] HostScreenPointResult pointer_position_impl() override;
-    [[nodiscard]] HostWindowAtResult window_at_impl(Point point) override;
+    [[nodiscard]] HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
     [[nodiscard]] HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     [[nodiscard]] HostServiceStatus destroy_window_impl(HostWindowId window) override;
     [[nodiscard]] HostMonitorResult query_monitors_impl() override;
@@ -117,7 +117,7 @@ private:
     bool deferred_reports_{};
     std::vector<DeferredReport> deferred_;
     std::vector<HostMonitor> monitors_;
-    Point pointer_{};
+    DesktopLogicalPoint pointer_{};
     std::vector<Rect> foreign_windows_;
     // Live native windows; `order_` holds their identities front to back.
     std::vector<NativeWindow> natives_;

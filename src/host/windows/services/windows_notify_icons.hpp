@@ -32,21 +32,21 @@ public:
     WindowsNotifyIcons(const WindowsNotifyIcons&) = delete;
     WindowsNotifyIcons& operator=(const WindowsNotifyIcons&) = delete;
 
-    [[nodiscard]] HostServiceStatus add(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    [[nodiscard]] HostServiceStatus update(std::uint64_t icon_id, const HostTrayIconRequest& request);
-    void remove(std::uint64_t icon_id) noexcept;
-    [[nodiscard]] HostServiceStatus notify(std::uint64_t icon_id, const HostTrayNotificationRequest& request);
+    [[nodiscard]] HostServiceStatus add(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    [[nodiscard]] HostServiceStatus update(HostTrayIconId icon_id, const HostTrayIconRequest& request);
+    void remove(HostTrayIconId icon_id) noexcept;
+    [[nodiscard]] HostServiceStatus notify(HostTrayIconId icon_id, const HostTrayNotificationRequest& request);
     // Shows a native popup menu at the pointer and returns when it closes.
-    [[nodiscard]] HostTrayMenuResult show_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request);
+    [[nodiscard]] HostTrayMenuResult show_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request);
 
     // For tests: the window the shell posts to, and an icon's shell ID.
     [[nodiscard]] HWND message_window() const noexcept { return window_; }
-    [[nodiscard]] std::optional<UINT> shell_id(std::uint64_t icon_id) const noexcept;
+    [[nodiscard]] std::optional<UINT> shell_id(HostTrayIconId icon_id) const noexcept;
     [[nodiscard]] UINT taskbar_created_message() const noexcept { return taskbar_created_; }
 
 private:
     struct Icon final {
-        std::uint64_t id{};
+        HostTrayIconId id{};
         // The shell's 16-bit icon identity (HIWORD of the callback's lParam).
         UINT shell_id{};
         HICON handle{};
@@ -54,7 +54,7 @@ private:
     };
 
     [[nodiscard]] bool ensure_window() noexcept;
-    [[nodiscard]] Icon* find(std::uint64_t icon_id) noexcept;
+    [[nodiscard]] Icon* find(HostTrayIconId icon_id) noexcept;
     [[nodiscard]] UINT next_shell_id() const noexcept;
     [[nodiscard]] bool show(const Icon& icon) noexcept;
     void handle_callback(WPARAM w_parameter, LPARAM l_parameter);

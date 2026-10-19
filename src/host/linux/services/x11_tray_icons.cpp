@@ -68,7 +68,7 @@ bool X11TrayIcons::tray_present(Display* display) noexcept {
     return present;
 }
 
-HostServiceStatus X11TrayIcons::add(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus X11TrayIcons::add(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     const ::Window tray = XGetSelectionOwner(display_, tray_selection(display_));
     if (tray == None) return {HostServiceError::backend_failure};
     const int screen = DefaultScreen(display_);
@@ -101,7 +101,7 @@ HostServiceStatus X11TrayIcons::add(std::uint64_t icon_id, const HostTrayIconReq
     return {};
 }
 
-HostServiceStatus X11TrayIcons::update(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus X11TrayIcons::update(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     for (Icon& icon : icons_) {
         if (icon.id != icon_id) continue;
         icon.images = request.images;
@@ -113,7 +113,7 @@ HostServiceStatus X11TrayIcons::update(std::uint64_t icon_id, const HostTrayIcon
     return {HostServiceError::backend_failure};
 }
 
-void X11TrayIcons::remove(std::uint64_t icon_id) noexcept {
+void X11TrayIcons::remove(HostTrayIconId icon_id) noexcept {
     for (std::size_t index = 0; index < icons_.size(); ++index) {
         if (icons_[index].id != icon_id) continue;
         XDestroyWindow(display_, icons_[index].window);

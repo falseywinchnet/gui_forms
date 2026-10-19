@@ -1185,7 +1185,9 @@ void DockSite::continue_window_move(Modifier modifiers) {
     const HostScreenPointResult pointer = handle.windows().pointer_position();
     const std::shared_ptr<Control> held = window_move_.remote.lock();
     DockSite* const previous = held ? static_cast<DockSite*>(held.get()) : nullptr;
-    DockSite* const under = pointer.status.accepted() ? remote_site(pointer.position, this) : nullptr;
+    // The docking controls keep desktop positions as Point in logical units.
+    const Point desktop{pointer.position.x, pointer.position.y};
+    DockSite* const under = pointer.status.accepted() ? remote_site(desktop, this) : nullptr;
     if (previous != nullptr && previous != under) (*previous).leave_guest_drag();
     if (under == nullptr || stacks_.empty()) {
         window_move_.remote.reset();
