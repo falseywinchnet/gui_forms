@@ -67,7 +67,7 @@ Related types
 
    ``#include <gui_forms/pages/types/page_set_types.hpp>``
 
-   A page's stable identity: the application's string, unique within one set (docking uses the panel's identity). It is never a position; positions are `PagePosition`s in the current order and change on every reorder.
+   A page's stable identity: the application's string, unique within one set (docking uses the panel's identity). It is never a position; positions are :cpp:class:`PagePosition <gui_forms::PagePosition>` values in the current order and change on every reorder.
 
    .. cpp:member:: std::string value
 
