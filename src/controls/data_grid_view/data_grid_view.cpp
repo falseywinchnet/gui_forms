@@ -2172,7 +2172,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
             const ColumnParts placed = column_parts(column, layout);
             SemanticNode node{};
             node.stable_id = column_stable_id(column);
-            node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::button;
             node.name = columns_[column].header_text.empty() ? columns_[column].name : columns_[column].header_text;
             node.description = "Column header";
@@ -2188,7 +2188,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
         const DataGridViewRowPosition row{position};
         SemanticNode row_node{};
         row_node.stable_id = row_id_text(row);
-        row_node.runtime_id = scrolling_detail::virtual_runtime_id(row_node.stable_id);
+        row_node.runtime_id = virtual_semantic_runtime_id(row_node.stable_id);
         row_node.role = SemanticRole::list_item;
         row_node.name = row_source_ == DataGridViewRowSource::unbound && !rows_[position].header_text.empty()
                             ? rows_[position].header_text
@@ -2208,7 +2208,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
             const CellParts placed = cell_parts(row, column, layout);
             SemanticNode cell{};
             cell.stable_id = cell_stable_id(row, column);
-            cell.runtime_id = scrolling_detail::virtual_runtime_id(cell.stable_id);
+            cell.runtime_id = virtual_semantic_runtime_id(cell.stable_id);
             cell.name = definition.header_text.empty() ? definition.name : definition.header_text;
             cell.value = cell_text(row, column);
             cell.bounds = {absolute.x + placed.cell.bounds.x, absolute.y + placed.cell.bounds.y,

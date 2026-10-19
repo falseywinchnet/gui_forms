@@ -447,7 +447,10 @@ struct DockEdit final {
     // dock_into: a stack or a document area. dock_beside: any node of a
     // main or floating site. set_ratio: a split.
     DockNodeId target{};
+    // set_floating_frame: the floating site.
     DockSiteId site{};
+    // dock_beside and dock_at_edge: the side the new item takes; auto_hide:
+    // the window edge.
     DockSide side{DockSide::left};
     // dock_into and move: the position in the resulting stack; an index past
     // the end appends.

@@ -271,12 +271,14 @@ void DockLayout::arrange(DockNodeId root, Rect bounds, double seam, std::vector<
             out.push_back(current);
             continue;
         }
-        const bool across = (*node).axis == DockAxis::horizontal;
+        // A horizontal split sets its children side by side, sharing the
+        // width.
+        const bool side_by_side = (*node).axis == DockAxis::horizontal;
         const Size first_minimum = minimum_size((*node).first, seam);
         const Size second_minimum = minimum_size((*node).second, seam);
-        const double extent = across ? current.bounds.width : current.bounds.height;
+        const double extent = side_by_side ? current.bounds.width : current.bounds.height;
         const double span = std::max(extent - seam, 0.0);
-        const DockSplitSizes sizes = across
+        const DockSplitSizes sizes = side_by_side
             ? solve_dock_split(span, (*node).ratio, first_minimum.width, second_minimum.width)
             : solve_dock_split(span, (*node).ratio, first_minimum.height, second_minimum.height);
         current.minimums_met = sizes.minimums_met;
@@ -287,7 +289,7 @@ void DockLayout::arrange(DockNodeId root, Rect bounds, double seam, std::vector<
         DockArrangedNode second{};
         second.node = (*node).second;
         second.bounds = current.bounds;
-        if (across) {
+        if (side_by_side) {
             first.bounds.width = sizes.first;
             second.bounds.x = current.bounds.x + sizes.first + seam;
             second.bounds.width = sizes.second;

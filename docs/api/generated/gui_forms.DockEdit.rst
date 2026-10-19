@@ -176,9 +176,11 @@ gui_forms::DockEdit
 
    .. cpp:member:: DockSiteId site
 
+      set_floating_frame: the floating site.
+
    .. cpp:member:: DockSide side
 
-      Default: ``{DockSide::left}``.
+      dock_beside and dock_at_edge: the side the new item takes; auto_hide: the window edge. Default: ``{DockSide::left}``.
 
    .. cpp:member:: std::uint32_t index
 

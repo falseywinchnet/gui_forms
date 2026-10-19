@@ -512,6 +512,60 @@ void batch_publishes_one_change() {
     require_invariants(set);
 }
 
+// Throws from pages_changed while armed (once per arming).
+class ThrowingHandler final : public Component {
+public:
+    void on_pages(const PageSetChange&) {
+        ++pages_events;
+        if (!armed) return;
+        armed = false;
+        throw std::runtime_error("a pages_changed handler failed");
+    }
+    void on_selection(const PageSelectionChange&) { ++selection_events; }
+
+    bool armed{};
+    int pages_events{};
+    int selection_events{};
+};
+
+// A batch closed by its destructor publishes without letting a handler's
+// exception out (std::terminate otherwise). The set stays consistent and
+// usable, the batch is closed, and the rest of that publication (here the
+// first page's selection) is dropped, as for any handler exception; close()
+// still hands the exception to its caller.
+void batch_destructor_contains_a_throwing_handler() {
+    PageSet set{};
+    ThrowingHandler handler{};
+    on(set.pages_changed(), handler, &ThrowingHandler::on_pages);
+    on(set.selected_page_changed(), handler, &ThrowingHandler::on_selection);
+    handler.armed = true;
+    {
+        PageSetBatch batch(set);
+        require(set.insert(page("a"), PagePlacement::end_of_group()) == PageEditStatus::applied &&
+                    set.insert(page("b"), PagePlacement::end_of_group()) == PageEditStatus::applied,
+                "two inserts apply inside the batch");
+    }
+    require(handler.pages_events == 1 && handler.selection_events == 0 && !set.batch_open() &&
+                set.count() == 2U && set.selected_page() == page_id("a"),
+            "the destructor contains the exception; the edits stand and the rest of the publication is dropped");
+    require_invariants(set);
+    require(set.insert(page("c"), PagePlacement::end_of_group()) == PageEditStatus::applied &&
+                handler.pages_events == 2,
+            "the set publishes the next edit as usual");
+    handler.armed = true;
+    bool threw = false;
+    {
+        PageSetBatch batch(set);
+        require(set.remove(page_id("c")) == PageEditStatus::applied, "a removal applies inside the batch");
+        try {
+            batch.close();
+        } catch (const std::runtime_error&) {
+            threw = true;
+        }
+    }
+    require(threw && !set.batch_open() && set.count() == 2U, "an explicit close hands the exception to its caller");
+}
+
 void fallback_under_both_policies() {
     PageSet strip;
     for (const char* id : {"a", "b", "c", "d"}) {
@@ -891,6 +945,7 @@ int main() {
     edits_from_selecting_are_refused();
     cancelled_selection_changes_nothing();
     batch_publishes_one_change();
+    batch_destructor_contains_a_throwing_handler();
     fallback_under_both_policies();
     history();
     pinned_boundary_on_every_path();
