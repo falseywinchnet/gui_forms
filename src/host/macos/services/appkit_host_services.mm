@@ -206,26 +206,44 @@ void cancel_alert_on_main(void* context) {
     [NSApp abortModal];
 }
 
-// Escape stops the running alert with `response`, the cancel choice's, and
-// is consumed; any other event passes on.
-NSEvent* escape_stops_modal(NSEvent* event, NSModalResponse response) {
-    if (event.keyCode != 53U) return event;
-    [NSApp stopModalWithCode:response];
-    return nil;
+bool is_escape_key_down(NSEvent* event) {
+    if (event.type != NSEventTypeKeyDown) return false;
+    return event.keyCode == 53U;
 }
 
-// The one Objective-C block left in the macOS host (owner decision V2-1 asks
-// for none; reported to the owner): NSEvent's local event monitor
-// (addLocalMonitorForEventsMatchingMask:handler:) takes only a block, with no
-// function-and-context form. The block is this adapter's alone: it captures
-// the response by value and calls the named escape_stops_modal. The caller
-// removes the returned monitor with [NSEvent removeMonitor:].
-id add_escape_stops_modal_monitor(NSModalResponse response) {
-    id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
-                                                       handler:^NSEvent* (NSEvent* event) { // house-style: admitted block (block-only AppKit API)
-                                                           return escape_stops_modal(event, response);
-                                                       }];
-    return monitor;
+// [alert runModal] that keeps Escape for the cancel choice. When Cancel is
+// also the declared default, the window's default button cell gives it
+// Return as its key equivalent and AppKit no longer cancels on Escape
+// (tests/macos_message_dialog_key_tests.mm). Without a block-only event
+// monitor (owner decision V2-1), the alert runs in its own modal session:
+// each event is taken from the queue in the modal panel mode; an Escape
+// key-down ends the session with `cancel_response` and is consumed; any
+// other event is dispatched, and runModalSession: then reports a button's
+// response (NSAlertFirstButtonReturn + index) or, after the test
+// cancellation's abortModal, NSModalResponseAbort.
+NSModalResponse run_alert_escape_cancels(NSAlert* alert, NSModalResponse cancel_response) {
+    [alert layout];
+    NSWindow* window = alert.window;
+    NSDate* never = [NSDate distantFuture];
+    NSModalSession session = [NSApp beginModalSessionForWindow:window];
+    NSModalResponse response = [NSApp runModalSession:session];
+    while (response == NSModalResponseContinue) {
+        NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny
+                                            untilDate:never
+                                               inMode:NSModalPanelRunLoopMode
+                                              dequeue:YES];
+        if (event != nil && is_escape_key_down(event)) {
+            response = cancel_response;
+            break;
+        }
+        if (event != nil) {
+            [NSApp sendEvent:event];
+        }
+        response = [NSApp runModalSession:session];
+    }
+    [NSApp endModalSession:session];
+    [window orderOut:nil];
+    return response;
 }
 
 void schedule_test_panel_cancel(NSSavePanel* panel, bool enabled) {
@@ -484,12 +502,12 @@ protected:
                     alert.window.defaultButtonCell = defaultButton.cell;
                 }
                 schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
-                id escapeMonitor = nil;
+                NSModalResponse response = 0;
                 if (cancelResponse != 0) {
-                    escapeMonitor = add_escape_stops_modal_monitor(cancelResponse);
+                    response = run_alert_escape_cancels(alert, cancelResponse);
+                } else {
+                    response = [alert runModal];
                 }
-                const NSModalResponse response = [alert runModal];
-                if (escapeMonitor != nil) [NSEvent removeMonitor:escapeMonitor];
                 HostMessageDialogResult value;
                 const NSInteger index = response - NSAlertFirstButtonReturn;
                 if (index >= 0 && static_cast<std::size_t>(index) < buttons.size()) {

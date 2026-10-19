@@ -3155,6 +3155,20 @@ if(GUI_FORMS_BUILD_TESTS)
         add_test(NAME gui_forms_macos_host_close_tests
                  COMMAND gui_forms_macos_host_close_tests)
 
+        add_executable(gui_forms_macos_message_dialog_key_tests MACOSX_BUNDLE
+            tests/macos_message_dialog_key_tests.mm)
+        target_compile_options(gui_forms_macos_message_dialog_key_tests PRIVATE -fobjc-arc)
+        target_link_libraries(gui_forms_macos_message_dialog_key_tests PRIVATE
+            gui_forms_host_macos)
+        # Launched through LaunchServices so the alert can become the key
+        # window; see cmake/run_macos_activated_test.cmake.
+        add_test(NAME gui_forms_macos_message_dialog_key_tests
+                 COMMAND ${CMAKE_COMMAND}
+                     -DBUNDLE=$<TARGET_BUNDLE_DIR:gui_forms_macos_message_dialog_key_tests>
+                     -DOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_macos_activated_test.cmake)
+        set_tests_properties(gui_forms_macos_message_dialog_key_tests PROPERTIES TIMEOUT 60)
+
         add_executable(gui_forms_macos_multi_window_tests
             tests/macos_multi_window_tests.mm)
         target_compile_options(gui_forms_macos_multi_window_tests PRIVATE -fobjc-arc)
