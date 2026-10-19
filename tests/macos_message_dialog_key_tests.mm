@@ -19,8 +19,8 @@
 // must end on the cancel choice, Return on the declared default choice, and
 // an ordinary key must leave the dialog open. The rows where Cancel is also
 // the default are the ones AppKit alone gets wrong (Escape is ignored there),
-// which is why the host runs a dialog with a cancel choice in its own modal
-// session. Each alert must also be visible and key at the modal panel level
+// which is why the host gives such a dialog a zero-sized button carrying
+// Escape. Each alert must also be visible and key at the modal panel level
 // of a [NSAlert runModal] alert, and ordered out afterwards. The keys reach
 // only an active application, so ctest launches this bundle through
 // cmake/run_macos_activated_test.cmake.
@@ -226,8 +226,8 @@ const char* key_name(ProbeKey key) {
     return "?";
 }
 
-// The first case has no cancel choice, so the host runs it with
-// [NSAlert runModal]; its window level is the reference for the rest.
+// The first case has no cancel choice, so the host adds nothing to its
+// [NSAlert runModal] alert; its window level is the reference for the rest.
 struct AlertWindowFacts final {
     bool recorded{};
     NSWindowLevel level{};

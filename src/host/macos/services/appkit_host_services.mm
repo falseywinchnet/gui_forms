@@ -206,44 +206,25 @@ void cancel_alert_on_main(void* context) {
     [NSApp abortModal];
 }
 
-bool is_escape_key_down(NSEvent* event) {
-    if (event.type != NSEventTypeKeyDown) return false;
-    return event.keyCode == 53U;
-}
-
-// [alert runModal] that keeps Escape for the cancel choice. When Cancel is
-// also the declared default, the window's default button cell gives it
-// Return as its key equivalent and AppKit no longer cancels on Escape
-// (tests/macos_message_dialog_key_tests.mm). Without a block-only event
-// monitor (owner decision V2-1), the alert runs in its own modal session:
-// each event is taken from the queue in the modal panel mode; an Escape
-// key-down ends the session with `cancel_response` and is consumed; any
-// other event is dispatched, and runModalSession: then reports a button's
-// response (NSAlertFirstButtonReturn + index) or, after the test
-// cancellation's abortModal, NSModalResponseAbort.
-NSModalResponse run_alert_escape_cancels(NSAlert* alert, NSModalResponse cancel_response) {
+// Keeps Escape on the cancel choice when Cancel is also the declared
+// default: the window's default button cell then gives Cancel Return as its
+// key equivalent, and AppKit ignores Escape
+// (tests/macos_message_dialog_key_tests.mm). A second button carries Escape
+// and clicks Cancel through its target and action, in place of a block-only
+// event monitor (owner decision V2-1); [alert runModal] then handles every
+// key itself. Hidden views take no key equivalents, so the button is
+// zero-sized rather than hidden, and it is kept out of the accessibility
+// tree. It joins the content view after [alert layout], which runModal's own
+// layout keeps; as the accessory view it would make the alert 16 pt taller.
+// The alert's view tree owns the button; the button only observes Cancel.
+void add_escape_clicks_cancel(NSAlert* alert, NSButton* cancel_button) {
     [alert layout];
-    NSWindow* window = alert.window;
-    NSDate* never = [NSDate distantFuture];
-    NSModalSession session = [NSApp beginModalSessionForWindow:window];
-    NSModalResponse response = [NSApp runModalSession:session];
-    while (response == NSModalResponseContinue) {
-        NSEvent* event = [NSApp nextEventMatchingMask:NSEventMaskAny
-                                            untilDate:never
-                                               inMode:NSModalPanelRunLoopMode
-                                              dequeue:YES];
-        if (event != nil && is_escape_key_down(event)) {
-            response = cancel_response;
-            break;
-        }
-        if (event != nil) {
-            [NSApp sendEvent:event];
-        }
-        response = [NSApp runModalSession:session];
-    }
-    [NSApp endModalSession:session];
-    [window orderOut:nil];
-    return response;
+    NSButton* escape = [[NSButton alloc] initWithFrame:NSZeroRect];
+    escape.keyEquivalent = @"\e";
+    escape.target = cancel_button;
+    escape.action = @selector(performClick:);
+    [escape setAccessibilityElement:NO];
+    [alert.window.contentView addSubview:escape];
 }
 
 void schedule_test_panel_cancel(NSSavePanel* panel, bool enabled) {
@@ -479,7 +460,7 @@ protected:
                     break;
                 }
                 NSButton* defaultButton = nil;
-                NSModalResponse cancelResponse = 0;
+                NSButton* cancelButton = nil;
                 for (std::size_t index = 0U; index < buttons.size(); ++index) {
                     const std::pair<NSString*, HostDialogChoice>& button_choice =
                         buttons[index];
@@ -493,21 +474,16 @@ protected:
                     button.keyEquivalent = choice == HostDialogChoice::cancel
                         ? @"\e" : @"";
                     if (choice == payload.default_choice) defaultButton = button;
-                    if (choice == HostDialogChoice::cancel) {
-                        cancelResponse = NSAlertFirstButtonReturn +
-                            static_cast<NSModalResponse>(index);
-                    }
+                    if (choice == HostDialogChoice::cancel) cancelButton = button;
                 }
                 if (defaultButton != nil) {
                     alert.window.defaultButtonCell = defaultButton.cell;
                 }
-                schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
-                NSModalResponse response = 0;
-                if (cancelResponse != 0) {
-                    response = run_alert_escape_cancels(alert, cancelResponse);
-                } else {
-                    response = [alert runModal];
+                if (cancelButton != nil && defaultButton == cancelButton) {
+                    add_escape_clicks_cancel(alert, cancelButton);
                 }
+                schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
+                const NSModalResponse response = [alert runModal];
                 HostMessageDialogResult value;
                 const NSInteger index = response - NSAlertFirstButtonReturn;
                 if (index >= 0 && static_cast<std::size_t>(index) < buttons.size()) {
