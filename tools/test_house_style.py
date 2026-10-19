@@ -57,6 +57,23 @@ class HouseStyleTests(unittest.TestCase):
         source: str = 'Order operator<=>(const Item&) const\n noexcept = default;'
         self.assertEqual(inspect(source), [Finding(1, "defaulted-comparison")])
 
+    def test_objective_c_blocks(self) -> None:
+        source: str = ('dispatch_async(queue, ^{ [view draw]; });\n'
+                       'set(^(NSTimer* timer) { stop(); });\n'
+                       'run(^BOOL(id value) { return YES; });\n')
+        self.assertEqual(inspect(source), [Finding(1, "objective-c-block"),
+                                           Finding(2, "objective-c-block"),
+                                           Finding(3, "objective-c-block")])
+
+    def test_no_block_is_admitted(self) -> None:
+        source: str = ('watch(^NSEvent* (NSEvent* event) { // house-style: admitted block (block-only API)\n'
+                       '    return event; });\n')
+        self.assertEqual(inspect(source), [Finding(1, "objective-c-block")])
+
+    def test_exclusive_or_is_not_a_block(self) -> None:
+        source: str = 'if ((flags ^ mask) != 0) { bits = a ^ (b & c); }\n// ^{ in a comment\n'
+        self.assertEqual(inspect(source), [])
+
     def test_included_sources_are_scanned(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run: Path = Path(directory) / "host_run.inc"

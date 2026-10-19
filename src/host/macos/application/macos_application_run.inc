@@ -329,10 +329,7 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
         else [nativeWindow orderFront:nil];
     }
     if (entry.options.close_after_launch_for_testing) {
-        NSWindow* closing = nativeWindow;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [closing performClose:nil];
-        });
+        post_perform_close(nativeWindow);
     }
     return outcome;
 }
