@@ -224,6 +224,14 @@ private:
 // when the selection ends on a different page than it began. Edits inside a
 // batch still apply one at a time: a refused edit leaves the earlier ones in
 // place. The set must outlive the scope.
+//
+// A handler that throws while `close` publishes hands its exception to
+// close's caller. While the destructor publishes, the exception is contained
+// there (a destructor publishes without throwing, house style section 9) and
+// is lost; there is no error channel to report it on, so call `close` where a
+// handler may throw. Either way the batch's edits stand, the batch is closed,
+// the set stays consistent and usable, and the notifications of that
+// publication not yet emitted are dropped, as for any handler exception.
 class PageSetBatch final {
 public:
     explicit PageSetBatch(PageSet& set) noexcept;

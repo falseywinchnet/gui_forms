@@ -28,6 +28,18 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
 }
 
 #if defined(GUI_FORMS_FUZZ_STANDALONE)
+namespace {
+
+// One xorshift64 step: advances `state` and returns it.
+std::uint64_t next_random(std::uint64_t& state) noexcept {
+    state ^= state << 13U;
+    state ^= state >> 7U;
+    state ^= state << 17U;
+    return state;
+}
+
+} // namespace
+
 int main() {
     const std::array<std::string_view, 2> seeds{
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -42,19 +54,16 @@ int main() {
         "<r a='&lt;&#65;&#x1F600;'>\n <!-- c -->\n <e>caf\xC3\xA9 &amp;</e><f/>\n</r>"};
     std::uint64_t state = 0x6a09e667f3bcc909ULL;
     for (std::size_t run = 0; run < 100'000; ++run) {
-        state ^= state << 13U;
-        state ^= state >> 7U;
-        state ^= state << 17U;
+        const std::uint64_t run_draw = next_random(state);
         std::string input(seeds[run % seeds.size()]);
-        const std::size_t mutations = 1U + static_cast<std::size_t>(state % 8U);
+        const std::size_t mutations = 1U + static_cast<std::size_t>(run_draw % 8U);
+        // Each mutation flips one bit of one byte.
         for (std::size_t mutation = 0; mutation < mutations; ++mutation) {
-            state ^= state << 13U;
-            state ^= state >> 7U;
-            state ^= state << 17U;
-            if (!input.empty()) {
-                const std::size_t offset = static_cast<std::size_t>(state % input.size());
-                input[offset] = static_cast<char>(input[offset] ^ static_cast<char>(1U << (state % 8U)));
-            }
+            const std::uint64_t draw = next_random(state);
+            if (input.empty()) continue;
+            const std::size_t offset = static_cast<std::size_t>(draw % input.size());
+            const char flipped_bit = static_cast<char>(1U << (draw % 8U));
+            input[offset] = static_cast<char>(input[offset] ^ flipped_bit);
         }
         if (run % 5U == 0 && !input.empty()) {
             input.resize(static_cast<std::size_t>(state % input.size()));

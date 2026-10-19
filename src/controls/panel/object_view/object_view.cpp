@@ -1223,7 +1223,7 @@ std::vector<SemanticNode> ObjectView::semantic_virtual_children() const {
         const Rect local = item_bounds(index);
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         // Only the visible items are described; their positions still count
         // the whole collection.

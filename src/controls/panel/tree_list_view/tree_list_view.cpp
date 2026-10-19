@@ -1561,7 +1561,7 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(column_cell(placed, column), placed.header);
         SemanticNode node{};
         node.stable_id = column_identity(view_id, columns_[column].stable_id);
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = columns_[column].text;
         if (sort_column_ == column && sort_order_ == TreeListSortOrder::ascending) node.value = "ascending";
@@ -1579,7 +1579,7 @@ std::vector<SemanticNode> TreeListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(row_bounds(placed, row), placed.viewport);
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::list_item;
         node.name = item.text;
         // No level field exists: the level leads the description.

@@ -161,23 +161,12 @@ struct Closing final {
         }
     }
 };
-void revoke(detail::ApplicationWindowState& state) noexcept {
-    state.closed = true;
-    state.ready = false;
-    state.request_close = {};
-    state.show = {};
-    state.hide = {};
-    state.toggle_full_screen = {};
-    state.set_title = {};
-    state.request_client_size = {};
-    state.frame_changed = {};
-}
 struct Closed final {
     std::shared_ptr<WindowBridge> bridge{};
     void operator()() const noexcept {
         if ((*(*bridge).state).closed) return;
         detail::unregister_run_window(*(*bridge).state);
-        revoke(*(*bridge).state);
+        detail::revoke_window_state(*(*bridge).state);
         try {
             if ((*bridge).options.closed) (*bridge).options.closed();
         } catch (...) { (*(*bridge).failure).capture(); }
@@ -190,7 +179,7 @@ public:
     BridgeScope& operator=(const BridgeScope&) = delete;
     ~BridgeScope() {
         for (std::size_t index = 0U; index < windows.size(); ++index) {
-            revoke(*(*windows[index]).state);
+            detail::revoke_window_state(*(*windows[index]).state);
         }
     }
     // Drops the bridges of closed windows. Each native callback holds its own
@@ -210,7 +199,7 @@ template <typename NativeWindow>
 NativeWindow prepare_one(ApplicationWindow& source, BridgeScope& scope,
                          const std::shared_ptr<CallbackFailure>& failure,
                          const std::shared_ptr<detail::ApplicationRunState>& run) {
-    const bool primary = source.owner_id.empty() && !source.tool_window;
+    const bool primary = detail::primary_window_entry(source);
     const std::shared_ptr<WindowBridge> bridge = std::make_shared<WindowBridge>();
     (*bridge).state = std::make_shared<detail::ApplicationWindowState>();
     (*bridge).failure = failure;
@@ -266,6 +255,35 @@ void prepare(std::vector<ApplicationWindow>& windows, BridgeScope& scope,
     }
 }
 
+// Why the run refuses to open `entry` during the run, before any native
+// request: invalid_argument for an entry Application::validate would refuse,
+// a primary entry, an owner that is not live, a floating entry not owned by
+// the primary window itself, or a stable id already live; too_large beyond
+// maximum_windows live windows or maximum_floating_windows floating ones.
+// HostServiceError::none when the entry may be opened. Reads `entry` only.
+HostServiceError runtime_entry_refusal(const ApplicationWindow& entry, const HostWindowing& windowing) {
+    if (!detail::valid_window_entry(entry) || !(*entry.model).check_access()) {
+        return HostServiceError::invalid_argument;
+    }
+    if (detail::primary_window_entry(entry)) return HostServiceError::invalid_argument;
+    std::optional<HostWindowId> owner{};
+    if (!entry.owner_id.empty()) {
+        owner = windowing.find(entry.owner_id);
+        if (!owner.has_value()) return HostServiceError::invalid_argument;
+    }
+    const bool floating = entry.floating != HostWindowFloating::none;
+    // A floating window is owned by the primary window itself.
+    if (floating && !(owner.has_value() && *owner == windowing.primary())) {
+        return HostServiceError::invalid_argument;
+    }
+    if (windowing.find(entry.stable_id).has_value()) return HostServiceError::invalid_argument;
+    if (windowing.window_count() >= HostWindowing::maximum_windows) return HostServiceError::too_large;
+    const bool floating_full =
+        floating && windowing.floating_window_count() >= HostWindowing::maximum_floating_windows;
+    if (floating_full) return HostServiceError::too_large;
+    return HostServiceError::none;
+}
+
 // The run's open operation (ApplicationWindows::open_window). Refusals found
 // before the native request leave the entry unchanged; HostWindowing::admit
 // applies the same rules again in the adapter.
@@ -285,23 +303,9 @@ struct RuntimeOpen final {
             result.status.error = HostServiceError::after_shutdown;
             return result;
         }
-        const HostWindowing& windowing = *(*state).windowing;
-        const bool primary = entry.owner_id.empty() && !entry.tool_window;
-        const std::optional<HostWindowId> owner = entry.owner_id.empty()
-            ? std::optional<HostWindowId>{} : windowing.find(entry.owner_id);
-        const bool owner_live = entry.owner_id.empty() || owner.has_value();
-        // A floating window is owned by the primary window itself.
-        const bool owner_fits = entry.floating == HostWindowFloating::none ||
-            (owner.has_value() && *owner == windowing.primary());
-        if (!detail::valid_window_entry(entry) || !(*entry.model).check_access() || primary ||
-            !owner_live || !owner_fits || windowing.find(entry.stable_id).has_value()) {
-            result.status.error = HostServiceError::invalid_argument;
-            return result;
-        }
-        const bool floating_full = entry.floating != HostWindowFloating::none &&
-            windowing.floating_window_count() >= HostWindowing::maximum_floating_windows;
-        if (windowing.window_count() >= HostWindowing::maximum_windows || floating_full) {
-            result.status.error = HostServiceError::too_large;
+        const HostServiceError refusal = runtime_entry_refusal(entry, *(*state).windowing);
+        if (refusal != HostServiceError::none) {
+            result.status.error = refusal;
             return result;
         }
         (*scope).prune();
@@ -309,7 +313,7 @@ struct RuntimeOpen final {
         const std::shared_ptr<detail::ApplicationWindowState> window = (*(*scope).windows.back()).state;
         const HostWindowAdmission admission = native_open(std::move(native));
         if (!admission.status.accepted()) {
-            revoke(*window);
+            detail::revoke_window_state(*window);
             result.status = admission.status;
             return result;
         }

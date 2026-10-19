@@ -1059,7 +1059,7 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
         if (hosted(item.kind)) continue;
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.name = item_text(item);
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         node.states = SemanticState::visible;

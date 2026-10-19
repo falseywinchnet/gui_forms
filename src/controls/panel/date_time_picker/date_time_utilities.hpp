@@ -22,8 +22,6 @@ namespace gui_forms::date_time_detail {
     DateTimeValue value, std::string_view pattern,
     const DateTimeFormatProvider& provider);
 void validate_provider(const DateTimeFormatProvider& provider);
-[[nodiscard]] std::uint64_t virtual_runtime_id(
-    std::string_view stable_id) noexcept;
 [[nodiscard]] bool parse_iso_date(
     std::string_view text, DateTimeValue& value);
 

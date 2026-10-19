@@ -500,6 +500,8 @@ private:
         }
         take_subject(subject);
         if (subject.kind == DockSubjectKind::stack) erase_node(subject.stack);
+        // The target is pruned when the subject was its only panel (a panel
+        // docked into its own stack): that is docking into itself.
         if (find_dock_node(state_, target_id) == nullptr) {
             return refuse(DockRefusalReason::target_is_subject, DockRefusalLayer::model);
         }
@@ -552,6 +554,8 @@ private:
         }
         take_subject(subject);
         if (at_main_edge) target_id = state_.main_root;
+        // Taking the subject out prunes the target when the subject was all
+        // it held (its only panel, or a split's side): beside itself.
         if (find_dock_node(state_, target_id) == nullptr) {
             return refuse(DockRefusalReason::target_is_subject, DockRefusalLayer::model);
         }
@@ -849,7 +853,7 @@ private:
 
     DockLayoutState& state_;
     const DockRules& rules_;
-    DockEditOrigin origin_;
+    DockEditOrigin origin_{};
 };
 
 } // namespace

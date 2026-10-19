@@ -1615,7 +1615,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(column_cell(placed, column), placed.header);
         SemanticNode node{};
         node.stable_id = column_identity(list_id, columns_[column].stable_id);
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = columns_[column].text;
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::ascending) node.value = "ascending";
@@ -1634,7 +1634,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(item_bounds(placed, index), placed.viewport);
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
         node.name = item.text;
         if (view_ == ListViewView::details) {

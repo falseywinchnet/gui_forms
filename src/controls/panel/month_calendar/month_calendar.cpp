@@ -893,7 +893,7 @@ std::vector<SemanticNode> MonthCalendar::semantic_virtual_children() const {
     for (const int direction : directions) {
         SemanticNode node{};
         node.stable_id = prefix + (direction < 0 ? ".previous_month" : ".next_month");
-        node.runtime_id = date_time_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = direction < 0 ? "Previous month" : "Next month";
         const Rect bounds = direction < 0 ? control.previous_arrow.bounds : control.next_arrow.bounds;
@@ -914,7 +914,7 @@ std::vector<SemanticNode> MonthCalendar::semantic_virtual_children() const {
             const AnatomyStateSet states = day_states(date);
             SemanticNode node{};
             node.stable_id = day_stable_id(date);
-            node.runtime_id = date_time_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::date_cell;
             node.name = date_time_detail::format_date_time(date, provider_.long_date_pattern, provider_);
             node.value = iso_date(date);

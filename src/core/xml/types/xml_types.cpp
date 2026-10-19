@@ -34,7 +34,7 @@ std::string_view xml_error_name(XmlError error) noexcept {
     return "unknown";
 }
 
-const XmlAttribute* XmlElement::find_attribute(std::string_view attribute_name) const noexcept {
+const XmlAttribute* XmlElement::find_attribute(std::string_view attribute_name) const& noexcept {
     for (const XmlAttribute& attribute : attributes) {
         if (attribute.name == attribute_name) {
             const XmlAttribute* found = &attribute;

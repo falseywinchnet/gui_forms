@@ -115,9 +115,14 @@ void BackstageView::set_column_width(double width) {
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+const std::string& BackstageView::authored_text(const BackstageItemSpec& item) noexcept {
+    if (item.text.empty() && item.command) return (*item.command).state().text;
+    return item.text;
+}
+
+// The label as shown: the authored text without its mnemonic marker.
 std::string BackstageView::item_text(const BackstageItemSpec& item) const {
-    const std::string& authored = item.text.empty() && item.command ? (*item.command).state().text : item.text;
-    return parse_mnemonic_text(authored).display_text;
+    return parse_mnemonic_text(authored_text(item)).display_text;
 }
 
 bool BackstageView::item_enabled(const BackstageItemSpec& item) const {
@@ -183,11 +188,12 @@ Size BackstageView::measure(Size available) {
     return available;
 }
 
+// The selected topic's page fills the page part; the other pages collapse.
+// The page comes from geometry(), the one function paint and the published
+// parts use, in the bounds as arranged.
 void BackstageView::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    const double scale = effective_text_scale();
-    const double column = std::min(final_bounds.width, column_width_ * scale);
-    const Rect page{column, 0.0, std::max(0.0, final_bounds.width - column), final_bounds.height};
+    const Rect page = geometry().page;
     for (std::size_t item = 0; item < items_.size(); ++item) {
         const Control::Ptr& control = items_[item].page;
         if (!control || !is_current_layout_child(control)) continue;
@@ -368,8 +374,7 @@ void BackstageView::on_focus_changed(bool focused) {
 
 bool BackstageView::mnemonic_matches(char32_t character) const noexcept {
     for (const BackstageItemSpec& item : items_) {
-        const std::string& authored = item.text.empty() && item.command ? (*item.command).state().text : item.text;
-        if (is_mnemonic(character, authored)) return true;
+        if (is_mnemonic(character, authored_text(item))) return true;
     }
     return false;
 }
@@ -377,8 +382,7 @@ bool BackstageView::mnemonic_matches(char32_t character) const noexcept {
 bool BackstageView::process_mnemonic_self(char32_t character) {
     for (std::size_t item = 0; item < items_.size(); ++item) {
         const BackstageItemSpec& spec = items_[item];
-        const std::string& authored = spec.text.empty() && spec.command ? (*spec.command).state().text : spec.text;
-        if (!is_mnemonic(character, authored) || !item_enabled(spec)) continue;
+        if (!is_mnemonic(character, authored_text(spec)) || !item_enabled(spec)) continue;
         activate_item(item);
         return true;
     }

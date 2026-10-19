@@ -19,8 +19,8 @@ using namespace ribbon_detail;
 
 namespace {
 
-// Whether a layout step may make command `index` small: a button-family
-// command that is large in `sizes`.
+// Whether a generated layout step may make `command` small: a button-family
+// command whose size so far, `size`, is large.
 bool convertible(const RibbonCommandSpec& command, RibbonCommandSize size) noexcept {
     const bool result = !hosted(command.kind) && size == RibbonCommandSize::large;
     return result;

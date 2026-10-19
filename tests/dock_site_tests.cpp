@@ -937,6 +937,26 @@ void lifetime_and_refusals() {
             "the navigator publishes its rows and headings");
 }
 
+// A site asked to run a position command for a stack it does not realize
+// (here a floating site whose floating site is not in the layout, asked to
+// auto-hide a main-site tool stack the layout would let go) refuses, changing
+// nothing, rather than reading a stack slot it does not have.
+void position_command_from_another_site() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockWorkspace& workspace = *(*fixture).workspace;
+    const std::shared_ptr<DockSite> stranger =
+        make_control<DockSite>(StableId("stranger"), workspace, DockSiteId{9999U});
+    const DockPanelId output("output");
+    require((*stranger).position_command_enabled(output, DockPositionCommand::auto_hide),
+            "the layout lets the bottom stack auto-hide");
+    const std::uint64_t before = workspace.layout().generation();
+    require(!(*stranger).run_position_command(output, DockPositionCommand::auto_hide),
+            "a site without the stack refuses to auto-hide it");
+    require(workspace.layout().generation() == before &&
+                workspace.layout().locate(output).placement == DockPlacementKind::docked,
+            "the refused command leaves the layout unchanged");
+}
+
 } // namespace
 
 int main() {
@@ -951,6 +971,7 @@ int main() {
     position_menu();
     semantic_snapshot();
     lifetime_and_refusals();
+    position_command_from_another_site();
     std::cout << "DockSite, DockWorkspace and DockNavigator: parts, seams, collapse, lazy creation, activation, "
                  "navigator, keys, menu and semantics passed\n";
     return EXIT_SUCCESS;

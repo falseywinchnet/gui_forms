@@ -1056,6 +1056,10 @@ Functions, constants and aliases
 
 .. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
 
+.. cpp:function:: std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept
+
+   The runtime ID of a virtual semantic child (a tab, an item, a caption button: a SemanticNode with no control of its own), from its stable ID: a 64-bit FNV-1a-style hash of the ID's bytes with the top bit set, so it never meets a control's own runtime ID (those count up from 1). The same stable ID always gives the same runtime ID, on every host.
+
 .. cpp:var:: constexpr std::size_t semantic_role_count
 
    Value: ``static_cast<std::size_t>(SemanticRole::count)``.

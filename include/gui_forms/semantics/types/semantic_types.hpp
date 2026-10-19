@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace gui_forms {
@@ -139,5 +140,12 @@ struct SemanticSnapshot final {
 [[nodiscard]] const char* semantic_role_name(SemanticRole role) noexcept;
 [[nodiscard]] const char* semantic_action_name(SemanticAction action) noexcept;
 [[nodiscard]] const char* semantic_orientation_name(SemanticOrientation orientation) noexcept;
+
+// The runtime ID of a virtual semantic child (a tab, an item, a caption
+// button: a SemanticNode with no control of its own), from its stable ID: a
+// 64-bit FNV-1a-style hash of the ID's bytes with the top bit set, so it
+// never meets a control's own runtime ID (those count up from 1). The same
+// stable ID always gives the same runtime ID, on every host.
+[[nodiscard]] std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept;
 
 } // namespace gui_forms

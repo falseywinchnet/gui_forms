@@ -491,6 +491,54 @@ void backstage() {
     require(threw && (*view).items().size() == 4U, "a topic without a page is refused");
 }
 
+// The palette's keyboard entry outlives the entries when the recent colours
+// are cleared while the palette is open; the arrows then move from the last
+// entry that remains.
+void color_palette_shrinks_while_open() {
+    std::shared_ptr<ColorCommand> command = std::make_shared<ColorCommand>(std::make_shared<Command>("ink", "Ink"));
+    static_cast<void>((*command).commit(Color::rgba(1, 2, 3), "test"));
+    static_cast<void>((*command).commit(Color::rgba(4, 5, 6), "test"));
+    std::shared_ptr<RibbonColorPicker> picker = make_control<RibbonColorPicker>(StableId("shrinking"));
+    (*picker).set_command(command);
+    Window window(picker, {300.0, 300.0});
+    window.perform_layout();
+    require(window.request_focus(picker), "the picker takes focus");
+    press_key(window, PhysicalKey::down);
+    press_key(window, PhysicalKey::end);
+    require((*picker).palette_open() && (*picker).realized_entries().size() == 13U &&
+                (*picker).realized_entries()[12].states.focus_visible,
+            "End puts the keyboard on the last recent colour");
+    (*command).clear_recent_colors();
+    press_key(window, PhysicalKey::up);
+    const std::vector<RibbonColorPicker::PaletteEntry> entries = (*picker).realized_entries();
+    require(entries.size() == 11U && entries[0].states.focus_visible,
+            "Up from past the remaining entries moves from the last one, to Automatic above the palette row");
+    (*picker).close_palette();
+}
+
+// A control whose maximum size is narrower than the bounds its parent offers
+// is arranged at its maximum width: its child controls sit on its published
+// parts, which paint and hit testing use.
+void arranged_within_maximum_size() {
+    std::shared_ptr<BackstageView> view = make_control<BackstageView>(StableId("limited.backstage"));
+    std::shared_ptr<Label> info = make_control<Label>(StableId("limited.backstage.info"), "Information");
+    (*view).set_items({{.stable_id = "info", .kind = BackstageItemKind::topic, .text = "Info", .page = info}});
+    (*view).set_maximum_size({300.0, 0.0});
+    Window backstage_window(view, {900.0, 400.0});
+    backstage_window.perform_layout();
+    require((*view).committed_arranged_bounds().width == 300.0 &&
+                (*info).committed_arranged_bounds() == (*view).parts().page.bounds,
+            "a Backstage page sits on the published page part within the view's maximum width");
+
+    std::shared_ptr<RibbonFontControl> font = make_control<RibbonFontControl>(StableId("limited.font"));
+    (*font).set_maximum_size({100.0, 0.0});
+    Window font_window(font, {200.0, 22.0});
+    font_window.perform_layout();
+    require((*font).committed_arranged_bounds().width == 100.0 &&
+                (*(*font).family_box()).committed_arranged_bounds() == (*font).parts().family_field.bounds,
+            "a font control's family field sits on its published part within the control's maximum width");
+}
+
 } // namespace
 
 int main() {
@@ -500,6 +548,8 @@ int main() {
     hosted_in_ribbon();
     recent_pane();
     backstage();
+    arranged_within_maximum_size();
+    color_palette_shrinks_while_open();
     std::cout << "Ribbon file area: value commands, font control, colour picker, hosting, recent pane and Backstage "
                  "passed\n";
     return 0;

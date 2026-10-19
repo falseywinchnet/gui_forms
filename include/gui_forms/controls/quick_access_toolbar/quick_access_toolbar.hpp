@@ -15,7 +15,8 @@ namespace gui_forms {
 
 // Where the toolbar sits: on the ribbon's tab row beside the File tab, or in
 // its own row below the ribbon (owner decision RB-12). The toolbar only
-// records the choice; the Ribbon that hosts it applies it.
+// records the choice; whoever places the toolbar applies it (the Ribbon
+// does not host the toolbar yet).
 enum class QuickAccessToolbarPlacement : std::uint8_t { above_ribbon, below_ribbon };
 
 // One command the toolbar may show. Every declared command is listed, with a

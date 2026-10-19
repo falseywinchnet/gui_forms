@@ -167,7 +167,7 @@ private:
     // The palette's cells, from its top-left corner.
     [[nodiscard]] std::vector<Cell> cells() const;
     [[nodiscard]] Size palette_size() const;
-    [[nodiscard]] std::optional<std::size_t> current_entry() const;
+    [[nodiscard]] std::optional<std::size_t> current_entry(const std::vector<Cell>& all) const;
     [[nodiscard]] PaletteEntryParts entry_parts(const std::vector<Cell>& all, std::size_t entry) const;
     [[nodiscard]] AnatomyStateSet entry_states(const std::vector<Cell>& all, std::size_t entry) const;
     void commit(std::optional<Color> color);

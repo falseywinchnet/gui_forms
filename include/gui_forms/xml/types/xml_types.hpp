@@ -103,8 +103,11 @@ struct XmlElement final {
     std::string text;
 
     // The attribute with this name, or null. The pointer borrows from this
-    // element and is invalidated by any change to attributes.
-    [[nodiscard]] const XmlAttribute* find_attribute(std::string_view attribute_name) const noexcept;
+    // element and is invalidated by any change to attributes. A temporary
+    // element is refused (house style section 5): its attributes end with
+    // the statement.
+    [[nodiscard]] const XmlAttribute* find_attribute(std::string_view attribute_name) const& noexcept;
+    const XmlAttribute* find_attribute(std::string_view attribute_name) const&& = delete;
 
     friend bool operator==(const XmlElement& left, const XmlElement& right) noexcept {
         return left.name == right.name && left.attributes == right.attributes &&

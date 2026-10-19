@@ -130,19 +130,18 @@ DockWorkspace::DockWorkspace(std::string stable_id) : stable_id_(std::move(stabl
 }
 
 DockWorkspace::~DockWorkspace() {
-    layout_token_.disconnect();
-    detach_windows();
-    std::vector<DockSite*> sites{};
-    try {
-        sites = bound_sites();
-    } catch (...) {
-    }
-    site_ = nullptr;
-    floating_sites_.clear();
-    for (DockSite* const site : sites) (*site).release_workspace();
+    release_sites();
 }
 
 void DockWorkspace::on_dispose() noexcept {
+    release_sites();
+    Component::on_dispose();
+}
+
+// The workspace goes: it stops hearing its layout, destroys its floating
+// windows, and unbinds every site, which then shows nothing. A site whose
+// list cannot be copied (no memory) is unbound without being told.
+void DockWorkspace::release_sites() noexcept {
     layout_token_.disconnect();
     detach_windows();
     std::vector<DockSite*> sites{};
@@ -153,7 +152,6 @@ void DockWorkspace::on_dispose() noexcept {
     site_ = nullptr;
     floating_sites_.clear();
     for (DockSite* const site : sites) (*site).release_workspace();
-    Component::on_dispose();
 }
 
 // -- registration --------------------------------------------------------------
@@ -429,10 +427,7 @@ void DockWorkspace::on_layout_changed(const DockLayoutChange& change) {
     publish_command_targets();
     Window* const main = main_model();
     if (transaction_ != nullptr || !windows_attached() || main == nullptr) {
-        const std::vector<DockSite*> sites = bound_sites();
-        for (DockSite* const site : sites) {
-            if (bound(site)) (*site).on_layout_changed(change);
-        }
+        realize_on_sites(change);
         if (transaction_ != nullptr) reconcile_windows(*transaction_);
         return;
     }
@@ -443,10 +438,7 @@ void DockWorkspace::on_layout_changed(const DockLayoutChange& change) {
     }
     transaction_ = &transaction;
     try {
-        const std::vector<DockSite*> sites = bound_sites();
-        for (DockSite* const site : sites) {
-            if (bound(site)) (*site).on_layout_changed(change);
-        }
+        realize_on_sites(change);
         reconcile_windows(transaction);
     } catch (...) {
         transaction_ = nullptr;
@@ -455,6 +447,15 @@ void DockWorkspace::on_layout_changed(const DockLayoutChange& change) {
     transaction_ = nullptr;
     static_cast<void>(transaction.commit());
     write_pending_frames();
+}
+
+// The bound sites realize a change, the main site first. The list is copied
+// first, and a site a handler unbound in the meantime is skipped.
+void DockWorkspace::realize_on_sites(const DockLayoutChange& change) {
+    const std::vector<DockSite*> sites = bound_sites();
+    for (DockSite* const site : sites) {
+        if (bound(site)) (*site).on_layout_changed(change);
+    }
 }
 
 // -- sites ---------------------------------------------------------------------
@@ -727,16 +728,7 @@ void DockWorkspace::open_window(const DockFloatingSite& site, WorkspaceTransacti
     if (!opened.status.accepted() || !opened.window.active()) {
         // The site stays in the layout without a window; the next change or
         // attach tries again.
-        for (std::size_t index = 0; index < windows_.size(); ++index) {
-            if (!(windows_[index].site == site.id)) continue;
-            windows_.erase(windows_.begin() + static_cast<std::ptrdiff_t>(index));
-            break;
-        }
-        DockSite* const orphan = floating_site(site.id);
-        if (orphan != nullptr) {
-            detach_site(*orphan);
-            (*orphan).release_workspace();
-        }
+        forget_window(site.id);
         return;
     }
     FloatingWindow* const kept = find_window(site.id);
@@ -753,15 +745,33 @@ void DockWorkspace::on_window_ready(DockSiteId site, Window& window, const Appli
     publish_command_targets();
 }
 
-// The close button: the window stays; its panels go first, which closes it.
+// The close button. With a main site bound, the window stays for now: its
+// panels go first, in a transaction posted to the main window (so it runs
+// after this request returns), and that transaction destroys the window.
+// Without one (no main site is bound, or it is in no window) there is no
+// main window to post to and no transaction would destroy the window: the
+// panels go at once, as close_floating_site does, and the close goes ahead,
+// so the host closes the window and on_window_closed forgets it. If that
+// transaction is refused (the docking lock), the window still closes and
+// its site stays in the layout without a window, as after a refused opening;
+// the next attach opens it again.
 void DockWorkspace::on_window_closing(DockSiteId site, HostCloseRequest& request) {
-    request.cancel = true;
     Window* const main = main_model();
-    if (main == nullptr || site_ == nullptr) return;
+    if (main == nullptr) {
+        close_floating_site(site);
+        return;
+    }
+    request.cancel = true;
     static_cast<void>((*main).begin_invoke((*site_).shared_from_this(), CloseFloatingSite{liaison_, site}));
 }
 
 void DockWorkspace::on_window_closed(DockSiteId site) noexcept {
+    forget_window(site);
+}
+
+// Drops the record of a site's floating window and unbinds the DockSite that
+// realized it (the window's root, which then shows nothing).
+void DockWorkspace::forget_window(DockSiteId site) noexcept {
     for (std::size_t index = 0; index < windows_.size(); ++index) {
         if (!(windows_[index].site == site)) continue;
         windows_.erase(windows_.begin() + static_cast<std::ptrdiff_t>(index));
@@ -849,6 +859,8 @@ void DockWorkspace::close_floating_site(DockSiteId site) {
 bool DockWorkspace::can_float(const DockSubject& subject) const {
     if (!windows_attached() || main_model() == nullptr) return false;
     if (main_window_.windows().window_count() >= Application::maximum_windows) return false;
+    // The probe's frame only has to be valid: the restrictions, the lock and
+    // the site limit decide, not where the window would stand.
     DockTransaction transaction{};
     transaction.origin = DockEditOrigin::user;
     transaction.edits.push_back(DockEdit::float_subject(subject, Rect{0.0, 0.0, 320.0, 240.0}, std::string{}));
@@ -970,7 +982,9 @@ bool DockWorkspace::site_contains(const DockSite& site, Point desktop) const {
 
 DockSite* DockWorkspace::site_at(Point desktop, const DockSite* excluded) const {
     if (!windows_attached()) return nullptr;
-    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop);
+    // The docking controls keep desktop positions as Point in logical units.
+    const DesktopLogicalPoint desktop_point{desktop.x, desktop.y};
+    const ApplicationWindowAtResult at = main_window_.windows().window_at(desktop_point);
     if (!at.status.accepted() || !at.found) return nullptr;
     const HostWindowId topmost = at.window.id();
     const std::vector<DockSite*> sites = bound_sites();

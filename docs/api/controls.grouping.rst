@@ -377,7 +377,7 @@ Related types
 
    ``#include <gui_forms/controls/pages/page_strip/page_strip.hpp>``
 
-   A request for a tab's context menu (PageView study I11). The strip shows no menu of its own; a handler that shows one sets ``handled``. ``anchor`` is in window coordinates: the pointer, or for the keyboard the corner of the tab on the content's side where reading starts.
+   A request for a tab's context menu (PageView study I11). The strip shows no menu of its own; a handler that shows one sets ``handled``. ``anchor`` is in window coordinates: the pointer, or for the keyboard the corner of the tab on the content's side where reading starts (a tab scrolled out of view is scrolled back first; one that cannot be shown anchors at the list button, or the strip, the same way).
 
    .. cpp:member:: PageId page
 

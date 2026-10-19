@@ -39,6 +39,14 @@ PartGeometry visible_part(Rect bounds, Rect clip) noexcept {
     return geometry;
 }
 
+// One cell's height at `scale`: the item's image area, and its label under
+// it when labels show. Lines, geometry and measure all use it.
+double cell_height(Size item_size, bool show_labels, double scale) noexcept {
+    const double label = show_labels ? label_height : 0.0;
+    const double height = (item_size.height + label) * scale;
+    return height;
+}
+
 } // namespace
 
 // -- lines ---------------------------------------------------------------------
@@ -54,7 +62,7 @@ std::size_t RibbonGallery::active_columns() const noexcept {
 void RibbonGallery::rebuild_lines() {
     lines_.clear();
     const double scale = effective_text_scale();
-    const double row_height = (item_size_.height + (show_labels_ ? label_height : 0.0)) * scale;
+    const double row_height = cell_height(item_size_, show_labels_, scale);
     const std::size_t columns = active_columns();
     const bool grouped = form_ == RibbonGalleryForm::drop_down && !categories_.empty();
     lines_.reserve(order_.size() / columns + categories_.size() + 1U);
@@ -95,7 +103,8 @@ void RibbonGallery::rebuild_lines() {
 
 namespace {
 
-// Orders a display position before the first line that starts after it.
+// Orders a display position before the first line that starts after it. A
+// template only because RibbonGallery::Line is private to the gallery.
 struct PositionBeforeLine final {
     template <typename Line>
     bool operator()(std::size_t position, const Line& line) const noexcept {
@@ -124,7 +133,7 @@ RibbonGallery::Geometry RibbonGallery::geometry() const {
     const double scale = effective_text_scale();
     layout.scale = scale;
     layout.client = client_rectangle();
-    layout.cell = {item_size_.width * scale, (item_size_.height + (show_labels_ ? label_height : 0.0)) * scale};
+    layout.cell = {item_size_.width * scale, cell_height(item_size_, show_labels_, scale)};
     const double column = scroll_column_width * scale;
     const double inset = viewport_inset * scale;
     const double width = layout.client.width;
@@ -207,19 +216,17 @@ double RibbonGallery::width_for_columns(std::size_t columns) const noexcept {
 
 Size RibbonGallery::measure(Size available) {
     const double scale = effective_text_scale();
-    const double cell_width = item_size_.width * scale;
-    const double cell_height = (item_size_.height + (show_labels_ ? label_height : 0.0)) * scale;
-    const double chrome_width = (scroll_column_width + viewport_inset * 2.0) * scale;
+    const double row_height = cell_height(item_size_, show_labels_, scale);
     const double chrome_height = viewport_inset * 2.0 * scale;
     double width = 0.0;
     double height = 0.0;
     if (form_ == RibbonGalleryForm::in_ribbon) {
         width = width_for_columns(columns_);
-        height = static_cast<double>(visible_rows_) * cell_height + chrome_height;
+        height = static_cast<double>(visible_rows_) * row_height + chrome_height;
     } else {
         // The drop-down shows its rows of items, plus the captions among
         // them, up to drop_down_rows rows; a short gallery is shorter.
-        width = static_cast<double>(drop_down_columns_) * cell_width + chrome_width;
+        width = width_for_columns(drop_down_columns_);
         double content = 0.0;
         std::size_t rows = 0U;
         for (const Line& line : lines_) {
@@ -229,7 +236,7 @@ Size RibbonGallery::measure(Size available) {
             }
             content += line.height;
         }
-        height = std::max(content, cell_height) + chrome_height;
+        height = std::max(content, row_height) + chrome_height;
     }
     const Size result{std::min(width, available.width), std::min(height, available.height)};
     return result;

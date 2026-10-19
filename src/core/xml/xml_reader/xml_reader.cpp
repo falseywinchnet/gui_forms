@@ -20,8 +20,8 @@ using detail::is_xml_character;
 using detail::is_xml_name_character;
 using detail::is_xml_name_start;
 
-// The longest predefined entity name is "quot" and "apos"; a longer run of
-// letters before ';' cannot name one.
+// The longest predefined entity names, "quot" and "apos", have four letters;
+// a longer run of letters before ';' cannot name one.
 constexpr std::size_t maximum_entity_name_bytes = 4;
 // Leading zeros are legal in a character reference; this bounds the digits
 // read for one so the scan stays short on hostile input.
@@ -602,7 +602,7 @@ private:
         return true;
     }
 
-    std::string_view input_;
+    std::string_view input_{};
     const XmlLimits& limits_;
     std::size_t offset_{};
     XmlError error_{XmlError::none};

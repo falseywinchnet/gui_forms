@@ -32,6 +32,14 @@ std::string size_text(double size) {
     return text.str();
 }
 
+// The size list's rows, one per size in `sizes`.
+std::vector<std::string> size_texts(std::span<const double> sizes) {
+    std::vector<std::string> texts;
+    texts.reserve(sizes.size());
+    for (const double size : sizes) texts.push_back(size_text(size));
+    return texts;
+}
+
 } // namespace
 
 RibbonFontControl::RibbonFontControl(StableId stable_id) : Control(std::move(stable_id)) {
@@ -45,16 +53,13 @@ void RibbonFontControl::initialize_control_tree() {
     size_ = make_control<ComboBox>(StableId(prefix + ".size"));
     (*family_).set_accessible_name("Font");
     (*size_).set_accessible_name("Font size");
-    std::vector<std::string> sizes;
-    sizes.reserve(sizes_.size());
-    for (const double size : sizes_) sizes.push_back(size_text(size));
-    (*size_).set_items(std::move(sizes));
+    (*size_).set_items(size_texts(sizes_));
     add_child(family_);
     add_child(size_);
     const std::weak_ptr<RibbonFontControl> weak =
         std::static_pointer_cast<RibbonFontControl>(shared_from_this());
-    family_changed_ = (*family_).selected_index_changed().subscribe(*this, FieldChanged{weak, true});
-    size_changed_ = (*size_).selected_index_changed().subscribe(*this, FieldChanged{weak, false});
+    family_changed_ = (*family_).selected_index_changed().subscribe(*this, FieldChanged{weak, Field::family});
+    size_changed_ = (*size_).selected_index_changed().subscribe(*this, FieldChanged{weak, Field::size});
 }
 
 void RibbonFontControl::on_dispose() noexcept {
@@ -96,9 +101,7 @@ void RibbonFontControl::set_sizes(std::vector<double> sizes) {
         }
     }
     sizes_ = std::move(sizes);
-    std::vector<std::string> texts;
-    texts.reserve(sizes_.size());
-    for (const double size : sizes_) texts.push_back(size_text(size));
+    std::vector<std::string> texts = size_texts(sizes_);
     synchronizing_ = true;
     (*size_).set_items(std::move(texts));
     synchronizing_ = false;
@@ -157,7 +160,7 @@ void RibbonFontControl::set_value(FontChoice value) {
 
 void RibbonFontControl::FieldChanged::operator()(std::optional<std::size_t> index) const {
     const std::shared_ptr<RibbonFontControl> control = target.lock();
-    if (control && (*control).is_alive()) (*control).field_changed(family, index);
+    if (control && (*control).is_alive()) (*control).field_changed(field, index);
 }
 
 void RibbonFontControl::CommandValueChanged::operator()(const FontChoice& value) const {
@@ -174,10 +177,10 @@ void RibbonFontControl::CommandStateChanged::operator()(const CommandState&) con
 
 // The user chose in a field: the other half of the value is kept, and the
 // choice commits to the command (or becomes the control's own value).
-void RibbonFontControl::field_changed(bool family, std::optional<std::size_t> index) {
+void RibbonFontControl::field_changed(Field field, std::optional<std::size_t> index) {
     if (synchronizing_ || !index) return;
     FontChoice chosen = value();
-    if (family) {
+    if (field == Field::family) {
         if (*index >= families_.size()) return;
         chosen.family = families_[*index];
     } else {
@@ -248,7 +251,8 @@ Size RibbonFontControl::measure(Size available) {
 
 void RibbonFontControl::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
-    const Fields placed = fields({0.0, 0.0, final_bounds.width, final_bounds.height});
+    // In the bounds as arranged, as publish_part_geometry places them.
+    const Fields placed = fields(client_rectangle());
     if (family_ && is_current_layout_child(family_)) set_child_layout(family_, placed.family);
     if (size_ && is_current_layout_child(size_)) set_child_layout(size_, placed.size);
 }
