@@ -119,7 +119,12 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
         }
 
         try {
+            // Moving a std::function need not empty its source (libc++
+            // copies a callable kept in its small buffer), so the work item
+            // is emptied explicitly: a completed operation must not keep the
+            // callable, or what it owns, alive.
             std::function<void()> callback = std::move((*work).callback);
+            (*work).callback = {};
             callback();
             (*work).state.store(DispatchOperationState::completed,
                               std::memory_order_release);

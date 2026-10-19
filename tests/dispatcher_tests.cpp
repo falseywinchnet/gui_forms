@@ -467,6 +467,33 @@ void test_cancellation_owner_lifetime_and_fault_isolation() {
             "BeginInvoke on a detached control must reject instead of orphaning work");
 }
 
+// A callable small enough for std::function's inline buffer, owning a
+// sentinel so the test can see when the callable has been destroyed.
+class HoldSentinel final {
+public:
+    explicit HoldSentinel(std::shared_ptr<int> sentinel)
+        : sentinel_(std::move(sentinel)) {}
+
+    void operator()() const {}
+
+private:
+    std::shared_ptr<int> sentinel_;
+};
+
+void test_completed_work_releases_its_callable() {
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.release.root"));
+    Window window(root, {320.0, 180.0});
+    std::shared_ptr<int> sentinel = std::make_shared<int>(7);
+    const std::weak_ptr<int> observer = sentinel;
+    DispatchOperation operation = window.begin_invoke(HoldSentinel(std::move(sentinel)));
+    require(!observer.expired(), "posted work must own its callable until it runs");
+    const DispatchDrainResult result = window.drain_posted_work();
+    require(result.invoked == 1U &&
+                operation.state() == DispatchOperationState::completed &&
+                observer.expired(),
+            "completed work must release its callable while the operation is still held");
+}
+
 void test_cross_thread_post_and_headless_pump() {
     std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.thread.root"));
     Window window(root, {320.0, 180.0});
@@ -774,6 +801,7 @@ int main() {
     try {
         test_fifo_snapshot_and_nested_deferral();
         test_cancellation_owner_lifetime_and_fault_isolation();
+        test_completed_work_releases_its_callable();
         test_cross_thread_post_and_headless_pump();
         test_synchronous_invoke_inline_marshal_fault_and_owner_cancel();
         test_synchronous_invoke_host_and_shutdown_guards();
