@@ -10,7 +10,7 @@ namespace gui_forms {
 
 // A page's stable identity: the application's string, unique within one set
 // (docking uses the panel's identity). It is never a position; positions are
-// `PagePosition`s in the current order and change on every reorder.
+// `PagePosition` values in the current order and change on every reorder.
 struct PageId final {
     std::string value{};
 
