@@ -442,7 +442,7 @@ void move_floating_window_into_main() {
     const ApplicationWindowHandle handle = workspace.floating_window(floating);
     const Rect start = content_of(handle);
     const Point caption = centre(caption_of(floating_site, stack_of(workspace, "properties")));
-    const Point grab{start.x + caption.x, start.y + caption.y};
+    const DesktopLogicalPoint grab{start.x + caption.x, start.y + caption.y};
     windowing.set_pointer(grab);
     press(floating_window, caption);
     windowing.set_pointer({grab.x + 12.0, grab.y + 12.0});
@@ -459,7 +459,7 @@ void move_floating_window_into_main() {
     const DockSite::Stack* const record = find_stack(stacks, solution);
     require(record != nullptr, "Solution is realized");
     const Point over_solution = centre((*record).parts.stack_area.bounds);
-    const Point desktop{100.0 + over_solution.x, 100.0 + over_solution.y};
+    const DesktopLogicalPoint desktop{100.0 + over_solution.x, 100.0 + over_solution.y};
     windowing.set_pointer(desktop);
     move(floating_window, {caption.x + 1.0, caption.y + 1.0});
     require((*(*app).site).showing_remote_drag(), "the main window, under the moving window, shows the targets");
