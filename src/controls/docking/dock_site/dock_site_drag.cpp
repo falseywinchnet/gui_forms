@@ -150,7 +150,12 @@ void DockSite::set_drag_threshold(double threshold) {
 void DockSite::reset_drag() noexcept {
     if (drag_.picture && !drag_.guest) {
         Window* const host = attached_window();
-        if (host != nullptr) static_cast<void>((*host).release_control_snapshot((*drag_.picture).image));
+        // A release that fails (allocation while marking the repaint) leaves
+        // the image to the window's end.
+        try {
+            if (host != nullptr) static_cast<void>((*host).release_control_snapshot((*drag_.picture).image));
+        } catch (...) {
+        }
     }
     drag_ = DragSession{};
 }
@@ -1180,7 +1185,9 @@ void DockSite::continue_window_move(Modifier modifiers) {
     const HostScreenPointResult pointer = handle.windows().pointer_position();
     const std::shared_ptr<Control> held = window_move_.remote.lock();
     DockSite* const previous = held ? static_cast<DockSite*>(held.get()) : nullptr;
-    DockSite* const under = pointer.status.accepted() ? remote_site(pointer.position, this) : nullptr;
+    // The docking controls keep desktop positions as Point in logical units.
+    const Point desktop{pointer.position.x, pointer.position.y};
+    DockSite* const under = pointer.status.accepted() ? remote_site(desktop, this) : nullptr;
     if (previous != nullptr && previous != under) (*previous).leave_guest_drag();
     if (under == nullptr || stacks_.empty()) {
         window_move_.remote.reset();

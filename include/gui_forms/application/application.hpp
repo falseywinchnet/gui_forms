@@ -171,7 +171,7 @@ public:
     // The pointer in desktop logical units (capability screen_pointer).
     [[nodiscard]] HostScreenPointResult pointer_position() const;
     // The run's topmost window at a desktop point (window_at_point).
-    [[nodiscard]] ApplicationWindowAtResult window_at(Point point) const;
+    [[nodiscard]] ApplicationWindowAtResult window_at(DesktopLogicalPoint point) const;
     // Monitors in desktop logical units (monitor_geometry).
     [[nodiscard]] HostMonitorResult monitors() const;
     // Live windows of the run, including any not yet ready.

@@ -86,21 +86,21 @@ public:
     // and removes every live icon at shutdown, so adapters agree on those
     // rules. An unknown or removed identity is an invalid_argument.
     [[nodiscard]] HostTrayIconResult add_tray_icon(const HostTrayIconRequest& request);
-    [[nodiscard]] HostServiceStatus update_tray_icon(std::uint64_t icon_id,
+    [[nodiscard]] HostServiceStatus update_tray_icon(HostTrayIconId icon_id,
                                                      const HostTrayIconRequest& request);
-    [[nodiscard]] HostServiceStatus remove_tray_icon(std::uint64_t icon_id);
+    [[nodiscard]] HostServiceStatus remove_tray_icon(HostTrayIconId icon_id);
     // Capability notification_area_messages.
     [[nodiscard]] HostServiceStatus show_tray_notification(
-        std::uint64_t icon_id, const HostTrayNotificationRequest& request);
+        HostTrayIconId icon_id, const HostTrayNotificationRequest& request);
     // Capability notification_area_menus. Shows a native menu at the icon and
     // returns when it closes, as show_dialog does.
-    [[nodiscard]] HostTrayMenuResult show_tray_menu(std::uint64_t icon_id,
+    [[nodiscard]] HostTrayMenuResult show_tray_menu(HostTrayIconId icon_id,
                                                     const HostTrayMenuRequest& request);
     // Raised on the UI thread for each user action on a live tray icon.
     [[nodiscard]] Event<const HostTrayIconEvent&>& tray_icon_events() noexcept {
         return tray_icon_events_;
     }
-    [[nodiscard]] bool tray_icon_live(std::uint64_t icon_id) const noexcept;
+    [[nodiscard]] bool tray_icon_live(HostTrayIconId icon_id) const noexcept;
     void shutdown() noexcept;
 
     [[nodiscard]] HostServicesSnapshot snapshot() const;
@@ -136,15 +136,15 @@ protected:
     // Tray adapters: called with a validated request and an identity the base
     // class assigned. The defaults refuse as unsupported.
     [[nodiscard]] virtual HostServiceStatus add_tray_icon_impl(
-        std::uint64_t icon_id, const HostTrayIconRequest& request);
+        HostTrayIconId icon_id, const HostTrayIconRequest& request);
     [[nodiscard]] virtual HostServiceStatus update_tray_icon_impl(
-        std::uint64_t icon_id, const HostTrayIconRequest& request);
+        HostTrayIconId icon_id, const HostTrayIconRequest& request);
     // Must not fail in a way that leaves the icon shown; called at shutdown.
-    virtual void remove_tray_icon_impl(std::uint64_t icon_id) noexcept;
+    virtual void remove_tray_icon_impl(HostTrayIconId icon_id) noexcept;
     [[nodiscard]] virtual HostServiceStatus show_tray_notification_impl(
-        std::uint64_t icon_id, const HostTrayNotificationRequest& request);
+        HostTrayIconId icon_id, const HostTrayNotificationRequest& request);
     [[nodiscard]] virtual HostTrayMenuResult show_tray_menu_impl(
-        std::uint64_t icon_id, const HostTrayMenuRequest& request);
+        HostTrayIconId icon_id, const HostTrayMenuRequest& request);
     // Adapters report native tray events here, on the UI thread. Events for
     // identities that are not live are dropped.
     void publish_tray_icon_event(const HostTrayIconEvent& event);
@@ -175,7 +175,8 @@ private:
     std::optional<HostSoundCue> last_sound_cue_;
     std::uint64_t last_sound_timestamp_{};
     // Live tray icon identities, in creation order; identities are never reused.
-    std::vector<std::uint64_t> tray_icons_;
+    std::vector<HostTrayIconId> tray_icons_;
+    // The value the next added icon's identity takes.
     std::uint64_t next_tray_icon_id_{1U};
     Event<const HostTrayIconEvent&> tray_icon_events_;
 };

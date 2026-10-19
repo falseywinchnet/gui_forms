@@ -178,7 +178,7 @@ HostScreenPointResult X11Windowing::pointer_position_impl() {
   return current;
 }
 
-HostWindowAtResult X11Windowing::window_at_impl(Point point) {
+HostWindowAtResult X11Windowing::window_at_impl(DesktopLogicalPoint point) {
   HostWindowAtResult result;
   Display *display = runtime_.display;
   const ::Window root = DefaultRootWindow(display);
@@ -213,7 +213,8 @@ HostWindowAtResult X11Windowing::window_at_impl(Point point) {
                       static_cast<double>(attributes.y),
                       static_cast<double>(attributes.width + 2 * attributes.border_width),
                       static_cast<double>(attributes.height + 2 * attributes.border_width)};
-    if (!bounds.contains(point))
+    // Logical units are X pixels here (scale 1).
+    if (!bounds.contains(Point{point.x, point.y}))
       continue;
     for (std::size_t i = 0; i < own.size(); ++i) {
       if (own[i].top_level == child) {

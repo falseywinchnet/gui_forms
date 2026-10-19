@@ -20,6 +20,19 @@ namespace gui_forms::host {
 
 class HeadlessApplication;
 
+// A fault the headless host injects into its next runtime open, to test
+// what callers do when a native creation fails after the host has taken the
+// entry (ApplicationWindows::open_window consumed it).
+enum class HeadlessOpenFault : std::uint8_t {
+    none,
+    // Refuse with backend_failure and destroy the entry's model, as a
+    // native host whose window creation failed releases it.
+    refuse_and_destroy,
+    // Refuse with backend_failure but keep the model alive in
+    // refused_models(), so a test can see whether anything touched it.
+    refuse_and_keep,
+};
+
 // The headless reference adapter's windowing: a simulated desktop with
 // monitors, native window rectangles, visibility, a z-order and a pointer.
 // Every native operation appends one line to trace(), so tests can read the
@@ -37,7 +50,7 @@ public:
     // Replaces the simulated monitors (desktop logical units). An empty
     // list is ignored.
     void set_monitors(std::vector<HostMonitor> monitors);
-    void set_pointer(Point position) noexcept { pointer_ = position; }
+    void set_pointer(DesktopLogicalPoint position) noexcept { pointer_ = position; }
     // A window of another application covering `outer`, above every window
     // of this run. window_at reports no window where it lies.
     void add_foreign_window(Rect outer);
@@ -74,7 +87,7 @@ protected:
     [[nodiscard]] HostServiceStatus request_frame_impl(HostWindowId window,
                                                        Rect content) override;
     [[nodiscard]] HostScreenPointResult pointer_position_impl() override;
-    [[nodiscard]] HostWindowAtResult window_at_impl(Point point) override;
+    [[nodiscard]] HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
     [[nodiscard]] HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     [[nodiscard]] HostServiceStatus destroy_window_impl(HostWindowId window) override;
     [[nodiscard]] HostMonitorResult query_monitors_impl() override;
@@ -104,7 +117,7 @@ private:
     bool deferred_reports_{};
     std::vector<DeferredReport> deferred_;
     std::vector<HostMonitor> monitors_;
-    Point pointer_{};
+    DesktopLogicalPoint pointer_{};
     std::vector<Rect> foreign_windows_;
     // Live native windows; `order_` holds their identities front to back.
     std::vector<NativeWindow> natives_;
@@ -149,6 +162,14 @@ public:
     void simulate_application_active(bool active);
     // The user minimizes or restores a window.
     void simulate_minimized(HostWindowId window, bool minimized);
+    // Applies `fault` to the next runtime open only, after admission and
+    // after the entry is consumed.
+    void inject_open_fault(HeadlessOpenFault fault) noexcept { open_fault_ = fault; }
+    // Models of runtime opens refused by refuse_and_keep, in refusal order;
+    // owned here until the application ends.
+    [[nodiscard]] const std::vector<std::unique_ptr<Window>>& refused_models() const noexcept {
+        return refused_models_;
+    }
     // Releases the models and protocol adapters of windows closed earlier.
     // A test calls it between steps, as a native host does at the end of a
     // loop turn, so a window is never released inside one of its own
@@ -193,6 +214,8 @@ private:
     std::vector<std::unique_ptr<WindowEntry>> entries_;
     std::uint64_t timestamp_{};
     std::uint32_t placements_{};
+    HeadlessOpenFault open_fault_{HeadlessOpenFault::none};
+    std::vector<std::unique_ptr<Window>> refused_models_;
 };
 
 } // namespace gui_forms::host

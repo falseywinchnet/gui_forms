@@ -21,6 +21,9 @@ struct WindowsRunSlot final {
     bool initial{};
     // Shown and hidden by the floating policy (HostWindowKindTraits).
     bool floating{};
+    // CreateWindowExW failed: the state never had a native window, so it
+    // never reaches destroyed(); reclaim releases it all the same.
+    bool never_created{};
     bool print_metrics_on_close{};
     std::function<void(std::string_view metrics_json, std::string_view host_json)> final_snapshot{};
     std::string capture_path{};
@@ -61,8 +64,8 @@ std::vector<HostMonitor> device_monitors() {
 using DwmGetWindowAttributeFunction = decltype(&::DwmGetWindowAttribute);
 
 // The visible window bounds without the invisible resize borders Windows 10
-// and later add around a sizable window (DWMWA_EXTENDED_FRAME_BOUNDS, 9),
-// read through dwmapi.dll when it is present; else GetWindowRect.
+// and later add around a sizable window (DWMWA_EXTENDED_FRAME_BOUNDS), read
+// through dwmapi.dll when it is present; else GetWindowRect.
 DwmGetWindowAttributeFunction load_dwm_get_window_attribute() noexcept {
     HMODULE library = LoadLibraryW(L"dwmapi.dll");
     if (library == nullptr) return nullptr;
@@ -73,13 +76,51 @@ DwmGetWindowAttributeFunction load_dwm_get_window_attribute() noexcept {
 
 bool visible_window_bounds(HWND window, RECT& bounds) noexcept {
     static const DwmGetWindowAttributeFunction get_attribute = load_dwm_get_window_attribute();
-    constexpr DWORD extended_frame_bounds = 9U;
+    constexpr DWORD extended_frame_bounds = DWMWA_EXTENDED_FRAME_BOUNDS;
     if (get_attribute != nullptr &&
         SUCCEEDED(get_attribute(window, extended_frame_bounds, &bounds, sizeof(bounds)))) {
         return true;
     }
     const bool measured = GetWindowRect(window, &bounds) != FALSE;
     return measured;
+}
+
+// The Win32 window styles of one window.
+struct WindowsWindowStyles final {
+    DWORD style{};
+    DWORD extended{};
+};
+
+// The styles for a window of `kind` with `options`: a popup window has a
+// border only; otherwise an overlapped window, without its minimize box
+// when the window is not minimizable, and a tool window takes the tool
+// caption. Floating windows (decision 10) are owned by the primary window,
+// which already keeps them off the taskbar, above the owner only and hidden
+// while it is minimized; they minimize with it, never on their own, so they
+// have no minimize box, and a floating tool takes the tool caption without
+// a maximize box.
+WindowsWindowStyles windows_window_styles(HostWindowKind kind, bool tool_window,
+                                          const WindowsHostOptions& options) noexcept {
+    WindowsWindowStyles styles;
+    if (kind == HostWindowKind::floating_tool) {
+        styles.style = WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
+        styles.extended = WS_EX_TOOLWINDOW;
+        return styles;
+    }
+    if (kind == HostWindowKind::floating_document) {
+        styles.style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
+        styles.extended = 0;
+        return styles;
+    }
+    if (options.popup_window) {
+        styles.style = WS_POPUP | WS_BORDER;
+    } else if (options.minimizable) {
+        styles.style = WS_OVERLAPPEDWINDOW;
+    } else {
+        styles.style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
+    }
+    styles.extended = tool_window ? WS_EX_TOOLWINDOW : 0;
+    return styles;
 }
 
 class WindowsApplicationRun final : public HostWindowing {
@@ -118,7 +159,8 @@ public:
     // initial windows are shown (WM_ACTIVATEAPP reports later changes).
     void report_foreground();
     // Releases runtime windows that closed during the turn, after printing
-    // their metrics as the run prints every window's at exit.
+    // their metrics as the run prints every window's at exit, and runtime
+    // windows whose native creation failed.
     void reclaim();
     // Prints one window's final metrics and snapshot.
     static void publish_final_metrics(WindowsRunSlot& slot);
@@ -127,7 +169,7 @@ protected:
     HostWindowFrameResult frame_impl(HostWindowId window) override;
     HostServiceStatus request_frame_impl(HostWindowId window, Rect content) override;
     HostScreenPointResult pointer_position_impl() override;
-    HostWindowAtResult window_at_impl(Point point) override;
+    HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
     HostServiceStatus bring_to_front_impl(HostWindowId window) override;
     HostServiceStatus destroy_window_impl(HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
@@ -153,15 +195,15 @@ HostWindowFrame native_window_frame(HWND window) {
     if (!GetClientRect(window, &client) || !ClientToScreen(window, &origin)) return frame;
     const std::vector<HostMonitor> monitors = device_monitors();
     const double scale = query_scale(window);
-    const Point content_origin = desktop_logical_point(
-        monitors, {static_cast<double>(origin.x), static_cast<double>(origin.y)});
+    const DesktopLogicalPoint content_origin = desktop_logical_point(
+        monitors, DesktopDevicePoint{static_cast<double>(origin.x), static_cast<double>(origin.y)});
     frame.content = {content_origin.x, content_origin.y,
                      static_cast<double>(client.right - client.left) / scale,
                      static_cast<double>(client.bottom - client.top) / scale};
     RECT outer{};
     if (visible_window_bounds(window, outer)) {
-        const Point outer_origin = desktop_logical_point(
-            monitors, {static_cast<double>(outer.left), static_cast<double>(outer.top)});
+        const DesktopLogicalPoint outer_origin = desktop_logical_point(
+            monitors, DesktopDevicePoint{static_cast<double>(outer.left), static_cast<double>(outer.top)});
         frame.outer = {outer_origin.x, outer_origin.y,
                        static_cast<double>(outer.right - outer.left) / scale,
                        static_cast<double>(outer.bottom - outer.top) / scale};
@@ -245,22 +287,9 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
     const bool close_after_launch = entry.options.close_after_launch_for_testing;
     window_slot.state = std::make_unique<WindowsHostState>(std::move(entry.model), std::move(host_options));
     (*window_slot.state).attach_run(*this, id);
-    DWORD style = entry.options.popup_window
-        ? (WS_POPUP | WS_BORDER)
-        : (entry.options.minimizable ? WS_OVERLAPPEDWINDOW
-                                     : (WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX));
-    DWORD ex_style = entry.tool_window ? WS_EX_TOOLWINDOW : 0;
-    // Floating windows (decision 10) are owned by the primary window, which
-    // already keeps them off the taskbar, above the owner only and hidden
-    // while it is minimized; they minimize with it, not on their own. A
-    // floating tool takes the tool caption.
-    if (kind == HostWindowKind::floating_tool) {
-        style = WS_OVERLAPPEDWINDOW & ~(WS_MINIMIZEBOX | WS_MAXIMIZEBOX);
-        ex_style = WS_EX_TOOLWINDOW;
-    } else if (kind == HostWindowKind::floating_document) {
-        style = WS_OVERLAPPEDWINDOW & ~WS_MINIMIZEBOX;
-        ex_style = 0;
-    }
+    const WindowsWindowStyles styles = windows_window_styles(kind, entry.tool_window, entry.options);
+    const DWORD style = styles.style;
+    const DWORD ex_style = styles.extended;
     const double initial_scale = query_scale(owner);
     const Size initial_size = entry.options.capture_size.has_value()
         ? *entry.options.capture_size : entry.options.initial_size;
@@ -277,6 +306,7 @@ WindowsApplicationRun::OpenOutcome WindowsApplicationRun::open(WindowsApplicatio
                                   owner, nullptr, instance_, &state);
     if (window == nullptr || !state.initialize(window)) {
         if (window != nullptr) DestroyWindow(window);
+        if (window == nullptr) window_slot.never_created = true;
         retire(id);
         outcome.admission.status.error = HostServiceError::backend_failure;
         outcome.admission.window = {};
@@ -343,8 +373,11 @@ void WindowsApplicationRun::publish_final_metrics(WindowsRunSlot& run_slot) {
 void WindowsApplicationRun::reclaim() {
     for (std::size_t index = slots_.size(); index > 0U; --index) {
         WindowsRunSlot& candidate = *slots_[index - 1U];
-        if (candidate.initial || !candidate.state || !(*candidate.state).destroyed()) continue;
-        publish_final_metrics(candidate);
+        if (candidate.initial || !candidate.state) continue;
+        const bool closed = (*candidate.state).destroyed();
+        if (!closed && !candidate.never_created) continue;
+        // A window that was never created has no metrics to publish.
+        if (closed) publish_final_metrics(candidate);
         slots_.erase(slots_.begin() + static_cast<std::ptrdiff_t>(index - 1U));
     }
 }
@@ -373,7 +406,8 @@ HostServiceStatus WindowsApplicationRun::request_frame_impl(HostWindowId window,
     if (state.frame_fixed()) return {HostServiceError::unsupported};
     const std::vector<HostMonitor> monitors = device_monitors();
     double target_scale = 1.0;
-    const Point device_origin = desktop_device_point(monitors, {content.x, content.y}, target_scale);
+    const DesktopDevicePoint device_origin =
+        desktop_device_point(monitors, DesktopLogicalPoint{content.x, content.y}, target_scale);
     RECT frame{0, 0, static_cast<LONG>(std::lround(content.width * target_scale)),
                static_cast<LONG>(std::lround(content.height * target_scale))};
     adjust_client_frame(frame, static_cast<DWORD>(GetWindowLongPtrW(native_window, GWL_STYLE)),
@@ -400,15 +434,15 @@ HostScreenPointResult WindowsApplicationRun::pointer_position_impl() {
     }
     const std::vector<HostMonitor> monitors = device_monitors();
     result.position = desktop_logical_point(
-        monitors, {static_cast<double>(device.x), static_cast<double>(device.y)});
+        monitors, DesktopDevicePoint{static_cast<double>(device.x), static_cast<double>(device.y)});
     return result;
 }
 
-HostWindowAtResult WindowsApplicationRun::window_at_impl(Point point) {
+HostWindowAtResult WindowsApplicationRun::window_at_impl(DesktopLogicalPoint point) {
     HostWindowAtResult result;
     const std::vector<HostMonitor> monitors = device_monitors();
     double scale = 1.0;
-    const Point device = desktop_device_point(monitors, point, scale);
+    const DesktopDevicePoint device = desktop_device_point(monitors, point, scale);
     const POINT native_point{static_cast<LONG>(std::lround(device.x)),
                              static_cast<LONG>(std::lround(device.y))};
     // WindowFromPoint skips hidden and disabled windows; its result may be a

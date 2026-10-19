@@ -119,7 +119,7 @@ void notify_icon_menus() {
     const std::shared_ptr<CommandTarget> target = main_target(handler, "tray.mute");
     window.set_command_target(CommandRouteStage::main_window, target);
     services.queue_tray_menu_choice("tray.menu.mute");
-    services.simulate_tray_icon_event({1U, HostTrayIconAction::context});
+    services.simulate_tray_icon_event({HostTrayIconId{1U}, HostTrayIconAction::context});
     require(journal.handled.size() == 1U && invoked == 0,
             "a notification-area menu row routes its command through the window's chain");
     icon.dispose();

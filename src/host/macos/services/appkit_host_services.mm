@@ -573,7 +573,7 @@ protected:
 
     // Notification-area icons: NSStatusItems in the menu bar, created with the
     // first icon. Notification text is not offered (see AppKitStatusItems).
-    HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id,
+    HostServiceStatus add_tray_icon_impl(gui_forms::HostTrayIconId icon_id,
                                          const gui_forms::HostTrayIconRequest& request) override {
         if (!status_items_) {
             status_items_ = std::make_unique<gui_forms::host::detail::AppKitStatusItems>(
@@ -582,15 +582,15 @@ protected:
         }
         return (*status_items_).add(icon_id, request);
     }
-    HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id,
+    HostServiceStatus update_tray_icon_impl(gui_forms::HostTrayIconId icon_id,
                                             const gui_forms::HostTrayIconRequest& request) override {
         if (!status_items_) return {HostServiceError::backend_failure};
         return (*status_items_).update(icon_id, request);
     }
-    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override {
+    void remove_tray_icon_impl(gui_forms::HostTrayIconId icon_id) noexcept override {
         if (status_items_) (*status_items_).remove(icon_id);
     }
-    gui_forms::HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id,
+    gui_forms::HostTrayMenuResult show_tray_menu_impl(gui_forms::HostTrayIconId icon_id,
                                                       const gui_forms::HostTrayMenuRequest& request) override {
         if (!status_items_) {
             gui_forms::HostTrayMenuResult refused;
