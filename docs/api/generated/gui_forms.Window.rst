@@ -835,7 +835,7 @@ gui_forms::Window
       the image lives until :cpp:func:`release_control_snapshot <gui_forms::Window::release_control_snapshot>` or the window's end.
       The docking drag's stamp uses it.
 
-   .. cpp:function:: bool release_control_snapshot(ImageId image) noexcept
+   .. cpp:function:: bool release_control_snapshot(ImageId image)
 
       Removes a snapshot's image; false when it is not there.
 

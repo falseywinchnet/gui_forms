@@ -2399,7 +2399,7 @@ Related types
 
    .. cpp:function:: ApplicationWindowOpenResult open_window(ApplicationWindow&& entry)
 
-      Opens a window, hidden, and includes its model. It is shown at the commit when ``entry.options.initially_visible`` was true. The refusals are ApplicationWindows::open_window's.
+      Opens a window, hidden, and includes its model. It is shown at the commit when ``entry.options.initially_visible`` was true. The refusals are ApplicationWindows::open_window's; on a refusal the model is no longer included (its scope is closed when the entry is still the caller's, abandoned when the host had taken it).
 
    .. cpp:function:: HostServiceStatus show_window(const ApplicationWindowHandle& window)
 
