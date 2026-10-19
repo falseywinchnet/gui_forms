@@ -91,18 +91,42 @@ uninstrumented. CMake reads those variables only when it first configures a
 tree, so delete a macOS `gui-forms-sanitize` tree configured before this
 change.
 
-The first macOS run (2026-10-19, Apple M4, macOS 26.5, Xcode 26.5, `--tests macos`, 7 tests) found no
-AddressSanitizer or UndefinedBehaviorSanitizer report, but every test
-failed on LeakSanitizer reports, between 23 and about 900 per test. Every
-reported allocation is made inside AppKit, CoreFoundation, CoreGraphics,
-ImageIO or the Objective-C runtime (`NSApplication`, `NSWindow`,
-`NSAlert`, `CGContextDrawImage`, `NSBitmapImageRep`, class
-initialisation); none is made directly by GUI.Forms code. With
-`detect_leaks=0` all seven pass. `gui_forms_macos_idle_visibility_tests`
-also exceeded its own 15-second limit once while LeakSanitizer scanned at
-exit. Whether macOS gets a suppression baseline for these system
-allocations or runs without leak detection is an open owner decision; until
-it is made, the macOS sanitized tests fail.
+On macOS LeakSanitizer reports thousands of blocks that Apple's
+frameworks keep for the life of the process: caches, per-thread state,
+class initialisation, XPC connections, and work still queued in libdispatch
+at exit, whose queue pointers are signed on arm64e so LeakSanitizer cannot
+follow them. The first macOS run (2026-10-19, Apple M4, macOS 26.5,
+Xcode 26.5, the seven macOS host tests) had between 23 and about 900 such
+reports per test, none allocated directly by GUI.Forms code.
+`tools/sanitizer/lsan.supp` carries a macOS baseline for them, under one
+rule: a suppression matches any frame of a leak's allocation stack, and
+AppKit, CoreFoundation, Foundation, CoreGraphics, QuartzCore, HIToolbox,
+libdispatch and the Objective-C runtime call into GUI.Forms (event
+dispatch, drawing, timers, dispatch), so those libraries are never named
+whole; only their internal allocation sites are. Whole libraries are listed
+only where they never call into GUI.Forms (ColorSync, vImage, CoreUI,
+SwiftUICore, the XPC and service frameworks and similar). Deliberate leaks
+added for the check were all still reported: in `main`, in a dispatch
+callback inside the AppKit run loop, in `-[GUIFormsView drawRect:]` during
+a Core Animation commit, and a leaked Objective-C object and CF string. One
+category is knowingly hidden: what a GUI.Forms work item still queued in
+libdispatch at exit owns. When a new macOS release adds reports, name the
+internal allocation site that holds them, never a library that calls into
+GUI.Forms or a function on the path from it, and check that the deliberate
+leaks above are still reported.
+
+The baseline's first run also found a GUI.Forms leak, now fixed: a
+completed `DispatchWork` kept its callable, because moving a
+`std::function` need not empty the source (libc++ copies a callable held in
+its small buffer), so a callable that owned a holder of its own
+`DispatchOperation` formed a cycle (`gui_forms_macos_host_close_tests`).
+`gui_forms_owned_event_tests` skips its allocation-balance assertion under
+AddressSanitizer on macOS as on Windows: the pinned libc++ dylib's
+allocations do not reach the test's replacement `operator new` (-24000
+blocks over its 1000 buttons), and LeakSanitizer found nothing there.
+`gui_forms_macos_idle_visibility_tests` exceeded its own 15-second limit
+once while LeakSanitizer scanned at exit; rerun it alone before treating
+that as a finding.
 
 `tools/run_sanitizer_suite.sh <build-directory>` builds the toolkit, the
 Gallery and every test with AddressSanitizer and UndefinedBehaviorSanitizer
