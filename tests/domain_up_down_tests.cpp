@@ -59,6 +59,10 @@ void stepping_and_wrap() {
             "the down key steps to the next item before the editor sees it");
 
     const Rect spin = (*window.find("domain.step.spinner")).absolute_bounds();
+    const Rect field = (*(*domain).editor()).absolute_bounds();
+    require(spin.x == 162.0 && spin.width == 18.0 && spin.height == 32.0 && field.x == 0.0 &&
+                field.width == 162.0 && field.height == 32.0,
+            "the spin column takes the button width at the right and the field the rest");
     const Point upper{spin.x + spin.width * 0.5, spin.y + spin.height * 0.25};
     require(window.dispatch_pointer({PointerAction::down, PointerButton::primary, upper}),
             "the upper arrow takes the press");
@@ -147,6 +151,13 @@ void read_only_and_semantics() {
             "set_value selects the matching item and shows its text");
     require(!(*domain).on_semantic_action(SemanticAction::set_value, "SSB"),
             "a read-only domain refuses a value that matches no item");
+
+    // A typed character is its whole UTF-8 sequence: the two bytes of "É"
+    // select the item they start, not the first item sharing the lead byte.
+    (*domain).set_items({"AM", "À la carte", "Éclair"});
+    static_cast<void>(window.dispatch_text({"É"}));
+    require((*domain).selected_index() == 2U && (*domain).text() == "Éclair",
+            "a typed multi-byte character selects the item it starts");
 }
 
 } // namespace

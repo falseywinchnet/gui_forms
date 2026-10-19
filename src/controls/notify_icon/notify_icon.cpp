@@ -169,9 +169,10 @@ HostServiceStatus NotifyIcon::show_balloon_tip(std::string title, std::string te
     notification.title = std::move(title);
     notification.text = std::move(text);
     notification.icon = icon;
+    // At most ten minutes; zero or less is the host's default.
     const long long milliseconds = timeout.count();
-    notification.timeout_milliseconds =
-        milliseconds <= 0 ? 0U : static_cast<std::uint32_t>(std::min<long long>(milliseconds, 600000));
+    const long long bounded = std::clamp<long long>(milliseconds, 0, 600000);
+    notification.timeout_milliseconds = static_cast<std::uint32_t>(bounded);
     status_ = (*services).show_tray_notification(icon_id_, notification);
     return status_;
 }
@@ -223,23 +224,28 @@ void NotifyIcon::show_menu() {
     const HostTrayMenuResult chosen = services.show_tray_menu(icon_id_, menu);
     status_ = chosen.status;
     if (!chosen.status.accepted() || chosen.chosen_id.empty() || !is_alive() || !context_menu_) return;
-    for (const MenuItemSpec& spec : (*context_menu_).items()) {
+    // The command may replace or remove this icon's menu, or the menu's rows:
+    // everything the invocation reports is copied before it runs.
+    const std::shared_ptr<ContextMenu> menu_owner = context_menu_;
+    std::shared_ptr<Command> command{};
+    for (const MenuItemSpec& spec : (*menu_owner).items()) {
         if (spec.stable_id != chosen.chosen_id || !spec.command) continue;
-        const std::shared_ptr<Command> command = spec.command;
-        // Through the bound window's command chain (owner decision DK-47).
-        Window* const routing = bound_window();
-        bool executed = false;
-        if (routing != nullptr) {
-            executed = (*command).execute_routed(*routing, notify_icon_source);
-        } else {
-            executed = (*command).execute(notify_icon_source);
-        }
-        if (!executed || !is_alive()) return;
-        const MenuItemInvocation invocation{(*context_menu_).stable_id(), spec.stable_id, (*command).stable_id(),
-                                            std::string(notify_icon_source)};
-        menu_item_invoked_.emit(invocation);
-        return;
+        command = spec.command;
+        break;
     }
+    if (!command) return;
+    const MenuItemInvocation invocation{(*menu_owner).stable_id(), chosen.chosen_id, (*command).stable_id(),
+                                        std::string(notify_icon_source)};
+    // Through the bound window's command chain (owner decision DK-47).
+    Window* const routing = bound_window();
+    bool executed = false;
+    if (routing != nullptr) {
+        executed = (*command).execute_routed(*routing, notify_icon_source);
+    } else {
+        executed = (*command).execute(notify_icon_source);
+    }
+    if (!executed || !is_alive()) return;
+    menu_item_invoked_.emit(invocation);
 }
 
 void NotifyIcon::verify_dispose_thread() {

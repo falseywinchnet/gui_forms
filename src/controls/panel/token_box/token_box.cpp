@@ -262,13 +262,8 @@ void TokenBox::editor_text_changed(const std::string& text) {
         set_selected(std::nullopt);
         if (!is_alive()) return;
     }
-    bool delimited = false;
-    for (const char byte : text) {
-        if (!delimiters_.empty() && delimiters_.find(byte) != std::string::npos) {
-            delimited = true;
-            break;
-        }
-    }
+    // Any delimiter in the text (none without delimiters) splits it.
+    const bool delimited = text.find_first_of(delimiters_) != std::string::npos;
     if (delimited) split_delimited(text);
 }
 
@@ -348,7 +343,8 @@ std::string TokenBox::token_stable_id(TokenId id) const {
 }
 
 bool TokenBox::focus_visible() const noexcept {
-    const bool result = editor_focused_ && window() != nullptr && (*window()).focus_cue_visible();
+    const Window* const host = window();
+    const bool result = editor_focused_ && host != nullptr && (*host).focus_cue_visible();
     return result;
 }
 
@@ -440,7 +436,8 @@ void TokenBox::on_pointer(PointerEvent& event) {
     }
     if (event.button != PointerButton::primary) return;
     if (event.action == PointerAction::down) {
-        if (window() != nullptr) static_cast<void>((*window()).request_focus(editor_));
+        Window* const host = window();
+        if (host != nullptr) static_cast<void>((*host).request_focus(editor_));
         if (hit.index && hit.close) {
             // The close glyph acts on release over it, as a button does.
             pressed_close_ = tokens_[*hit.index].id;
@@ -572,8 +569,9 @@ std::vector<SemanticNode> TokenBox::semantic_virtual_children() const {
 }
 
 bool TokenBox::on_semantic_action(SemanticAction action, std::string_view value) {
-    if (action == SemanticAction::focus && editor_ && window() != nullptr) {
-        const bool focused = (*window()).request_focus(editor_);
+    Window* const host = window();
+    if (action == SemanticAction::focus && editor_ && host != nullptr) {
+        const bool focused = (*host).request_focus(editor_);
         return focused;
     }
     const bool handled = Control::on_semantic_action(action, value);

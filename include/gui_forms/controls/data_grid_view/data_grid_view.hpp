@@ -692,7 +692,14 @@ private:
     [[nodiscard]] AnatomyStateSet column_states(std::size_t column) const;
     [[nodiscard]] HitResult hit_test(Point local) const;
     // Realized items in paint order: rows, then cells row by row, then
-    // column headers.
+    // column headers. A slot names one: its item system, the row of a row or
+    // cell, and the column of a cell or header.
+    struct RealizedSlot final {
+        ItemSystemIndex system{};
+        DataGridViewRowPosition row{};
+        std::size_t column{};
+    };
+    [[nodiscard]] RealizedSlot realized_slot(const GridLayout& layout, std::size_t item) const;
     [[nodiscard]] std::size_t realized_row_count(const GridLayout& layout) const noexcept;
     [[nodiscard]] std::size_t realized_column_count(const GridLayout& layout) const noexcept;
     void paint_row(Painter& painter, DataGridViewRowPosition row, const GridLayout& layout) const;

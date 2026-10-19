@@ -258,10 +258,6 @@ bool TreeListView::can_expand(std::size_t index) const noexcept {
     return result;
 }
 
-std::size_t TreeListView::row_index(std::size_t index) const noexcept {
-    return row_of_node_[index];
-}
-
 std::size_t TreeListView::require_index(std::string_view node_id, const char* message) const {
     const NodeIndices::const_iterator found = node_indices_.find(std::string(node_id));
     if (found == node_indices_.end()) throw std::out_of_range(message);
@@ -662,15 +658,18 @@ void TreeListView::set_indentation(double indentation) {
 
 void TreeListView::set_image_list(std::shared_ptr<ImageList> images) {
     require_mutable();
-    if (images && (!(*images).is_alive() || (window() && !(*images).belongs_to(*window())))) {
+    // A list must be alive and, once this view is in a window, that window's.
+    const Window* const host = window();
+    if (images && (!(*images).is_alive() || (host != nullptr && !(*images).belongs_to(*host)))) {
         throw std::invalid_argument("TreeListView requires a live ImageList of its own Window");
     }
     if (images_ == images) return;
     images_changed_.disconnect();
     images_ = std::move(images);
     if (images_) {
-        images_changed_ = (*images_).changed().subscribe(
-            *this, Delegate<const ImageListChange&>::bind<TreeListView, &TreeListView::image_list_changed>(*this));
+        const Delegate<const ImageListChange&> changed =
+            Delegate<const ImageListChange&>::bind<TreeListView, &TreeListView::image_list_changed>(*this);
+        images_changed_ = (*images_).changed().subscribe(*this, changed);
     }
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
@@ -731,8 +730,10 @@ TreeListView::Layout TreeListView::layout_for(Rect client) const {
     // Without columns there is no tree column to show the nodes in.
     placed.shown_rows = columns_.empty() ? 0U : visible_.size();
     const double header_height = columns_.empty() ? 0.0 : row + 2.0 * scale;
-    // Showing one bar can shrink the area enough to need the other, so
-    // settle the bars over at most three passes.
+    // Showing one bar can shrink the area enough to need the other. A bar
+    // only shrinks the area, and a smaller area never needs fewer bars, so
+    // each flag turns on at most once: two changes and a confirming pass
+    // settle them, and the loop ends with `area` matching both flags.
     bool vertical = false;
     bool horizontal = false;
     Rect area{};
@@ -1061,7 +1062,8 @@ void TreeListView::paint_row(Painter& painter, const Layout& placed, std::size_t
         part.mark = PartMark::none;
     }
     if (parts.icon.present && !node.image_key.empty()) {
-        const double density = attached_window() != nullptr ? (*attached_window()).scale() : 1.0;
+        const Window* const host = attached_window();
+        const double density = host != nullptr ? (*host).scale() : 1.0;
         const ImageListResolution resolved = (*images_).resolve(node.image_key, image_state(states), density);
         if (resolved) {
             part.role = PartRole::icon;
@@ -1492,7 +1494,7 @@ void TreeListView::type_select(std::string_view text) {
     for (std::size_t offset = 0; offset < count; ++offset) {
         const std::size_t row = (start + offset) % count;
         const TreeListNode& node = nodes_[visible_[row]];
-        if (node.enabled && collection_detail::fold_ascii(node.text).starts_with(type_prefix_)) {
+        if (node.enabled && collection_detail::starts_with_folded(node.text, type_prefix_)) {
             choose_row(row);
             return;
         }
@@ -1819,65 +1821,71 @@ std::size_t TreeListView::realized_item_count() const {
     return result;
 }
 
-// The realized item `item`, in paint order: rows, then cells, then column
-// headers.
-std::string TreeListView::realized_item_stable_id(std::size_t item) const {
-    const Layout placed = layout();
+TreeListView::RealizedSlot TreeListView::realized_slot(const Layout& placed, std::size_t item) const {
     const std::size_t rows = realized_row_count(placed);
     const std::size_t cells = realized_cell_count(placed);
-    if (item < rows) return nodes_[visible_[placed.top_row + item]].stable_id;
+    RealizedSlot slot;
+    if (item < rows) {
+        slot.system = row_system;
+        slot.row = placed.top_row + item;
+        return slot;
+    }
     if (item < rows + cells) {
+        // cells is rows times the visible columns after the tree column, so
+        // a nonzero count has rows and a whole number of cells per row.
         const std::size_t per_row = cells / rows;
         const std::size_t position = item - rows;
-        const std::size_t row = placed.top_row + position / per_row;
-        const std::size_t column = realized_cell_column(placed, position % per_row);
-        return cell_identity(nodes_[visible_[row]].stable_id, columns_[column].stable_id);
+        slot.system = cell_system;
+        slot.row = placed.top_row + position / per_row;
+        slot.column = realized_cell_column(placed, position % per_row);
+        return slot;
     }
-    const std::size_t column = visible_column(placed, item - rows - cells);
-    return column_identity(stable_id().value(), columns_[column].stable_id);
+    slot.system = column_system;
+    slot.column = visible_column(placed, item - rows - cells);
+    return slot;
+}
+
+std::string TreeListView::realized_item_stable_id(std::size_t item) const {
+    const Layout placed = layout();
+    const RealizedSlot slot = realized_slot(placed, item);
+    if (slot.system == column_system) {
+        std::string identity = column_identity(stable_id().value(), columns_[slot.column].stable_id);
+        return identity;
+    }
+    const std::string& node_id = nodes_[visible_[slot.row]].stable_id;
+    if (slot.system == row_system) return node_id;
+    std::string identity = cell_identity(node_id, columns_[slot.column].stable_id);
+    return identity;
 }
 
 ItemSystemIndex TreeListView::publish_realized_item_system(std::size_t item) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    if (item < rows) return row_system;
-    if (item < rows + realized_cell_count(placed)) return cell_system;
-    return column_system;
+    const RealizedSlot slot = realized_slot(placed, item);
+    return slot.system;
 }
 
 void TreeListView::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    const std::size_t cells = realized_cell_count(placed);
-    if (item < rows) {
-        const RowParts record = row_parts(placed, placed.top_row + item, placed.viewport);
-        write_item_parts(anatomy().item_systems[row_system.value], tree_list_view_row_part_fields, record,
-                         geometry);
-        return;
+    const RealizedSlot slot = realized_slot(placed, item);
+    const ItemSystemDeclaration& system = anatomy().item_systems[slot.system.value];
+    if (slot.system == row_system) {
+        const RowParts record = row_parts(placed, slot.row, placed.viewport);
+        write_item_parts(system, tree_list_view_row_part_fields, record, geometry);
+    } else if (slot.system == cell_system) {
+        const CellParts record = cell_parts(placed, slot.row, slot.column, placed.viewport);
+        write_item_parts(system, tree_list_view_cell_part_fields, record, geometry);
+    } else {
+        const ColumnParts record = column_parts(placed, slot.column, placed.header);
+        write_item_parts(system, tree_list_view_column_part_fields, record, geometry);
     }
-    if (item < rows + cells) {
-        const std::size_t per_row = cells / rows;
-        const std::size_t position = item - rows;
-        const std::size_t row = placed.top_row + position / per_row;
-        const std::size_t column = realized_cell_column(placed, position % per_row);
-        const CellParts record = cell_parts(placed, row, column, placed.viewport);
-        write_item_parts(anatomy().item_systems[cell_system.value], tree_list_view_cell_part_fields, record,
-                         geometry);
-        return;
-    }
-    const std::size_t column = visible_column(placed, item - rows - cells);
-    const ColumnParts record = column_parts(placed, column, placed.header);
-    write_item_parts(anatomy().item_systems[column_system.value], tree_list_view_column_part_fields, record,
-                     geometry);
 }
 
 AnatomyStateSet TreeListView::realized_item_anatomy_states(std::size_t item) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    const std::size_t cells = realized_cell_count(placed);
-    if (item < rows) return row_states(placed.top_row + item);
-    if (item < rows + cells) return cell_states(placed.top_row + (item - rows) / (cells / rows));
-    return column_states(visible_column(placed, item - rows - cells));
+    const RealizedSlot slot = realized_slot(placed, item);
+    if (slot.system == row_system) return row_states(slot.row);
+    if (slot.system == cell_system) return cell_states(slot.row);
+    return column_states(slot.column);
 }
 
 std::vector<TreeListView::Row> TreeListView::realized_rows() const {
@@ -1907,11 +1915,11 @@ std::vector<TreeListView::Cell> TreeListView::realized_cells() const {
     records.reserve(count);
     for (std::size_t position = 0; position < count; ++position) {
         const std::size_t item = rows + position;
-        const std::size_t per_row = count / rows;
         const PartGeometryBuffer published = published_realized_item_geometry(item);
+        const RealizedSlot slot = realized_slot(placed, item);
         Cell record;
-        record.row = placed.top_row + position / per_row;
-        record.column = realized_cell_column(placed, position % per_row);
+        record.row = slot.row;
+        record.column = slot.column;
         record.stable_id = realized_item_stable_id(item);
         read_item_parts(anatomy().item_systems[cell_system.value], tree_list_view_cell_part_fields,
                         published.parts(), record.parts);

@@ -44,9 +44,9 @@ constexpr double heading_size = 14.0;
 constexpr double footnote_size = 10.0;
 
 struct StandardButtonName final {
-    TaskDialogStandardButton standard;
-    std::string_view stable_id;
-    std::string_view text;
+    TaskDialogStandardButton standard{TaskDialogStandardButton::ok};
+    std::string_view stable_id{};
+    std::string_view text{};
 };
 
 constexpr std::array<StandardButtonName, 11> standard_buttons{{
@@ -134,10 +134,11 @@ public:
         arrange_self(final_bounds);
         const double scale = effective_text_scale();
         const double margin = window_margin * scale;
-        for (const Control::Ptr& child : snapshot_layout_children()) {
+        const Size available{std::max(0.0, final_bounds.width - margin * 2.0),
+                             std::max(0.0, final_bounds.height - margin * 2.0)};
+        const std::vector<Control::Ptr> children = snapshot_layout_children();
+        for (const Control::Ptr& child : children) {
             if (!is_current_layout_child(child)) continue;
-            const Size available{std::max(0.0, final_bounds.width - margin * 2.0),
-                                 std::max(0.0, final_bounds.height - margin * 2.0)};
             const Size wanted = (*child).measure(available);
             const double width = std::min(wanted.width, available.width);
             const double height = std::min(wanted.height, std::max(0.0, final_bounds.height));
@@ -203,7 +204,10 @@ void TaskDialog::set_page(TaskDialogPage page) {
     if (!page.default_button.empty()) {
         bool found = false;
         for (const TaskDialogButton& button : page.buttons) {
-            if (button.stable_id == page.default_button) found = true;
+            if (button.stable_id == page.default_button) {
+                found = true;
+                break;
+            }
         }
         if (!found) throw std::invalid_argument("TaskDialog default button is not on the page");
     }
@@ -245,6 +249,18 @@ void TaskDialog::clear_children_of_page() noexcept {
     progress_.reset();
 }
 
+std::shared_ptr<Label> TaskDialog::make_paragraph(std::string_view suffix, const std::string& text,
+                                                  FontSpec font) {
+    std::string identity(stable_id().value());
+    identity.append(suffix);
+    std::shared_ptr<Label> paragraph = make_control<Label>(StableId(std::move(identity)), text);
+    (*paragraph).set_font(font);
+    (*paragraph).set_text_wrapping(TextWrapping::word);
+    (*paragraph).set_vertical_alignment(VerticalAlignment::near);
+    add_child(paragraph);
+    return paragraph;
+}
+
 void TaskDialog::rebuild_children() {
     clear_children_of_page();
     clear_children();
@@ -254,20 +270,8 @@ void TaskDialog::rebuild_children() {
     heading_font.weight = 600;
     FontSpec footnote_font = font_;
     footnote_font.size = footnote_size;
-    if (!page_.heading.empty()) {
-        heading_ = make_control<Label>(StableId(prefix + ".heading"), page_.heading);
-        (*heading_).set_font(heading_font);
-        (*heading_).set_text_wrapping(TextWrapping::word);
-        (*heading_).set_vertical_alignment(VerticalAlignment::near);
-        add_child(heading_);
-    }
-    if (!page_.text.empty()) {
-        text_ = make_control<Label>(StableId(prefix + ".text"), page_.text);
-        (*text_).set_font(font_);
-        (*text_).set_text_wrapping(TextWrapping::word);
-        (*text_).set_vertical_alignment(VerticalAlignment::near);
-        add_child(text_);
-    }
+    if (!page_.heading.empty()) heading_ = make_paragraph(".heading", page_.heading, heading_font);
+    if (!page_.text.empty()) text_ = make_paragraph(".text", page_.text, font_);
     if (page_.progress_bar) {
         const TaskDialogProgressBar& settings = *page_.progress_bar;
         progress_ = make_control<ProgressBar>(StableId(prefix + ".progress"));
@@ -295,11 +299,7 @@ void TaskDialog::rebuild_children() {
         add_child(expander_button_);
         child_tokens_.push_back((*expander_button_).clicked().subscribe(
             *this, Delegate<ButtonBase&>::bind<TaskDialog, &TaskDialog::on_expander>(*this)));
-        expanded_text_ = make_control<Label>(StableId(prefix + ".expanded_text"), expander.text);
-        (*expanded_text_).set_font(font_);
-        (*expanded_text_).set_text_wrapping(TextWrapping::word);
-        (*expanded_text_).set_vertical_alignment(VerticalAlignment::near);
-        add_child(expanded_text_);
+        expanded_text_ = make_paragraph(".expanded_text", expander.text, font_);
         set_child_layout_collapsed(expanded_text_, !expander.expanded);
     }
     if (!page_.verification_text.empty()) {
@@ -320,13 +320,7 @@ void TaskDialog::rebuild_children() {
             *this, Delegate<ButtonBase&>::bind<TaskDialog, &TaskDialog::on_child_button>(*this)));
         buttons_.push_back(std::move(control));
     }
-    if (!page_.footnote.empty()) {
-        footnote_ = make_control<Label>(StableId(prefix + ".footnote"), page_.footnote);
-        (*footnote_).set_font(footnote_font);
-        (*footnote_).set_text_wrapping(TextWrapping::word);
-        (*footnote_).set_vertical_alignment(VerticalAlignment::near);
-        add_child(footnote_);
-    }
+    if (!page_.footnote.empty()) footnote_ = make_paragraph(".footnote", page_.footnote, footnote_font);
 }
 
 std::optional<std::size_t> TaskDialog::button_index(std::string_view button_id) const noexcept {
@@ -480,8 +474,10 @@ void TaskDialog::on_key_preview(KeyEvent& event) {
 
 bool TaskDialog::show(const Control::Ptr& owner) {
     require_mutable();
-    if (shown_ || !owner || (*owner).attached_window() == nullptr || parent()) return false;
-    Window& host = *(*owner).attached_window();
+    Window* const window = owner ? (*owner).attached_window() : nullptr;
+    if (shown_ || window == nullptr || parent()) return false;
+    Window& host = *window;
+    // A page never set has no buttons; setting it gives it the OK button.
     if (page_.buttons.empty()) set_page(page_);
     const Size client = host.client_size();
     Control::Ptr layer = make_control<TaskDialogLayer>(StableId(std::string(stable_id().value()) + ".layer"));
@@ -529,10 +525,12 @@ void TaskDialog::on_dispose() noexcept {
     // A disposed dialog closes without raising closed.
     shown_ = false;
     popup_revoked_.disconnect();
-    if (scope_ && attached_window() != nullptr) {
+    Window* const host = attached_window();
+    if (scope_ && host != nullptr) {
         try {
-            static_cast<void>((*attached_window()).end_focus_scope(scope_));
+            static_cast<void>((*host).end_focus_scope(scope_));
         } catch (...) {
+            // Disposal must not throw; the window ends the scope with the popup.
         }
     }
     scope_ = {};
@@ -634,7 +632,8 @@ TaskDialog::Layout TaskDialog::layout(double width) const {
     std::vector<double> widths(buttons_.size(), 0.0);
     double total = 0.0;
     for (std::size_t index = 0; index < buttons_.size(); ++index) {
-        const double measured = resolve_text_layout_utf8(page_.buttons[index].text, font).logical_size.width;
+        const ResolvedTextLayout label = resolve_text_layout_utf8(page_.buttons[index].text, font);
+        const double measured = label.logical_size.width;
         widths[index] = std::max(minimum_button_width * scale, measured + button_text_padding * scale);
         total += widths[index];
     }

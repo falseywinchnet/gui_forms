@@ -237,9 +237,8 @@ void ComboBox::create_editor() {
     configure_editor_auto_complete();
     // The editor takes the focus for the field.
     set_focusable(false);
-    if (had_focus && window() != nullptr) {
-        static_cast<void>((*window()).request_focus(editor_));
-    }
+    Window* const host = window();
+    if (had_focus && host != nullptr) static_cast<void>((*host).request_focus(editor_));
 }
 
 void ComboBox::remove_editor() {
@@ -252,9 +251,8 @@ void ComboBox::remove_editor() {
     editor_.reset();
     focused_ = false;
     set_focusable(true);
-    if (had_focus && window() != nullptr) {
-        static_cast<void>((*window()).request_focus(shared_from_this()));
-    }
+    Window* const host = window();
+    if (had_focus && host != nullptr) static_cast<void>((*host).request_focus(shared_from_this()));
 }
 
 void ComboBox::configure_editor_auto_complete() {
@@ -363,14 +361,12 @@ void ComboBox::refresh_open_rows(std::string_view pattern) {
 bool ComboBox::step_row(std::uint32_t key) {
     if (rows_.empty()) return false;
     const std::optional<std::size_t> row = row_of_item(selected_index_);
+    if (key != PhysicalKey::down && key != PhysicalKey::up) return false;
+    // From no selected row either key goes to the first row; otherwise one
+    // row on, stopping at the ends.
     std::size_t next = 0U;
-    if (key == PhysicalKey::down) {
-        next = row ? std::min(*row + 1U, rows_.size() - 1U) : 0U;
-    } else if (key == PhysicalKey::up) {
-        next = row ? (*row == 0U ? 0U : *row - 1U) : 0U;
-    } else {
-        return false;
-    }
+    if (row && key == PhysicalKey::down) next = std::min(*row + 1U, rows_.size() - 1U);
+    if (row && key == PhysicalKey::up && *row > 0U) next = *row - 1U;
     set_selected_index(rows_[next]);
     return true;
 }
@@ -432,6 +428,7 @@ void ComboBox::match_editor_text() {
     const std::string_view typed = (*editor_).text();
     std::optional<std::size_t> found{};
     for (std::size_t index = 0U; index < items_.size(); ++index) {
+        // Equal ignoring ASCII case: as long as the text, and a prefix match.
         const bool same_length = items_[index].size() == typed.size();
         if (same_length && find_text_match(items_[index], typed, TextMatchMode::prefix, false)) {
             found = index;
@@ -495,6 +492,7 @@ void ComboBox::set_items(std::vector<std::string> items) {
     rebuild_list_items_source();
     if (editor_) {
         // The selection follows the text; an open list keeps its filter.
+        // The pattern is a copy: compute_rows replaces filter_pattern_.
         const std::string pattern = filter_pattern_;
         refresh_open_rows(pattern);
         if (!is_alive()) return;
@@ -524,6 +522,7 @@ void ComboBox::add_item(std::string item) {
     }
     items_.push_back(std::move(item));
     rebuild_list_items_source();
+    // A copy: compute_rows replaces filter_pattern_.
     const std::string pattern = filter_pattern_;
     refresh_open_rows(pattern);
     if (!is_alive()) return;
@@ -639,50 +638,13 @@ void ComboBox::open_drop_down(std::string_view pattern) {
     const double popup_y = combo.y + combo.height + popup_height <= client.height
         ? combo.y + combo.height : std::max(0.0, combo.y - popup_height);
 
+    if (editor_) {
+        open_field_list(requested_width, popup_height);
+        return;
+    }
     const std::string prefix(stable_id().value());
     const std::weak_ptr<ComboBox> weak =
         std::static_pointer_cast<ComboBox>(shared_from_this());
-    if (editor_) {
-        // The drop_down style: the list opens under the field without a
-        // focus scope, so typing goes on in the editor, which drives the
-        // list through on_key_preview. The anchored layer passes presses
-        // on the field through to it.
-        (*editor_).close_auto_complete();
-        AnchoredPopupPlacement placement{};
-        placement.preferred_size = Size{requested_width, popup_height};
-        std::shared_ptr<AnchoredPopupLayer> anchored =
-            make_control<AnchoredPopupLayer>(StableId(prefix + ".popup.layer"), shared_from_this(), placement);
-        std::shared_ptr<gui_forms::ListBox> field_list = make_control<DropDownList>(StableId(prefix + ".popup.list"));
-        (*field_list).set_focusable(false);
-        (*field_list).set_paint_plane(PaintPlane::overlay);
-        (*field_list).set_font(font_);
-        (*anchored).set_content(field_list);
-        PopupToken field_token = (*window()).open_popup(shared_from_this(), anchored);
-        popup_layer_ = anchored;
-        popup_list_ = field_list;
-        popup_token_ = std::move(field_token);
-        show_rows();
-        popup_selection_ = (*field_list).selection_changed().subscribe(
-            *this, detail::WeakMemberCallback<
-                void (ComboBox::*)(const ListSelectionChange&)>(
-                    weak, &ComboBox::popup_selection_changed));
-        popup_activation_ = (*field_list).item_activated().subscribe(
-            *this, detail::WeakMemberCallback<
-                void (ComboBox::*)(std::size_t)>(
-                    weak, &ComboBox::commit_popup_selection));
-        popup_dismissal_ = (*anchored).dismiss_requested().subscribe(
-            *this, detail::WeakMemberCallback<void (ComboBox::*)(PopupDismissReason)>(
-                weak, &ComboBox::on_anchored_dismissal));
-        if (Event<>* closed = popup_token_.closed_event()) {
-            popup_revocation_ = (*closed).subscribe(
-                *this, detail::WeakMemberCallback<void (ComboBox::*)()>(
-                    weak, &ComboBox::on_popup_revoked));
-        }
-        dropped_down_ = true;
-        invalidate(Dirty::paint | Dirty::semantics);
-        publish_change(drop_down_changed_, true);
-        return;
-    }
     std::shared_ptr<gui_forms::DropDownLayer> layer = make_control<DropDownLayer>(StableId(prefix + ".popup.layer"));
     (*layer).set_requested_bounds({0.0, 0.0, client.width, client.height});
     std::shared_ptr<gui_forms::ListBox> list = make_control<DropDownList>(StableId(prefix + ".popup.list"));
@@ -722,6 +684,56 @@ void ComboBox::open_drop_down(std::string_view pattern) {
     publish_change(drop_down_changed_, true);
 }
 
+// The drop_down style: the list opens under the field without a focus
+// scope, so typing goes on in the editor, which drives the list through
+// on_key_preview. The anchored layer passes presses on the field through to
+// it. The rows are already computed.
+void ComboBox::open_field_list(double width, double height) {
+    const std::string prefix(stable_id().value());
+    const std::weak_ptr<ComboBox> weak =
+        std::static_pointer_cast<ComboBox>(shared_from_this());
+    (*editor_).close_auto_complete();
+    AnchoredPopupPlacement placement{};
+    placement.preferred_size = Size{width, height};
+    std::shared_ptr<AnchoredPopupLayer> anchored =
+        make_control<AnchoredPopupLayer>(StableId(prefix + ".popup.layer"), shared_from_this(), placement);
+    std::shared_ptr<gui_forms::ListBox> field_list = make_control<DropDownList>(StableId(prefix + ".popup.list"));
+    (*field_list).set_focusable(false);
+    (*field_list).set_paint_plane(PaintPlane::overlay);
+    (*field_list).set_font(font_);
+    (*anchored).set_content(field_list);
+    PopupToken field_token = (*window()).open_popup(shared_from_this(), anchored);
+    popup_layer_ = anchored;
+    popup_list_ = field_list;
+    popup_token_ = std::move(field_token);
+    show_rows();
+    popup_selection_ = (*field_list).selection_changed().subscribe(
+        *this, detail::WeakMemberCallback<
+            void (ComboBox::*)(const ListSelectionChange&)>(
+                weak, &ComboBox::popup_selection_changed));
+    popup_activation_ = (*field_list).item_activated().subscribe(
+        *this, detail::WeakMemberCallback<
+            void (ComboBox::*)(std::size_t)>(
+                weak, &ComboBox::commit_popup_selection));
+    popup_dismissal_ = (*anchored).dismiss_requested().subscribe(
+        *this, detail::WeakMemberCallback<void (ComboBox::*)(PopupDismissReason)>(
+            weak, &ComboBox::on_anchored_dismissal));
+    if (Event<>* closed = popup_token_.closed_event()) {
+        popup_revocation_ = (*closed).subscribe(
+            *this, detail::WeakMemberCallback<void (ComboBox::*)()>(
+                weak, &ComboBox::on_popup_revoked));
+    }
+    dropped_down_ = true;
+    invalidate(Dirty::paint | Dirty::semantics);
+    publish_change(drop_down_changed_, true);
+}
+
+void ComboBox::clear_rows() noexcept {
+    rows_.clear();
+    row_matches_.clear();
+    filter_pattern_.clear();
+}
+
 void ComboBox::close_drop_down() {
     if (!dropped_down_ && !popup_layer_) return;
     closing_popup_ = true;
@@ -739,9 +751,7 @@ void ComboBox::close_drop_down() {
     const bool changed = dropped_down_;
     dropped_down_ = false;
     closing_popup_ = false;
-    rows_.clear();
-    row_matches_.clear();
-    filter_pattern_.clear();
+    clear_rows();
     invalidate(Dirty::paint | Dirty::semantics);
     if (changed) publish_change(drop_down_changed_, false);
 }
@@ -761,9 +771,7 @@ void ComboBox::on_popup_revoked() {
     popup_layer_.reset();
     const bool changed = dropped_down_;
     dropped_down_ = false;
-    rows_.clear();
-    row_matches_.clear();
-    filter_pattern_.clear();
+    clear_rows();
     invalidate(Dirty::paint | Dirty::semantics);
     if (changed) publish_change(drop_down_changed_, false);
 }
@@ -814,8 +822,10 @@ void ComboBox::on_paint(Painter& painter, Rect damage) {
                            7.0 - row * 2.0, 1.0},
                           themed ? button_recipe.glyph : style().dark_border);
     }
-    const std::string_view text = editor_ ? std::string_view{}
-        : selected_index_ ? selected_text() : std::string_view(placeholder_);
+    // The drop_down style's editor shows its own text; otherwise the field
+    // shows the selected item, or the placeholder without one.
+    std::string_view text{};
+    if (!editor_) text = selected_index_ ? selected_text() : std::string_view(placeholder_);
     painter.save();
     painter.clip_rect({5.0, 2.0,
                        std::max(0.0, bounds.width - button_width - 8.0),
@@ -858,9 +868,8 @@ void ComboBox::arrange(Rect final_bounds) {
 void ComboBox::on_pointer(PointerEvent& event) {
     if (!eligible_for_input()) return;
     if (event.action == PointerAction::down && event.button == PointerButton::primary) {
-        if (editor_ && window() != nullptr) {
-            static_cast<void>((*window()).request_focus(editor_));
-        }
+        Window* const host = window();
+        if (editor_ && host != nullptr) static_cast<void>((*host).request_focus(editor_));
         set_dropped_down(!dropped_down_);
         event.handled = true;
     } else if (event.action == PointerAction::up &&
@@ -961,8 +970,10 @@ bool ComboBox::on_semantic_action(SemanticAction action, std::string_view value)
         set_text(std::string(value));
         return true;
     }
-    if (editor_ && action == SemanticAction::focus && window() != nullptr) {
-        return (*window()).request_focus(editor_);
+    Window* const host = window();
+    if (editor_ && action == SemanticAction::focus && host != nullptr) {
+        const bool focused = (*host).request_focus(editor_);
+        return focused;
     }
     return Panel::on_semantic_action(action, value);
 }
@@ -978,9 +989,7 @@ void ComboBox::on_detached_from_window() noexcept {
     popup_layer_.reset();
     dropped_down_ = false;
     focused_ = false;
-    rows_.clear();
-    row_matches_.clear();
-    filter_pattern_.clear();
+    clear_rows();
 }
 
 
