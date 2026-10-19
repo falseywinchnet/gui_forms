@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <exception>
+#include <memory>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -182,23 +183,65 @@ HostPathDialogResult native_path_result(NSModalResponse response,
     return result;
 }
 
+// Test cancellation on the main queue without Objective-C blocks (owner
+// decision V2-1): a named context, adopted and deleted by a named
+// dispatch_function_t; the context keeps the panel or alert alive until the
+// work runs, as the replaced blocks did.
+struct PanelCancelWork final {
+    NSSavePanel* panel;
+};
+
+void cancel_panel_on_main(void* context) {
+    const std::unique_ptr<PanelCancelWork> work(static_cast<PanelCancelWork*>(context));
+    [(*work).panel cancel:nil];
+}
+
+struct AlertCancelWork final {
+    NSAlert* alert;
+};
+
+void cancel_alert_on_main(void* context) {
+    const std::unique_ptr<AlertCancelWork> work(static_cast<AlertCancelWork*>(context));
+    [(*work).alert.window orderOut:nil];
+    [NSApp abortModal];
+}
+
+// Escape stops the running alert with `response`, the cancel choice's, and
+// is consumed; any other event passes on.
+NSEvent* escape_stops_modal(NSEvent* event, NSModalResponse response) {
+    if (event.keyCode != 53U) return event;
+    [NSApp stopModalWithCode:response];
+    return nil;
+}
+
+// The one Objective-C block left in the macOS host (owner decision V2-1 asks
+// for none; reported to the owner): NSEvent's local event monitor
+// (addLocalMonitorForEventsMatchingMask:handler:) takes only a block, with no
+// function-and-context form. The block is this adapter's alone: it captures
+// the response by value and calls the named escape_stops_modal. The caller
+// removes the returned monitor with [NSEvent removeMonitor:].
+id add_escape_stops_modal_monitor(NSModalResponse response) {
+    id monitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown
+                                                       handler:^NSEvent* (NSEvent* event) { // house-style: admitted block (block-only AppKit API)
+                                                           return escape_stops_modal(event, response);
+                                                       }];
+    return monitor;
+}
+
 void schedule_test_panel_cancel(NSSavePanel* panel, bool enabled) {
     if (!enabled) {
         return;
     }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [panel cancel:nil];
-    });
+    PanelCancelWork* const work = new PanelCancelWork{panel};
+    dispatch_async_f(dispatch_get_main_queue(), work, &cancel_panel_on_main);
 }
 
 void schedule_test_alert_cancel(NSAlert* alert, bool enabled) {
     if (!enabled) {
         return;
     }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [alert.window orderOut:nil];
-        [NSApp abortModal];
-    });
+    AlertCancelWork* const work = new AlertCancelWork{alert};
+    dispatch_async_f(dispatch_get_main_queue(), work, &cancel_alert_on_main);
 }
 
 class AppKitHostServices final : public HostServices {
@@ -443,14 +486,7 @@ protected:
                 schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
                 id escapeMonitor = nil;
                 if (cancelResponse != 0) {
-                    escapeMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:
-                        NSEventMaskKeyDown handler:^NSEvent* (NSEvent* event) {
-                            if (event.keyCode == 53U) {
-                                [NSApp stopModalWithCode:cancelResponse];
-                                return nil;
-                            }
-                            return event;
-                        }];
+                    escapeMonitor = add_escape_stops_modal_monitor(cancelResponse);
                 }
                 const NSModalResponse response = [alert runModal];
                 if (escapeMonitor != nil) [NSEvent removeMonitor:escapeMonitor];

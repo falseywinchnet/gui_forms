@@ -901,6 +901,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (HostServiceStatus)writeHostClipboard:(std::string_view)text;
 - (HostServiceStatus)showHostTooltip:(const HostTooltipRequest&)request;
 - (void)hideHostTooltip;
+- (void)tooltipTimerFired:(NSTimer*)timer;
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action;
 - (std::string)metricsJSON;
 - (std::string)hostJSON;
@@ -1202,6 +1203,46 @@ static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     return element;
 }
 
+// Main-queue work without Objective-C blocks (house style section 2, owner
+// decision V2-1). Each posting allocates one named context on the heap and
+// passes it to dispatch_async_f with a named dispatch_function_t; the
+// function adopts the context (std::unique_ptr) and so deletes it whether or
+// not its target still lives. Contexts hold their Objective-C objects as the
+// blocks they replace captured them: __weak where the block re-checked a
+// weak reference, strong (ARC's default) where it captured the object.
+
+namespace {
+// A view that may be gone by the time the work runs.
+struct WeakViewWork final {
+    __weak GUIFormsView* view;
+};
+
+void drain_posted_work_on_main(void* context) {
+    const std::unique_ptr<WeakViewWork> work(static_cast<WeakViewWork*>(context));
+    GUIFormsView* const view = (*work).view;
+    if (view != nil) [view drainPostedWork];
+}
+
+void collect_damage_on_main(void* context) {
+    const std::unique_ptr<WeakViewWork> work(static_cast<WeakViewWork*>(context));
+    GUIFormsView* const view = (*work).view;
+    if (view != nil) [view collectDamage];
+}
+
+// The wake timer's event handler. Its context belongs to the dispatch
+// source (dispatch_set_context) and is deleted by release_weak_view_work,
+// the source's finalizer, when the source is released.
+void scheduled_wake_on_main(void* context) {
+    WeakViewWork& work = *static_cast<WeakViewWork*>(context);
+    GUIFormsView* const view = work.view;
+    if (view != nil) [view scheduledWake];
+}
+
+void release_weak_view_work(void* context) {
+    const std::unique_ptr<WeakViewWork> work(static_cast<WeakViewWork*>(context));
+}
+} // namespace
+
 class DrainPostedWorkWake final {
 public:
     explicit DrainPostedWorkWake(GUIFormsView* view) noexcept
@@ -1209,11 +1250,8 @@ public:
 
     void operator()() const
     {
-        __weak GUIFormsView* weakView = view_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            GUIFormsView* strongView = weakView;
-            if (strongView != nil) [strongView drainPostedWork];
-        });
+        WeakViewWork* const work = new WeakViewWork{view_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &drain_posted_work_on_main);
     }
 
 private:
@@ -1227,16 +1265,30 @@ public:
 
     void operator()() const
     {
-        __weak GUIFormsView* weakView = view_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            GUIFormsView* strongView = weakView;
-            if (strongView != nil) [strongView collectDamage];
-        });
+        WeakViewWork* const work = new WeakViewWork{view_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &collect_damage_on_main);
     }
 
 private:
     __weak GUIFormsView* view_;
 };
+
+namespace {
+// A window the work keeps alive until it runs, as the replaced blocks did.
+struct WindowWork final {
+    NSWindow* window;
+};
+
+void perform_close_on_main(void* context) {
+    const std::unique_ptr<WindowWork> work(static_cast<WindowWork*>(context));
+    [(*work).window performClose:nil];
+}
+
+void post_perform_close(NSWindow* window) {
+    WindowWork* const work = new WindowWork{window};
+    dispatch_async_f(dispatch_get_main_queue(), work, &perform_close_on_main);
+}
+} // namespace
 
 @implementation GUIFormsView
 
@@ -1288,13 +1340,11 @@ private:
         _hostOccluded = NO;
         _wakeSource = dispatch_source_create(
             DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
-        __weak GUIFormsView* weakSelf = self;
-        dispatch_source_set_event_handler(_wakeSource, ^{
-            GUIFormsView* strongSelf = weakSelf;
-            if (strongSelf != nil) {
-                [strongSelf scheduledWake];
-            }
-        });
+        // The source owns its context; its finalizer deletes it.
+        WeakViewWork* const wakeWork = new WeakViewWork{self};
+        dispatch_set_context(_wakeSource, wakeWork);
+        dispatch_set_finalizer_f(_wakeSource, &release_weak_view_work);
+        dispatch_source_set_event_handler_f(_wakeSource, &scheduled_wake_on_main);
         dispatch_resume(_wakeSource);
         dispatch_source_set_timer(_wakeSource, DISPATCH_TIME_FOREVER,
                                   DISPATCH_TIME_FOREVER, 0);
@@ -1427,10 +1477,7 @@ private:
     const std::vector<std::byte> encoded = _raster.encode_png();
     _frameCaptureSaved = gui_forms::host::detail::complete_frame_capture(
         _frameCapturePath, encoded) ? YES : NO;
-    NSWindow* window = self.window;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [window performClose:nil];
-    });
+    post_perform_close(self.window);
 }
 - (void)notifyClosed {
     [self notifyClosedWithReason:HostCloseReason::user];
@@ -1696,11 +1743,20 @@ private:
     [panel orderFrontRegardless];
     _tooltipPanel = panel;
     if (request.duration_milliseconds != 0U) {
-        _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:
-            request.duration_milliseconds / 1000.0 repeats:NO
-            block:^(NSTimer*) { [self hideHostTooltip]; }];
+        // The timer retains its target until it fires or is invalidated, as
+        // the block it replaces retained the view.
+        _tooltipTimer = [NSTimer scheduledTimerWithTimeInterval:request.duration_milliseconds / 1000.0
+                                                         target:self
+                                                       selector:@selector(tooltipTimerFired:)
+                                                       userInfo:nil
+                                                        repeats:NO];
     }
     return {};
+}
+
+- (void)tooltipTimerFired:(NSTimer*)timer {
+    static_cast<void>(timer);
+    [self hideHostTooltip];
 }
 
 - (void)hideHostTooltip {
@@ -3003,6 +3059,50 @@ HostCapabilities macos_capabilities() {
             macos_key_map()};
 }
 
+namespace {
+// The pending-dispatch callback and the view it collects damage on, both
+// kept until the work runs, as the replaced block captured them.
+struct DispatchAndCollectWork final {
+    GUIFormsView* view;
+    std::function<void()> dispatch_pending;
+};
+
+void dispatch_and_collect_on_main(void* context) {
+    const std::unique_ptr<DispatchAndCollectWork> work(static_cast<DispatchAndCollectWork*>(context));
+    if ((*work).dispatch_pending) (*work).dispatch_pending();
+    [(*work).view collectDamage];
+}
+
+void make_key_and_activate_on_main(void* context) {
+    const std::unique_ptr<WindowWork> work(static_cast<WindowWork*>(context));
+    [(*work).window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+}
+
+void toggle_full_screen_on_main(void* context) {
+    const std::unique_ptr<WindowWork> work(static_cast<WindowWork*>(context));
+    [(*work).window toggleFullScreen:nil];
+}
+
+void order_out_on_main(void* context) {
+    const std::unique_ptr<WindowWork> work(static_cast<WindowWork*>(context));
+    [(*work).window orderOut:nil];
+}
+
+// run_macos's test close: up to `attempts` performClose: while visible.
+struct RepeatedCloseWork final {
+    NSWindow* window;
+    std::uint32_t attempts;
+};
+
+void repeated_close_on_main(void* context) {
+    const std::unique_ptr<RepeatedCloseWork> work(static_cast<RepeatedCloseWork*>(context));
+    for (std::uint32_t attempt = 0; attempt < (*work).attempts && (*work).window.isVisible; ++attempt) {
+        [(*work).window performClose:nil];
+    }
+}
+} // namespace
+
 class DispatchAndCollectWake final {
 public:
     DispatchAndCollectWake(
@@ -3012,12 +3112,8 @@ public:
 
     void operator()() const
     {
-        GUIFormsView* view = view_;
-        const std::function<void()> dispatch_pending = dispatch_pending_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if (dispatch_pending) dispatch_pending();
-            [view collectDamage];
-        });
+        DispatchAndCollectWork* const work = new DispatchAndCollectWork{view_, dispatch_pending_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &dispatch_and_collect_on_main);
     }
 
 private:
@@ -3031,10 +3127,7 @@ public:
 
     void operator()() const
     {
-        NSWindow* window = window_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [window performClose:nil];
-        });
+        post_perform_close(window_);
     }
 
 private:
@@ -3047,11 +3140,8 @@ public:
 
     void operator()() const
     {
-        NSWindow* window = window_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [window makeKeyAndOrderFront:nil];
-            [NSApp activateIgnoringOtherApps:YES];
-        });
+        WindowWork* const work = new WindowWork{window_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &make_key_and_activate_on_main);
     }
 
 private:
@@ -3127,8 +3217,8 @@ class RequestNativeFullScreen final {
 public:
     explicit RequestNativeFullScreen(NSWindow* window) noexcept : window_(window) {}
     void operator()() const {
-        NSWindow* window = window_;
-        dispatch_async(dispatch_get_main_queue(), ^{ [window toggleFullScreen:nil]; });
+        WindowWork* const work = new WindowWork{window_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &toggle_full_screen_on_main);
     }
 private:
     NSWindow* window_;
@@ -3140,10 +3230,8 @@ public:
 
     void operator()() const
     {
-        NSWindow* window = window_;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [window orderOut:nil];
-        });
+        WindowWork* const work = new WindowWork{window_};
+        dispatch_async_f(dispatch_get_main_queue(), work, &order_out_on_main);
     }
 
 private:
@@ -3329,13 +3417,8 @@ int run_macos(std::unique_ptr<Window> model, MacHostOptions options) {
         if (options.close_after_launch_for_testing) {
             const std::uint32_t closeAttempts =
                 std::max<std::uint32_t>(1, options.close_attempts_for_testing);
-            dispatch_async(dispatch_get_main_queue(), ^{
-                for (std::uint32_t attempt = 0;
-                     attempt < closeAttempts && nativeWindow.isVisible;
-                     ++attempt) {
-                    [nativeWindow performClose:nil];
-                }
-            });
+            RepeatedCloseWork* const work = new RepeatedCloseWork{nativeWindow, closeAttempts};
+            dispatch_async_f(dispatch_get_main_queue(), work, &repeated_close_on_main);
         }
         [application run];
         const std::string metrics = [view metricsJSON];
