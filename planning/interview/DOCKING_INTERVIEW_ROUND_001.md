@@ -698,3 +698,34 @@ colour, (3) keep the documented exception. The owner, verbatim:
 > accepted.
 
 - **GIVEN C1-1.** A content-colour field on `PartPaint` (W decision 7).
+
+### Note, 2026-10-19: the cleanup reviews' findings (V1 to V4)
+
+From the house-style cleanup review of the window layer (#172) and of PageView
+and docking (#173): (V1) a use-after-free in `WorkspaceTransaction::open_window`
+when macOS or X11 refuses an entry after taking ownership of it; fix by adding
+a way to abandon an `UpdateScope` without closing it (recommended), or by a
+liveness check in the transaction; (V2) Objective-C blocks in the macOS host
+are anonymous callbacks, which §2 forbids: replace them with named functions
+and explicit context (`dispatch_async_f`) and teach the checker to flag blocks
+(recommended), or admit them as an AppKit-adapter exception; (V3) tray icon
+ids and device versus logical desktop points are plain types: add wrapper
+types while the APIs are provisional (recommended); (V4) fixes needing no
+decision: a Windows runtime window whose creation fails is never released;
+releasing a control snapshot lacks the UI-thread check and the repaint; the
+house-style checker skips `.inc` files; a floating window cancels its own
+close when no main site is bound; `PageSetBatch`'s destructor lets a
+handler's exception end the program; the keyboard context menu of a
+scrolled-out tab opens at the strip's corner; the runtime-ID hash is copied in
+ten sources; `DockSite::arrange` is not split into stages. The owner,
+verbatim:
+
+> v1: approved. v2: approved. v3: approved. v4: understood.
+
+- **GIVEN V1-1.** `UpdateScope` gains a way to be abandoned without closing;
+  the transaction uses it when a host refuses an entry after taking it.
+- **GIVEN V2-1.** No Objective-C blocks: the macOS host uses named functions
+  with explicit context; the checker flags blocks.
+- **GIVEN V3-1.** Wrapper types for tray icon identities and for device and
+  logical desktop points.
+- **GIVEN V4.** The listed fixes go ahead.
