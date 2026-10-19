@@ -643,7 +643,7 @@ std::vector<SemanticNode> BreadcrumbTrail::semantic_virtual_children() const {
     for (const VisibleItem& item : visible_items_) {
         SemanticNode node{};
         node.stable_id = std::string(visible_stable_id(item));
-        node.runtime_id = virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.bounds = {trail.x + item.bounds.x, trail.y + item.bounds.y,
                        item.bounds.width, item.bounds.height};

@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -305,6 +306,10 @@ private:
 
     [[nodiscard]] Layout layout() const;
     [[nodiscard]] Layout layout_for(Rect surface) const;
+    // The two halves of layout_for: each fills `placed` for a non-empty
+    // surface from the pages shown (positions, in order).
+    void layout_collapsed(Rect surface, std::span<const std::size_t> shown, Layout& placed) const;
+    void layout_expanded(Rect surface, std::span<const std::size_t> shown, Layout& placed) const;
     [[nodiscard]] FlyoutLayout flyout_layout() const;
     [[nodiscard]] PageButtonParts button_parts(const TabSlot& slot) const;
     [[nodiscard]] PageIconParts icon_parts(const TabSlot& slot) const;
@@ -338,6 +343,7 @@ private:
     void refresh_content();
     void move_host_to_popup();
     void move_host_to_pane();
+    void release_popup(FocusScopeCloseReason reason) noexcept;
     void finish_popup_close() noexcept;
     void notify_state();
     void on_selected_page_changed(const PageSelectionChange& change);

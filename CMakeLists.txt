@@ -142,6 +142,7 @@ add_library(gui_forms_core STATIC
     src/core/live_surface/wake_connection/live_surface_wake_connection.cpp
     src/core/live_surface/write_lease/live_surface_write_lease.cpp
     src/core/semantics/snapshot/semantic_snapshot.cpp
+    src/core/semantics/types/semantic_types.cpp
     src/core/anatomy/types/anatomy_types.cpp
     src/core/schema/types/schema_types.cpp
     src/core/xml/types/xml_types.cpp

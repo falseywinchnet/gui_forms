@@ -127,6 +127,8 @@ void ToolStripPanel::arrange(Rect final_bounds) {
         ToolStrip* const strip = dynamic_cast<ToolStrip*>(child.get());
         if (strip == nullptr) continue;
         const double thickness = strip_thickness(*strip, along_height, offered);
+        // Measuring runs the strip's program code, which may take it out of
+        // the panel.
         if (!is_current_layout_child(child)) continue;
         const Rect slot = along_height ? Rect{next, 0.0, thickness, final_bounds.height}
                                        : Rect{0.0, next, final_bounds.width, thickness};

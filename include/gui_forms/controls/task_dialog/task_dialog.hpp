@@ -237,6 +237,11 @@ private:
     [[nodiscard]] Layout layout(double width) const;
     [[nodiscard]] double preferred_width(Size available) const noexcept;
     void rebuild_children();
+    // Adds a word-wrapped, top-aligned Label child named <stable_id><suffix>
+    // showing `text` in `font`: the heading, text, expanded text and
+    // footnote paragraphs.
+    [[nodiscard]] std::shared_ptr<Label> make_paragraph(std::string_view suffix, const std::string& text,
+                                                        FontSpec font);
     void clear_children_of_page() noexcept;
     void on_child_button(ButtonBase& sender);
     void on_expander(ButtonBase& sender);

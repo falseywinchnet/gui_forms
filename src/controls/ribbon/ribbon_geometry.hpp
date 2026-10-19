@@ -1,8 +1,7 @@
 #pragma once
 
 // Ribbon geometry and command-kind tests shared by the ribbon's sources
-// (ribbon.cpp, ribbon_scaling.cpp, ribbon_group_popup.cpp). Private to the
-// ribbon.
+// (ribbon.cpp and ribbon_scaling.cpp). Private to the ribbon.
 
 #include "gui_forms/controls/ribbon/ribbon.hpp"
 

@@ -1282,7 +1282,7 @@ void DataGridView::select_range(DataGridViewCellAddress from, DataGridViewCellAd
     const std::size_t first_column = std::min(from.column, to.column);
     const std::size_t last_column = std::max(from.column, to.column);
     for (std::size_t position = first_row; position <= last_row; ++position) {
-        const std::string& row_id = row_id_text(DataGridViewRowPosition{position});
+        const std::string row_id = row_id_text(DataGridViewRowPosition{position});
         for (std::size_t column = first_column; column <= last_column; ++column) {
             insert_selected_cell(row_id, column);
         }
@@ -1407,14 +1407,14 @@ bool DataGridView::set_current_cell(std::optional<DataGridViewCellAddress> cell)
 
 bool DataGridView::is_cell_selected(DataGridViewRowPosition row, std::size_t column) const {
     if (row.value >= row_count()) return false;
-    const std::string& row_id = row_id_text(row);
+    const std::string row_id = row_id_text(row);
     if (selection_mode_ == DataGridViewSelectionMode::full_row_select) return row_in_selection(row_id);
     return cell_in_selection(row_id, column);
 }
 
 bool DataGridView::is_row_selected(DataGridViewRowPosition row) const {
     if (row.value >= row_count()) return false;
-    const std::string& row_id = row_id_text(row);
+    const std::string row_id = row_id_text(row);
     if (selection_mode_ == DataGridViewSelectionMode::full_row_select) return row_in_selection(row_id);
     if (columns_.empty()) return false;
     // A row's entry holds unique column indices below the column count.
@@ -1432,7 +1432,7 @@ void DataGridView::set_cell_selected(DataGridViewRowPosition row, std::size_t co
     }
     const std::uint64_t before = selection_revision_;
     if (selected && !multi_select_) clear_selection_state();
-    const std::string& row_id = row_id_text(row);
+    const std::string row_id = row_id_text(row);
     if (selected) insert_selected_cell(row_id, column);
     else erase_selected_cell(row_id, column);
     publish_selection(before);
@@ -1443,7 +1443,7 @@ void DataGridView::set_row_selected(DataGridViewRowPosition row, bool selected) 
     if (row.value >= row_count()) throw std::out_of_range("DataGridView row is past the end");
     const std::uint64_t before = selection_revision_;
     if (selected && !multi_select_) clear_selection_state();
-    const std::string& row_id = row_id_text(row);
+    const std::string row_id = row_id_text(row);
     if (selection_mode_ == DataGridViewSelectionMode::full_row_select) {
         if (selected) insert_selected_row(row_id);
         else erase_selected_row(row_id);
@@ -1549,8 +1549,10 @@ bool DataGridView::begin_text_edit(std::string initial_text, bool select_all) {
     TextBox& editor = *editor_;
     editor.set_text(std::move(initial_text));
     set_child_layout_collapsed(editor_, false);
-    set_child_layout(editor_, grid_parts(grid_layout()).editor.bounds);
-    if (window() != nullptr) static_cast<void>((*window()).request_focus(editor_));
+    const Parts editor_parts = grid_parts(grid_layout());
+    set_child_layout(editor_, editor_parts.editor.bounds);
+    Window* const host = window();
+    if (host != nullptr) static_cast<void>((*host).request_focus(editor_));
     if (select_all) {
         editor.select_all();
     } else {
@@ -1636,12 +1638,12 @@ void DataGridView::cancel_edit() {
 // when the editor held it.
 void DataGridView::finish_edit() {
     ending_edit_ = true;
-    const bool editor_focused = window() != nullptr && editor_ &&
-                                (*window()).focused_control() == editor_;
+    Window* const host = window();
+    const bool editor_focused = host != nullptr && editor_ && (*host).focused_control() == editor_;
     editing_ = false;
     edit_kind_ = EditKind::none;
     edit_invalid_ = false;
-    if (editor_focused) static_cast<void>((*window()).request_focus(shared_from_this()));
+    if (editor_focused) static_cast<void>((*host).request_focus(shared_from_this()));
     if (editor_) set_child_layout_collapsed(editor_, true);
     ending_edit_ = false;
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
@@ -1806,7 +1808,8 @@ void DataGridView::on_pointer(PointerEvent& event) {
             set_column_width(*resizing_column_, width);
         } else if (event.action == PointerAction::up) {
             resizing_column_.reset();
-            if (window() != nullptr && has_pointer_capture()) (*window()).release_pointer();
+            Window* const host = window();
+            if (host != nullptr && has_pointer_capture()) (*host).release_pointer();
             invalidate(Dirty::paint | Dirty::semantics);
         }
         event.handled = true;
@@ -1854,12 +1857,17 @@ void DataGridView::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::down) {
         event.handled = true;
         if (editing_ && !end_edit()) {
-            if (edit_kind_ == EditKind::text && window() != nullptr) {
-                static_cast<void>((*window()).request_focus(editor_));
+            // The edit stays open (its text is refused): the editor keeps
+            // the focus. end_edit runs the program's handlers, so the
+            // window is read after it.
+            Window* const editing_host = window();
+            if (edit_kind_ == EditKind::text && editing_host != nullptr) {
+                static_cast<void>((*editing_host).request_focus(editor_));
             }
             return;
         }
-        if (window() != nullptr) static_cast<void>((*window()).request_focus(lifetime));
+        Window* const host = window();
+        if (host != nullptr) static_cast<void>((*host).request_focus(lifetime));
         const bool shift = has_modifier(event.modifiers, Modifier::shift);
         const bool control = has_modifier(event.modifiers, Modifier::control);
         SelectionGesture gesture = SelectionGesture::replace;
@@ -1869,7 +1877,9 @@ void DataGridView::on_pointer(PointerEvent& event) {
             resizing_column_ = hit.column;
             resize_start_x_ = local.x;
             resize_start_width_ = columns_[hit.column].width;
-            if (window() != nullptr) (*window()).capture_pointer(lifetime, event.pointer_id);
+            // Read again: the focus change above ran the program's handlers.
+            Window* const capture_host = window();
+            if (capture_host != nullptr) (*capture_host).capture_pointer(lifetime, event.pointer_id);
             invalidate(Dirty::paint | Dirty::semantics);
             return;
         }
@@ -2172,7 +2182,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
             const ColumnParts placed = column_parts(column, layout);
             SemanticNode node{};
             node.stable_id = column_stable_id(column);
-            node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::button;
             node.name = columns_[column].header_text.empty() ? columns_[column].name : columns_[column].header_text;
             node.description = "Column header";
@@ -2188,7 +2198,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
         const DataGridViewRowPosition row{position};
         SemanticNode row_node{};
         row_node.stable_id = row_id_text(row);
-        row_node.runtime_id = scrolling_detail::virtual_runtime_id(row_node.stable_id);
+        row_node.runtime_id = virtual_semantic_runtime_id(row_node.stable_id);
         row_node.role = SemanticRole::list_item;
         row_node.name = row_source_ == DataGridViewRowSource::unbound && !rows_[position].header_text.empty()
                             ? rows_[position].header_text
@@ -2208,7 +2218,7 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
             const CellParts placed = cell_parts(row, column, layout);
             SemanticNode cell{};
             cell.stable_id = cell_stable_id(row, column);
-            cell.runtime_id = scrolling_detail::virtual_runtime_id(cell.stable_id);
+            cell.runtime_id = virtual_semantic_runtime_id(cell.stable_id);
             cell.name = definition.header_text.empty() ? definition.name : definition.header_text;
             cell.value = cell_text(row, column);
             cell.bounds = {absolute.x + placed.cell.bounds.x, absolute.y + placed.cell.bounds.y,
@@ -2249,8 +2259,10 @@ std::vector<SemanticNode> DataGridView::semantic_virtual_children() const {
 }
 
 bool DataGridView::on_semantic_action(SemanticAction action, std::string_view value) {
-    if (action == SemanticAction::focus && window() != nullptr) {
-        return (*window()).request_focus(shared_from_this());
+    Window* const host = window();
+    if (action == SemanticAction::focus && host != nullptr) {
+        const bool focused = (*host).request_focus(shared_from_this());
+        return focused;
     }
     return Control::on_semantic_action(action, value);
 }
@@ -2269,15 +2281,17 @@ bool DataGridView::on_semantic_child_action(std::string_view id, SemanticAction 
         const std::optional<std::size_t> row = find_row(id);
         if (!row || columns_.empty()) return false;
         if (action != SemanticAction::focus && action != SemanticAction::select) return false;
-        if (action == SemanticAction::focus && window() != nullptr) {
-            static_cast<void>((*window()).request_focus(shared_from_this()));
+        Window* const host = window();
+        if (action == SemanticAction::focus && host != nullptr) {
+            static_cast<void>((*host).request_focus(shared_from_this()));
         }
         const std::size_t column = current_ ? (*current_).column : 0U;
         const bool moved = move_current({DataGridViewRowPosition{*row}, column}, SelectionGesture::replace);
         return moved;
     }
-    if (action == SemanticAction::focus && window() != nullptr) {
-        static_cast<void>((*window()).request_focus(shared_from_this()));
+    Window* const host = window();
+    if (action == SemanticAction::focus && host != nullptr) {
+        static_cast<void>((*host).request_focus(shared_from_this()));
     }
     if (!move_current(*cell, SelectionGesture::replace)) return false;
     if (action == SemanticAction::focus || action == SemanticAction::select) return true;

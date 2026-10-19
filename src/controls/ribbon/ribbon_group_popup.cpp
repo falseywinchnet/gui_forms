@@ -1,7 +1,5 @@
 #include "ribbon_group_popup.hpp"
 
-#include "ribbon_geometry.hpp"
-
 #include "gui_forms/theme/part_painting/part_painting.hpp"
 
 #include <algorithm>

@@ -226,12 +226,14 @@ From the docking interview (2026-10-17,
     expand and collapse state, since tabs expose selection and never
     invoke; clicking the selected tab keeps working by pointer.
 
-From the owner's review of phase 2b (relayed by the coordinator, 2026-10):
+From the owner's review of phase 2b (relayed by the coordinator, 2026-10).
+These two restate decisions 45 and 46 above, with their reasons; they were
+first numbered 45 and 46 again and are renumbered 47 and 48 (2026-10-19):
 
-45. **The scroll buttons take 8 units of hysteresis**, as the hide rule does
+47. **The scroll buttons take 8 units of hysteresis**, as the hide rule does
     (decision 36): they appear when the narrowest layout no longer fits and
     disappear only when 8 more units are available.
-46. **The command plane expands and collapses for assistive technology
+48. **The command plane expands and collapses for assistive technology
     (R7).** Tabs expose selection and never invoke, so clicking the selected
     tab to minimize is unreachable through accessibility. The command plane
     publishes an expanded or collapsed state and expand and collapse actions

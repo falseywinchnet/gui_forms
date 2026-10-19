@@ -185,7 +185,7 @@ Related types
    * - :cpp:class:`RibbonScalingCounters <gui_forms::RibbonScalingCounters>`
      - Structured scaling instrumentation (RIBBON_SCALING_STUDY.md §5.7).
    * - :cpp:class:`RibbonState <gui_forms::RibbonState>`
-     - What a ribbon window keeps between sessions (owner decision RB-12, D4-1): the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized.
+     - What a ribbon window keeps between sessions: the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized.
    * - :cpp:class:`RibbonStateDiagnostic <gui_forms::RibbonStateDiagnostic>`
      -  
    * - :cpp:class:`RibbonStateParseResult <gui_forms::RibbonStateParseResult>`
@@ -1172,7 +1172,7 @@ Related types
 
    ``#include <gui_forms/controls/quick_access_toolbar/ribbon_state.hpp>``
 
-   What a ribbon window keeps between sessions (owner decision RB-12, D4-1): the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized. The last selected tab is not kept. GUI.Forms has no runtime layout or session store yet (the resources and configuration interview, §2.4 and §7, leaves its syntax open), so the state is saved and loaded explicitly as text: serialize_ribbon_state and parse_ribbon_state. When the store exists, the Ribbon saves this value through it.
+   What a ribbon window keeps between sessions: the Quick Access Toolbar's command IDs in order, its placement, and whether the ribbon is minimized. The last selected tab is not kept. The ribbon is not a layout (owner decision RB-44, revising RB-12): these are a settings permutation the program saves with its own settings; the ribbon never saves them on its own. The program captures and applies the state (capture_ribbon_state, apply_ribbon_state) and stores it as text (serialize_ribbon_state, parse_ribbon_state).
 
    .. cpp:member:: std::vector<std::string> quick_access_command_ids
 

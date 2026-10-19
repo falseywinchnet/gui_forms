@@ -21,6 +21,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace gui_forms {
@@ -274,7 +275,11 @@ struct RibbonTabChange final {
 // the application's availability calls, tinted from the theme's accent ramp,
 // with the built-in selection rules; modes choose the tabs and groups shown.
 //
-// Not yet: the Quick Access Toolbar, the minimized popup, Backstage,
+// The file area (phase 6): the File tab opens Backstage when the ribbon has
+// one, else the application menu, in two panes while there are recent items.
+//
+// Not yet: hosting the QuickAccessToolbar on the tab row (it is a separate
+// control the application places), the minimized ribbon's temporary popup,
 // right-to-left mirroring and two-line large labels.
 class Ribbon final : public Control {
 public:
@@ -746,9 +751,38 @@ private:
     [[nodiscard]] std::optional<std::size_t> find_tab_set(std::string_view set_id) const noexcept;
     [[nodiscard]] std::optional<AccentIndex> tab_accent(std::size_t tab) const noexcept;
     [[nodiscard]] std::optional<std::size_t> fallback_tab() const noexcept;
-    [[nodiscard]] std::size_t position_among_shown(std::size_t tab, std::size_t& count) const noexcept;
+    // A shown tab's 1-based place among the shown tabs of its kind (the core
+    // tabs, or its set's tabs) and how many of them there are.
+    struct TabPosition final {
+        std::size_t position{};
+        std::size_t count{};
+    };
+    [[nodiscard]] TabPosition position_among_shown(std::size_t tab) const noexcept;
     void refresh_accents();
     void tabs_shown_changed();
+
+    // -- set_tabs stages (ribbon.cpp) -------------------------------------------
+    // What set_tabs prepares before it changes anything: each tab's set (none
+    // for a core tab) and every group's layouts, indexed [tab][group].
+    struct PreparedTabs final {
+        std::vector<std::optional<std::size_t>> tab_set_of;
+        std::vector<std::vector<std::vector<RibbonGroupLayout>>> layouts;
+    };
+    // The hosted controls taken out of the records set_tabs replaces:
+    // ribbon-made controls with their records (and Command watches), keyed
+    // "<command ID>/<kind>", and the application's controls (galleries, font
+    // controls, colour pickers), matched by identity.
+    struct HostedCarryOver final {
+        std::vector<std::pair<std::string, CommandRecord>> made;
+        std::vector<Control::Ptr> authored;
+    };
+    [[nodiscard]] PreparedTabs prepare_tabs(const std::vector<RibbonTabSpec>& tabs,
+                                            const std::vector<RibbonTabSetSpec>& sets) const;
+    [[nodiscard]] HostedCarryOver take_hosted_controls();
+    [[nodiscard]] std::vector<TabSetState> carried_set_states(
+        const std::vector<RibbonTabSetSpec>& sets, const std::vector<std::optional<std::size_t>>& tab_set_of) const;
+    void rebuild_records(HostedCarryOver& carried);
+    void release_carried(const HostedCarryOver& carried);
 
     // A realized item located: a tab, a group or a command of the selected
     // tab, or nothing past the end.
@@ -896,6 +930,9 @@ private:
     mutable ScalingKey scaling_key_{};
     mutable std::vector<TabScaling> scaling_{};
     mutable RowMetrics row_metrics_{};
+    // Scratch for the command rectangles place_group fills while only a
+    // width is wanted (state_width, popup_panel_size); its contents mean
+    // nothing between calls, and its capacity is kept for the next.
     mutable std::vector<Rect> scratch_commands_{};
     mutable RibbonScalingCounters counters_{};
     std::size_t first_group_{};

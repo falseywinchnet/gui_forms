@@ -177,15 +177,6 @@ void validate_provider(const DateTimeFormatProvider& provider) {
     }
 }
 
-[[nodiscard]] std::uint64_t virtual_runtime_id(std::string_view stable_id) noexcept {
-    std::uint64_t value = 1469598103934665603ULL;
-    for (const unsigned char byte : stable_id) {
-        value ^= byte;
-        value *= 1099511628211ULL;
-    }
-    return value | (std::uint64_t{1} << 63U);
-}
-
 bool parse_iso_date(std::string_view text, DateTimeValue& value) {
     if (text.size() != 10U || text[4] != '-' || text[7] != '-') return false;
     int year{};

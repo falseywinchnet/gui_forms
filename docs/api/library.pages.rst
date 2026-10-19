@@ -168,7 +168,7 @@ Related types
 
    ``#include <gui_forms/pages/page_set/page_set.hpp>``
 
-   Groups edits into one publication. Constructing it opens a batch on the set; :cpp:func:`close <gui_forms::PageSetBatch::close>` or destruction closes it. Closing the outermost batch publishes one ``pages_changed`` when any edit applied and one ``selected_page_changed`` when the selection ends on a different page than it began. Edits inside a batch still apply one at a time: a refused edit leaves the earlier ones in place. The set must outlive the scope.
+   Groups edits into one publication. Constructing it opens a batch on the set; :cpp:func:`close <gui_forms::PageSetBatch::close>` or destruction closes it. Closing the outermost batch publishes one ``pages_changed`` when any edit applied and one ``selected_page_changed`` when the selection ends on a different page than it began. Edits inside a batch still apply one at a time: a refused edit leaves the earlier ones in place. The set must outlive the scope. A handler that throws while :cpp:func:`close <gui_forms::PageSetBatch::close>` publishes hands its exception to close's caller. While the destructor publishes, the exception is contained there (a destructor publishes without throwing, house style section 9) and is lost; there is no error channel to report it on, so call :cpp:func:`close <gui_forms::PageSetBatch::close>` where a handler may throw. Either way the batch's edits stand, the batch is closed, the set stays consistent and usable, and the notifications of that publication not yet emitted are dropped, as for any handler exception.
 
 
    .. rubric:: Construction

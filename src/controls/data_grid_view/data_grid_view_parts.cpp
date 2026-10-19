@@ -820,65 +820,63 @@ std::size_t DataGridView::realized_item_count() const {
     return result;
 }
 
-ItemSystemIndex DataGridView::publish_realized_item_system(std::size_t item) const {
-    const GridLayout layout = grid_layout();
+DataGridView::RealizedSlot DataGridView::realized_slot(const GridLayout& layout, std::size_t item) const {
     const std::size_t rows = realized_row_count(layout);
-    const std::size_t cells = rows * realized_column_count(layout);
-    if (item < rows) return row_system;
-    if (item < rows + cells) return cell_system;
-    return column_system;
+    const std::size_t columns = realized_column_count(layout);
+    const std::size_t first_column = first_visible_column(layout);
+    const std::size_t cells = rows * columns;
+    RealizedSlot slot;
+    if (item < rows) {
+        slot.system = row_system;
+        slot.row = DataGridViewRowPosition{first_row_ + item};
+        return slot;
+    }
+    if (item < rows + cells) {
+        // A nonzero cell count has columns: cells run row by row.
+        const std::size_t position = item - rows;
+        slot.system = cell_system;
+        slot.row = DataGridViewRowPosition{first_row_ + position / columns};
+        slot.column = first_column + position % columns;
+        return slot;
+    }
+    slot.system = column_system;
+    slot.column = first_column + (item - rows - cells);
+    return slot;
+}
+
+ItemSystemIndex DataGridView::publish_realized_item_system(std::size_t item) const {
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    return slot.system;
 }
 
 std::string DataGridView::realized_item_stable_id(std::size_t item) const {
-    const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    if (item < rows) return row_id_text(DataGridViewRowPosition{first_row_ + item});
-    const std::size_t cells = rows * columns;
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        const DataGridViewRowPosition row{first_row_ + position / columns};
-        return cell_stable_id(row, first_column + position % columns);
-    }
-    return column_stable_id(first_column + (item - rows - cells));
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    if (slot.system == row_system) return row_id_text(slot.row);
+    if (slot.system == cell_system) return cell_stable_id(slot.row, slot.column);
+    return column_stable_id(slot.column);
 }
 
 AnatomyStateSet DataGridView::realized_item_anatomy_states(std::size_t item) const {
-    const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    if (item < rows) return row_states(DataGridViewRowPosition{first_row_ + item});
-    const std::size_t cells = rows * columns;
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        const DataGridViewRowPosition row{first_row_ + position / columns};
-        return cell_states(row, first_column + position % columns);
-    }
-    return column_states(first_column + (item - rows - cells));
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    if (slot.system == row_system) return row_states(slot.row);
+    if (slot.system == cell_system) return cell_states(slot.row, slot.column);
+    return column_states(slot.column);
 }
 
 void DataGridView::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
     const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    const std::size_t cells = rows * columns;
-    if (item < rows) {
-        const RowParts record = row_parts(DataGridViewRowPosition{first_row_ + item}, layout);
-        write_item_parts(anatomy().item_systems[row_system.value], row_part_fields, record, geometry);
-        return;
+    const RealizedSlot slot = realized_slot(layout, item);
+    const ItemSystemDeclaration& system = anatomy().item_systems[slot.system.value];
+    if (slot.system == row_system) {
+        const RowParts record = row_parts(slot.row, layout);
+        write_item_parts(system, row_part_fields, record, geometry);
+    } else if (slot.system == cell_system) {
+        const CellParts record = cell_parts(slot.row, slot.column, layout);
+        write_item_parts(system, cell_part_fields, record, geometry);
+    } else {
+        const ColumnParts record = column_parts(slot.column, layout);
+        write_item_parts(system, column_part_fields, record, geometry);
     }
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        const DataGridViewRowPosition row{first_row_ + position / columns};
-        const CellParts record = cell_parts(row, first_column + position % columns, layout);
-        write_item_parts(anatomy().item_systems[cell_system.value], cell_part_fields, record, geometry);
-        return;
-    }
-    const ColumnParts record = column_parts(first_column + (item - rows - cells), layout);
-    write_item_parts(anatomy().item_systems[column_system.value], column_part_fields, record, geometry);
 }
 
 std::vector<DataGridView::Row> DataGridView::realized_rows() const {

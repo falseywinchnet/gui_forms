@@ -79,6 +79,18 @@ function pointer looked up by name takes its type from the declaration. The
 `sanitizers` CI job runs the whole suite under ASan, UBSan and LSan on Linux
 and fails on any report.
 
+Every build tree keeps a sanitizer tree beside its ordinary one, on every
+platform it builds on:
+
+```text
+python3 -B tools/ci_build.py --sanitize [--gallery] [--tests REGEX]
+```
+
+It builds `.build/native-<host>-<arch>/gui-forms-sanitize` with CI's flags
+(ASan and UBSan everywhere, LSan on Linux and macOS; the Windows MinGW runtime
+has none) and fails on any report. Run it over the tests your change touches
+before pushing C++, and the whole suite before a stage gate.
+
 The checks cover spelling and those two rules only. Ownership, lifetime, initialization and
 naming still need review against the full document.
 

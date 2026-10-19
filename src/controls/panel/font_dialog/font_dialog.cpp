@@ -69,16 +69,17 @@ public:
     }
 };
 
-std::string_view style_name(std::uint8_t style) noexcept {
-    switch (style) {
-    case 0U: return "Regular";
-    case 1U: return "Bold";
-    case 2U: return "Italic";
-    default: return "Bold Italic";
-    }
-}
-
 } // namespace
+
+std::string_view FontDialog::style_name(FontStyle style) noexcept {
+    switch (style) {
+    case FontStyle::regular: return "Regular";
+    case FontStyle::bold: return "Bold";
+    case FontStyle::italic: return "Italic";
+    case FontStyle::bold_italic: return "Bold Italic";
+    }
+    return "Bold Italic";
+}
 
 std::span<const BundledFontFace> bundled_font_faces() noexcept {
     return bundled_faces;
@@ -175,7 +176,7 @@ void FontDialog::fill_styles() {
     }
     std::vector<std::string> names;
     for (const FontStyle style : styles_) {
-        names.push_back(std::string(style_name(static_cast<std::uint8_t>(style))));
+        names.push_back(std::string(style_name(style)));
     }
     (*style_list_).set_items(std::move(names));
 }
@@ -297,8 +298,9 @@ void FontDialog::on_key_preview(KeyEvent& event) {
 bool FontDialog::show(const Control::Ptr& owner) {
     require_mutable();
     if (open_) return true;
-    if (!owner || (*owner).attached_window() == nullptr || parent()) return false;
-    Window& host = *(*owner).attached_window();
+    Window* const window = owner ? (*owner).attached_window() : nullptr;
+    if (window == nullptr || parent()) return false;
+    Window& host = *window;
     const Size client = host.client_size();
     const std::string prefix(stable_id().value());
     std::shared_ptr<FontDialogLayer> layer = make_control<FontDialogLayer>(StableId(prefix + ".layer"));

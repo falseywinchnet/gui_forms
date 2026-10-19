@@ -52,11 +52,20 @@ DateTimeValue civil_date(DateTimeValue value) noexcept {
     return result;
 }
 
+namespace {
+
+// Days from a month page's first day to the month's first day: 0 to 6.
+std::int64_t leading_days(DateTimeValue month_start, std::uint8_t first_day_of_week) noexcept {
+    const std::uint8_t weekday = day_of_week(month_start);
+    const int leading = (static_cast<int>(weekday) - static_cast<int>(first_day_of_week) + 7) % 7;
+    return leading;
+}
+
+} // namespace
+
 std::array<DateTimeValue, grid_cells> month_page_dates(DateTimeValue month_start,
                                                        std::uint8_t first_day_of_week) noexcept {
-    const std::uint8_t weekday = day_of_week(month_start);
-    // Days from the page's first day to the month's first day: 0 to 6.
-    const int leading = (static_cast<int>(weekday) - static_cast<int>(first_day_of_week) + 7) % 7;
+    const std::int64_t leading = leading_days(month_start, first_day_of_week);
     const DateTimeValue start = add_days(month_start, -leading);
     std::array<DateTimeValue, grid_cells> dates{};
     for (std::size_t index = 0U; index < dates.size(); ++index) {
@@ -67,8 +76,7 @@ std::array<DateTimeValue, grid_cells> month_page_dates(DateTimeValue month_start
 
 std::optional<std::size_t> month_page_cell(DateTimeValue month_start, std::uint8_t first_day_of_week,
                                            DateTimeValue date) noexcept {
-    const std::uint8_t weekday = day_of_week(month_start);
-    const std::int64_t leading = (static_cast<int>(weekday) - static_cast<int>(first_day_of_week) + 7) % 7;
+    const std::int64_t leading = leading_days(month_start, first_day_of_week);
     const std::int64_t start = date_time_detail::days_from_civil(month_start.year, month_start.month,
                                                                  month_start.day) - leading;
     const std::int64_t offset = date_time_detail::days_from_civil(date.year, date.month, date.day) - start;
