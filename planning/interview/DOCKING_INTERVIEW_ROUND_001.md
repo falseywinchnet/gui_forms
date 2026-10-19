@@ -729,3 +729,44 @@ verbatim:
 - **GIVEN V3-1.** Wrapper types for tray icon identities and for device and
   logical desktop points.
 - **GIVEN V4.** The listed fixes go ahead.
+
+### Note, 2026-10-19: V2a, the one AppKit block (open)
+
+V2's change (#181) removed every Objective-C block from the macOS host but
+one: `add_escape_stops_modal_monitor` in
+`src/host/macos/services/appkit_host_services.mm`, which installs
+`[NSEvent addLocalMonitorForEventsMatchingMask:handler:]`, an API that takes
+only a block. The owner did not admit it ("you can merge other standout work
+except v2a"), so #181 is held.
+
+What the monitor intercepts: key-down events only, only while the host's
+message dialog runs `[alert runModal]`, and of those only Escape (key code
+53): Escape ends the alert with the cancel choice's response and is
+consumed; every other key passes on. It and the cancel button's Escape key
+equivalent arrived together (e42bab4a, 2026-08-06), beside setting the
+window's default button cell for the declared default choice. The likely
+reason, unverified: when Cancel is also the declared default, making it the
+default button cell gives it Return as its key equivalent and displaces
+Escape, so the monitor keeps Escape reaching the cancel choice.
+
+Replacements without a block, for the owner:
+
+1. **The alert's own modal session** (recommended). Lay out the alert, begin
+   a modal session for its window, and pump it: take each event with
+   `nextEventMatchingMask:untilDate:inMode:dequeue:` in
+   `NSModalPanelRunLoopMode`, end the session with the cancel response on
+   Escape, and send every other event with `sendEvent:`; `runModalSession:`
+   reports the button's response. This sees exactly the events the local
+   monitor sees, before dispatch, and changes nothing outside this one
+   function.
+2. **An `NSApplication` subclass overriding `sendEvent:`** (a sibling's
+   suggestion). Not recommended: it changes the whole application for one
+   dialog and fails when the embedding application has its own
+   `NSApplication` class.
+3. **No monitor at all.** If AppKit still cancels on Escape when Cancel is
+   also the default (or the default cell can be kept off the Cancel button
+   without losing Return), the monitor can simply go. One test on the Mac
+   decides this.
+
+Checking 3 first is cheapest, then 1 if the monitor proves necessary. Both
+need the M4: a local instance runs them and reports back.
