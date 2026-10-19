@@ -2281,15 +2281,17 @@ bool DataGridView::on_semantic_child_action(std::string_view id, SemanticAction 
         const std::optional<std::size_t> row = find_row(id);
         if (!row || columns_.empty()) return false;
         if (action != SemanticAction::focus && action != SemanticAction::select) return false;
-        if (action == SemanticAction::focus && window() != nullptr) {
-            static_cast<void>((*window()).request_focus(shared_from_this()));
+        Window* const host = window();
+        if (action == SemanticAction::focus && host != nullptr) {
+            static_cast<void>((*host).request_focus(shared_from_this()));
         }
         const std::size_t column = current_ ? (*current_).column : 0U;
         const bool moved = move_current({DataGridViewRowPosition{*row}, column}, SelectionGesture::replace);
         return moved;
     }
-    if (action == SemanticAction::focus && window() != nullptr) {
-        static_cast<void>((*window()).request_focus(shared_from_this()));
+    Window* const host = window();
+    if (action == SemanticAction::focus && host != nullptr) {
+        static_cast<void>((*host).request_focus(shared_from_this()));
     }
     if (!move_current(*cell, SelectionGesture::replace)) return false;
     if (action == SemanticAction::focus || action == SemanticAction::select) return true;
