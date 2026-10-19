@@ -65,11 +65,10 @@ class HouseStyleTests(unittest.TestCase):
                                            Finding(2, "objective-c-block"),
                                            Finding(3, "objective-c-block")])
 
-    def test_admitted_block(self) -> None:
+    def test_no_block_is_admitted(self) -> None:
         source: str = ('watch(^NSEvent* (NSEvent* event) { // house-style: admitted block (block-only API)\n'
-                       '    return event; });\n'
-                       'later(^{ go(); });\n')
-        self.assertEqual(inspect(source), [Finding(3, "objective-c-block")])
+                       '    return event; });\n')
+        self.assertEqual(inspect(source), [Finding(1, "objective-c-block")])
 
     def test_exclusive_or_is_not_a_block(self) -> None:
         source: str = 'if ((flags ^ mask) != 0) { bits = a ^ (b & c); }\n// ^{ in a comment\n'
