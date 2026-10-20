@@ -38,11 +38,21 @@ bool surface_role(PartRole role) noexcept {
     }
 }
 
+// The corner radius a surface part is drawn with: its own, when set (never
+// negative), else its recipe's material's.
+double part_corner_radius(const PartPaint& part, const ControlVisualRecipe& recipe) noexcept {
+    if (part.corner_radius) {
+        const double result = std::max(0.0, *part.corner_radius);
+        return result;
+    }
+    return recipe.material.corner_radius;
+}
+
 // The overlay shadow's layers around `part.bounds`, in theme order, before
 // the casting surface is painted over them.
 void paint_overlay_shadow(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe,
                           const std::vector<MaterialShadow>& layers) {
-    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    const double radius = part_corner_radius(part, recipe);
     for (const MaterialShadow& shadow : layers) {
         painter.draw_box_shadow(part.bounds, radius, shadow.offset, shadow.blur_radius, shadow.spread,
                                 shadow.color);
@@ -109,32 +119,53 @@ void paint_focus_ring(Painter& painter, Rect bounds, const ControlVisualRecipe& 
                                 recipe.focus_ring, recipe.focus_width);
 }
 
-// A solid triangle pointing `direction`, filled one device-independent row
-// at a time so every host rasterizes the same spans.
+// One arrow kernel: `rows` one-unit strips across the arrow's axis, strip
+// `row` at `first + step * row` along it and spanning `row` units either side
+// of `centre` across it. `horizontal_strips` lays the strips along x (an
+// arrow pointing up or down); otherwise along y. Every value is a whole
+// number, so the strips land on whole units on every host.
+void fill_arrow_strips(Painter& painter, bool horizontal_strips, double centre, double first,
+                       double step, int rows, Color color) {
+    for (int row = 0; row < rows; ++row) {
+        const double extent = static_cast<double>(row);
+        const double position = first + step * static_cast<double>(row);
+        const double length = extent * 2.0 + 1.0;
+        if (horizontal_strips) {
+            painter.fill_rect({centre - extent, position, length, 1.0}, color);
+        } else {
+            painter.fill_rect({position, centre - extent, 1.0, length}, color);
+        }
+    }
+}
+
+// A solid triangle pointing `direction`, filled one device-independent strip
+// at a time so every host rasterizes the same spans. The tip is the one-unit
+// strip; each strip after it reaches one unit further on either side. The
+// triangle is `half` strips deep, with its middle strip at the box's centre.
 void fill_arrow(Painter& painter, Rect bounds, PartMark direction, Color color) {
     const double side = std::min(bounds.width, bounds.height);
     const double half = std::floor(side * 0.5);
     if (half < 1.0) return;
     const double centre_x = std::floor(bounds.x + bounds.width * 0.5);
     const double centre_y = std::floor(bounds.y + bounds.height * 0.5);
-    // `half` rows (or columns), each one unit longer than the last from the tip.
     const int rows = static_cast<int>(half);
-    for (int row = 0; row < rows; ++row) {
-        const double extent = static_cast<double>(row);
-        const double offset = static_cast<double>(row) - std::floor(half * 0.5);
-        if (direction == PartMark::arrow_down) {
-            const double y = centre_y - offset + 0.5;
-            painter.fill_rect({centre_x - extent, y - 0.5, extent * 2.0 + 1.0, 1.0}, color);
-        } else if (direction == PartMark::arrow_up) {
-            const double y = centre_y + offset - 0.5;
-            painter.fill_rect({centre_x - extent, y - 0.5, extent * 2.0 + 1.0, 1.0}, color);
-        } else if (direction == PartMark::arrow_right) {
-            const double x = centre_x - offset + 0.5;
-            painter.fill_rect({x - 0.5, centre_y - extent, 1.0, extent * 2.0 + 1.0}, color);
-        } else {
-            const double x = centre_x + offset - 0.5;
-            painter.fill_rect({x - 0.5, centre_y - extent, 1.0, extent * 2.0 + 1.0}, color);
-        }
+    const double middle_row = std::floor(half * 0.5);
+    switch (direction) {
+    case PartMark::arrow_down:
+        // Tip at the bottom: strips climb from centre_y + middle_row.
+        fill_arrow_strips(painter, true, centre_x, centre_y + middle_row, -1.0, rows, color);
+        return;
+    case PartMark::arrow_up:
+        // Tip at the top: strips descend from centre_y - middle_row - 1.
+        fill_arrow_strips(painter, true, centre_x, centre_y - middle_row - 1.0, 1.0, rows, color);
+        return;
+    case PartMark::arrow_right:
+        fill_arrow_strips(painter, false, centre_y, centre_x + middle_row, -1.0, rows, color);
+        return;
+    default:
+        // arrow_left, the one direction left.
+        fill_arrow_strips(painter, false, centre_y, centre_x - middle_row - 1.0, 1.0, rows, color);
+        return;
     }
 }
 
@@ -207,6 +238,90 @@ void paint_customize(Painter& painter, Rect box, Color ink) {
     const Point middle{square.x + side * 0.5, square.y + side * 0.75};
     painter.draw_line({middle.x - half, middle.y - half * 0.75}, middle, ink, 1.5);
     painter.draw_line(middle, {middle.x + half, middle.y - half * 0.75}, ink, 1.5);
+}
+
+// One point of the pin mark, given in the upright pin's frame as fractions
+// of `square` (`across` from the left, `down` from the top). Upright, the
+// pin stands needle down; lying, the same pin is turned a quarter so that
+// the needle points left. Points land on half units so one-unit strokes
+// stay crisp.
+Point pin_point(Rect square, bool upright, double across, double down) noexcept {
+    const double side = square.width;
+    double x = square.x + across * side;
+    double y = square.y + down * side;
+    if (!upright) {
+        x = square.x + (1.0 - down) * side;
+        y = square.y + across * side;
+    }
+    const Point point{std::floor(x) + 0.5, std::floor(y) + 0.5};
+    return point;
+}
+
+// A pushpin: a barrel (three sides of a small block), a collar across its
+// open end and a needle beyond the collar. Pinned stands it upright, needle
+// down, as a docked panel's caption shows it; unpinned lays it on its side
+// with the needle pointing left (owner decision DK-35, J1).
+void paint_pin(Painter& painter, Rect box, bool pinned, Color ink) {
+    const Rect square = square_in(box);
+    if (square.width < 6.0) return;
+    const Point barrel_top_left = pin_point(square, pinned, 0.3, 0.05);
+    const Point barrel_top_right = pin_point(square, pinned, 0.7, 0.05);
+    const Point barrel_bottom_left = pin_point(square, pinned, 0.3, 0.5);
+    const Point barrel_bottom_right = pin_point(square, pinned, 0.7, 0.5);
+    painter.draw_line(barrel_top_left, barrel_top_right, ink, 1.0);
+    painter.draw_line(barrel_top_left, barrel_bottom_left, ink, 1.0);
+    painter.draw_line(barrel_top_right, barrel_bottom_right, ink, 1.0);
+    const Point collar_start = pin_point(square, pinned, 0.1, 0.5);
+    const Point collar_end = pin_point(square, pinned, 0.9, 0.5);
+    painter.draw_line(collar_start, collar_end, ink, 1.0);
+    const Point needle_start = pin_point(square, pinned, 0.5, 0.5);
+    const Point needle_end = pin_point(square, pinned, 0.5, 0.95);
+    painter.draw_line(needle_start, needle_end, ink, 1.0);
+}
+
+// A docking target's shape (owner decision DK-35, J2): a small window, its
+// caption a two-unit bar along the top and its other three edges one-unit
+// strokes, with the region a drop there gives the panel filled inside it,
+// one unit clear of the edges: a half of the interior for a side, or the
+// middle half of it each way for tab_into.
+void paint_dock_shape(Painter& painter, Rect box, DockShapeRegion region, Color ink) {
+    const Rect square = square_in(box);
+    const double side = square.width;
+    if (side < 8.0) return;
+    painter.fill_rect({square.x, square.y, side, 2.0}, ink);
+    const double left = square.x + 0.5;
+    const double right = square.x + side - 0.5;
+    const double bottom = square.y + side - 0.5;
+    painter.draw_line({left, square.y + 2.0}, {left, bottom}, ink, 1.0);
+    painter.draw_line({right, square.y + 2.0}, {right, bottom}, ink, 1.0);
+    painter.draw_line({left, bottom}, {right, bottom}, ink, 1.0);
+    const Rect interior{square.x + 2.0, square.y + 3.0, side - 4.0, side - 5.0};
+    const double half_width = std::floor(interior.width * 0.5);
+    const double half_height = std::floor(interior.height * 0.5);
+    Rect filled = interior;
+    switch (region) {
+    case DockShapeRegion::top:
+        filled.height = half_height;
+        break;
+    case DockShapeRegion::bottom:
+        filled.y = interior.y + interior.height - half_height;
+        filled.height = half_height;
+        break;
+    case DockShapeRegion::left:
+        filled.width = half_width;
+        break;
+    case DockShapeRegion::right:
+        filled.x = interior.x + interior.width - half_width;
+        filled.width = half_width;
+        break;
+    case DockShapeRegion::tab_into:
+        filled.x = interior.x + std::floor(interior.width * 0.25);
+        filled.y = interior.y + std::floor(interior.height * 0.25);
+        filled.width = half_width;
+        filled.height = half_height;
+        break;
+    }
+    painter.fill_rect(filled, ink);
 }
 
 void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualRecipe& recipe) {
@@ -284,27 +399,69 @@ void paint_mark(Painter& painter, const PartPaint& part, const ControlVisualReci
     case PartMark::customize:
         paint_customize(painter, box, ink);
         return;
+    case PartMark::pin:
+        paint_pin(painter, box, part.states.contains(AnatomyState::checked), ink);
+        return;
+    case PartMark::dock_shape:
+        paint_dock_shape(painter, box, part.dock_region, ink);
+        return;
     }
 }
 
-// Text centred vertically in the part's bounds, aligned along it, clipped to
-// it. The origin is the baseline, as Painter::draw_text_utf8 takes it.
+// One line of text in the part's bounds, its line box centred across the
+// reading direction and the run aligned along it, clipped to the bounds.
+// The origin is the start of the baseline, as Painter::draw_text_utf8 and
+// draw_turned_text_utf8 take it. A turned run reads along the bounds'
+// height with the glyph tops towards the left (bottom_to_top) or the right
+// (top_to_bottom), so its line box is centred across the width.
 void paint_text(Painter& painter, const PartPaint& part, Color color) {
     if (part.text.empty()) return;
     const Size measured = painter.measure_text_utf8(part.text, part.font);
     const double line_height = std::max(measured.height, part.font.size * 1.2);
-    double x = part.bounds.x;
+    const double ascent = std::max(part.font.size, line_height * 0.82);
+    const bool turned = part.orientation != TextOrientation::horizontal;
+    const double run_extent = turned ? part.bounds.height : part.bounds.width;
+    const double cross_extent = turned ? part.bounds.width : part.bounds.height;
+    // Distances along the reading direction from the end reading starts at,
+    // and across it from the edge the glyph tops face.
+    double along = 0.0;
     if (part.alignment == PartTextAlignment::center) {
-        x += (part.bounds.width - measured.width) * 0.5;
+        along = (run_extent - measured.width) * 0.5;
     } else if (part.alignment == PartTextAlignment::end) {
-        x += part.bounds.width - measured.width;
+        along = run_extent - measured.width;
     }
-    const double top = part.bounds.y + (part.bounds.height - line_height) * 0.5;
-    const double baseline = top + std::max(part.font.size, line_height * 0.82);
+    const double line_top = (cross_extent - line_height) * 0.5;
+    Point origin{part.bounds.x + along, part.bounds.y + line_top + ascent};
+    if (part.orientation == TextOrientation::bottom_to_top) {
+        origin = {part.bounds.x + line_top + ascent, part.bounds.y + part.bounds.height - along};
+    } else if (part.orientation == TextOrientation::top_to_bottom) {
+        origin = {part.bounds.x + part.bounds.width - line_top - ascent, part.bounds.y + along};
+    }
     painter.save();
     painter.clip_rect(part.bounds);
-    painter.draw_text_utf8({x, baseline}, part.text, part.font, color);
+    if (turned) {
+        painter.draw_turned_text_utf8(origin, part.text, part.font, color, part.orientation);
+    } else {
+        painter.draw_text_utf8(origin, part.text, part.font, color);
+    }
     painter.restore();
+}
+
+// A fill part's content colour (owner decision W-7): flat, in the part's
+// shape, as given; a disabled part's at 45 % of its opacity, as a disabled
+// icon is drawn.
+void paint_content_color(Painter& painter, const PartPaint& part, Color color, bool disabled) {
+    Color shown = color;
+    if (disabled) {
+        const double faded = static_cast<double>(color.alpha) * 0.45;
+        shown.alpha = static_cast<std::uint8_t>(std::lround(faded));
+    }
+    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : 0.0;
+    if (radius > 0.0) {
+        painter.fill_rounded_rect(part.bounds, radius, shown);
+        return;
+    }
+    painter.fill_rect(part.bounds, shown);
 }
 
 } // namespace
@@ -343,6 +500,8 @@ std::string_view part_mark_name(PartMark mark) noexcept {
     case PartMark::more: return "more";
     case PartMark::overflow: return "overflow";
     case PartMark::customize: return "customize";
+    case PartMark::pin: return "pin";
+    case PartMark::dock_shape: return "dock_shape";
     case PartMark::count: return {};
     }
     return {};
@@ -366,11 +525,11 @@ void paint_part(Painter& painter, const Control& control, const PartPaint& part)
     }
     paint_part_from_recipe(painter, part, recipe, context);
     if (!part.accent || !surface_role(part.role)) return;
-    // Provisional accent (design language 8.5): the ramp colour, which
+    // Provisional accent (design language §8.5): the ramp colour, which
     // carries its own translucency, laid over the part's material in the
     // part's shape. T4 replaces this with the engine's tint.
     const Color tint = theme.accent(*part.accent);
-    const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : recipe.material.corner_radius;
+    const double radius = part_corner_radius(part, recipe);
     painter.fill_rounded_rect(part.bounds, radius, tint);
 }
 
@@ -386,10 +545,16 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
     case PartRole::sheen:
     case PartRole::count:
         return;
+    case PartRole::fill:
+        if (part.content_color) {
+            paint_content_color(painter, part, *part.content_color, disabled);
+            return;
+        }
+        paint_surface(painter, part, recipe);
+        return;
     case PartRole::face:
     case PartRole::well:
     case PartRole::track:
-    case PartRole::fill:
     case PartRole::thumb:
     case PartRole::actuator:
     case PartRole::chip:

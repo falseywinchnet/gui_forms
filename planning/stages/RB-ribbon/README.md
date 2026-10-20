@@ -220,6 +220,25 @@ From the docking interview (2026-10-17,
     settings. The ribbon exposes that state (`RibbonState`, with
     `capture_ribbon_state` and `apply_ribbon_state`); it never saves on its
     own. Revises decision 12.
+45. **The scroll buttons take 8 units of hysteresis (R4),** as the hide
+    rule does (decision 36); WordPad's are about 9.5.
+46. **Minimizing is accessible (R7-1):** the command plane publishes an
+    expand and collapse state, since tabs expose selection and never
+    invoke; clicking the selected tab keeps working by pointer.
+
+From the owner's review of phase 2b (relayed by the coordinator, 2026-10).
+These two restate decisions 45 and 46 above, with their reasons; they were
+first numbered 45 and 46 again and are renumbered 47 and 48 (2026-10-19):
+
+47. **The scroll buttons take 8 units of hysteresis**, as the hide rule does
+    (decision 36): they appear when the narrowest layout no longer fits and
+    disappear only when 8 more units are available.
+48. **The command plane expands and collapses for assistive technology
+    (R7).** Tabs expose selection and never invoke, so clicking the selected
+    tab to minimize is unreachable through accessibility. The command plane
+    publishes an expanded or collapsed state and expand and collapse actions
+    (mapped as the existing expand and collapse are), driving the same
+    minimize and restore as the pointer click, which keeps working.
 
 ## Gate
 

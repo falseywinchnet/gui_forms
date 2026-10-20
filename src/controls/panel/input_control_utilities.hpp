@@ -8,16 +8,6 @@
 
 namespace gui_forms::input_control_detail {
 
-[[nodiscard]] inline std::uint64_t virtual_semantic_runtime_id(
-    std::string_view stable_id) noexcept {
-    std::uint64_t value = 1469598103934665603ULL;
-    for (const unsigned char byte : stable_id) {
-        value ^= byte;
-        value *= 1099511628211ULL;
-    }
-    return value | (std::uint64_t{1} << 63U);
-}
-
 [[nodiscard]] inline bool includes(Modifier value, Modifier requested) noexcept {
     return (static_cast<std::uint8_t>(value) &
             static_cast<std::uint8_t>(requested)) != 0U;

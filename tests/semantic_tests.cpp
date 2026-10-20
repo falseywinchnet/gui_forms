@@ -4,6 +4,8 @@
 #include "gui_forms/window.hpp"
 #include "support/named_callbacks.hpp"
 
+#include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -26,6 +28,7 @@ const SemanticNode* find_node(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
 
 bool has_action(const SemanticNode& node, SemanticAction action) {
     return std::find(node.actions.begin(), node.actions.end(), action) !=
@@ -178,11 +181,12 @@ void test_semantic_actions_use_control_behavior() {
     require(window.perform_semantic_action("actions.combo", SemanticAction::expand) &&
                 (*combo).dropped_down() && window.focus_scope_depth() == 1U,
             "semantic combo expansion must enter the real popup focus scope");
-    require(window.perform_semantic_action("actions.combo.popup.list.item.1",
-                                            SemanticAction::press) &&
+    const bool chosen = window.perform_semantic_action("actions.combo.popup.list.item.1", SemanticAction::press);
+    const SemanticSnapshot closed = window.semantic_snapshot();
+    require(chosen &&
                 (*combo).selected_index() == 1U && !(*combo).dropped_down() &&
                 window.focus_scope_depth() == 0U &&
-                !find_node(window.semantic_snapshot().roots,
+                !find_node(closed.roots,
                            "actions.combo.popup.list"),
             "semantic popup row press must commit, detach, and restore focus safely");
     require(window.perform_semantic_action("actions.combo", SemanticAction::expand) &&
@@ -191,7 +195,8 @@ void test_semantic_actions_use_control_behavior() {
     require(window.perform_semantic_action("actions.combo", SemanticAction::collapse) &&
                 !(*combo).dropped_down() && window.focus_scope_depth() == 0U,
             "semantic combo collapse must revoke the real popup scope");
-    require(!find_node(window.semantic_snapshot().roots,
+    const SemanticSnapshot after_close = window.semantic_snapshot();
+    require(!find_node(after_close.roots,
                        "actions.combo.popup.list"),
             "detached popup semantics must disappear in the closing generation");
 }
@@ -256,13 +261,44 @@ void test_modal_semantic_scope() {
             "stale accessible objects cannot activate background commands");
     require(window.perform_semantic_action("inside", SemanticAction::set_value, "hello"), "modal field remains editable");
     window.end_focus_scope(scope);
-    require(find_node(window.semantic_snapshot().roots, "outside"), "closing modal restores semantic tree");
+    const SemanticSnapshot outside_snapshot = window.semantic_snapshot();
+    require(find_node(outside_snapshot.roots, "outside"), "closing modal restores semantic tree");
+}
+
+// The helper every control's virtual semantic children used to copy, kept
+// verbatim as the reference the shared helper must match byte for byte.
+std::uint64_t former_copy(std::string_view id) noexcept {
+    std::uint64_t hash = 1469598103934665603ULL;
+    for (const unsigned char byte : id) {
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+    }
+    const std::uint64_t result = hash | (1ULL << 63U);
+    return result;
+}
+
+void test_virtual_runtime_ids_are_unchanged() {
+    const std::array<std::string_view, 7> ids{
+        "", "a", "foobar", "site.stack.3", "strip.tab.doc:file:///a.txt", "café",
+        "a stable ID long enough to carry the hash through many rounds of the loop"};
+    for (const std::string_view id : ids) {
+        require(virtual_semantic_runtime_id(id) == former_copy(id),
+                "the shared virtual runtime ID matches the former copies");
+        require((virtual_semantic_runtime_id(id) & (1ULL << 63U)) != 0U, "a virtual runtime ID has its top bit set");
+    }
+    // Pinned values, so a change to the reference copy cannot hide one.
+    require(virtual_semantic_runtime_id("") == 0x94650fb0739d0383ULL &&
+                virtual_semantic_runtime_id("a") == 0xc4bd8ad473cd9906ULL &&
+                virtual_semantic_runtime_id("site.stack.3") == 0xe9a74df8c42ada75ULL &&
+                virtual_semantic_runtime_id("café") == 0x8385b6459d53dff7ULL,
+            "the virtual runtime IDs keep their recorded values");
 }
 
 } // namespace
 
 int main() {
     try {
+        test_virtual_runtime_ids_are_unchanged();
         test_modal_semantic_scope();
         test_subtree_visibility_advances_semantic_generation();
         test_snapshot_roles_states_hierarchy_and_json();

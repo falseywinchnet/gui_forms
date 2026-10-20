@@ -1,5 +1,9 @@
 #include "drop_down_layer.hpp"
 
+#include "../list_box/list_box_anatomy.hpp"
+#include "gui_forms/theme/part_painting/part_painting.hpp"
+
+#include <array>
 #include <utility>
 #include <algorithm>
 #include <cmath>
@@ -59,6 +63,116 @@ bool DropDownList::on_semantic_child_action(std::string_view id, SemanticAction 
     const bool result = ListBox::on_semantic_child_action(id, action, value);
     synchronize_scroll();
     return result;
+}
+
+void DropDownList::set_matches(std::vector<TextMatchRange> matches) {
+    require_mutable();
+    matches_ = std::move(matches);
+    invalidate(Dirty::paint);
+}
+
+Rect DropDownList::match_bounds(std::size_t index, Rect row) const {
+    if (index >= matches_.size() || index >= items().size()) return {};
+    const TextMatchRange match = matches_[index];
+    const std::string_view text = items()[index];
+    if (match.length == 0U || match.offset >= text.size()) return {};
+    // ListBox keeps its selected indices sorted.
+    const std::span<const std::size_t> chosen = selected_indices();
+    const bool selected = std::binary_search(chosen.begin(), chosen.end(), index);
+    if (selected) return {};
+    const std::size_t end = std::min(text.size(), match.offset + match.length);
+    // The run's edges are the widths of the text before them, measured as
+    // ListBox measures a row's label.
+    const FontSpec label_font = effective_font(font());
+    const ResolvedTextLayout before = resolve_text_layout_utf8(text.substr(0U, match.offset), label_font);
+    const ResolvedTextLayout through = resolve_text_layout_utf8(text.substr(0U, end), label_font);
+    const double left = row_text_left() + before.logical_size.width;
+    const double right = row_text_left() + through.logical_size.width;
+    const Rect bounds{left, row.y + 3.0, std::max(0.0, right - left), std::max(0.0, row.height - 6.0)};
+    return bounds;
+}
+
+void DropDownList::paint_row_adornment(Painter& painter, std::size_t index, Rect row_bounds,
+                                       bool, bool) const {
+    const Rect bounds = match_bounds(index, row_bounds);
+    if (bounds.empty()) return;
+    // No vocabulary atom names a text match: it is a selection part of the
+    // selection family in the hot state, the lighter plate the hovered row
+    // uses, under the label's text (an owner vocabulary decision).
+    AnatomyStateSet states;
+    states.insert(AnatomyState::hot);
+    const PartPaint part{.role = PartRole::selection, .bounds = bounds, .states = states,
+                         .family = ControlVisualRole::selection};
+    paint_part(painter, *this, part);
+}
+
+namespace {
+
+// The matched text takes the hot state of its own.
+constexpr std::array<AnatomyState, 1> match_part_states{{AnatomyState::hot}};
+
+constexpr std::array<PartField<DropDownList::ItemParts>, 4> drop_down_item_part_fields{{
+    {.declaration = {.name = "row", .role = PartRole::region, .composed_from = {}},
+     .member = &DropDownList::ItemParts::row},
+    {.declaration = {.name = "label", .role = PartRole::label, .composed_from = {}},
+     .member = &DropDownList::ItemParts::label},
+    {.declaration = {.name = "row_focus", .role = PartRole::focus, .composed_from = {}},
+     .member = &DropDownList::ItemParts::row_focus},
+    {.declaration = {.name = "match", .role = PartRole::selection, .composed_from = {},
+                     .states = match_part_states},
+     .member = &DropDownList::ItemParts::match},
+}};
+
+constexpr std::array<AnatomyState, 3> drop_down_item_states{{
+    AnatomyState::selected, AnatomyState::hot, AnatomyState::current,
+}};
+
+constexpr std::array<PartDeclaration, 4> drop_down_item_parts_declared =
+    part_declarations(drop_down_item_part_fields);
+
+constexpr std::array<ItemSystemDeclaration, 1> drop_down_list_item_systems{{
+    {.name = "item", .parts = drop_down_item_parts_declared, .states = drop_down_item_states,
+     .custom_states = {}},
+}};
+
+constexpr ControlAnatomy drop_down_list_anatomy{
+    .control_id = "drop_down_list",
+    .parts = list_box_detail::parts,
+    .states = scrollable_detail::states,
+    .custom_states = {},
+    .item_systems = drop_down_list_item_systems,
+};
+
+} // namespace
+
+const ControlAnatomy& DropDownList::anatomy() const noexcept {
+    return drop_down_list_anatomy;
+}
+
+DropDownList::ItemParts DropDownList::drop_down_item_parts(std::size_t item) const {
+    const ListBox::ItemParts base = list_item_parts(item);
+    ItemParts record;
+    record.row = base.row;
+    record.label = base.label;
+    record.row_focus = base.row_focus;
+    // The row as paint lays it out, before ListBox clips it to the content.
+    const Rect bounds = local_bounds();
+    const double row_height = item_height() * effective_text_scale();
+    const Rect row{2.0, 2.0 + static_cast<double>(item) * row_height,
+                   std::max(0.0, bounds.width - 4.0), row_height};
+    const Rect content{2.0, 2.0, std::max(0.0, bounds.width - 4.0), std::max(0.0, bounds.height - 4.0)};
+    const Rect match = Rect::intersection(match_bounds(realized_item_index(item), row), content);
+    if (!match.empty()) {
+        record.match = PartGeometry::from_bounds(match);
+        record.match.states.insert(AnatomyState::hot);
+    }
+    return record;
+}
+
+void DropDownList::publish_realized_item_geometry(std::size_t item,
+                                                  std::span<PartGeometry> geometry) const {
+    const ItemParts record = drop_down_item_parts(item);
+    write_item_parts(anatomy().item_systems.front(), drop_down_item_part_fields, record, geometry);
 }
 
 DropDownLayer::DropDownLayer(StableId stable_id) : Panel(std::move(stable_id)) {

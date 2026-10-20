@@ -97,6 +97,7 @@ const SemanticNode* find_semantic(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_semantic(std::vector<SemanticNode>&& nodes, std::string_view id) = delete;
 
 InstrumentFieldSpec choice(std::string id, std::string name,
                            std::string value,

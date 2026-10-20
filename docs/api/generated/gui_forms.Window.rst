@@ -81,6 +81,23 @@ gui_forms::Window
       **host_services** : ``HostServices*``, read-only
          The services of the attached native host, or null when none is attached.
 
+      **key_map** : ``KeyMap``, read-only
+         The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), from the
+         window's :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`: the host's defaults with the application's
+         rebindings over them. Until a host seeds them, the defaults are the PC
+         convention (``pc_key_map``: Ctrl+F4 closes a document, Shift+F10 or the
+         context-menu key opens a context menu); the first host session seeds
+         them with its host's (``HostCapabilities::key_map``), so under the macOS
+         host Cmd+W closes a document. Controls ask it through
+         ``Control::effective_key_map``.
+
+      **key_bindings** : ``std::shared_ptr<KeyBindings>``
+         The window's :cpp:class:`KeyBindings <gui_forms::KeyBindings>`, which an application shares among all its
+         windows (decision DK-44): ``Application::run`` gives every window the
+         application's one set, and a floating window takes its main window's.
+         A window made on its own has a set of its own. :cpp:func:`set_key_bindings <gui_forms::Window::set_key_bindings>` shares
+         another set; a null set throws ``std::invalid_argument``.
+
       **paint_lease_snapshot** : ``PaintLeaseSnapshot``, read-only
          Returns revision, epoch, lease, wake, deferral, and receipt counters plus current lease state.
 
@@ -198,6 +215,15 @@ gui_forms::Window
       **active_changed** : ``Event<bool>``
          Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
 
+      **focused_control_changed** : ``Event<const FocusedControlChange&>``
+         Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
+         none), once the controls' own focus notifications ran, with the old and
+         new controls' runtime identities and the new one's stable identity. It is
+         not raised when focus is dropped because the focused control left the
+         window. A handler may request focus again; that move raises its own
+         event afterwards. A :cpp:class:`DockSite <gui_forms::DockSite>` follows it to keep its workspace's active
+         panel.
+
       **dialog_result_changed** : ``Event<DialogResult>``
          Raised after :cpp:func:`dialog_result <gui_forms::Window::dialog_result>` changes, with the new result.
 
@@ -228,10 +254,18 @@ gui_forms::Window
         - Changes the client size and marks the whole tree for layout, which runs at the next flush or geometry read.
       * - :cpp:func:`create_framebuffer <gui_forms::Window::create_framebuffer>`
         -  
+      * - :cpp:func:`snapshot_control <gui_forms::Window::snapshot_control>`
+        - A picture of a control and its descendants as last laid out: their retained painting is replayed, every paint plane in order, into an offscreen framebuffer of the host's own CPU raster at the given scale, and the pixels are registered as one of the window's images (premultiplied BGRA).
+      * - :cpp:func:`release_control_snapshot <gui_forms::Window::release_control_snapshot>`
+        - Removes a snapshot's image; false when it is not there.
       * - :cpp:func:`resolve_text_layout_utf8 <gui_forms::Window::resolve_text_layout_utf8>`
         -  
       * - :cpp:func:`shares_resources_with <gui_forms::Window::shares_resources_with>`
         -  
+      * - :cpp:func:`rebind_key_command <gui_forms::Window::rebind_key_command>`
+        - Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the window's key bindings, so in every window sharing them, over the host's default; an empty binding leaves the command without keys.
+      * - :cpp:func:`restore_key_command <gui_forms::Window::restore_key_command>`
+        - Returns a command to the host's default.
       * - :cpp:func:`begin_update <gui_forms::Window::begin_update>`
         - Opens an update scope and returns its :cpp:class:`UpdateScope <gui_forms::UpdateScope>` token.
       * - :cpp:func:`perform_layout <gui_forms::Window::perform_layout>`
@@ -314,6 +348,14 @@ gui_forms::Window
         - Shows a detached control as an overlay owned by another control, such as a menu or a drop-down, and returns a :cpp:class:`PopupToken <gui_forms::PopupToken>` that closes it.
       * - :cpp:func:`register_accelerator <gui_forms::Window::register_accelerator>`
         - Installs a window-wide keyboard shortcut owned by a :cpp:class:`Component <gui_forms::Component>`.
+      * - :cpp:func:`offer_accelerators <gui_forms::Window::offer_accelerators>`
+        - Offers a key press to the accelerators that wait for the focused route, as a key the window's own route declined; true when one took it.
+      * - :cpp:func:`command_target <gui_forms::Window::command_target>`
+        -  
+      * - :cpp:func:`resolve_command <gui_forms::Window::resolve_command>`
+        - Where the chain would run a command with a given identity now, without running it: a :cpp:class:`CommandRouteResult <gui_forms::CommandRouteResult>` whose outcome is handled, with the stage and target name, or unhandled.
+      * - :cpp:func:`route_command <gui_forms::Window::route_command>`
+        - Offers an invocation to the chain in order (the focused control and its ancestors, the active panel, the active document, the main window) and runs the first handler for its command identity.
       * - :cpp:func:`dispatch_pointer <gui_forms::Window::dispatch_pointer>`
         - Delivers a pointer event, as the host does for mouse, pen and touch input, and returns whether a control handled it.
       * - :cpp:func:`dispatch_key <gui_forms::Window::dispatch_key>`
@@ -346,6 +388,8 @@ gui_forms::Window
         - Host adapters install a thread-safe wake primitive.
       * - :cpp:func:`set_paint_wake_handler <gui_forms::Window::set_paint_wake_handler>`
         - Host adapters also install a paint wake seam.
+      * - :cpp:func:`set_command_target <gui_forms::Window::set_command_target>`
+        - Names the :cpp:class:`CommandTarget <gui_forms::CommandTarget>` of one stage of the command routing chain: the active panel, the active document or the main window, or clears it with null.
 
    .. seealso::
 
@@ -557,6 +601,29 @@ gui_forms::Window
 
       The services of the attached native host, or null when none is attached.
 
+   .. cpp:function:: const KeyMap& key_map() const noexcept
+
+      The keys of the named keyboard commands (:cpp:enum:`KeyCommand <gui_forms::KeyCommand>`), from the
+      window's :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`: the host's defaults with the application's
+      rebindings over them. Until a host seeds them, the defaults are the PC
+      convention (``pc_key_map``: Ctrl+F4 closes a document, Shift+F10 or the
+      context-menu key opens a context menu); the first host session seeds
+      them with its host's (``HostCapabilities::key_map``), so under the macOS
+      host Cmd+W closes a document. Controls ask it through
+      ``Control::effective_key_map``.
+
+   .. cpp:function:: const std::shared_ptr<KeyBindings>& key_bindings() const noexcept
+
+      The window's :cpp:class:`KeyBindings <gui_forms::KeyBindings>`, which an application shares among all its
+      windows (decision DK-44): ``Application::run`` gives every window the
+      application's one set, and a floating window takes its main window's.
+      A window made on its own has a set of its own. :cpp:func:`set_key_bindings <gui_forms::Window::set_key_bindings>` shares
+      another set; a null set throws ``std::invalid_argument``.
+
+   .. cpp:function:: void set_key_bindings(std::shared_ptr<KeyBindings> bindings)
+
+      Sets :cpp:func:`key_bindings <gui_forms::Window::key_bindings>`; see the property's description above.
+
    .. cpp:function:: PaintLeaseSnapshot paint_lease_snapshot() const noexcept
 
    .. cpp:function:: PresentationAvailability presentation_availability() const noexcept
@@ -707,6 +774,16 @@ gui_forms::Window
 
       Raised after :cpp:func:`active <gui_forms::Window::active>` changes, with the new value.
 
+   .. cpp:function:: Event<const FocusedControlChange&>& focused_control_changed() noexcept
+
+      Raised after :cpp:func:`request_focus <gui_forms::Window::request_focus>` moved focus to another control (or to
+      none), once the controls' own focus notifications ran, with the old and
+      new controls' runtime identities and the new one's stable identity. It is
+      not raised when focus is dropped because the focused control left the
+      window. A handler may request focus again; that move raises its own
+      event afterwards. A :cpp:class:`DockSite <gui_forms::DockSite>` follows it to keep its workspace's active
+      panel.
+
    .. cpp:function:: Event<DialogResult>& dialog_result_changed() noexcept
 
       Raised after :cpp:func:`dialog_result <gui_forms::Window::dialog_result>` changes, with the new result.
@@ -744,9 +821,41 @@ gui_forms::Window
 
    .. cpp:function:: std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
 
+   .. cpp:function:: std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale)
+
+      A picture of a control and its descendants as last laid out: their
+      retained painting is replayed, every paint plane in order, into an
+      offscreen framebuffer of the host's own CPU raster at the given scale,
+      and the pixels are registered as one of the window's images
+      (premultiplied BGRA). Areas the subtree does not paint stay
+      transparent. Returns the image, its logical size, scale and pixel size,
+      or none without a framebuffer painter (headless windows), during a
+      paint, for a control of another window or not shown, or a scale outside
+      (0, 8]. It costs one replay of the subtree and one copy of its pixels;
+      the image lives until :cpp:func:`release_control_snapshot <gui_forms::Window::release_control_snapshot>` or the window's end.
+      The docking drag's stamp uses it.
+
+   .. cpp:function:: bool release_control_snapshot(ImageId image)
+
+      Removes a snapshot's image; false when it is not there.
+
    .. cpp:function:: ResolvedTextLayout resolve_text_layout_utf8(std::string_view utf8, FontSpec effective_font) const
 
    .. cpp:function:: bool shares_resources_with(const Window& other) const noexcept
+
+   .. cpp:function:: void rebind_key_command(KeyCommand command, KeyBinding binding)
+
+      Binds a :cpp:enum:`KeyCommand <gui_forms::KeyCommand>` to a :cpp:class:`KeyBinding <gui_forms::KeyBinding>` (up to two chords) in the
+      window's key bindings, so in every window sharing them, over the host's
+      default; an empty binding leaves the command without keys. The
+      rebinding is kept when a host attaches later. A
+      command outside the enumeration, or a chord with unknown modifier bits
+      or modifiers without a key, throws ``std::invalid_argument`` and binds
+      nothing.
+
+   .. cpp:function:: void restore_key_command(KeyCommand command)
+
+      Returns a command to the host's default.
 
    .. cpp:function:: UpdateScope begin_update()
 
@@ -964,6 +1073,29 @@ gui_forms::Window
       ``AcceleratorOptions::before_focused_route`` is set. The returned token,
       or disposing the owner, removes it.
 
+   .. cpp:function:: bool offer_accelerators(const KeyEvent& event)
+
+      Offers a key press to the accelerators that wait for the focused route,
+      as a key the window's own route declined; true when one took it. A
+      floating docking window passes the keys it did not use to its main
+      window this way (stage DK phase D4), so shortcuts work from it.
+
+   .. cpp:function:: std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const
+
+   .. cpp:function:: CommandRouteResult resolve_command(std::string_view command_id) const
+
+      Where the chain would run a command with a given identity now, without
+      running it: a :cpp:class:`CommandRouteResult <gui_forms::CommandRouteResult>` whose outcome is handled, with the
+      stage and target name, or unhandled.
+
+   .. cpp:function:: CommandRouteResult route_command(const CommandInvocation& invocation)
+
+      Offers an invocation to the chain in order (the focused control and its
+      ancestors, the active panel, the active document, the main window) and
+      runs the first handler for its command identity. Exactly one handler
+      runs, or none; a routing nested more than eight deep inside handlers is
+      refused. ``Command::execute_routed`` is the usual caller.
+
    .. cpp:function:: bool dispatch_pointer(PointerEvent event)
 
       Delivers a pointer event, as the host does for mouse, pen and touch
@@ -1027,3 +1159,14 @@ gui_forms::Window
    .. cpp:function:: void set_paint_wake_handler(std::function<void()> wake)
 
       Host adapters also install a paint wake seam. Retained invalidation may originate from another Window's callback, so relying only on the host currently dispatching input can strand valid dirty state indefinitely. Wakes coalesce until the host consumes damage and remain suppressed while the model is explicitly occluded.
+
+   .. cpp:function:: void set_command_target(CommandRouteStage stage, const std::shared_ptr<CommandTarget>& target)
+
+      Names the :cpp:class:`CommandTarget <gui_forms::CommandTarget>` of one stage of the command routing chain:
+      the active panel, the active document or the main window, or clears it
+      with null. The window only observes the target; once its owner
+      destroys it, it drops out of the chain. The focused route has no
+      single target, since controls carry its targets
+      (``Control::set_command_target``), and naming it throws
+      ``std::invalid_argument``. ``command_target(stage)`` returns the named
+      target while it lives.

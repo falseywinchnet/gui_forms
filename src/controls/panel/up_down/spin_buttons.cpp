@@ -27,6 +27,20 @@ Rect spin_glyph(Rect half) noexcept {
     return glyph;
 }
 
+SpinPartGeometry spin_part_geometry(const SpinButtons& spin) {
+    const SpinHalves halves = spin_halves(spin.committed_arranged_bounds());
+    SpinPartGeometry parts;
+    parts.upper_arrow = PartGeometry::from_bounds(halves.upper);
+    parts.lower_arrow = PartGeometry::from_bounds(halves.lower);
+    parts.upper_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
+    parts.lower_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
+    parts.upper_arrow.states = spin.half_states(SpinHalf::upper);
+    parts.lower_arrow.states = spin.half_states(SpinHalf::lower);
+    parts.upper_glyph.states = parts.upper_arrow.states;
+    parts.lower_glyph.states = parts.lower_arrow.states;
+    return parts;
+}
+
 SpinButtons::SpinButtons(StableId stable_id) : Control(std::move(stable_id)) {
     set_focusable(false);
     set_cursor(CursorKind::hand);
@@ -65,7 +79,8 @@ SpinHalf SpinButtons::half_at(Point window_position) const {
     if (!bounds.contains(window_position)) return SpinHalf::none;
     const SpinHalves halves = spin_halves({0.0, 0.0, bounds.width, bounds.height});
     const double local_y = window_position.y - bounds.y;
-    return local_y < halves.lower.y ? SpinHalf::upper : SpinHalf::lower;
+    const SpinHalf half = local_y < halves.lower.y ? SpinHalf::upper : SpinHalf::lower;
+    return half;
 }
 
 void SpinButtons::show(SpinHalf hot, SpinHalf pressed) {
@@ -92,7 +107,8 @@ void SpinButtons::on_pointer(PointerEvent& event) {
     if (event.button != PointerButton::primary) return;
     if (event.action == PointerAction::down && half != SpinHalf::none) {
         show(half, half);
-        stepped_.emit(half == SpinHalf::upper ? 1 : -1);
+        const int step = half == SpinHalf::upper ? 1 : -1;
+        stepped_.emit(step);
         event.handled = true;
     } else if (event.action == PointerAction::up) {
         show(half, SpinHalf::none);

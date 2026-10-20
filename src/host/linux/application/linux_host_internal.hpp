@@ -34,7 +34,7 @@ protected:
   HostWindowFrameResult frame_impl(HostWindowId window) override;
   HostServiceStatus request_frame_impl(HostWindowId window, Rect content) override;
   HostScreenPointResult pointer_position_impl() override;
-  HostWindowAtResult window_at_impl(Point point) override;
+  HostWindowAtResult window_at_impl(DesktopLogicalPoint point) override;
   HostServiceStatus bring_to_front_impl(HostWindowId window) override;
   HostServiceStatus destroy_window_impl(HostWindowId window) override;
   HostMonitorResult query_monitors_impl() override;
@@ -71,11 +71,11 @@ protected:
   HostServiceStatus write_clipboard_image_impl(HostImageView image) override;
   HostDialogResult show_dialog_impl(const HostDialogRequest &request) override;
   HostServiceStatus play_sound_cue_impl(const HostSoundCueRequest &) override;
-  HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id,
+  HostServiceStatus add_tray_icon_impl(HostTrayIconId icon_id,
                                        const HostTrayIconRequest &request) override;
-  HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id,
+  HostServiceStatus update_tray_icon_impl(HostTrayIconId icon_id,
                                           const HostTrayIconRequest &request) override;
-  void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override;
+  void remove_tray_icon_impl(HostTrayIconId icon_id) noexcept override;
 
 private:
   struct CursorEntry final {

@@ -131,12 +131,12 @@ public:
     [[nodiscard]] std::shared_ptr<ComboBox> combo_box(std::string_view item_id) const;
     [[nodiscard]] std::shared_ptr<TextBox> text_box(std::string_view item_id) const;
     [[nodiscard]] std::shared_ptr<ProgressBar> progress_bar(std::string_view item_id) const;
-    // The checked state the strip shows for an item: its command's when it
-    // has one. Throws std::out_of_range for an unknown ID.
     // Replaces one item's text (a hosted item's accessible name). Throws
     // std::out_of_range for an unknown ID and std::invalid_argument for
     // invalid UTF-8.
     void set_item_text(std::string_view item_id, std::string text);
+    // The checked state the strip shows for an item: its command's when it
+    // has one. Throws std::out_of_range for an unknown ID.
     [[nodiscard]] bool item_checked(std::string_view item_id) const;
     void set_item_checked(std::string_view item_id, bool checked);
     // Whether the grip is shown at the strip's start.
@@ -298,6 +298,10 @@ private:
     [[nodiscard]] bool overflow_at(Point window_point) const;
     [[nodiscard]] std::optional<std::size_t> next_interactive(std::size_t start, int direction) const;
     void click(std::size_t index);
+    // Flips a check-on-click item's checked state: its command's when it has
+    // one, else the strip's own. Returns whether the strip's own state
+    // changed (a command's change reaches the strip through on_command_state).
+    [[nodiscard]] bool flip_checked(std::size_t index);
     void set_hot(std::optional<std::size_t> index, ItemZone zone);
     void focus_item(std::optional<std::size_t> index);
     void paint_item(Painter& painter, std::size_t index, Rect bounds) const;

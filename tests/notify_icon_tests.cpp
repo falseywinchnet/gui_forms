@@ -103,34 +103,34 @@ void contract() {
     SubscriptionToken token = services.tray_icon_events().subscribe(
         Delegate<const HostTrayIconEvent&>::bind<EventLog, &EventLog::on_event>(log));
     const HostTrayIconResult added = services.add_tray_icon(icon_request("Radio"));
-    require(added.status.accepted() && added.icon_id == 1U && services.tray_icon_live(1U) &&
+    require(added.status.accepted() && added.icon_id == HostTrayIconId{1U} && services.tray_icon_live(HostTrayIconId{1U}) &&
                 services.snapshot().tray_icons == 1U,
             "an icon is added with the first identity");
-    require(services.tray_icon(1U) != nullptr && (*services.tray_icon(1U)).images.size() == 2U,
+    require(services.tray_icon(HostTrayIconId{1U}) != nullptr && (*services.tray_icon(HostTrayIconId{1U})).images.size() == 2U,
             "the host receives every image size");
-    require(services.update_tray_icon(9U, icon_request("x")).error == HostServiceError::invalid_argument,
+    require(services.update_tray_icon(HostTrayIconId{9U}, icon_request("x")).error == HostServiceError::invalid_argument,
             "an unknown identity is refused");
-    require(services.update_tray_icon(1U, icon_request("Radio, muted")).accepted() &&
+    require(services.update_tray_icon(HostTrayIconId{1U}, icon_request("Radio, muted")).accepted() &&
                 services.snapshot().tray_icon_updates == 1U,
             "a live icon updates");
-    require(services.show_tray_notification(1U, {"Scan", "", HostTrayNotificationIcon::none, 0U}).error ==
+    require(services.show_tray_notification(HostTrayIconId{1U}, {"Scan", "", HostTrayNotificationIcon::none, 0U}).error ==
                 HostServiceError::invalid_argument,
             "a notification without text is refused");
-    require(services.show_tray_notification(1U, {"Scan", "42 stations", HostTrayNotificationIcon::information, 0U})
+    require(services.show_tray_notification(HostTrayIconId{1U}, {"Scan", "42 stations", HostTrayNotificationIcon::information, 0U})
                 .accepted(),
             "a notification is shown");
     services.queue_tray_menu_choice("quit");
     HostTrayMenuRequest menu;
     menu.items = {{"open", "Open"}, {"", "", true, false, true}, {"quit", "Quit"}};
-    const HostTrayMenuResult chosen = services.show_tray_menu(1U, menu);
+    const HostTrayMenuResult chosen = services.show_tray_menu(HostTrayIconId{1U}, menu);
     require(chosen.status.accepted() && chosen.chosen_id == "quit", "a native menu returns the chosen row");
     HostTrayMenuRequest unnamed;
     unnamed.items = {{"", "Nameless"}};
-    require(services.show_tray_menu(1U, unnamed).status.error == HostServiceError::invalid_argument,
+    require(services.show_tray_menu(HostTrayIconId{1U}, unnamed).status.error == HostServiceError::invalid_argument,
             "a menu row without an identity is refused");
 
     services.simulate_tray_icon_event({1U, HostTrayIconAction::double_click});
-    services.simulate_tray_icon_event({7U, HostTrayIconAction::click});
+    services.simulate_tray_icon_event({HostTrayIconId{7U}, HostTrayIconAction::click});
     require(log.events.size() == 1U && log.events[0].action == HostTrayIconAction::double_click &&
                 services.snapshot().tray_events == 1U,
             "events reach observers only for live icons");
@@ -145,8 +145,8 @@ void contract() {
     }
     require(services.add_tray_icon(icon_request("one too many")).status.error == HostServiceError::too_large,
             "icons past the bound are refused");
-    require(services.remove_tray_icon(1U).accepted() && !services.tray_icon_live(1U) &&
-                services.remove_tray_icon(1U).error == HostServiceError::invalid_argument,
+    require(services.remove_tray_icon(HostTrayIconId{1U}).accepted() && !services.tray_icon_live(HostTrayIconId{1U}) &&
+                services.remove_tray_icon(HostTrayIconId{1U}).error == HostServiceError::invalid_argument,
             "a removed identity is gone and not reused");
     services.shutdown();
     require(services.snapshot().tray_icons == 0U &&
@@ -219,7 +219,7 @@ void component() {
         Delegate<const MenuItemInvocation&>::bind<ClickLog, &ClickLog::on_menu>(log)));
 
     // This host's first icon: identity 1.
-    const std::uint64_t id = 1U;
+    const HostTrayIconId id{1U};
     services.simulate_tray_icon_event({id, HostTrayIconAction::click});
     services.simulate_tray_icon_event({id, HostTrayIconAction::double_click});
     require(log.clicks.size() == 1U && log.clicks[0] == PointerButton::primary && log.double_clicks == 1,
@@ -260,6 +260,38 @@ void component() {
     require(services.snapshot().tray_icons == 0U, "disposal removes the icon");
 }
 
+// A menu command that takes the icon's context menu away while it runs.
+struct DropIconMenu final {
+    NotifyIcon* icon{};
+    void operator()(const CommandInvocation&) const { (*icon).set_context_menu(nullptr); }
+};
+
+// The chosen row's command may replace or remove the icon's context menu;
+// the invocation is still reported, with the menu and row it ran from.
+void menu_removed_by_its_command() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("notify.menu-removed"));
+    Window window(root, {320.0, 200.0});
+    host::HeadlessHost headless(window);
+    host::HeadlessHostServices& services = static_cast<host::HeadlessHostServices&>(headless.services());
+    NotifyIcon icon(window);
+    icon.set_icon({solid_image(16U)});
+    require(icon.set_visible(true).accepted() && icon.shown(), "the icon shows");
+    ClickLog log;
+    SubscriptionToken invoked = icon.menu_item_invoked().subscribe(
+        Delegate<const MenuItemInvocation&>::bind<ClickLog, &ClickLog::on_menu>(log));
+    const std::shared_ptr<Command> quit = std::make_shared<Command>("tray.quit", "Quit");
+    SubscriptionToken dropping = (*quit).invoked().subscribe(DropIconMenu{&icon});
+    std::shared_ptr<ContextMenu> menu = std::make_shared<ContextMenu>("tray.menu");
+    (*menu).set_items({MenuItemSpec("tray.menu.quit", MenuItemKind::command, quit)});
+    icon.set_context_menu(menu);
+    services.queue_tray_menu_choice("tray.menu.quit");
+    services.simulate_tray_icon_event({1U, HostTrayIconAction::context});
+    require(!icon.context_menu(), "the command removed the icon's menu");
+    require(log.invocations.size() == 1U && log.invocations[0].menu_id == "tray.menu" &&
+                log.invocations[0].item_id == "tray.menu.quit" && log.invocations[0].command_id == "tray.quit",
+            "the invocation is reported from the menu the row ran in");
+}
+
 void session_end() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("notify.session"));
     Window window(root, {320.0, 200.0});
@@ -279,6 +311,7 @@ int main() {
     image_selection();
     contract();
     component();
+    menu_removed_by_its_command();
     session_end();
     std::cout << "NotifyIcon: image choice, tray contract, headless host, clicks, menu, notifications, "
                  "visibility, disposal and session end passed\n";

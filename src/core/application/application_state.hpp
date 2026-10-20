@@ -95,4 +95,12 @@ void unregister_run_window(ApplicationWindowState& state) noexcept;
 // Validates one entry as Application::validate validates each entry,
 // without the run-wide rules (one primary, ownership order).
 [[nodiscard]] bool valid_window_entry(const ApplicationWindow& entry);
+// Whether an entry asks for the run's one primary window
+// (HostWindowKind::primary): no owner and not a tool window.
+[[nodiscard]] bool primary_window_entry(const ApplicationWindow& entry) noexcept;
+// Ends a window state's part in the run: it reads closed and not ready, and
+// every native operation it held is released, so its handles report
+// after_shutdown. Its stable id, identity and run stay, so
+// unregister_run_window still finds it.
+void revoke_window_state(ApplicationWindowState& state) noexcept;
 } // namespace gui_forms::detail

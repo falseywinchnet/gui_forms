@@ -32,9 +32,65 @@ def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
     return value in ('1', 'true', 'on', 'yes')
 
 
-def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False) -> None:
-    """Build, test, then install only into the explicitly supplied build SDK."""
-    toolkit: Path = build / 'gui-forms'
+SANITIZER_FLAGS: str = '-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
+
+
+SANITIZER_LINK_FLAGS: str = '-fsanitize=address,undefined'
+
+
+def sanitizer_options(host: str, lsan_suppressions: Path) -> tuple[list[str], dict[str, str]]:
+    """CMake options and the configure and test environment for the sanitized suite on host.
+
+    Address and undefined-behaviour sanitizers everywhere, and the leak
+    sanitizer where it runs inside AddressSanitizer: Linux and macOS (the
+    MinGW runtime on Windows has none). Every report stops its test, so any
+    finding fails the run. Third-party sources built by CMake (HarfBuzz,
+    FreeType) are instrumented too; the prebuilt Skia archive is not.
+
+    On macOS cmake/llvm22.cmake puts the pinned libc++ headers and runtime
+    link flags in CMAKE_<LANG>_FLAGS_INIT, which a -DCMAKE_<LANG>_FLAGS on
+    the command line replaces (the tree then compiles against Homebrew's
+    libc++ headers). There the flags go through CFLAGS, CXXFLAGS,
+    OBJCXXFLAGS and LDFLAGS instead, which CMake joins with the _INIT values
+    when it first configures the tree; OBJCXXFLAGS also instruments the
+    Objective-C++ host. Being read at the first configure only, they reach a
+    macOS tree configured earlier only after that tree is deleted.
+    """
+    detect_leaks: str = '0'
+    if host in ('linux', 'macos'):
+        detect_leaks = '1'
+    options: list[str] = ['-DCMAKE_BUILD_TYPE=RelWithDebInfo']
+    environment: dict[str, str] = {
+        'ASAN_OPTIONS': 'detect_leaks=' + detect_leaks + ':halt_on_error=1:abort_on_error=0:print_summary=1',
+        'UBSAN_OPTIONS': 'print_stacktrace=1:halt_on_error=1:print_summary=1',
+    }
+    if host == 'macos':
+        environment['CFLAGS'] = SANITIZER_FLAGS
+        environment['CXXFLAGS'] = SANITIZER_FLAGS
+        environment['OBJCXXFLAGS'] = SANITIZER_FLAGS
+        environment['LDFLAGS'] = SANITIZER_LINK_FLAGS
+    else:
+        options.extend([
+            '-DCMAKE_C_FLAGS=' + SANITIZER_FLAGS,
+            '-DCMAKE_CXX_FLAGS=' + SANITIZER_FLAGS,
+            '-DCMAKE_EXE_LINKER_FLAGS=' + SANITIZER_LINK_FLAGS,
+            '-DCMAKE_SHARED_LINKER_FLAGS=' + SANITIZER_LINK_FLAGS,
+        ])
+    if detect_leaks == '1':
+        environment['LSAN_OPTIONS'] = 'suppressions=' + str(lsan_suppressions) + ':print_suppressions=0'
+    return options, environment
+
+
+def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
+                  sanitize: bool = False, tests: str = '') -> None:
+    """Build, test, then install only into the explicitly supplied build SDK.
+
+    With sanitize, the toolkit is built in its own directory with the
+    sanitizers and only tested: nothing is installed and the installed-SDK
+    examples are not built. tests, a ctest -R pattern, narrows that run; empty
+    runs the whole suite.
+    """
+    toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
     gallery_option: str = 'ON' if gallery else 'OFF'
     miniaudio: Path = toolkit / '_deps/gui_forms_miniaudio-src'
@@ -66,6 +122,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
             run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu.sh', skia_out)
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=ON', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON',
                         '-DGUI_FORMS_SKIA_PREBUILT=ON', f'-DGUI_FORMS_SKIA_OUT={skia_out}'])
+    timeout: str = '120'
+    if sanitize:
+        sanitizer_cmake: list[str]
+        sanitizer_environment: dict[str, str]
+        sanitizer_cmake, sanitizer_environment = sanitizer_options(host, ROOT / 'gui_forms/tools/sanitizer/lsan.supp')
+        options.extend(sanitizer_cmake)
+        os.environ.update(sanitizer_environment)
+        timeout = '900'
     run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
@@ -74,7 +138,12 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
     run('cmake', '--build', toolkit, '--parallel', jobs)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', '120')
+    selection: list[str] = []
+    if tests:
+        selection = ['-R', tests]
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout, *selection)
+    if sanitize:
+        return
     run('cmake', '--install', toolkit)
     examples: Path = build / 'installed-reference-examples'
     run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples,
@@ -87,12 +156,19 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--sanitize', action='store_true',
+                        help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
+                             'and macOS) and only test')
+    parser.add_argument('--tests', default='',
+                        help='with --sanitize, run only the tests matching this ctest -R pattern')
     parser.add_argument('--gallery', action='store_true',
                         help='also configure GUI_FORMS_BUILD_GALLERY=ON '
                              '(or set GUI_FORMS_CI_BUILD_GALLERY=1); default OFF')
     args: argparse.Namespace = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
+    if args.tests and not args.sanitize:
+        parser.error('--tests narrows the sanitized run only')
     hosts: dict[str, str] = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}
     host: str = hosts[platform.system()]
     architecture: str = 'x64'
@@ -102,7 +178,7 @@ def main() -> None:
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
-                  gallery_enabled(args.gallery, dict(os.environ)))
+                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests)
 
 
 if __name__ == '__main__':

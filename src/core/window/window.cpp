@@ -124,6 +124,8 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.position_in_set = descriptor.position_in_set;
     node.set_size = descriptor.set_size;
     node.has_popup = descriptor.has_popup;
+    node.controlled_panel = descriptor.controlled_panel;
+    node.orientation = descriptor.orientation;
     node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
@@ -156,6 +158,19 @@ bool dispatch_semantic_child_action(Control::Ptr control,
         if (dispatch_semantic_child_action(child, stable_id, action, value)) return true;
     }
     return false;
+}
+
+// Whether `control` is the F6 region `region` or lies inside it.
+bool region_holds(const Control& region, const Control& control) noexcept {
+    const bool held = &region == &control || region.contains(control);
+    return held;
+}
+
+// Whether two F6 regions are the same control or one is inside the other,
+// which the region list refuses.
+bool regions_nest(const Control& first, const Control& second) noexcept {
+    const bool nest = region_holds(first, second) || region_holds(second, first);
+    return nest;
 }
 
 } // namespace
@@ -352,6 +367,12 @@ void Window::close_accelerator(
     accelerators_.erase(found);
 }
 
+bool Window::offer_accelerators(const KeyEvent& event) {
+    require_ui_thread("accelerator offer");
+    const bool taken = dispatch_accelerator(event, false);
+    return taken;
+}
+
 bool Window::dispatch_accelerator(const KeyEvent& event, bool preemptive) {
     if (event.action != KeyAction::down) return false;
     const AcceleratorList snapshot = accelerators_;
@@ -542,6 +563,14 @@ bool Window::request_focus(const Control::Ptr& control) {
             FocusChangePublication{this, control, true});
     }
     metrics_.record_focus_transition();
+    FocusedControlChange moved{};
+    if (previous) moved.previous_id = (*previous).runtime_id();
+    const Control::Ptr current = focused_.lock();
+    if (current) {
+        moved.current_id = (*current).runtime_id();
+        moved.stable_id = std::string((*current).stable_id().value());
+    }
+    focused_control_changed_.emit(moved);
     return true;
 }
 
@@ -1179,8 +1208,7 @@ void Window::set_focus_regions(std::vector<Control::Ptr> regions) {
             throw std::invalid_argument("GUI.Forms focus regions must be attached to this Window");
         }
         for (std::size_t other = 0; other < index; ++other) {
-            const Control::Ptr& earlier = regions[other];
-            if (earlier == region || (*earlier).contains(*region) || (*region).contains(*earlier)) {
+            if (regions_nest(*regions[other], *region)) {
                 throw std::invalid_argument("GUI.Forms focus regions must be distinct and not nested");
             }
         }
@@ -1191,7 +1219,7 @@ void Window::set_focus_regions(std::vector<Control::Ptr> regions) {
     for (const Control::Ptr& region : regions) {
         FocusRegion entry;
         entry.region = region;
-        if (focused && (focused == region || (*region).contains(*focused))) entry.remembered = focused;
+        if (focused && region_holds(*region, *focused)) entry.remembered = focused;
         next.push_back(std::move(entry));
     }
     focus_regions_.swap(next);
@@ -1213,12 +1241,12 @@ bool Window::add_focus_region(const Control::Ptr& region) {
     for (const FocusRegion& entry : focus_regions_) {
         const Control::Ptr existing = entry.region.lock();
         if (!existing) continue;
-        if (existing == region || (*existing).contains(*region) || (*region).contains(*existing)) return false;
+        if (regions_nest(*existing, *region)) return false;
     }
     FocusRegion entry;
     entry.region = region;
     const Control::Ptr focused = focused_.lock();
-    if (focused && (focused == region || (*region).contains(*focused))) entry.remembered = focused;
+    if (focused && region_holds(*region, *focused)) entry.remembered = focused;
     focus_regions_.push_back(std::move(entry));
     return true;
 }
@@ -1226,7 +1254,7 @@ bool Window::add_focus_region(const Control::Ptr& region) {
 void Window::remember_region_focus(const Control::Ptr& control) {
     for (FocusRegion& entry : focus_regions_) {
         const Control::Ptr region = entry.region.lock();
-        if (region && (region == control || (*region).contains(*control))) entry.remembered = control;
+        if (region && region_holds(*region, *control)) entry.remembered = control;
     }
 }
 
@@ -1238,10 +1266,9 @@ bool Window::focus_into_region(FocusRegion& entry) {
         return false;
     }
     const Control::Ptr remembered = entry.remembered.lock();
-    if (remembered && (*remembered).is_alive() && (*remembered).attached_window() == this &&
-        (remembered == region || (*region).contains(*remembered)) && request_focus(remembered)) {
-        return true;
-    }
+    const bool remembered_usable = remembered && (*remembered).is_alive() &&
+        (*remembered).attached_window() == this && region_holds(*region, *remembered);
+    if (remembered_usable && request_focus(remembered)) return true;
     const ControlList candidates = focus_candidates(region);
     for (const Control::Ptr& candidate : candidates) {
         if (request_focus(candidate)) return true;
@@ -1258,23 +1285,24 @@ bool Window::move_focus_region(bool forward) {
     std::optional<std::size_t> current{};
     for (std::size_t index = 0; index < count && focused; ++index) {
         const Control::Ptr region = focus_regions_[index].region.lock();
-        if (region && (region == focused || (*region).contains(*focused))) {
+        if (region && region_holds(*region, *focused)) {
             current = index;
             break;
         }
     }
-    // Try every other region once, in order from the current one.
-    for (std::size_t step = 0; step < count; ++step) {
-        std::size_t index = 0;
-        if (!current) {
-            index = forward ? step : count - 1U - step;
-        } else if (step + 1U == count) {
-            break;
-        } else if (forward) {
-            index = (*current + 1U + step) % count;
-        } else {
-            index = (*current + count - 1U - step) % count;
-        }
+    // The regions are tried one after another from `origin`, wrapping: from
+    // inside a region, each other region once, starting beside it; from
+    // outside every region, all of them, from the first (forward) or the
+    // last (backward), as if leaving a region just before the first or just
+    // after the last.
+    std::size_t origin = forward ? count - 1U : 0U;
+    std::size_t attempts = count;
+    if (current) {
+        origin = *current;
+        attempts = count - 1U;
+    }
+    for (std::size_t step = 0; step < attempts; ++step) {
+        const std::size_t index = forward ? (origin + 1U + step) % count : (origin + count - 1U - step) % count;
         if (focus_into_region(focus_regions_[index])) return true;
     }
     return false;

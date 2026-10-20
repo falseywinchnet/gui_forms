@@ -2,6 +2,8 @@
 
 #include "gui_forms/window/update_scope/update_scope.hpp"
 
+#include "gui_forms/commands/command_route/command_route.hpp"
+
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
@@ -157,6 +159,15 @@ struct PointerCaptureChange final {
     std::uint64_t pointer_id{};
 };
 
+// Focus moved from one control to another (or to or from none) through
+// request_focus. `previous_id` and `current_id` are zero for none;
+// `stable_id` is the newly focused control's, or empty.
+struct FocusedControlChange final {
+    RuntimeId previous_id{};
+    RuntimeId current_id{};
+    std::string stable_id;
+};
+
 struct ControlAvailabilityChange final {
     RuntimeId control_id{};
     std::string stable_id;
@@ -237,6 +248,16 @@ struct DialogKeySnapshot final {
     std::uint64_t mnemonic_cycles{};
 };
 
+// A control subtree's picture (Window::snapshot_control): the registered
+// image, the logical size it covers and its pixels per logical unit.
+struct ControlSnapshot final {
+    ImageId image{};
+    Size logical_size{};
+    double scale{};
+    std::uint32_t pixel_width{};
+    std::uint32_t pixel_height{};
+};
+
 class Window {
 public:
     explicit Window(Control::Ptr root, Size client_size = {});
@@ -281,6 +302,28 @@ public:
     // Created framebuffers own their rendering state independently of the host.
     void set_framebuffer_painter(Painter* painter);
     [[nodiscard]] std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale);
+    // A picture of a control and its descendants as the window last laid
+    // them out (stage DK phase D3: the drag stamp, owner decision D1): the
+    // subtree's retained display chunks are replayed, every paint plane in
+    // order, into an offscreen framebuffer of the host's own CPU raster at
+    // `scale` device pixels per logical unit, and the pixels are registered
+    // as one of this window's images (its application's, where it shares
+    // ApplicationResources; premultiplied BGRA). Areas the subtree
+    // does not paint stay transparent; the window's backplane is not drawn.
+    // None, changing nothing, while no framebuffer painter is installed (a
+    // headless window, a host whose fonts are not ready), during a paint,
+    // for a control of another window or not shown, for a scale outside
+    // (0, 8], or when the framebuffer or the image registry refuses.
+    // Cost: one replay of the subtree into ceil(width * scale) by
+    // ceil(height * scale) pixels and one copy of them into the registry;
+    // chunks the replay had to rebuild are marked for the next real paint.
+    // The image lives until release_control_snapshot or the window's end.
+    [[nodiscard]] std::optional<ControlSnapshot> snapshot_control(const Control::Ptr& control, double scale);
+    // Removes a snapshot's image as remove_image does: every window sharing
+    // the registry retires its retained paint, so no chunk replays the dead
+    // image. False, changing nothing, for an image that is not there.
+    // std::logic_error off the UI thread.
+    bool release_control_snapshot(ImageId image);
     [[nodiscard]] TextMetricsProvider* text_metrics_provider() const noexcept {
         return text_metrics_provider_;
     }
@@ -319,6 +362,22 @@ public:
     [[nodiscard]] HostServices* host_services() const noexcept {
         return host_services_;
     }
+    // The keys of the named keyboard commands (owner decisions DK-30 and
+    // DK-44): the window's KeyBindings, which an application shares among all
+    // its windows (Application gives every window it runs its one set, and a
+    // floating window takes its main window's). A window made alone has a
+    // set of its own. The first HostSession to attach seeds the set with the
+    // host's defaults (HostCapabilities::key_map); the PC convention holds
+    // until then. Controls ask through Control::effective_key_map.
+    [[nodiscard]] const KeyMap& key_map() const noexcept { return (*key_bindings_).map(); }
+    [[nodiscard]] const std::shared_ptr<KeyBindings>& key_bindings() const noexcept { return key_bindings_; }
+    // Shares `bindings` with this window. A null pointer throws
+    // std::invalid_argument and changes nothing.
+    void set_key_bindings(std::shared_ptr<KeyBindings> bindings);
+    // KeyBindings::rebind and restore on the window's set, for every window
+    // sharing it. Throw std::invalid_argument as those do.
+    void rebind_key_command(KeyCommand command, KeyBinding binding);
+    void restore_key_command(KeyCommand command);
 
     [[nodiscard]] UpdateScope begin_update();
     void perform_layout();
@@ -460,6 +519,14 @@ public:
     [[nodiscard]] Control::Ptr hit_test(Point position);
     bool request_focus(const Control::Ptr& control);
     [[nodiscard]] Control::Ptr focused_control() const noexcept { return focused_.lock(); }
+    // Raised by request_focus after focus moved, once the controls' own
+    // focus notifications (on_focus_changed, focus_observed) ran; not raised
+    // when focus is dropped because the focused control left the window. A
+    // docking site follows it to keep its workspace's active panel. A handler
+    // may request focus again; that move raises its own event afterwards.
+    [[nodiscard]] Event<const FocusedControlChange&>& focused_control_changed() noexcept {
+        return focused_control_changed_;
+    }
     // Browser-style focus-visible modality: keyboard and semantic navigation
     // expose a cue; primary-pointer focus suppresses it without losing focus.
     [[nodiscard]] bool focus_cue_visible() const noexcept {
@@ -544,6 +611,36 @@ public:
     [[nodiscard]] AcceleratorToken register_accelerator(
         Component& owner, KeyGesture gesture, std::function<bool()> callback,
         AcceleratorOptions options = {});
+    // Offers a key press to this window's accelerators that wait for the
+    // focused route (those not before_focused_route), as a key the window's
+    // own route declined would be: true when one took it. For a window
+    // passing on keys it did not use, as a floating docking window passes
+    // them to its main window (stage DK phase D4, owner decision DK-29:
+    // shortcuts work from a floating tool window). UI thread.
+    bool offer_accelerators(const KeyEvent& event);
+    // The command routing chain (owner decision DK-29; the order is in
+    // gui_forms/commands/command_route). Names the target of the active
+    // panel, active document or main window stage, or clears it with null.
+    // The window observes the target and never extends its life; a
+    // destroyed target drops out of the chain. The focused route has no
+    // single target (controls carry its targets): naming it throws
+    // std::invalid_argument and changes nothing.
+    void set_command_target(CommandRouteStage stage, const std::shared_ptr<CommandTarget>& target);
+    [[nodiscard]] std::shared_ptr<CommandTarget> command_target(CommandRouteStage stage) const;
+    // Where the chain would run a command with this identity now, from the
+    // current focus and targets, without running it: outcome handled with
+    // the stage and target, or unhandled.
+    [[nodiscard]] CommandRouteResult resolve_command(std::string_view command_id) const;
+    // Offers `invocation` to the chain and runs the first handler for
+    // `invocation.command_id`, holding its target alive while it runs; the
+    // chain is read when the routing starts, so a handler that moves focus
+    // or names other targets changes only later routings. Exactly one
+    // handler runs, or none (unhandled; refused when nested deeper than
+    // maximum_command_route_depth inside handlers, counted per UI thread
+    // across windows). A handler may route other commands; an exception
+    // from a handler propagates to the caller. Command::execute_routed is
+    // the usual caller.
+    CommandRouteResult route_command(const CommandInvocation& invocation);
     [[nodiscard]] Control::Ptr pressed_control() const noexcept { return pressed_.lock(); }
 
     // During an active paint lease these return true when the input was
@@ -576,6 +673,9 @@ public:
 
 private:
     friend class HostSession;
+    // Called by HostSession: seeds the window's bindings with the host's
+    // defaults unless they are seeded already.
+    void install_host_key_map(const KeyMap& defaults);
     void initialize_cursor_identity() noexcept;
     void invalidate_cursor_interaction(CursorError cause) noexcept;
     friend class Control;
@@ -839,9 +939,13 @@ private:
     Control::WeakPtr captured_;
     std::uint64_t captured_pointer_id_{};
     Event<const PointerCaptureChange&> pointer_capture_changed_;
+    Event<const FocusedControlChange&> focused_control_changed_;
     Event<const ControlAvailabilityChange&> control_availability_changed_;
     PopupList popups_;
     AcceleratorList accelerators_;
+    // The active panel's, active document's and main window's command
+    // targets, in that order; observed, never owned.
+    std::array<std::weak_ptr<CommandTarget>, 3> command_targets_{};
     Control::WeakPtr pressed_;
     Control::WeakPtr hovered_;
     Control::WeakPtr drag_target_;
@@ -945,6 +1049,9 @@ private:
     std::uint64_t semantic_generation_{1U};
     bool in_semantic_snapshot_{};
     HostServices* host_services_{};
+    // The keyboard commands' keys, shared with the application's other
+    // windows (see key_map); never null.
+    std::shared_ptr<KeyBindings> key_bindings_{std::make_shared<KeyBindings>()};
 };
 
 } // namespace gui_forms

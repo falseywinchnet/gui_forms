@@ -286,6 +286,7 @@ private:
     void on_command_state(const CommandState& state);
     void on_layer_dismissed(PopupDismissReason reason);
     void on_popup_revoked();
+    void release_layer_content() noexcept;
     void on_more_open_changed(bool open);
     [[nodiscard]] bool navigate(std::uint32_t key);
 
@@ -321,8 +322,9 @@ private:
     std::string dwell_item_{};
     FrameRequestToken dwell_timer_{};
 
-    // Popup state of a drop-down gallery: the layer it sits in while open,
-    // its popup lease and focus scope.
+    // Popup state of a drop-down gallery: the layer it sits in while open
+    // (owned by the gallery; the layer holds the gallery as its content only
+    // while open), its popup lease and focus scope.
     std::shared_ptr<AnchoredPopupLayer> layer_{};
     PopupToken popup_{};
     FocusScopeId scope_{};

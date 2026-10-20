@@ -1,13 +1,7 @@
 #include "gui_forms/controls/scrollable_control/container_control/tab_control/tab_page/tab_page.hpp"
 #include "../../../../panel/panel_anatomy.hpp"
 
-#include <algorithm>
-#include <cmath>
-#include <limits>
-#include <numeric>
-#include <stdexcept>
 #include <string>
-#include <unordered_set>
 #include <utility>
 
 namespace gui_forms {
@@ -29,14 +23,13 @@ void TabPage::set_text(std::string text) {
 }
 
 SemanticDescriptor TabPage::semantic_descriptor() const {
-    SemanticDescriptor descriptor;
-    descriptor.role = SemanticRole::group;
+    SemanticDescriptor descriptor{};
+    descriptor.role = SemanticRole::tab_panel;
     descriptor.name = accessible_name().empty() ? text_ : accessible_name();
     descriptor.description = accessible_description();
     descriptor.exposed = true;
     return descriptor;
 }
-
 
 namespace {
 

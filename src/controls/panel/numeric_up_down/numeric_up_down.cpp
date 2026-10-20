@@ -334,16 +334,12 @@ void NumericUpDown::publish_part_geometry(std::span<PartGeometry> geometry) cons
         record.field = PartGeometry::from_bounds((*editor_).committed_arranged_bounds());
     }
     if (spinner_) {
-        const SpinButtons& spin = static_cast<const SpinButtons&>(*spinner_);
-        const SpinHalves halves = spin_halves((*spinner_).committed_arranged_bounds());
-        record.increment_arrow = PartGeometry::from_bounds(halves.upper);
-        record.decrement_arrow = PartGeometry::from_bounds(halves.lower);
-        record.increment_glyph = PartGeometry::from_bounds(spin_glyph(halves.upper));
-        record.decrement_glyph = PartGeometry::from_bounds(spin_glyph(halves.lower));
-        record.increment_arrow.states = spin.half_states(SpinHalf::upper);
-        record.decrement_arrow.states = spin.half_states(SpinHalf::lower);
-        record.increment_glyph.states = record.increment_arrow.states;
-        record.decrement_glyph.states = record.decrement_arrow.states;
+        // spinner_ is the SpinButtons initialize_control_tree made.
+        const SpinPartGeometry spin = spin_part_geometry(static_cast<const SpinButtons&>(*spinner_));
+        record.increment_arrow = spin.upper_arrow;
+        record.decrement_arrow = spin.lower_arrow;
+        record.increment_glyph = spin.upper_glyph;
+        record.decrement_glyph = spin.lower_glyph;
     }
     write_parts(anatomy(), scrollable_detail::part_fields, record.scrollable, geometry);
     write_parts(anatomy(), numeric_up_down_extra_part_fields, record, geometry);

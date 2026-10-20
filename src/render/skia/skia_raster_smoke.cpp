@@ -292,6 +292,10 @@ int main() {
         inset_edge[1] >= inset_center[1] ||
         inset_edge[2] >= inset_center[2]) {
         std::fputs("Skia inset shadow clipping/gradient contract changed\n", stderr);
+        std::fprintf(stderr, "inset outside %u %u %u %u, edge %u %u %u %u, centre %u %u %u %u\n",
+                     inset_outside[0], inset_outside[1], inset_outside[2], inset_outside[3], inset_edge[0],
+                     inset_edge[1], inset_edge[2], inset_edge[3], inset_center[0], inset_center[1],
+                     inset_center[2], inset_center[3]);
         return 15;
     }
     if (repeat_first[0] != repeat_second[0] ||

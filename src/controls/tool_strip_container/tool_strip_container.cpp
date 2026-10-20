@@ -15,6 +15,14 @@ double usable(double thickness) noexcept {
     return thickness;
 }
 
+// One side panel's placement for arrange: the panel, its rectangle and
+// whether it is shown.
+struct PanelPlacement final {
+    Control::Ptr panel{};
+    Rect bounds{};
+    bool shown{};
+};
+
 } // namespace
 
 ToolStripContainer::ToolStripContainer(StableId stable_id) : Control(std::move(stable_id)) {
@@ -67,18 +75,28 @@ ToolStripContainer::Layout ToolStripContainer::layout_for(Size client) {
     Layout placed;
     const double width = std::max(0.0, client.width);
     const double height = std::max(0.0, client.height);
+    // Each panel is offered what the panels before it left, and takes at
+    // most that.
     double top = 0.0;
+    if (top_ && top_visible_) {
+        const Size wanted = (*top_).measure({width, height});
+        top = std::min(height, usable(wanted.height));
+    }
     double bottom = 0.0;
-    if (top_ && top_visible_) top = std::min(height, usable((*top_).measure({width, height}).height));
     if (bottom_ && bottom_visible_) {
-        bottom = std::min(height - top, usable((*bottom_).measure({width, height - top}).height));
+        const Size wanted = (*bottom_).measure({width, height - top});
+        bottom = std::min(height - top, usable(wanted.height));
     }
     const double middle = std::max(0.0, height - top - bottom);
     double left = 0.0;
+    if (left_ && left_visible_) {
+        const Size wanted = (*left_).measure({width, middle});
+        left = std::min(width, usable(wanted.width));
+    }
     double right = 0.0;
-    if (left_ && left_visible_) left = std::min(width, usable((*left_).measure({width, middle}).width));
     if (right_ && right_visible_) {
-        right = std::min(width - left, usable((*right_).measure({width - left, middle}).width));
+        const Size wanted = (*right_).measure({width - left, middle});
+        right = std::min(width - left, usable(wanted.width));
     }
     placed.top = {0.0, 0.0, width, top};
     placed.bottom = {0.0, height - bottom, width, bottom};
@@ -91,19 +109,19 @@ ToolStripContainer::Layout ToolStripContainer::layout_for(Size client) {
 void ToolStripContainer::arrange(Rect final_bounds) {
     arrange_self(final_bounds);
     const Layout placed = layout_for({final_bounds.width, final_bounds.height});
+    // Measuring the panels measures their strips, whose program code may
+    // dispose this container or take a panel out of it.
     if (!is_alive()) return;
-    const std::array<std::pair<Control::Ptr, Rect>, 4> panels{{
-        {top_, placed.top},
-        {bottom_, placed.bottom},
-        {left_, placed.left},
-        {right_, placed.right},
+    const std::array<PanelPlacement, 4> panels{{
+        {.panel = top_, .bounds = placed.top, .shown = top_visible_},
+        {.panel = bottom_, .bounds = placed.bottom, .shown = bottom_visible_},
+        {.panel = left_, .bounds = placed.left, .shown = left_visible_},
+        {.panel = right_, .bounds = placed.right, .shown = right_visible_},
     }};
-    const std::array<bool, 4> shown{{top_visible_, bottom_visible_, left_visible_, right_visible_}};
-    for (std::size_t index = 0; index < panels.size(); ++index) {
-        const Control::Ptr& panel = panels[index].first;
-        if (!panel || !is_current_layout_child(panel)) continue;
-        set_child_layout_collapsed(panel, !shown[index]);
-        if (shown[index]) set_child_layout(panel, panels[index].second);
+    for (const PanelPlacement& placement : panels) {
+        if (!placement.panel || !is_current_layout_child(placement.panel)) continue;
+        set_child_layout_collapsed(placement.panel, !placement.shown);
+        if (placement.shown) set_child_layout(placement.panel, placement.bounds);
     }
     if (content_ && is_current_layout_child(content_)) set_child_layout(content_, placed.content);
 }

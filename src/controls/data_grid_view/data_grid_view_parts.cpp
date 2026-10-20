@@ -126,15 +126,16 @@ Rect DataGridView::column_header_bounds(std::size_t column, const GridLayout& la
     return bounds;
 }
 
-Rect DataGridView::row_header_bounds(std::size_t row, const GridLayout& layout) const noexcept {
-    const double offset = static_cast<double>(row) - static_cast<double>(first_row_);
+Rect DataGridView::row_header_bounds(DataGridViewRowPosition row, const GridLayout& layout) const noexcept {
+    const double offset = static_cast<double>(row.value) - static_cast<double>(first_row_);
     const Rect bounds{0.0, layout.data.y + offset * layout.row_height, layout.row_header_band.width,
                       layout.row_height};
     return bounds;
 }
 
-Rect DataGridView::cell_bounds(std::size_t row, std::size_t column, const GridLayout& layout) const noexcept {
-    const double offset = static_cast<double>(row) - static_cast<double>(first_row_);
+Rect DataGridView::cell_bounds(DataGridViewRowPosition row, std::size_t column,
+                               const GridLayout& layout) const noexcept {
+    const double offset = static_cast<double>(row.value) - static_cast<double>(first_row_);
     const Rect bounds{column_left(column, layout), layout.data.y + offset * layout.row_height,
                       columns_[column].width * layout.scale, layout.row_height};
     return bounds;
@@ -170,8 +171,9 @@ std::size_t DataGridView::visible_row_end(const GridLayout& layout) const noexce
     return std::min(count, end);
 }
 
-std::size_t DataGridView::displayed_row_end() const {
-    return visible_row_end(grid_layout());
+DataGridViewRowPosition DataGridView::displayed_row_end() const {
+    const DataGridViewRowPosition end{visible_row_end(grid_layout())};
+    return end;
 }
 
 std::size_t DataGridView::fully_visible_rows(const GridLayout& layout) const noexcept {
@@ -206,10 +208,12 @@ DataGridView::Parts DataGridView::grid_parts(const GridLayout& layout) const {
     record.horizontal_scroll_bar = PartGeometry::from_bounds(layout.horizontal_bar);
     record.vertical_scroll_bar = PartGeometry::from_bounds(layout.vertical_bar);
     record.scroll_corner = PartGeometry::from_bounds(layout.scroll_corner);
-    // The editor covers the current cell inside its grid lines.
-    if (editing_ && edit_kind_ == EditKind::text && current_ && (*current_).row < row_count() &&
-        (*current_).column < columns_.size()) {
-        const Rect cell = cell_bounds((*current_).row, (*current_).column, layout);
+    // The editor covers the current cell inside its grid lines, at its row's
+    // present position.
+    std::optional<DataGridViewCellAddress> current{};
+    if (editing_ && edit_kind_ == EditKind::text) current = current_cell();
+    if (current && (*current).column < columns_.size()) {
+        const Rect cell = cell_bounds((*current).row, (*current).column, layout);
         const Rect inside{cell.x, cell.y, std::max(0.0, cell.width - 1.0), std::max(0.0, cell.height - 1.0)};
         record.editor = visible_part(inside, layout.data);
     }
@@ -217,7 +221,7 @@ DataGridView::Parts DataGridView::grid_parts(const GridLayout& layout) const {
     return record;
 }
 
-DataGridView::RowParts DataGridView::row_parts(std::size_t row, const GridLayout& layout) const {
+DataGridView::RowParts DataGridView::row_parts(DataGridViewRowPosition row, const GridLayout& layout) const {
     RowParts record;
     if (!row_headers_visible_) return record;
     const Rect clip = layout.row_header_band;
@@ -227,11 +231,11 @@ DataGridView::RowParts DataGridView::row_parts(std::size_t row, const GridLayout
     const double glyph_margin = row_glyph_margin * layout.scale;
     // The current row's glyph sits at the header's start; only the current
     // row has one.
-    if (current_ && (*current_).row == row) {
+    if (is_current_row(row)) {
         const Rect lane{header.x + glyph_margin, header.y, glyph_side, header.height};
         record.row_glyph = visible_part(centred_square(lane, glyph_side), clip);
     }
-    if (row_source_ == DataGridViewRowSource::unbound && !rows_[row].header_text.empty()) {
+    if (row_source_ == DataGridViewRowSource::unbound && !rows_[row.value].header_text.empty()) {
         const double start = glyph_margin * 2.0 + glyph_side;
         const Rect label{header.x + start, header.y, std::max(0.0, header.width - start - glyph_margin),
                          std::max(0.0, header.height - 1.0)};
@@ -242,7 +246,7 @@ DataGridView::RowParts DataGridView::row_parts(std::size_t row, const GridLayout
     return record;
 }
 
-DataGridView::CellParts DataGridView::cell_parts(std::size_t row, std::size_t column,
+DataGridView::CellParts DataGridView::cell_parts(DataGridViewRowPosition row, std::size_t column,
                                                  const GridLayout& layout) const {
     CellParts record;
     const Rect clip = layout.data;
@@ -321,18 +325,17 @@ constexpr CustomStateIndex sorted_descending_state{1U};
 
 } // namespace
 
-AnatomyStateSet DataGridView::row_states(std::size_t row) const {
+AnatomyStateSet DataGridView::row_states(DataGridViewRowPosition row) const {
     AnatomyStateSet states;
     if (is_row_selected(row)) states.insert(AnatomyState::selected);
-    if (current_ && (*current_).row == row) states.insert(AnatomyState::current);
+    if (is_current_row(row)) states.insert(AnatomyState::current);
     if (read_only_ || row_read_only(row)) states.insert(AnatomyState::read_only);
     return states;
 }
 
-AnatomyStateSet DataGridView::cell_states(std::size_t row, std::size_t column) const {
+AnatomyStateSet DataGridView::cell_states(DataGridViewRowPosition row, std::size_t column) const {
     AnatomyStateSet states;
-    const DataGridViewCellAddress cell{row, column};
-    const bool current = current_ && *current_ == cell;
+    const bool current = is_current_cell(row, column);
     if (is_cell_selected(row, column)) states.insert(AnatomyState::selected);
     if (current) states.insert(AnatomyState::current);
     if (cell_read_only(row, column)) states.insert(AnatomyState::read_only);
@@ -342,7 +345,9 @@ AnatomyStateSet DataGridView::cell_states(std::size_t row, std::size_t column) c
         binding_value_to_bool(stored_value(row, column)).value_or(false)) {
         states.insert(AnatomyState::checked);
     }
-    if (pressed_button_ && *pressed_button_ == cell) states.insert(AnatomyState::pressed);
+    const bool pressed = pressed_button_ && (*pressed_button_).column == column &&
+                         (*pressed_button_).row_id == row_id_text(row);
+    if (pressed) states.insert(AnatomyState::pressed);
     if (current && edit_kind_ == EditKind::choice) states.insert(AnatomyState::open);
     const Window* const host = attached_window();
     const bool cue = host != nullptr && (*host).focus_cue_visible();
@@ -401,7 +406,8 @@ DataGridView::HitResult DataGridView::hit_test(Point local) const {
     }
     const std::size_t row_end = visible_row_end(layout);
     if (!layout.row_header_band.empty() && layout.row_header_band.contains(local)) {
-        for (std::size_t row = std::min(first_row_, row_end); row < row_end; ++row) {
+        for (std::size_t position = std::min(first_row_, row_end); position < row_end; ++position) {
+            const DataGridViewRowPosition row{position};
             if (row_header_bounds(row, layout).contains(local)) {
                 result.zone = HitZone::row_header;
                 result.row = row;
@@ -412,8 +418,8 @@ DataGridView::HitResult DataGridView::hit_test(Point local) const {
     }
     if (!layout.data.contains(local) || layout.row_height <= 0.0) return result;
     const double offset = std::floor((local.y - layout.data.y) / layout.row_height);
-    const std::size_t row = first_row_ + static_cast<std::size_t>(std::max(0.0, offset));
-    if (row >= row_end) return result;
+    const DataGridViewRowPosition row{first_row_ + static_cast<std::size_t>(std::max(0.0, offset))};
+    if (row.value >= row_end) return result;
     for (std::size_t column = first_column; column < column_end; ++column) {
         if (cell_bounds(row, column, layout).contains(local)) {
             result.zone = HitZone::cell;
@@ -427,7 +433,7 @@ DataGridView::HitResult DataGridView::hit_test(Point local) const {
 
 // -- paint ---------------------------------------------------------------------
 
-void DataGridView::paint_row(Painter& painter, std::size_t row, const GridLayout& layout) const {
+void DataGridView::paint_row(Painter& painter, DataGridViewRowPosition row, const GridLayout& layout) const {
     const RowParts parts = row_parts(row, layout);
     const AnatomyStateSet states = row_states(row);
     PartPaint part;
@@ -447,7 +453,7 @@ void DataGridView::paint_row(Painter& painter, std::size_t row, const GridLayout
     if (parts.row_header_label.present) {
         part.role = PartRole::label;
         part.bounds = parts.row_header_label.bounds;
-        part.text = rows_[row].header_text;
+        part.text = rows_[row.value].header_text;
         paint_part(painter, *this, part);
         part.text = {};
     }
@@ -456,14 +462,13 @@ void DataGridView::paint_row(Painter& painter, std::size_t row, const GridLayout
     paint_part(painter, *this, part);
 }
 
-void DataGridView::paint_cell(Painter& painter, std::size_t row, std::size_t column,
+void DataGridView::paint_cell(Painter& painter, DataGridViewRowPosition row, std::size_t column,
                               const GridLayout& layout) const {
     const CellParts parts = cell_parts(row, column, layout);
     if (!parts.cell.present) return;
     const AnatomyStateSet states = cell_states(row, column);
     const DataGridViewColumn& definition = columns_[column];
-    const bool text_edit = editing_ && edit_kind_ == EditKind::text && current_ &&
-                           *current_ == DataGridViewCellAddress{row, column};
+    const bool text_edit = editing_ && edit_kind_ == EditKind::text && is_current_cell(row, column);
     PartPaint part;
     part.states = states;
     part.font = effective_font(font_);
@@ -582,7 +587,8 @@ void DataGridView::on_paint(Painter& painter, Rect) {
     if (!layout.data.empty()) {
         painter.save();
         painter.clip_rect(layout.data);
-        for (std::size_t row = first_row; row < row_end; ++row) {
+        for (std::size_t position = first_row; position < row_end; ++position) {
+            const DataGridViewRowPosition row{position};
             for (std::size_t column = first_column; column < column_end; ++column) {
                 paint_cell(painter, row, column, layout);
             }
@@ -606,7 +612,9 @@ void DataGridView::on_paint(Painter& painter, Rect) {
         paint_part(painter, *this, surface);
         painter.save();
         painter.clip_rect(layout.row_header_band);
-        for (std::size_t row = first_row; row < row_end; ++row) paint_row(painter, row, layout);
+        for (std::size_t position = first_row; position < row_end; ++position) {
+            paint_row(painter, DataGridViewRowPosition{position}, layout);
+        }
         painter.restore();
     }
     if (grid.top_left_header.present) {
@@ -812,62 +820,63 @@ std::size_t DataGridView::realized_item_count() const {
     return result;
 }
 
-ItemSystemIndex DataGridView::publish_realized_item_system(std::size_t item) const {
-    const GridLayout layout = grid_layout();
+DataGridView::RealizedSlot DataGridView::realized_slot(const GridLayout& layout, std::size_t item) const {
     const std::size_t rows = realized_row_count(layout);
-    const std::size_t cells = rows * realized_column_count(layout);
-    if (item < rows) return row_system;
-    if (item < rows + cells) return cell_system;
-    return column_system;
+    const std::size_t columns = realized_column_count(layout);
+    const std::size_t first_column = first_visible_column(layout);
+    const std::size_t cells = rows * columns;
+    RealizedSlot slot;
+    if (item < rows) {
+        slot.system = row_system;
+        slot.row = DataGridViewRowPosition{first_row_ + item};
+        return slot;
+    }
+    if (item < rows + cells) {
+        // A nonzero cell count has columns: cells run row by row.
+        const std::size_t position = item - rows;
+        slot.system = cell_system;
+        slot.row = DataGridViewRowPosition{first_row_ + position / columns};
+        slot.column = first_column + position % columns;
+        return slot;
+    }
+    slot.system = column_system;
+    slot.column = first_column + (item - rows - cells);
+    return slot;
+}
+
+ItemSystemIndex DataGridView::publish_realized_item_system(std::size_t item) const {
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    return slot.system;
 }
 
 std::string DataGridView::realized_item_stable_id(std::size_t item) const {
-    const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    if (item < rows) return row_stable_id(first_row_ + item);
-    const std::size_t cells = rows * columns;
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        return cell_stable_id(first_row_ + position / columns, first_column + position % columns);
-    }
-    return column_stable_id(first_column + (item - rows - cells));
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    if (slot.system == row_system) return row_id_text(slot.row);
+    if (slot.system == cell_system) return cell_stable_id(slot.row, slot.column);
+    return column_stable_id(slot.column);
 }
 
 AnatomyStateSet DataGridView::realized_item_anatomy_states(std::size_t item) const {
-    const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    if (item < rows) return row_states(first_row_ + item);
-    const std::size_t cells = rows * columns;
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        return cell_states(first_row_ + position / columns, first_column + position % columns);
-    }
-    return column_states(first_column + (item - rows - cells));
+    const RealizedSlot slot = realized_slot(grid_layout(), item);
+    if (slot.system == row_system) return row_states(slot.row);
+    if (slot.system == cell_system) return cell_states(slot.row, slot.column);
+    return column_states(slot.column);
 }
 
 void DataGridView::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
     const GridLayout layout = grid_layout();
-    const std::size_t rows = realized_row_count(layout);
-    const std::size_t columns = realized_column_count(layout);
-    const std::size_t first_column = first_visible_column(layout);
-    const std::size_t cells = rows * columns;
-    if (item < rows) {
-        const RowParts record = row_parts(first_row_ + item, layout);
-        write_item_parts(anatomy().item_systems[row_system.value], row_part_fields, record, geometry);
-        return;
+    const RealizedSlot slot = realized_slot(layout, item);
+    const ItemSystemDeclaration& system = anatomy().item_systems[slot.system.value];
+    if (slot.system == row_system) {
+        const RowParts record = row_parts(slot.row, layout);
+        write_item_parts(system, row_part_fields, record, geometry);
+    } else if (slot.system == cell_system) {
+        const CellParts record = cell_parts(slot.row, slot.column, layout);
+        write_item_parts(system, cell_part_fields, record, geometry);
+    } else {
+        const ColumnParts record = column_parts(slot.column, layout);
+        write_item_parts(system, column_part_fields, record, geometry);
     }
-    if (item < rows + cells) {
-        const std::size_t position = item - rows;
-        const CellParts record = cell_parts(first_row_ + position / columns, first_column + position % columns, layout);
-        write_item_parts(anatomy().item_systems[cell_system.value], cell_part_fields, record, geometry);
-        return;
-    }
-    const ColumnParts record = column_parts(first_column + (item - rows - cells), layout);
-    write_item_parts(anatomy().item_systems[column_system.value], column_part_fields, record, geometry);
 }
 
 std::vector<DataGridView::Row> DataGridView::realized_rows() const {
@@ -878,10 +887,10 @@ std::vector<DataGridView::Row> DataGridView::realized_rows() const {
     for (std::size_t item = 0; item < count; ++item) {
         const PartGeometryBuffer published = published_realized_item_geometry(item);
         Row record;
-        record.index = first_row_ + item;
-        record.stable_id = row_stable_id(record.index);
+        record.position = DataGridViewRowPosition{first_row_ + item};
+        record.stable_id = row_id_text(record.position);
         read_item_parts(anatomy().item_systems[row_system.value], row_part_fields, published.parts(), record.parts);
-        read_states(row_state_fields, row_states(record.index), record.states);
+        read_states(row_state_fields, row_states(record.position), record.states);
         records.push_back(record);
     }
     return records;
@@ -897,7 +906,7 @@ std::vector<DataGridView::Cell> DataGridView::realized_cells() const {
     for (std::size_t position = 0; position < rows * columns; ++position) {
         const PartGeometryBuffer published = published_realized_item_geometry(rows + position);
         Cell record;
-        record.address = {first_row_ + position / columns, first_column + position % columns};
+        record.address = {DataGridViewRowPosition{first_row_ + position / columns}, first_column + position % columns};
         record.stable_id = cell_stable_id(record.address.row, record.address.column);
         read_item_parts(anatomy().item_systems[cell_system.value], cell_part_fields, published.parts(), record.parts);
         read_states(cell_state_fields, cell_states(record.address.row, record.address.column), record.states);
@@ -930,7 +939,7 @@ std::vector<DataGridView::Column> DataGridView::realized_columns() const {
 namespace {
 
 // The events DataGridView adds to those of Control, in declaration order.
-constexpr std::array<InteractionDeclaration, 9> data_grid_view_interactions{{
+constexpr std::array<InteractionDeclaration, 10> data_grid_view_interactions{{
     {.name = "selection_changed", .payload = "", .mutable_payload = false},
     {.name = "current_cell_changed", .payload = "std::optional<DataGridViewCellAddress>", .mutable_payload = false},
     {.name = "cell_begin_edit", .payload = "DataGridViewCellCancelEvent", .mutable_payload = true},
@@ -938,6 +947,7 @@ constexpr std::array<InteractionDeclaration, 9> data_grid_view_interactions{{
     {.name = "cell_validating", .payload = "DataGridViewCellValidatingEvent", .mutable_payload = true},
     {.name = "cell_value_changed", .payload = "DataGridViewCellEvent", .mutable_payload = false},
     {.name = "cell_content_click", .payload = "DataGridViewCellEvent", .mutable_payload = false},
+    {.name = "row_order_mode_changed", .payload = "DataGridViewRowOrderModeChange", .mutable_payload = false},
     {.name = "column_header_click", .payload = "std::size_t", .mutable_payload = false},
     {.name = "column_width_changed", .payload = "std::size_t", .mutable_payload = false},
 }};

@@ -2,6 +2,7 @@
 #include "windows_host.hpp"
 #include "../accessibility/windows_accessibility.hpp"
 #include "../services/windows_clipboard_image.hpp"
+#include "../services/windows_clipboard_open.hpp"
 #include "../services/windows_cursor.hpp"
 #include "../services/windows_notify_icons.hpp"
 #include "../input/windows_key_translation.hpp"
@@ -35,6 +36,8 @@
 #include <commdlg.h>
 #include <shlobj.h>
 #include <shellapi.h>
+#include <shellscalingapi.h>
+#include <dwmapi.h>
 
 #include <algorithm>
 #include <array>
@@ -412,8 +415,8 @@ bool apply_system_cursor(CursorKind kind) noexcept {
     return applied;
 }
 
-using GetDpiForMonitorFunction =
-    HRESULT(WINAPI*)(HMONITOR, int, UINT*, UINT*);
+// Shcore's entry point, typed from its declaration (house style section 9).
+using GetDpiForMonitorFunction = decltype(&::GetDpiForMonitor);
 
 GetDpiForMonitorFunction load_get_dpi_for_monitor() noexcept {
     HMODULE library = LoadLibraryW(L"Shcore.dll");
@@ -431,7 +434,7 @@ double native_monitor_scale(HMONITOR monitor) noexcept {
     UINT x = 96U;
     UINT y = 96U;
     if (get_dpi_for_monitor == nullptr ||
-        FAILED(get_dpi_for_monitor(monitor, 0, &x, &y)) || x == 0U) {
+        FAILED(get_dpi_for_monitor(monitor, MDT_EFFECTIVE_DPI, &x, &y)) || x == 0U) {
         return 1.0;
     }
     return static_cast<double>(x) / 96.0;
@@ -527,7 +530,7 @@ Function load_function(HMODULE module, const char* name) noexcept {
 }
 
 double query_scale(HWND window) noexcept {
-    using GetDpiForWindowFunction = UINT(WINAPI*)(HWND);
+    using GetDpiForWindowFunction = decltype(&::GetDpiForWindow);
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
         const GetDpiForWindowFunction function =
             load_function<GetDpiForWindowFunction>(
@@ -545,7 +548,7 @@ double query_scale(HWND window) noexcept {
 
 void adjust_client_frame(RECT& frame, DWORD style, DWORD extended_style,
                          double scale) noexcept {
-    using AdjustForDpiFunction = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
+    using AdjustForDpiFunction = decltype(&::AdjustWindowRectExForDpi);
     const HMODULE user32 = GetModuleHandleW(L"user32.dll");
     if (user32 != nullptr) {
         const AdjustForDpiFunction function = load_function<AdjustForDpiFunction>(
@@ -557,13 +560,13 @@ void adjust_client_frame(RECT& frame, DWORD style, DWORD extended_style,
 }
 
 void enable_best_dpi_awareness() noexcept {
-    using SetContextFunction = BOOL(WINAPI*)(HANDLE);
-    using SetAwareFunction = BOOL(WINAPI*)();
+    using SetContextFunction = decltype(&::SetProcessDpiAwarenessContext);
+    using SetAwareFunction = decltype(&::SetProcessDPIAware);
     if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
         const SetContextFunction set_context =
             load_function<SetContextFunction>(
             user32, "SetProcessDpiAwarenessContext");
-        if (set_context != nullptr && set_context(reinterpret_cast<HANDLE>(-4))) return;
+        if (set_context != nullptr && set_context(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) return;
         const SetAwareFunction set_aware = load_function<SetAwareFunction>(
             user32, "SetProcessDPIAware");
         if (set_aware != nullptr) static_cast<void>(set_aware());
@@ -1353,6 +1356,33 @@ public:
         composite_run((*memo).shaped, font, origin, color, memo);
     }
 
+    // A turned run is rasterized by the shared engine's general placement
+    // (unhinted, as every rotated run is) and blended as an ordinary run. It
+    // keeps no retained coverage.
+    void draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font,
+                               const Color color, const TextOrientation orientation) override {
+        if (orientation == TextOrientation::horizontal) {
+            draw_text_utf8(origin, text, font, color);
+            return;
+        }
+        const PaintTimer timer(timings_[5]);
+        if (text.empty() || !text_engine_ || pixels_ == nullptr || width_ <= 0 || height_ <= 0 ||
+            states_.empty()) return;
+        const text::ShapedText shaped = (*text_engine_).shape(text, font);
+        const State& current = state();
+        // Run space (x along the baseline, y down) to device pixels:
+        // bottom_to_top maps (x, y) to (y, -x) and top_to_bottom to (-y, x).
+        const double turn = orientation == TextOrientation::bottom_to_top ? 1.0 : -1.0;
+        const text::GlyphRunTransform transform{0.0, turn * scale_, -turn * scale_, 0.0};
+        if (!glyph_runs_) glyph_runs_ = std::make_unique<text::GlyphRunRasterizer>(*text_engine_);
+        text::GlyphRunOrigin placement{};
+        const double device_x = (origin.x + current.tx) * scale_;
+        const double device_y = (origin.y + current.ty) * scale_;
+        const text::GlyphRunCoverage coverage =
+            (*glyph_runs_).rasterize_transformed(shaped, font, transform, device_x, device_y, {}, placement);
+        blend_run_coverage(coverage, placement, color);
+    }
+
     Size measure_text_utf8(std::string_view text, FontSpec font) override {
         if (text.empty() || !text_engine_) return {0.0, font.size};
         const text::ShapedText shaped = (*text_engine_).shape(text, font);
@@ -2047,7 +2077,14 @@ private:
                 coverage = &(*memo).coverage;
             }
         }
-        if ((*coverage).pixels.empty()) return;
+        blend_run_coverage(*coverage, placement, color);
+    }
+    // Blends a run's coverage, placed at `placement`, into the DIB under the
+    // current clip.
+    void blend_run_coverage(const text::GlyphRunCoverage& coverage, const text::GlyphRunOrigin placement,
+                            const Color color) {
+        if (coverage.pixels.empty()) return;
+        const State& current = state();
         // Finish batched GDI writes before blending through the CPU pointer.
         GdiFlush();
         const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
@@ -2067,10 +2104,10 @@ private:
             clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
             clip.radius = (*current.rounded_clip).radius * scale_;
         }
-        const gui_forms::detail::TextCoverage source{.pixels = (*coverage).pixels, .width = (*coverage).width,
-                                          .height = (*coverage).height,
-                                          .left = placement.pixel_x + (*coverage).left,
-                                          .top = placement.pixel_y + (*coverage).top};
+        const gui_forms::detail::TextCoverage source{.pixels = coverage.pixels, .width = coverage.width,
+                                          .height = coverage.height,
+                                          .left = placement.pixel_x + coverage.left,
+                                          .top = placement.pixel_y + coverage.top};
         static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
     }
     void apply_gdi_clip() const {
@@ -4034,7 +4071,10 @@ HostCapabilities windows_capabilities() {
                 HostCapability::window_frames |
                 HostCapability::screen_pointer |
                 HostCapability::window_at_point |
-                HostCapability::window_ordering};
+                HostCapability::window_ordering,
+            // Windows follows the PC keyboard convention (Ctrl+F4 closes a
+            // document).
+            pc_key_map()};
 }
 
 int run_windows(std::unique_ptr<Window> model, WindowsHostOptions options) {

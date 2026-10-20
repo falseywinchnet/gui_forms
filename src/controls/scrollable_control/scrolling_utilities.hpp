@@ -9,16 +9,6 @@ namespace gui_forms::scrolling_detail {
 
 inline constexpr double comparison_epsilon = 0.0001;
 
-[[nodiscard]] inline std::uint64_t virtual_runtime_id(
-    std::string_view stable_id) noexcept {
-    std::uint64_t value = 1469598103934665603ULL;
-    for (const unsigned char byte : stable_id) {
-        value ^= byte;
-        value *= 1099511628211ULL;
-    }
-    return value | (std::uint64_t{1} << 63U);
-}
-
 [[nodiscard]] inline bool approximately_greater(
     double left, double right) noexcept {
     return left > right + comparison_epsilon;

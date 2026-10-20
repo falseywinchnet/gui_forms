@@ -38,6 +38,20 @@ void test_collections_and_popups(gui_forms::Window& window) {
     (*single).select_index(5U);
     require((*status).text().find("Location 6 selected") == 0U,
             "ListBox selection_changed must drive the owner's status handler");
+
+    // The searchable station field narrows its list as the user types.
+    std::shared_ptr<gui_forms::ComboBox> search = std::dynamic_pointer_cast<ComboBox>(
+        window.find("gallery.collections.combo.search"));
+    require(search && (*search).editor() && window.request_focus((*search).editor()) &&
+                window.dispatch_text({"hb"}) && (*search).dropped_down() &&
+                (*search).drop_down_items().size() == 4U &&
+                (*status).text() == "Stations matching \"hb\": 4",
+            "typing in the station field filters its list by substring");
+    require(window.dispatch_key({KeyAction::down, PhysicalKey::down}) &&
+                window.dispatch_key({KeyAction::down, PhysicalKey::enter}) &&
+                !(*search).dropped_down() && (*search).selected_index() == 5U &&
+                (*search).text() == "Frankfurt (Main) Hbf",
+            "the first filtered row is chosen by its item index");
 }
 
 } // namespace gallery_pages_tests

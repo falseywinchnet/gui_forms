@@ -77,6 +77,13 @@ LONG role(SemanticRole value) noexcept {
     case SemanticRole::separator: return ROLE_SYSTEM_SEPARATOR;
     case SemanticRole::split_button: return ROLE_SYSTEM_SPLITBUTTON;
     case SemanticRole::menu_button: return ROLE_SYSTEM_BUTTONMENU;
+    // A tab's content is MSAA's property page, as a Win32 tab dialog's page
+    // is. MSAA has no relation, orientation or second action: the
+    // tab-to-panel relation, a tab list's orientation and the close action
+    // wait for UIA (stage A); a node's default action stays its press,
+    // select or expand.
+    case SemanticRole::pane: return ROLE_SYSTEM_PANE;
+    case SemanticRole::tab_panel: return ROLE_SYSTEM_PROPERTYPAGE;
     default: return ROLE_SYSTEM_GROUPING;
     }
 }

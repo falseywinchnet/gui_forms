@@ -1,4 +1,5 @@
 #include "windows_clipboard_image.hpp"
+#include "windows_clipboard_open.hpp"
 #include "../../../core/host/image/clipboard_image_wire.hpp"
 #include "../../../core/host/image/clipboard_dib.hpp"
 #include <cstring>
@@ -8,7 +9,7 @@ namespace {
 UINT raw_format() { return RegisterClipboardFormatW(L"GUI.Forms.RGBA8.v1"); }
 class ClipboardLease final {
 public:
-    explicit ClipboardLease(HWND owner) noexcept : opened_(OpenClipboard(owner) != FALSE) {}
+    explicit ClipboardLease(HWND owner) noexcept : opened_(open_clipboard_with_retry(owner)) {}
     ~ClipboardLease() { if (opened_) CloseClipboard(); }
     ClipboardLease(const ClipboardLease&) = delete;
     ClipboardLease& operator=(const ClipboardLease&) = delete;

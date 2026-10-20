@@ -147,6 +147,30 @@ struct HostClipboardFilesResult final {
     std::uint64_t generation{};
 };
 
+// Completion candidates a host may own (Windows Forms' AutoCompleteSource
+// values FileSystem to AllSystemSources). No host adapter supplies them yet.
+enum class HostAutoCompleteSource : std::uint8_t {
+    file_system,
+    file_system_directories,
+    history_list,
+    recently_used_list,
+    all_url,
+    all_system_sources,
+};
+
+// `prefix_utf8` is borrowed for the call. A host returns at most
+// `maximum_candidates` strings, each valid UTF-8, in its own order.
+struct HostAutoCompleteRequest final {
+    HostAutoCompleteSource source{HostAutoCompleteSource::file_system};
+    std::string_view prefix_utf8{};
+    std::size_t maximum_candidates{256U};
+};
+
+struct HostAutoCompleteResult final {
+    HostServiceStatus status;
+    std::vector<std::string> candidates_utf8;
+};
+
 enum class HostDialogOutcome : std::uint8_t {
     accepted,
     cancelled,
@@ -285,9 +309,28 @@ struct HostTrayIconRequest final {
     std::string tooltip;
 };
 
+// The identity of one notification-area icon (owner decision V3-1): assigned
+// by HostServices::add_tray_icon from 1 and never reused by that
+// HostServices; zero is no icon. A distinct type, so it cannot be confused
+// with a window, runtime or request identity, or with a host's own native
+// icon number.
+struct HostTrayIconId final {
+    std::uint64_t value{};
+
+    [[nodiscard]] bool valid() const noexcept { return value != 0U; }
+    friend bool operator==(HostTrayIconId left, HostTrayIconId right) noexcept {
+        const bool equal = left.value == right.value;
+        return equal;
+    }
+    friend bool operator!=(HostTrayIconId left, HostTrayIconId right) noexcept {
+        const bool different = !(left == right);
+        return different;
+    }
+};
+
 struct HostTrayIconResult final {
     HostServiceStatus status;
-    std::uint64_t icon_id{};
+    HostTrayIconId icon_id{};
 };
 
 // What the user did to a tray icon, reported on the UI thread. `context` is
@@ -301,7 +344,7 @@ enum class HostTrayIconAction : std::uint8_t {
 };
 
 struct HostTrayIconEvent final {
-    std::uint64_t icon_id{};
+    HostTrayIconId icon_id{};
     HostTrayIconAction action{HostTrayIconAction::click};
 };
 

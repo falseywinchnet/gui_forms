@@ -119,7 +119,7 @@ protected:
     HostServiceStatus request_frame_impl(gui_forms::HostWindowId window,
                                          gui_forms::Rect content) override;
     gui_forms::HostScreenPointResult pointer_position_impl() override;
-    gui_forms::HostWindowAtResult window_at_impl(GFPoint point) override;
+    gui_forms::HostWindowAtResult window_at_impl(gui_forms::DesktopLogicalPoint point) override;
     HostServiceStatus bring_to_front_impl(gui_forms::HostWindowId window) override;
     HostServiceStatus destroy_window_impl(gui_forms::HostWindowId window) override;
     HostMonitorResult query_monitors_impl() override;
@@ -329,10 +329,7 @@ MacApplicationRun::OpenOutcome MacApplicationRun::open(MacApplicationWindow entr
         else [nativeWindow orderFront:nil];
     }
     if (entry.options.close_after_launch_for_testing) {
-        NSWindow* closing = nativeWindow;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [closing performClose:nil];
-        });
+        post_perform_close(nativeWindow);
     }
     return outcome;
 }
@@ -433,7 +430,7 @@ gui_forms::HostScreenPointResult MacApplicationRun::pointer_position_impl() {
     return result;
 }
 
-gui_forms::HostWindowAtResult MacApplicationRun::window_at_impl(GFPoint point) {
+gui_forms::HostWindowAtResult MacApplicationRun::window_at_impl(gui_forms::DesktopLogicalPoint point) {
     gui_forms::HostWindowAtResult result;
     const NSPoint location = NSMakePoint(point.x, desktop_top() - point.y);
     // The frontmost window of any application at the point (0: no window to

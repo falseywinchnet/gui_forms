@@ -303,16 +303,18 @@ HostScreenPointResult HeadlessWindowing::pointer_position_impl() {
     return result;
 }
 
-HostWindowAtResult HeadlessWindowing::window_at_impl(Point point) {
+HostWindowAtResult HeadlessWindowing::window_at_impl(DesktopLogicalPoint point) {
     HostWindowAtResult result;
+    // The simulated desktop's rectangles are logical, as the point is.
+    const Point desktop{point.x, point.y};
     for (std::size_t index = 0U; index < foreign_windows_.size(); ++index) {
-        if (foreign_windows_[index].contains(point)) return result;
+        if (foreign_windows_[index].contains(desktop)) return result;
     }
     for (std::size_t index = 0U; index < order_.size(); ++index) {
         const NativeWindow* entry = native(order_[index]);
         if (entry == nullptr || !(*entry).visible) continue;
         const HostWindowFrame frame = native_frame(order_[index]);
-        if (!frame.outer.contains(point)) continue;
+        if (!frame.outer.contains(desktop)) continue;
         result.window = order_[index];
         return result;
     }
@@ -517,6 +519,15 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     window.stable_id = std::move(source.stable_id);
     window.model = std::move(source.model);
     window.options = std::move(source.options);
+    if (runtime && open_fault_ != HeadlessOpenFault::none) {
+        // An injected native creation failure, after the entry was taken.
+        const HeadlessOpenFault fault = open_fault_;
+        open_fault_ = HeadlessOpenFault::none;
+        windowing_.retire(window.id);
+        if (fault == HeadlessOpenFault::refuse_and_keep) refused_models_.push_back(std::move(window.model));
+        result.status.error = HostServiceError::backend_failure;
+        return result;
+    }
     window.host = std::make_unique<HeadlessHost>(*window.model);
     const HostDispatchResult attached = (*window.host).dispatch(
         HostAttachEvent{window.options.initial_size, 1.0}, next_timestamp());
@@ -563,13 +574,14 @@ ApplicationWindowOpenResult HeadlessApplication::open(ApplicationWindow&& source
     detail::register_run_window(opened.state);
     const ApplicationWindowHandle handle = detail::ApplicationHandleAccess::make(opened.state);
     if (opened.options.ready) opened.options.ready(*opened.model, handle);
+    // The ready callback may have closed the window.
     WindowEntry* still_open = entry(admission.window);
-    if (still_open != nullptr && floating) {
-        // Created hidden; the policy shows it when it may be on screen.
-        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
-    } else if (still_open != nullptr) {
-        windowing_.window_created(admission.window, (*still_open).options.initially_visible);
-        if ((*still_open).options.initially_visible) show(admission.window, true);
+    if (still_open != nullptr) {
+        const bool initially_visible = (*still_open).options.initially_visible;
+        // A floating window was created hidden: window_created shows it when
+        // the policy lets it be on screen. Any other window is shown here.
+        windowing_.window_created(admission.window, initially_visible);
+        if (!floating && initially_visible) show(admission.window, true);
     }
     result.window = handle;
     return result;
@@ -665,15 +677,7 @@ void HeadlessApplication::close(WindowEntry& window, HostCloseReason reason) {
     window.closed = true;
     static_cast<void>((*window.host).dispatch(HostClosedEvent{reason}, next_timestamp()));
     detail::ApplicationWindowState& state = *window.state;
-    state.closed = true;
-    state.ready = false;
-    state.request_close = {};
-    state.show = {};
-    state.hide = {};
-    state.toggle_full_screen = {};
-    state.set_title = {};
-    state.request_client_size = {};
-    state.frame_changed = {};
+    detail::revoke_window_state(state);
     detail::unregister_run_window(state);
     windowing_.remove_native(window.id);
     windowing_.retire(window.id);

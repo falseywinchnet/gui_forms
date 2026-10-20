@@ -7,6 +7,10 @@ owner chose (decision 6) and the naming rulings (decisions 7 and 8) merged
 through PRs #62 to #67 and #70, and the owner signed off and declared T1
 sealed. Items not required to close T1 are proposed for T2 (decision 6); see
 [Hand-off](#hand-off) for where the next stages pick up.
+Rechecked 2026-10-19 on main after the W, PageView, docking and ribbon
+work: 85 of 85 controls articulated, 35,487 instances inspected; the
+vocabulary gaps bridged since are listed for T2
+(`results/2026-10-19-t1-recheck`).
 Authority: `planning/FORWARD_PROGRAMME.md` §4 T1.
 
 Read [the shared brief](../README.md) first.

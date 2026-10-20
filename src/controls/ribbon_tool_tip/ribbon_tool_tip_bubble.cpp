@@ -33,11 +33,14 @@ double line_height(const Control& measurer, FontSpec font) {
 }
 
 // Greedy word wrap of `text` into lines no wider than `width`, honouring
-// newlines; a single word wider than `width` keeps its own line. Appends to
-// `lines` with bounds from (`x`, `y`); returns the y below the last line.
+// newlines (a trailing newline ends in an empty line); a single word wider
+// than `width` keeps its own line. Appends to `lines` with bounds from (`x`,
+// `y`); returns the y below the last line. Each candidate line is measured
+// whole, in one buffer reused across words.
 double wrap_text(const Control& measurer, std::string_view text, FontSpec font, double x, double y,
                  double width, std::vector<RibbonToolTipLine>& lines) {
     const double height = line_height(measurer, font);
+    std::string candidate;
     std::size_t paragraph_start = 0U;
     while (paragraph_start <= text.size()) {
         std::size_t paragraph_end = text.find('\n', paragraph_start);
@@ -49,7 +52,7 @@ double wrap_text(const Control& measurer, std::string_view text, FontSpec font, 
             std::size_t word_end = paragraph.find(' ', word_start);
             if (word_end == std::string_view::npos) word_end = paragraph.size();
             const std::string_view word = paragraph.substr(word_start, word_end - word_start);
-            std::string candidate = current;
+            candidate.assign(current);
             if (!candidate.empty()) candidate += ' ';
             candidate += word;
             if (!current.empty() && text_width(measurer, candidate, font) > width) {
@@ -57,7 +60,7 @@ double wrap_text(const Control& measurer, std::string_view text, FontSpec font, 
                 y += height;
                 current = std::string(word);
             } else {
-                current = std::move(candidate);
+                current.swap(candidate);
             }
             word_start = word_end + 1U;
         }

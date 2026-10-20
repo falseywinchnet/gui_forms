@@ -11,6 +11,10 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`DockSite <gui_forms::DockSite>`
+     - The docked part of a docking workspace in one window: tool stacks with captions around the document area, separated by seams.
+   * - :cpp:class:`DockNavigator <gui_forms::DockNavigator>`
+     - The two-list window switcher of docking: the active tool windows beside the active files.
    * - :cpp:class:`FlowLayoutPanel <gui_forms::FlowLayoutPanel>`
      - A container that lays its children out one after another in a row or column, wrapping onto new lines.
    * - :cpp:class:`TableLayoutPanel <gui_forms::TableLayoutPanel>`
@@ -31,6 +35,8 @@ Flow, table, split, master/detail, responsive and scaled layout containers.
 .. toctree::
    :hidden:
 
+   generated/gui_forms.DockSite
+   generated/gui_forms.DockNavigator
    generated/gui_forms.FlowLayoutPanel
    generated/gui_forms.TableLayoutPanel
    generated/gui_forms.ResponsiveTrackPanel
@@ -52,6 +58,42 @@ Related types
    * - :cpp:class:`CommandOverflowGroupSpec <gui_forms::CommandOverflowGroupSpec>`
      - One direct child command group.
    * - :cpp:class:`CommandOverflowSnapshot <gui_forms::CommandOverflowSnapshot>`
+     -  
+   * - :cpp:class:`DockDragOutcome <gui_forms::DockDragOutcome>`
+     -  
+   * - :cpp:class:`DockFlyoutChange <gui_forms::DockFlyoutChange>`
+     - Raised after a flyout opened (open true) or closed.
+   * - :cpp:class:`DockNavigator::Item <gui_forms::DockNavigator::Item>`
+     -  
+   * - :cpp:class:`DockNavigator::ItemParts <gui_forms::DockNavigator::ItemParts>`
+     - Item system entry: one row.
+   * - :cpp:class:`DockNavigator::ItemStates <gui_forms::DockNavigator::ItemStates>`
+     -  
+   * - :cpp:class:`DockNavigator::Parts <gui_forms::DockNavigator::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`DockNavigatorChoice <gui_forms::DockNavigatorChoice>`
+     - The row the user chose, raised by ``chosen``.
+   * - :cpp:class:`DockNavigatorEntry <gui_forms::DockNavigatorEntry>`
+     - One row: a panel and the title shown for it.
+   * - :cpp:class:`DockSite::Parts <gui_forms::DockSite::Parts>`
+     - Stage T1 anatomy, as dot members; its states are Control's.
+   * - :cpp:class:`DockSite::Seam <gui_forms::DockSite::Seam>`
+     -  
+   * - :cpp:class:`DockSite::SeamParts <gui_forms::DockSite::SeamParts>`
+     - Item system seam: the bar between a split's two children and its grip.
+   * - :cpp:class:`DockSite::SeamStates <gui_forms::DockSite::SeamStates>`
+     -  
+   * - :cpp:class:`DockSite::Stack <gui_forms::DockSite::Stack>`
+     -  
+   * - :cpp:class:`DockSite::StackParts <gui_forms::DockSite::StackParts>`
+     - Item system stack: a stack's area and, for a tool stack, its caption and the caption's parts (absent for a document stack).
+   * - :cpp:class:`DockSite::StackStates <gui_forms::DockSite::StackStates>`
+     -  
+   * - :cpp:class:`DockSite::Tile <gui_forms::DockSite::Tile>`
+     -  
+   * - :cpp:class:`DockSite::TileParts <gui_forms::DockSite::TileParts>`
+     - Item system drop_tile: a target tile and its dock-shape glyph, over the hovered pane (five) and at the window's edges (four), while dragging.
+   * - :cpp:class:`DockSite::TileStates <gui_forms::DockSite::TileStates>`
      -  
    * - :cpp:class:`MasterDetailLayout <gui_forms::MasterDetailLayout>`
      - MasterDetailLayout defines bounded navigation width and inter-pane gap for deterministic responsive projection.
@@ -133,6 +175,328 @@ Related types
    .. cpp:member:: std::uint64_t committed_revision
 
    .. cpp:member:: std::vector<CommandOverflowGroupResult> groups
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockDragOutcome final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockDragEnd end
+
+      Default: ``{DockDragEnd::escaped}``.
+
+   .. cpp:member:: DockSubject subject
+
+   .. cpp:member:: std::optional<DockDropTarget> target
+
+      The target dropped on, for ``dropped``, in the coordinates of the site that showed it.
+
+   .. cpp:member:: DockTransactionResult result
+
+      The layout transaction's result, for ``dropped`` and ``floated``.
+
+   .. cpp:member:: bool across_windows
+
+      For ``dropped``: whether the target was in another site's window (a drag across windows, phase D4).
+
+   .. cpp:member:: Rect frame
+
+      For ``floated``: the new floating window's client area, in desktop logical units.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockFlyoutChange final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Raised after a flyout opened (open true) or closed.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: bool open
+
+   .. cpp:member:: DockFlyoutCause cause
+
+      Default: ``{DockFlyoutCause::programmatic}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigator::Item final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   .. cpp:member:: DockNavigatorList list
+
+      Default: ``{DockNavigatorList::tools}``.
+
+   .. cpp:member:: std::size_t index
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: ItemParts parts
+
+   .. cpp:member:: ItemStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigator::ItemParts final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   Item system entry: one row.
+
+   .. cpp:member:: PartGeometry entry_face
+
+   .. cpp:member:: PartGeometry entry_label
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigator::ItemStates final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool selected
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigator::Parts final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry face
+
+   .. cpp:member:: PartGeometry tool_heading
+
+   .. cpp:member:: PartGeometry document_heading
+
+   .. cpp:member:: PartGeometry focus
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigatorChoice final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   The row the user chose, raised by ``chosen``.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: DockNavigatorList list
+
+      Default: ``{DockNavigatorList::documents}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockNavigatorEntry final
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   One row: a panel and the title shown for it.
+
+   .. cpp:member:: DockPanelId panel
+
+   .. cpp:member:: std::string title
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::Parts final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Stage T1 anatomy, as dot members; its states are Control's.
+
+   .. cpp:member:: PartGeometry region
+
+   .. cpp:member:: PartGeometry document_area
+
+      The document area's rectangle, its well showing while it is empty.
+
+   .. cpp:member:: PartGeometry focus
+
+   .. cpp:member:: PartGeometry drag_stamp
+
+      The drag layer (present only while dragging or settling): the stamp, its label, the tinted area the subject would take (drop_accepted) and the cue at the pointer where nothing accepts a drop (drop_rejected).
+
+   .. cpp:member:: PartGeometry drag_stamp_label
+
+   .. cpp:member:: PartGeometry drag_stamp_image
+
+      The panel's picture in the stamp, below its label, while the window can snapshot it (Window::snapshot_control); absent where it cannot, the content well standing in.
+
+   .. cpp:member:: PartGeometry drop_area
+
+   .. cpp:member:: PartGeometry drop_cue
+
+   .. cpp:member:: PartGeometry flyout_shadow
+
+      The open flyout, in the site's coordinates as it stands in its slide: its overlay shadow, its face and the grip on its inner edge (hot and captured as the pointer is on it or drags it). Absent while no flyout is open.
+
+   .. cpp:member:: PartGeometry flyout_face
+
+   .. cpp:member:: PartGeometry flyout_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::Seam final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockNodeId split
+
+   .. cpp:member:: DockAxis axis
+
+      Default: ``{DockAxis::horizontal}``.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: SeamParts parts
+
+   .. cpp:member:: SeamStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::SeamParts final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Item system seam: the bar between a split's two children and its grip.
+
+   .. cpp:member:: PartGeometry seam_bar
+
+   .. cpp:member:: PartGeometry seam_grip
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::SeamStates final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: bool hot
+
+   .. cpp:member:: bool captured
+
+   .. cpp:member:: bool focus_visible
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::Stack final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockNodeId stack
+
+   .. cpp:member:: DockNodeKind kind
+
+      Default: ``{DockNodeKind::tool_stack}``.
+
+   .. cpp:member:: DockPanelId panel
+
+      The stack's selected panel.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: StackParts parts
+
+   .. cpp:member:: StackStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::StackParts final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Item system stack: a stack's area and, for a tool stack, its caption and the caption's parts (absent for a document stack). The actuators carry their own hot, pressed, open, checked and disabled states.
+
+   .. cpp:member:: PartGeometry stack_area
+
+   .. cpp:member:: PartGeometry caption
+
+   .. cpp:member:: PartGeometry caption_accent
+
+   .. cpp:member:: PartGeometry caption_key
+
+   .. cpp:member:: PartGeometry caption_label
+
+   .. cpp:member:: PartGeometry caption_menu
+
+   .. cpp:member:: PartGeometry caption_menu_glyph
+
+   .. cpp:member:: PartGeometry caption_pin
+
+   .. cpp:member:: PartGeometry caption_pin_glyph
+
+   .. cpp:member:: PartGeometry caption_close
+
+   .. cpp:member:: PartGeometry caption_close_glyph
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::StackStates final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: bool current
+
+      The stack holds the active panel.
+
+   .. cpp:member:: bool disabled
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::Tile final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: DockDropTargetKind kind
+
+      Default: ``{DockDropTargetKind::pane}``.
+
+   .. cpp:member:: DockNodeId pane
+
+   .. cpp:member:: DockDropZone zone
+
+      Default: ``{DockDropZone::center}``.
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: TileParts parts
+
+   .. cpp:member:: TileStates states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::TileParts final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   Item system drop_tile: a target tile and its dock-shape glyph, over the hovered pane (five) and at the window's edges (four), while dragging. ``selected`` is the lit tile; ``disabled`` a choice the restrictions refuse; ``expanding`` while the cross fades in.
+
+   .. cpp:member:: PartGeometry tile
+
+   .. cpp:member:: PartGeometry tile_glyph
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DockSite::TileStates final
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:member:: bool selected
+
+   .. cpp:member:: bool disabled
+
+   .. cpp:member:: bool expanding
 
 .. cpp:namespace:: gui_forms
 
@@ -479,6 +843,96 @@ Related types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockDragEnd
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: dropped
+
+   .. cpp:enumerator:: escaped
+
+   .. cpp:enumerator:: capture_lost
+
+   .. cpp:enumerator:: deactivated
+
+   .. cpp:enumerator:: layout_changed
+
+   .. cpp:enumerator:: rejected
+
+   .. cpp:enumerator:: floated
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockDragPhase
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: idle
+
+   .. cpp:enumerator:: armed
+
+   .. cpp:enumerator:: dragging
+
+   .. cpp:enumerator:: settling
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockFlyoutCause
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: hover
+
+   .. cpp:enumerator:: pointer
+
+   .. cpp:enumerator:: keyboard
+
+   .. cpp:enumerator:: programmatic
+
+   .. cpp:enumerator:: pointer_left
+
+   .. cpp:enumerator:: outside_press
+
+   .. cpp:enumerator:: focus_lost
+
+   .. cpp:enumerator:: escape
+
+   .. cpp:enumerator:: swapped
+
+   .. cpp:enumerator:: layout
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockNavigatorList
+
+   ``#include <gui_forms/controls/docking/dock_navigator/dock_navigator.hpp>``
+
+   .. cpp:enumerator:: tools
+
+   .. cpp:enumerator:: documents
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: DockPositionCommand
+
+   ``#include <gui_forms/controls/docking/dock_site/dock_site.hpp>``
+
+   .. cpp:enumerator:: float_panel
+
+   .. cpp:enumerator:: dock
+
+   .. cpp:enumerator:: dock_as_document
+
+   .. cpp:enumerator:: auto_hide
+
+   .. cpp:enumerator:: hide
+
+   .. cpp:enumerator:: close
+
+   .. cpp:enumerator:: move
 
 .. cpp:namespace:: gui_forms
 

@@ -19,6 +19,7 @@
 #include "gui_forms/dirty.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/docking.hpp"
 #include "gui_forms/drawing.hpp"
 #include "gui_forms/engine.hpp"
 #include "gui_forms/event.hpp"
@@ -36,6 +37,7 @@
 #include "gui_forms/popup_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/metrics.hpp"
+#include "gui_forms/pages.hpp"
 #include "gui_forms/resources.hpp"
 #include "gui_forms/scheduler.hpp"
 #include "gui_forms/scrolling.hpp"
@@ -51,6 +53,7 @@
 #include "gui_forms/theme.hpp"
 #include "gui_forms/window.hpp"
 #include "gui_forms/visual_inspection.hpp"
+#include "gui_forms/xml.hpp"
 
 #include "gui_forms/value.hpp"
 

@@ -3,10 +3,13 @@ A field that shows one selected item and drops down a list of the others.
 A combo box takes the space of one line and opens a pop-up list when the
 user clicks it or presses F4, Alt+Down or Space. Choosing a row in the
 list selects it and closes the list; Up, Down, Home and End change the
-selection without opening it. The field cannot be typed into: it always
-shows an item from `items`, or `placeholder_text` when nothing is
-selected. Use a `ListBox` to show all choices at once or to allow several,
-and a `ChoiceGroup` for a few choices that should all stay visible.
+selection without opening it. In the default `drop_down_list` style the
+field cannot be typed into: it always shows an item from `items`, or
+`placeholder_text` when nothing is selected. In the `drop_down` style the
+field is an `editor` text box: the user types any text or chooses an item,
+and the field can complete what is typed (`auto_complete_mode`). Use a
+`ListBox` to show all choices at once or to allow several, and a
+`ChoiceGroup` for a few choices that should all stay visible.
 
 Parameters
 ----------
@@ -14,7 +17,8 @@ stable_id
     Identity of the control, unique within its window. Logs, automation and
     semantic actions address the control by this ID. The pop-up list is
     named after it, ``<stable_id>.popup.list``, and its rows
-    ``<stable_id>.popup.list.item.<index>``.
+    ``<stable_id>.popup.list.item.<index>``; the drop_down style's editor is
+    ``<stable_id>.editor``.
 
 Properties
 ----------
@@ -32,8 +36,45 @@ selected_index : default ``std::nullopt``
     available to bindings as ``SelectedIndex``, with -1 for no selection.
 selected_text
     The text of the selected item, or an empty view when nothing is
-    selected. Also available to bindings as ``Text``; setting ``Text``
-    selects the first item with that text, or clears the selection.
+    selected.
+drop_down_style : default ``ComboBoxStyle::drop_down_list``
+    Whether the field takes text. Switching to `drop_down` adds the
+    `editor` showing the selected item's text and makes the editor take the
+    focus for the field; switching back removes it and keeps the selection.
+    Either switch closes an open list. Windows Forms' third style, a list
+    always shown under the field, is not offered.
+text
+    The field's text: the editor's in the drop_down style, otherwise the
+    selected item's. `set_text` in the drop_down style sets the editor's
+    text and selects the item it equals, ignoring ASCII case, or clears the
+    selection; in the drop_down_list style it selects the first item equal
+    to the text, or clears the selection. Invalid UTF-8 throws
+    `std::invalid_argument`. Also available to bindings as ``Text``.
+editor
+    The drop_down style's `TextBox`, or null in the drop_down_list style.
+auto_complete_mode : default ``AutoCompleteMode::none``
+    How the drop_down style's editor completes what is typed, as
+    `TextBox::auto_complete_mode`. The setting is kept in the
+    drop_down_list style, where nothing can be typed, and acts once the
+    style is drop_down.
+auto_complete_source : default ``AutoCompleteSource::none``
+    Where the candidates come from: `list_items` uses `items`,
+    `custom_source` uses `auto_complete_custom_source`, and the host
+    sources offer nothing yet, as for `TextBox`.
+auto_complete_custom_source
+    The collection the `custom_source` source reads; a new combo box owns an
+    empty one, and an assigned one is shared. A null collection throws
+    `std::invalid_argument`.
+drop_down_filter : default ``ComboBoxFilter::none``
+    Whether typing searches the list, in the drop_down style: `prefix`
+    shows the items that start with the typed text and `substring` the items
+    that contain it, ignoring ASCII case, with the matched text highlighted.
+    While a filter is set the editor does not auto-complete. Changing it
+    closes the list; it is kept in the drop_down_list style, where it does
+    nothing.
+drop_down_items
+    The items the open list shows, as indices into `items`, in row order;
+    empty while the list is closed.
 placeholder_text : default ``""``
     Text shown in a muted colour when nothing is selected. It is also the
     accessible description when the control has none of its own. It must
@@ -67,6 +108,10 @@ drop_down_changed
 items_changed
     Raised after `set_items` or `add_item` changes the items, after any
     `selected_index_changed` the change caused.
+text_changed
+    Raised after `text` changes, with the new text: in the drop_down style
+    for every change of the editor's text, before any selection change it
+    causes; in the drop_down_list style after `selected_index_changed`.
 
 Methods
 -------
@@ -77,13 +122,21 @@ on_pointer
     Opens the pop-up list on a primary press. The window calls it.
 on_key
     Handles the keyboard input described under Notes. The window calls it.
+on_key_preview
+    In the drop_down style, sees the editor's keys first and handles F4,
+    Alt+Down, Up and Down, and Enter and Escape while the list is open. The
+    window calls it.
+arrange
+    Places the drop_down style's editor left of the drop-down button.
 semantic_descriptor
-    Publishes the role `combo_box`, with the selected text as value, the
-    `expanded` state while the list is open, and the action `expand` or
-    `collapse`.
+    Publishes the role `combo_box`, with `text` as value, the `expanded`
+    state while the list is open, and the action `expand` or `collapse`; in
+    the drop_down style also `set_value`, with the editor published through
+    the field rather than as a node of its own.
 on_semantic_action
     Opens the list on `expand` and closes it on `collapse`; `focus` focuses
-    the field. Other actions are not handled.
+    the field (its editor in the drop_down style), and in the drop_down
+    style `set_value` sets the text. Other actions are not handled.
 
 See Also
 --------
@@ -96,7 +149,7 @@ A primary press on the field opens the list. With the field focused, F4,
 Alt+Down and Space open the list, and Up, Down, Home and End select the
 previous, next, first or last item directly without opening it. When
 nothing is selected Up and Down count from the first item, so Down selects
-the second. There is no type-ahead search.
+the second. The drop_down_list style has no type-ahead search.
 
 The open list is a `ListBox` in a pop-up layer over the window, and it
 takes the keyboard focus. Moving through it with the arrow keys selects
@@ -106,6 +159,36 @@ semantic press on a row does the same. Escape or a press outside the list
 closes it without restoring the earlier selection. Closing returns the
 focus to the field. The list also closes when the control is hidden,
 disabled or removed from the window.
+
+In the drop_down style the open list does not take the focus: the editor
+keeps it, so typing goes on while the list is open, and the list closes
+when the field loses the focus. Up and Down choose the previous or next
+item, and the editor shows each one: while the list is open they move
+through its rows, and from no selection either goes to the first row;
+while it is closed they step through the items as in the drop_down_list
+style. F4 and Alt+Down open and close the list, and Enter and Escape close
+it. Space is
+typed. A press on the field's button opens or closes the list; a press in
+the editor places the caret. The selection follows the text: typed text
+that equals an item, ignoring ASCII case, selects it (the text stays as
+typed), and other text clears the selection. While the editor's suggestion
+list is open (`auto_complete_mode`), Up, Down, Enter and Escape are the
+suggestion list's; F4 and Alt+Down still open the field's own list, which
+closes the suggestions.
+
+With a `drop_down_filter`, the combo box is searchable. Each edit the user
+makes opens the list on the items that match the typed text, in their own
+order, narrows or widens the rows as the text changes, and closes the list
+when nothing matches; text set by the program (`set_text`, or the editor
+showing a chosen item) does not filter. Opening the list with the button,
+F4, Alt+Down or `set_dropped_down` shows every item. The rows keep their
+items' identities: the selection is always an index into `items`, a row's
+semantic ID ends in its item's index rather than its position, a row
+pressed or chosen with the keys selects its item, and when the items change
+under the open list the filter is applied again and the selection follows
+the text. The matched text of each row is drawn as a highlight under its
+label and published as the row's `match` part, except on the selected row,
+whose own plate marks it.
 
 Opening the list and clicking a row therefore raises `drop_down_changed`
 with `true`, then `selected_index_changed` if the row was not already
@@ -151,3 +234,34 @@ selection that no longer exists, and the handler sees that too:
        (*field.combo).set_selected_index(2U);                 // field.density is "Spacious"
        (*field.combo).set_items({"Compact", "Comfortable"});  // and now ""
    }
+
+An editable field that completes from its items:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::ComboBox> band =
+       gf::make_control<gf::ComboBox>(gf::StableId("radio.band"));
+   (*band).set_items({"Long wave", "Medium wave", "Short wave"});
+   (*band).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+   (*band).set_auto_complete_source(gf::AutoCompleteSource::list_items);
+   (*band).set_auto_complete_mode(gf::AutoCompleteMode::append);
+   gf::Window window(band, gf::Size{220.0, 30.0});
+   window.request_focus((*band).editor());
+   window.dispatch_text(gf::TextInputEvent{"m"});
+   // The field shows "medium wave" with "edium wave" selected, and the
+   // text equals the second item, so (*band).selected_index() is 1.
+
+A searchable field that lists the stations containing what is typed:
+
+.. code-block:: cpp
+
+   std::shared_ptr<gf::ComboBox> station =
+       gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+   (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+   (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+   (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+   gf::Window window(station, gf::Size{240.0, 200.0});
+   window.request_focus((*station).editor());
+   window.dispatch_text(gf::TextInputEvent{"hb"});
+   // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+   // (*station).drop_down_items() is {0, 1, 3}.

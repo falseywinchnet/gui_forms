@@ -723,34 +723,31 @@ void ListView::sort_items(std::size_t column, ListViewSortOrder order) {
 
 // -- images and font -----------------------------------------------------------
 
-void ListView::set_small_image_list(std::shared_ptr<ImageList> images) {
+void ListView::set_image_list(std::shared_ptr<ImageList> images, std::shared_ptr<ImageList>& slot,
+                              SubscriptionToken& subscription) {
     require_mutable();
-    if (images && (!(*images).is_alive() || (window() && !(*images).belongs_to(*window())))) {
+    // A list must be alive and, once this view is in a window, that window's.
+    const Window* const host = window();
+    if (images && (!(*images).is_alive() || (host != nullptr && !(*images).belongs_to(*host)))) {
         throw std::invalid_argument("ListView requires a live ImageList of its own Window");
     }
-    if (small_images_ == images) return;
-    small_images_changed_.disconnect();
-    small_images_ = std::move(images);
-    if (small_images_) {
-        small_images_changed_ = (*small_images_).changed().subscribe(
-            *this, Delegate<const ImageListChange&>::bind<ListView, &ListView::image_list_changed>(*this));
+    if (slot == images) return;
+    subscription.disconnect();
+    slot = std::move(images);
+    if (slot) {
+        const Delegate<const ImageListChange&> changed =
+            Delegate<const ImageListChange&>::bind<ListView, &ListView::image_list_changed>(*this);
+        subscription = (*slot).changed().subscribe(*this, changed);
     }
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
 }
 
+void ListView::set_small_image_list(std::shared_ptr<ImageList> images) {
+    set_image_list(std::move(images), small_images_, small_images_changed_);
+}
+
 void ListView::set_large_image_list(std::shared_ptr<ImageList> images) {
-    require_mutable();
-    if (images && (!(*images).is_alive() || (window() && !(*images).belongs_to(*window())))) {
-        throw std::invalid_argument("ListView requires a live ImageList of its own Window");
-    }
-    if (large_images_ == images) return;
-    large_images_changed_.disconnect();
-    large_images_ = std::move(images);
-    if (large_images_) {
-        large_images_changed_ = (*large_images_).changed().subscribe(
-            *this, Delegate<const ImageListChange&>::bind<ListView, &ListView::image_list_changed>(*this));
-    }
-    invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
+    set_image_list(std::move(images), large_images_, large_images_changed_);
 }
 
 void ListView::image_list_changed(const ImageListChange&) {
@@ -825,8 +822,10 @@ ListView::Layout ListView::layout_for(Rect client) const {
         placed.cell = {list_cell_width * scale, row};
     }
     const double line_extent = list ? placed.cell.width : placed.cell.height;
-    // Showing one bar can shrink the area enough to need the other, so
-    // settle the bars over at most three passes.
+    // Showing one bar can shrink the area enough to need the other. A bar
+    // only shrinks the area, and a smaller area never needs fewer bars, so
+    // each flag turns on at most once: two changes and a confirming pass
+    // settle them, and the loop ends with `area` matching both flags.
     bool vertical = false;
     bool horizontal = false;
     Rect area{};
@@ -1167,7 +1166,8 @@ void ListView::paint_item(Painter& painter, const Layout& placed, std::size_t in
     if (parts.icon.present && !item.image_key.empty()) {
         const std::shared_ptr<ImageList>& images =
             view_ == ListViewView::large_icon ? large_images_ : small_images_;
-        const double density = attached_window() != nullptr ? (*attached_window()).scale() : 1.0;
+        const Window* const host = attached_window();
+        const double density = host != nullptr ? (*host).scale() : 1.0;
         const ImageListResolution resolved = (*images).resolve(item.image_key, image_state(states), density);
         if (resolved) {
             part.role = PartRole::icon;
@@ -1545,7 +1545,7 @@ void ListView::type_select(std::string_view text) {
     const std::size_t start = single ? (focus + 1U) % count : focus % count;
     for (std::size_t offset = 0; offset < count; ++offset) {
         const std::size_t index = (start + offset) % count;
-        if (collection_detail::fold_ascii(items_[index].text).starts_with(type_prefix_)) {
+        if (collection_detail::starts_with_folded(items_[index].text, type_prefix_)) {
             choose(index, Modifier::none, false);
             return;
         }
@@ -1615,7 +1615,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(column_cell(placed, column), placed.header);
         SemanticNode node{};
         node.stable_id = column_identity(list_id, columns_[column].stable_id);
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = columns_[column].text;
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::ascending) node.value = "ascending";
@@ -1634,7 +1634,7 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         const Rect bounds = Rect::intersection(item_bounds(placed, index), placed.viewport);
         SemanticNode node{};
         node.stable_id = item.stable_id;
-        node.runtime_id = collection_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
         node.name = item.text;
         if (view_ == ListViewView::details) {
@@ -1877,74 +1877,81 @@ std::size_t ListView::realized_item_count() const {
     return result;
 }
 
-// The realized item `item`, in paint order: rows, then sub-items, then
-// column headers.
-std::string ListView::realized_item_stable_id(std::size_t item) const {
-    const Layout placed = layout();
+ListView::RealizedSlot ListView::realized_slot(const Layout& placed, std::size_t item) const {
     const std::size_t rows = realized_row_count(placed);
     const std::size_t sub_items = realized_sub_item_count(placed);
-    ListViewItem scratch;
-    if (item < rows) return item_at(first_realized(placed) + item, scratch).stable_id;
+    const std::size_t first = first_realized(placed);
+    RealizedSlot slot;
+    if (item < rows) {
+        slot.system = item_system;
+        slot.index = first + item;
+        return slot;
+    }
     if (item < rows + sub_items) {
+        // sub_items is rows times the visible columns after the first, so a
+        // nonzero count has rows and a whole number of cells per row.
         const std::size_t per_row = sub_items / rows;
         const std::size_t position = item - rows;
-        const std::size_t index = first_realized(placed) + position / per_row;
-        const std::size_t column = realized_sub_item_column(placed, position % per_row);
-        return sub_item_identity(item_at(index, scratch).stable_id, columns_[column].stable_id);
+        slot.system = sub_item_system;
+        slot.index = first + position / per_row;
+        slot.column = realized_sub_item_column(placed, position % per_row);
+        return slot;
     }
-    const std::size_t column = visible_column(placed, item - rows - sub_items);
-    return column_identity(stable_id().value(), columns_[column].stable_id);
+    slot.system = column_system;
+    slot.column = visible_column(placed, item - rows - sub_items);
+    return slot;
+}
+
+std::string ListView::realized_item_stable_id(std::size_t item) const {
+    const Layout placed = layout();
+    const RealizedSlot slot = realized_slot(placed, item);
+    if (slot.system == column_system) {
+        std::string identity = column_identity(stable_id().value(), columns_[slot.column].stable_id);
+        return identity;
+    }
+    ListViewItem scratch;
+    const ListViewItem& realized = item_at(slot.index, scratch);
+    if (slot.system == item_system) return realized.stable_id;
+    std::string identity = sub_item_identity(realized.stable_id, columns_[slot.column].stable_id);
+    return identity;
 }
 
 ItemSystemIndex ListView::publish_realized_item_system(std::size_t item) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    if (item < rows) return item_system;
-    if (item < rows + realized_sub_item_count(placed)) return sub_item_system;
-    return column_system;
+    const RealizedSlot slot = realized_slot(placed, item);
+    return slot.system;
 }
 
 void ListView::publish_realized_item_geometry(std::size_t item, std::span<PartGeometry> geometry) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    const std::size_t sub_items = realized_sub_item_count(placed);
-    if (item < rows) {
-        const ItemParts record = item_parts(placed, first_realized(placed) + item, placed.viewport);
-        write_item_parts(anatomy().item_systems[item_system.value], list_view_item_part_fields, record, geometry);
-        return;
+    const RealizedSlot slot = realized_slot(placed, item);
+    const ItemSystemDeclaration& system = anatomy().item_systems[slot.system.value];
+    if (slot.system == item_system) {
+        const ItemParts record = item_parts(placed, slot.index, placed.viewport);
+        write_item_parts(system, list_view_item_part_fields, record, geometry);
+    } else if (slot.system == sub_item_system) {
+        const SubItemParts record = sub_item_parts(placed, slot.index, slot.column, placed.viewport);
+        write_item_parts(system, list_view_sub_item_part_fields, record, geometry);
+    } else {
+        const ColumnParts record = column_parts(placed, slot.column, placed.header);
+        write_item_parts(system, list_view_column_part_fields, record, geometry);
     }
-    if (item < rows + sub_items) {
-        const std::size_t per_row = sub_items / rows;
-        const std::size_t position = item - rows;
-        const std::size_t index = first_realized(placed) + position / per_row;
-        const std::size_t column = realized_sub_item_column(placed, position % per_row);
-        const SubItemParts record = sub_item_parts(placed, index, column, placed.viewport);
-        write_item_parts(anatomy().item_systems[sub_item_system.value], list_view_sub_item_part_fields, record,
-                         geometry);
-        return;
-    }
-    const std::size_t column = visible_column(placed, item - rows - sub_items);
-    const ColumnParts record = column_parts(placed, column, placed.header);
-    write_item_parts(anatomy().item_systems[column_system.value], list_view_column_part_fields, record, geometry);
 }
 
 AnatomyStateSet ListView::realized_item_anatomy_states(std::size_t item) const {
     const Layout placed = layout();
-    const std::size_t rows = realized_row_count(placed);
-    const std::size_t sub_items = realized_sub_item_count(placed);
-    ListViewItem scratch;
-    if (item < rows) {
-        const std::size_t index = first_realized(placed) + item;
-        return item_states(index, item_at(index, scratch).checked);
+    const RealizedSlot slot = realized_slot(placed, item);
+    if (slot.system == column_system) return column_states(slot.column);
+    if (slot.system == item_system) {
+        ListViewItem scratch;
+        const bool checked = item_at(slot.index, scratch).checked;
+        return item_states(slot.index, checked);
     }
-    if (item < rows + sub_items) {
-        const std::size_t index = first_realized(placed) + (item - rows) / (sub_items / rows);
-        AnatomyStateSet states;
-        if (selected_[index] != 0U) states.insert(AnatomyState::selected);
-        if (!effectively_enabled()) states.insert(AnatomyState::disabled);
-        return states;
-    }
-    return column_states(visible_column(placed, item - rows - sub_items));
+    // A sub-item shows its row's selection and the view's enabled state.
+    AnatomyStateSet states;
+    if (selected_[slot.index] != 0U) states.insert(AnatomyState::selected);
+    if (!effectively_enabled()) states.insert(AnatomyState::disabled);
+    return states;
 }
 
 std::vector<ListView::Item> ListView::realized_items() const {
@@ -1975,9 +1982,10 @@ std::vector<ListView::SubItem> ListView::realized_sub_items() const {
     for (std::size_t position = 0; position < count; ++position) {
         const std::size_t item = rows + position;
         const PartGeometryBuffer published = published_realized_item_geometry(item);
+        const RealizedSlot slot = realized_slot(placed, item);
         SubItem record;
-        record.index = first_realized(placed) + position / (count / rows);
-        record.column = realized_sub_item_column(placed, position % (count / rows));
+        record.index = slot.index;
+        record.column = slot.column;
         record.stable_id = realized_item_stable_id(item);
         read_item_parts(anatomy().item_systems[sub_item_system.value], list_view_sub_item_part_fields,
                         published.parts(), record.parts);
