@@ -7,4 +7,5 @@
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/theme_engine/theme_engine.hpp"
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"

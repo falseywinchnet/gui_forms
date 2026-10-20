@@ -298,15 +298,22 @@ bool covered_by(Rect pending, std::span<const Rect> painted) noexcept {
 
 } // namespace
 
-void Window::note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states) {
+std::optional<PartRecordHandle> Window::note_engine_part(const Control& control, const PartKey& key,
+                                                         AnatomyStateSet states) {
     const PartRecordAcquisition acquired = engine_parts_.acquire(control.stable_id().value(), key);
     if (acquired.created) metrics_.record_engine_part_created(key.index_fallback(), engine_parts_.record_count());
     if (acquired.evicted > 0U) metrics_.record_engine_parts_evicted(acquired.evicted, engine_parts_.record_count());
     EnginePartRecord* const record = engine_parts_.record(acquired.handle);
-    if (record == nullptr) return;
+    if (record == nullptr) return std::nullopt;
     (*record).states = states;
     // The paint in progress, counted as the paints completed before it.
     (*record).last_painted = paint_leases_completed_;
+    return acquired.handle;
+}
+
+PartRasterResult Window::engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request) {
+    const PartRasterResult result = engine_parts_.raster_for(handle, request, paint_leases_completed_);
+    return result;
 }
 
 std::optional<PaintReceipt> Window::paint(Painter& painter,

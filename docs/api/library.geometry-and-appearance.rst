@@ -20,6 +20,12 @@ Types
      - A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent.
    * - :cpp:class:`Color <gui_forms::Color>`
      - gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default.
+   * - :cpp:class:`CompiledThemeRules <gui_forms::CompiledThemeRules>`
+     - A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them.
+   * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
+     - What a part is: the facts its selectors are matched against.
+   * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
+     -  
    * - :cpp:class:`ConnectedControlSeam <gui_forms::ConnectedControlSeam>`
      -  
    * - :cpp:class:`ConnectedControlTopology <gui_forms::ConnectedControlTopology>`
@@ -130,6 +136,14 @@ Types
      -  
    * - :cpp:class:`RetainedDrawMemo <gui_forms::RetainedDrawMemo>`
      - Renderer-derived data for one retained draw command, such as shaped text.
+   * - :cpp:class:`RuleDeclaration <gui_forms::RuleDeclaration>`
+     - One declaration: a property and its value.
+   * - :cpp:class:`RuleDiagnostic <gui_forms::RuleDiagnostic>`
+     -  
+   * - :cpp:class:`RuleSelector <gui_forms::RuleSelector>`
+     - What a rule applies to.
+   * - :cpp:class:`RuleSpecificity <gui_forms::RuleSpecificity>`
+     - A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
    * - :cpp:class:`Size <gui_forms::Size>`
      - Size is a renderer-neutral logical width and height.
    * - :cpp:class:`SurfaceMaterial <gui_forms::SurfaceMaterial>`
@@ -140,10 +154,16 @@ Types
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
    * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
      - The theme engine's entry point (T2 plan, ThemeEngine).
+   * - :cpp:class:`ThemeEngine::PartPlan <gui_forms::ThemeEngine::PartPlan>`
+     -  
    * - :cpp:class:`ThemeGeometryTokens <gui_forms::ThemeGeometryTokens>`
      - ThemeGeometryTokens centralizes control heights, touch targets, splitter geometry, navigation extents, and compact breakpoint.
    * - :cpp:class:`ThemeMotionTokens <gui_forms::ThemeMotionTokens>`
      - ThemeMotionTokens defines quick, standard, emphasized, and busy-cycle durations without prescribing an animation engine.
+   * - :cpp:class:`ThemeRule <gui_forms::ThemeRule>`
+     - One rule.
+   * - :cpp:class:`ThemeRuleSheet <gui_forms::ThemeRuleSheet>`
+     - A theme's rules, as authored, with the engine version the theme declares it needs.
    * - :cpp:class:`ThemeSpacingTokens <gui_forms::ThemeSpacingTokens>`
      - ThemeSpacingTokens names the shared micro-through-section logical spacing scale.
    * - :cpp:class:`ThemeStructureTokens <gui_forms::ThemeStructureTokens>`
@@ -253,6 +273,81 @@ Types
    .. cpp:member:: std::uint8_t alpha
 
       Default: ``{255}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: CompiledThemeRules final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them. Immutable once made; a ThemeEngine owns one. Compiling never fails as a whole: an invalid declaration or rule is dropped with a diagnostic and the rest stands, so a broken rule cannot take the theme's other rules down with it.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: CompiledThemeRules() = default
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool empty() const noexcept
+
+   .. cpp:function:: std::size_t rule_count() const noexcept
+
+   .. cpp:function:: const std::vector<RuleDiagnostic>& diagnostics() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static CompiledThemeRules compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
+
+      Compiles ``sheet`` against ``registry``, which must outlive the result.
+
+   .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
+
+      The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::PartFacts final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   What a part is: the facts its selectors are matched against. The views are borrowed for the call.
+
+   .. cpp:member:: std::string_view control_type
+
+   .. cpp:member:: std::string_view stable_id
+
+   .. cpp:member:: std::span<const std::string> classes
+
+   .. cpp:member:: std::string_view part
+
+      Empty for an unkeyed part.
+
+   .. cpp:member:: PartRole role
+
+      Default: ``{PartRole::region}``.
+
+   .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::Resolution final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: Outcome outcome
+
+      Default: ``{Outcome::no_rule}``.
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: CascadeLevel level
+
+      The level of the declaration that chose the primitive (or built_in); built_in when no rule did. Default: ``{CascadeLevel::built_in}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1683,6 +1778,93 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RuleDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static RuleDeclaration primitive(std::string_view primitive_name)
+
+   .. cpp:function:: static RuleDeclaration number_value(std::string_view parameter, double value)
+
+   .. cpp:function:: static RuleDeclaration colour_value(std::string_view parameter, Color value)
+
+   .. cpp:member:: std::string property
+
+   .. cpp:member:: RuleValueKind kind
+
+      Default: ``{RuleValueKind::number}``.
+
+   .. cpp:member:: std::string name
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: Color colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleDiagnostic final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: RuleDiagnosticKind kind
+
+      Default: ``{RuleDiagnosticKind::rule_empty}``.
+
+   .. cpp:member:: std::size_t rule
+
+      The rule's position in the sheet and its label.
+
+   .. cpp:member:: std::string label
+
+   .. cpp:member:: std::string property
+
+      The declaration's property, empty for a whole-rule diagnostic.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleSelector final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   What a rule applies to. Every field it sets must match; an empty field matches anything. No combinators: a selector names one part of one control. - ``control_type``: the control's anatomy id (ControlAnatomy::control_id, its id in manifests/controls.json). - ``stable_id``: the control's stable ID. - ``classes``: classes the control must all have (Control::classes). - ``part``: the part's declared name. A part is known by name only when it is painted with a key (PartPaint::key); an unkeyed part never matches a selector that names one. - ``role``: the part's role. - ``states``: states the part must all be in.
+
+   .. cpp:member:: std::string control_type
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::vector<std::string> classes
+
+   .. cpp:member:: std::string part
+
+   .. cpp:member:: std::optional<PartRole> role
+
+   .. cpp:member:: std::vector<AnatomyState> states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleSpecificity final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
+
+   .. cpp:member:: std::uint32_t ids
+
+   .. cpp:member:: std::uint32_t classes
+
+   .. cpp:member:: std::uint32_t types
+
+   .. cpp:member:: std::uint32_t parts
+
+   .. cpp:member:: std::uint32_t states
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Size
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -1814,18 +1996,28 @@ Types
 
       The overlay shadow in high contrast, under the same rules. Empty by default: high contrast draws no cast shadow, and the overlay's high-contrast edge separates it from the content below.
 
+   .. cpp:member:: ThemeRuleSheet rules
+
+      The theme's rules (the cascade, T2 E4): which primitive draws which part. Empty by default: every part keeps the built-in recipe. They are compiled when the theme is made; an invalid rule or declaration is dropped with a diagnostic (Theme::engine().rules().diagnostics()).
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:class:: ThemeEngine final
 
    ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
 
-   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's rules (from T3) and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable. The engine draws a part with a primitive only when a rule of its theme selects a registered primitive for the part, the parameters validate and the cost is within budget. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. No theme has rules before T3, so today every part is drawn by the built-in recipe and every recorded command is what it was.
+   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4) and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules draws every part with the built-in recipe, as before E4.
 
 
    .. rubric:: Construction
 
    .. cpp:function:: ThemeEngine()
+
+      An engine with no rules.
+
+   .. cpp:function:: explicit ThemeEngine(const ThemeRuleSheet& sheet)
+
+      An engine with ``sheet`` compiled against the built-in registry. Invalid rules and declarations are dropped with diagnostics; nothing throws for them.
 
 
    .. rubric:: Properties
@@ -1834,12 +2026,36 @@ Types
 
       The primitives the engine's rules may select.
 
+   .. cpp:function:: const CompiledThemeRules& rules() const noexcept
+
 
    .. rubric:: Methods
 
+   .. cpp:function:: PartPlan plan(const Control& control, const PartPaint& part) const noexcept
+
+      The cascade's decision for one part of ``control``, without painting.
+
    .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
 
-      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first. A part without a key, or of a detached control, is drawn statically and leaves no record.
+      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeEngine::PartPlan final
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   .. cpp:member:: PartDrawing drawing
+
+      Default: ``{PartDrawing::built_in_recipe}``.
+
+   .. cpp:member:: CompiledThemeRules::Resolution resolution
+
+   .. cpp:member:: DeviceExtent extent
+
+      The raster's size for a primitive, in device pixels.
+
+   .. cpp:member:: DeviceScale scale
 
 .. cpp:namespace:: gui_forms
 
@@ -1912,6 +2128,40 @@ Types
    .. cpp:member:: std::chrono::milliseconds busy_cycle
 
       Default: ``{1400}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeRule final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's.
+
+   .. cpp:member:: std::string label
+
+   .. cpp:member:: CascadeLevel level
+
+      Default: ``{CascadeLevel::theme_sheet}``.
+
+   .. cpp:member:: RuleSelector selector
+
+   .. cpp:member:: std::vector<RuleDeclaration> declarations
+
+   .. cpp:member:: std::optional<EngineVersion> requires_engine
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeRuleSheet final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A theme's rules, as authored, with the engine version the theme declares it needs.
+
+   .. cpp:member:: EngineVersion requires_engine
+
+      Default: ``{current_engine_version}``.
+
+   .. cpp:member:: std::vector<ThemeRule> rules
 
 .. cpp:namespace:: gui_forms
 
@@ -1999,6 +2249,40 @@ Types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CascadeLevel
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: built_in
+
+   .. cpp:enumerator:: theme_sheet
+
+   .. cpp:enumerator:: class_rule
+
+   .. cpp:enumerator:: stable_id_rule
+
+   .. cpp:enumerator:: inline_style
+
+   .. cpp:enumerator:: forced_high_contrast
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CompiledThemeRules::Outcome
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: primitive
+
+   .. cpp:enumerator:: no_rule
+
+   .. cpp:enumerator:: built_in_selected
+
+   .. cpp:enumerator:: role_mismatch
 
 .. cpp:namespace:: gui_forms
 
@@ -2492,6 +2776,56 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RuleDiagnosticKind
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: needs_newer_engine
+
+   .. cpp:enumerator:: level_not_authored
+
+   .. cpp:enumerator:: selector_missing_level_field
+
+   .. cpp:enumerator:: selector_invalid
+
+   .. cpp:enumerator:: unknown_primitive
+
+   .. cpp:enumerator:: primitive_role_mismatch
+
+   .. cpp:enumerator:: primitive_over_budget
+
+   .. cpp:enumerator:: primitive_cost_unbounded
+
+   .. cpp:enumerator:: primitive_value_not_a_name
+
+   .. cpp:enumerator:: parameter_without_primitive
+
+   .. cpp:enumerator:: unknown_parameter
+
+   .. cpp:enumerator:: parameter_wrong_kind
+
+   .. cpp:enumerator:: parameter_not_finite
+
+   .. cpp:enumerator:: parameter_out_of_range
+
+   .. cpp:enumerator:: duplicate_declaration
+
+   .. cpp:enumerator:: rule_empty
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RuleValueKind
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: name
+
+   .. cpp:enumerator:: number
+
+   .. cpp:enumerator:: colour
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextOrientation
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -2501,6 +2835,24 @@ Enumerations
    .. cpp:enumerator:: bottom_to_top
 
    .. cpp:enumerator:: top_to_bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ThemeEngine::PartDrawing
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   .. cpp:enumerator:: primitive
+
+   .. cpp:enumerator:: built_in_recipe
+
+   .. cpp:enumerator:: forced_high_contrast
+
+   .. cpp:enumerator:: role_mismatch
+
+   .. cpp:enumerator:: over_frame_budget
+
+   .. cpp:enumerator:: not_paintable
 
 Functions, constants and aliases
 --------------------------------
@@ -2646,6 +2998,36 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 
    Value: ``64``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+.. cpp:function:: std::string_view cascade_level_name(CascadeLevel level) noexcept
+
+.. cpp:function:: bool valid_style_class_name(std::string_view name) noexcept
+
+   Whether ``name`` is a valid style class name: 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter.
+
+.. cpp:function:: RuleSpecificity rule_specificity(const RuleSelector& selector) noexcept
+
+.. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
+
+.. cpp:var:: constexpr std::string_view primitive_property
+
+   The name of the declaration that selects a part's primitive. Its value is a registered primitive's name, or ``built_in`` for the built-in recipe. Value: ``"primitive"``.
+
+.. cpp:var:: constexpr std::string_view built_in_primitive_name
+
+   Value: ``"built_in"``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
+
+   Budgets (GIVEN F1-1): a part's primitive costs at most 512 declared operations per device pixel, and an animated part (one whose primitive has an animated parameter) at most 4 million per frame. A part beyond either keeps the built-in recipe; a primitive declaring no per-pixel cost cannot be bounded and is refused too. Value: ``512U``.
+
+.. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
+
+   Value: ``4'000'000U``.
 
 .. cpp:namespace:: gui_forms
 

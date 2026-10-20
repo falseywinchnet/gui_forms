@@ -554,6 +554,19 @@ public:
     void set_double_buffered(bool enabled);
     [[nodiscard]] std::optional<CursorKind> cursor() const noexcept { return cursor_; }
     void set_cursor(std::optional<CursorKind> cursor);
+    // Style classes (T2 plan, E4): names a theme's class rules select, in
+    // the order they were added, without duplicates. A class name is 1 to 64
+    // characters of lowercase ASCII letters, digits, '-' and '_', starting
+    // with a letter (valid_style_class_name). Changing the classes repaints
+    // the control. set_classes throws std::invalid_argument for an invalid
+    // name and then changes nothing; it drops repeated names.
+    [[nodiscard]] std::span<const std::string> classes() const noexcept { return classes_; }
+    void set_classes(std::vector<std::string> classes);
+    // Adds or removes one class; false when the class was already there (or
+    // absent). An invalid name throws std::invalid_argument.
+    bool add_class(std::string_view name);
+    bool remove_class(std::string_view name);
+    [[nodiscard]] bool has_class(std::string_view name) const noexcept;
     // A stock assignment clears the image override. Null images select fallback.
     void set_custom_cursor(CursorImagesPtr images, CursorKind fallback = CursorKind::arrow);
     [[nodiscard]] CursorImagesPtr effective_cursor_images() const noexcept;
@@ -942,6 +955,7 @@ private:
                           ControlStyles::selectable |
                           ControlStyles::all_painting_in_one_pass};
     std::optional<CursorKind> cursor_;
+    std::vector<std::string> classes_;
     CursorImagesPtr cursor_images_;
     std::shared_ptr<const Theme> theme_override_;
     std::optional<SurfaceMaterial> authored_surface_material_;
