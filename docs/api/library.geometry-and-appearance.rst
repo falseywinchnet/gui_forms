@@ -75,7 +75,7 @@ Types
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
-     - A declared upper bound on the work of one rasterization: at most ``per_device_pixel`` arithmetic operations for each destination pixel, plus ``fixed`` for the whole part.
+     - A declared upper bound on a primitive's work.
    * - :cpp:class:`PrimitiveDescriptor <gui_forms::PrimitiveDescriptor>`
      - What a primitive is.
    * - :cpp:class:`PrimitiveParameterBlock <gui_forms::PrimitiveParameterBlock>`
@@ -84,6 +84,8 @@ Types
      - One declared parameter.
    * - :cpp:class:`PrimitiveParameterValue <gui_forms::PrimitiveParameterValue>`
      - One parameter's value.
+   * - :cpp:class:`PrimitivePreparation <gui_forms::PrimitivePreparation>`
+     - What a primitive derives once from a part's geometry and fixed parameters, and reuses for every rasterization in which only animated parameters change.
    * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
      - A fixed table of primitives, in registration order.
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
@@ -451,14 +453,18 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One kind of effect. A primitive is immutable and holds no per-part state: one instance serves every part, on the UI thread.
+   One kind of effect. A primitive is immutable and holds no per-part state: one instance serves every part, on the UI thread. Per-part derived values live in the caller's PrimitivePreparation.
 
 
    .. rubric:: Methods
 
-   .. cpp:function:: RasterOutcome rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, const PartRasterView& destination) const noexcept
+   .. cpp:function:: PreparationOutcome prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, PrimitivePreparation& preparation) const noexcept
 
-      Validates the destination, the target and the parameters once, then fills every pixel of the destination with premultiplied RGBA8. Anything but ``painted`` leaves the destination's bytes unchanged.
+      Validates the target and the parameters, then derives the preparation's values. Anything but ``prepared`` leaves ``preparation`` unchanged. Its cost is the descriptor's preparation_per_device_pixel for each device pixel of the part's box.
+
+   .. cpp:function:: RasterOutcome rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, const PrimitivePreparation& preparation, const PartRasterView& destination) const noexcept
+
+      Validates the destination, the target, the parameters and the preparation once, then fills every pixel of the destination with premultiplied RGBA8. Anything but ``painted`` leaves the destination's bytes unchanged.
 
 
    .. rubric:: Extension points
@@ -929,11 +935,13 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   A declared upper bound on the work of one rasterization: at most ``per_device_pixel`` arithmetic operations for each destination pixel, plus ``fixed`` for the whole part. Budgets are checked against it at load (E4).
+   A declared upper bound on a primitive's work. One rasterization costs at most ``per_device_pixel`` arithmetic operations for each destination pixel, plus ``fixed`` for the whole part. One preparation costs at most ``preparation_per_device_pixel`` for each device pixel of the part's box; it runs once per part geometry, not once per frame. Budgets are checked against these at load (E4).
 
    .. cpp:member:: std::uint32_t per_device_pixel
 
    .. cpp:member:: std::uint32_t fixed
+
+   .. cpp:member:: std::uint32_t preparation_per_device_pixel
 
 .. cpp:namespace:: gui_forms
 
@@ -967,6 +975,10 @@ Types
 
       How far the primitive draws outside the part's bounds, in logical units; zero for a primitive that stays inside them.
 
+   .. cpp:member:: std::size_t prepared_values
+
+      How many values the primitive's preparation derives, at most maximum_prepared_values; zero for a primitive that derives none.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PrimitiveParameterBlock final
@@ -985,7 +997,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for.
+   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for. An ``animated`` parameter is one a transition drives from frame to frame, such as the bulge's amplitude during the ribbon's rise. A primitive's preparation never reads it, so changing it never makes a preparation stale (see PrimitivePreparation).
 
    .. cpp:member:: std::string_view name
 
@@ -1000,6 +1012,8 @@ Types
    .. cpp:member:: double default_number
 
    .. cpp:member:: Color default_colour
+
+   .. cpp:member:: bool animated
 
 .. cpp:namespace:: gui_forms
 
@@ -1016,6 +1030,36 @@ Types
    .. cpp:member:: double number
 
    .. cpp:member:: Color colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PrimitivePreparation final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   What a primitive derives once from a part's geometry and fixed parameters, and reuses for every rasterization in which only animated parameters change. The dithered bulge, for example, derives its tone's full-amplitude extremes here, so that the rise does not recompute them each frame. The caller owns a preparation and keeps it beside the part's raster (in E2, the part's record in the window's EnginePartTable). It records what it was derived from: the primitive, the part's logical size and scale, the read states it saw, and every parameter value. A rasterization whose primitive, size, scale, read states or non-animated parameters differ is refused as stale; the caller prepares again. A preparation borrows nothing: ``primitive`` is compared, never called through.
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+      The primitive that derived the values; null until the first successful prepare().
+
+   .. cpp:member:: Size logical_size
+
+   .. cpp:member:: DeviceScale scale
+
+   .. cpp:member:: AnatomyStateSet states_read
+
+      The target's states restricted to the descriptor's states_read.
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+      The parameters as they were at preparation. Only non-animated values are compared.
+
+   .. cpp:member:: std::array<double, maximum_prepared_values> values
+
+      ``count`` live values, as many as the descriptor's prepared_values; what each means is the primitive's own business.
+
+   .. cpp:member:: std::size_t count
 
 .. cpp:namespace:: gui_forms
 
@@ -1729,6 +1773,18 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PreparationOutcome
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: prepared
+
+   .. cpp:enumerator:: invalid_target
+
+   .. cpp:enumerator:: invalid_parameters
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PrimitiveParameterKind
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -1752,6 +1808,8 @@ Enumerations
    .. cpp:enumerator:: invalid_target
 
    .. cpp:enumerator:: invalid_parameters
+
+   .. cpp:enumerator:: stale_preparation
 
 .. cpp:namespace:: gui_forms
 
@@ -1800,6 +1858,8 @@ Enumerations
    .. cpp:enumerator:: default_out_of_range
 
    .. cpp:enumerator:: introduced_after_engine
+
+   .. cpp:enumerator:: too_many_prepared_values
 
 .. cpp:namespace:: gui_forms
 
@@ -1887,6 +1947,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_primitive_parameters
 
    Value: ``24``.
+
+.. cpp:var:: constexpr std::size_t maximum_prepared_values
+
+   Value: ``4``.
 
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 
