@@ -463,6 +463,78 @@ void test_semantic_focus_reaches_composites() {
             "a disabled composite is refused");
 }
 
+// A node publishes the focusable state when a control it hides (one that
+// publishes no node of its own) can take focus, and the focused state while
+// focus is on such a control, so a client sees focus on the composite.
+void test_hidden_focus_is_published_on_the_composite() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("hidden.root"));
+    std::shared_ptr<NumericUpDown> numeric = make_control<NumericUpDown>(StableId("hidden.numeric"));
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("hidden.split"));
+    std::shared_ptr<TokenBox> tokens = make_control<TokenBox>(StableId("hidden.tokens"));
+    std::shared_ptr<Panel> plain = make_control<Panel>(StableId("hidden.plain"));
+    std::shared_ptr<Button> button = make_control<Button>(StableId("hidden.button"), "Press");
+    (*numeric).set_requested_bounds({0, 0, 120, 24});
+    (*split).set_requested_bounds({0, 30, 240, 80});
+    (*tokens).set_requested_bounds({0, 120, 200, 28});
+    (*plain).set_requested_bounds({250, 0, 60, 40});
+    (*button).set_requested_bounds({250, 50, 60, 24});
+    (*root).add_child(numeric);
+    (*root).add_child(split);
+    (*root).add_child(tokens);
+    (*root).add_child(plain);
+    (*root).add_child(button);
+    Window window(root, {320, 160});
+    window.perform_layout();
+    require(window.request_focus(button), "focus starts on the button");
+
+    const SemanticSnapshot resting = window.semantic_snapshot();
+    const SemanticNode* numeric_node = find_node(resting.roots, "hidden.numeric");
+    const SemanticNode* split_node = find_node(resting.roots, "hidden.split");
+    const SemanticNode* tokens_node = find_node(resting.roots, "hidden.tokens");
+    const SemanticNode* editor_node = find_node(resting.roots, "hidden.tokens.editor");
+    const SemanticNode* plain_node = find_node(resting.roots, "hidden.plain");
+    require(numeric_node && has_semantic_state((*numeric_node).states, SemanticState::focusable) &&
+                !has_semantic_state((*numeric_node).states, SemanticState::focused),
+            "NumericUpDown's node is focusable through its hidden editor, and not focused");
+    require(split_node && has_semantic_state((*split_node).states, SemanticState::focusable),
+            "SplitContainer's node is focusable through its splitter, which publishes no node");
+    require(tokens_node && !has_semantic_state((*tokens_node).states, SemanticState::focusable) && editor_node &&
+                has_semantic_state((*editor_node).states, SemanticState::focusable),
+            "TokenBox publishes its editor as a node, which is focusable; the list itself is not");
+    require(plain_node == nullptr, "a plain panel publishes no node");
+
+    require(window.perform_semantic_action("hidden.numeric", SemanticAction::focus),
+            "focus on NumericUpDown is performed");
+    const SemanticSnapshot focused = window.semantic_snapshot();
+    numeric_node = find_node(focused.roots, "hidden.numeric");
+    const SemanticNode* button_node = find_node(focused.roots, "hidden.button");
+    require(numeric_node && has_semantic_state((*numeric_node).states, SemanticState::focused) && button_node &&
+                !has_semantic_state((*button_node).states, SemanticState::focused),
+            "while its hidden editor has focus, NumericUpDown's node is the focused one");
+
+    require(window.perform_semantic_action("hidden.split", SemanticAction::focus), "focus on SplitContainer is performed");
+    const SemanticSnapshot split_focused = window.semantic_snapshot();
+    split_node = find_node(split_focused.roots, "hidden.split");
+    numeric_node = find_node(split_focused.roots, "hidden.numeric");
+    require(split_node && has_semantic_state((*split_node).states, SemanticState::focused) && numeric_node &&
+                !has_semantic_state((*numeric_node).states, SemanticState::focused),
+            "focus on the splitter shows on SplitContainer's node and leaves NumericUpDown's");
+
+    require(window.perform_semantic_action("hidden.tokens", SemanticAction::focus), "focus on TokenBox is performed");
+    const SemanticSnapshot tokens_focused = window.semantic_snapshot();
+    tokens_node = find_node(tokens_focused.roots, "hidden.tokens");
+    editor_node = find_node(tokens_focused.roots, "hidden.tokens.editor");
+    require(tokens_node && !has_semantic_state((*tokens_node).states, SemanticState::focused) && editor_node &&
+                has_semantic_state((*editor_node).states, SemanticState::focused),
+            "TokenBox's published editor is the focused node, not the list");
+
+    (*numeric).set_enabled(false);
+    const SemanticSnapshot disabled = window.semantic_snapshot();
+    numeric_node = find_node(disabled.roots, "hidden.numeric");
+    require(numeric_node && !has_semantic_state((*numeric_node).states, SemanticState::focusable),
+            "a disabled composite's hidden editor cannot take focus, so its node is not focusable");
+}
+
 // The helper every control's virtual semantic children used to copy, kept
 // verbatim as the reference the shared helper must match byte for byte.
 std::uint64_t former_copy(std::string_view id) noexcept {
@@ -618,6 +690,7 @@ int main() {
         test_trees_sharing_item_identities_route_by_owner();
         test_unnumbered_virtual_children_get_runtime_ids();
         test_semantic_focus_reaches_composites();
+        test_hidden_focus_is_published_on_the_composite();
         test_semantics_enforce_ui_thread();
         std::cout << "gui_forms_semantic_tests: all tests passed\n";
         return EXIT_SUCCESS;
