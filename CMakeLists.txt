@@ -3184,6 +3184,8 @@ if(GUI_FORMS_BUILD_TESTS)
         # process (no Accessibility permission needed).
         add_executable(gui_forms_macos_accessibility_tests MACOSX_BUNDLE
             tests/macos_accessibility_tests.mm
+            tests/support/accessibility_actions.cpp
+            tests/support/macos_accessibility_contract.cpp
             tests/support/stock_control_fixture.cpp)
         target_compile_options(gui_forms_macos_accessibility_tests PRIVATE -fobjc-arc)
         target_include_directories(gui_forms_macos_accessibility_tests PRIVATE
@@ -3212,7 +3214,8 @@ if(GUI_FORMS_BUILD_TESTS)
                 gui_forms_macos_exposure_tests
                 gui_forms_macos_idle_visibility_tests
                 gui_forms_macos_host_close_tests
-                gui_forms_macos_multi_window_tests)
+                gui_forms_macos_multi_window_tests
+                gui_forms_macos_accessibility_tests)
             set_target_properties(${native_fixture} PROPERTIES MACOSX_BUNDLE TRUE)
             target_sources(${native_fixture} PRIVATE
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})

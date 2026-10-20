@@ -3,6 +3,8 @@
 #include "macos_host.hpp"
 
 #include "gui_forms/gui_forms.hpp"
+#include "support/accessibility_actions.hpp"
+#include "support/macos_accessibility_contract.hpp"
 #include "support/stock_control_fixture.hpp"
 
 #include <cstdint>
@@ -22,7 +24,7 @@
 // its element and observes the change, and checks that an element held past
 // its control's removal refuses actions. It runs in process, so it needs no
 // Accessibility permission (CI); the out-of-process AXUIElement client is
-// macos_ax_client_tests.
+// macos_accessibility_client_tests.
 
 namespace {
 
@@ -37,139 +39,15 @@ using gui_forms::test_support::StockControlFixture;
 
 constexpr const char* fixture_title = "GUI.Forms accessibility fixture";
 
-// ---------------------------------------------------------------------------
-// The projection contract: what a semantic node must publish through
-// NSAccessibility. Written here, apart from the host, so a host change that
-// alters the projection fails this test.
-
-const char* expected_ax_role(SemanticRole role) {
-    switch (role) {
-    case SemanticRole::static_text: return "AXStaticText";
-    case SemanticRole::button: return "AXButton";
-    case SemanticRole::check_box: return "AXCheckBox";
-    case SemanticRole::radio_button: return "AXRadioButton";
-    case SemanticRole::toolbar: return "AXToolbar";
-    case SemanticRole::radio_group: return "AXRadioGroup";
-    case SemanticRole::link: return "AXLink";
-    case SemanticRole::text_box: return "AXTextField";
-    case SemanticRole::numeric_field: return "AXTextField";
-    case SemanticRole::list: return "AXList";
-    case SemanticRole::list_item: return "AXRow";
-    case SemanticRole::check_list_item: return "AXCheckBox";
-    case SemanticRole::combo_box: return "AXComboBox";
-    case SemanticRole::slider: return "AXSlider";
-    case SemanticRole::scroll_bar: return "AXScrollBar";
-    case SemanticRole::progress_bar: return "AXProgressIndicator";
-    case SemanticRole::image: return "AXImage";
-    case SemanticRole::tab_group: return "AXTabGroup";
-    case SemanticRole::tab: return "AXRadioButton";
-    case SemanticRole::split_pane: return "AXSplitGroup";
-    case SemanticRole::tool_tip: return "AXStaticText";
-    case SemanticRole::date_picker: return "AXComboBox";
-    case SemanticRole::date_cell: return "AXButton";
-    case SemanticRole::property_row: return "AXStaticText";
-    case SemanticRole::menu_bar: return "AXMenuBar";
-    case SemanticRole::menu_bar_item: return "AXMenuBarItem";
-    case SemanticRole::menu: return "AXMenu";
-    case SemanticRole::menu_item: return "AXMenuItem";
-    case SemanticRole::split_button: return "AXButton";
-    case SemanticRole::menu_button: return "AXMenuButton";
-    case SemanticRole::generic:
-    case SemanticRole::group:
-    case SemanticRole::calendar:
-    case SemanticRole::property_grid:
-    case SemanticRole::property_group:
-    case SemanticRole::separator:
-    case SemanticRole::pane:
-    case SemanticRole::tab_panel:
-    case SemanticRole::count:
-        return "AXGroup";
-    }
-    return "AXGroup";
-}
-
-const char* expected_ax_subrole(SemanticRole role) {
-    if (role == SemanticRole::tab_panel) return "AXTabPanel";
-    if (role == SemanticRole::tab) return "AXTabButton";
-    return "";
-}
-
-bool has_action(const SemanticNode& node, SemanticAction action) {
-    for (const SemanticAction published : node.actions) {
-        if (published == action) return true;
-    }
-    return false;
-}
-
-std::string number_text(double value) {
-    char buffer[64] = {};
-    std::snprintf(buffer, sizeof(buffer), "%g", value);
-    return std::string(buffer);
-}
-
-// The value an element publishes, in one text form: a check box, a check
-// list item and a radio button publish 0, 1 or 2 (mixed); a tab publishes 1
-// when selected and 0 otherwise, as AppKit's tab buttons do; a node with a
-// numeric value publishes the number; any other node its value text.
-std::string expected_value(const SemanticNode& node) {
-    if (node.role == SemanticRole::check_box ||
-        node.role == SemanticRole::check_list_item ||
-        node.role == SemanticRole::radio_button) {
-        if (has_semantic_state(node.states, SemanticState::mixed)) return "2";
-        return has_semantic_state(node.states, SemanticState::checked) ? "1" : "0";
-    }
-    if (node.role == SemanticRole::tab) {
-        return has_semantic_state(node.states, SemanticState::selected) ? "1" : "0";
-    }
-    if (node.numeric_value) return number_text(*node.numeric_value);
-    return node.value;
-}
-
-struct Projection final {
-    std::string role;
-    std::string subrole;
-    std::string label;
-    std::string identifier;
-    std::string value;
-    bool enabled{};
-    bool focused{};
-    bool selected{};
-    bool expanded{};
-    bool press{};
-    bool show_menu{};
-    bool increment{};
-    bool decrement{};
-    bool focus_settable{};
-    bool value_settable{};
-    bool selected_settable{};
-    bool close_action{};
-};
-
-Projection expected_projection(const SemanticNode& node) {
-    Projection expected;
-    expected.role = expected_ax_role(node.role);
-    expected.subrole = expected_ax_subrole(node.role);
-    expected.label = node.name;
-    expected.identifier = node.stable_id;
-    expected.value = expected_value(node);
-    expected.enabled = has_semantic_state(node.states, SemanticState::enabled);
-    expected.focused = has_semantic_state(node.states, SemanticState::focused);
-    expected.selected = has_semantic_state(node.states, SemanticState::selected);
-    expected.expanded = has_semantic_state(node.states, SemanticState::expanded);
-    expected.press = has_action(node, SemanticAction::press) ||
-                     has_action(node, SemanticAction::select) ||
-                     has_action(node, SemanticAction::expand) ||
-                     has_action(node, SemanticAction::collapse);
-    expected.show_menu = has_action(node, SemanticAction::show_menu) ||
-                         has_action(node, SemanticAction::expand);
-    expected.increment = has_action(node, SemanticAction::increment);
-    expected.decrement = has_action(node, SemanticAction::decrement);
-    expected.focus_settable = has_action(node, SemanticAction::focus);
-    expected.value_settable = has_action(node, SemanticAction::set_value);
-    expected.selected_settable = has_action(node, SemanticAction::select);
-    expected.close_action = has_action(node, SemanticAction::close);
-    return expected;
-}
+using Projection = gui_forms::test_support::AccessibilityProjection;
+using gui_forms::test_support::default_action_node;
+using gui_forms::test_support::default_action_value;
+using gui_forms::test_support::expected_ax_projection;
+using gui_forms::test_support::find_semantic_node;
+using gui_forms::test_support::has_semantic_action;
+using gui_forms::test_support::same_semantic_roots;
+using gui_forms::test_support::semantic_number_text;
+using gui_forms::test_support::semantic_subtree_signature;
 
 // ---------------------------------------------------------------------------
 // What an element publishes, read through the NSAccessibility protocol.
@@ -184,7 +62,7 @@ std::string value_text(id value) {
     if (value == nil) return {};
     if ([value isKindOfClass:[NSNumber class]]) {
         NSNumber* number = (NSNumber*)value;
-        return number_text(number.doubleValue);
+        return semantic_number_text(number.doubleValue);
     }
     if ([value isKindOfClass:[NSString class]]) return utf8((NSString*)value);
     return utf8([value description]);
@@ -281,7 +159,7 @@ public:
             add(owner, node.stable_id, "element", "present", "missing");
             node_matches = false;
         } else {
-            const Projection expected = expected_projection(node);
+            const Projection expected = expected_ax_projection(node);
             const Projection published = published_projection(element);
             node_matches = compare_projection(owner, node.stable_id, expected, published);
         }
@@ -385,17 +263,6 @@ void compare_window(const StockControlFixture& fixture, gui_forms::Window& windo
 // ---------------------------------------------------------------------------
 // Default actions.
 
-// Returns a borrow into `nodes`; a temporary list is refused.
-const SemanticNode* find_node(std::vector<SemanticNode>&& nodes, std::string_view stable_id) = delete;
-const SemanticNode* find_node(const std::vector<SemanticNode>& nodes, std::string_view stable_id) {
-    for (const SemanticNode& node : nodes) {
-        if (node.stable_id == stable_id) return &node;
-        const SemanticNode* found = find_node(node.children, stable_id);
-        if (found != nullptr) return found;
-    }
-    return nullptr;
-}
-
 id find_element(NSArray* elements, NSString* identifier) {
     for (id element in elements) {
         if ([[element accessibilityIdentifier] isEqualToString:identifier]) return element;
@@ -403,83 +270,6 @@ id find_element(NSArray* elements, NSString* identifier) {
         if (found != nil) return found;
     }
     return nil;
-}
-
-// The order in which a node's actions are taken as its default action;
-// focus alone is not a default action.
-constexpr SemanticAction default_action_order[] = {
-    SemanticAction::press, SemanticAction::select, SemanticAction::increment,
-    SemanticAction::set_value, SemanticAction::show_menu, SemanticAction::expand,
-    SemanticAction::collapse,
-};
-
-// Selecting an item that is already selected changes nothing, so such an
-// item does not stand for its control's default action.
-bool default_action_of(const SemanticNode& node, SemanticAction& action) {
-    if (!has_semantic_state(node.states, SemanticState::enabled)) return false;
-    // An increment at the maximum (an empty range) changes nothing either.
-    const bool at_maximum = node.numeric_value && node.maximum_value &&
-        *node.numeric_value >= *node.maximum_value;
-    for (const SemanticAction candidate : default_action_order) {
-        const bool already_selected = candidate == SemanticAction::select &&
-            has_semantic_state(node.states, SemanticState::selected);
-        const bool cannot_grow = candidate == SemanticAction::increment && at_maximum;
-        if (has_action(node, candidate) && !already_selected && !cannot_grow) {
-            action = candidate;
-            return true;
-        }
-    }
-    return false;
-}
-
-// The node whose default action stands for the control: the control's own
-// node when it has one, else its first descendant that has one.
-const SemanticNode* default_action_node(const SemanticNode& control, SemanticAction& action) {
-    if (default_action_of(control, action)) return &control;
-    for (const SemanticNode& child : control.children) {
-        const SemanticNode* found = default_action_node(child, action);
-        if (found != nullptr) return found;
-    }
-    return nullptr;
-}
-
-bool is_iso_date(const std::string& text) {
-    if (text.size() != 10U || text[4] != '-' || text[7] != '-') return false;
-    for (std::size_t index = 0U; index < text.size(); ++index) {
-        if (index == 4U || index == 7U) continue;
-        if (text[index] < '0' || text[index] > '9') return false;
-    }
-    return true;
-}
-
-bool has_letter(const std::string& text) {
-    for (const char character : text) {
-        if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')) return true;
-    }
-    return false;
-}
-
-// A value the node accepts and that differs from its current one: the
-// maximum (or one more) for a number, an ISO date for a calendar or date
-// picker (whose published value is the long form, but which set an ISO
-// date), another day for an ISO date, the text with a suffix for text, and
-// digits for anything else (a masked field).
-std::string set_value_text(const SemanticNode& node) {
-    if (node.role == SemanticRole::calendar || node.role == SemanticRole::date_picker) {
-        return node.value.find("15") == std::string::npos ? "2026-10-15" : "2026-10-16";
-    }
-    if (node.numeric_value) {
-        const double target = node.maximum_value ? *node.maximum_value : *node.numeric_value + 1.0;
-        return number_text(target);
-    }
-    if (is_iso_date(node.value)) {
-        std::string next = node.value;
-        next[8] = next[8] == '1' ? '2' : '1';
-        next[9] = '5';
-        return next;
-    }
-    if (has_letter(node.value)) return node.value + " (changed)";
-    return "12345";
 }
 
 bool perform_through_element(id element, SemanticAction action, const SemanticNode& node) {
@@ -494,7 +284,7 @@ bool perform_through_element(id element, SemanticAction action, const SemanticNo
     case SemanticAction::increment:
         return [element accessibilityPerformIncrement];
     case SemanticAction::set_value: {
-        NSString* value = [NSString stringWithUTF8String:set_value_text(node).c_str()];
+        NSString* value = [NSString stringWithUTF8String:default_action_value(node).c_str()];
         [element setAccessibilityValue:value];
         return true;
     }
@@ -509,37 +299,6 @@ bool perform_through_element(id element, SemanticAction action, const SemanticNo
     return false;
 }
 
-// The published state of a subtree in one string: each node's identity,
-// states, value and children in order. A default action shows its effect as
-// a change here or in the fixture's effect counter.
-void append_signature(const SemanticNode& node, std::string& signature) {
-    signature += node.stable_id;
-    signature += '|';
-    signature += std::to_string(static_cast<std::uint32_t>(node.states));
-    signature += '|';
-    signature += node.value;
-    signature += '|';
-    if (node.numeric_value) signature += number_text(*node.numeric_value);
-    signature += '{';
-    for (const SemanticNode& child : node.children) append_signature(child, signature);
-    signature += '}';
-}
-
-std::string subtree_signature(const std::vector<SemanticNode>& roots, std::string_view stable_id) {
-    std::string signature;
-    const SemanticNode* node = find_node(roots, stable_id);
-    if (node != nullptr) append_signature(*node, signature);
-    return signature;
-}
-
-bool same_roots(const SemanticSnapshot& left, const SemanticSnapshot& right) {
-    if (left.roots.size() != right.roots.size()) return false;
-    for (std::size_t index = 0U; index < left.roots.size(); ++index) {
-        if (left.roots[index].stable_id != right.roots[index].stable_id) return false;
-    }
-    return true;
-}
-
 // Puts the window back after a default action that opened something: a node
 // left expanded is collapsed through the model, and an open popup, which
 // replaces the window's semantic roots, is closed with Escape (at most three
@@ -547,14 +306,14 @@ bool same_roots(const SemanticSnapshot& left, const SemanticSnapshot& right) {
 void restore_after_action(gui_forms::Window& window, const std::string& target_id,
                           const SemanticSnapshot& before) {
     const SemanticSnapshot after = window.semantic_snapshot();
-    const SemanticNode* target = find_node(after.roots, target_id);
+    const SemanticNode* target = find_semantic_node(after.roots, target_id);
     if (target != nullptr && has_semantic_state((*target).states, SemanticState::expanded) &&
-        has_action(*target, SemanticAction::collapse)) {
+        has_semantic_action(*target, SemanticAction::collapse)) {
         static_cast<void>(window.perform_semantic_action(target_id, SemanticAction::collapse, ""));
     }
     for (int attempt = 0; attempt < 3; ++attempt) {
         const SemanticSnapshot current = window.semantic_snapshot();
-        if (same_roots(current, before)) return;
+        if (same_semantic_roots(current, before)) return;
         gui_forms::KeyEvent escape{};
         escape.action = gui_forms::KeyAction::down;
         escape.physical_key = gui_forms::PhysicalKey::escape;
@@ -566,7 +325,7 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
                              Report& report) {
     for (const StockControlEntry& entry : fixture.controls) {
         const SemanticSnapshot before = window.semantic_snapshot();
-        const SemanticNode* control_node = find_node(before.roots, entry.manifest_id);
+        const SemanticNode* control_node = find_semantic_node(before.roots, entry.manifest_id);
         if (control_node == nullptr) continue;
         SemanticAction action = SemanticAction::focus;
         const SemanticNode* target = default_action_node(*control_node, action);
@@ -584,11 +343,11 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
             continue;
         }
         const std::uint64_t effects_before = (*fixture.effects).total();
-        const std::string signature_before = subtree_signature(before.roots, entry.manifest_id);
+        const std::string signature_before = semantic_subtree_signature(before.roots, entry.manifest_id);
         const bool performed = perform_through_element(element, action, target_before);
         const SemanticSnapshot after = window.semantic_snapshot();
         const bool effect = (*fixture.effects).total() > effects_before;
-        const bool changed = subtree_signature(after.roots, entry.manifest_id) != signature_before;
+        const bool changed = semantic_subtree_signature(after.roots, entry.manifest_id) != signature_before;
         tally.action_observed = performed && (effect || changed);
         restore_after_action(window, target_before.stable_id, before);
         if (!tally.action_observed) {
