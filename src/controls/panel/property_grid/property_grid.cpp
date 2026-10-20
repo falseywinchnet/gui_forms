@@ -847,7 +847,10 @@ struct PropertyGrid::Impl final {
             static_cast<void>((*list).set_validation((*row).second,
                                                    (*last_error).message));
         }
-        owner.edit_failed_.emit(*last_error);
+        // A copy: a handler that selects another object resets last_error,
+        // which ends the error's lifetime while later handlers still read it.
+        const PropertyGridEditError failure = *last_error;
+        owner.edit_failed_.emit(failure);
     }
 
     bool set_value(std::string_view property_name, BindingValue value,

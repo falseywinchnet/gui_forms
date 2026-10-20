@@ -477,7 +477,12 @@ public:
         std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn);
     [[nodiscard]] DispatcherSnapshot dispatcher_snapshot() const noexcept;
     // Host adapters install a thread-safe wake primitive. Installing a handler
-    // after work was queued immediately publishes one coalesced wake.
+    // after work was queued immediately publishes one coalesced wake. The
+    // handler runs under the dispatcher's lock, on whichever thread posted:
+    // it may only signal (set a flag, post a message, write a pipe) and must
+    // never call back into the window. In return, once this call replaces or
+    // removes a handler, no wake through the old one is under way or to come,
+    // so its target may be destroyed.
     void set_dispatch_wake_handler(std::function<void()> wake);
     // Host adapters also install a paint wake seam. Retained invalidation may
     // originate from another Window's callback, so relying only on the host
@@ -683,6 +688,21 @@ public:
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
+    // Performs `action` on a semantic node a host published, named by the
+    // runtime identity of a control: that control's own node when
+    // `virtual_child` is empty, otherwise the virtual child with that stable
+    // identity published by the control or by a control inside it (the
+    // semantic tree publishes an unexposed control's virtual children at its
+    // nearest exposed ancestor, so hosts name that ancestor). Runtime
+    // identities are never reused, so a host still holding the node of a
+    // disposed or replaced control is refused (false) instead of reaching
+    // another control (interview GF017), and a virtual child whose stable
+    // identity another control's virtual child repeats is searched for only
+    // under the named control. Otherwise the same rules as the overload
+    // above: UI thread only, deferred while painting, and refused outside the
+    // active focus scope.
+    bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
+                                 SemanticAction action, std::string_view value = {});
 
 private:
     friend class HostSession;
@@ -832,11 +852,24 @@ private:
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
     void update_paint_lease_state() noexcept;
+    // A semantic action that arrived during paint. `owner` is zero for one
+    // named by stable identity alone; otherwise it is the publishing
+    // control's runtime identity and `stable_id` the virtual child (empty for
+    // the control's own node).
     struct DeferredSemanticInput final {
         std::string stable_id;
         SemanticAction action{SemanticAction::focus};
         std::string value;
+        RuntimeId owner{};
     };
+    // The attached control, in the root tree or a popup, with runtime
+    // identity `control`, or empty.
+    [[nodiscard]] Control::Ptr find_runtime_control(RuntimeId control) const;
+    // Whether a semantic action may reach `control` under the active focus
+    // scope: no scope contains focus, `control` lies inside the scope, or it
+    // lies in a popup whose owner does (the reach of the stable-identity
+    // overload's virtual-child search).
+    [[nodiscard]] bool semantic_scope_reaches(const Control::Ptr& control) const;
     using DeferredInput = std::variant<
         PointerEvent, KeyEvent, TextInputEvent, DragEvent,
         DeferredSemanticInput>;
