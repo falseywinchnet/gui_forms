@@ -272,6 +272,40 @@ id find_element(NSArray* elements, NSString* identifier) {
     return nil;
 }
 
+// The first node, in tree order, whose stable id begins with the control's
+// ("property_grid.row.0"), for a control that publishes no node of its own
+// but publishes its parts. Returns a borrow into `nodes`.
+const SemanticNode* first_prefixed_node(const std::vector<SemanticNode>& nodes, const std::string& control_id) {
+    const std::string prefix = control_id + ".";
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id.compare(0U, prefix.size(), prefix) == 0) return &node;
+        const SemanticNode* found = first_prefixed_node(node.children, control_id);
+        if (found != nullptr) return found;
+    }
+    return nullptr;
+}
+const SemanticNode* first_prefixed_node(std::vector<SemanticNode>&& nodes, const std::string& control_id) = delete;
+
+void append_prefixed_signatures(const std::vector<SemanticNode>& nodes, const std::string& prefix,
+                                std::string& signature) {
+    for (const SemanticNode& node : nodes) {
+        if (node.stable_id.compare(0U, prefix.size(), prefix) == 0) {
+            signature += semantic_subtree_signature(nodes, node.stable_id);
+        } else {
+            append_prefixed_signatures(node.children, prefix, signature);
+        }
+    }
+}
+
+// The control's published state: its own subtree's signature, or, for a
+// control that publishes no node of its own, those of the top-most nodes
+// under its stable id.
+std::string control_signature(const std::vector<SemanticNode>& roots, const std::string& control_id) {
+    std::string signature = semantic_subtree_signature(roots, control_id);
+    if (signature.empty()) append_prefixed_signatures(roots, control_id + ".", signature);
+    return signature;
+}
+
 bool perform_through_element(id element, SemanticAction action, const SemanticNode& node) {
     switch (action) {
     case SemanticAction::press:
@@ -326,6 +360,7 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
     for (const StockControlEntry& entry : fixture.controls) {
         const SemanticSnapshot before = window.semantic_snapshot();
         const SemanticNode* control_node = find_semantic_node(before.roots, entry.manifest_id);
+        if (control_node == nullptr) control_node = first_prefixed_node(before.roots, entry.manifest_id);
         if (control_node == nullptr) continue;
         SemanticAction action = SemanticAction::focus;
         const SemanticNode* target = default_action_node(*control_node, action);
@@ -343,11 +378,11 @@ void perform_default_actions(StockControlFixture& fixture, gui_forms::Window& wi
             continue;
         }
         const std::uint64_t effects_before = (*fixture.effects).total();
-        const std::string signature_before = semantic_subtree_signature(before.roots, entry.manifest_id);
+        const std::string signature_before = control_signature(before.roots, entry.manifest_id);
         const bool performed = perform_through_element(element, action, target_before);
         const SemanticSnapshot after = window.semantic_snapshot();
         const bool effect = (*fixture.effects).total() > effects_before;
-        const bool changed = semantic_subtree_signature(after.roots, entry.manifest_id) != signature_before;
+        const bool changed = control_signature(after.roots, entry.manifest_id) != signature_before;
         tally.action_observed = performed && (effect || changed);
         restore_after_action(window, target_before.stable_id, before);
         if (!tally.action_observed) {
