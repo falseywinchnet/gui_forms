@@ -3414,7 +3414,18 @@ endif()
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
 
 # The accessibility service adapter is independently testable without a renderer.
+# Stage A on Linux: a real AT-SPI client (tests/linux_accessibility_client.py)
+# drives the fixture over D-Bus inside its own session bus with the AT-SPI bus
+# launcher and registry. It runs under the system Python, which carries
+# PyGObject and the Atspi typelib (not a toolcache Python earlier on PATH).
+# On CI a missing prerequisite fails the test; elsewhere the client reports
+# the platform as unsupported with ctest's skip code, 77.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
+    find_program(GUI_FORMS_SYSTEM_PYTHON3 NAMES python3 PATHS /usr/bin /usr/local/bin NO_DEFAULT_PATH)
+    if(NOT GUI_FORMS_SYSTEM_PYTHON3)
+        find_program(GUI_FORMS_SYSTEM_PYTHON3 NAMES python3)
+    endif()
+    set(gui_forms_linux_accessibility_test_ready OFF)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(GUI_FORMS_TEST_ATK QUIET IMPORTED_TARGET atk atk-bridge-2.0)
@@ -3425,7 +3436,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
                 src/host/linux/accessibility/linux_accessibility.cpp)
             target_link_libraries(gui_forms_linux_accessibility_fixture PRIVATE
                 gui_forms_controls gui_forms_core PkgConfig::GUI_FORMS_TEST_ATK X11::X11)
+            set(gui_forms_linux_accessibility_test_ready ON)
         endif()
+    endif()
+    if(NOT GUI_FORMS_SYSTEM_PYTHON3)
+        if("$ENV{CI}" STREQUAL "true")
+            message(FATAL_ERROR "The Linux accessibility test needs python3 on CI")
+        endif()
+        message(STATUS "Linux accessibility test: unsupported (no python3)")
+    elseif(gui_forms_linux_accessibility_test_ready)
+        add_test(NAME gui_forms_linux_accessibility_tests
+                 COMMAND ${GUI_FORMS_SYSTEM_PYTHON3} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_client.py
+                         $<TARGET_FILE:gui_forms_linux_accessibility_fixture>)
+    else()
+        add_test(NAME gui_forms_linux_accessibility_tests
+                 COMMAND ${GUI_FORMS_SYSTEM_PYTHON3} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_client.py
+                         --unsupported "ATK, atk-bridge-2.0 or X11 development files were not found")
+    endif()
+    if(TEST gui_forms_linux_accessibility_tests)
+        set_tests_properties(gui_forms_linux_accessibility_tests PROPERTIES
+            SKIP_RETURN_CODE 77)
     endif()
 endif()
 
