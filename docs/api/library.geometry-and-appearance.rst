@@ -50,6 +50,8 @@ Types
      - The table.
    * - :cpp:class:`EnginePrimitive <gui_forms::EnginePrimitive>`
      - One kind of effect.
+   * - :cpp:class:`EngineSineCosine <gui_forms::EngineSineCosine>`
+     - The sine and cosine of ``x`` radians, computed together (E3's springs).
    * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
      - The engine version a primitive was introduced in, and the version a theme declares it needs.
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
@@ -70,6 +72,18 @@ Types
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
      - MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
+   * - :cpp:class:`MotionClock <gui_forms::MotionClock>`
+     - One window's motion clock (T2 plan, MotionClock; GIVEN D1-1).
+   * - :cpp:class:`MotionCurve <gui_forms::MotionCurve>`
+     - How a value moves.
+   * - :cpp:class:`MotionRecordHandle <gui_forms::MotionRecordHandle>`
+     - Which record of a clock a value holds while it moves: a slot and the slot's generation when the record was made.
+   * - :cpp:class:`MotionStep <gui_forms::MotionStep>`
+     - One step of a value, as its listener sees it.
+   * - :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>`
+     - Where a clock reads the time a motion starts.
+   * - :cpp:class:`MotionValue <gui_forms::MotionValue>`
+     - One value.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
@@ -624,6 +638,18 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: EngineSineCosine final
+
+   ``#include <gui_forms/engine/engine_math/engine_math.hpp>``
+
+   The sine and cosine of ``x`` radians, computed together (E3's springs). For |x| at most 2^20 the absolute error of each is at most 2^-50; beyond that, and for infinities and NaN, both are NaN. Exact case: x = 0 gives sine 0 and cosine 1. The argument is reduced by the nearest multiple of π/2, with π/2 split in three parts (Cody and Waite) so that the reduction is exact to about 2^-100 relative.
+
+   .. cpp:member:: double sine
+
+   .. cpp:member:: double cosine
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: EngineVersion final
 
    ``#include <gui_forms/engine/types/engine_types.hpp>``
@@ -896,6 +922,204 @@ Types
       Default: ``{Color::rgba(20, 30, 42, 72)}``.
 
    .. cpp:member:: bool inset
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MotionClock final
+
+   ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+   One window's motion clock (T2 plan, MotionClock; GIVEN D1-1). The window owns it; it observes the window. It holds at most one frame request, armed only while some value it holds has not settled, however many values move; the request is disconnected once the last one settles, so a window at rest schedules no frames. Execution: every member runs on the window's UI thread. Frames, settling and the listeners' damage all happen inside the window's frame poll. Event order on a frame: each value enlisted before the frame starts is advanced to the frame's time, in the order of its record's slot (the same for the same sequence of starts and releases); a value that settles is released before its listener runs; then the owner is invalidated as the value declared, then its listener runs. Values started by a listener are first advanced on the next frame. A listener that throws is counted as a frame callback fault; its value jumps to its end. Ending motion (all by name): - finish_all: reduced motion turned on (GIVEN D2-1) or the window occluded or minimized (GIVEN D4-1). Every value jumps to its end and its listener runs once, with the cause. While either holds, a new move jumps to its end at once and nothing is scheduled. - release_owner: a control left the window. Its values jump to their ends without listeners. - cancel: the window closes (or cancels its frame requests). Every value jumps to its end without listeners, and the request is disconnected. A record is named by its handle; a stale handle (its record released) is rejected, so a value whose owner has gone is never advanced.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit MotionClock(Window& window) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: FrameTime now() const noexcept
+
+      The time a move starting now starts at.
+
+   .. cpp:function:: bool armed() const noexcept
+
+      Whether the clock holds its frame request.
+
+   .. cpp:function:: std::size_t moving_count() const noexcept
+
+      Values moving on the clock now.
+
+   .. cpp:function:: bool suppressed() const noexcept
+
+      Whether a move would jump to its end at once: reduced motion, or an occluded or minimized window.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void set_time_source(const MotionTimeSource* source) noexcept
+
+      Borrows ``source`` (it must outlive its installation); null restores the steady clock.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionCurve final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   How a value moves. Make it with the named factories, which keep the fields that belong together consistent.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static MotionCurve timed(FrameInterval duration, MotionEasing easing) noexcept
+
+   .. cpp:function:: static MotionCurve follow(FrameInterval time_constant = follow_time_constant) noexcept
+
+   .. cpp:function:: static MotionCurve spring(FrameInterval response, double overshoot = 0.0) noexcept
+
+   .. cpp:function:: static MotionCurve decay(FrameInterval time_constant) noexcept
+
+   .. cpp:member:: MotionKind kind
+
+      Default: ``{MotionKind::timed}``.
+
+   .. cpp:member:: FrameInterval duration
+
+      timed: the duration. follow and decay: the time constant. spring: the response time, 1/ω for the natural angular frequency ω. Clamped to [0, motion_duration_ceiling]; zero means the value jumps to its end. Default: ``{std::chrono::milliseconds(180)}``.
+
+   .. cpp:member:: MotionEasing easing
+
+      timed only. Default: ``{MotionEasing::smoothstep}``.
+
+   .. cpp:member:: double overshoot
+
+      spring only: the overshoot of a move from rest, as a fraction of the distance, from 0 (critically damped) to maximum_motion_overshoot.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionRecordHandle final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   Which record of a clock a value holds while it moves: a slot and the slot's generation when the record was made. A released record's handle is stale and names nothing, even after its slot is reused.
+
+   .. cpp:member:: std::uint32_t slot
+
+   .. cpp:member:: std::uint32_t generation
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionStep final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   One step of a value, as its listener sees it. ``value`` is the value that moved; it is valid for the call.
+
+   .. cpp:member:: MotionValue* value
+
+   .. cpp:member:: double previous
+
+   .. cpp:member:: double current
+
+   .. cpp:member:: bool settled
+
+      The value reached its settled condition (or jumped to its end) and stands exactly at its target; the clock no longer advances it.
+
+   .. cpp:member:: MotionStepCause cause
+
+      Default: ``{MotionStepCause::advanced}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MotionTimeSource
+
+   ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+   Where a clock reads the time a motion starts. Steady-clock time unless a source is installed: tests install one so that motion is sampled from a time they choose, never from the wall clock. Its times must be in the same domain as the times the window is polled with.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual FrameTime now() const noexcept = 0
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MotionValue final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   One value. Ownership: a control owns it as a member (or through something the control owns), and names itself as the owner, so the owner outlives it. It neither copies nor moves, so the clock's record of it stays valid; it releases that record when it is destroyed. All of it runs on the UI thread of the owner's window. The settled conditions, in device pixels at the window's scale (extent times scale converts value units): - timed: the duration has elapsed; - follow and decay: the remaining gap is within motion_settle_tolerance; - spring: the gap is within it, and so is the movement over one 60 Hz frame at the current velocity. On settling the value snaps exactly to its target, so the last frame is the static rendering. Every move starts from where the value stands at that moment, with its velocity: a retarget mid-flight never jumps (design language §9.1).
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: MotionValue(Control& owner, MotionCurve curve, double initial = 0.0) noexcept
+
+      A settled value at ``initial``, owned by :cpp:func:`owner <gui_forms::MotionValue::owner>`.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: double current() const noexcept
+
+      The value at the last frame, start or jump.
+
+   .. cpp:function:: double target() const noexcept
+
+      Where the value is going (a decay: where it comes to rest).
+
+   .. cpp:function:: double velocity() const noexcept
+
+   .. cpp:function:: bool settled() const noexcept
+
+   .. cpp:function:: const MotionCurve& curve() const noexcept
+
+   .. cpp:function:: void set_curve(MotionCurve curve) noexcept
+
+      The curve of the next move; a move under way keeps its own. Durations and overshoot are clamped (see MotionCurve).
+
+   .. cpp:function:: double extent() const noexcept
+
+   .. cpp:function:: bool set_extent(double logical_units) noexcept
+
+      The logical length one unit of the value spans, for the settled conditions (default 1: the value is a logical length). A progress across a 150-unit slide has extent 150. Refused (returns false, the extent unchanged) outside [minimum_motion_extent, maximum_motion_extent] or when not finite.
+
+   .. cpp:function:: Control& owner() const noexcept
+
+   .. cpp:function:: bool enlisted() const noexcept
+
+      Whether a clock holds this value's record (it is moving on it).
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: MotionStart animate_to(double target)
+
+      Moves toward :cpp:func:`target <gui_forms::MotionValue::target>` from where the value stands now. A decay comes to rest at the target. If the clock's record or its frame request cannot be made, the exception propagates and the value is unchanged.
+
+   .. cpp:function:: MotionStart fling(double velocity)
+
+      decay only: launches the value at :cpp:func:`velocity <gui_forms::MotionValue::velocity>` (value units per second); it comes to rest where friction stops it.
+
+   .. cpp:function:: MotionStart adopt(const MotionValue& source)
+
+      Moves as ``source`` moves: its curve, its current move and its time, on this value's own clock (a docking guest showing another window's stamp). A settled source makes this value jump to its value.
+
+   .. cpp:function:: void finish() noexcept
+
+      Ends the move: the value stands at its target, settled. No listener runs.
+
+   .. cpp:function:: void jump_to(double value) noexcept
+
+      Stands the value at ``value``, settled (a non-finite value is ignored). No listener runs.
+
+   .. cpp:function:: void set_listener(MotionListener listener) noexcept
+
+   .. cpp:function:: void set_invalidation(Dirty dirty) noexcept
+
+      What the clock invalidates on the owner after each step; none by default (the listener invalidates what it moved).
 
 .. cpp:namespace:: gui_forms
 
@@ -2012,6 +2236,64 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MotionEasing
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: smoothstep
+
+   .. cpp:enumerator:: exponential_approach
+
+   .. cpp:enumerator:: linear
+
+   .. cpp:enumerator:: ease
+
+   .. cpp:enumerator:: overshoot
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionKind
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: follow
+
+   .. cpp:enumerator:: spring
+
+   .. cpp:enumerator:: decay
+
+   .. cpp:enumerator:: timed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionStart
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: started
+
+   .. cpp:enumerator:: unchanged
+
+   .. cpp:enumerator:: finished
+
+   .. cpp:enumerator:: detached
+
+   .. cpp:enumerator:: refused
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionStepCause
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: advanced
+
+   .. cpp:enumerator:: reduced_motion
+
+   .. cpp:enumerator:: occluded
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ParameterAssignment
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -2264,6 +2546,56 @@ Functions, constants and aliases
 .. cpp:function:: double engine_power(double base, double exponent) noexcept
 
    ``base`` raised to ``exponent``, for base ≥ 0. Exact cases: base^0 is 1, 1^exponent is 1, and 0^exponent is 0 for exponent > 0. Returns NaN for a negative or NaN base and for a NaN exponent.
+
+.. cpp:function:: EngineSineCosine engine_sine_cosine(double x) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+.. cpp:var:: constexpr FrameInterval motion_frame_interval
+
+   The clock's frame cadence while something moves. Value: ``std::chrono::milliseconds(16)``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+.. cpp:function:: double motion_easing(MotionEasing easing, double progress) noexcept
+
+   The eased progress for ``progress`` in [0, 1] (clamped), for tests and for later engine transitions.
+
+.. cpp:var:: constexpr FrameInterval motion_duration_ceiling
+
+   The ceiling on every duration (design language §9.2; the 400 ms starting token). A longer duration or time constant is clamped to it. Value: ``std::chrono::milliseconds(400)``.
+
+.. cpp:var:: constexpr FrameInterval follow_time_constant
+
+   The exponential approach's time constant (GIVEN D3-1, "a fixed fraction of the remaining gap per about 75 ms"): each 75 ms the gap shrinks by a factor of e, so 63 % of what remains is covered. Value: ``std::chrono::milliseconds(75)``.
+
+.. cpp:var:: constexpr double maximum_motion_overshoot
+
+   The largest overshoot a spring or the overshoot easing shows, as a fraction of the distance travelled (the 8 % starting token). A larger request is clamped to it. Value: ``0.08``.
+
+.. cpp:var:: constexpr double motion_settle_tolerance
+
+   The settled conditions' tolerance: half a device pixel at the window's scale. A settling value whose remaining gap (and, for a spring, whose movement over one 60 Hz frame) is within it snaps to its target. Value: ``0.5``.
+
+.. cpp:var:: constexpr double motion_settle_frame_seconds
+
+   Value: ``1.0 / 60.0``.
+
+.. cpp:var:: constexpr double minimum_motion_extent
+
+   The bounds of a value's extent (MotionValue::set_extent). Value: ``1e-6``.
+
+.. cpp:var:: constexpr double maximum_motion_extent
+
+   Value: ``1e6``.
+
+.. cpp:type:: MotionListener = Delegate<const MotionStep&>
+
+   A value's listener: a named member or function of the owner, bound with Delegate::bind. It runs on the UI thread, from the clock's frame or from the window event that ended the motion, after the value moved and after the owner was invalidated as declared. It may retarget, finish or jump any value, its own included; a value it starts is first advanced on the next frame.
 
 .. cpp:namespace:: gui_forms
 

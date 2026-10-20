@@ -70,6 +70,8 @@ Window::~Window() {
         (*popups_.back()).disconnect();
     }
     focus_scopes_.clear();
+    // The clock is cancelled by name before its request goes with the rest.
+    motion_clock_.cancel();
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
         (*request).disconnect();
     }
@@ -135,6 +137,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     }
     const bool text_scale_changed =
         presentation_settings_.text_scale != settings.text_scale;
+    const bool motion_reduced_now =
+        settings.reduced_motion && !presentation_settings_.reduced_motion;
     presentation_settings_ = settings;
     // Transient overlays own geometry resolved for the opening text metrics.
     // A text-scale transition dismisses them deterministically; reopening
@@ -151,6 +155,9 @@ void Window::set_presentation_settings(PresentationSettings settings) {
             mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
         }
     }
+    // Reduced motion (GIVEN D2-1, design language §9.5): every value jumps
+    // to its end in this call, and later moves jump at once.
+    if (motion_reduced_now) motion_clock_.finish_all(MotionStepCause::reduced_motion);
     presentation_changed_.emit(presentation_settings_);
 }
 

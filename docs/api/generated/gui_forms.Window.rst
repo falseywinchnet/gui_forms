@@ -56,7 +56,8 @@ gui_forms::Window
          Text scale, high contrast, reduced motion and sound preferences. The
          text scale must lie between 0.5 and 4.0, and changing it closes open
          popups. Any change remeasures the tree and raises
-         :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`.
+         :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`. Turning reduced motion on puts every motion
+         value of the window at its end in the same call.
 
       **text_metrics_provider** : ``TextMetricsProvider*``
 
@@ -115,7 +116,8 @@ gui_forms::Window
 
       **occluded** : ``bool``, default ``false``
          Whether the host reports the window as hidden from view. While occluded,
-         painting and paint wake-ups are suspended.
+         painting and paint wake-ups are suspended, and motion values jump to
+         their ends without scheduling frames.
 
       **check_access** : ``bool``, read-only
          Whether the calling thread is the window's UI thread: the thread that
@@ -202,6 +204,12 @@ gui_forms::Window
 
       **engine_parts** : ``EnginePartTable``, read-only
          The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
+      **motion_clock** : ``MotionClock``, read-only
+         The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+         control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+         has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+         it so that motion is sampled from their own time.
 
       **semantic_generation** : ``std::uint64_t``, read-only
          A number that changes whenever the semantic (accessibility) tree may
@@ -369,6 +377,8 @@ gui_forms::Window
         -  
       * - :cpp:func:`cancel_drag <gui_forms::Window::cancel_drag>`
         -  
+      * - :cpp:func:`motion_clock <gui_forms::Window::motion_clock>`
+        - The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are.
       * - :cpp:func:`metrics <gui_forms::Window::metrics>`
         - The live instrumentation counters, for hosts and renderers that record into them.
       * - :cpp:func:`reset_activity_metrics <gui_forms::Window::reset_activity_metrics>`
@@ -560,7 +570,8 @@ gui_forms::Window
       Text scale, high contrast, reduced motion and sound preferences. The
       text scale must lie between 0.5 and 4.0, and changing it closes open
       popups. Any change remeasures the tree and raises
-      :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`.
+      :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`. Turning reduced motion on puts every motion
+      value of the window at its end in the same call.
 
    .. cpp:function:: void set_presentation_settings(PresentationSettings settings)
 
@@ -646,7 +657,8 @@ gui_forms::Window
    .. cpp:function:: bool occluded() const noexcept
 
       Whether the host reports the window as hidden from view. While occluded,
-      painting and paint wake-ups are suspended.
+      painting and paint wake-ups are suspended, and motion values jump to
+      their ends without scheduling frames.
 
    .. cpp:function:: void set_occluded(bool occluded, FrameTime transition_time)
 
@@ -760,6 +772,13 @@ gui_forms::Window
    .. cpp:function:: const EnginePartTable& engine_parts() const noexcept
 
       The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
+   .. cpp:function:: const MotionClock& motion_clock() const noexcept
+
+      The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+      control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+      has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+      it so that motion is sampled from their own time.
 
    .. cpp:function:: std::uint64_t semantic_generation() const noexcept
 
@@ -1122,6 +1141,13 @@ gui_forms::Window
    .. cpp:function:: DragDispatchResult dispatch_drag(DragEvent event)
 
    .. cpp:function:: void cancel_drag() noexcept
+
+   .. cpp:function:: MotionClock& motion_clock() noexcept
+
+      The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+      control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+      has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+      it so that motion is sampled from their own time.
 
    .. cpp:function:: Metrics& metrics() noexcept
 

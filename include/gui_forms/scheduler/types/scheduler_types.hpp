@@ -32,6 +32,9 @@ struct FramePollResult final {
     std::uint64_t deadlines_fired{};
     std::uint64_t active_surface_ticks{};
     std::uint64_t ui_timer_ticks{};
+    // Frames of the window's motion clock: at most one per poll, however
+    // many values move.
+    std::uint64_t motion_clock_ticks{};
     std::uint64_t coalesced_requests{};
     // Throwing callbacks are disconnected individually so one animated
     // surface cannot repeatedly escape through a native timer callback.

@@ -267,9 +267,17 @@ Related types
 
       Counts a scheduled frame request.
 
-   .. cpp:function:: void record_frame_poll(std::uint64_t deadlines_fired, std::uint64_t active_surface_ticks, std::uint64_t coalesced_requests) noexcept
+   .. cpp:function:: void record_frame_poll(std::uint64_t deadlines_fired, std::uint64_t active_surface_ticks, std::uint64_t motion_clock_ticks, std::uint64_t coalesced_requests) noexcept
 
       Accumulates deadlines, active ticks, coalescing, and nonempty scheduler wakes.
+
+   .. cpp:function:: void record_motion_started() noexcept
+
+      The motion clock: a move started, a value settled on a frame, a value jumped to its end at once, and the values moving now.
+
+   .. cpp:function:: void record_motion_settled() noexcept
+
+   .. cpp:function:: void record_motion_finished() noexcept
 
    .. cpp:function:: void record_frame_callback_fault() noexcept
 
@@ -310,6 +318,8 @@ Related types
    .. cpp:function:: void set_display_cache(std::uint64_t entries, std::uint64_t generation) noexcept
 
       Sets current cache entries and generation.
+
+   .. cpp:function:: void set_motion_values_moving(std::uint64_t moving) noexcept
 
    .. cpp:function:: void set_active_surface_count(std::size_t count) noexcept
 
@@ -452,6 +462,10 @@ Related types
 
    .. cpp:member:: std::uint64_t active_surface_ticks
 
+   .. cpp:member:: std::uint64_t motion_clock_ticks
+
+      Frames of the window's motion clock (T2 plan, phase E3): at most one per frame poll, however many motion values move.
+
    .. cpp:member:: std::uint64_t frame_requests_coalesced
 
    .. cpp:member:: std::uint64_t frame_callback_faults
@@ -503,6 +517,16 @@ Related types
    .. cpp:member:: std::uint64_t engine_part_records_evicted
 
       Item-part records evicted, least recently painted first, to keep within the window's cap (maximum_item_part_records).
+
+   .. cpp:member:: std::uint64_t motion_values_moving
+
+      The motion clock's values (T2 plan, phase E3): those moving now, moves started (a retarget is a start), those that reached their settled condition on a frame, and those that jumped to their end at once (reduced motion, an occluded or minimized window, a zero duration, or an end by finish_all). The moving count is population and survives reset_activity; zero means the window schedules no motion frames.
+
+   .. cpp:member:: std::uint64_t motion_values_started
+
+   .. cpp:member:: std::uint64_t motion_values_settled
+
+   .. cpp:member:: std::uint64_t motion_values_finished
 
    .. cpp:member:: std::string renderer_name
 
