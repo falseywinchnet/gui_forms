@@ -314,7 +314,7 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 | Relief | Construction | Typical parts | Source |
 |---|---|---|---|
 | Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | push button, chip, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
-| Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; each holds near its peak across the bulge and falls off over a narrow band at the rim: intensity × (1 − t^q) with q about 2.2 over the half-width t (a tighter slope means a larger q; a curve concentrated at the centre, such as (1 − t)^p, reads looser and is wrong) and melt back into the plane before the part's bounds; pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
+| Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; each holds near its peak across the bulge and falls off over a narrow band at the rim: intensity × (1 − t^q) with q about 2.2 over the half-width t (a tighter slope means a larger q; a curve concentrated at the centre, such as (1 − t)^p, reads looser and is wrong) and melt back into the plane, the lit slope and crown before the part's bounds, while the shaded slope may still hold part of its peak at the lower-right bounds (about 45 % at the middle of the bottom edge; owner, §12.12 G2); flat at rest, the bulge rises when hot (§12.12 G4); pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
 | Dithered bulge | the bulge field above, subsampled onto a regular lattice (1 logical px dots every 2 px) with a multi-tone ramp: the signed tone (lit minus shaded slope) is quantized onto at least three steps per side (for the default, deep, mid and light blue on the shaded side; pale tint, near-white and white on the lit side; ambers and creams for the active tool), and an ordered 4×4 threshold dithers between neighbouring steps so the gradation survives; a two-colour dither is wrong; the plane shows where the tone rounds to zero; no edge; pressed and active as for Bulge | ribbon command buttons (studies); a theme choice | owner, §12.4 |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
 | Pressed | face darkened, inner lines inverted (dark top/left, light bottom/right), contact shadow removed | button, command, segment | Plan Paint pressed tile |
@@ -1483,6 +1483,40 @@ plan:
   colour, honoured by the `fill` role only (§8.5), so that a swatch is a
   fill inside a well and every part of a colour picker paints by role. The
   schema export lists it under `vocabulary.values` as `content_color`.
+
+### 12.12 Owner decisions, T2 engine interview, 2026-10-19
+
+Recorded in `planning/interview/T2_INTERVIEW_ROUND_001.md`. The GIVEN list is
+in the T2 brief. Those that touch this document:
+
+- **Atoms (§12.7).** Admitted:
+  - the engine inputs: `pointer_x` and `pointer_y` in part-local logical
+    units (published only while hot), `time_in_state`, `display_scale`,
+    `text_scale`, and published application values;
+  - an `image` part role, a content picture drawn exactly as given;
+  - a grip primitive that fills its box.
+
+  Density waits for stage L or T4. Part opacity is an engine presentational
+  property, not an atom.
+- **Motion (§9).**
+  - Reduced motion follows §9.5 exactly.
+  - Occluded windows jump every transition to its end.
+  - The ribbon rise is an exponential approach, a fixed fraction of the
+    remaining gap per about 75 ms.
+  - A presentational scale exists only as a capability. It is drawn about
+    the part's centre, inside its granted overflow, with the hit region and
+    layout unchanged, and the default does not use it, so §9.1 still holds
+    for the default.
+  - An application may mark a surface ceremonial, lifting the 10 % ambient
+    cap (§10) for that surface only.
+- **The bulge (§3.5).**
+  - **G2:** the shade field keeps the approved formula, and the Bulge row
+    now says what it does at the bounds.
+  - **G4:** a ribbon button is flat at rest and its bulge rises when hot.
+    Hover is the rise, with no brightness lift.
+  - **G1, G3:** the dithered bulge rescales its quantization to the part's
+    own tone range, and is drawn at the nearest integer display scale. The
+    rules are in `T4-default-theme/RENDERING_REFERENCE.md` §3.
 
 ## Appendix A. Anti-models
 

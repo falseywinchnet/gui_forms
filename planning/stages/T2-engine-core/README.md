@@ -1,7 +1,9 @@
 # Stage T2: engine core
 
 Release: 0.3 Themeable. Depends on: T1 (anatomy and schema). Unblocks T3,
-T4, T5, C. Status 2026-10-13: not started; ready, since T1's gate is recorded
+T4, T5, C. Status 2026-10-19: interview round 001 answered and the phase
+plan E1 to E11 accepted ("Owner decisions" below); E1 (#161) is revised to
+the decisions, then E2 starts. Earlier status, 2026-10-13: not started; ready, since T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). T1 hands T2 hit regions derived from
 part geometry and text published as layout slots (T1 brief, "Hand-off").
 Authority:
@@ -172,6 +174,83 @@ pixels; the window counters report zero frames once inputs stop and every
 settling primitive has settled; a part whose cost cannot be bounded falls back
 to the built-in recipe; reduced motion disables motion primitives. Record
 under `results/` with the hash comparison per host.
+
+## Owner decisions, interview round 001 (2026-10-19)
+
+Recorded in `planning/interview/T2_INTERVIEW_ROUND_001.md`, answered on
+`interview_round_001_source.html`.
+
+### Scope and the gate
+- **GIVEN A1-1.** Phase order: E1 and E2 (kernels and the composite) first,
+  then E3 (motion).
+- **GIVEN A2-2.** The identity gate hashes each primitive's raster bytes and
+  the composite into the window through each host's painter.
+- **GIVEN A3-1.** #159 and #161 are revised to these answers.
+
+### Atoms
+- **GIVEN B1-1.** The engine-input atoms:
+  - `pointer_x` and `pointer_y` (published only while the part is hot);
+  - `time_in_state`, `display_scale` and `text_scale`;
+  - published application values (named, numeric, read-only).
+- **GIVEN B2-1.** Pointer inputs are in part-local logical units.
+- **GIVEN B3-1.** An application-set ceremonial flag on a surface lifts the
+  10 % ambient cap for that surface only.
+- **GIVEN B4-2.** No density atom until stage L or T4 needs it.
+
+### Opacity and motion
+- **GIVEN C1-1.** Part opacity is an engine presentational property driven by
+  transitions, with no new atom.
+- **GIVEN C2-1.** The built-in rules draw the docking tile fade once
+  transitions exist (E7).
+- **GIVEN D1-1.** Motion a control computes runs on control-owned motion
+  values, on one clock per window. They replace the stamp's and the flyout's
+  timers.
+- **GIVEN D2-1.** Reduced motion follows §9.5:
+  - transitions jump to their end;
+  - ambient effects stop;
+  - the activity object holds a static pose.
+
+  `MotionPolicy::reduced` follows in T4.
+- **GIVEN D3-1.** The ribbon rise is an exponential approach, a fixed
+  fraction of the remaining gap per about 75 ms.
+- **GIVEN D4-1.** In an occluded or minimized window, every transition jumps
+  to its end and nothing is scheduled.
+- **GIVEN D5-1.** A presentational scale is a capability only:
+  - drawn about the part's centre, inside its granted overflow;
+  - the hit region and layout are unchanged;
+  - the default does not use it.
+
+### Shadow, content colour and budgets
+- **GIVEN E1-1.** The overlay shadow is an engine primitive with a
+  first-party blur (E9), keeping today's values, outsets and high-contrast
+  rule.
+- **GIVEN E2-1.** Content colour is drawn exactly as given.
+- **GIVEN F1-1.** Per-part cost is at most 512 declared operations per device
+  pixel, and 4 million per frame for an animated part. Beyond that, the part
+  falls back to the built-in recipe.
+- **GIVEN F2-1.** Cached part rasters use at most 8 MB per window, evicting
+  the least recently painted first.
+
+### The rendering reference
+- **GIVEN G1-3.** Dither quantization is rescaled to the part's tone range
+  (rule in `RENDERING_REFERENCE.md` §3).
+- **GIVEN G2-1.** The shade field keeps the approved formula; §3.5's wording
+  is corrected.
+- **GIVEN G3-3.** Dithered parts are drawn at the nearest integer scale (rule
+  in `RENDERING_REFERENCE.md` §3).
+- **GIVEN G4-1.** No hover lift. A ribbon button is flat at rest, and hot
+  raises its bulge (D3-1); hover is the rise.
+
+### Vocabulary
+- **GIVEN H1-1.** An `image` part role: content pictures drawn exactly as
+  given.
+- **GIVEN H2-1.** A grip primitive fills its part's box with the dot pattern.
+- **GIVEN H3-1.** A part's identity across frames is the control's stable
+  ID, the declared part, and the item's stable ID. Items without one fall
+  back to their index, and the fallback is reported.
+
+### The plan
+- **GIVEN Z1-1.** E1 to E11 are the T2 plan, revised by these decisions.
 
 ## Open decisions (ask, do not decide)
 
