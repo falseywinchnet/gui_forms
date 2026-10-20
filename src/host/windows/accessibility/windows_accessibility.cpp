@@ -1,5 +1,6 @@
 #include "windows_accessibility.hpp"
 
+#include "windows_automation.hpp"
 #include "windows_semantic_source.hpp"
 
 #include <oleacc.h>
@@ -45,55 +46,22 @@ namespace {
 // units.
 constexpr UINT maximum_value_length = 1024U * 1024U;
 
-HRESULT utf8_to_bstr(std::string_view value, BSTR* result) noexcept {
-    *result = nullptr;
-    if (value.empty()) return S_FALSE;
-    if (value.size() > static_cast<std::size_t>(INT_MAX)) return E_FAIL;
-    const int size = static_cast<int>(value.size());
-    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size,
-                                          nullptr, 0);
-    if (count <= 0) return E_FAIL;
-    BSTR text = SysAllocStringLen(nullptr, static_cast<UINT>(count));
-    if (text == nullptr) return E_OUTOFMEMORY;
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size, text, count);
-    *result = text;
-    return S_OK;
-}
-
 // Converts a client's text to UTF-8. Returns false for text longer than
 // maximum_value_length or not valid UTF-16, leaving `text` empty.
 bool utf8_from_bstr(BSTR value, std::string& text) {
     text.clear();
     if (value == nullptr) return true;
     const UINT length = SysStringLen(value);
-    if (length == 0U) return true;
     if (length > maximum_value_length) return false;
-    const int units = static_cast<int>(length);
-    const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, units, nullptr, 0,
-                                         nullptr, nullptr);
-    if (size <= 0) return false;
-    text.resize(static_cast<std::size_t>(size));
-    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, units, text.data(), size, nullptr,
-                        nullptr);
-    return true;
-}
-
-bool has_action(const SemanticNode& node, SemanticAction action) noexcept {
-    for (const SemanticAction published : node.actions) {
-        if (published == action) return true;
-    }
-    return false;
+    const std::wstring_view wide(value, length);
+    const bool converted = utf8_from_wide(wide, text);
+    return converted;
 }
 
 bool button_role(SemanticRole role) noexcept {
     const bool button = role == SemanticRole::button || role == SemanticRole::split_button ||
                         role == SemanticRole::menu_button;
     return button;
-}
-
-bool check_role(SemanticRole role) noexcept {
-    const bool check = role == SemanticRole::check_box || role == SemanticRole::check_list_item;
-    return check;
 }
 
 LONG msaa_role(SemanticRole role) noexcept {
@@ -163,12 +131,12 @@ LONG msaa_state(const SemanticNode& node) noexcept {
     }
     if (has_semantic_state(states, SemanticState::mixed)) bits |= STATE_SYSTEM_MIXED;
     if (has_semantic_state(states, SemanticState::selected)) bits |= STATE_SYSTEM_SELECTED;
-    if (has_action(node, SemanticAction::select)) bits |= STATE_SYSTEM_SELECTABLE;
+    if (semantic_has_action(node, SemanticAction::select)) bits |= STATE_SYSTEM_SELECTABLE;
     if (has_semantic_state(states, SemanticState::read_only)) bits |= STATE_SYSTEM_READONLY;
     // A node that can expand and is not expanded is collapsed.
     if (has_semantic_state(states, SemanticState::expanded)) {
         bits |= STATE_SYSTEM_EXPANDED;
-    } else if (has_action(node, SemanticAction::expand)) {
+    } else if (semantic_has_action(node, SemanticAction::expand)) {
         bits |= STATE_SYSTEM_COLLAPSED;
     }
     if (has_semantic_state(states, SemanticState::protected_content)) bits |= STATE_SYSTEM_PROTECTED;
@@ -185,12 +153,12 @@ LONG msaa_state(const SemanticNode& node) noexcept {
 // publishes, else expand or collapse by its expanded state. Focus is not a
 // default action; a client reaches it through accSelect.
 std::optional<SemanticAction> default_action(const SemanticNode& node) noexcept {
-    if (has_action(node, SemanticAction::press)) return SemanticAction::press;
-    if (has_action(node, SemanticAction::show_menu)) return SemanticAction::show_menu;
-    if (has_action(node, SemanticAction::select)) return SemanticAction::select;
+    if (semantic_has_action(node, SemanticAction::press)) return SemanticAction::press;
+    if (semantic_has_action(node, SemanticAction::show_menu)) return SemanticAction::show_menu;
+    if (semantic_has_action(node, SemanticAction::select)) return SemanticAction::select;
     const bool expanded = has_semantic_state(node.states, SemanticState::expanded);
-    if (expanded && has_action(node, SemanticAction::collapse)) return SemanticAction::collapse;
-    if (!expanded && has_action(node, SemanticAction::expand)) return SemanticAction::expand;
+    if (expanded && semantic_has_action(node, SemanticAction::collapse)) return SemanticAction::collapse;
+    if (!expanded && semantic_has_action(node, SemanticAction::expand)) return SemanticAction::expand;
     return std::nullopt;
 }
 
@@ -206,7 +174,7 @@ const wchar_t* default_action_verb(const SemanticNode& node) noexcept {
                             node.role == SemanticRole::menu_bar_item ||
                             node.role == SemanticRole::menu_button);
         if (opens) return L"Open";
-        if (check_role(node.role)) {
+        if (checkable_role(node.role)) {
             const bool checked = has_semantic_state(node.states, SemanticState::checked);
             return checked ? L"Uncheck" : L"Check";
         }
@@ -230,42 +198,22 @@ const wchar_t* default_action_verb(const SemanticNode& node) noexcept {
     return nullptr;
 }
 
-bool contains_point(const SemanticNode& node, double x, double y) noexcept {
-    const Rect bounds = node.bounds;
-    const bool inside = x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width &&
-                        y < bounds.y + bounds.height;
-    return inside;
-}
-
-// The deepest visible node at (x, y), in logical window coordinates, at or
-// below `at`; later children are above earlier ones.
-bool hit_location(const SemanticLocation& at, double x, double y, SemanticLocation& hit) noexcept {
-    const std::size_t count = (*at.node).children.size();
-    for (std::size_t index = count; index > 0U; --index) {
-        const SemanticLocation child = child_location(at, index - 1U);
-        if (hit_location(child, x, y, hit)) return true;
+// Takes the window's client tree and, when a tree was announced before and
+// a UI Automation client listens, raises the events for the change from it;
+// then keeps the new tree as the one announced. A failed snapshot keeps the
+// old one.
+void publish_automation_tree(const std::shared_ptr<SemanticSource>& source) noexcept {
+    SemanticSource& state = *source;
+    try {
+        SemanticNode current;
+        if (!state.snapshot(current)) return;
+        if (state.announced && UiaClientsAreListening()) {
+            raise_automation_events(source, state.published, current);
+        }
+        state.published = std::move(current);
+        state.announced = true;
+    } catch (...) {
     }
-    const bool visible = has_semantic_state((*at.node).states, SemanticState::visible);
-    if (visible && contains_point(*at.node, x, y)) {
-        hit = at;
-        return true;
-    }
-    return false;
-}
-
-// The first node at or below `at`, in tree order, with `state`.
-bool state_location(const SemanticLocation& at, SemanticState state,
-                    SemanticLocation& found) noexcept {
-    if (has_semantic_state((*at.node).states, state)) {
-        found = at;
-        return true;
-    }
-    const std::size_t count = (*at.node).children.size();
-    for (std::size_t index = 0; index < count; ++index) {
-        const SemanticLocation child = child_location(at, index);
-        if (state_location(child, state, found)) return true;
-    }
-    return false;
 }
 
 // Which text property a text getter reads.
@@ -536,7 +484,7 @@ HRESULT STDMETHODCALLTYPE MsaaElement::get_accFocus(VARIANT* out) {
     const HRESULT status = resolve_self(client, self);
     if (FAILED(status)) return status;
     SemanticLocation found;
-    if (!state_location(self, SemanticState::focused, found)) return S_FALSE;
+    if (!find_state_location(self, SemanticState::focused, found)) return S_FALSE;
     return variant_for(found, out);
 }
 
@@ -548,7 +496,7 @@ HRESULT STDMETHODCALLTYPE MsaaElement::get_accSelection(VARIANT* out) {
     const HRESULT status = resolve_self(client, self);
     if (FAILED(status)) return status;
     SemanticLocation found;
-    if (!state_location(self, SemanticState::selected, found)) return S_FALSE;
+    if (!find_state_location(self, SemanticState::selected, found)) return S_FALSE;
     return variant_for(found, out);
 }
 
@@ -651,7 +599,7 @@ HRESULT STDMETHODCALLTYPE MsaaElement::accHitTest(LONG x, LONG y, VARIANT* out) 
     const double logical_x = (x - origin.x) / scale;
     const double logical_y = (y - origin.y) / scale;
     SemanticLocation hit;
-    if (!hit_location(self, logical_x, logical_y, hit)) return S_FALSE;
+    if (!hit_semantic_location(self, logical_x, logical_y, hit)) return S_FALSE;
     return variant_for(hit, out);
 }
 
@@ -676,7 +624,7 @@ HRESULT STDMETHODCALLTYPE MsaaElement::put_accValue(VARIANT child, BSTR value) {
     SemanticLocation target;
     const HRESULT status = resolve(child, client, target);
     if (FAILED(status)) return status;
-    if (!has_action(*target.node, SemanticAction::set_value)) return DISP_E_MEMBERNOTFOUND;
+    if (!semantic_has_action(*target.node, SemanticAction::set_value)) return DISP_E_MEMBERNOTFOUND;
     std::string text;
     try {
         if (!utf8_from_bstr(value, text)) return E_INVALIDARG;
@@ -700,8 +648,16 @@ void WindowsAccessibility::attach(HWND hwnd, Window& model, double scale) {
 }
 
 void WindowsAccessibility::detach() noexcept {
-    (*source_).model = nullptr;
-    (*source_).hwnd = nullptr;
+    SemanticSource& source = *source_;
+    // UI Automation holds the providers it was handed for this window until
+    // told the window is going.
+    if (source.automation_observed && source.hwnd != nullptr) {
+        UiaReturnRawElementProvider(source.hwnd, 0, 0, nullptr);
+    }
+    source.model = nullptr;
+    source.hwnd = nullptr;
+    source.published = SemanticNode{};
+    source.announced = false;
 }
 
 LRESULT WindowsAccessibility::object(WPARAM parameter) noexcept {
@@ -714,15 +670,39 @@ LRESULT WindowsAccessibility::object(WPARAM parameter) noexcept {
     return result;
 }
 
+bool WindowsAccessibility::automation_request(LPARAM lparam) noexcept {
+    // WM_GETOBJECT carries the object ID in the low 32 bits of lparam.
+    const bool requested = static_cast<LONG>(lparam) == static_cast<LONG>(UiaRootObjectId);
+    return requested;
+}
+
+LRESULT WindowsAccessibility::automation_object(WPARAM wparam, LPARAM lparam) noexcept {
+    SemanticSource& source = *source_;
+    if (source.model == nullptr || source.hwnd == nullptr) return 0;
+    if (!source.automation_observed) {
+        // The tree the first client sees is the one later changes are
+        // compared against.
+        source.automation_observed = true;
+        publish_automation_tree(source_);
+    }
+    IRawElementProviderSimple* root = make_automation_element(source_, SemanticElementId{});
+    if (root == nullptr) return 0;
+    const LRESULT result = UiaReturnRawElementProvider(source.hwnd, wparam, lparam, root);
+    (*root).Release();
+    return result;
+}
+
 void WindowsAccessibility::notify(double scale) noexcept {
     SemanticSource& source = *source_;
     source.scale = scale;
-    if (source.model == nullptr || !source.observed) return;
+    if (source.model == nullptr || (!source.observed && !source.automation_observed)) return;
     if ((*source.model).semantic_generation() == source.generation) return;
     try {
         const SemanticSnapshot snapshot = (*source.model).semantic_snapshot();
         if (snapshot.generation == source.generation) return;
         source.generation = snapshot.generation;
+        if (source.automation_observed) publish_automation_tree(source_);
+        if (!source.observed) return;
         NotifyWinEvent(EVENT_OBJECT_REORDER, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
         NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
         NotifyWinEvent(EVENT_OBJECT_STATECHANGE, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
@@ -730,7 +710,7 @@ void WindowsAccessibility::notify(double scale) noexcept {
         for (const SemanticNode& root : snapshot.roots) {
             const SemanticLocation root_at = client_location(root);
             SemanticLocation found;
-            if (state_location(root_at, SemanticState::focused, found)) {
+            if (find_state_location(root_at, SemanticState::focused, found)) {
                 focused = (*found.node).runtime_id;
                 break;
             }

@@ -1,5 +1,6 @@
 #include "windows_semantic_source.hpp"
 
+#include <climits>
 #include <exception>
 #include <string>
 #include <utility>
@@ -127,6 +128,103 @@ bool parent_semantic_location(const SemanticNode& client, const SemanticLocation
     }
     const bool found = locate_semantic_element(client, id, parent);
     return found;
+}
+
+namespace {
+
+bool contains_point(const SemanticNode& node, double x, double y) noexcept {
+    const Rect bounds = node.bounds;
+    const bool inside = x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width &&
+                        y < bounds.y + bounds.height;
+    return inside;
+}
+
+} // namespace
+
+bool hit_semantic_location(const SemanticLocation& at, double x, double y,
+                           SemanticLocation& hit) noexcept {
+    const std::size_t count = (*at.node).children.size();
+    for (std::size_t index = count; index > 0U; --index) {
+        const SemanticLocation child = child_location(at, index - 1U);
+        if (hit_semantic_location(child, x, y, hit)) return true;
+    }
+    const bool visible = has_semantic_state((*at.node).states, SemanticState::visible);
+    if (visible && contains_point(*at.node, x, y)) {
+        hit = at;
+        return true;
+    }
+    return false;
+}
+
+bool find_state_location(const SemanticLocation& at, SemanticState state,
+                         SemanticLocation& found) noexcept {
+    if (has_semantic_state((*at.node).states, state)) {
+        found = at;
+        return true;
+    }
+    const std::size_t count = (*at.node).children.size();
+    for (std::size_t index = 0; index < count; ++index) {
+        const SemanticLocation child = child_location(at, index);
+        if (find_state_location(child, state, found)) return true;
+    }
+    return false;
+}
+
+bool find_control_location(const SemanticLocation& at, std::string_view stable_id,
+                           SemanticLocation& found) noexcept {
+    const std::size_t count = (*at.node).children.size();
+    for (std::size_t index = 0; index < count; ++index) {
+        const SemanticLocation child = child_location(at, index);
+        // A control-backed node never lies below a virtual one.
+        if (!control_backed(*child.node)) continue;
+        if ((*child.node).stable_id == stable_id) {
+            found = child;
+            return true;
+        }
+        if (find_control_location(child, stable_id, found)) return true;
+    }
+    return false;
+}
+
+bool semantic_has_action(const SemanticNode& node, SemanticAction action) noexcept {
+    for (const SemanticAction published : node.actions) {
+        if (published == action) return true;
+    }
+    return false;
+}
+
+bool checkable_role(SemanticRole role) noexcept {
+    const bool check = role == SemanticRole::check_box || role == SemanticRole::check_list_item;
+    return check;
+}
+
+HRESULT utf8_to_bstr(std::string_view value, BSTR* result) noexcept {
+    *result = nullptr;
+    if (value.empty()) return S_FALSE;
+    if (value.size() > static_cast<std::size_t>(INT_MAX)) return E_FAIL;
+    const int size = static_cast<int>(value.size());
+    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size,
+                                          nullptr, 0);
+    if (count <= 0) return E_FAIL;
+    BSTR text = SysAllocStringLen(nullptr, static_cast<UINT>(count));
+    if (text == nullptr) return E_OUTOFMEMORY;
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size, text, count);
+    *result = text;
+    return S_OK;
+}
+
+bool utf8_from_wide(std::wstring_view value, std::string& text) {
+    text.clear();
+    if (value.empty()) return true;
+    if (value.size() > static_cast<std::size_t>(INT_MAX)) return false;
+    const int units = static_cast<int>(value.size());
+    const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), units,
+                                         nullptr, 0, nullptr, nullptr);
+    if (size <= 0) return false;
+    text.resize(static_cast<std::size_t>(size));
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), units, text.data(), size,
+                        nullptr, nullptr);
+    return true;
 }
 
 bool SemanticSource::snapshot(SemanticNode& client) noexcept {
