@@ -76,8 +76,8 @@ private:
 
 // The layer the drag paints on: a child of the site kept above the stacks,
 // covering the site, transparent to hit testing, taking no focus and
-// publishing nothing (its parts are the site's). It receives the drag's
-// frames.
+// publishing nothing (its parts are the site's). The site's motion values
+// move what it paints; the site invalidates it.
 class DockSite::DragLayer final : public Control {
 public:
     DragLayer(StableId stable_id, DockSite& site) : Control(std::move(stable_id)), site_(&site) {
@@ -91,10 +91,6 @@ public:
 
     void on_paint(Painter& painter, Rect) override {
         if (site_ != nullptr) (*site_).paint_drag_layer(painter);
-    }
-
-    void on_frame(FrameTime now) override {
-        if (site_ != nullptr) (*site_).advance_drag(now);
     }
 
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {

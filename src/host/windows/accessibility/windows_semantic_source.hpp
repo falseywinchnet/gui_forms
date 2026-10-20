@@ -3,21 +3,26 @@
 // One window's semantic tree as the Windows accessibility publishers see it:
 // how a native object names its node, how the node is found again in a
 // fresh snapshot, and how an action reaches the retained control. Shared by
-// the MSAA objects (windows_accessibility.cpp). Win32 types stay inside
+// the MSAA objects (windows_accessibility.cpp) and the UI Automation
+// providers (windows_automation.cpp). Win32 types stay inside
 // src/host/windows/.
 //
 // Execution context: every member is used on the window's UI thread, the
 // one owner of the semantic tree. MSAA calls from a client in another
 // process arrive through WM_GETOBJECT and COM's apartment marshalling, which
 // delivers them on this thread; in-process calls from this thread arrive
-// directly.
+// directly. UI Automation calls arrive on this thread because every
+// provider asks for COM threading (windows_automation.hpp).
 
 #include "gui_forms/window.hpp"
 
 #include <windows.h>
 
+#include <oleauto.h>
+
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace gui_forms::host {
@@ -78,6 +83,42 @@ bool locate_semantic_element(SemanticNode&&, SemanticElementId, SemanticLocation
 bool parent_semantic_location(SemanticNode&&, const SemanticLocation&,
                               SemanticLocation&) = delete;
 
+// The deepest visible node at (x, y), in logical window coordinates, at or
+// below `at`; later children are above earlier ones. Returns false, leaving
+// `hit` unchanged, when no visible node there contains the point.
+[[nodiscard]] bool hit_semantic_location(const SemanticLocation& at, double x, double y,
+                                         SemanticLocation& hit) noexcept;
+
+// The first node at or below `at`, in tree order, with `state`. Returns
+// false, leaving `found` unchanged, when there is none.
+[[nodiscard]] bool find_state_location(const SemanticLocation& at, SemanticState state,
+                                       SemanticLocation& found) noexcept;
+
+// The control-backed node at or below `at` with stable ID `stable_id` (a
+// tab's controlled panel, for one). Returns false, leaving `found`
+// unchanged, when there is none.
+[[nodiscard]] bool find_control_location(const SemanticLocation& at, std::string_view stable_id,
+                                         SemanticLocation& found) noexcept;
+
+// Whether `node` publishes `action`.
+[[nodiscard]] bool semantic_has_action(const SemanticNode& node, SemanticAction action) noexcept;
+
+// Whether `role` is checked and unchecked by a press: a check box or a
+// checked list's item. (A toggle button is a button; the tree has no flag
+// for one that is off.)
+[[nodiscard]] bool checkable_role(SemanticRole role) noexcept;
+
+// A new BSTR holding `value` as UTF-16, which the caller frees. Empty text
+// leaves `*result` null and returns S_FALSE; text that is not valid UTF-8
+// returns E_FAIL and memory exhaustion E_OUTOFMEMORY, both with `*result`
+// null.
+[[nodiscard]] HRESULT utf8_to_bstr(std::string_view value, BSTR* result) noexcept;
+
+// Converts a client's UTF-16 text to UTF-8 in `text`. Returns false, with
+// `text` empty, for text that is not valid UTF-16 or longer than INT_MAX
+// code units. Throws std::bad_alloc when memory runs out.
+[[nodiscard]] bool utf8_from_wide(std::wstring_view value, std::string& text);
+
 // The publishers' link to one window. Shared by WindowsAccessibility and
 // every native object it hands out; `model` and `hwnd` are cleared when the
 // window goes, after which every object resolves to nothing and reports its
@@ -91,9 +132,17 @@ struct SemanticSource final {
     std::uint64_t generation{};
     // The runtime ID of the focused node last announced, or zero.
     std::uint64_t focus{};
-    // True once a client has asked for an object; events are raised only
-    // after that.
+    // True once a client has asked for an MSAA object; MSAA events are
+    // raised only after that.
     bool observed{};
+    // True once a client has asked for the UI Automation root; UI
+    // Automation events are raised only after that, and only while a
+    // client listens.
+    bool automation_observed{};
+    // The client tree last announced to UI Automation, which the next
+    // change is compared against; valid while `announced` is true.
+    SemanticNode published{};
+    bool announced{};
 
     // Fills `client` with the window's client node: the snapshot's roots
     // under one node named by the window title and covering the client

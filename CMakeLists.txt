@@ -126,6 +126,8 @@ add_library(gui_forms_core STATIC
     src/core/engine/part_table/engine_part_table.cpp
     src/core/engine/part_raster/part_raster.cpp
     src/core/engine/theme_engine/theme_engine.cpp
+    src/core/engine/motion_value/motion_value.cpp
+    src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -1110,6 +1112,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         src/host/windows/application/windows_host.cpp
         src/host/windows/accessibility/windows_accessibility.cpp
         src/host/windows/accessibility/windows_semantic_source.cpp
+        src/host/windows/accessibility/windows_automation.cpp
         src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -1138,7 +1141,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32
+        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
@@ -1159,7 +1162,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             "-Wl,--whole-archive" gui_forms_core gui_drawing_core
             gui_forms_controls gui_forms_host_windows "-Wl,--no-whole-archive"
             gui_forms_text_engine freetype harfbuzz gui_forms_bidi
-            user32 gdi32 ole32 oleaut32 oleacc uuid windowscodecs comdlg32 shell32)
+            user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32)
         target_link_options(gui_forms_application PRIVATE "-Wl,--export-all-symbols")
         install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -2016,6 +2019,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
+                src/host/windows/accessibility/windows_automation.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2026,7 +2030,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
             target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
-                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
                 windowscodecs comdlg32 shell32)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
@@ -2036,6 +2040,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
                 src/host/windows/accessibility/windows_semantic_source.cpp
+                src/host/windows/accessibility/windows_automation.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2046,7 +2051,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_WINDOWS_TOOLTIP_TEST=1)
             target_link_libraries(gui_forms_windows_tooltip_tests PRIVATE
-                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
                 windowscodecs comdlg32 shell32)
             add_test(NAME gui_forms_windows_tooltip_tests
                      COMMAND gui_forms_windows_tooltip_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -2057,6 +2062,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     src/host/windows/application/windows_host.cpp
                     src/host/windows/accessibility/windows_accessibility.cpp
                     src/host/windows/accessibility/windows_semantic_source.cpp
+                    src/host/windows/accessibility/windows_automation.cpp
                     src/host/windows/services/windows_clipboard_image.cpp
                     src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2069,7 +2075,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
-                    gui_forms_prepared_text_impl gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uuid
+                    gui_forms_prepared_text_impl gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
                     windowscodecs comdlg32 shell32)
                 add_test(NAME gui_forms_windows_prepared_text_tests
                     COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
@@ -2255,6 +2261,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
+    add_executable(gui_forms_motion_clock_tests tests/motion_clock_tests.cpp)
+    target_link_libraries(gui_forms_motion_clock_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_motion_clock_tests COMMAND gui_forms_motion_clock_tests)
     add_executable(gui_forms_engine_math_tests tests/engine_math_tests.cpp)
     target_link_libraries(gui_forms_engine_math_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_math_tests COMMAND gui_forms_engine_math_tests)
@@ -2531,6 +2540,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_tool_strip_tests tests/tool_strip_tests.cpp)
     target_link_libraries(gui_forms_tool_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_tool_strip_tests COMMAND gui_forms_tool_strip_tests)
+    add_executable(gui_forms_event_payload_lifetime_tests tests/event_payload_lifetime_tests.cpp)
+    target_link_libraries(gui_forms_event_payload_lifetime_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_event_payload_lifetime_tests COMMAND gui_forms_event_payload_lifetime_tests)
     add_executable(gui_forms_page_strip_tests tests/page_strip_tests.cpp)
     target_link_libraries(gui_forms_page_strip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_page_strip_tests COMMAND gui_forms_page_strip_tests)
@@ -2827,6 +2839,9 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_host_headless
     )
     add_test(NAME gui_forms_host_protocol_tests COMMAND gui_forms_host_protocol_tests)
+    add_executable(gui_forms_window_teardown_tests tests/window_teardown_tests.cpp)
+    target_link_libraries(gui_forms_window_teardown_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_window_teardown_tests COMMAND gui_forms_window_teardown_tests)
     add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
     target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)
@@ -3501,8 +3516,19 @@ endif()
 
 if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
-    target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc oleaut32 uuid)
+    target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc uiautomationcore oleaut32 uuid)
     add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)
+    # Stage A, A-W2: the UI Automation provider read through IUIAutomation
+    # from a client thread.
+    add_executable(gui_forms_windows_accessibility_uia_provider_tests
+        tests/windows_accessibility_uia_provider_tests.cpp)
+    target_compile_definitions(gui_forms_windows_accessibility_uia_provider_tests PRIVATE
+        WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+    target_link_libraries(gui_forms_windows_accessibility_uia_provider_tests PRIVATE
+        gui_forms_controls gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
+    add_test(NAME gui_forms_windows_accessibility_uia_provider_tests
+        COMMAND gui_forms_windows_accessibility_uia_provider_tests)
+    set_tests_properties(gui_forms_windows_accessibility_uia_provider_tests PROPERTIES TIMEOUT 60)
     # Stage A, A-W1: an MSAA client enumerates every Gallery page in a real
     # Win32 window and performs each control's default action.
     if(TARGET gui_forms_gallery_model)
@@ -3510,12 +3536,26 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         target_compile_definitions(gui_forms_windows_accessibility_msaa_gallery_tests PRIVATE
             WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
         target_link_libraries(gui_forms_windows_accessibility_msaa_gallery_tests PRIVATE
-            gui_forms_gallery_model gui_forms_host_windows oleacc oleaut32 uuid)
+            gui_forms_gallery_model gui_forms_host_windows oleacc uiautomationcore oleaut32 uuid)
         add_test(NAME gui_forms_windows_accessibility_msaa_gallery_tests COMMAND gui_forms_windows_accessibility_msaa_gallery_tests)
         # Every page, then one fresh Gallery window per page of actions:
         # about 10 s in a release tree, about 340 s in the sanitizer tree
         # (measured 2026-10-20 on the owner's machine with other builds
         # running), whose ctest budget is 900 s.
         set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 900)
+        # Stage A, A-W3: an IUIAutomation client on a thread of its own
+        # enumerates every Gallery page and performs each control's default
+        # action through its pattern.
+        add_executable(gui_forms_windows_accessibility_uia_gallery_tests tests/windows_accessibility_uia_gallery_tests.cpp)
+        target_compile_definitions(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
+            gui_forms_gallery_model gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
+        add_test(NAME gui_forms_windows_accessibility_uia_gallery_tests COMMAND gui_forms_windows_accessibility_uia_gallery_tests)
+        # About 49 s in a release tree and 741 s in the sanitizer tree
+        # (measured 2026-10-20 with other builds running): every provider
+        # call takes a fresh snapshot of the whole Gallery. The limit leaves
+        # the sanitizer run room under heavier load.
+        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 1800)
     endif()
 endif()

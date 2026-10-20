@@ -94,11 +94,14 @@ void TreeView::set_expanded(std::string_view id, bool value) {
         }
     }
     item.expanded = value;
+    // A copy: an expansion handler may replace the items, which ends
+    // `item`'s lifetime and may remove the item itself.
+    const std::string item_id = item.stable_id;
     rebuild_visible();
     invalidate(Dirty::paint | Dirty::hit_test | Dirty::semantics);
     publish_change(expansion_changed_,
-                   TreeExpansionChange{item.stable_id, value});
-    if (selected_descendant && is_alive()) set_selected_id(item.stable_id);
+                   TreeExpansionChange{item_id, value});
+    if (selected_descendant && is_alive() && item_index(item_id)) set_selected_id(item_id);
 }
 
 void TreeView::set_item_height(double height) {
@@ -220,12 +223,14 @@ void TreeView::ensure_visible(std::size_t row) {
 
 void TreeView::select_visible_row(std::size_t row, bool activate) {
     if (row >= visible_.size()) return;
-    const TreeViewItem& item = items_[visible_[row]];
-    if (!item.enabled) return;
-    active_id_ = item.stable_id;
-    set_selected_id(item.stable_id);
-    ensure_visible(row);
-    if (activate && is_alive()) item_activated_.emit(item.stable_id);
+    if (!items_[visible_[row]].enabled) return;
+    // A copy: a selection handler may replace the items, which ends the
+    // item's lifetime, so nothing here reads the item after it runs.
+    const std::string item_id = items_[visible_[row]].stable_id;
+    active_id_ = item_id;
+    set_selected_id(item_id);
+    if (row < visible_.size()) ensure_visible(row);
+    if (activate && is_alive()) item_activated_.emit(item_id);
 }
 
 void TreeView::arrange(Rect final_bounds) {

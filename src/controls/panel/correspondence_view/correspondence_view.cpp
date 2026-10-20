@@ -936,8 +936,11 @@ bool CorrespondenceView::on_semantic_child_action(
         focus_index(*activate_index,
                     CorrespondenceExpansionReason::keyboard_focus);
         set_selected_id(item_id);
-        if (items_[*activate_index].enabled) {
-            emit_item_activated(items_[*activate_index].stable_id);
+        // A selection handler may have replaced the items: look the item up
+        // again rather than reading items_ at the old index.
+        const std::optional<std::size_t> activated = item_index(item_id);
+        if (activated && items_[*activated].enabled) {
+            emit_item_activated(items_[*activated].stable_id);
         }
         return true;
     }
@@ -954,7 +957,9 @@ bool CorrespondenceView::on_semantic_child_action(
         set_selected_id(stable_id);
     } else if (action == SemanticAction::press) {
         set_selected_id(stable_id);
-        emit_item_activated(items_[*index].stable_id);
+        // As above: the selection handler may have replaced the items.
+        const std::optional<std::size_t> activated = item_index(stable_id);
+        if (activated) emit_item_activated(items_[*activated].stable_id);
     } else if (action == SemanticAction::show_menu) {
         set_selected_id(stable_id);
         const Rect local = item_bounds(*index);

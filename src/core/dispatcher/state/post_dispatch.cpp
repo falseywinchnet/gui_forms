@@ -27,6 +27,17 @@ DispatchOperation post_dispatch(const std::shared_ptr<DispatcherState>& state,
     std::shared_ptr<DispatchWork> work;
     {
         std::scoped_lock lock((*state).mutex);
+        if (!(*state).accepting && (*state).closing) {
+            // The teardown refusal: an operation that is already cancelled
+            // and holds no callback. The callback is released with this
+            // call's argument.
+            std::shared_ptr<DispatchWork> refused = std::make_shared<DispatchWork>();
+            (*refused).state.store(DispatchOperationState::cancelled, std::memory_order_release);
+            (*refused).dispatcher = state;
+            ++(*state).cancelled;
+            ++(*state).teardown_refusals;
+            return DispatchOperation(std::move(refused));
+        }
         if (!(*state).accepting) {
             throw std::logic_error("GUI.Forms dispatcher is shut down");
         }

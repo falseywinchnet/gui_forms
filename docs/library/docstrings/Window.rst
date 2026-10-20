@@ -55,7 +55,8 @@ presentation_settings
     Text scale, high contrast, reduced motion and sound preferences. The
     text scale must lie between 0.5 and 4.0, and changing it closes open
     popups. Any change remeasures the tree and raises
-    `presentation_changed`.
+    `presentation_changed`. Turning reduced motion on puts every motion
+    value of the window at its end in the same call.
 theme
     The theme every control inherits unless it has its own override.
     Setting it sets the theme of every window sharing this window's
@@ -117,9 +118,15 @@ key_bindings
     another set; a null set throws `std::invalid_argument`.
 needs_frame
     Whether painting is pending.
+motion_clock
+    The window's `MotionClock`: one frame request, armed only while some
+    control's `MotionValue` is moving, however many are. Once every value
+    has settled it schedules nothing. Tests install a `MotionTimeSource` on
+    it so that motion is sampled from their own time.
 occluded : default ``false``
     Whether the host reports the window as hidden from view. While occluded,
-    painting and paint wake-ups are suspended.
+    painting and paint wake-ups are suspended, and motion values jump to
+    their ends without scheduling frames.
 metrics_snapshot
     A copy of the window's instrumentation counters: layout passes, flushes,
     mutations, damage, input, focus, disposals, wrong-thread rejections and
