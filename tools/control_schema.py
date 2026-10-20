@@ -212,9 +212,11 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         per_pixel_budget = int(budgets["operations_per_device_pixel"])
     roles: set[str] = set()
     states: set[str] = set()
+    inputs: set[str] = set()
     if isinstance(vocabulary, dict):
         roles = {str(name) for name in vocabulary.get("part_roles", [])}
         states = {str(name) for name in vocabulary.get("states", [])}
+        inputs = {str(name) for name in vocabulary.get("engine_inputs", [])}
     primitives: object = engine.get("primitives")
     if not isinstance(primitives, list) or not primitives:
         findings.append("engine: no primitives are registered")
@@ -236,6 +238,9 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         for state in primitive.get("states_read", []):
             if states and str(state) not in states:
                 findings.append(f"engine: {name} reads {state!r}, which is not a vocabulary state")
+        for read in primitive.get("inputs_read", []):
+            if inputs and str(read) not in inputs:
+                findings.append(f"engine: {name} reads {read!r}, which is not a vocabulary engine input")
         cost: Mapping[str, object] = primitive.get("cost", {})
         per_pixel: object = cost.get("per_device_pixel")
         if not isinstance(per_pixel, int) or per_pixel <= 0 or (per_pixel_budget and per_pixel > per_pixel_budget):
@@ -289,7 +294,7 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
         findings.append("the schema has no vocabulary (part roles, states, custom states, marks, values, "
                         "families, semantic roles, actions and fields)")
     else:
-        for key in ("part_roles", "states", "custom_states", "marks", "values", "families",
+        for key in ("part_roles", "states", "custom_states", "marks", "engine_inputs", "values", "families",
                     "semantic_roles", "semantic_actions", "semantic_fields"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
@@ -396,7 +401,8 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("")
         titles: list[tuple[str, str]] = [("part_roles", "Part roles"), ("states", "States"),
                                          ("custom_states", "Admitted custom states"),
-                                         ("marks", "Marks"), ("values", "Values"),
+                                         ("marks", "Marks"), ("engine_inputs", "Engine inputs"),
+                                         ("values", "Values"),
                                          ("families", "Recipe families"),
                                          ("semantic_roles", "Semantic roles"),
                                          ("semantic_actions", "Semantic actions"),
@@ -417,7 +423,9 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("|---|---|---|---|---|---|")
         for primitive in engine.get("primitives", []):  # type: ignore[union-attr]
             painted: str = ", ".join(_code(str(role)) for role in primitive.get("roles", []))
-            read: str = ", ".join(_code(str(state)) for state in primitive.get("states_read", [])) or "none"
+            read_atoms: list[str] = [str(state) for state in primitive.get("states_read", [])]
+            read_atoms.extend(str(item) for item in primitive.get("inputs_read", []))
+            read: str = ", ".join(_code(atom) for atom in read_atoms) or "none"
             parameters: str = ", ".join(_code(str(item["name"])) for item in primitive.get("parameters", []))
             cost: Mapping[str, object] = primitive.get("cost", {})
             lines.append(f"| {_code(str(primitive['name']))} | {primitive['introduced']} | {painted} | {read} | "

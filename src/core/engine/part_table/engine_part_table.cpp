@@ -1,5 +1,6 @@
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 
+#include <cmath>
 #include <limits>
 #include <new>
 #include <utility>
@@ -22,6 +23,25 @@ AnatomyStateSet read_states_of(const EnginePrimitive& primitive, const Primitive
         if (target.states.contains(state)) read.insert(state);
     }
     return read;
+}
+
+// Whether two values of an input are the same, an input not published
+// (NaN) being the same as another not published.
+bool same_input(double left, double right) noexcept {
+    if (left == right) return true;
+    const bool both_unpublished = std::isnan(left) && std::isnan(right);
+    return both_unpublished;
+}
+
+// Whether the inputs the primitive reads have the same values in both
+// targets.
+bool same_read_inputs(const EnginePrimitive& primitive, const PrimitiveTarget& left,
+                      const PrimitiveTarget& right) noexcept {
+    for (const EngineInput input : primitive.descriptor().inputs_read) {
+        const std::size_t index = static_cast<std::size_t>(input);
+        if (!same_input(left.inputs[index], right.inputs[index])) return false;
+    }
+    return true;
 }
 
 bool same_parameters(const PrimitiveParameterBlock& left, const PrimitiveParameterBlock& right) noexcept {
@@ -73,6 +93,7 @@ void EnginePartTable::unlink(const std::uint32_t slot) noexcept {
 void EnginePartTable::release_slot(const std::uint32_t slot) noexcept {
     RecordSlot& released = slots_[slot];
     drop_raster(*released.record);
+    count_readers((*released.record).inputs_read, 0U);
     if (released.item) {
         unlink(slot);
         released.item = false;
@@ -247,6 +268,7 @@ bool EnginePartTable::raster_current(const EnginePartRecord& record, const PartR
     if (!(cached.target.scale == request.target.scale)) return false;
     const AnatomyStateSet read = read_states_of(*request.primitive, request.target);
     if (!(cached.target.states == read)) return false;
+    if (!same_read_inputs(*request.primitive, cached.target, request.target)) return false;
     const bool same = same_parameters(cached.parameters, request.parameters);
     return same;
 }
@@ -323,6 +345,41 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
     cached.raster_generation = part.generation;
     cached.raster_table_generation = raster_table_generation_;
     return PartRasterResult{storage, status};
+}
+
+void EnginePartTable::count_readers(const std::uint64_t old_inputs, const std::uint64_t inputs) noexcept {
+    if (old_inputs == inputs) return;
+    for (std::size_t position = 0; position < maximum_expression_inputs; ++position) {
+        const std::uint64_t bit = std::uint64_t{1} << position;
+        if ((old_inputs & bit) != 0U) readers_[position] = readers_[position] - 1U;
+        if ((inputs & bit) != 0U) readers_[position] = readers_[position] + 1U;
+    }
+}
+
+void EnginePartTable::note_paint(const PartRecordHandle handle, const std::uint64_t inputs_read,
+                                 std::string_view painted_by, const Rect extent) {
+    EnginePartRecord* const found = record(handle);
+    if (found == nullptr) return;
+    EnginePartRecord& part = *found;
+    // The copy first: it may allocate, and nothing has changed yet.
+    if (part.painted_by != painted_by) part.painted_by.assign(painted_by.data(), painted_by.size());
+    part.extent = extent;
+    count_readers(part.inputs_read, inputs_read);
+    part.inputs_read = inputs_read;
+}
+
+bool EnginePartTable::reads_any(const std::uint64_t inputs) const noexcept {
+    for (std::size_t position = 0; position < maximum_expression_inputs; ++position) {
+        const std::uint64_t bit = std::uint64_t{1} << position;
+        if ((inputs & bit) != 0U && readers_[position] != 0U) return true;
+    }
+    return false;
+}
+
+const EnginePartRecord* EnginePartTable::record_in_slot(const std::size_t slot) const noexcept {
+    if (slot >= slots_.size() || !slots_[slot].record) return nullptr;
+    const EnginePartRecord* const live = &*slots_[slot].record;
+    return live;
 }
 
 void EnginePartTable::invalidate_raster(const PartRecordHandle handle) noexcept {

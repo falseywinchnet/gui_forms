@@ -28,6 +28,8 @@ Admitted custom states: `modified`, `pinned`.
 
 Marks: `check`, `indeterminate`, `radio_dot`, `toggle_knob`, `arrow_up`, `arrow_down`, `arrow_left`, `arrow_right`, `chevron_down`, `chevron_right`, `close`, `grip_dots`, `dialog_launcher`, `more`, `overflow`, `customize`, `pin`, `dock_shape`.
 
+Engine inputs: `pointer_x`, `pointer_y`, `time_in_state`, `display_scale`, `text_scale`.
+
 Values: `accent_index`, `text_orientation`, `dock_region`, `content_color`.
 
 Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.

@@ -86,7 +86,9 @@ std::optional<RuleDiagnosticKind> parameter_defect(const PrimitiveDescriptor& de
     if (!found) return RuleDiagnosticKind::unknown_parameter;
     const PrimitiveParameterDeclaration& parameter = descriptor.parameters[*found];
     if (declaration.kind == RuleValueKind::name) return RuleDiagnosticKind::parameter_wrong_kind;
-    const bool number = declaration.kind == RuleValueKind::number;
+    // An expression gives a number; its fallback, in `number`, is checked
+    // as a number value is.
+    const bool number = declaration.kind == RuleValueKind::number || declaration.kind == RuleValueKind::expression;
     if (number != (parameter.kind == PrimitiveParameterKind::number)) return RuleDiagnosticKind::parameter_wrong_kind;
     if (number) {
         if (!std::isfinite(declaration.number)) return RuleDiagnosticKind::parameter_not_finite;
@@ -96,6 +98,25 @@ std::optional<RuleDiagnosticKind> parameter_defect(const PrimitiveDescriptor& de
     }
     index = *found;
     return std::nullopt;
+}
+
+// Whether an expression reads a parameter that is a colour.
+bool reads_colour_parameter(const PrimitiveDescriptor& descriptor, const EngineExpression& expression) noexcept {
+    for (std::size_t index = 0; index < descriptor.parameters.size(); ++index) {
+        const ExpressionParameterIndex position{static_cast<std::uint8_t>(index)};
+        if (!expression.dependencies().reads_parameter(position)) continue;
+        if (descriptor.parameters[index].kind == PrimitiveParameterKind::colour) return true;
+    }
+    return false;
+}
+
+// The primitive's declared inputs as expression input bits.
+std::uint64_t declared_input_bits(const PrimitiveDescriptor& descriptor) noexcept {
+    std::uint64_t bits = 0U;
+    for (const EngineInput input : descriptor.inputs_read) {
+        bits = bits | expression_input_bit(engine_input_position(input));
+    }
+    return bits;
 }
 
 } // namespace
@@ -151,7 +172,10 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::parameter_not_finite: return "parameter_not_finite";
     case RuleDiagnosticKind::parameter_out_of_range: return "parameter_out_of_range";
     case RuleDiagnosticKind::duplicate_declaration: return "duplicate_declaration";
+    case RuleDiagnosticKind::expression_invalid: return "expression_invalid";
+    case RuleDiagnosticKind::expression_reads_colour: return "expression_reads_colour";
     case RuleDiagnosticKind::rule_empty: return "rule_empty";
+    case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
     }
     return {};
 }
@@ -180,6 +204,24 @@ RuleDeclaration RuleDeclaration::colour_value(std::string_view parameter, Color 
     return result;
 }
 
+RuleDeclaration RuleDeclaration::expression_value(std::string_view parameter,
+                                                  std::span<const ExpressionInstruction> program, double fallback) {
+    RuleDeclaration result{};
+    result.property = std::string(parameter);
+    result.kind = RuleValueKind::expression;
+    result.number = fallback;
+    result.program.assign(program.begin(), program.end());
+    return result;
+}
+
+std::optional<ExpressionInputIndex> CompiledThemeRules::published_value_input(std::string_view name) const noexcept {
+    if (name.empty()) return std::nullopt;
+    for (std::size_t index = 0; index < published_values_.size(); ++index) {
+        if (published_values_[index] == name) return published_value_position(index);
+    }
+    return std::nullopt;
+}
+
 // -- compiling -----------------------------------------------------------------
 
 namespace {
@@ -198,6 +240,28 @@ struct LowerPrecedence final {
 
 CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry) {
     CompiledThemeRules result{};
+    // The published values first: expressions are checked against their
+    // count. An unusable name keeps its position, empty, so that the
+    // positions after it stay where the sheet's expressions expect them.
+    const std::size_t published = std::min(sheet.published_values.size(), maximum_published_values);
+    result.published_values_.reserve(published);
+    for (std::size_t index = 0; index < sheet.published_values.size(); ++index) {
+        const std::string& name = sheet.published_values[index];
+        bool usable = index < maximum_published_values && valid_style_class_name(name);
+        for (std::size_t earlier = 0; usable && earlier < index; ++earlier) {
+            if (sheet.published_values[earlier] == name) usable = false;
+        }
+        if (!usable) {
+            RuleDiagnostic invalid{};
+            invalid.kind = RuleDiagnosticKind::published_value_invalid;
+            invalid.rule = sheet_diagnostic;
+            invalid.property = name;
+            result.diagnostics_.push_back(std::move(invalid));
+        }
+        if (index >= maximum_published_values) continue;
+        result.published_values_.push_back(usable ? name : std::string{});
+    }
+    const std::size_t input_count = result.input_count();
     result.rules_.reserve(sheet.rules.size());
     for (std::size_t index = 0; index < sheet.rules.size(); ++index) {
         const ThemeRule& rule = sheet.rules[index];
@@ -279,7 +343,29 @@ CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, cons
             }
             CompiledDeclaration value{};
             value.parameter = parameter;
-            if (declaration.kind == RuleValueKind::number) {
+            if (declaration.kind == RuleValueKind::expression) {
+                const PrimitiveDescriptor& descriptor = (*compiled.primitive).descriptor();
+                ExpressionLimits limits{};
+                limits.inputs = input_count;
+                limits.parameters = descriptor.parameters.size();
+                const ExpressionCompilation built =
+                    value.program.compile(declaration.program, declaration.number, limits);
+                if (built.defect != ExpressionDefect::none) {
+                    RuleDiagnostic invalid =
+                        diagnostic(RuleDiagnosticKind::expression_invalid, index, rule, declaration.property);
+                    invalid.expression = built.defect;
+                    result.diagnostics_.push_back(std::move(invalid));
+                    continue;
+                }
+                if (reads_colour_parameter(descriptor, value.program)) {
+                    result.diagnostics_.push_back(
+                        diagnostic(RuleDiagnosticKind::expression_reads_colour, index, rule, declaration.property));
+                    continue;
+                }
+                value.expression = true;
+                value.value.kind = PrimitiveParameterKind::number;
+                value.value.number = declaration.number;
+            } else if (declaration.kind == RuleValueKind::number) {
                 value.value.kind = PrimitiveParameterKind::number;
                 value.value.number = declaration.number;
             } else {
@@ -345,12 +431,20 @@ CompiledThemeRules::Resolution CompiledThemeRules::resolve(const PartFacts& fact
     }
     result.parameters = default_parameters(descriptor);
     // Every matching rule for the same primitive contributes, in ascending
-    // precedence, so the last write of each parameter is its winner.
+    // precedence, so the last write of each parameter is its winner. A
+    // winning expression keeps its fallback as the parameter's value until
+    // the engine evaluates it.
     for (const CompiledRule& rule : rules_) {
         if (rule.primitive != chosen.primitive || !matches(rule, facts)) continue;
         for (const CompiledDeclaration& declaration : rule.parameters) {
             result.parameters.values[declaration.parameter] = declaration.value;
+            result.expressions[declaration.parameter] = declaration.expression ? &declaration.program : nullptr;
         }
+    }
+    result.inputs_read = declared_input_bits(descriptor);
+    for (std::size_t index = 0; index < result.parameters.count; ++index) {
+        const EngineExpression* const expression = result.expressions[index];
+        if (expression != nullptr) result.inputs_read = result.inputs_read | (*expression).dependencies().inputs;
     }
     result.outcome = Outcome::primitive;
     result.primitive = chosen.primitive;

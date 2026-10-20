@@ -44,9 +44,8 @@ inline constexpr std::size_t maximum_expression_stack = 16;
 inline constexpr std::size_t maximum_expression_inputs = 64;
 inline constexpr std::size_t maximum_expression_parameters = 32;
 
-// The position of an engine input in the inputs an expression is evaluated
-// with (E6 defines which input sits at which position). Distinct from a
-// parameter's position and from a state.
+// The position of an input in the inputs an expression is evaluated with.
+// Distinct from a parameter's position and from a state.
 struct ExpressionInputIndex final {
     std::uint8_t value{};
 
@@ -54,6 +53,34 @@ struct ExpressionInputIndex final {
         return left.value == right.value;
     }
 };
+
+// Where the engine puts its inputs (E6): first the engine inputs, in
+// EngineInput order, then the values an application publishes that the
+// theme names (ThemeRuleSheet::published_values), in the order the theme
+// lists them. An input that is not published, such as the pointer of a part
+// that is not hot, reads as NaN, so an expression reading it gives its
+// fallback.
+inline constexpr std::size_t maximum_published_values = 32;
+static_assert(engine_input_count + maximum_published_values <= maximum_expression_inputs,
+              "every engine input and published value has an expression input position");
+
+[[nodiscard]] constexpr ExpressionInputIndex engine_input_position(EngineInput input) noexcept {
+    const ExpressionInputIndex position{static_cast<std::uint8_t>(input)};
+    return position;
+}
+
+// The position of the theme's `value`th published value (counting from 0).
+[[nodiscard]] constexpr ExpressionInputIndex published_value_position(std::size_t value) noexcept {
+    const ExpressionInputIndex position{static_cast<std::uint8_t>(engine_input_count + value)};
+    return position;
+}
+
+// One input's bit in a set of inputs read (ExpressionDependencies::inputs).
+[[nodiscard]] constexpr std::uint64_t expression_input_bit(ExpressionInputIndex input) noexcept {
+    if (input.value >= maximum_expression_inputs) return 0U;
+    const std::uint64_t bit = std::uint64_t{1} << input.value;
+    return bit;
+}
 
 // The position of a number parameter among a primitive's declared
 // parameters (PrimitiveDescriptor::parameters).

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/engine_expression/engine_expression.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
@@ -105,25 +106,39 @@ enum class RuleValueKind : std::uint8_t {
     name,
     number,
     colour,
+    // A bounded expression (E5) giving a number parameter's value from the
+    // part's inputs, states and the primitive's other parameters (E6).
+    expression,
 };
 
 // One declaration: a property and its value. Every property but `primitive`
 // is a parameter of the primitive the same rule selects, so a rule that sets
 // parameters names its primitive too.
+//
+// An expression's program reads inputs by position (engine_input_position,
+// published_value_position), states, and the primitive's number parameters
+// by their declaration position. A parameter it reads has the value the
+// cascade gives it before any expression, so expressions never read one
+// another. `number` is the expression's fallback. Its value is clamped to
+// the parameter's range.
 struct RuleDeclaration final {
     std::string property{};
     RuleValueKind kind{RuleValueKind::number};
     std::string name{};
     double number{};
     Color colour{};
+    std::vector<ExpressionInstruction> program{};
 
     [[nodiscard]] static RuleDeclaration primitive(std::string_view primitive_name);
     [[nodiscard]] static RuleDeclaration number_value(std::string_view parameter, double value);
     [[nodiscard]] static RuleDeclaration colour_value(std::string_view parameter, Color value);
+    [[nodiscard]] static RuleDeclaration expression_value(std::string_view parameter,
+                                                          std::span<const ExpressionInstruction> program,
+                                                          double fallback);
 
     friend bool operator==(const RuleDeclaration& left, const RuleDeclaration& right) noexcept {
         return left.property == right.property && left.kind == right.kind && left.name == right.name &&
-               left.number == right.number && left.colour == right.colour;
+               left.number == right.number && left.colour == right.colour && left.program == right.program;
     }
 };
 
@@ -144,13 +159,19 @@ struct ThemeRule final {
 };
 
 // A theme's rules, as authored, with the engine version the theme declares
-// it needs.
+// it needs and the values an application publishes that its expressions
+// read (E6; Window::publish_value). The `n`th name is read at
+// published_value_position(n). Each is 1 to 64 characters of lowercase
+// ASCII letters, digits, '-' and '_', the first a letter, and is listed
+// once; at most maximum_published_values.
 struct ThemeRuleSheet final {
     EngineVersion requires_engine{current_engine_version};
     std::vector<ThemeRule> rules{};
+    std::vector<std::string> published_values{};
 
     friend bool operator==(const ThemeRuleSheet& left, const ThemeRuleSheet& right) noexcept {
-        return left.requires_engine == right.requires_engine && left.rules == right.rules;
+        return left.requires_engine == right.requires_engine && left.rules == right.rules &&
+               left.published_values == right.published_values;
     }
 };
 
@@ -186,19 +207,36 @@ enum class RuleDiagnosticKind : std::uint8_t {
     parameter_not_finite,
     parameter_out_of_range,
     duplicate_declaration,
+    // An expression that does not compile (RuleDiagnostic::expression names
+    // the defect), or that reads a colour parameter; the declaration is
+    // dropped.
+    expression_invalid,
+    expression_reads_colour,
     // A rule left with no declarations after the drops above is dropped.
     rule_empty,
+    // A published value's name is invalid, repeats an earlier one or is
+    // past maximum_published_values. The diagnostic, of the sheet rather
+    // than a rule, names it in `property`; its position stays, and reads as
+    // not published.
+    published_value_invalid,
 };
 
 [[nodiscard]] std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept;
 
+// The rule position of a diagnostic about the sheet itself rather than one
+// of its rules.
+inline constexpr std::size_t sheet_diagnostic = static_cast<std::size_t>(-1);
+
 struct RuleDiagnostic final {
     RuleDiagnosticKind kind{RuleDiagnosticKind::rule_empty};
-    // The rule's position in the sheet and its label.
+    // The rule's position in the sheet and its label (sheet_diagnostic and
+    // empty for the sheet).
     std::size_t rule{};
     std::string label{};
     // The declaration's property, empty for a whole-rule diagnostic.
     std::string property{};
+    // For expression_invalid, why the expression does not compile.
+    ExpressionDefect expression{ExpressionDefect::none};
 };
 
 // A sheet compiled against a registry: the rules that survived, each
@@ -216,6 +254,19 @@ public:
     [[nodiscard]] bool empty() const noexcept { return rules_.empty(); }
     [[nodiscard]] std::size_t rule_count() const noexcept { return rules_.size(); }
     [[nodiscard]] const std::vector<RuleDiagnostic>& diagnostics() const noexcept { return diagnostics_; }
+
+    // The published values the sheet's expressions read, in position order
+    // (an invalid name is kept empty, so later positions stay).
+    [[nodiscard]] const std::vector<std::string>& published_values() const noexcept { return published_values_; }
+    // The position of the published value `name`, or none when the sheet
+    // does not read it.
+    [[nodiscard]] std::optional<ExpressionInputIndex> published_value_input(std::string_view name) const noexcept;
+    // How many inputs the sheet's expressions are evaluated with: the
+    // engine inputs and the sheet's published values.
+    [[nodiscard]] std::size_t input_count() const noexcept {
+        const std::size_t count = engine_input_count + published_values_.size();
+        return count;
+    }
 
     // What a part is: the facts its selectors are matched against. The
     // views are borrowed for the call.
@@ -248,6 +299,13 @@ public:
         // The level of the declaration that chose the primitive (or
         // built_in); built_in when no rule did.
         CascadeLevel level{CascadeLevel::built_in};
+        // The expression whose value a parameter takes, by the parameter's
+        // position, where the winning declaration of the parameter is one;
+        // null elsewhere. The expressions belong to the compiled rules.
+        std::array<const EngineExpression*, maximum_primitive_parameters> expressions{};
+        // The inputs the part reads (E6): the primitive's declared inputs
+        // and every input its expressions read, as expression input bits.
+        std::uint64_t inputs_read{};
     };
 
     // The cascade for one part: the winning primitive declaration, then
@@ -266,6 +324,9 @@ private:
         const EnginePrimitive* primitive{};
         std::size_t parameter{};
         PrimitiveParameterValue value{};
+        // An expression declaration: `program` gives the value.
+        bool expression{};
+        EngineExpression program{};
     };
 
     struct CompiledRule final {
@@ -288,6 +349,7 @@ private:
     // order. The cascade's winner for a property is the last match.
     std::vector<CompiledRule> rules_{};
     std::vector<RuleDiagnostic> diagnostics_{};
+    std::vector<std::string> published_values_{};
 };
 
 } // namespace gui_forms

@@ -116,10 +116,11 @@ void append_name_list(std::string& out, std::span<const std::string_view> names)
 }
 
 // The atom vocabulary (design language 8.5 and 12.7): every part role,
-// state, admitted custom state, mark, value type, recipe family, semantic
-// role, semantic action and semantic node field, in enum order. `none` is
-// the absence of a mark, not a mark, and is left out. Values and node fields
-// have no enum; they are listed here in the order they were admitted.
+// state, admitted custom state, mark, engine input, value type, recipe
+// family, semantic role, semantic action and semantic node field, in enum
+// order. `none` is the absence of a mark, not a mark, and is left out.
+// Values and node fields have no enum; they are listed here in the order
+// they were admitted.
 void append_vocabulary(std::string& out) {
     std::vector<std::string_view> names;
     out += "  \"vocabulary\": {\n";
@@ -149,6 +150,13 @@ void append_vocabulary(std::string& out) {
         names.push_back(part_mark_name(static_cast<PartMark>(index)));
     }
     append_key(out, "    ", "marks");
+    append_name_list(out, names);
+    out += ",\n";
+    names.clear();
+    for (std::size_t index = 0; index < engine_input_count; ++index) {
+        names.push_back(engine_input_name(static_cast<EngineInput>(index)));
+    }
+    append_key(out, "    ", "engine_inputs");
     append_name_list(out, names);
     out += ",\n";
     names.clear();
@@ -309,6 +317,11 @@ void append_engine(std::string& out) {
         append_key(out, "        ", "states_read");
         append_state_list(out, descriptor.states_read);
         out += ",\n";
+        names.clear();
+        for (const EngineInput input : descriptor.inputs_read) names.push_back(engine_input_name(input));
+        append_key(out, "        ", "inputs_read");
+        append_name_list(out, names);
+        out += ",\n";
         append_key(out, "        ", "cost");
         out += '{';
         append_json_string(out, "per_device_pixel");
@@ -358,6 +371,13 @@ void append_engine(std::string& out) {
         names.push_back(expression_operation_name(static_cast<ExpressionOperation>(index)));
     }
     append_name_list(out, names);
+    out += "},\n";
+    // Published values (E6): how many a theme may name.
+    append_key(out, "    ", "published_values");
+    out += '{';
+    append_json_string(out, "maximum");
+    out += ": ";
+    append_unsigned(out, maximum_published_values);
     out += '}';
     out += "\n  },\n";
 }

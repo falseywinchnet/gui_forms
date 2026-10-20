@@ -115,6 +115,9 @@ std::string MetricsSnapshot::to_json() const {
            << "\"motion_values_started\":" << motion_values_started << ','
            << "\"motion_values_settled\":" << motion_values_settled << ','
            << "\"motion_values_finished\":" << motion_values_finished << ','
+           << "\"engine_input_changes\":" << engine_input_changes << ','
+           << "\"engine_input_damaged_parts\":" << engine_input_damaged_parts << ','
+           << "\"engine_input_damage_area\":" << engine_input_damage_area << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';

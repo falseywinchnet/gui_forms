@@ -133,6 +133,18 @@ public:
         self.assertIn("sparkle", findings[0])
         self.assertIn("budget", findings[1])
 
+    def test_the_engine_inputs_are_vocabulary(self) -> None:
+        schema = cs.load_schema()
+        self.assertEqual(schema["vocabulary"]["engine_inputs"],
+                         ["pointer_x", "pointer_y", "time_in_state", "display_scale", "text_scale"])
+        self.assertEqual(schema["engine"]["published_values"]["maximum"], 32)
+        broken = json.loads(json.dumps(schema["engine"]))
+        broken["primitives"][0]["inputs_read"] = ["density"]
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 1)
+        self.assertIn("density", findings[0])
+
     def test_the_engine_lists_its_expression_operations(self) -> None:
         schema = cs.load_schema()
         expressions = schema["engine"]["expressions"]

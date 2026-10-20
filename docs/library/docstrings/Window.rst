@@ -341,6 +341,19 @@ metrics
 reset_activity_metrics
     Zeroes the activity counters, keeping the population and depth values,
     so a test can measure one workload.
+publish_value
+    Publishes a named number for the theme engine, such as a meter's
+    `level`. A theme's expressions read the values its rule sheet names; a
+    theme never writes them. A changed value damages only the parts whose
+    expressions read it, within their extents
+    (`MetricsSnapshot::engine_input_damaged_parts`). Returns false, changing
+    nothing, for a name that is not 1 to 64 lowercase ASCII letters, digits,
+    '-' and '_' starting with a letter, or a value that is not finite.
+withdraw_value
+    Withdraws a published value; its readers then read it as not published
+    and give their expressions' fallbacks.
+published_value
+    The value published under a name, or none.
 
 See Also
 --------

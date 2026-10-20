@@ -123,6 +123,14 @@ struct MetricsSnapshot {
     std::uint64_t motion_values_started{};
     std::uint64_t motion_values_settled{};
     std::uint64_t motion_values_finished{};
+    // The theme engine's inputs (T2 plan, phase E6): changes the engine saw
+    // to an input a part may read (a pointer move inside the window, a
+    // value published or withdrawn), the parts those changes damaged
+    // because they read the input, and the logical area of that damage. A
+    // change no part reads damages nothing.
+    std::uint64_t engine_input_changes{};
+    std::uint64_t engine_input_damaged_parts{};
+    double engine_input_damage_area{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

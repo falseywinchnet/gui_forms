@@ -186,6 +186,21 @@ bool regions_nest(const Control& first, const Control& second) noexcept {
     return nest;
 }
 
+// Marks the control whose display chunk is being recorded, for the theme
+// engine (T2 E6), for the life of one recording: it restores the marks it
+// found on every exit. It borrows the window's two mark fields.
+struct RecordingMark final {
+    const Control*& control;
+    const detail::RecordingPainter*& painter;
+    const Control* previous_control{};
+    const detail::RecordingPainter* previous_painter{};
+
+    ~RecordingMark() {
+        control = previous_control;
+        painter = previous_painter;
+    }
+};
+
 } // namespace
 
 void Window::FocusChangePublication::operator()() const {
@@ -1376,6 +1391,7 @@ bool Window::dispatch_pointer(PointerEvent event) {
         return defer_input(DeferredInput{std::move(event)});
     }
     metrics_.record_input();
+    note_engine_pointer(event);
     if (event.action == PointerAction::down &&
         event.button == PointerButton::primary) {
         set_focus_cue_visible(false);
@@ -2950,6 +2966,12 @@ void Window::paint_recursive(const Control::Ptr& control,
         if (rebuild) {
             (*control).clear_dirty(Dirty::paint);
             detail::RecordingPainter recorder(text_metrics_provider_);
+            // Declared after the recorder it names, so it is destroyed
+            // first and the mark never outlives it.
+            const RecordingMark mark{recording_control_, recording_painter_, recording_control_,
+                                     recording_painter_};
+            recording_control_ = control.get();
+            recording_painter_ = &recorder;
             (*control).paint_authored_surface(recorder, logical_bounds);
             (*control).paint_owned_decorations(
                 recorder, logical_bounds,

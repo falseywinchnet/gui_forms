@@ -1,10 +1,14 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/engine_expression/engine_expression.hpp"
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
+#include "gui_forms/scheduler/types/scheduler_types.hpp"
+#include "gui_forms/types/geometry/geometry.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -94,6 +98,24 @@ struct EnginePartRecord final {
     // True while a transition or motion value of the part has not settled
     // (E3, E7): such a record is never evicted. Nothing sets it before E3.
     bool motion_unsettled{};
+
+    // What the part's last paint read, and where it was drawn (E6). An
+    // input change damages exactly this extent of this control.
+    // - `inputs_read`: the inputs its primitive and its expressions read,
+    //   as expression input bits (expression_input_bit); zero for a part
+    //   the built-in recipe draws. Set only through
+    //   EnginePartTable::note_paint, which keeps the table's reader counts.
+    // - `painted_by`: the stable ID of the control whose display chunk
+    //   recorded the part. It is the control painting the part, or one
+    //   that paints on its behalf, such as a docking site's drag layer.
+    // - `extent`: the part's bounds and its primitive's outsets, in that
+    //   control's local coordinates.
+    std::uint64_t inputs_read{};
+    std::string painted_by{};
+    Rect extent{};
+    // When the part entered the states it was last painted in, on the
+    // window's motion clock; time_in_state counts from it.
+    FrameTime state_entered{};
 
     // The cached raster and what drew it, made the first time a primitive
     // draws the part, so that a record no primitive draws stays small.
@@ -243,6 +265,19 @@ public:
 
     [[nodiscard]] RasterCacheStatistics cache_statistics() const noexcept { return statistics_; }
 
+    // Records what a part's paint read and where it was drawn (E6; see
+    // EnginePartRecord::inputs_read). A stale handle does nothing. If the
+    // control's ID cannot be copied, std::bad_alloc propagates and the
+    // record is unchanged.
+    void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent);
+    // Whether any live record reads any input of `inputs`, from the
+    // table's reader counts, without a scan.
+    [[nodiscard]] bool reads_any(std::uint64_t inputs) const noexcept;
+    // The live record in `slot` (below slot_count()), or null for a free
+    // slot: for scans over the table. Valid until the next acquire() or
+    // release.
+    [[nodiscard]] const EnginePartRecord* record_in_slot(std::size_t slot) const noexcept;
+
 private:
     static constexpr std::uint32_t no_slot = 0xFFFFFFFFU;
 
@@ -278,6 +313,8 @@ private:
 
     // Drops a record's cached raster from the cache and its counts.
     void drop_raster(EnginePartRecord& record) noexcept;
+    // Moves the reader counts from a record's old inputs to `inputs`.
+    void count_readers(std::uint64_t old_inputs, std::uint64_t inputs) noexcept;
     // Evicts the least recently painted cached rasters, never `keep`'s,
     // until `incoming` more bytes fit the budget.
     void make_room(std::size_t incoming, const EnginePartRecord* keep) noexcept;
@@ -300,6 +337,8 @@ private:
     // cached a raster (raster_table_generation 0) is never current.
     std::uint64_t raster_table_generation_{1U};
     RasterCacheStatistics statistics_{};
+    // Live records reading each expression input, by position.
+    std::array<std::uint32_t, maximum_expression_inputs> readers_{};
 };
 
 } // namespace gui_forms

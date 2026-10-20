@@ -69,7 +69,7 @@ Types
    * - :cpp:class:`ExpressionEnvironment <gui_forms::ExpressionEnvironment>`
      - What one evaluation reads.
    * - :cpp:class:`ExpressionInputIndex <gui_forms::ExpressionInputIndex>`
-     - The position of an engine input in the inputs an expression is evaluated with (E6 defines which input sits at which position).
+     - The position of an input in the inputs an expression is evaluated with.
    * - :cpp:class:`ExpressionInstruction <gui_forms::ExpressionInstruction>`
      - One instruction.
    * - :cpp:class:`ExpressionLimits <gui_forms::ExpressionLimits>`
@@ -145,7 +145,7 @@ Types
    * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
      - A fixed table of primitives, in registration order.
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
-     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states.
+     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot).
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
      - The raster cache's counters, for instrumentation.
    * - :cpp:class:`Rect <gui_forms::Rect>`
@@ -181,7 +181,7 @@ Types
    * - :cpp:class:`ThemeRule <gui_forms::ThemeRule>`
      - One rule.
    * - :cpp:class:`ThemeRuleSheet <gui_forms::ThemeRuleSheet>`
-     - A theme's rules, as authored, with the engine version the theme declares it needs.
+     - A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value).
    * - :cpp:class:`ThemeSpacingTokens <gui_forms::ThemeSpacingTokens>`
      - ThemeSpacingTokens names the shared micro-through-section logical spacing scale.
    * - :cpp:class:`ThemeStructureTokens <gui_forms::ThemeStructureTokens>`
@@ -314,12 +314,24 @@ Types
 
    .. cpp:function:: const std::vector<RuleDiagnostic>& diagnostics() const noexcept
 
+   .. cpp:function:: const std::vector<std::string>& published_values() const noexcept
+
+      The published values the sheet's expressions read, in position order (an invalid name is kept empty, so later positions stay).
+
+   .. cpp:function:: std::size_t input_count() const noexcept
+
+      How many inputs the sheet's expressions are evaluated with: the engine inputs and the sheet's published values.
+
 
    .. rubric:: Methods
 
    .. cpp:function:: static CompiledThemeRules compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
 
       Compiles ``sheet`` against ``registry``, which must outlive the result.
+
+   .. cpp:function:: std::optional<ExpressionInputIndex> published_value_input(std::string_view name) const noexcept
+
+      The position of the published value ``name``, or none when the sheet does not read it.
 
    .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
 
@@ -366,6 +378,14 @@ Types
    .. cpp:member:: CascadeLevel level
 
       The level of the declaration that chose the primitive (or built_in); built_in when no rule did. Default: ``{CascadeLevel::built_in}``.
+
+   .. cpp:member:: std::array<const EngineExpression*, maximum_primitive_parameters> expressions
+
+      The expression whose value a parameter takes, by the parameter's position, where the winning declaration of the parameter is one; null elsewhere. The expressions belong to the compiled rules.
+
+   .. cpp:member:: std::uint64_t inputs_read
+
+      The inputs the part reads (E6): the primitive's declared inputs and every input its expressions read, as expression input bits.
 
 .. cpp:namespace:: gui_forms
 
@@ -693,6 +713,18 @@ Types
 
       True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
 
+   .. cpp:member:: std::uint64_t inputs_read
+
+      What the part's last paint read, and where it was drawn (E6). An input change damages exactly this extent of this control. - ``inputs_read``: the inputs its primitive and its expressions read, as expression input bits (expression_input_bit); zero for a part the built-in recipe draws. Set only through EnginePartTable::note_paint, which keeps the table's reader counts. - ``painted_by``: the stable ID of the control whose display chunk recorded the part. It is the control painting the part, or one that paints on its behalf, such as a docking site's drag layer. - ``extent``: the part's bounds and its primitive's outsets, in that control's local coordinates.
+
+   .. cpp:member:: std::string painted_by
+
+   .. cpp:member:: Rect extent
+
+   .. cpp:member:: FrameTime state_entered
+
+      When the part entered the states it was last painted in, on the window's motion clock; time_in_state counts from it.
+
    .. cpp:member:: std::unique_ptr<CachedPartRaster> cached
 
       The cached raster and what drew it, made the first time a primitive draws the part, so that a record no primitive draws stays small.
@@ -763,6 +795,18 @@ Types
    .. cpp:function:: void invalidate_rasters() noexcept
 
       Makes every cached raster stale, as when the theme changes.
+
+   .. cpp:function:: void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent)
+
+      Records what a part's paint read and where it was drawn (E6; see EnginePartRecord::inputs_read). A stale handle does nothing. If the control's ID cannot be copied, std::bad_alloc propagates and the record is unchanged.
+
+   .. cpp:function:: bool reads_any(std::uint64_t inputs) const noexcept
+
+      Whether any live record reads any input of ``inputs``, from the table's reader counts, without a scan.
+
+   .. cpp:function:: const EnginePartRecord* record_in_slot(std::size_t slot) const noexcept
+
+      The live record in ``slot`` (below slot_count()), or null for a free slot: for scans over the table. Valid until the next acquire() or release.
 
 .. cpp:namespace:: gui_forms
 
@@ -867,7 +911,7 @@ Types
 
    ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
 
-   The position of an engine input in the inputs an expression is evaluated with (E6 defines which input sits at which position). Distinct from a parameter's position and from a state.
+   The position of an input in the inputs an expression is evaluated with. Distinct from a parameter's position and from a state.
 
    .. cpp:member:: std::uint8_t value
 
@@ -1749,6 +1793,10 @@ Types
 
       How many values the primitive's preparation derives, at most maximum_prepared_values; zero for a primitive that derives none.
 
+   .. cpp:member:: std::span<const EngineInput> inputs_read
+
+      The engine inputs the primitive's output depends on (E6), read from PrimitiveTarget::inputs. A change to any other input never repaints it. Like animated parameters, inputs are never read by the preparation.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PrimitiveParameterBlock final
@@ -1861,13 +1909,15 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states. The destination's extent is the caller's choice, normally the logical size times the scale, rounded up.
+   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot). The destination's extent is the caller's choice, normally the logical size times the scale, rounded up.
 
    .. cpp:member:: Size logical_size
 
    .. cpp:member:: DeviceScale scale
 
    .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: std::array<double, engine_input_count> inputs
 
 .. cpp:namespace:: gui_forms
 
@@ -1963,7 +2013,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too.
+   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too. An expression's program reads inputs by position (engine_input_position, published_value_position), states, and the primitive's number parameters by their declaration position. A parameter it reads has the value the cascade gives it before any expression, so expressions never read one another. ``number`` is the expression's fallback. Its value is clamped to the parameter's range.
 
 
    .. rubric:: Methods
@@ -1973,6 +2023,8 @@ Types
    .. cpp:function:: static RuleDeclaration number_value(std::string_view parameter, double value)
 
    .. cpp:function:: static RuleDeclaration colour_value(std::string_view parameter, Color value)
+
+   .. cpp:function:: static RuleDeclaration expression_value(std::string_view parameter, std::span<const ExpressionInstruction> program, double fallback)
 
    .. cpp:member:: std::string property
 
@@ -1986,6 +2038,8 @@ Types
 
    .. cpp:member:: Color colour
 
+   .. cpp:member:: std::vector<ExpressionInstruction> program
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: RuleDiagnostic final
@@ -1998,13 +2052,17 @@ Types
 
    .. cpp:member:: std::size_t rule
 
-      The rule's position in the sheet and its label.
+      The rule's position in the sheet and its label (sheet_diagnostic and empty for the sheet).
 
    .. cpp:member:: std::string label
 
    .. cpp:member:: std::string property
 
       The declaration's property, empty for a whole-rule diagnostic.
+
+   .. cpp:member:: ExpressionDefect expression
+
+      For expression_invalid, why the expression does not compile. Default: ``{ExpressionDefect::none}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2336,13 +2394,15 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   A theme's rules, as authored, with the engine version the theme declares it needs.
+   A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value). The `n`th name is read at published_value_position(n). Each is 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter, and is listed once; at most maximum_published_values.
 
    .. cpp:member:: EngineVersion requires_engine
 
       Default: ``{current_engine_version}``.
 
    .. cpp:member:: std::vector<ThemeRule> rules
+
+   .. cpp:member:: std::vector<std::string> published_values
 
 .. cpp:namespace:: gui_forms
 
@@ -3051,6 +3111,8 @@ Enumerations
 
    .. cpp:enumerator:: too_many_prepared_values
 
+   .. cpp:enumerator:: input_out_of_range
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: RuleDiagnosticKind
@@ -3087,7 +3149,13 @@ Enumerations
 
    .. cpp:enumerator:: duplicate_declaration
 
+   .. cpp:enumerator:: expression_invalid
+
+   .. cpp:enumerator:: expression_reads_colour
+
    .. cpp:enumerator:: rule_empty
+
+   .. cpp:enumerator:: published_value_invalid
 
 .. cpp:namespace:: gui_forms
 
@@ -3100,6 +3168,8 @@ Enumerations
    .. cpp:enumerator:: number
 
    .. cpp:enumerator:: colour
+
+   .. cpp:enumerator:: expression
 
 .. cpp:namespace:: gui_forms
 
@@ -3164,6 +3234,16 @@ Functions, constants and aliases
 
 ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
 
+.. cpp:function:: constexpr ExpressionInputIndex engine_input_position(EngineInput input) noexcept
+
+.. cpp:function:: constexpr ExpressionInputIndex published_value_position(std::size_t value) noexcept
+
+   The position of the theme's `value`th published value (counting from 0).
+
+.. cpp:function:: constexpr std::uint64_t expression_input_bit(ExpressionInputIndex input) noexcept
+
+   One input's bit in a set of inputs read (ExpressionDependencies::inputs).
+
 .. cpp:function:: const char* expression_operation_name(ExpressionOperation operation) noexcept
 
    Registered (snake_case) name of an operation, for diagnostics and the schema.
@@ -3191,6 +3271,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_expression_parameters
 
    Value: ``32``.
+
+.. cpp:var:: constexpr std::size_t maximum_published_values
+
+   Where the engine puts its inputs (E6): first the engine inputs, in EngineInput order, then the values an application publishes that the theme names (ThemeRuleSheet::published_values), in the order the theme lists them. An input that is not published, such as the pointer of a part that is not hot, reads as NaN, so an expression reading it gives its fallback. Value: ``32``.
 
 .. cpp:var:: constexpr std::size_t expression_operation_count
 
@@ -3341,6 +3425,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
 
    Value: ``4'000'000U``.
+
+.. cpp:var:: constexpr std::size_t sheet_diagnostic
+
+   The rule position of a diagnostic about the sheet itself rather than one of its rules. Value: ``static_cast<std::size_t>(-1)``.
 
 .. cpp:namespace:: gui_forms
 

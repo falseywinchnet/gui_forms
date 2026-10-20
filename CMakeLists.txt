@@ -196,6 +196,7 @@ add_library(gui_forms_core STATIC
     src/core/window/update_scope/update_scope.cpp
     src/core/window/presentation/window_presentation.cpp
     src/core/window/scheduler/window_scheduler.cpp
+    src/core/window/engine_inputs/window_engine_inputs.cpp
     src/core/window/popup/popup_token.cpp
     src/core/window/accelerator/accelerator_token.cpp
     src/core/control/dispatcher/control_dispatcher.cpp
@@ -2278,6 +2279,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_expression_tests tests/engine_expression_tests.cpp)
     target_link_libraries(gui_forms_engine_expression_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_expression_tests COMMAND gui_forms_engine_expression_tests)
+    add_executable(gui_forms_engine_input_tests tests/engine_input_tests.cpp)
+    target_link_libraries(gui_forms_engine_input_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_input_tests COMMAND gui_forms_engine_input_tests)
     add_executable(gui_forms_engine_primitive_tests tests/engine_primitive_tests.cpp)
     target_link_libraries(gui_forms_engine_primitive_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_primitive_tests COMMAND gui_forms_engine_primitive_tests)

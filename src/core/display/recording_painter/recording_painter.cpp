@@ -41,7 +41,9 @@ PreparedTextPaintResult RecordingPainter::draw_prepared_text(const PreparedTextL
 void RecordingPainter::save() {
     DisplayCommand command;
     command.operation = DisplayOperation::save;
+    saved_origins_.reserve(saved_origins_.size() + 1U);
     commands_.push_back(std::move(command));
+    saved_origins_.push_back(origin_);
     ++save_depth_;
 }
 
@@ -53,6 +55,8 @@ void RecordingPainter::restore() {
     command.operation = DisplayOperation::restore;
     commands_.push_back(std::move(command));
     --save_depth_;
+    origin_ = saved_origins_.back();
+    saved_origins_.pop_back();
 }
 
 void RecordingPainter::translate(Point offset) {
@@ -60,6 +64,7 @@ void RecordingPainter::translate(Point offset) {
     command.operation = DisplayOperation::translate;
     command.first = offset;
     commands_.push_back(std::move(command));
+    origin_ = Point{origin_.x + offset.x, origin_.y + offset.y};
 }
 
 void RecordingPainter::clip_rect(Rect rect) {
