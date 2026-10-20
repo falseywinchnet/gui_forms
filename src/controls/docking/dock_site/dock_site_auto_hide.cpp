@@ -27,8 +27,6 @@ using dock_site_detail::strip_extent;
 constexpr double flyout_grip_thickness = 5.0;
 constexpr double flyout_minimum_extent = 48.0;
 constexpr double flyout_fallback_extent = 240.0;
-// The slide's frame interval.
-constexpr std::chrono::milliseconds slide_interval{16};
 // The repeat interval of a timer that fires once: its target disconnects it
 // when it fires, so the repeat is never reached.
 constexpr std::chrono::hours one_shot_interval{24};
@@ -58,16 +56,6 @@ PageStripPlacement placement_for(DockSide edge) noexcept {
 
 // Each fires on the window's UI timer and finds the site through a weak
 // reference; a site that is gone or disposed does nothing.
-struct DockSite::SlideTick final {
-    std::weak_ptr<Control> target;
-
-    void operator()(FrameTime now) const {
-        const std::shared_ptr<Control> control = target.lock();
-        if (!control || !(*control).is_alive()) return;
-        static_cast<DockSite&>(*control).slide_tick(now);
-    }
-};
-
 struct DockSite::HoverElapsed final {
     std::weak_ptr<Control> target;
     DockPanelId panel{};
@@ -399,7 +387,7 @@ DockSite::FlyoutGeometry DockSite::flyout_geometry() const {
     const double scale = effective_text_scale();
     const double smallest = std::min(flyout_minimum_extent * scale, span);
     const double extent = std::clamp(flyout_default_extent(slot), smallest, std::max(smallest, span));
-    const double visible = extent * flyout_progress_;
+    const double visible = extent * flyout_slide_.current();
     const double grip = std::min(flyout_grip_thickness * scale, extent);
     Rect inner{};
     if (slot.edge == DockSide::left) {
@@ -552,17 +540,14 @@ bool DockSite::open_flyout(const DockPanelId& panel, DockFlyoutCause cause) {
     flyout_ = make_control<Flyout>(StableId(std::string(stable_id().value()) + ".flyout"), *this);
     flyout_root_ = flyout_;
     move_view_to_flyout(*slot);
-    const bool reduced = (*host).presentation_settings().reduced_motion;
-    flyout_progress_ = reduced ? 1.0 : 0.0;
-    flyout_started_ = FrameClock::now();
+    // The slide starts under the strip; under reduced motion or in an
+    // occluded window it is all out at once.
+    flyout_slide_.jump_to(0.0);
+    static_cast<void>(flyout_slide_.animate_to(1.0));
     place_flyout();
     flyout_token_ = (*host).open_popup(shared_from_this(), flyout_);
     if (Event<>* const closed = flyout_token_.closed_event()) {
         flyout_revoked_ = (*closed).subscribe(*this, Delegate<>::bind<DockSite, &DockSite::on_flyout_revoked>(*this));
-    }
-    if (!reduced) {
-        const std::weak_ptr<Control> weak = shared_from_this();
-        slide_timer_ = (*host).schedule_ui_timer(*this, slide_interval, flyout_started_ + slide_interval, SlideTick{weak});
     }
     sync_side_strips();
     if (take_focus) {
@@ -589,7 +574,6 @@ void DockSite::close_flyout(DockFlyoutCause cause) noexcept {
         if (menu_from_flyout_) close_position_menu();
     } catch (...) {
     }
-    slide_timer_.disconnect();
     hover_timer_.disconnect();
     hover_panel_ = {};
     leave_timer_.disconnect();
@@ -607,7 +591,7 @@ void DockSite::close_flyout(DockFlyoutCause cause) noexcept {
     release_flyout_control();
     flyout_panel_.reset();
     flyout_stack_ = {};
-    flyout_progress_ = 1.0;
+    flyout_slide_.jump_to(1.0);
     flyout_focused_ = false;
     flyout_focus_pending_ = false;
     pointer_in_flyout_ = false;
@@ -631,17 +615,11 @@ void DockSite::on_flyout_revoked() {
     close_flyout(DockFlyoutCause::programmatic);
 }
 
-void DockSite::slide_tick(FrameTime now) {
-    if (!flyout_panel_) {
-        slide_timer_.disconnect();
-        return;
-    }
-    const double elapsed = std::chrono::duration<double>(now - flyout_started_).count();
-    const double duration = std::chrono::duration<double>(flyout_slide_duration).count();
-    // Plain interpolation until stage T2 gives the motion its easing.
-    flyout_progress_ = std::clamp(elapsed / duration, 0.0, 1.0);
+// A step of the slide on the window's motion clock: the flyout moves to
+// where it now stands.
+void DockSite::on_slide_motion(const MotionStep&) {
+    if (!flyout_panel_) return;
     place_flyout();
-    if (flyout_progress_ >= 1.0) slide_timer_.disconnect();
 }
 
 void DockSite::schedule_stale_check() {

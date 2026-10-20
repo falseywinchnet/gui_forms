@@ -443,6 +443,10 @@ Related types
 
    .. cpp:member:: std::uint64_t ui_timer_ticks
 
+   .. cpp:member:: std::uint64_t motion_clock_ticks
+
+      Frames of the window's motion clock: at most one per poll, however many values move.
+
    .. cpp:member:: std::uint64_t coalesced_requests
 
    .. cpp:member:: std::uint64_t callback_faults

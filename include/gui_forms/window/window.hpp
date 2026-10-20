@@ -7,6 +7,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/engine/motion_clock/motion_clock.hpp"
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
@@ -659,6 +660,11 @@ public:
     // The theme engine's records of this window's keyed parts (T2 plan,
     // EnginePartTable), for inspection. The engine alone changes them.
     [[nodiscard]] const EnginePartTable& engine_parts() const noexcept { return engine_parts_; }
+    // The window's motion clock (T2 plan, phase E3): it advances the motion
+    // values of this window's controls on one frame request. A control's
+    // MotionValue finds it here; tests install a time source on it.
+    [[nodiscard]] MotionClock& motion_clock() noexcept { return motion_clock_; }
+    [[nodiscard]] const MotionClock& motion_clock() const noexcept { return motion_clock_; }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
     // Captures the committed retained visual state without exposing a renderer
@@ -677,6 +683,12 @@ public:
 
 private:
     friend class HostSession;
+    friend class MotionClock;
+    // Called by the motion clock: its single frame request, first due at
+    // `first_deadline` and then every motion_frame_interval. Each frame
+    // calls the clock's advance; the clock disconnects the request when
+    // nothing moves. Throws std::length_error at the request limit.
+    [[nodiscard]] FrameRequestToken request_motion_frames(FrameTime first_deadline);
     // Called by HostSession: seeds the window's bindings with the host's
     // defaults unless they are seeded already.
     void install_host_key_map(const KeyMap& defaults);
@@ -1008,6 +1020,8 @@ private:
     // The theme engine's records of this window's keyed parts. A control's
     // records are released when it leaves the window.
     EnginePartTable engine_parts_;
+    // After metrics_, which it reports into, so that it is destroyed first.
+    MotionClock motion_clock_{*this};
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

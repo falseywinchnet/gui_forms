@@ -37,6 +37,10 @@ constexpr double label_gap = 4.0;
 // The active caption's accent line (DK-41, T4-3).
 constexpr double accent_height = 2.0;
 constexpr double extent_tolerance = 1e-9;
+// The drag's motions (about 220 ms for the stamp, D1 as corrected; the
+// tiles fade in over about 100 ms, T2-4), run on the window's motion clock.
+constexpr std::chrono::milliseconds stamp_motion_duration{220};
+constexpr std::chrono::milliseconds tile_fade_duration{100};
 
 
 constexpr std::array<std::string_view, 7> position_names{
@@ -84,9 +88,15 @@ DockSite::DockSite(StableId stable_id, DockWorkspace& workspace)
     : DockSite(std::move(stable_id), workspace, DockSiteId{}) {}
 
 DockSite::DockSite(StableId stable_id, DockWorkspace& workspace, DockSiteId floating_site)
-    : Control(std::move(stable_id)), workspace_(&workspace), floating_site_(floating_site) {
+    : Control(std::move(stable_id)), workspace_(&workspace), floating_site_(floating_site),
+      stamp_motion_(*this, MotionCurve::timed(stamp_motion_duration, MotionEasing::smoothstep), 1.0),
+      tile_fade_(*this, MotionCurve::timed(tile_fade_duration, MotionEasing::linear), 1.0),
+      flyout_slide_(*this, MotionCurve::timed(flyout_slide_duration, MotionEasing::linear), 1.0) {
     set_cursor(CursorKind::arrow);
     set_paint_plane(PaintPlane::control);
+    stamp_motion_.set_listener(MotionListener::bind<DockSite, &DockSite::on_drag_motion>(*this));
+    tile_fade_.set_listener(MotionListener::bind<DockSite, &DockSite::on_drag_motion>(*this));
+    flyout_slide_.set_listener(MotionListener::bind<DockSite, &DockSite::on_slide_motion>(*this));
     const std::string prefix((*this).stable_id().value());
     menu_ = std::make_unique<ContextMenu>(prefix + ".position_menu");
     menu_invoked_ = (*menu_).item_invoked().subscribe(
@@ -109,7 +119,6 @@ void DockSite::initialize_control_tree() {
 }
 
 DockSite::~DockSite() {
-    drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
     focus_token_.disconnect();
@@ -117,7 +126,6 @@ DockSite::~DockSite() {
     root_pointer_.disconnect();
     navigator_revoked_.disconnect();
     navigator_token_.disconnect();
-    slide_timer_.disconnect();
     hover_timer_.disconnect();
     leave_timer_.disconnect();
     stale_timer_.disconnect();
@@ -136,7 +144,6 @@ DockSite::~DockSite() {
 }
 
 void DockSite::on_dispose() noexcept {
-    drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
     reset_drag();
@@ -753,7 +760,6 @@ void DockSite::on_detaching_from_window(Window& former_window) noexcept {
     close_flyout(DockFlyoutCause::programmatic);
     close_navigator();
     close_position_menu();
-    drag_frames_.disconnect();
     capture_token_.disconnect();
     active_token_.disconnect();
     // The stamp's picture is the former window's image. A release that

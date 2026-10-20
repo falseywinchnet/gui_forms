@@ -170,7 +170,8 @@ struct DockFlyoutChange final {
 // height and top and bottom between them; the tree is laid out in what
 // remains. A side tab opens its panel's flyout: an in-window overlay that
 // slides out from the strip over the tree in `flyout_slide_duration`
-// (linear until the motion of stage T2; at once under reduced motion),
+// (linear, on the window's motion clock; at once under reduced motion or in
+// an occluded window),
 // casting the overlay shadow, holding the stack's caption (its pin unchecked
 // for an auto-hidden stack), the panel and a grip on its inner edge. The
 // flyout opens when the pointer rests on a tab for `flyout_hover_delay`
@@ -261,9 +262,10 @@ struct DockFlyoutChange final {
 // panel (its caption strip by role over a picture of its view, taken with
 // Window::snapshot_control as the drag starts; the content well where the
 // window cannot snapshot) is interpolated from the panel's rectangle down to a stamp about 100 units
-// long over 220 ms and follows the pointer; at the drop it grows into the
-// panel's new place, on Escape back into its old one; reduced motion skips
-// the motion. Targets (DockDropTarget, planned when the drag starts and at
+// long over 220 ms (smoothstep, on the window's motion clock) and follows
+// the pointer; at the drop it grows into the panel's new place, on Escape
+// back into its old one; reduced motion and an occluded window skip the
+// motion. Targets (DockDropTarget, planned when the drag starts and at
 // every layout pass): over the hovered pane only, a cross of five quiet
 // tiles (top, left, tab into, right, bottom) appears, fading in over 100 ms;
 // the pointer's position within the pane (or the tile under it) selects
@@ -431,7 +433,7 @@ public:
     // The panel the flyout shows, or none.
     [[nodiscard]] const std::optional<DockPanelId>& flyout_panel() const noexcept { return flyout_panel_; }
     // How far the flyout has slid out, from 0 to 1 (1 while closed).
-    [[nodiscard]] double flyout_reveal() const noexcept { return flyout_progress_; }
+    [[nodiscard]] double flyout_reveal() const noexcept { return flyout_slide_.current(); }
     // The open flyout's extent across its edge, in logical units, or 0.
     [[nodiscard]] double flyout_extent() const;
     // Sets the open flyout's extent, as its grip does, within the tree's
@@ -584,7 +586,6 @@ private:
     class StackView;
     class DragLayer;
     class Flyout;
-    struct SlideTick;
     struct HoverElapsed;
     struct LeaveElapsed;
     struct StaleFlyout;
@@ -810,7 +811,8 @@ private:
     void start_hover(const DockPanelId& panel);
     void stop_hover() noexcept;
     void start_leave();
-    void slide_tick(FrameTime now);
+    // The slide's steps on the window's motion clock: the flyout moves.
+    void on_slide_motion(const MotionStep& step);
     void hover_elapsed(const DockPanelId& panel);
     void leave_elapsed();
     void stale_flyout_elapsed();
@@ -858,14 +860,10 @@ private:
         Rect source{};
         std::string title{};
         std::uint64_t generation{};
-        FrameTime started{};
         std::vector<DockDropPane> panes{};
         std::vector<DockDropTarget> targets{};
         std::optional<std::size_t> target{};
         std::optional<std::size_t> hovered_pane{};
-        FrameTime hovered_since{};
-        // The hovered pane's cross is fading in (T2-4, about 100 ms).
-        bool tiles_fading{};
         // A panel_only drag's page has left its view (done at the first
         // layout pass, never inside the strip's own drag event).
         bool page_held_out{};
@@ -876,7 +874,6 @@ private:
         bool settle_found{};
         Rect settle_from{};
         Rect settle_to{};
-        FrameTime settle_started{};
         std::string announcement{};
         // The panel's picture, taken as the drag starts (the stamp's image;
         // none where the window cannot snapshot), and released when the
@@ -904,8 +901,11 @@ private:
     // skipped), or null; this site itself when the pointer is over it.
     [[nodiscard]] DockSite* remote_site(Point desktop, const DockSite* excluded) const;
     [[nodiscard]] DockSite* remote_guest() const noexcept;
-    // Shows, follows and stops showing another site's drag.
-    void show_guest_drag(const DragSession& source, Point local, Modifier modifiers);
+    // Shows, follows and stops showing another site's drag. The guest's
+    // stamp moves as `source_motion` does (the source site's stamp), or
+    // starts its own shrink when that is null.
+    void show_guest_drag(const DragSession& source, const MotionValue* source_motion, Point local,
+                         Modifier modifiers);
     void leave_guest_drag() noexcept;
     // Moves the drag's targets to the site under `desktop` (another site,
     // this one, or none).
@@ -953,12 +953,15 @@ private:
     void select_drag_target(std::optional<std::size_t> target, std::optional<std::size_t> hovered_pane);
     void end_drag(DockDragEnd end);
     void finish_settling() noexcept;
-    void request_drag_frames();
-    void advance_drag(FrameTime now);
+    // The stamp's and the tiles' steps on the window's motion clock.
+    void on_drag_motion(const MotionStep& step);
     void place_settle_target();
     [[nodiscard]] bool hidden_by_drag(DockNodeId stack) const noexcept;
     [[nodiscard]] bool motion_reduced() const noexcept;
-    [[nodiscard]] Rect stamp_at(FrameTime now) const;
+    // The hovered pane's cross is fading in (T2-4, about 100 ms).
+    [[nodiscard]] bool tiles_fading() const noexcept { return !tile_fade_.settled(); }
+    // The stamp where the shrink stands now (stamp_motion_).
+    [[nodiscard]] Rect stamp_at() const;
     [[nodiscard]] Rect drag_label_bounds() const noexcept;
     [[nodiscard]] Rect drag_image_bounds() const noexcept;
     [[nodiscard]] Rect drop_cue_bounds() const noexcept;
@@ -1033,10 +1036,17 @@ private:
     SubscriptionToken navigator_revoked_{};
     SubscriptionToken window_pointer_{};
     // The drag: its session, the layer that paints it above the stacks (a
-    // child kept last), its frames and the window events that cancel it.
+    // child kept last), its motion and the window events that cancel it.
+    // stamp_motion_ is the stamp's progress, 0 to 1 over 220 ms
+    // (smoothstep): from the source's rectangle to the miniature while
+    // dragging, and from where the drag ended to the panel's place while
+    // settling. tile_fade_ runs 0 to 1 over 100 ms (linear) after the
+    // hovered pane changes. Both are outside the session, which is replaced
+    // whole, and both end with it (reset_drag).
     DragSession drag_{};
     std::shared_ptr<DragLayer> drag_layer_{};
-    FrameRequestToken drag_frames_{};
+    MotionValue stamp_motion_;
+    MotionValue tile_fade_;
     DispatchOperation capture_check_{};
     SubscriptionToken capture_token_{};
     SubscriptionToken active_token_{};
@@ -1063,9 +1073,9 @@ private:
     SubscriptionToken flyout_revoked_{};
     std::optional<DockPanelId> flyout_panel_{};
     DockNodeId flyout_stack_{};
-    double flyout_progress_{1.0};
-    FrameTime flyout_started_{};
-    FrameRequestToken slide_timer_{};
+    // How far the flyout has slid out: 0 to 1 over flyout_slide_duration
+    // (linear), and 1 while closed.
+    MotionValue flyout_slide_;
     FrameRequestToken hover_timer_{};
     DockPanelId hover_panel_{};
     FrameRequestToken leave_timer_{};
