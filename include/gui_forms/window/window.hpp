@@ -477,7 +477,12 @@ public:
         std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn);
     [[nodiscard]] DispatcherSnapshot dispatcher_snapshot() const noexcept;
     // Host adapters install a thread-safe wake primitive. Installing a handler
-    // after work was queued immediately publishes one coalesced wake.
+    // after work was queued immediately publishes one coalesced wake. The
+    // handler runs under the dispatcher's lock, on whichever thread posted:
+    // it may only signal (set a flag, post a message, write a pipe) and must
+    // never call back into the window. In return, once this call replaces or
+    // removes a handler, no wake through the old one is under way or to come,
+    // so its target may be destroyed.
     void set_dispatch_wake_handler(std::function<void()> wake);
     // Host adapters also install a paint wake seam. Retained invalidation may
     // originate from another Window's callback, so relying only on the host

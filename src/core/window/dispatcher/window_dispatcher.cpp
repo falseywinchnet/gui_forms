@@ -144,7 +144,6 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
         metrics_.record_callback_emitted();
     }
 
-    std::function<void()> wake;
     {
         std::scoped_lock lock((*dispatcher_state_).mutex);
         (*dispatcher_state_).invoked += result.invoked;
@@ -172,11 +171,11 @@ DispatchDrainResult Window::drain_posted_work(std::size_t maximum_callbacks) {
             (*dispatcher_state_).wake && !(*dispatcher_state_).wake_pending) {
             (*dispatcher_state_).wake_pending = true;
             ++(*dispatcher_state_).wake_requests;
-            wake = (*dispatcher_state_).wake;
+            // Under the lock, as in post_dispatch.
+            (*dispatcher_state_).wake();
         }
         result.wake_requested = (*dispatcher_state_).wake_pending;
     }
-    if (wake) wake();
     return result;
 }
 
@@ -203,7 +202,6 @@ DispatcherSnapshot Window::dispatcher_snapshot() const noexcept {
 
 void Window::set_dispatch_wake_handler(std::function<void()> wake_handler) {
     require_ui_thread("dispatcher wake-handler mutation");
-    std::function<void()> wake;
     {
         std::scoped_lock lock((*dispatcher_state_).mutex);
         if (!wake_handler) {
@@ -229,10 +227,10 @@ void Window::set_dispatch_wake_handler(std::function<void()> wake_handler) {
             (*dispatcher_state_).wake) {
             (*dispatcher_state_).wake_pending = true;
             ++(*dispatcher_state_).wake_requests;
-            wake = (*dispatcher_state_).wake;
+            // Under the lock, as in post_dispatch.
+            (*dispatcher_state_).wake();
         }
     }
-    if (wake) wake();
 }
 
 void Window::begin_dispatcher_teardown() noexcept {
