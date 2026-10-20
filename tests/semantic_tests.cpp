@@ -267,15 +267,17 @@ void test_modal_semantic_scope() {
 
 // A control that publishes one virtual child, "shared", whose stable identity
 // every instance repeats (as tree and object views repeat their model's item
-// identities), and counts the presses that child receives.
+// identities), and counts the presses that child receives. An unexposed one
+// has no node of its own, so its child is published at its nearest exposed
+// ancestor.
 class SharedVirtualChild final : public Control {
 public:
-    explicit SharedVirtualChild(StableId stable_id) : Control(std::move(stable_id)) {}
+    SharedVirtualChild(StableId stable_id, bool exposed) : Control(std::move(stable_id)), exposed_(exposed) {}
     [[nodiscard]] int presses() const noexcept { return presses_; }
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
         SemanticDescriptor descriptor;
         descriptor.role = SemanticRole::group;
-        descriptor.exposed = true;
+        descriptor.exposed = exposed_;
         return descriptor;
     }
     [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
@@ -296,6 +298,7 @@ public:
     }
 
 private:
+    bool exposed_{};
     int presses_{};
 };
 
@@ -305,20 +308,33 @@ private:
 // identity.
 void test_runtime_identity_semantic_actions() {
     std::shared_ptr<Panel> root = make_control<Panel>(StableId("identity.root"));
-    std::shared_ptr<SharedVirtualChild> first = make_control<SharedVirtualChild>(StableId("identity.first"));
-    std::shared_ptr<SharedVirtualChild> second = make_control<SharedVirtualChild>(StableId("identity.second"));
+    std::shared_ptr<SharedVirtualChild> first = make_control<SharedVirtualChild>(StableId("identity.first"), true);
+    std::shared_ptr<SharedVirtualChild> second = make_control<SharedVirtualChild>(StableId("identity.second"), true);
+    std::shared_ptr<GroupBox> holder = make_control<GroupBox>(StableId("identity.holder"), "Holder");
+    std::shared_ptr<SharedVirtualChild> inner = make_control<SharedVirtualChild>(StableId("identity.inner"), false);
     std::shared_ptr<Button> button = make_control<Button>(StableId("identity.button"), "Press");
     (*first).set_requested_bounds({0, 0, 50, 20});
     (*second).set_requested_bounds({0, 30, 50, 20});
+    (*holder).set_requested_bounds({60, 0, 80, 60});
+    (*inner).set_requested_bounds({0, 0, 40, 20});
     (*button).set_requested_bounds({0, 60, 50, 20});
     (*root).add_child(first);
     (*root).add_child(second);
+    (*root).add_child(holder);
+    (*holder).add_child(inner);
     (*root).add_child(button);
     Window window(root, {200, 120});
     int clicks = 0;
     SubscriptionToken clicked =
         (*button).clicked().subscribe(test_support::IncrementCounter<int, ButtonBase&>(clicks));
 
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* holder_node = find_node(snapshot.roots, "identity.holder");
+    require(holder_node && find_node((*holder_node).children, "shared") && !find_node(snapshot.roots, "identity.inner"),
+            "an unexposed control's virtual child is published at its nearest exposed ancestor");
+    require(window.perform_semantic_action((*holder).runtime_id(), "shared", SemanticAction::press) &&
+                (*inner).presses() == 1 && (*first).presses() == 0 && (*second).presses() == 0,
+            "a virtual child named by its nearest exposed ancestor reaches the unexposed control inside it");
     require(window.perform_semantic_action((*second).runtime_id(), "shared", SemanticAction::press) &&
                 (*second).presses() == 1 && (*first).presses() == 0,
             "a virtual child named by its owner's runtime identity reaches that owner only");

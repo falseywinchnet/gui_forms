@@ -675,15 +675,18 @@ public:
                                  SemanticAction action,
                                  std::string_view value = {});
     // Performs `action` on a semantic node a host published, named by the
-    // runtime identity of the control that published it: that control's own
-    // node when `virtual_child` is empty, otherwise its virtual child with
-    // that stable identity. Runtime identities are never reused, so a host
-    // still holding the node of a disposed or replaced control is refused
-    // (false) instead of reaching another control (interview GF017), and a
-    // virtual child whose stable identity another control's virtual child
-    // repeats reaches its own owner only. Otherwise the same rules as the
-    // overload above: UI thread only, deferred while painting, and refused
-    // outside the active focus scope.
+    // runtime identity of a control: that control's own node when
+    // `virtual_child` is empty, otherwise the virtual child with that stable
+    // identity published by the control or by a control inside it (the
+    // semantic tree publishes an unexposed control's virtual children at its
+    // nearest exposed ancestor, so hosts name that ancestor). Runtime
+    // identities are never reused, so a host still holding the node of a
+    // disposed or replaced control is refused (false) instead of reaching
+    // another control (interview GF017), and a virtual child whose stable
+    // identity another control's virtual child repeats is searched for only
+    // under the named control. Otherwise the same rules as the overload
+    // above: UI thread only, deferred while painting, and refused outside the
+    // active focus scope.
     bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
                                  SemanticAction action, std::string_view value = {});
 
@@ -833,12 +836,11 @@ private:
     // The attached control, in the root tree or a popup, with runtime
     // identity `control`, or empty.
     [[nodiscard]] Control::Ptr find_runtime_control(RuntimeId control) const;
-    // Offers a virtual child's action to the controls in the active focus
-    // scope (or the root tree) and its popups, in that order; only `owner`
-    // may claim it when it is not null.
-    [[nodiscard]] bool dispatch_virtual_semantic_action(
-        std::string_view stable_id, SemanticAction action,
-        std::string_view value, const Control* owner);
+    // Whether a semantic action may reach `control` under the active focus
+    // scope: no scope contains focus, `control` lies inside the scope, or it
+    // lies in a popup whose owner does (the reach of the stable-identity
+    // overload's virtual-child search).
+    [[nodiscard]] bool semantic_scope_reaches(const Control::Ptr& control) const;
     using DeferredInput = std::variant<
         PointerEvent, KeyEvent, TextInputEvent, DragEvent,
         DeferredSemanticInput>;
