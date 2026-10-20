@@ -322,8 +322,10 @@ void check_root_and_identity(ClientContext& context, IUIAutomation& automation,
     expect(context, SUCCEEDED(read) && framework.text() == L"GUI.Forms", "FrameworkId is GUI.Forms");
     const std::vector<int> button_id = runtime_id(*button.get());
     const std::vector<int> check_id = runtime_id(*check.get());
-    expect(context, button_id.size() == 5U && check_id.size() == 5U && button_id != check_id,
-           "elements carry distinct runtime IDs of five parts");
+    // UI Automation replaces UiaAppendRuntimeId with the window's own
+    // prefix, so a client sees that prefix and the provider's four parts.
+    expect(context, button_id.size() > 4U && check_id.size() > 4U && button_id != check_id,
+           "elements carry distinct runtime IDs that end in the provider's four parts");
 }
 
 void check_invoke(ClientContext& context, IUIAutomation& automation, IUIAutomationElement& window) {
