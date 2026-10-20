@@ -38,6 +38,15 @@ Semantic actions: `focus`, `press`, `select`, `increment`, `decrement`, `expand`
 
 Semantic node fields: `position_in_set`, `set_size`, `has_popup`, `controlled_panel`, `orientation`.
 
+## Engine
+
+Theme engine 0.1 (T2): the primitives a theme's rules may select, the atoms each declares against, and its cost. Cascade levels, lowest first: `built_in`, `theme_sheet`, `class_rule`, `stable_id_rule`, `inline_style`, `forced_high_contrast`.
+
+| Primitive | Since | Paints | Reads | Cost per device pixel | Parameters |
+|---|---|---|---|---|---|
+| `bulge` | 0.1 | `face` | `pressed`, `active_tool` | 320 | `amplitude`, `exponent`, `light_colour`, `light_peak`, `shade_colour`, `shade_peak`, `crown_colour`, `crown_peak`, `gold_light_colour`, `gold_light_peak`, `gold_shade_colour`, `gold_shade_peak`, `gold_crown_colour`, `gold_crown_peak` |
+| `dithered_bulge` | 0.1 | `face` | `pressed`, `active_tool` | 280 | `amplitude`, `exponent`, `lit_1`, `lit_2`, `lit_3`, `shaded_1`, `shaded_2`, `shaded_3`, `lit_gain`, `shade_gain`, `crown_gain`, `gold_lit_1`, `gold_lit_2`, `gold_lit_3`, `gold_body_1`, `gold_body_2`, `gold_body_3`, `gold_shaded_1`, `gold_shaded_2`, `gold_shaded_3` |
+
 ## `button_base` (ButtonBase, control)
 
 | Part | Role | Reuses | Own states |

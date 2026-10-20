@@ -795,6 +795,65 @@ void test_bounds_and_shutdown_revocation() {
             "a shut-down dispatcher must reject new work deterministically");
 }
 
+// A host's wake that stays inside the call until released, recording where
+// it is: 0 not called, 1 inside, 2 returned.
+struct SlowWake final {
+    std::atomic<int>* phase{};
+    std::atomic<bool>* release{};
+    void operator()() const {
+        (*phase).store(1, std::memory_order_release);
+        while (!(*release).load(std::memory_order_acquire)) std::this_thread::yield();
+        (*phase).store(2, std::memory_order_release);
+    }
+};
+
+struct WakeEntered final {
+    const std::atomic<int>* phase{};
+    bool operator()() const { return (*phase).load(std::memory_order_acquire) == 1; }
+};
+
+class PostingWorker final {
+public:
+    explicit PostingWorker(Window& window) noexcept : window_(window) {}
+    void operator()() const { static_cast<void>(window_.begin_invoke(do_nothing)); }
+
+private:
+    Window& window_;
+};
+
+// Lets the wake return a while after it entered, so that the UI thread is
+// already removing the handler when it does.
+struct LateRelease final {
+    const std::atomic<int>* phase{};
+    std::atomic<bool>* release{};
+    void operator()() const {
+        while ((*phase).load(std::memory_order_acquire) != 1) std::this_thread::yield();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        (*release).store(true, std::memory_order_release);
+    }
+};
+
+// A worker's post calls the host's wake. Removing the handler on the UI
+// thread must wait for a wake already under way, so that the host may be
+// destroyed as soon as the removal returns (the gallery's dispatcher page
+// once woke a destroyed headless host from its worker).
+void test_wake_removal_waits_for_a_wake_under_way() {
+    std::shared_ptr<gui_forms::Control> root = make_control<Control>(StableId("dispatcher.wake.root"));
+    Window window(root, {320.0, 180.0});
+    std::atomic<int> phase{0};
+    std::atomic<bool> release{false};
+    window.set_dispatch_wake_handler(SlowWake{&phase, &release});
+    std::thread worker{PostingWorker{window}};
+    require_eventually(WakeEntered{&phase}, "the worker's post calls the host's wake");
+    std::thread releaser(LateRelease{&phase, &release});
+    window.set_dispatch_wake_handler({});
+    const int after_removal = phase.load(std::memory_order_acquire);
+    worker.join();
+    releaser.join();
+    require(after_removal == 2, "removing the wake handler waits for the wake already under way");
+    window.shutdown_dispatcher();
+}
+
 } // namespace
 
 int main() {
@@ -809,6 +868,7 @@ int main() {
         test_concurrent_producer_fifo_and_turn_bound();
         test_dispatch_order_against_input_timer_layout_and_paint();
         test_bounds_and_shutdown_revocation();
+        test_wake_removal_waits_for_a_wake_under_way();
         std::cout << "dispatcher-tests=pass\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

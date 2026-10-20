@@ -2548,6 +2548,9 @@ public:
             switch (message) {
             case WM_GETOBJECT:
                 if (static_cast<LONG>(lparam) == OBJID_CLIENT) { return accessibility_.object(wparam); }
+                if (WindowsAccessibility::automation_request(lparam)) {
+                    return accessibility_.automation_object(wparam, lparam);
+                }
                 break;
             case WM_GETMINMAXINFO:
                 minimum_size(reinterpret_cast<MINMAXINFO*>(lparam));
@@ -2716,6 +2719,9 @@ public:
         case WM_CHAR: character(static_cast<wchar_t>(wparam)); return 0;
         case WM_GETOBJECT:
             if (static_cast<LONG>(lparam) == OBJID_CLIENT) { return accessibility_.object(wparam); }
+            if (WindowsAccessibility::automation_request(lparam)) {
+                return accessibility_.automation_object(wparam, lparam);
+            }
             break;
         case WM_GETMINMAXINFO: minimum_size(reinterpret_cast<MINMAXINFO*>(lparam)); return 0;
         case WM_COPYDATA: return automation(reinterpret_cast<const COPYDATASTRUCT*>(lparam));
