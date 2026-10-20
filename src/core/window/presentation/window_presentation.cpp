@@ -301,6 +301,7 @@ bool covered_by(Rect pending, std::span<const Rect> painted) noexcept {
 void Window::note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states) {
     const PartRecordAcquisition acquired = engine_parts_.acquire(control.stable_id().value(), key);
     if (acquired.created) metrics_.record_engine_part_created(key.index_fallback(), engine_parts_.record_count());
+    if (acquired.evicted > 0U) metrics_.record_engine_parts_evicted(acquired.evicted, engine_parts_.record_count());
     EnginePartRecord* const record = engine_parts_.record(acquired.handle);
     if (record == nullptr) return;
     (*record).states = states;

@@ -42,6 +42,14 @@ PartRasterRequest request_for(const EnginePrimitive& primitive, Size logical, do
     return request;
 }
 
+// Whether the record holds a cached raster.
+bool holds_raster(const EnginePartTable& table, PartRecordHandle handle) {
+    const EnginePartRecord* const record = table.record(handle);
+    if (record == nullptr || !(*record).cached) return false;
+    const bool held = (*(*record).cached).raster != nullptr;
+    return held;
+}
+
 PartRecordHandle record_of(EnginePartTable& table, const char* control, const char* part) {
     const PartRecordAcquisition acquired = table.acquire(control, PartKey{part, {}, {}});
     return acquired.handle;
@@ -188,9 +196,9 @@ void test_eviction_order_and_the_cap() {
     statistics = table.cache_statistics();
     require(statistics.evictions == 1U && statistics.rasters == 4U && statistics.bytes <= raster_cache_budget_bytes,
             "one raster is evicted to stay within the budget");
-    require((*table.record(handles[1])).raster == nullptr, "the least recently painted part (b) is evicted");
-    require((*table.record(handles[0])).raster != nullptr && (*table.record(handles[2])).raster != nullptr &&
-                (*table.record(handles[3])).raster != nullptr && (*table.record(handles[4])).raster != nullptr,
+    require(!holds_raster(table, handles[1]), "the least recently painted part (b) is evicted");
+    require(holds_raster(table, handles[0]) && holds_raster(table, handles[2]) && holds_raster(table, handles[3]) &&
+                holds_raster(table, handles[4]),
             "the more recently painted parts keep their rasters");
 
     // An evicted part draws again when it is next painted, evicting the
@@ -198,7 +206,7 @@ void test_eviction_order_and_the_cap() {
     require(table.raster_for(handles[1], request_for(dithered, wide, 1.0, 1.0), 7U).status ==
                 PartRasterStatus::new_storage,
             "an evicted part draws again");
-    require((*table.record(handles[2])).raster == nullptr, "the next least recently painted part (c) is evicted");
+    require(!holds_raster(table, handles[2]), "the next least recently painted part (c) is evicted");
 
     // A raster larger than the whole budget is drawn and returned, never
     // kept, and evicts nothing.
@@ -209,8 +217,28 @@ void test_eviction_order_and_the_cap() {
             "a raster over the budget is drawn but not kept");
     statistics = table.cache_statistics();
     require(statistics.uncached == 1U && statistics.evictions == evictions_before &&
-                statistics.bytes <= raster_cache_budget_bytes && (*table.record(huge)).raster == nullptr,
+                statistics.bytes <= raster_cache_budget_bytes && !holds_raster(table, huge),
             "the cap holds: nothing is evicted for a raster that cannot fit");
+}
+
+// Evicting an item record (E2a's cap) releases its raster from the cache
+// too, so the raster budget and the record cap hold together.
+void test_evicted_item_records_release_their_rasters() {
+    EnginePartTable table(2U);
+    const EnginePrimitive& dithered = builtin("dithered_bulge");
+    const PartRecordHandle first = table.acquire("list", PartKey{"row", {}, 0U}).handle;
+    const PartRecordHandle second = table.acquire("list", PartKey{"row", {}, 1U}).handle;
+    require(table.raster_for(first, request_for(dithered, button, 1.0, 1.0), 1U).status ==
+                    PartRasterStatus::new_storage &&
+                table.raster_for(second, request_for(dithered, button, 1.0, 1.0), 2U).status ==
+                    PartRasterStatus::new_storage,
+            "both rows draw");
+    require(table.cache_statistics().rasters == 2U, "two rasters are cached");
+    const PartRecordAcquisition third = table.acquire("list", PartKey{"row", {}, 2U});
+    require(third.evicted == 1U && table.record(first) == nullptr, "the oldest row's record is evicted");
+    const RasterCacheStatistics statistics = table.cache_statistics();
+    require(statistics.rasters == 1U && statistics.bytes == 40U * 28U * 4U,
+            "the evicted record's raster leaves the cache");
 }
 
 } // namespace
@@ -220,6 +248,7 @@ int main() {
     test_invalidation_by_generation();
     test_refusal_keeps_the_cache();
     test_eviction_order_and_the_cap();
+    test_evicted_item_records_release_their_rasters();
     std::cout << "engine raster cache tests passed\n";
     return 0;
 }

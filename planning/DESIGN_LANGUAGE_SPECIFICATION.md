@@ -796,7 +796,7 @@ owner direction; §12.1 item 1).
 | indicator | binary or tri-state mark | check mark, radio dot, switch knob |
 | activity | authored indeterminate-progress object | busy indicator (C164) |
 | glyph, icon | vector symbol; image slot | arrows, close; command and object icons |
-| image | content picture, drawn exactly as given and never tinted or resized by a theme (§12.12, T2 H1-1) | the docking stamp's snapshot, thumbnails |
+| image | content picture, drawn exactly as given and never tinted, dimmed or resized by a theme, also when disabled (§12.12, T2 H1-1) | the docking stamp's snapshot, thumbnails |
 | label, content | text in the control role; text in the content role | caption, menu text; field value, list item |
 | caret | insertion point | editors |
 | disclosure | open/close affordance | menu arrow, tree expander |
@@ -951,9 +951,11 @@ in the part's shape, in place of the recipe's material; every other role
 ignores it. A swatch is therefore a `fill` part inside a `well` part that
 frames it. The colour is drawn as given in ordinary and high-contrast
 presentation alike, as an image is (the framing well follows the
-high-contrast recipe, so the sample stays outlined), and at 45 % opacity on
-a disabled part, as a disabled icon is. A part publishes it in its geometry
-record and a painter receives it with the part.
+high-contrast recipe, so the sample stays outlined), and on a disabled part
+too: a theme styles only what surrounds it, so a disabled swatch shows
+through its well, edge and label (owner, T2 interview E2-1, §12.12; this
+replaces the 45 % opacity first written here). A part publishes it in its
+geometry record and a painter receives it with the part.
 
 | Value | Carried by | Honoured by | Used by |
 |---|---|---|---|

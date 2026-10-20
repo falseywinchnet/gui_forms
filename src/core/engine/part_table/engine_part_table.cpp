@@ -42,6 +42,69 @@ std::size_t raster_bytes(DeviceExtent extent) noexcept {
 
 } // namespace
 
+EnginePartTable::EnginePartTable(const std::size_t item_record_cap) noexcept
+    : item_record_cap_(item_record_cap == 0U ? 1U : item_record_cap) {}
+
+void EnginePartTable::link_newest(const std::uint32_t slot) noexcept {
+    RecordSlot& linked = slots_[slot];
+    linked.older = newest_item_;
+    linked.newer = no_slot;
+    if (newest_item_ != no_slot) slots_[newest_item_].newer = slot;
+    newest_item_ = slot;
+    if (oldest_item_ == no_slot) oldest_item_ = slot;
+}
+
+void EnginePartTable::unlink(const std::uint32_t slot) noexcept {
+    RecordSlot& unlinked = slots_[slot];
+    if (unlinked.older != no_slot) {
+        slots_[unlinked.older].newer = unlinked.newer;
+    } else {
+        oldest_item_ = unlinked.newer;
+    }
+    if (unlinked.newer != no_slot) {
+        slots_[unlinked.newer].older = unlinked.older;
+    } else {
+        newest_item_ = unlinked.older;
+    }
+    unlinked.older = no_slot;
+    unlinked.newer = no_slot;
+}
+
+void EnginePartTable::release_slot(const std::uint32_t slot) noexcept {
+    RecordSlot& released = slots_[slot];
+    drop_raster(*released.record);
+    if (released.item) {
+        unlink(slot);
+        released.item = false;
+        item_records_ = item_records_ - 1U;
+    }
+    index_.erase(released.lookup);
+    released.record.reset();
+    released.lookup.clear();
+    released.generation = released.generation + 1U;
+    // A generation that wraps to 0 would match default handles; skip it.
+    if (released.generation == 0U) released.generation = 1U;
+    // free_slots_ holds fewer entries than slots_, and acquire() reserves its
+    // capacity whenever slots_ grows, so this cannot allocate.
+    free_slots_.push_back(slot);
+    live_ = live_ - 1U;
+}
+
+std::size_t EnginePartTable::evict_items(const std::uint32_t keep) noexcept {
+    std::size_t evicted = 0U;
+    std::uint32_t candidate = oldest_item_;
+    while (item_records_ > item_record_cap_ && candidate != no_slot) {
+        const std::uint32_t next = slots_[candidate].newer;
+        const bool unsettled = (*slots_[candidate].record).motion_unsettled;
+        if (candidate != keep && !unsettled) {
+            release_slot(candidate);
+            evicted = evicted + 1U;
+        }
+        candidate = next;
+    }
+    return evicted;
+}
+
 void EnginePartTable::write_lookup_text(std::string& text, std::string_view control_id, const PartKey& key) {
     text.clear();
     append_field(text, control_id);
@@ -61,6 +124,10 @@ PartRecordAcquisition EnginePartTable::acquire(std::string_view control_id, cons
     const std::unordered_map<std::string, std::uint32_t>::const_iterator found = index_.find(lookup);
     if (found != index_.end()) {
         const std::uint32_t slot = (*found).second;
+        if (slots_[slot].item && newest_item_ != slot) {
+            unlink(slot);
+            link_newest(slot);
+        }
         const PartRecordAcquisition existing{PartRecordHandle{slot, slots_[slot].generation}, false};
         return existing;
     }
@@ -95,7 +162,15 @@ PartRecordAcquisition EnginePartTable::acquire(std::string_view control_id, cons
     target.record = std::move(made);
     target.lookup = std::move(owned_lookup);
     live_ = live_ + 1U;
-    const PartRecordAcquisition acquired{PartRecordHandle{slot, target.generation}, true};
+    const bool item = !key.item.empty() || key.item_index.has_value();
+    std::size_t evicted = 0U;
+    if (item) {
+        target.item = true;
+        item_records_ = item_records_ + 1U;
+        link_newest(slot);
+        evicted = evict_items(slot);
+    }
+    const PartRecordAcquisition acquired{PartRecordHandle{slot, slots_[slot].generation}, true, evicted};
     return acquired;
 }
 
@@ -128,30 +203,21 @@ const EnginePartRecord* EnginePartTable::record(PartRecordHandle handle) const n
 std::size_t EnginePartTable::release_control(std::string_view control_id) noexcept {
     std::size_t released = 0U;
     for (std::size_t index = 0U; index < slots_.size(); ++index) {
-        RecordSlot& slot = slots_[index];
+        const RecordSlot& slot = slots_[index];
         if (!slot.record || (*slot.record).control != control_id) continue;
-        drop_raster(*slot.record);
-        index_.erase(slot.lookup);
-        slot.record.reset();
-        slot.lookup.clear();
-        slot.generation = slot.generation + 1U;
-        // A generation that wraps to 0 would match default handles; skip it.
-        if (slot.generation == 0U) slot.generation = 1U;
-        // free_slots_ holds fewer entries than slots_, and acquire() reserves
-        // its capacity whenever slots_ grows, so this cannot allocate.
-        free_slots_.push_back(static_cast<std::uint32_t>(index));
-        live_ = live_ - 1U;
+        release_slot(static_cast<std::uint32_t>(index));
         released = released + 1U;
     }
     return released;
 }
 
 void EnginePartTable::drop_raster(EnginePartRecord& record) noexcept {
-    if (!record.raster) return;
-    statistics_.bytes = statistics_.bytes - (*record.raster).pixels().size();
+    if (!record.cached || !(*record.cached).raster) return;
+    CachedPartRaster& cached = *record.cached;
+    statistics_.bytes = statistics_.bytes - (*cached.raster).pixels().size();
     statistics_.rasters = statistics_.rasters - 1U;
-    record.raster.reset();
-    record.raster_primitive = nullptr;
+    cached.raster.reset();
+    cached.primitive = nullptr;
 }
 
 void EnginePartTable::make_room(const std::size_t incoming, const EnginePartRecord* const keep) noexcept {
@@ -160,7 +226,8 @@ void EnginePartTable::make_room(const std::size_t incoming, const EnginePartReco
         // `keep`; ties go to the lower slot, so eviction order is fixed.
         EnginePartRecord* oldest = nullptr;
         for (RecordSlot& slot : slots_) {
-            if (!slot.record || !(*slot.record).raster || &*slot.record == keep) continue;
+            if (!slot.record || &*slot.record == keep) continue;
+            if (!(*slot.record).cached || !(*(*slot.record).cached).raster) continue;
             if (oldest == nullptr || (*slot.record).last_painted < (*oldest).last_painted) oldest = &*slot.record;
         }
         if (oldest == nullptr) return;
@@ -170,15 +237,17 @@ void EnginePartTable::make_room(const std::size_t incoming, const EnginePartReco
 }
 
 bool EnginePartTable::raster_current(const EnginePartRecord& record, const PartRasterRequest& request) const noexcept {
-    if (!record.raster || record.raster_primitive != request.primitive) return false;
-    if (record.raster_generation != record.generation) return false;
-    if (record.raster_table_generation != raster_table_generation_) return false;
-    if (!(record.raster_extent == request.extent)) return false;
-    if (!(record.raster_target.logical_size == request.target.logical_size)) return false;
-    if (!(record.raster_target.scale == request.target.scale)) return false;
+    if (!record.cached) return false;
+    const CachedPartRaster& cached = *record.cached;
+    if (!cached.raster || cached.primitive != request.primitive) return false;
+    if (cached.raster_generation != record.generation) return false;
+    if (cached.raster_table_generation != raster_table_generation_) return false;
+    if (!(cached.extent == request.extent)) return false;
+    if (!(cached.target.logical_size == request.target.logical_size)) return false;
+    if (!(cached.target.scale == request.target.scale)) return false;
     const AnatomyStateSet read = read_states_of(*request.primitive, request.target);
-    if (!(record.raster_target.states == read)) return false;
-    const bool same = same_parameters(record.raster_parameters, request.parameters);
+    if (!(cached.target.states == read)) return false;
+    const bool same = same_parameters(cached.parameters, request.parameters);
     return same;
 }
 
@@ -191,20 +260,24 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
     part.last_painted = paint_sequence;
     if (raster_current(part, request)) {
         statistics_.hits = statistics_.hits + 1U;
-        return PartRasterResult{part.raster, PartRasterStatus::cached};
+        return PartRasterResult{(*part.cached).raster, PartRasterStatus::cached};
     }
+    // The cache record is made once per part, before anything is drawn, so
+    // that an allocation failure leaves the record as it was.
+    if (!part.cached) part.cached = std::make_unique<CachedPartRaster>();
+    CachedPartRaster& cached = *part.cached;
 
     // Choose the storage. The cached raster is rewritten only when the cache
     // holds its one reference: a recorded command still showing it keeps
     // its pixels.
     const EnginePrimitive& primitive = *request.primitive;
     const std::size_t bytes = raster_bytes(request.extent);
-    const bool reusable = part.raster && part.raster_extent == request.extent &&
-                          (*part.raster).scale() == request.target.scale && part.raster.use_count() == 1;
+    const bool reusable = cached.raster && cached.extent == request.extent &&
+                          (*cached.raster).scale() == request.target.scale && cached.raster.use_count() == 1;
     std::shared_ptr<PartRaster> storage{};
     PartRasterStatus status = PartRasterStatus::reused_storage;
     if (reusable) {
-        storage = part.raster;
+        storage = cached.raster;
     } else {
         storage = PartRaster::create(request.extent, request.target.scale);
         if (!storage) return PartRasterResult{nullptr, PartRasterStatus::refused};
@@ -235,20 +308,20 @@ PartRasterResult EnginePartTable::raster_for(const PartRecordHandle handle, cons
     if (status == PartRasterStatus::new_storage) {
         drop_raster(part);
         make_room(bytes, &part);
-        part.raster = storage;
+        cached.raster = storage;
         statistics_.bytes = statistics_.bytes + bytes;
         statistics_.rasters = statistics_.rasters + 1U;
         statistics_.storage_allocations = statistics_.storage_allocations + 1U;
     } else {
         statistics_.storage_reuses = statistics_.storage_reuses + 1U;
     }
-    part.raster_primitive = request.primitive;
-    part.raster_parameters = request.parameters;
-    part.raster_target = request.target;
-    part.raster_target.states = read_states_of(primitive, request.target);
-    part.raster_extent = request.extent;
-    part.raster_generation = part.generation;
-    part.raster_table_generation = raster_table_generation_;
+    cached.primitive = request.primitive;
+    cached.parameters = request.parameters;
+    cached.target = request.target;
+    cached.target.states = read_states_of(primitive, request.target);
+    cached.extent = request.extent;
+    cached.raster_generation = part.generation;
+    cached.raster_table_generation = raster_table_generation_;
     return PartRasterResult{storage, status};
 }
 

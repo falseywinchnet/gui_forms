@@ -25,6 +25,16 @@ namespace gui_forms {
 // A part painted without a key has no record and is drawn statically: no
 // cached raster either.
 //
+// Bounds. A part that is not an item's is one of its control's declared
+// parts, so those records are bounded by the window's controls and released
+// with them. Item parts are bounded by maximum_item_part_records: a
+// virtualized control can paint any number of items over time, so beyond
+// the cap the least recently painted item record is evicted, as if
+// released. A record whose motion is unsettled (motion_unsettled) is never
+// evicted; the table then holds more than the cap until its motion settles.
+// No control publishes when it unrealizes an item yet, so records are
+// released only by eviction and by their control leaving the window.
+//
 // The raster cache (GIVEN F2-1): a record keeps the raster its primitive
 // last drew while what drew it is unchanged, and reuses the raster's
 // storage when it must draw again at the same size. The table holds at most
@@ -32,7 +42,8 @@ namespace gui_forms {
 // painted part's raster first to make room. A raster is invalidated by
 // generation: invalidate_raster() for one part, invalidate_rasters() for the
 // whole table (a theme change). A raster's transparency passes through as
-// its own premultiplied alpha when it is composited.
+// its own premultiplied alpha when it is composited. Releasing or evicting a
+// record releases its raster.
 
 // Which record a handle names: a slot of the table and the slot's
 // generation when the record was made. Releasing a record advances its
@@ -45,6 +56,23 @@ struct PartRecordHandle final {
     friend constexpr bool operator==(PartRecordHandle left, PartRecordHandle right) noexcept {
         return left.slot == right.slot && left.generation == right.generation;
     }
+};
+
+// A part's cached raster and what drew it: the primitive, every parameter
+// (animated ones included, since they change the pixels), the target with
+// its states restricted to those the primitive reads, and the extent. The
+// record owns it; `raster` is the cache's reference, and recorded commands
+// that composite the raster hold others.
+struct CachedPartRaster final {
+    std::shared_ptr<PartRaster> raster{};
+    const EnginePrimitive* primitive{};
+    PrimitiveParameterBlock parameters{};
+    PrimitiveTarget target{};
+    DeviceExtent extent{};
+    // The record's and the table's raster generations when `raster` was
+    // drawn; invalidation advances the current ones.
+    std::uint64_t raster_generation{};
+    std::uint64_t raster_table_generation{};
 };
 
 // One painted part's record. The identity strings are owned copies of the
@@ -63,24 +91,27 @@ struct EnginePartRecord final {
     // When the part was last painted: the number of window paints completed
     // before the one that drew it. The cache evicts the smallest first.
     std::uint64_t last_painted{};
+    // True while a transition or motion value of the part has not settled
+    // (E3, E7): such a record is never evicted. Nothing sets it before E3.
+    bool motion_unsettled{};
 
-    // The cached raster, or null. The table owns this reference; recorded
-    // commands that composite the raster hold others.
-    std::shared_ptr<PartRaster> raster{};
-    // What drew `raster`: the primitive, every parameter (animated ones
-    // included, since they change the pixels), the target with its states
-    // restricted to those the primitive reads, and the extent.
-    const EnginePrimitive* raster_primitive{};
-    PrimitiveParameterBlock raster_parameters{};
-    PrimitiveTarget raster_target{};
-    DeviceExtent raster_extent{};
-    // The record's and the table's raster generations when `raster` was
-    // drawn; invalidation advances the current ones.
-    std::uint64_t raster_generation{};
-    std::uint64_t raster_table_generation{};
-    // The record's current raster generation.
+    // The cached raster and what drew it, made the first time a primitive
+    // draws the part, so that a record no primitive draws stays small.
+    std::unique_ptr<CachedPartRaster> cached{};
+    // The record's current raster generation; invalidate_raster advances it.
     std::uint64_t generation{1U};
 };
+
+// The most item-part records one window keeps before it evicts the least
+// recently painted (see EnginePartTable). A record is about 800 bytes on
+// 64-bit hosts (its preparation is about half of that); with its slot, its
+// lookup text and its index entry it takes about 1 KB, so the cap costs at
+// most about 4 MB per window. A part a primitive draws also has its
+// CachedPartRaster (about 450 bytes) and its raster, which the raster
+// cache's budget bounds. The cap covers far more item parts than a window
+// shows at once: a record evicted while its part is still on screen is only
+// made again on the next paint. Each eviction is O(1).
+inline constexpr std::size_t maximum_item_part_records = 4096;
 
 // What a part needs drawn: the primitive a rule selected, its parameters,
 // the part's target, and the destination extent in device pixels (normally
@@ -138,15 +169,24 @@ struct PartRecordAcquisition final {
     PartRecordHandle handle{};
     // A new record was made for the key.
     bool created{};
+    // Item records evicted to keep within the cap; their handles are stale.
+    std::size_t evicted{};
 };
 
 // The table. It owns its records. Every member runs on the window's UI
 // thread; the table is not shared between windows.
 class EnginePartTable final {
 public:
-    // The record for `control_id` and `key`, made if there is none. A new
-    // record reuses a released slot before the table grows. If an
-    // allocation fails, std::bad_alloc propagates and the table is
+    // The table keeps at most `item_record_cap` item-part records (at least
+    // 1); the window's table uses maximum_item_part_records.
+    explicit EnginePartTable(std::size_t item_record_cap = maximum_item_part_records) noexcept;
+
+    // The record for `control_id` and `key`, made if there is none, and
+    // marked the most recently painted item record when it is an item's. A
+    // new record reuses a released slot before the table grows; a new item
+    // record beyond the cap evicts the least recently painted settled item
+    // record (O(1) unless records with unsettled motion are passed over).
+    // If an allocation fails, std::bad_alloc propagates and the table is
     // unchanged.
     [[nodiscard]] PartRecordAcquisition acquire(std::string_view control_id, const PartKey& key);
 
@@ -166,8 +206,12 @@ public:
     // table's slots.
     std::size_t release_control(std::string_view control_id) noexcept;
 
-    // Live records.
+    // Live records, and those of item parts among them.
     [[nodiscard]] std::size_t record_count() const noexcept { return live_; }
+    [[nodiscard]] std::size_t item_record_count() const noexcept { return item_records_; }
+    // Record storage allocated, live or free: released and evicted slots are
+    // reused before it grows, so it stays near the most records live at once.
+    [[nodiscard]] std::size_t slot_count() const noexcept { return slots_.size(); }
 
     // The part's raster for `request`, painted on window paint
     // `paint_sequence` (the record's new last_painted).
@@ -200,6 +244,8 @@ public:
     [[nodiscard]] RasterCacheStatistics cache_statistics() const noexcept { return statistics_; }
 
 private:
+    static constexpr std::uint32_t no_slot = 0xFFFFFFFFU;
+
     struct RecordSlot final {
         std::optional<EnginePartRecord> record{};
         // The record's lookup text, the key of its index_ entry; empty while
@@ -207,7 +253,22 @@ private:
         std::string lookup;
         // Starts at 1, so that a default handle (generation 0) is never live.
         std::uint32_t generation{1U};
+        // An item record's neighbours in recency order, older and newer, or
+        // no_slot at either end; unused for other records.
+        bool item{};
+        std::uint32_t older{no_slot};
+        std::uint32_t newer{no_slot};
     };
+
+    // Recency list of item records: link at the newest end, unlink anywhere.
+    void link_newest(std::uint32_t slot) noexcept;
+    void unlink(std::uint32_t slot) noexcept;
+    // Ends a live record's lifetime: its handles become stale and its slot
+    // is free for reuse. Never allocates.
+    void release_slot(std::uint32_t slot) noexcept;
+    // Evicts least recently painted settled item records, never `keep`,
+    // until the cap holds; returns how many.
+    std::size_t evict_items(std::uint32_t keep) noexcept;
 
     // Writes the lookup text for `control_id` and `key` into `text`,
     // replacing its contents. Each field is written as its byte length, a
@@ -231,6 +292,10 @@ private:
     // nothing once the string has grown to the longest key.
     std::string lookup_scratch_;
     std::size_t live_{};
+    std::size_t item_records_{};
+    std::size_t item_record_cap_{};
+    std::uint32_t oldest_item_{no_slot};
+    std::uint32_t newest_item_{no_slot};
     // Advanced by invalidate_rasters; starts at 1 so a record that never
     // cached a raster (raster_table_generation 0) is never current.
     std::uint64_t raster_table_generation_{1U};

@@ -109,6 +109,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"engine_part_records\":" << engine_part_records << ','
            << "\"engine_part_index_fallbacks\":" << engine_part_index_fallbacks << ','
            << "\"engine_part_records_released\":" << engine_part_records_released << ','
+           << "\"engine_part_records_evicted\":" << engine_part_records_evicted << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';

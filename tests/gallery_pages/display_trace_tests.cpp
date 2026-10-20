@@ -7,7 +7,6 @@
 #include <cstring>
 #include <fstream>
 #include <iomanip>
-#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -30,11 +29,16 @@ namespace {
 // The month calendars show "today", which the system clock supplies; the
 // test pins it so that the trace does not depend on the date.
 //
-// Two pages show counters that depend on how much wall time the test took,
-// so their digests differ between runs on different machines: live-surfaces
-// (its producer's Timer publishes frames and the page reports the count) and
-// typography-and-inspection (its inspector reports the window's pending
-// damage). Their traces are still recorded and written, but not checked.
+// Two pages show values that the page's own content does not fix:
+// - live-surfaces reports its surface's pixel format, which is the
+//   platform's native one (native_live_surface_pixel_format: BGRA on
+//   Windows, RGBA elsewhere), so it has one digest for Windows and one for
+//   the other platforms, which differ only in that word;
+// - typography-and-inspection's inspector shows the inspected control's
+//   RuntimeId, a process-wide counter of every control made so far. The
+//   test therefore runs first in its binary (main.cpp), before any other
+//   test has made a control, so the counter has the same value on every
+//   run and host.
 
 class TracePainter final : public Painter {
 public:
@@ -303,6 +307,9 @@ struct PageDigest final {
 };
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
+// typography-and-inspection's entry is main's trace with the RuntimeId the
+// specimen has when this test runs first (#1251 rather than #19747); the
+// two traces differ in that number alone.
 constexpr std::array<PageDigest, 29> expected_digests{{
     {"basics", 0x6d537a7173ffd432ULL},
     {"values", 0x9262ff950cdb0bbaULL},
@@ -331,21 +338,19 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0xaf03a11988a78143ULL},
+    {"typography-and-inspection", 0x27adf74d8cf4ec14ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 
-// Pages whose readouts depend on elapsed wall time (see above).
-constexpr std::array<std::string_view, 2> timing_dependent_pages{"live-surfaces", "typography-and-inspection"};
-
-bool timing_dependent(std::string_view page) {
-    for (const std::string_view listed : timing_dependent_pages) {
-        if (listed == page) return true;
-    }
-    return false;
-}
+// live-surfaces names the platform's native live-surface pixel format.
+#if defined(_WIN32)
+constexpr std::uint64_t live_surfaces_digest = 0x5d366debbc32b5ffULL;
+#else
+constexpr std::uint64_t live_surfaces_digest = 0xc98130cb78ec491fULL;
+#endif
 
 std::uint64_t expected_digest(std::string_view page) {
+    if (page == "live-surfaces") return live_surfaces_digest;
     for (const PageDigest& digest : expected_digests) {
         if (digest.page == page) return digest.hash;
     }
@@ -379,7 +384,6 @@ void test_display_commands_unchanged() {
                       << std::dec << "ULL},\n";
             continue;
         }
-        if (timing_dependent(page.id)) continue;
         if (hash != expected_digest(page.id)) {
             mismatches += std::string(page.id) + " ";
         }
