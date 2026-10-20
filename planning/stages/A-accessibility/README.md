@@ -1,7 +1,10 @@
 # Stage A: accessibility verified on every host
 
 Release: 0.2 Verified. Depends on: nothing. Runs beside every other stage.
-Status 2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md`
+Status 2026-10-20: started. macOS: `gui_forms_macos_accessibility_tests`
+(in process, runs on CI) and `gui_forms_macos_accessibility_client_tests`
+(AXUIElement client; skipped as unsupported without the Accessibility
+permission) registered; gate run recorded in `results/2026-10-20-a-macos`. Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -38,7 +41,11 @@ is never turned off (accessibility round A3).
   (interview GF012–GF013).
 - **macOS.** NSAccessibility publication inside
   `src/host/macos/application/macos_host.mm` (`native_accessibility_role` and
-  the element classes near it). No registered test.
+  the element classes near it). Tested in process by
+  `gui_forms_macos_accessibility_tests` and through AXUIElement by
+  `gui_forms_macos_accessibility_client_tests` (and its Gallery variant),
+  against the contract in `tests/support/macos_accessibility_contract.cpp`;
+  the stock-control fixture is `tests/support/stock_control_fixture.cpp`.
 - **Windows.** MSAA (`IAccessible`) in
   `src/host/windows/accessibility/windows_accessibility.cpp`. Test
   `tests/windows_accessibility_tests.cpp`, registered in `CMakeLists.txt` as

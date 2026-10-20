@@ -31,7 +31,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 
 | Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-13 |
 |---|---|---|---|---|
-| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | not started |
+| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | started 2026-10-20: macOS in-process and out-of-process AX tests registered, macOS gate run recorded (`results/2026-10-20-a-macos`); Windows and Linux in progress |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | not started |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | interview answered 2026-10-19; plan E1–E11 accepted (`T2-engine-core/PLAN.md`); E1 revision then E2 next |
