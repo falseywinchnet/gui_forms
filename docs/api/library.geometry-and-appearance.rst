@@ -16,6 +16,8 @@ Types
 
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
      - BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
+   * - :cpp:class:`CachedPartRaster <gui_forms::CachedPartRaster>`
+     - A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent.
    * - :cpp:class:`Color <gui_forms::Color>`
      - gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default.
    * - :cpp:class:`ConnectedControlSeam <gui_forms::ConnectedControlSeam>`
@@ -78,6 +80,10 @@ Types
      - One part to paint, in the control's local coordinates.
    * - :cpp:class:`PartRaster <gui_forms::PartRaster>`
      - One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale.
+   * - :cpp:class:`PartRasterRequest <gui_forms::PartRasterRequest>`
+     - What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size times the scale, rounded up).
+   * - :cpp:class:`PartRasterResult <gui_forms::PartRasterResult>`
+     -  
    * - :cpp:class:`PartRasterView <gui_forms::PartRasterView>`
      - A borrowed destination for one part's pixels.
    * - :cpp:class:`PartRecordAcquisition <gui_forms::PartRecordAcquisition>`
@@ -102,6 +108,8 @@ Types
      - A fixed table of primitives, in registration order.
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
      - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states.
+   * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
+     - The raster cache's counters, for instrumentation.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
@@ -184,6 +192,30 @@ Types
    .. cpp:member:: Color visited_link
 
       Default: ``{Color::rgba(93, 65, 145)}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CachedPartRaster final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent. The record owns it; ``raster`` is the cache's reference, and recorded commands that composite the raster hold others.
+
+   .. cpp:member:: std::shared_ptr<PartRaster> raster
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: PrimitiveTarget target
+
+   .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: std::uint64_t raster_generation
+
+      The record's and the table's raster generations when ``raster`` was drawn; invalidation advances the current ones.
+
+   .. cpp:member:: std::uint64_t raster_table_generation
 
 .. cpp:namespace:: gui_forms
 
@@ -489,11 +521,19 @@ Types
 
    .. cpp:member:: std::uint64_t last_painted
 
-      When the part was last painted: the number of window paints completed before the one that drew it.
+      When the part was last painted: the number of window paints completed before the one that drew it. The cache evicts the smallest first.
 
    .. cpp:member:: bool motion_unsettled
 
       True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
+
+   .. cpp:member:: std::unique_ptr<CachedPartRaster> cached
+
+      The cached raster and what drew it, made the first time a primitive draws the part, so that a record no primitive draws stays small.
+
+   .. cpp:member:: std::uint64_t generation
+
+      The record's current raster generation; invalidate_raster advances it. Default: ``{1U}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -523,6 +563,8 @@ Types
 
       Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
 
+   .. cpp:function:: RasterCacheStatistics cache_statistics() const noexcept
+
 
    .. rubric:: Methods
 
@@ -542,7 +584,19 @@ Types
 
    .. cpp:function:: std::size_t release_control(std::string_view control_id) noexcept
 
-      Releases every record of the control with this stable ID, as when it leaves the window, and returns how many. Their handles become stale. The cost is one pass over the table's slots.
+      Releases every record of the control with this stable ID, as when it leaves the window, and returns how many. Their handles become stale and their cached rasters are released. The cost is one pass over the table's slots.
+
+   .. cpp:function:: PartRasterResult raster_for(PartRecordHandle handle, const PartRasterRequest& request, std::uint64_t paint_sequence)
+
+      The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
+
+   .. cpp:function:: void invalidate_raster(PartRecordHandle handle) noexcept
+
+      Makes one part's cached raster stale; the next raster_for draws it again. A stale handle does nothing.
+
+   .. cpp:function:: void invalidate_rasters() noexcept
+
+      Makes every cached raster stale, as when the theme changes.
 
 .. cpp:namespace:: gui_forms
 
@@ -1061,6 +1115,36 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartRasterRequest final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size times the scale, rounded up).
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: PrimitiveTarget target
+
+   .. cpp:member:: DeviceExtent extent
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRasterResult final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   .. cpp:member:: std::shared_ptr<const PartRaster> raster
+
+      The part's raster, or null when status is stale_record or refused.
+
+   .. cpp:member:: PartRasterStatus status
+
+      Default: ``{PartRasterStatus::refused}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartRasterView final
 
    ``#include <gui_forms/engine/types/engine_types.hpp>``
@@ -1284,6 +1368,34 @@ Types
    .. cpp:member:: DeviceScale scale
 
    .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RasterCacheStatistics final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   The raster cache's counters, for instrumentation.
+
+   .. cpp:member:: std::size_t rasters
+
+      Rasters held and their bytes now.
+
+   .. cpp:member:: std::size_t bytes
+
+   .. cpp:member:: std::uint64_t hits
+
+      Requests answered from the cache, drawn into reused storage, drawn into new storage, and drawn without caching.
+
+   .. cpp:member:: std::uint64_t storage_reuses
+
+   .. cpp:member:: std::uint64_t storage_allocations
+
+   .. cpp:member:: std::uint64_t uncached
+
+   .. cpp:member:: std::uint64_t evictions
+
+      Rasters evicted to keep within the budget.
 
 .. cpp:namespace:: gui_forms
 
@@ -1978,6 +2090,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PartRasterStatus
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   .. cpp:enumerator:: cached
+
+   .. cpp:enumerator:: reused_storage
+
+   .. cpp:enumerator:: new_storage
+
+   .. cpp:enumerator:: uncached
+
+   .. cpp:enumerator:: stale_record
+
+   .. cpp:enumerator:: refused
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PartTextAlignment
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -2141,7 +2271,11 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr std::size_t maximum_item_part_records
 
-   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is 792 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. It covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is about 800 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. A part a primitive draws also has its CachedPartRaster (about 450 bytes) and its raster, which the raster cache's budget bounds. The cap covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+
+.. cpp:var:: constexpr std::size_t raster_cache_budget_bytes
+
+   The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB). Value: ``8U * 1024U * 1024U``.
 
 .. cpp:namespace:: gui_forms
 
