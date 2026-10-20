@@ -106,19 +106,11 @@ OPENERS: tuple[tuple[str, str, str], ...] = (
 # Defects this test finds and the ATK adapter cannot fix: the default action
 # a target publishes is refused by the window. Listed so the test stays green
 # while each is open; a listed target whose action starts to show an effect
-# fails the test until it leaves the list. Each publishes the focus action
-# without the focusable state. Its own on_semantic_action would move focus to
-# its inner editor, but Window::perform_semantic_action handles focus itself
-# and asks for focus on the control, which is not focusable, so it refuses.
-# (Refused in the headless model on Windows too; AT-SPI does not report the
-# refusal, see perform_default.)
-KNOWN_REFUSALS: dict[str, str] = {
-    'gallery.text.tokens.recipients': 'TokenBox publishes focus but is not focusable',
-    'gallery.text.masked.phone': 'MaskedTextBox publishes focus but is not focusable',
-    'gallery.values.numeric.0': 'NumericUpDown publishes focus but is not focusable',
-    'gallery.values.domain': 'DomainUpDown publishes focus but is not focusable',
-    'gallery.containers.split': 'SplitContainer publishes focus but is not focusable',
-}
+# fails the test until it leaves the list. Empty: the five composites listed
+# here until the window left their focus action to their own
+# on_semantic_action (TokenBox, MaskedTextBox, NumericUpDown, DomainUpDown,
+# SplitContainer) are now ordinary targets.
+KNOWN_REFUSALS: dict[str, str] = {}
 
 # Targets whose default action the window accepts (in the headless model)
 # and which changes nothing the semantic tree or the fixture's counters show,
@@ -807,8 +799,8 @@ def perform_default(atspi: ModuleType, glib: ModuleType, comparer: Comparer, fix
         results.mismatches.append(where + ': ' + names[0] + ' did not open a visible ' + target.opens)
     # An action is judged by its observed effect. DoAction's answer does not
     # say whether the window performed it: at-spi2-atk on ubuntu-24.04
-    # answered true for the five KNOWN_REFUSALS targets, whose actions the
-    # window refuses (CI run of fe636c05). A false answer is still a mismatch.
+    # answered true for five focus actions the window then refused (CI run
+    # of fe636c05). A false answer is still a mismatch.
     if not performed:
         results.mismatches.append(where + ': DoAction answered false for ' + names[0] + ' (action 0)')
     known: str = ''
