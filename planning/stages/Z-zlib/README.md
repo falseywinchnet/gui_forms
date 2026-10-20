@@ -1,6 +1,9 @@
 # Z. Owned zlib replacement: phase 1 study and threat model
 
-Date: 2026-10-19. Status: **phase 2 authorized and implemented for review; verification gate open**.
+Date: 2026-10-19. Status: **phase 2 implemented for review; owned PNG phase started; verification gates open**.
+The owner explicitly requested starting PNG on 2026-10-19. The separate
+[PNG contract and remaining gates](PNG_CODEC.md) records the reordered phase,
+private lossless sample seam and outstanding colour/encoder integration.
 The owner subsequently authorized source reuse and a house-style rewrite of
 both deflate and PNG. The six decisions were accepted, with PNG ownership
 then revised to an owned codec. This authorizes phase 2; later phases still

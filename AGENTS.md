@@ -263,3 +263,23 @@ assembly using the installed macOS SDK, generic SSE2 and no AVX; it does not
 execute an x64 test. Decoder SIMD design targets common 128-bit SSE/NEON lane
 groups in portable C++, following the owner's BFFT/Airspy direction. Do not
 introduce platform-specific intrinsic forks or wider-register algorithms.
+
+## Owned PNG: remote phase-5b experiments
+
+The private sample decoder's sanitizer/oracle and benchmark commands are:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- env PATH=/opt/homebrew/opt/llvm@22/bin:/opt/homebrew/bin:/usr/bin:/bin python3 -B tools/validate_png.py --libpng build-zlib-study-sources/libpng --zlib build-zlib-study-sources/upstream-zlib --output build/png-final --seconds 60
+/Users/ultimussecundai/.local/bin/m4build -- env PATH=/opt/homebrew/opt/llvm@22/bin:/opt/homebrew/bin:/usr/bin:/bin python3 -B tools/benchmark_png.py --libpng build-zlib-study-sources/libpng --zlib build-zlib-study-sources/upstream-zlib --workloads build/png-final/workloads --output build/png-benchmark
+```
+
+The first command generates the second's workloads. Serialize them and every
+other mirror/build operation. Oracle pins and file hashes are checked before
+compiling. The sanitizer comparison uses portable-C libpng; the benchmark
+uses its NEON implementation on arm64. Neither is a production dependency
+change. Full-suite sanitizer verification still uses `tools/ci_build.py`. The recorded
+helper supplies its logical workspace layout on the hashed M4 mirror:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- sh results/2026-10-19-zlib/png/full-suite-driver.sh
+```

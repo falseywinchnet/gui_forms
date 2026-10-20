@@ -16,16 +16,25 @@ constexpr std::size_t stored_block_limit = 65535U;
 // what the toolkit's own PNG validator will accept.
 constexpr std::uint32_t dimension_limit = 16384U;
 
-std::array<std::uint32_t, 256> make_crc_table() noexcept {
-    std::array<std::uint32_t, 256> table{};
+// Eight byte positions, 256 values each. Tables encode successive applications
+// of the same reflected IEEE polynomial; they are not CRC32C instruction tables.
+using CrcTables = std::array<std::array<std::uint32_t, 256>, 8>;
+constexpr CrcTables make_crc_tables() noexcept {
+    CrcTables tables{};
     for (std::uint32_t index = 0; index < 256U; ++index) {
         std::uint32_t value = index;
-        for (int bit = 0; bit < 8; ++bit) {
+        for (unsigned bit = 0; bit < 8; ++bit) {
             value = (value & 1U) != 0U ? 0xedb88320U ^ (value >> 1U) : value >> 1U;
         }
-        table[index] = value;
+        tables[0][index] = value;
     }
-    return table;
+    for (std::size_t position = 1; position < tables.size(); ++position) {
+        for (std::size_t index = 0; index < 256; ++index) {
+            const std::uint32_t previous = tables[position - 1][index];
+            tables[position][index] = tables[0][previous & 255U] ^ (previous >> 8U);
+        }
+    }
+    return tables;
 }
 
 void append_u32_big_endian(std::vector<std::byte>& output, std::uint32_t value) {
@@ -51,12 +60,30 @@ void append_chunk(std::vector<std::byte>& output, const char (&type)[5],
 } // namespace
 
 std::uint32_t png_crc32(std::span<const std::byte> bytes) noexcept {
-    static const std::array<std::uint32_t, 256> table = make_crc_table();
+    static constexpr CrcTables tables = make_crc_tables();
     std::uint32_t crc = 0xffffffffU;
-    for (const std::byte value : bytes) {
-        crc = table[(crc ^ std::to_integer<std::uint32_t>(value)) & 0xffU] ^ (crc >> 8U);
+    const std::size_t interior = bytes.size() - bytes.size() % 8;
+    std::size_t offset = 0;
+    for (; offset < interior; offset += 8) {
+        // Explicit byte order, unaligned input, and no read beyond the live span.
+        const std::uint32_t first = std::to_integer<std::uint32_t>(bytes[offset]) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 1]) << 8U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 2]) << 16U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 3]) << 24U);
+        const std::uint32_t combined = crc ^ first;
+        crc = tables[7][combined & 255U] ^ tables[6][(combined >> 8U) & 255U] ^
+              tables[5][(combined >> 16U) & 255U] ^ tables[4][combined >> 24U] ^
+              tables[3][std::to_integer<unsigned>(bytes[offset + 4])] ^
+              tables[2][std::to_integer<unsigned>(bytes[offset + 5])] ^
+              tables[1][std::to_integer<unsigned>(bytes[offset + 6])] ^
+              tables[0][std::to_integer<unsigned>(bytes[offset + 7])];
     }
-    return crc ^ 0xffffffffU;
+    for (; offset < bytes.size(); ++offset) {
+        const unsigned value = std::to_integer<unsigned>(bytes[offset]);
+        crc = tables[0][(crc ^ value) & 255U] ^ (crc >> 8U);
+    }
+    const std::uint32_t result = crc ^ 0xffffffffU;
+    return result;
 }
 
 std::uint32_t png_adler32(std::span<const std::byte> bytes) noexcept {

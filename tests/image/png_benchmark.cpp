@@ -1,0 +1,92 @@
+#include "../../src/core/image/png_decoder.hpp"
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <vector>
+
+extern "C" int gui_forms_png_oracle(const unsigned char*, std::size_t,
+    unsigned char*, std::size_t, std::uint32_t, std::uint32_t);
+
+namespace {
+using namespace gui_forms;
+struct Trial final { double median = 0; double minimum = 0; double maximum = 0; };
+Trial timing(const std::vector<std::byte>& png, bool oracle, unsigned iterations,
+    compression::InflateStream& workspace, std::vector<std::byte>& rows,
+    std::vector<std::uint16_t>& rgba, std::vector<std::byte>& metadata,
+    std::vector<image::PngMetadataRecord>& records, std::vector<unsigned char>& reference,
+    const image::PngSampleLayout& layout) {
+    std::array<double,5> samples{};
+    for (unsigned batch = 0; batch < 7; ++batch) {
+        const std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+        for (unsigned index = 0; index < iterations; ++index) {
+            if (oracle) {
+                const unsigned char* input = reinterpret_cast<const unsigned char*>(png.data());
+                const int valid = gui_forms_png_oracle(input, png.size(), reference.data(), reference.size(), layout.width, layout.height);
+                if (valid == 0) throw std::runtime_error("oracle decode failed");
+            } else {
+                const image::PngDecodeResult result = image::decode_png_samples(png, {}, workspace, rows, rgba, metadata, records);
+                if (result.error != image::PngDecodeError::none) throw std::runtime_error("owned decode failed");
+            }
+        }
+        const std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> elapsed = end - start;
+        if (batch >= 2) {
+            const double bytes = static_cast<double>(layout.rgba_samples) * 2 * iterations;
+            samples[batch - 2] = bytes / (elapsed.count() * 1048576.0);
+        }
+    }
+    std::sort(samples.begin(), samples.end());
+    const Trial trial{.median=samples[2], .minimum=samples[0], .maximum=samples[4]};
+    return trial;
+}
+void benchmark(const std::filesystem::path& path) {
+    const std::uintmax_t size = std::filesystem::file_size(path);
+    if (size > 32ULL * 1024 * 1024) throw std::runtime_error("benchmark file too large");
+    std::vector<std::byte> png(static_cast<std::size_t>(size));
+    std::ifstream stream(path, std::ios::binary);
+    stream.read(reinterpret_cast<char*>(png.data()), static_cast<std::streamsize>(size));
+    if (!stream) throw std::runtime_error("benchmark read failed");
+    const image::PngDecodeResult inspected = image::inspect_png_samples(png, {});
+    if (inspected.error != image::PngDecodeError::none) throw std::runtime_error("benchmark inspection failed");
+    const image::PngSampleLayout& layout = inspected.layout;
+    std::unique_ptr<compression::InflateStream> workspace = std::make_unique<compression::InflateStream>();
+    std::vector<std::byte> rows(layout.row_storage_bytes);
+    std::vector<std::uint16_t> rgba(layout.rgba_samples);
+    std::vector<std::byte> metadata(4096);
+    std::vector<image::PngMetadataRecord> records(layout.metadata_records);
+    std::vector<unsigned char> reference(layout.rgba_samples * 2);
+    const Trial owned = timing(png, false, 32, *workspace, rows, rgba, metadata, records, reference, layout);
+    const Trial oracle = timing(png, true, 32, *workspace, rows, rgba, metadata, records, reference, layout);
+    for (std::size_t index = 0; index < rgba.size(); ++index) {
+        const unsigned expected = static_cast<unsigned>(reference[index * 2]) * 256 + reference[index * 2 + 1];
+        if (rgba[index] != expected) throw std::runtime_error("benchmark sample mismatch");
+    }
+    std::cout << path.filename().string() << ',' << png.size() << ',' << layout.row_storage_bytes << ','
+        << owned.median << ',' << owned.minimum << ',' << owned.maximum << ','
+        << oracle.median << ',' << oracle.minimum << ',' << oracle.maximum << '\n';
+}
+} // namespace
+int main(int argc, char** argv) {
+    if (argc != 2) return 2;
+    try {
+        std::vector<std::filesystem::path> paths{};
+        for (const std::filesystem::directory_entry& entry : std::filesystem::directory_iterator(argv[1])) {
+            if (entry.is_regular_file()) paths.push_back(entry.path());
+        }
+        std::sort(paths.begin(), paths.end());
+        std::cout << "workload,encoded_bytes,row_storage_bytes,owned_mib_s,owned_min_mib_s,owned_max_mib_s,libpng_mib_s,libpng_min_mib_s,libpng_max_mib_s\n";
+        std::cout << std::fixed << std::setprecision(2);
+        for (const std::filesystem::path& path : paths) benchmark(path);
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}
