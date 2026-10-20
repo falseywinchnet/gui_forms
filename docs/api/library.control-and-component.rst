@@ -928,6 +928,8 @@ Enumerations
 
    .. cpp:enumerator:: drop
 
+   .. cpp:enumerator:: image
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms

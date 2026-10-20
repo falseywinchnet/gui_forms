@@ -96,6 +96,10 @@ using namespace gallery_pages_tests;
 
 int main() {
     try {
+        // First, while the process has made no other control: the
+        // typography page shows a RuntimeId, which counts every control
+        // made before it.
+        test_display_commands_unchanged();
         test_page_contract_and_rendering();
         test_catalog_pages_resolve_and_headers_describe_pages();
         test_gallery_semantic_surface();

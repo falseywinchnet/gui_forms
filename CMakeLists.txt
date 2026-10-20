@@ -123,6 +123,8 @@ add_library(gui_forms_core STATIC
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
+    src/core/engine/part_table/engine_part_table.cpp
+    src/core/engine/theme_engine/theme_engine.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2172,6 +2174,13 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
+        target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_content_pixels_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_content_pixels_tests COMMAND gui_forms_windows_content_pixels_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
     endif()
 
@@ -2226,6 +2235,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
+    add_executable(gui_forms_engine_part_table_tests tests/engine_part_table_tests.cpp)
+    target_link_libraries(gui_forms_engine_part_table_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_part_table_tests COMMAND gui_forms_engine_part_table_tests)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
@@ -2897,6 +2909,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/main.cpp
             tests/gallery_pages/catalog_tests.cpp
             tests/gallery_pages/shell_tests.cpp
+            tests/gallery_pages/display_trace_tests.cpp
             tests/gallery_pages/ranges-and-progress_tests.cpp
             tests/gallery_pages/containers-and-focus_tests.cpp
             tests/gallery_pages/animation-laboratory_tests.cpp

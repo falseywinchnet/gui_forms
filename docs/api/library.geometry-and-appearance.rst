@@ -42,6 +42,10 @@ Types
      - A raster's size in device pixels.
    * - :cpp:class:`DeviceScale <gui_forms::DeviceScale>`
      - Device pixels per logical unit.
+   * - :cpp:class:`EnginePartRecord <gui_forms::EnginePartRecord>`
+     - One painted part's record.
+   * - :cpp:class:`EnginePartTable <gui_forms::EnginePartTable>`
+     - The table.
    * - :cpp:class:`EnginePrimitive <gui_forms::EnginePrimitive>`
      - One kind of effect.
    * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
@@ -68,10 +72,16 @@ Types
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
+   * - :cpp:class:`PartKey <gui_forms::PartKey>`
+     - A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster.
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
    * - :cpp:class:`PartRasterView <gui_forms::PartRasterView>`
      - A borrowed destination for one part's pixels.
+   * - :cpp:class:`PartRecordAcquisition <gui_forms::PartRecordAcquisition>`
+     - What acquire() did.
+   * - :cpp:class:`PartRecordHandle <gui_forms::PartRecordHandle>`
+     - Which record a handle names: a slot of the table and the slot's generation when the record was made.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
@@ -104,6 +114,8 @@ Types
      - Theme is an immutable validated role/state recipe table plus structural spacing, geometry, typography, and motion tokens; it resolves logical visual context without exposing renderer or platform objects.
    * - :cpp:class:`ThemeDefinition <gui_forms::ThemeDefinition>`
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
+   * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
+     - The theme engine's entry point (T2 plan, ThemeEngine).
    * - :cpp:class:`ThemeGeometryTokens <gui_forms::ThemeGeometryTokens>`
      - ThemeGeometryTokens centralizes control heights, touch targets, splitter geometry, navigation extents, and compact breakpoint.
    * - :cpp:class:`ThemeMotionTokens <gui_forms::ThemeMotionTokens>`
@@ -446,6 +458,89 @@ Types
    .. cpp:member:: double value
 
       Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: EnginePartRecord final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   One painted part's record. The identity strings are owned copies of the key the part was first painted with.
+
+   .. cpp:member:: std::string control
+
+   .. cpp:member:: std::string part
+
+   .. cpp:member:: std::string item
+
+   .. cpp:member:: std::optional<std::size_t> item_index
+
+      Set only for the index fallback (PartKey::index_fallback).
+
+   .. cpp:member:: AnatomyStateSet states
+
+      The states the part was last painted in.
+
+   .. cpp:member:: PrimitivePreparation preparation
+
+      What the part's primitive derived for its geometry; empty until a primitive draws the part (never, before themes select one in T3).
+
+   .. cpp:member:: std::uint64_t last_painted
+
+      When the part was last painted: the number of window paints completed before the one that drew it.
+
+   .. cpp:member:: bool motion_unsettled
+
+      True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: EnginePartTable final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   The table. It owns its records. Every member runs on the window's UI thread; the table is not shared between windows.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit EnginePartTable(std::size_t item_record_cap = maximum_item_part_records) noexcept
+
+      The table keeps at most ``item_record_cap`` item-part records (at least 1); the window's table uses maximum_item_part_records.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::size_t record_count() const noexcept
+
+      Live records, and those of item parts among them.
+
+   .. cpp:function:: std::size_t item_record_count() const noexcept
+
+   .. cpp:function:: std::size_t slot_count() const noexcept
+
+      Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: PartRecordAcquisition acquire(std::string_view control_id, const PartKey& key)
+
+      The record for ``control_id`` and ``key``, made if there is none, and marked the most recently painted item record when it is an item's. A new record reuses a released slot before the table grows; a new item record beyond the cap evicts the least recently painted settled item record (O(1) unless records with unsettled motion are passed over). If an allocation fails, std::bad_alloc propagates and the table is unchanged.
+
+   .. cpp:function:: std::optional<PartRecordHandle> find(std::string_view control_id, const PartKey& key) const
+
+      The live record for ``control_id`` and ``key``, if there is one. For inspection: it builds its lookup text in a string of its own.
+
+   .. cpp:function:: EnginePartRecord* record(PartRecordHandle handle) noexcept
+
+      The record a handle names, or null when the handle is stale (its record was released) or names no slot. The pointer is valid until the next acquire() or release on this table.
+
+   .. cpp:function:: const EnginePartRecord* record(PartRecordHandle handle) const noexcept
+
+   .. cpp:function:: std::size_t release_control(std::string_view control_id) noexcept
+
+      Releases every record of the control with this stable ID, as when it leaves the window, and returns how many. Their handles become stale. The cost is one pass over the table's slots.
 
 .. cpp:namespace:: gui_forms
 
@@ -853,11 +948,32 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartKey final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster. The full identity is the control's stable ID, the declared part, and for an item part the item's stable ID. The engine takes the control's stable ID from the control painting the part, so a key cannot name another control; the key carries the rest: - ``part``: the part's declared name, as in the control's anatomy; - ``item``: the item's stable ID, empty for a part that is not an item's or for an item without one; - ``item_index``: the item's index. It is part of the identity only when ``item`` is empty: the index fallback, which the window counts in its metrics, because the record then follows the position, not the item. Every view is borrowed for the call that paints the part.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr bool index_fallback() const noexcept
+
+      Whether the key falls back to an item index.
+
+   .. cpp:member:: std::string_view part
+
+   .. cpp:member:: std::string_view item
+
+   .. cpp:member:: std::optional<std::size_t> item_index
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartPaint final
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
 
-   One part to paint, in the control's local coordinates. ``text``, ``image`` and ``mark`` are read only by roles that show them (label, caption and content; icon; glyph and indicator). ``text`` is borrowed for the call. ``font`` is an effective font (Control::effective_font). ``corner_radius``, when set, gives a surface part its shape; the theme (T4) will own shapes, so a control sets it only where today's recipe has no shape for the part. ``orientation`` and ``alignment`` are read with ``text``; ``dock_region`` only by the dock_shape mark.
+   One part to paint, in the control's local coordinates. ``text``, ``image`` and ``mark`` are read only by roles that show them (label, caption and content; icon and image; glyph and indicator). ``text`` is borrowed for the call. ``font`` is an effective font (Control::effective_font). ``corner_radius``, when set, gives a surface part its shape; the theme (T4) will own shapes, so a control sets it only where today's recipe has no shape for the part. ``orientation`` and ``alignment`` are read with ``text``; ``dock_region`` only by the dock_shape mark.
 
    .. cpp:member:: PartRole role
 
@@ -901,7 +1017,11 @@ Types
 
    .. cpp:member:: std::optional<Color> content_color
 
-      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and at 45 % opacity when the part is disabled, as a disabled icon is.
+      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and when the part is disabled (T2 GIVEN E2-1: a theme styles only what surrounds it, so a disabled swatch shows through its well, edge and label).
+
+   .. cpp:member:: std::optional<PartKey> key
+
+      The part's identity across frames (T2 GIVEN H3-1), or none. A part with a key has a record in its window's engine part table; one without is drawn statically, with no transitions and no cached raster. It is identity, not vocabulary: it changes nothing a part looks like today. Its views are borrowed for the call.
 
 .. cpp:namespace:: gui_forms
 
@@ -916,6 +1036,36 @@ Types
    .. cpp:member:: DeviceExtent extent
 
    .. cpp:member:: std::size_t row_bytes
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRecordAcquisition final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   What acquire() did.
+
+   .. cpp:member:: PartRecordHandle handle
+
+   .. cpp:member:: bool created
+
+      A new record was made for the key.
+
+   .. cpp:member:: std::size_t evicted
+
+      Item records evicted to keep within the cap; their handles are stale.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRecordHandle final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   Which record a handle names: a slot of the table and the slot's generation when the record was made. Releasing a record advances its slot's generation, so a handle kept past the release is stale and finds nothing, even after the slot is reused.
+
+   .. cpp:member:: std::uint32_t slot
+
+   .. cpp:member:: std::uint32_t generation
 
 .. cpp:namespace:: gui_forms
 
@@ -1239,6 +1389,10 @@ Types
 
       Returns the complete immutable definition for inspection or derivation.
 
+   .. cpp:function:: const ThemeEngine& engine() const noexcept
+
+      The theme's engine, which paint_part calls for every part. The theme owns it, so every window showing the theme shares it (T2 plan).
+
 
    .. rubric:: Methods
 
@@ -1287,6 +1441,33 @@ Types
    .. cpp:member:: std::vector<MaterialShadow> high_contrast_overlay_shadow
 
       The overlay shadow in high contrast, under the same rules. Empty by default: high contrast draws no cast shadow, and the overlay's high-contrast edge separates it from the content below.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ThemeEngine final
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's rules (from T3) and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable. The engine draws a part with a primitive only when a rule of its theme selects a registered primitive for the part, the parameters validate and the cost is within budget. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. No theme has rules before T3, so today every part is drawn by the built-in recipe and every recorded command is what it was.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: ThemeEngine()
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const PrimitiveRegistry& registry() const noexcept
+
+      The primitives the engine's rules may select.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
+
+      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first. A part without a key, or of a detached control, is drawn statically and leaves no record.
 
 .. cpp:namespace:: gui_forms
 
@@ -1920,6 +2101,14 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_item_part_records
+
+   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is 792 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. It covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
 .. cpp:function:: PrimitiveParameterBlock default_parameters(const PrimitiveDescriptor& descriptor) noexcept
@@ -2016,7 +2205,7 @@ Functions, constants and aliases
 
 .. cpp:function:: void paint_part(Painter& painter, const Control& control, const PartPaint& part)
 
-   Paints one part of ``control`` by its role (see PartPaint). Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
+   Paints one part of ``control`` by its role (see PartPaint), through the engine of the control's effective theme. Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. What disabled means (owner, 2026-10-20: "a change in font color or control highlighting. greyed out"): a disabled part greys the control's chrome, through the recipes' disabled states: the text colour of labels and captions, and the highlighting (edge, well, hot and selected plates). Content never changes: - the image role (T2 GIVEN H1-1) is a content picture, such as the docking stamp's snapshot, drawn exactly as given into ``bounds``, never tinted, dimmed or resized by a theme, disabled or not; - a content colour (GIVEN E2-1) is drawn exactly as given, disabled or not. An icon is chrome, the theme's or the command's symbol, and keeps its disabled treatment: 45 % opacity. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
 
 .. cpp:function:: Insets overlay_shadow_outsets(const Control& control) noexcept
 

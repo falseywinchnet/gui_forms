@@ -7,6 +7,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
@@ -655,6 +656,9 @@ public:
     void cancel_drag() noexcept;
 
     [[nodiscard]] MetricsSnapshot metrics_snapshot() const { return metrics_.snapshot(); }
+    // The theme engine's records of this window's keyed parts (T2 plan,
+    // EnginePartTable), for inspection. The engine alone changes them.
+    [[nodiscard]] const EnginePartTable& engine_parts() const noexcept { return engine_parts_; }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
     // Captures the committed retained visual state without exposing a renderer
@@ -696,6 +700,10 @@ private:
     friend class NotifyIcon;
     friend class BindingContext;
     friend class detail::PopupAttachment;
+    friend class ThemeEngine;
+    // Called by ThemeEngine::paint for a part painted with a key: makes or
+    // updates its record and counts a new record's index fallback.
+    void note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states);
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;
@@ -997,6 +1005,9 @@ private:
     LiveSurfaceRegistrationMap live_surface_registrations_;
     std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
+    // The theme engine's records of this window's keyed parts. A control's
+    // records are released when it leaves the window.
+    EnginePartTable engine_parts_;
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

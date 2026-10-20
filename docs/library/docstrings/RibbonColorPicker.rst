@@ -80,9 +80,10 @@ is the colour (``"#C00000"``, or ``"Automatic"``); the palette's entries are
 positioned buttons, the current one selected.
 
 Every part paints by role. The colour samples are fills with a content
-colour (owner decision W-7; design language §8.5): drawn as given, also in
-high contrast, where their wells keep them outlined, and at 45 % opacity
-while the picker is disabled.
+colour (owner decision W-7; design language §8.5): drawn exactly as given,
+also in high contrast, where their wells keep them outlined, and while the
+picker is disabled, when the wells, edges and labels show the state (T2
+decision E2-1).
 
 Not yet: theme colour shades, a "More colours" dialog and live preview.
 
