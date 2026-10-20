@@ -62,7 +62,13 @@ Window::~Window() {
     paint_wake_handler_ = {};
     paint_wake_pending_ = false;
     abandon_deferred_input();
-    shutdown_dispatcher();
+    // Teardown order (house style §6): the controls are told everything
+    // (popups closing, capture and focus revoked, the tree detached) while
+    // the dispatcher still accepts work, and the dispatcher is shut down
+    // only after them, which cancels whatever they posted. If a host shut it
+    // down already (it closed the window), a post from these notifications
+    // is refused by name instead of throwing out of this destructor.
+    begin_dispatcher_teardown();
     while (!accelerators_.empty()) {
         (*accelerators_.back()).disconnect();
     }
@@ -70,6 +76,8 @@ Window::~Window() {
         (*popups_.back()).disconnect();
     }
     focus_scopes_.clear();
+    // The clock is cancelled by name before its request goes with the rest.
+    motion_clock_.cancel();
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
         (*request).disconnect();
     }
@@ -78,6 +86,7 @@ Window::~Window() {
     if (root_) {
         detach_subtree(root_);
     }
+    shutdown_dispatcher();
     (*resources_).detach(*this);
     (*lifetime_).window = nullptr;
 }
@@ -135,6 +144,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     }
     const bool text_scale_changed =
         presentation_settings_.text_scale != settings.text_scale;
+    const bool motion_reduced_now =
+        settings.reduced_motion && !presentation_settings_.reduced_motion;
     presentation_settings_ = settings;
     // Transient overlays own geometry resolved for the opening text metrics.
     // A text-scale transition dismisses them deterministically; reopening
@@ -151,6 +162,9 @@ void Window::set_presentation_settings(PresentationSettings settings) {
             mark_subtree_dirty(*overlay, invalidation::conservative_subtree);
         }
     }
+    // Reduced motion (GIVEN D2-1, design language §9.5): every value jumps
+    // to its end in this call, and later moves jump at once.
+    if (motion_reduced_now) motion_clock_.finish_all(MotionStepCause::reduced_motion);
     presentation_changed_.emit(presentation_settings_);
 }
 
@@ -176,7 +190,12 @@ void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
                                Dirty::style | Dirty::paint | Dirty::semantics);
         }
     }
-    theme_changed_.emit(*theme_);
+    // Held here: a handler that sets another theme replaces theme_, which
+    // can release this theme while later handlers of this emission still
+    // read it. They see this theme, after the handlers of the nested
+    // emission have seen the newer one.
+    const std::shared_ptr<const Theme> emitted = theme_;
+    theme_changed_.emit(*emitted);
 }
 
 void Window::set_active(bool active) {

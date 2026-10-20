@@ -2040,12 +2040,15 @@ void post_perform_close(NSWindow* window) {
     if (_model) {
         (*_model).set_live_surface_idle_wake_handler({});
         (*_model).set_paint_wake_handler({});
-        (*_model).shutdown_dispatcher();
     }
+    // The session's shutdown releases capture while the dispatcher still
+    // accepts the work controls post about it, then shuts the dispatcher
+    // down; without a session the dispatcher is shut down here.
     if (_hostSession) {
         static_cast<void>([self dispatchHostPayload:HostShutdownEvent{}
                                    timestampNanoseconds:host_now_nanoseconds()]);
     }
+    if (_model) (*_model).shutdown_dispatcher();
 }
 
 - (DragEvent)dragEventFor:(id<NSDraggingInfo>)sender action:(DragAction)action {
