@@ -29,6 +29,12 @@ namespace {
 //
 // The month calendars show "today", which the system clock supplies; the
 // test pins it so that the trace does not depend on the date.
+//
+// Two pages show counters that depend on how much wall time the test took,
+// so their digests differ between runs on different machines: live-surfaces
+// (its producer's Timer publishes frames and the page reports the count) and
+// typography-and-inspection (its inspector reports the window's pending
+// damage). Their traces are still recorded and written, but not checked.
 
 class TracePainter final : public Painter {
 public:
@@ -317,6 +323,16 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
 
+// Pages whose readouts depend on elapsed wall time (see above).
+constexpr std::array<std::string_view, 2> timing_dependent_pages{"live-surfaces", "typography-and-inspection"};
+
+bool timing_dependent(std::string_view page) {
+    for (const std::string_view listed : timing_dependent_pages) {
+        if (listed == page) return true;
+    }
+    return false;
+}
+
 std::uint64_t expected_digest(std::string_view page) {
     for (const PageDigest& digest : expected_digests) {
         if (digest.page == page) return digest.hash;
@@ -351,6 +367,7 @@ void test_display_commands_unchanged() {
                       << std::dec << "ULL},\n";
             continue;
         }
+        if (timing_dependent(page.id)) continue;
         if (hash != expected_digest(page.id)) {
             mismatches += std::string(page.id) + " ";
         }
