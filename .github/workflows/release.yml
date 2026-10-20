@@ -127,7 +127,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev \
-            xvfb xauth xdg-utils xdotool patchelf dpkg-dev
+            xvfb xauth xdg-utils xdotool patchelf dpkg-dev dbus at-spi2-core python3-gi gir1.2-atspi-2.0
           echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
       - uses: msys2/setup-msys2@v2
         id: msys2
