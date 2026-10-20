@@ -1,0 +1,1100 @@
+<meta charset="utf-8">
+<title>T2 Engine Interview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/*FONTS*/
+/* Layout: one reading column of question cards under a sticky section rail; visuals break wider inside their own scroll boxes. */
+:root {
+  --paper: #F4F5F7;
+  --card: #FFFFFF;
+  --ink: #16263A;
+  --ink-2: #4B5B70;
+  --rule: #D3DCE8;
+  --accent: #173F79;
+  --accent-soft: #E3EDFB;
+  --rec: #A9720F;
+  --rec-soft: #FBF1DC;
+  --done: #2F7A4B;
+  --chip: #E8EEF6;
+  --series-1: #2F68C7;
+  --series-2: #B8860B;
+  --series-3: #B5476F;
+  --face-display: "Portsmouth Rapids", "Segoe UI", Tahoma, Arial, sans-serif;
+  --face-body: "Portsmouth Rapids", "Segoe UI", Tahoma, Arial, sans-serif;
+  --face-mono: "Portsmouth Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #050706; --card: #0E1310; --ink: #E2EADF; --ink-2: #A3B39D; --rule: #26322A;
+    --accent: #82B361; --accent-soft: #17241A; --rec: #D98AAB; --rec-soft: #2A1620;
+    --done: #82B361; --chip: #18211B; --series-1: #82B361; --series-2: #E0B860; --series-3: #D98AAB;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #050706; --card: #0E1310; --ink: #E2EADF; --ink-2: #A3B39D; --rule: #26322A;
+  --accent: #82B361; --accent-soft: #17241A; --rec: #D98AAB; --rec-soft: #2A1620;
+  --done: #82B361; --chip: #18211B; --series-1: #82B361; --series-2: #E0B860; --series-3: #D98AAB;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--face-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 860px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--face-display); font-weight: 700; text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 2.1rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; margin: 0; }
+h3 { font-size: 1.08rem; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--ink-2); max-width: 65ch; }
+.mono { font-family: var(--face-mono); }
+header.top { padding-block: 32px 18px; display: grid; gap: 14px; }
+.eyebrow { font-family: var(--face-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.status-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 0.9rem; color: var(--ink-2); }
+.meter { flex: 1 1 220px; height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; min-width: 160px; }
+.meter > i { display: block; height: 100%; width: 0; background: var(--done); transition: width 200ms ease; }
+.store-note { font-size: 0.85rem; }
+nav.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+  padding-block: 10px; margin-bottom: 18px;
+}
+nav.rail .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+nav.rail a {
+  flex: 0 0 auto; text-decoration: none; color: var(--ink); background: var(--chip);
+  font-size: 0.84rem; padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+}
+nav.rail a:focus-visible, button:focus-visible, textarea:focus-visible, .opt input:focus-visible + .opt-body { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav.rail a .count { font-family: var(--face-mono); color: var(--ink-2); margin-left: 4px; }
+nav.rail a.complete { background: var(--accent-soft); }
+.context { display: grid; gap: 14px; margin-bottom: 28px; }
+.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--face-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 400; }
+section.group { display: grid; gap: 16px; margin-bottom: 36px; scroll-margin-top: 64px; }
+section.group > header { display: grid; gap: 4px; padding-top: 6px; border-top: 2px solid var(--accent); }
+section.group > header .eyebrow { margin-top: 10px; }
+article.q { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 12px; scroll-margin-top: 64px; min-width: 0; }
+article.q.answered { border-left: 4px solid var(--done); }
+.q-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.q-id { font-family: var(--face-mono); font-size: 0.82rem; color: var(--accent); }
+.q-context { color: var(--ink-2); font-size: 0.95rem; max-width: 70ch; }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); width: 17px; height: 17px; }
+.opt-body { border: 1px solid var(--rule); border-radius: 5px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.opt input:checked + .opt-body { border-color: var(--accent); background: var(--accent-soft); }
+.opt-title { font-weight: 700; }
+.opt-why { color: var(--ink-2); font-size: 0.92rem; }
+.rec { display: inline-block; font-family: var(--face-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rec); background: var(--rec-soft); border-radius: 3px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+.note-row { display: grid; gap: 4px; }
+.note-row label { font-size: 0.84rem; color: var(--ink-2); }
+textarea { width: 100%; min-height: 56px; resize: vertical; font: inherit; font-size: 0.95rem; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px; }
+.saved { font-size: 0.8rem; color: var(--ink-2); min-height: 1.2em; }
+.visual { border: 1px dashed var(--rule); border-radius: 6px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.visual .cap { font-size: 0.85rem; color: var(--ink-2); max-width: 70ch; }
+.vis-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.vis-cell { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.vis-cell .lbl { font-size: 0.82rem; font-family: var(--face-mono); color: var(--ink-2); }
+.vis-cell .lbl b { color: var(--ink); font-weight: 700; }
+canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; max-width: 100%; height: auto; background: #fff; }
+.vis-scroll { overflow-x: auto; }
+button.act { font: inherit; font-size: 0.88rem; color: var(--card); background: var(--accent); border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+button.ghost { font: inherit; font-size: 0.88rem; color: var(--accent); background: transparent; border: 1px solid var(--accent); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+.motion-note { font-size: 0.82rem; color: var(--rec); }
+.tiles { position: relative; width: 168px; height: 168px; background: #22262B; border-radius: 4px; }
+.tiles .tile { position: absolute; width: 40px; height: 40px; border: 2px solid #0B0E12; background: #3F7FE0; border-radius: 3px; box-shadow: inset 0 0 0 2px #9CC2FF; }
+.tiles .tile.off { opacity: 0; }
+.tiles.fade .tile { transition: opacity 100ms linear; }
+.diagram { display: grid; gap: 8px; }
+.layer { border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.layer .who { font-family: var(--face-mono); font-size: 0.78rem; color: var(--ink-2); }
+.layer.covered { background: var(--accent-soft); border-color: var(--accent); }
+.press-zone { display: grid; gap: 6px; justify-items: center; }
+.press-frame { outline: 1px dashed var(--ink-2); outline-offset: 0; display: inline-block; line-height: 0; }
+.press-frame canvas { transition: transform 60ms ease-out; touch-action: none; cursor: pointer; }
+#summary pre { white-space: pre-wrap; font-family: var(--face-mono); font-size: 0.82rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 12px; margin: 0; max-height: 420px; overflow: auto; }
+.sum-table td:first-child { font-family: var(--face-mono); white-space: nowrap; }
+.pending { color: var(--rec); }
+footer.next { display: grid; gap: 10px; }
+@media (max-width: 520px) {
+  h1 { font-size: 1.7rem; }
+  article.q, .panel { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter > i, .press-frame canvas { transition: none; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">GUI.Forms · stage T2 · engine core · interview round 1</div>
+    <h1>T2 Engine Interview</h1>
+    <p class="lede">The theme engine's first stage waits on these decisions. Each question gives the options, what each one costs, and my recommendation. Choose one per question; add a note where you want to qualify it. Your answers are kept in this browser as you go. When you're done, save them to a file or copy the record, and give it to the coordinating session, which records them in the T2 brief, revises the build plan (#159), and starts the first phases.</p>
+    <div class="status-row">
+      <span id="progress-text">0 of 0 answered</span>
+      <span class="meter" aria-hidden="true"><i id="progress-bar"></i></span>
+      <span id="store-note" class="store-note">Answers are kept in this browser. Save them to a file to keep them anywhere else.</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Sections"><div class="chips" id="rail"></div></nav>
+
+  <div class="context">
+    <div class="panel">
+      <h2>What T2 has to prove</h2>
+      <p>The gate, from the stage brief: a reference-image test per primitive on all three hosts with identical pixels; the window counters report zero frames once inputs stop and every settling primitive has settled; a part whose cost cannot be bounded falls back to the built-in recipe; reduced motion disables motion primitives. The accepted starting tokens stay as they are (light angle 135°, overshoot 8 %, blur cap 8 px, ambient 30 fps over at most 10 % of the window, 400 ms ceiling) until a native specimen sheet revisits them.</p>
+      <p>Already shown by the paused first phase (#161): the bulge and dithered bulge produced the same 36 reference-image hashes and the same 1,536-value math table on macOS arm64, Linux arm64, Linux x64 and Windows x64, using first-party power, exponential and logarithm and no fused multiply-add.</p>
+    </div>
+    <div class="panel">
+      <h2>Who is waiting</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Consumer</th><th>Today</th><th>Needs from T2</th></tr></thead>
+          <tbody>
+            <tr><td>By-role paint path (every W, RB and DK control)</td><td><span class="mono">paint_part</span> draws from today's recipes</td><td>An engine entry point taking the same description, today's body as fallback, and a stable part identity (H3)</td></tr>
+            <tr><td>Docking stamp and flyout</td><td>Own <span class="mono">activate_surface</span> loop and smoothstep; <span class="mono">schedule_ui_timer</span></td><td>Control-owned motion on one clock per window (D1)</td></tr>
+            <tr><td>Docking tile fade</td><td>Published as <span class="mono">expanding</span> for 100 ms, not drawn</td><td>Part opacity driven by a transition (C1, C2)</td></tr>
+            <tr><td>Ribbon dithered rise</td><td>Not drawn</td><td>The <span class="mono">dithered_bulge</span> primitive with an amplitude, and a rise on <span class="mono">hot</span> (D3)</td></tr>
+            <tr><td>Overlay shadow</td><td><span class="mono">Painter::draw_box_shadow</span></td><td>An engine-owned, host-identical blur (E1)</td></tr>
+            <tr><td>Content colour, accent tint</td><td>Honoured by <span class="mono">paint_part</span>; provisional ramp</td><td>Read as value atoms; drawn as given (E2)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="lede">The visual panels are browser sketches drawn from the rendering reference's formulas, not engine pixels. The engine's own rasters come from <span class="mono">GUI_FORMS_ENGINE_DUMP</span> once you've chosen.</p>
+  </div>
+
+  <main id="groups"></main>
+
+  <section class="group" id="summary">
+    <header><div class="eyebrow">Record</div><h2>Your answers</h2></header>
+    <div class="panel">
+      <p class="lede" id="summary-lede">Answered questions appear here as you go. Save the answers to a file (you can load it back here later, in any browser), or copy the record and paste it into the conversation.</p>
+      <div class="table-scroll"><table class="sum-table"><thead><tr><th>Question</th><th>Choice</th><th>Note</th></tr></thead><tbody id="summary-rows"></tbody></table></div>
+      <div class="vis-row"><button class="act" id="save-btn" type="button">Save answers to a file</button><button class="ghost" id="load-btn" type="button">Load answers from a file</button><button class="ghost" id="copy-btn" type="button">Copy the record</button><input type="file" id="load-file" accept=".json,application/json" hidden><span class="saved" id="copy-state"></span></div>
+      <pre id="summary-text" hidden></pre>
+    </div>
+  </section>
+
+  <footer class="next panel">
+    <h2>What happens with your answers</h2>
+    <p>Your answers become GIVEN decisions in <span class="mono">planning/stages/T2-engine-core/README.md</span> and in the interview ledger. The phase plan (#159) is revised to them, the E1 code (#161) is revised and leaves draft, and E2 starts: <span class="mono">paint_part</span> routed through the engine with today's body as the fallback, part keys, and the composite. Each phase ends with reference tests on every CI platform and a sanitized run, and the gate is recorded under <span class="mono">results/</span> with the hash comparison per host.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- questions
+const GROUPS = [
+  { key: "A", title: "Scope and order", blurb: "What T2 builds first and what its identity test covers.", questions: [
+    { id: "T2-A1", q: "Which phase comes first?",
+      ctx: "E1 (deterministic kernels, the primitive registry, the bulge pair) exists as draft #161. The tile fade and the ribbon rise need both a composite and motion before they can be drawn.",
+      opts: [
+        { t: "Kernels and the composite (E1, E2), then motion (E3)", w: "Routes paint_part through the engine with today's body as the fallback, so every existing control keeps drawing, and puts the first engine pixels on screen. Motion follows, which is the shortest path to the tile fade and the rise. The stamp and flyout keep their own timers a little longer.", rec: true },
+        { t: "Motion first (E3 only)", w: "Moves the stamp and flyout off their hand-rolled timers early, but nothing new is drawn and the tile fade still cannot be shown, because the composite has no opacity yet." },
+        { t: "The cascade first (E4)", w: "Lets T3 start writing themes against a real cascade, but the cascade would be designed before the primitives it styles exist, and no primitive draws." } ] },
+    { id: "T2-A2", q: "What must the identity gate cover?",
+      ctx: "ADR-004 made text byte-identical on every host by giving the Skia raster and the Windows DIB compositor one blend arithmetic. The same question arises for engine parts.",
+      visual: "gate",
+      opts: [
+        { t: "Each primitive's raster bytes only", w: "Cheapest. It proves the kernels, but a host painter could still blend the part into the window differently, which is where ADR-004 found its differences for text." },
+        { t: "Raster bytes, plus the composite through each host's painter", w: "Proves what the user sees, part by part, following the ADR-004 precedent, without the fragility of whole-window captures. A failure points at one part on one host.", rec: true },
+        { t: "Whole-window captures", w: "The strongest claim, but any unrelated change (text, layout, a new control) changes every hash, failures are hard to localize, and the host's window server is outside our control." } ] },
+    { id: "T2-A3", q: "What happens to the paused PRs #159 (plan) and #161 (E1 code)?",
+      ctx: "Both were drafted before the scope changed and have been held for this interview.",
+      opts: [
+        { t: "Keep them as drafts and revise them after the interview", w: "Keeps E1's cross-platform identity evidence and the review trail; the plan and code are revised to your answers.", rec: true },
+        { t: "Close them and restart", w: "A clean history, but the E1 evidence has to be re-established and the review trail is lost." } ] } ] },
+  { key: "B", title: "Atoms", blurb: "Design language §12.7: adding an atom to the vocabulary is your decision.", questions: [
+    { id: "T2-B1", q: "Admit the engine inputs as atoms?",
+      ctx: "Engine inputs are values a theme's expressions may read. Damage by dependency (E6) repaints a part only when an input it reads changes, so the set shapes that design.",
+      opts: [
+        { t: "The brief's set", w: "pointer_x and pointer_y (published only while the part is hot, so idle parts never repaint on pointer motion), time_in_state, display_scale, text_scale, and published application values (named, numeric, read-only, for example a progress fraction). E6 is designed once, around the full set.", rec: true },
+        { t: "Only pointer_x, pointer_y and time_in_state now", w: "A smaller vocabulary today. Scale inputs and application values each come back later as a separate decision, and E6's dependency tracking may need revising then." },
+        { t: "Defer all of them to T3", w: "E6 cannot be built in T2, and no pointer-reactive or time-based primitive exists until T3." } ] },
+    { id: "T2-B2", q: "Pointer units?",
+      ctx: "How pointer_x and pointer_y are measured inside a hot part.",
+      opts: [
+        { t: "Part-local logical units", w: "Matches layout, which is in logical pixels; stable under display scale; a theme can say “within 8 px of the left edge”.", rec: true },
+        { t: "Normalized 0 to 1 across the part", w: "Shape-independent effects (a sheen 30 % of the way across) are simple, but any distance in pixels needs the part's size as well." },
+        { t: "Both, as two pairs of atoms", w: "The most expressive, at twice the atoms and twice the dependency tracking." } ] },
+    { id: "T2-B3", q: "A ceremonial surface?",
+      ctx: "§10 caps ambient motion at 10 % of the window, and says “the application decides” when ceremony (a splash, an about box, a first run) may exceed it.",
+      opts: [
+        { t: "A ceremonial flag on a surface, set by the application", w: "Lifts the 10 % ambient cap for that surface only; menus, toolbars and everything else stay under everyday rules.", rec: true },
+        { t: "A whole-window flag", w: "Simpler, but a window cannot be partly ceremonial, so the cap lifts for its chrome too." },
+        { t: "No flag; ceremony stays under the everyday cap", w: "The safest, but it overrides §10's “the application decides”." } ] },
+    { id: "T2-B4", q: "Density?",
+      ctx: "§8.4 names density (compact, standard, touch); no code has it yet and no T2 consumer needs it.",
+      opts: [
+        { t: "Admit compact, standard and touch now", w: "Early vocabulary, but with no consumer the values would be guesses and the atom untested." },
+        { t: "Leave it until stage L or T4 needs it", w: "An atom arrives with the consumer that tests it.", rec: true } ] } ] },
+  { key: "C", title: "Opacity and the docking tiles", blurb: "The tile fade is published today but not drawn, because paint_part has no opacity.", questions: [
+    { id: "T2-C1", q: "Where does a part's opacity come from?",
+      ctx: "Docking's drop tiles publish expanding for 100 ms (#144) and wait for a way to fade.",
+      opts: [
+        { t: "An engine presentational property driven by transitions", w: "The control passes only its states and part keys; the theme's rules fade the part. The tiles get their fade without a new atom, and motion stays out of controls, as the docking plan intends.", rec: true },
+        { t: "A control-supplied opacity value in PartPaint", w: "Quick to build, but every control that fades runs its own motion, which D1 and E3 exist to remove, and it is a new value atom." },
+        { t: "Both", w: "Control-supplied for control-owned motion, engine-owned for theme motion. Flexible, but two paths to the same effect make reduced motion and occlusion harder to reason about." } ] },
+    { id: "T2-C2", q: "Should the tile fade be drawn before T4?",
+      ctx: "Compare the two below: the left tiles fade in over 100 ms, the right ones appear at once.",
+      visual: "tiles",
+      opts: [
+        { t: "Yes, by the built-in rules once transitions exist (E7)", w: "The docking plan gives motion to T2; the fade ships with the engine, and T4 can restyle it.", rec: true },
+        { t: "No; wait for the T4 theme", w: "The tiles keep popping in until T4." } ] } ] },
+  { key: "D", title: "Motion", blurb: "One clock per window, reduced motion, and how things move.", questions: [
+    { id: "T2-D1", q: "Motion a control computes itself (the stamp, the flyout)?",
+      ctx: "The stamp shrinks to about 100 units over about 220 ms on its own activate_surface loop; the flyout slides over about 180 ms on schedule_ui_timer.",
+      opts: [
+        { t: "Motion values the control owns, on one clock per window", w: "Retargetable, honouring reduced motion and occlusion, and scheduling nothing once settled. Replaces each control's own timers, so a window has one clock.", rec: true },
+        { t: "Keep the controls' timers; the engine runs only theme transitions", w: "No migration risk now, but each control keeps its own reduced-motion and occlusion handling, and a window has several clocks." } ] },
+    { id: "T2-D2", q: "Reduced motion and the activity object?",
+      ctx: "Today MotionPolicy::reduced keeps animating at 0.35 speed with half the excursion. §9.5 and the T2 gate say reduced motion stops ambient motion and holds a static pose.",
+      opts: [
+        { t: "§9.5 governs", w: "Transitions jump to their end, ambient effects stop, and the activity object holds a static pose beside its stage text. Today's slowed MotionPolicy moves to this in T4.", rec: true },
+        { t: "Keep today's slowed cadence for activity objects only", w: "Some motion remains for people who asked for less, contradicting §9.5 for that one object." } ] },
+    { id: "T2-D3", q: "The ribbon's rise easing?",
+      ctx: "Hover a button below to raise its dithered bulge; move away to let it fall. Each uses a different easing. The curves show the first 300 ms after the pointer arrives.",
+      visual: "rise",
+      opts: [
+        { t: "Exponential approach", w: "A fixed fraction of the remaining gap per about 75 ms. It retargets smoothly mid-flight, which is §9.2's “lifts and pops that retarget”.", rec: true },
+        { t: "A critically damped spring", w: "Physical, and it keeps its velocity when retargeted; slightly slower to start, with a longer tail." },
+        { t: "Smoothstep over quick (100 ms)", w: "A fixed duration that ends crisply; a retarget restarts from the current value, which can show a kink." } ] },
+    { id: "T2-D4", q: "An occluded or minimized window?",
+      ctx: "Idle windows schedule zero frames today; this decides what a transition does when nobody can see it.",
+      opts: [
+        { t: "Every transition jumps to its end and nothing is scheduled", w: "Zero frames while hidden; on exposure the window shows the final state.", rec: true },
+        { t: "Transitions pause and resume on exposure", w: "The user sees the rest of an animation that started while hidden, which is stale motion, and every transition needs pause state." } ] },
+    { id: "T2-D5", q: "A presentational scale for loud themes?",
+      ctx: "§9.1 rejects scale transitions; the T3 scenario shows scale 0.97 on press. Press and hold each button below: the dashed outline is the hit region and layout box, which never changes.",
+      visual: "press",
+      opts: [
+        { t: "Allow it as a capability only", w: "Drawn about the part's centre and inside its granted overflow, with the hit region and layout unchanged, and not used by the default theme.", rec: true },
+        { t: "Do not offer scale at all", w: "Keeps §9.1 absolute; the T3 scenario is rewritten without it." } ] } ] },
+  { key: "E", title: "Overlay shadow and content colour", blurb: "Two values the engine takes over from today's painter.", questions: [
+    { id: "T2-E1", q: "The overlay shadow (RB-37)?",
+      ctx: "Today it is painted through each host's Painter::draw_box_shadow from two layers in ThemeDefinition::overlay_shadow, with none in high contrast. §12.9 calls it an engine input.",
+      opts: [
+        { t: "Move it to an engine primitive with a first-party blur (E9)", w: "Identical on every host, keeping today's values, outsets, and high-contrast rule.", rec: true },
+        { t: "Leave it on Painter's box shadow until T4", w: "Works today, but its pixels depend on each host's painter, so identity is not guaranteed." } ] },
+    { id: "T2-E2", q: "Content colour (W-7)?",
+      ctx: "The colour picker's swatches pass the colour they show through PartPaint today.",
+      opts: [
+        { t: "The engine draws content colour exactly as given", w: "A theme styles only what surrounds it (the edge, the well), so a swatch always shows the true colour.", rec: true },
+        { t: "A theme may adjust content colour", w: "For example, dimming it when disabled. The state reads on the swatch itself, but the swatch stops showing the true colour." } ] } ] },
+  { key: "F", title: "Budgets", blurb: "New tokens, revisited after the specimen sheet.", questions: [
+    { id: "T2-F1", q: "Per-part cost?",
+      ctx: "The gate says a part whose cost cannot be bounded falls back to the built-in recipe. This sets the bound.",
+      opts: [
+        { t: "At most 512 declared operations per device pixel, and 4 million per frame for an animated part", w: "A number that tests can check; parts beyond it fall back to the built-in recipe.", rec: true },
+        { t: "Enforce only “cannot be bounded” for now", w: "No limit is set before it's measured, but nothing stops a theme that is bounded yet slow." } ] },
+    { id: "T2-F2", q: "Memory for cached part rasters?",
+      ctx: "Per-part framebuffers (E2) let an animated part repaint without redrawing its neighbours.",
+      opts: [
+        { t: "At most 8 MB per window, evicting the least recently painted parts first", w: "A bounded cache from the start, with the eviction order stated.", rec: true },
+        { t: "No cache until measurements say it is needed", w: "Simplest, but animated parts recompute every frame until then." } ] } ] },
+  { key: "G", title: "Rendering reference findings", blurb: "What E1 found when it drew the reference exactly. Taste questions; the sketches are drawn from the reference's formulas.", questions: [
+    { id: "T2-G1", q: "The third shaded dither step?",
+      ctx: "With the light default's gains (lit 1.0, shade 0.85, crown 0.25) the tone across the button runs from about −0.63 to +1.05, so the third shaded colour (rgb 88, 122, 186), which needs −0.68, never appears. The dark variant's gains show all six steps. The counts under each sketch are dots per step.",
+      visual: "steps",
+      opts: [
+        { t: "Keep the reference as written", w: "The approved studies' look: three lit steps and two shaded ones in the light default." },
+        { t: "Raise the default shade gain to about 0.95", w: "The third step appears near the lower-right rim, which fits “deepest at the lower right”. One number changes.", rec: true },
+        { t: "Rescale quantization to the field's actual tone range", w: "Every step is always used whatever the gains, but tone stops being absolute, which changes how every gain behaves." } ] },
+    { id: "T2-G2", q: "The shade field at the edge?",
+      ctx: "The shade ellipse reaches 1.10 w and 1.12 h, so at the middle of the bottom edge it is still about 47 % of its peak. That fits “deepest at the lower right”, but not §3.5's “melt back into the plane before the part's bounds”. The right-hand pair shrinks the shade ellipse (radii 0.38 w, 0.34 h) so it reaches zero inside the bounds.",
+      visual: "edge",
+      opts: [
+        { t: "Keep the formula as the approved studies drew it", w: "The look you approved; §3.5's wording is corrected to match.", rec: true },
+        { t: "Shrink the shade ellipse so it melts before the bounds", w: "Matches §3.5's words; the lower-right deepening becomes lighter at the rim." } ] },
+    { id: "T2-G3", q: "Dither at fractional display scales?",
+      ctx: "The reference fixes the lattice at 2 logical px but leaves fractional scales to the engine. Below, each rule at 1.25× and 1.5×, magnified so every device pixel shows. These are my readings of each rule.",
+      visual: "fraction",
+      opts: [
+        { t: "Keep the lattice at exactly 2 logical px", w: "Dots of max(1, floor(s + 0.5)) device px at their logical positions; at 1.25× a dot's position varies by up to one device pixel.", rec: true },
+        { t: "A regular device lattice of round(2s) px", w: "Perfectly even on screen, but the logical period is no longer exactly 2 (2.4 logical px at 1.25×)." },
+        { t: "Draw dithered parts at the nearest integer scale", w: "The lattice of the nearest whole scale (period 2k, dots of k px, k = round(s)); even, but denser or sparser than 2 logical px." } ] },
+    { id: "T2-G4", q: "Hover on the smooth bulge?",
+      ctx: "The reference says hover brightens slightly; the studies used brightness 1.03–1.04 with saturation 1.15. Hover each pair's right-hand button.",
+      visual: "hover",
+      opts: [
+        { t: "No hover change", w: "The bulge stays as it is; hover is shown only by other means." },
+        { t: "The studies' lift: brightness 1.035, saturation 1.15", w: "The reference's own values.", rec: true },
+        { t: "A stronger lift: brightness 1.08, saturation 1.3", w: "Unmistakable, and closer to a highlight than a lift." } ] } ] },
+  { key: "H", title: "Vocabulary gaps handed to T2", blurb: "From the T1 recheck (85 of 85 controls articulated): gaps that were bridged with the nearest existing atom and are T2's to settle.", questions: [
+    { id: "T2-H1", q: "An image part role?",
+      ctx: "The docking stamp's picture is published as role icon today (#158).",
+      opts: [
+        { t: "Admit an image role", w: "A picture that is content (the stamp's snapshot, future thumbnails), drawn exactly as given, like content colour; themes never tint or resize it.", rec: true },
+        { t: "Keep icon", w: "No new atom, but themes treat icons as chrome they may tint or size, which is wrong for a snapshot." } ] },
+    { id: "T2-H2", q: "Grip dots across a whole box?",
+      ctx: "NavigationPane splits its grip into grip_bar and grip parts because no primitive fills a box with the dot pattern.",
+      opts: [
+        { t: "A grip primitive that fills its part's box with the dot pattern", w: "One part, one primitive; the theme sets the pattern.", rec: true },
+        { t: "Keep the two parts", w: "No engine work, but every control with a grip field repeats the split." } ] },
+    { id: "T2-H3", q: "What identifies a part across frames?",
+      ctx: "Motion and caching (E2, E3) need a stable key for each painted part; PartPaint has none today.",
+      opts: [
+        { t: "The control's stable ID, the declared part, and the item's stable ID", w: "Survives reordering, so a hot row's rise follows the row; items without stable IDs fall back to their index, and that fallback is reported.", rec: true },
+        { t: "The control's stable ID, the declared part, and the item's index", w: "Simpler, but motion jumps to another item when a list reorders or filters." } ] } ] },
+  { key: "Z", title: "The plan", blurb: "Pushes the stage forward.", questions: [
+    { id: "T2-Z1", q: "Accept the phase plan, revised by these answers?",
+      ctx: "E1 kernels and the bulge pair; E2 the engine entry point, part keys and the composite; E3 one motion clock; E4 the cascade; E5 bounded expressions; E6 engine inputs and damage by dependency; E7 state machines, transitions and reduced motion; E8 relief primitives and text slots; E9 gloss, glow, translucency, glass and the overlay shadow; E10 procedural materials; E11 the gate evidence and the native specimen sheet. Each phase ends with tests on every CI platform.",
+      opts: [
+        { t: "Accept E1 to E11 as the T2 plan", w: "The plan (#159) is revised to your answers, E1 leaves draft, and E2 starts.", rec: true },
+        { t: "Accept E1 to E3 now; review the rest after the first motion", w: "The engine reaches the tile fade and the rise first; the later phases come back for review." },
+        { t: "Not yet", w: "The plan stays a draft; say what should change in the note." } ] } ] }
+];
+
+// ------------------------------------------------------------- rendering
+const PLANE_TOP = [232, 242, 255];
+const PLANE_FOOT = [165, 196, 241];
+const LIGHT_FIELD = [0.42, 0.38, 0.48, 0.46];
+const SHADE_FIELD = [0.60, 0.64, 0.50, 0.48];
+const CROWN_FIELD = [0.50, 0.50, 0.50, 0.50];
+const SHRUNK_SHADE = [0.60, 0.64, 0.38, 0.34];
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const LIT = [[236, 244, 254], [246, 250, 255], [255, 255, 255]];
+const SHADED = [[176, 198, 232], [132, 162, 212], [88, 122, 186]];
+const BUTTON_W = 64;
+const BUTTON_H = 56;
+
+function planeAt(yFraction) {
+  const t = Math.min(Math.max(yFraction, 0), 1);
+  return [0, 1, 2].map(function (i) { return PLANE_TOP[i] + (PLANE_FOOT[i] - PLANE_TOP[i]) * t; });
+}
+function field(x, y, w, h, f) {
+  const dx = (x - f[0] * w) / (f[2] * w);
+  const dy = (y - f[1] * h) / (f[3] * h);
+  const t = Math.sqrt(dx * dx + dy * dy);
+  if (t >= 1) return 0;
+  return 1 - Math.pow(t, 2.2);
+}
+function fieldsAt(x, y, w, h, opt) {
+  const shade = opt.shadeField || SHADE_FIELD;
+  let light = LIGHT_FIELD;
+  let shadeF = shade;
+  if (opt.pressed) { light = [0.60, 0.64, 0.48, 0.46]; shadeF = [0.40, 0.36, shade[2], shade[3]]; }
+  return { l: field(x, y, w, h, light), s: field(x, y, w, h, shadeF), c: field(x, y, w, h, CROWN_FIELD) };
+}
+function over(base, colour, alpha) {
+  return [base[0] + (colour[0] - base[0]) * alpha, base[1] + (colour[1] - base[1]) * alpha, base[2] + (colour[2] - base[2]) * alpha];
+}
+function liftColour(c, brightness, saturation) {
+  const r = c[0] * brightness, g = c[1] * brightness, b = c[2] * brightness;
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return [lum + (r - lum) * saturation, lum + (g - lum) * saturation, lum + (b - lum) * saturation];
+}
+function putPixel(data, W, x, y, c) {
+  const k = (y * W + x) * 4;
+  data[k] = Math.max(0, Math.min(255, Math.round(c[0])));
+  data[k + 1] = Math.max(0, Math.min(255, Math.round(c[1])));
+  data[k + 2] = Math.max(0, Math.min(255, Math.round(c[2])));
+  data[k + 3] = 255;
+}
+function prepareCanvas(canvas, scale, zoom) {
+  const W = Math.round(BUTTON_W * scale);
+  const H = Math.round(BUTTON_H * scale);
+  canvas.width = W;
+  canvas.height = H;
+  canvas.style.width = (W * zoom) + "px";
+  return { W: W, H: H };
+}
+// The smooth bulge: white at 0.55 light, blue-grey at 0.22 shade, white at 0.12 crown over the plane.
+function drawSmooth(canvas, opt) {
+  const scale = opt.scale || 1;
+  const size = prepareCanvas(canvas, scale, opt.zoom || 2);
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(size.W, size.H);
+  const amp = opt.amp === undefined ? 1 : opt.amp;
+  for (let j = 0; j < size.H; j++) {
+    for (let i = 0; i < size.W; i++) {
+      const x = (i + 0.5) / scale, y = (j + 0.5) / scale;
+      const f = fieldsAt(x, y, BUTTON_W, BUTTON_H, opt);
+      let c = planeAt(y / BUTTON_H);
+      c = over(c, [255, 255, 255], 0.55 * f.l * amp);
+      c = over(c, [55, 90, 150], 0.22 * f.s * amp);
+      c = over(c, [255, 255, 255], 0.12 * f.c * amp);
+      if (opt.lift) c = liftColour(c, opt.lift[0], opt.lift[1]);
+      putPixel(img.data, size.W, i, j, c);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function quantize(v, threshold) {
+  const s = Math.min(Math.max(v, 0), 0.999) * 3;
+  let step = Math.floor(s);
+  if (s - step > threshold) step += 1;
+  return step;
+}
+function toneAt(x, y, opt) {
+  const f = fieldsAt(x, y, BUTTON_W, BUTTON_H, opt);
+  const g = opt.gains || [1.0, 0.85, 0.25];
+  const amp = opt.amp === undefined ? 1 : opt.amp;
+  return (f.l * g[0] + f.c * g[2] - f.s * g[1]) * amp;
+}
+// The lattice for one rule at display scale s: device dot positions, dot size, and the
+// lattice indices that pick the Bayer threshold.
+function latticeFor(rule, scale, W, H) {
+  const dots = [];
+  if (rule === "logical") {
+    const d = Math.max(1, Math.floor(scale + 0.5));
+    for (let ly = 1; ly < BUTTON_H; ly += 2) {
+      for (let lx = 1; lx < BUTTON_W; lx += 2) {
+        dots.push({ px: Math.floor(lx * scale), py: Math.floor(ly * scale), d: d, lx: lx, ly: ly, ix: lx >> 1, iy: ly >> 1 });
+      }
+    }
+    return dots;
+  }
+  let period, d;
+  if (rule === "device") { period = Math.round(2 * scale); d = Math.max(1, Math.round(scale)); }
+  else { const k = Math.max(1, Math.round(scale)); period = 2 * k; d = k; }
+  // The first dot sits about one logical px in, as the logical lattice's does.
+  const offset = Math.round(scale);
+  for (let m = 0; offset + m * period < H; m++) {
+    for (let n = 0; offset + n * period < W; n++) {
+      const px = offset + n * period, py = offset + m * period;
+      dots.push({ px: px, py: py, d: d, lx: px / scale, ly: py / scale, ix: n, iy: m });
+    }
+  }
+  return dots;
+}
+// The dithered bulge (reference §3). Returns dot counts per step: lit 1-3, shaded 1-3.
+function drawDither(canvas, opt) {
+  const scale = opt.scale || 1;
+  const size = prepareCanvas(canvas, scale, opt.zoom || 2);
+  const ctx = canvas.getContext("2d");
+  const img = ctx.createImageData(size.W, size.H);
+  for (let j = 0; j < size.H; j++) {
+    const c = planeAt((j + 0.5) / scale / BUTTON_H);
+    for (let i = 0; i < size.W; i++) putPixel(img.data, size.W, i, j, c);
+  }
+  const dots = latticeFor(opt.rule || "logical", scale, size.W, size.H);
+  let maxPos = 1, maxNeg = 1;
+  if (opt.rescale) {
+    maxPos = 1e-6; maxNeg = 1e-6;
+    for (const dot of dots) {
+      const t = toneAt(dot.lx, dot.ly, opt);
+      if (t > maxPos) maxPos = t;
+      if (-t > maxNeg) maxNeg = -t;
+    }
+  }
+  const counts = { lit: [0, 0, 0], shaded: [0, 0, 0] };
+  for (const dot of dots) {
+    const threshold = (BAYER[(dot.iy & 3) * 4 + (dot.ix & 3)] + 0.5) / 16;
+    const tone = toneAt(dot.lx, dot.ly, opt);
+    let colour = null;
+    if (tone >= 0) {
+      const step = quantize(tone / maxPos, threshold);
+      if (step > 0) { colour = LIT[step - 1]; counts.lit[step - 1]++; }
+    } else {
+      const step = quantize(-tone / maxNeg, threshold);
+      if (step > 0) { colour = SHADED[step - 1]; counts.shaded[step - 1]++; }
+    }
+    if (!colour) continue;
+    for (let yy = 0; yy < dot.d; yy++) {
+      for (let xx = 0; xx < dot.d; xx++) {
+        const X = dot.px + xx, Y = dot.py + yy;
+        if (X < size.W && Y < size.H) putPixel(img.data, size.W, X, Y, colour);
+      }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return counts;
+}
+function makeCanvas(label) {
+  const c = document.createElement("canvas");
+  c.className = "px";
+  c.setAttribute("role", "img");
+  c.setAttribute("aria-label", label);
+  return c;
+}
+function cell(canvas, labelHtml) {
+  const div = document.createElement("div");
+  div.className = "vis-cell";
+  div.appendChild(canvas);
+  const lbl = document.createElement("div");
+  lbl.className = "lbl";
+  lbl.innerHTML = labelHtml;
+  div.appendChild(lbl);
+  return div;
+}
+
+// ---------------------------------------------------------------- motion
+const reducedMotion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+let motionAllowed = !(reducedMotion && reducedMotion.matches);
+function motionNote(container) {
+  if (motionAllowed) return;
+  const row = document.createElement("label");
+  row.className = "motion-note";
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.addEventListener("change", function () { motionAllowed = box.checked; });
+  row.appendChild(box);
+  row.appendChild(document.createTextNode(" Your system asks for reduced motion, so these jump to their end. Tick to see the motion."));
+  container.appendChild(row);
+}
+const EASINGS = [
+  { key: "exp", name: "Exponential approach", colour: "--series-1" },
+  { key: "spring", name: "Critically damped spring", colour: "--series-2" },
+  { key: "smooth", name: "Smoothstep, 100 ms", colour: "--series-3" }
+];
+const TAU_MS = 75;
+const OMEGA = 1 / 32;
+function smoothstep(t) { return t * t * (3 - 2 * t); }
+function curveValue(key, t) {
+  if (key === "exp") return 1 - Math.exp(-t / TAU_MS);
+  if (key === "spring") return 1 - (1 + OMEGA * t) * Math.exp(-OMEGA * t);
+  return smoothstep(Math.min(1, t / 100));
+}
+function Mover(key) { this.key = key; this.value = 0; this.velocity = 0; this.target = 0; this.from = 0; this.since = 0; }
+Mover.prototype.retarget = function (target, now) { this.target = target; this.from = this.value; this.since = now; };
+Mover.prototype.step = function (dtMs, now) {
+  if (!motionAllowed) { this.value = this.target; this.velocity = 0; return; }
+  if (this.key === "exp") {
+    this.value += (this.target - this.value) * (1 - Math.exp(-dtMs / TAU_MS));
+  } else if (this.key === "spring") {
+    const steps = Math.max(1, Math.ceil(dtMs / 4));
+    const h = dtMs / steps;
+    for (let s = 0; s < steps; s++) {
+      const accel = OMEGA * OMEGA * (this.target - this.value) - 2 * OMEGA * this.velocity;
+      this.velocity += accel * h;
+      this.value += this.velocity * h;
+    }
+  } else {
+    const t = Math.min(1, (now - this.since) / 100);
+    this.value = this.from + (this.target - this.from) * smoothstep(t);
+  }
+};
+Mover.prototype.settled = function () { return Math.abs(this.target - this.value) < 0.002 && Math.abs(this.velocity) < 0.0005; };
+
+function riseVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  const movers = [];
+  const canvases = [];
+  for (const e of EASINGS) {
+    const c = makeCanvas("Ribbon button with " + e.name + " rise");
+    drawDither(c, { scale: 2, zoom: 1.5, amp: 0 });
+    const m = new Mover(e.key);
+    movers.push(m);
+    canvases.push(c);
+    c.addEventListener("pointerenter", function () { m.retarget(1, performance.now()); kick(); });
+    c.addEventListener("pointerleave", function () { m.retarget(0, performance.now()); kick(); });
+    row.appendChild(cell(c, "<b>" + e.name + "</b>"));
+  }
+  box.appendChild(row);
+  const controls = document.createElement("div");
+  controls.className = "vis-row";
+  const replay = document.createElement("button");
+  replay.type = "button"; replay.className = "ghost"; replay.textContent = "Replay a hover (400 ms)";
+  replay.addEventListener("click", function () {
+    const now = performance.now();
+    for (const m of movers) m.retarget(1, now);
+    kick();
+    setTimeout(function () { const t = performance.now(); for (const m of movers) m.retarget(0, t); kick(); }, 400);
+  });
+  controls.appendChild(replay);
+  box.appendChild(controls);
+  motionNote(box);
+  box.appendChild(curvePlot());
+  let running = false, last = 0;
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    let moving = false;
+    for (let i = 0; i < movers.length; i++) {
+      movers[i].step(dt, now);
+      drawDither(canvases[i], { scale: 2, zoom: 1.5, amp: movers[i].value });
+      if (!movers[i].settled()) moving = true;
+    }
+    if (moving) requestAnimationFrame(frame); else running = false;
+  }
+  function kick() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(frame); }
+}
+function curvePlot() {
+  const W = 520, H = 190, L = 44, R = 12, T = 14, B = 34;
+  const xs = function (t) { return L + (t / 300) * (W - L - R); };
+  const ys = function (v) { return T + (1 - v) * (H - T - B); };
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Rise amplitude over the first 300 milliseconds for the three easings");
+  svg.style.width = "100%"; svg.style.maxWidth = W + "px"; svg.style.height = "auto";
+  function add(tag, attrs, text) {
+    const el = document.createElementNS(ns, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (text) el.textContent = text;
+    svg.appendChild(el);
+    return el;
+  }
+  for (const v of [0, 0.5, 1]) {
+    add("line", { x1: L, x2: W - R, y1: ys(v), y2: ys(v), stroke: "var(--rule)", "stroke-width": 1 });
+    add("text", { x: L - 8, y: ys(v) + 4, "text-anchor": "end", fill: "var(--ink-2)", "font-size": 11, "font-family": "var(--face-mono)" }, String(v));
+  }
+  for (const t of [0, 100, 200, 300]) {
+    add("text", { x: xs(t), y: H - 12, "text-anchor": "middle", fill: "var(--ink-2)", "font-size": 11, "font-family": "var(--face-mono)" }, t + " ms");
+  }
+  let ly = T + 4;
+  for (const e of EASINGS) {
+    let d = "";
+    for (let t = 0; t <= 300; t += 3) d += (t === 0 ? "M" : "L") + xs(t).toFixed(1) + " " + ys(curveValue(e.key, t)).toFixed(1);
+    add("path", { d: d, fill: "none", stroke: "var(" + e.colour + ")", "stroke-width": 2 });
+    add("line", { x1: W - R - 170, x2: W - R - 152, y1: ys(0) - 70 + ly, y2: ys(0) - 70 + ly, stroke: "var(" + e.colour + ")", "stroke-width": 3 });
+    add("text", { x: W - R - 146, y: ys(0) - 66 + ly, fill: "var(--ink)", "font-size": 11 }, e.name);
+    ly += 16;
+  }
+  const wrap = document.createElement("div");
+  wrap.className = "vis-scroll";
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+function tilesVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  const sets = [];
+  for (const kind of ["fade", "instant"]) {
+    const t = document.createElement("div");
+    t.className = "tiles" + (kind === "fade" ? " fade" : "");
+    t.setAttribute("role", "img");
+    t.setAttribute("aria-label", kind === "fade" ? "Docking drop tiles that fade in over 100 ms" : "Docking drop tiles that appear at once");
+    const spots = [[64, 64], [64, 14], [64, 114], [14, 64], [114, 64]];
+    for (const p of spots) {
+      const tile = document.createElement("div");
+      tile.className = "tile off";
+      tile.style.left = p[0] + "px"; tile.style.top = p[1] + "px";
+      t.appendChild(tile);
+    }
+    sets.push(t);
+    row.appendChild(cell(t, kind === "fade" ? "<b>Fade, 100 ms</b>" : "<b>Instant</b>"));
+  }
+  box.appendChild(row);
+  const controls = document.createElement("div");
+  controls.className = "vis-row";
+  const show = document.createElement("button");
+  show.type = "button"; show.className = "ghost"; show.textContent = "Show the tiles";
+  let on = false;
+  show.addEventListener("click", function () {
+    on = !on;
+    for (const t of sets) {
+      t.classList.toggle("fade", t === sets[0] && motionAllowed);
+      for (const tile of t.children) tile.classList.toggle("off", !on);
+    }
+    show.textContent = on ? "Hide the tiles" : "Show the tiles";
+  });
+  controls.appendChild(show);
+  box.appendChild(controls);
+  motionNote(box);
+}
+
+function pressVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  for (const scaled of [true, false]) {
+    const c = makeCanvas(scaled ? "Button that scales to 0.97 when pressed" : "Button with no press scale");
+    drawSmooth(c, { scale: 2, zoom: 1 });
+    const frameEl = document.createElement("div");
+    frameEl.className = "press-frame";
+    frameEl.appendChild(c);
+    function press(down) {
+      drawSmooth(c, { scale: 2, zoom: 1, pressed: down });
+      if (scaled) c.style.transform = down ? "scale(0.97)" : "";
+    }
+    c.addEventListener("pointerdown", function (ev) { c.setPointerCapture(ev.pointerId); press(true); });
+    c.addEventListener("pointerup", function () { press(false); });
+    c.addEventListener("pointercancel", function () { press(false); });
+    const zone = document.createElement("div");
+    zone.className = "press-zone";
+    zone.appendChild(frameEl);
+    row.appendChild(cell(zone, scaled ? "<b>Scale 0.97 on press</b>" : "<b>No scale</b>"));
+  }
+  box.appendChild(row);
+}
+
+function stepsVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  const variants = [
+    { label: "As written (shade 0.85)", opt: { gains: [1.0, 0.85, 0.25] } },
+    { label: "Shade gain 0.95", opt: { gains: [1.0, 0.95, 0.25] } },
+    { label: "Rescaled quantization", opt: { gains: [1.0, 0.85, 0.25], rescale: true } }
+  ];
+  for (const v of variants) {
+    const c = makeCanvas("Dithered bulge, " + v.label);
+    const opt = Object.assign({ scale: 2, zoom: 2 }, v.opt);
+    const counts = drawDither(c, opt);
+    row.appendChild(cell(c, "<b>" + v.label + "</b><br>lit " + counts.lit.join(" / ") + "<br>shaded " + counts.shaded.join(" / ")));
+  }
+  box.appendChild(row);
+}
+
+function edgeVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  const pairs = [
+    { label: "As written", shadeField: SHADE_FIELD },
+    { label: "Shrunk shade ellipse", shadeField: SHRUNK_SHADE }
+  ];
+  for (const p of pairs) {
+    const a = makeCanvas("Smooth bulge, " + p.label);
+    drawSmooth(a, { scale: 2, zoom: 2, shadeField: p.shadeField });
+    const b = makeCanvas("Dithered bulge, " + p.label);
+    drawDither(b, { scale: 2, zoom: 2, shadeField: p.shadeField });
+    const atEdge = field(BUTTON_W / 2, BUTTON_H, BUTTON_W, BUTTON_H, p.shadeField);
+    const peak = 1;
+    row.appendChild(cell(a, "<b>" + p.label + "</b>, smooth"));
+    row.appendChild(cell(b, "dithered · in this sketch, shade at the bottom edge's midpoint: " + Math.round(100 * atEdge / peak) + " % of peak"));
+  }
+  box.appendChild(row);
+}
+
+function fractionVisual(box) {
+  const rules = [
+    { key: "logical", name: "2 logical px" },
+    { key: "device", name: "round(2s) device px" },
+    { key: "integer", name: "nearest integer scale" }
+  ];
+  for (const s of [1.25, 1.5]) {
+    const head = document.createElement("div");
+    head.className = "lbl mono";
+    head.textContent = "Display scale " + s + "×, magnified 3×";
+    box.appendChild(head);
+    const scroller = document.createElement("div");
+    scroller.className = "vis-scroll";
+    const row = document.createElement("div");
+    row.className = "vis-row";
+    row.style.flexWrap = "nowrap";
+    for (const r of rules) {
+      const c = makeCanvas("Dithered bulge at " + s + "x, rule " + r.name);
+      drawDither(c, { scale: s, zoom: 3, rule: r.key });
+      row.appendChild(cell(c, "<b>" + r.name + "</b>"));
+    }
+    scroller.appendChild(row);
+    box.appendChild(scroller);
+  }
+}
+
+function hoverVisual(box) {
+  const row = document.createElement("div");
+  row.className = "vis-row";
+  const lifts = [
+    { label: "No change", lift: null },
+    { label: "Studies' lift", lift: [1.035, 1.15] },
+    { label: "Stronger lift", lift: [1.08, 1.3] }
+  ];
+  for (const l of lifts) {
+    const rest = makeCanvas("Smooth bulge at rest");
+    drawSmooth(rest, { scale: 2, zoom: 1 });
+    const live = makeCanvas("Smooth bulge, " + l.label + ", hover to see it");
+    drawSmooth(live, { scale: 2, zoom: 1 });
+    live.addEventListener("pointerenter", function () { drawSmooth(live, { scale: 2, zoom: 1, lift: l.lift }); });
+    live.addEventListener("pointerleave", function () { drawSmooth(live, { scale: 2, zoom: 1 }); });
+    const pair = document.createElement("div");
+    pair.className = "vis-row";
+    pair.style.gap = "6px";
+    pair.appendChild(rest);
+    pair.appendChild(live);
+    row.appendChild(cell(pair, "<b>" + l.label + "</b> · rest | hover"));
+  }
+  box.appendChild(row);
+}
+
+function gateVisual(box) {
+  const layers = [
+    { name: "Whole window", who: "every control, text, layout", covered: [3] },
+    { name: "Composite into the window through each host's painter", who: "Skia raster · Windows DIB · AppKit", covered: [2, 3] },
+    { name: "Primitive raster bytes", who: "the engine's kernels", covered: [1, 2, 3] }
+  ];
+  const d = document.createElement("div");
+  d.className = "diagram";
+  const els = [];
+  for (const l of layers) {
+    const el = document.createElement("div");
+    el.className = "layer";
+    el.innerHTML = "<span>" + l.name + "</span><span class=\"who\">" + l.who + "</span>";
+    d.appendChild(el);
+    els.push({ el: el, covered: l.covered });
+  }
+  box.appendChild(d);
+  const note = document.createElement("p");
+  note.className = "cap";
+  note.textContent = "Highlighted: what the selected option hashes.";
+  box.appendChild(note);
+  box.highlight = function (choice) {
+    for (const e of els) e.el.classList.toggle("covered", choice > 0 && e.covered.indexOf(choice) >= 0);
+  };
+}
+
+const VISUALS = { rise: riseVisual, tiles: tilesVisual, press: pressVisual, steps: stepsVisual, edge: edgeVisual, fraction: fractionVisual, hover: hoverVisual, gate: gateVisual };
+
+// ---------------------------------------------------------------- answers
+const answers = {};
+
+function allQuestions() {
+  const list = [];
+  for (const g of GROUPS) for (const q of g.questions) list.push({ g: g, q: q });
+  return list;
+}
+function localKey() { return "t2-interview-round-1"; }
+function loadLocal() {
+  try { const raw = localStorage.getItem(localKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+function saveLocal() {
+  try { localStorage.setItem(localKey(), JSON.stringify(answers)); } catch (e) { /* storage unavailable */ }
+}
+function setSaved(id, text) {
+  const el = document.getElementById("saved-" + id);
+  if (el) el.textContent = text;
+}
+function persist(id) {
+  saveLocal();
+  setSaved(id, "Saved in this browser");
+}
+function record(id, choice, note) {
+  const now = new Date().toISOString();
+  const prev = answers[id] || { choice: 0, note: "", history: [] };
+  const history = (prev.history || []).slice(-19);
+  if (choice !== prev.choice) history.push({ choice: choice, at: now });
+  answers[id] = { choice: choice, note: note, at: now, history: history };
+  refreshQuestion(id);
+  refreshProgress();
+  persist(id);
+}
+function applyRemote(id, data) {
+  answers[id] = { choice: Number(data.choice) || 0, note: String(data.note || ""), at: String(data.at || ""), history: Array.isArray(data.history) ? data.history.slice(-20) : [] };
+  const radios = document.querySelectorAll("input[name='opt-" + id + "']");
+  for (const r of radios) r.checked = Number(r.value) === answers[id].choice;
+  const ta = document.getElementById("note-" + id);
+  if (ta && document.activeElement !== ta) ta.value = answers[id].note;
+  refreshQuestion(id);
+}
+
+// ---------------------------------------------------------------- page
+function buildPage() {
+  const rail = document.getElementById("rail");
+  const main = document.getElementById("groups");
+  for (const g of GROUPS) {
+    const a = document.createElement("a");
+    a.href = "#group-" + g.key;
+    a.id = "rail-" + g.key;
+    a.innerHTML = g.key + " · " + g.title + "<span class=\"count\"></span>";
+    rail.appendChild(a);
+    const sec = document.createElement("section");
+    sec.className = "group";
+    sec.id = "group-" + g.key;
+    const head = document.createElement("header");
+    head.innerHTML = "<div class=\"eyebrow\">Section " + g.key + "</div><h2>" + g.title + "</h2><p class=\"lede\">" + g.blurb + "</p>";
+    sec.appendChild(head);
+    for (const q of g.questions) sec.appendChild(buildQuestion(q));
+    main.appendChild(sec);
+  }
+  const s = document.createElement("a");
+  s.href = "#summary"; s.textContent = "Record";
+  rail.appendChild(s);
+}
+function buildQuestion(q) {
+  const art = document.createElement("article");
+  art.className = "q";
+  art.id = q.id;
+  const head = document.createElement("div");
+  head.className = "q-head";
+  head.innerHTML = "<span class=\"q-id\">" + q.id + "</span><h3>" + q.q + "</h3>";
+  art.appendChild(head);
+  const ctx = document.createElement("p");
+  ctx.className = "q-context";
+  ctx.textContent = q.ctx;
+  art.appendChild(ctx);
+  let visualBox = null;
+  if (q.visual) {
+    visualBox = document.createElement("div");
+    visualBox.className = "visual";
+    art.appendChild(visualBox);
+    VISUALS[q.visual](visualBox);
+  }
+  const opts = document.createElement("div");
+  opts.className = "opts";
+  opts.setAttribute("role", "radiogroup");
+  opts.setAttribute("aria-label", q.q);
+  q.opts.forEach(function (o, index) {
+    const n = index + 1;
+    const label = document.createElement("label");
+    label.className = "opt";
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "opt-" + q.id; input.value = String(n); input.id = "opt-" + q.id + "-" + n;
+    input.addEventListener("change", function () {
+      const note = (answers[q.id] && answers[q.id].note) || "";
+      record(q.id, n, note);
+      if (visualBox && visualBox.highlight) visualBox.highlight(n);
+    });
+    const body = document.createElement("div");
+    body.className = "opt-body";
+    const title = document.createElement("div");
+    title.className = "opt-title";
+    title.textContent = n + ". " + o.t;
+    if (o.rec) { const r = document.createElement("span"); r.className = "rec"; r.textContent = "Recommended"; title.appendChild(r); }
+    const why = document.createElement("div");
+    why.className = "opt-why";
+    why.textContent = o.w;
+    body.appendChild(title); body.appendChild(why);
+    label.appendChild(input); label.appendChild(body);
+    opts.appendChild(label);
+  });
+  art.appendChild(opts);
+  const noteRow = document.createElement("div");
+  noteRow.className = "note-row";
+  const nl = document.createElement("label");
+  nl.setAttribute("for", "note-" + q.id);
+  nl.textContent = "Note (optional): a qualification, or your own answer";
+  const ta = document.createElement("textarea");
+  ta.id = "note-" + q.id;
+  let timer = 0;
+  function commitNote() {
+    clearTimeout(timer);
+    const cur = answers[q.id] || { choice: 0, note: "" };
+    if (cur.note === ta.value) return;
+    record(q.id, cur.choice || 0, ta.value);
+  }
+  ta.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(commitNote, 900); });
+  ta.addEventListener("blur", commitNote);
+  noteRow.appendChild(nl); noteRow.appendChild(ta);
+  art.appendChild(noteRow);
+  const saved = document.createElement("div");
+  saved.className = "saved";
+  saved.id = "saved-" + q.id;
+  art.appendChild(saved);
+  art.visualBox = visualBox;
+  return art;
+}
+function refreshQuestion(id) {
+  const art = document.getElementById(id);
+  if (!art) return;
+  const a = answers[id];
+  const isAnswered = !!(a && (a.choice > 0 || (a.note && a.note.trim())));
+  art.classList.toggle("answered", isAnswered);
+  if (art.visualBox && art.visualBox.highlight) art.visualBox.highlight(a ? a.choice : 0);
+}
+function refreshProgress() {
+  const list = allQuestions();
+  let done = 0;
+  const perGroup = {};
+  for (const item of list) {
+    const a = answers[item.q.id];
+    const isDone = !!(a && a.choice > 0);
+    if (isDone) done++;
+    perGroup[item.g.key] = perGroup[item.g.key] || [0, 0];
+    perGroup[item.g.key][1]++;
+    if (isDone) perGroup[item.g.key][0]++;
+  }
+  document.getElementById("progress-text").textContent = done + " of " + list.length + " answered";
+  document.getElementById("progress-bar").style.width = (100 * done / list.length) + "%";
+  for (const g of GROUPS) {
+    const chip = document.getElementById("rail-" + g.key);
+    const c = perGroup[g.key];
+    chip.querySelector(".count").textContent = c[0] + "/" + c[1];
+    chip.classList.toggle("complete", c[0] === c[1]);
+  }
+  refreshSummary(list);
+}
+function refreshSummary(list) {
+  const rows = document.getElementById("summary-rows");
+  rows.textContent = "";
+  const lines = ["T2 interview, round 1"];
+  for (const item of list) {
+    const a = answers[item.q.id];
+    const tr = document.createElement("tr");
+    const tdId = document.createElement("td"); tdId.textContent = item.q.id;
+    const tdC = document.createElement("td");
+    const tdN = document.createElement("td");
+    if (a && a.choice > 0) {
+      const o = item.q.opts[a.choice - 1];
+      tdC.textContent = a.choice + ". " + o.t;
+      lines.push(item.q.id + ": " + a.choice + " (" + o.t + ")" + (a.note ? " — note: " + a.note : ""));
+    } else {
+      tdC.textContent = "Not answered"; tdC.className = "pending";
+      lines.push(item.q.id + ": not answered" + (a && a.note ? " — note: " + a.note : ""));
+    }
+    tdN.textContent = (a && a.note) || "";
+    tr.appendChild(tdId); tr.appendChild(tdC); tr.appendChild(tdN);
+    rows.appendChild(tr);
+  }
+  document.getElementById("summary-text").textContent = lines.join("\n");
+}
+function setStoreNote(text) { document.getElementById("store-note").textContent = text; }
+
+document.getElementById("copy-btn").addEventListener("click", function () {
+  const pre = document.getElementById("summary-text");
+  const text = pre.textContent;
+  const state = document.getElementById("copy-state");
+  function fallback() {
+    pre.hidden = false;
+    const range = document.createRange();
+    range.selectNodeContents(pre);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    state.textContent = "Selected below; copy it with your keyboard.";
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { state.textContent = "Copied."; }, fallback);
+  } else { fallback(); }
+});
+
+buildPage();
+const local = loadLocal();
+for (const id in local) { answers[id] = local[id]; }
+for (const id in answers) applyRemote(id, answers[id]);
+refreshProgress();
+
+// Saving to and loading from a file: the answers travel as JSON beside the readable record.
+function saveToFile() {
+  const payload = { interview: "T2 engine core, round 1", saved: new Date().toISOString(), answers: answers, record: document.getElementById("summary-text").textContent };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "t2-interview-answers.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+  document.getElementById("copy-state").textContent = "Saved t2-interview-answers.json to your downloads.";
+}
+function loadFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    const state = document.getElementById("copy-state");
+    let payload = null;
+    try { payload = JSON.parse(String(reader.result)); } catch (e) { payload = null; }
+    if (!payload || typeof payload.answers !== "object" || payload.answers === null) {
+      state.textContent = "That file is not a saved T2 interview; nothing was loaded.";
+      return;
+    }
+    let loaded = 0;
+    for (const id in payload.answers) {
+      if (!document.getElementById(id)) continue;
+      applyRemote(id, payload.answers[id]);
+      loaded++;
+    }
+    saveLocal();
+    refreshProgress();
+    state.textContent = "Loaded " + loaded + " answers from " + file.name + ".";
+  };
+  reader.readAsText(file);
+}
+document.getElementById("save-btn").addEventListener("click", saveToFile);
+document.getElementById("load-btn").addEventListener("click", function () { document.getElementById("load-file").click(); });
+document.getElementById("load-file").addEventListener("change", function (ev) {
+  const files = ev.target.files;
+  if (files && files.length > 0) loadFromFile(files[0]);
+  ev.target.value = "";
+});
+</script>

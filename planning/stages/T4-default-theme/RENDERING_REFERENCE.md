@@ -69,8 +69,13 @@ crown = field(x, y; 0.50, 0.50, 0.50, 0.50)   faint crown
 - **Active tool** is the same bulge in gold: light `rgb(255, 250, 225)` at
   0.70, shade `rgb(190, 130, 25)` at 0.30, crown `rgb(255, 214, 110)` at
   0.45.
-- **Hover** brightens slightly (studies: brightness 1.03–1.04, saturation
-  1.15).
+- **Hover is the rise** (owner, T2 interview G4-1, 2026-10-19: "when a
+  mouse isnt hovering over, the button goes away- the bulge flattens").
+  - A ribbon button is flat at rest.
+  - When it is hot, its amplitude rises from 0 to 1 by the exponential
+    approach (T2 D3-1), and falls back when it is no longer hot.
+  - There is no brightness or saturation lift. The studies' brightness
+    1.03–1.04 and saturation 1.15 are superseded.
 
 ## 3. Ribbon buttons: the dithered bulge
 
@@ -82,7 +87,7 @@ The accepted form ("this is quite the style"):
 lattice:   one 1-logical-px dot at every odd (x, y), i.e. every 2 px, both axes
 threshold: Bayer 4×4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
            threshold(x, y) = (bayer[((y >> 1) & 3)·4 + ((x >> 1) & 3)] + 0.5) / 16
-tone:      light·lit_gain + crown·crown_gain − shade·shade_gain
+tone:      a·(light·lit_gain + crown·crown_gain − shade·shade_gain), amplitude a in [0, 1] (§2 hover)
 quantize(v): s = clamp(v, 0, 0.999)·3; step = floor(s); if s − step > threshold: step += 1
 dot colour:
     tone ≥ 0: step = quantize(tone);  step > 0 → lit[step − 1],    else no dot
@@ -91,6 +96,26 @@ dot colour:
 
 Between dots, and wherever the tone rounds to zero, the ribbon plane shows.
 No edge. Pressed uses the dent centres of §2.
+
+**Rescaled quantization** (owner, T2 interview G1-3, 2026-10-19). The light
+default's gains never reach the third shaded step, so each side of the tone
+is rescaled to the part's own range:
+
+```text
+tone₁(x, y) = the tone at amplitude 1
+P = max(tone₁) over the part's dot positions;  N = max(−tone₁) over the same
+tone ≥ 0: step = quantize(a·tone₁ / P)
+tone < 0: step = quantize(a·(−tone₁) / N)
+a side whose extreme is 0 draws no dots
+```
+
+- P and N are taken at full amplitude, not the current one, so the rise
+  still grows the dither. Dividing by the current extreme would show the
+  whole pattern at any non-zero amplitude.
+- P and N depend only on the part's size, the gains, the pressed state and
+  the lattice, so the engine computes them once per part geometry.
+- With this rule the gains set the balance between the fields, no longer the
+  absolute tone.
 
 | Palette | Light default | Dark variant |
 |---|---|---|
@@ -105,9 +130,21 @@ Gold (active tool): for tone ≥ 0, a lit step uses `gold lit`; otherwise the
 crown quantized alone picks `gold body` (no dot when it rounds to zero). For
 tone < 0, a shaded step uses `gold shaded`; otherwise `gold body[0]`.
 
-At display scale s, draw each dot as an s × s device-pixel square at the
-logical lattice position. The studies did this; the engine must state its
-own rule and keep the lattice at 2 logical px.
+**Fractional display scales** (owner, T2 interview G3-3, 2026-10-19). A
+dithered part is drawn at its nearest integer scale:
+
+```text
+k = max(1, floor(s + 0.5))
+lattice:  period 2k device px from the part's device origin, both axes; dot n sits at device (2n + 1)·k
+dot:      k × k device px
+sample:   the fields at logical (2n + 1)·k / s across the part's logical box
+threshold: indexed by the lattice index n (equal to x >> 1 at integer scales)
+```
+
+- At integer scales this is the studies' rule exactly: dots at odd logical
+  positions, every 2 logical px.
+- At fractional scales the lattice stays perfectly even on screen. Its
+  logical period becomes 2k/s: 1.6 logical px at 1.25× and 2.67 at 1.5×.
 
 Flat, smooth bulge and dithered bulge are three engine renderings of one part
 role. **The default ships the dithered bulge** (owner decision, 2026-10-13;
