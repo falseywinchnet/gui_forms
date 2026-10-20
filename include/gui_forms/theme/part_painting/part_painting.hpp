@@ -110,8 +110,9 @@ struct PartPaint final {
     // is therefore a fill inside a well part that frames it. The colour is
     // data, as an image is: it is drawn as given in ordinary and
     // high-contrast presentation alike (the framing well follows the
-    // high-contrast recipe, so the sample stays outlined), and at 45 %
-    // opacity when the part is disabled, as a disabled icon is.
+    // high-contrast recipe, so the sample stays outlined), and when the
+    // part is disabled (T2 GIVEN E2-1: a theme styles only what surrounds
+    // it, so a disabled swatch shows through its well, edge and label).
     std::optional<Color> content_color{};
     // The part's identity across frames (T2 GIVEN H3-1), or none. A part
     // with a key has a record in its window's engine part table; one without
@@ -136,10 +137,11 @@ struct PartPaint final {
 // nothing.
 //
 // The image role (T2 GIVEN H1-1) is a content picture, such as the docking
-// stamp's snapshot: it is drawn exactly as given, never tinted or resized by
-// a theme, into `bounds`, and at 45 % opacity when the part is disabled, as
-// a disabled icon and a content colour are. An icon is the theme's or the
-// command's symbol; an image is the application's content.
+// stamp's snapshot: it is drawn exactly as given, never tinted, dimmed or
+// resized by a theme, into `bounds`, also when the part is disabled (the
+// disabled state shows through what surrounds it, as for a content colour,
+// GIVEN E2-1). An icon is the theme's or the command's symbol and is drawn
+// at 45 % opacity when disabled; an image is the application's content.
 //
 // The shadow role paints the theme's overlay shadow (owner decision RB-37):
 // `bounds` is the rect of the surface that casts it (a tooltip's face, a

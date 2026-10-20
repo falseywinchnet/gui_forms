@@ -452,18 +452,15 @@ void paint_text(Painter& painter, const PartPaint& part, Color color) {
 // A fill part's content colour (owner decision W-7): flat, in the part's
 // shape, as given; a disabled part's at 45 % of its opacity, as a disabled
 // icon is drawn.
-void paint_content_color(Painter& painter, const PartPaint& part, Color color, bool disabled) {
-    Color shown = color;
-    if (disabled) {
-        const double faded = static_cast<double>(color.alpha) * 0.45;
-        shown.alpha = static_cast<std::uint8_t>(std::lround(faded));
-    }
+// Content colour is drawn exactly as given, disabled or not (T2 GIVEN
+// E2-1): a disabled part shows through what surrounds it.
+void paint_content_color(Painter& painter, const PartPaint& part, Color color) {
     const double radius = part.corner_radius ? std::max(0.0, *part.corner_radius) : 0.0;
     if (radius > 0.0) {
-        painter.fill_rounded_rect(part.bounds, radius, shown);
+        painter.fill_rounded_rect(part.bounds, radius, color);
         return;
     }
-    painter.fill_rect(part.bounds, shown);
+    painter.fill_rect(part.bounds, color);
 }
 
 } // namespace
@@ -559,7 +556,7 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
         return;
     case PartRole::fill:
         if (part.content_color) {
-            paint_content_color(painter, part, *part.content_color, disabled);
+            paint_content_color(painter, part, *part.content_color);
             return;
         }
         paint_surface(painter, part, recipe);
@@ -602,8 +599,11 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
         paint_text(painter, part, disabled ? recipe.muted_text : recipe.text);
         return;
     case PartRole::icon:
-    case PartRole::image:
         if (part.image.value != 0U) painter.draw_image(part.image, part.bounds, disabled ? 0.45 : 1.0);
+        return;
+    case PartRole::image:
+        // Content, drawn exactly as given, disabled or not (GIVEN H1-1).
+        if (part.image.value != 0U) painter.draw_image(part.image, part.bounds, 1.0);
         return;
     case PartRole::caret:
         painter.fill_rect({part.bounds.x, part.bounds.y, std::max(1.0, part.bounds.width),
