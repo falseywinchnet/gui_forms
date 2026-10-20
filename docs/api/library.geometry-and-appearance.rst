@@ -491,6 +491,10 @@ Types
 
       When the part was last painted: the number of window paints completed before the one that drew it.
 
+   .. cpp:member:: bool motion_unsettled
+
+      True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:class:: EnginePartTable final
@@ -500,18 +504,31 @@ Types
    The table. It owns its records. Every member runs on the window's UI thread; the table is not shared between windows.
 
 
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit EnginePartTable(std::size_t item_record_cap = maximum_item_part_records) noexcept
+
+      The table keeps at most ``item_record_cap`` item-part records (at least 1); the window's table uses maximum_item_part_records.
+
+
    .. rubric:: Properties
 
    .. cpp:function:: std::size_t record_count() const noexcept
 
-      Live records.
+      Live records, and those of item parts among them.
+
+   .. cpp:function:: std::size_t item_record_count() const noexcept
+
+   .. cpp:function:: std::size_t slot_count() const noexcept
+
+      Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
 
 
    .. rubric:: Methods
 
    .. cpp:function:: PartRecordAcquisition acquire(std::string_view control_id, const PartKey& key)
 
-      The record for ``control_id`` and ``key``, made if there is none. A new record reuses a released slot before the table grows. If an allocation fails, std::bad_alloc propagates and the table is unchanged.
+      The record for ``control_id`` and ``key``, made if there is none, and marked the most recently painted item record when it is an item's. A new record reuses a released slot before the table grows; a new item record beyond the cap evicts the least recently painted settled item record (O(1) unless records with unsettled motion are passed over). If an allocation fails, std::bad_alloc propagates and the table is unchanged.
 
    .. cpp:function:: std::optional<PartRecordHandle> find(std::string_view control_id, const PartKey& key) const
 
@@ -1006,7 +1023,7 @@ Types
 
    .. cpp:member:: std::optional<Color> content_color
 
-      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and at 45 % opacity when the part is disabled, as a disabled icon is.
+      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and when the part is disabled (T2 GIVEN E2-1: a theme styles only what surrounds it, so a disabled swatch shows through its well, edge and label).
 
    .. cpp:member:: std::optional<PartKey> key
 
@@ -1069,6 +1086,10 @@ Types
    .. cpp:member:: bool created
 
       A new record was made for the key.
+
+   .. cpp:member:: std::size_t evicted
+
+      Item records evicted to keep within the cap; their handles are stale.
 
 .. cpp:namespace:: gui_forms
 
@@ -2116,6 +2137,14 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_item_part_records
+
+   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is 792 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. It covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
 .. cpp:function:: PrimitiveParameterBlock default_parameters(const PrimitiveDescriptor& descriptor) noexcept
@@ -2212,7 +2241,7 @@ Functions, constants and aliases
 
 .. cpp:function:: void paint_part(Painter& painter, const Control& control, const PartPaint& part)
 
-   Paints one part of ``control`` by its role (see PartPaint), through the engine of the control's effective theme. Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. The image role (T2 GIVEN H1-1) is a content picture, such as the docking stamp's snapshot: it is drawn exactly as given, never tinted or resized by a theme, into ``bounds``, and at 45 % opacity when the part is disabled, as a disabled icon and a content colour are. An icon is the theme's or the command's symbol; an image is the application's content. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
+   Paints one part of ``control`` by its role (see PartPaint), through the engine of the control's effective theme. Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. What disabled means (owner, 2026-10-20: "a change in font color or control highlighting. greyed out"): a disabled part greys the control's chrome, through the recipes' disabled states: the text colour of labels and captions, and the highlighting (edge, well, hot and selected plates). Content never changes: - the image role (T2 GIVEN H1-1) is a content picture, such as the docking stamp's snapshot, drawn exactly as given into ``bounds``, never tinted, dimmed or resized by a theme, disabled or not; - a content colour (GIVEN E2-1) is drawn exactly as given, disabled or not. An icon is chrome, the theme's or the command's symbol, and keeps its disabled treatment: 45 % opacity. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
 
 .. cpp:function:: Insets overlay_shadow_outsets(const Control& control) noexcept
 

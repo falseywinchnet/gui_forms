@@ -119,6 +119,11 @@ void Metrics::record_engine_parts_released(std::uint64_t released, std::uint64_t
     values_.engine_part_records_released = values_.engine_part_records_released + released;
     values_.engine_part_records = live;
 }
+
+void Metrics::record_engine_parts_evicted(std::uint64_t evicted, std::uint64_t live) noexcept {
+    values_.engine_part_records_evicted = values_.engine_part_records_evicted + evicted;
+    values_.engine_part_records = live;
+}
 void Metrics::record_wrong_thread_rejection() noexcept {
     wrong_thread_rejections_.fetch_add(1, std::memory_order_relaxed);
 }

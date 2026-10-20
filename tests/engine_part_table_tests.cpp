@@ -1,8 +1,9 @@
 // The theme engine's entry point and its per-window part table (T2 plan,
 // phase E2a): a keyed part has a record in its window's table, a stale
 // handle finds nothing, a control's records are released when it leaves the
-// window, the index fallback is counted, every window of an application
-// shares one engine, and a key changes nothing that is drawn.
+// window, item records stay within the window's cap, the index fallback is
+// counted, every window of an application shares one engine, and a key
+// changes nothing that is drawn.
 
 #include "gui_forms/control.hpp"
 #include "gui_forms/engine.hpp"
@@ -291,13 +292,128 @@ void test_image_role_draws_as_given() {
     picture.states.insert(AnatomyState::disabled);
     TracePainter disabled;
     paint_part(disabled, *control, picture);
-    require(disabled.last_image_opacity == 0.45, "a disabled image part is drawn at 45 % opacity");
+    require(disabled.trace == painter.trace && disabled.last_image_opacity == 1.0,
+            "a disabled image part draws its picture exactly as given (GIVEN H1-1)");
+
+    // An icon is a symbol, not content: it still dims when disabled.
+    PartPaint icon = picture;
+    icon.role = PartRole::icon;
+    TracePainter dimmed;
+    paint_part(dimmed, *control, icon);
+    require(dimmed.last_image_opacity == 0.45, "a disabled icon is drawn at 45 % opacity");
 
     PartPaint none = picture;
     none.image = ImageId{};
     TracePainter empty;
     paint_part(empty, *control, none);
     require(empty.trace.empty(), "an image part without a picture draws nothing");
+}
+
+// -- bounded item records -------------------------------------------------------
+
+void test_item_records_are_evicted_least_recently_painted_first() {
+    EnginePartTable table(4U);
+    std::vector<PartRecordHandle> rows{};
+    for (std::size_t index = 0U; index < 4U; ++index) {
+        rows.push_back(table.acquire("list", PartKey{"row", {}, index}).handle);
+    }
+    const PartRecordHandle face = table.acquire("list", PartKey{"face", {}, {}}).handle;
+    require(table.item_record_count() == 4U && table.record_count() == 5U,
+            "four item records and the control's own part");
+
+    // Painting row 0 again makes row 1 the least recently painted.
+    static_cast<void>(table.acquire("list", PartKey{"row", {}, 0U}));
+    const PartRecordAcquisition fifth = table.acquire("list", PartKey{"row", {}, 4U});
+    require(fifth.created && fifth.evicted == 1U, "a fifth item record evicts one");
+    require(table.record(rows[1]) == nullptr, "the least recently painted item record (row 1) is evicted");
+    require(table.record(rows[0]) != nullptr && table.record(rows[2]) != nullptr,
+            "more recently painted item records stay");
+    require(table.record(face) != nullptr, "a part that is not an item's is never evicted");
+    require(table.item_record_count() == 4U, "the cap holds");
+
+    // A record with unsettled motion is passed over.
+    (*table.record(rows[2])).motion_unsettled = true;
+    const PartRecordAcquisition sixth = table.acquire("list", PartKey{"row", {}, 5U});
+    require(sixth.evicted == 1U && table.record(rows[2]) != nullptr && table.record(rows[3]) == nullptr,
+            "an unsettled record is never evicted; the next oldest settled one is");
+
+    // When every other item record is unsettled, the table holds more than
+    // the cap until their motion settles.
+    for (std::size_t index = 0U; index < 6U; ++index) {
+        const std::optional<PartRecordHandle> handle = table.find("list", PartKey{"row", {}, index});
+        if (handle) (*table.record(*handle)).motion_unsettled = true;
+    }
+    const PartRecordAcquisition seventh = table.acquire("list", PartKey{"row", {}, 6U});
+    require(seventh.created && seventh.evicted == 0U && table.item_record_count() == 5U,
+            "nothing unsettled is evicted, even past the cap");
+}
+
+// A virtualized list of a million rows: it paints only the rows in view,
+// each row's label keyed by its stable ID ("row.<n>"), or by its index when
+// `stable` is false.
+class VirtualRows final : public Control {
+public:
+    explicit VirtualRows(StableId id) : Control(std::move(id)) {}
+
+    void on_paint(Painter& painter, Rect) override {
+        for (std::size_t offset = 0U; offset < visible; ++offset) {
+            const std::size_t row = first + offset;
+            const std::string row_id = "row." + std::to_string(row);
+            PartPaint label{};
+            label.role = PartRole::label;
+            label.bounds = {0.0, static_cast<double>(offset) * 2.0, 60.0, 2.0};
+            label.text = "row";
+            label.key = PartKey{"row_label", stable ? std::string_view(row_id) : std::string_view{}, row};
+            paint_part(painter, *this, label);
+        }
+    }
+
+    static constexpr std::size_t visible = 50U;
+    static constexpr std::size_t row_count = 1'000'000U;
+    std::size_t first{};
+    bool stable{true};
+};
+
+void scroll_rows(Window& window, VirtualRows& rows, std::size_t distance) {
+    for (std::size_t first = 0U; first + VirtualRows::visible <= distance; first += VirtualRows::visible) {
+        rows.first = first;
+        rows.invalidate(Dirty::paint);
+        paint_window(window);
+    }
+}
+
+void test_scrolling_a_virtualized_control_stays_within_the_cap() {
+    const bool variants[] = {true, false};
+    for (const bool stable : variants) {
+        const std::shared_ptr<Control> root = make_control<Control>(StableId("root"));
+        const std::shared_ptr<VirtualRows> rows = make_control<VirtualRows>(StableId("rows"));
+        (*rows).stable = stable;
+        (*rows).set_requested_bounds({0.0, 0.0, 80.0, 110.0});
+        (*root).add_child(rows);
+        Window window(root, Size{200.0, 120.0});
+        window.perform_layout();
+
+        // Across 100,000 of the million rows: 2,000 paints of 50 rows.
+        constexpr std::size_t distance = 100'000U;
+        scroll_rows(window, *rows, distance);
+        const EnginePartTable& table = window.engine_parts();
+        const MetricsSnapshot metrics = window.metrics_snapshot();
+        require(table.item_record_count() <= maximum_item_part_records &&
+                    table.record_count() <= maximum_item_part_records,
+                "scrolling 100,000 items keeps the records at or under the cap");
+        require(table.slot_count() <= maximum_item_part_records + 1U,
+                "evicted records' storage is reused: the slots never grow past the cap");
+        require(metrics.engine_part_records_evicted == distance - maximum_item_part_records,
+                "every record past the cap evicted one");
+        require(metrics.engine_part_index_fallbacks == (stable ? 0U : distance),
+                "only rows without a stable ID count the fallback");
+        const std::string last = "row." + std::to_string(distance - 1U);
+        const PartKey newest{"row_label", stable ? std::string_view(last) : std::string_view{}, distance - 1U};
+        const PartKey oldest{"row_label", stable ? std::string_view("row.0") : std::string_view{}, 0U};
+        require(table.find("rows", newest).has_value(), "the rows in view keep their records");
+        require(!table.find("rows", oldest).has_value(), "the rows scrolled away longest ago are evicted");
+    }
+    std::cout << "an EnginePartRecord is " << sizeof(EnginePartRecord) << " bytes\n";
 }
 
 } // namespace
@@ -309,6 +425,8 @@ int main() {
     test_key_changes_nothing_drawn();
     test_windows_share_the_application_engine();
     test_image_role_draws_as_given();
+    test_item_records_are_evicted_least_recently_painted_first();
+    test_scrolling_a_virtualized_control_stays_within_the_cap();
     std::cout << "engine part table tests passed\n";
     return 0;
 }
