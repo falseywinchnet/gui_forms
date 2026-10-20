@@ -45,6 +45,8 @@ public:
     void record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept;
     // `released` part records were released; `live` records remain.
     void record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept;
+    // `evicted` item-part records were evicted; `live` records remain.
+    void record_engine_parts_evicted(std::uint64_t evicted, std::uint64_t live) noexcept;
     void record_wrong_thread_rejection() noexcept;
     void record_subscription_connected() noexcept;
     void record_subscription_disconnected() noexcept;

@@ -16,6 +16,68 @@ void append_field(std::string& text, std::string_view field) {
 
 } // namespace
 
+EnginePartTable::EnginePartTable(const std::size_t item_record_cap) noexcept
+    : item_record_cap_(item_record_cap == 0U ? 1U : item_record_cap) {}
+
+void EnginePartTable::link_newest(const std::uint32_t slot) noexcept {
+    RecordSlot& linked = slots_[slot];
+    linked.older = newest_item_;
+    linked.newer = no_slot;
+    if (newest_item_ != no_slot) slots_[newest_item_].newer = slot;
+    newest_item_ = slot;
+    if (oldest_item_ == no_slot) oldest_item_ = slot;
+}
+
+void EnginePartTable::unlink(const std::uint32_t slot) noexcept {
+    RecordSlot& unlinked = slots_[slot];
+    if (unlinked.older != no_slot) {
+        slots_[unlinked.older].newer = unlinked.newer;
+    } else {
+        oldest_item_ = unlinked.newer;
+    }
+    if (unlinked.newer != no_slot) {
+        slots_[unlinked.newer].older = unlinked.older;
+    } else {
+        newest_item_ = unlinked.older;
+    }
+    unlinked.older = no_slot;
+    unlinked.newer = no_slot;
+}
+
+void EnginePartTable::release_slot(const std::uint32_t slot) noexcept {
+    RecordSlot& released = slots_[slot];
+    if (released.item) {
+        unlink(slot);
+        released.item = false;
+        item_records_ = item_records_ - 1U;
+    }
+    index_.erase(released.lookup);
+    released.record.reset();
+    released.lookup.clear();
+    released.generation = released.generation + 1U;
+    // A generation that wraps to 0 would match default handles; skip it.
+    if (released.generation == 0U) released.generation = 1U;
+    // free_slots_ holds fewer entries than slots_, and acquire() reserves its
+    // capacity whenever slots_ grows, so this cannot allocate.
+    free_slots_.push_back(slot);
+    live_ = live_ - 1U;
+}
+
+std::size_t EnginePartTable::evict_items(const std::uint32_t keep) noexcept {
+    std::size_t evicted = 0U;
+    std::uint32_t candidate = oldest_item_;
+    while (item_records_ > item_record_cap_ && candidate != no_slot) {
+        const std::uint32_t next = slots_[candidate].newer;
+        const bool unsettled = (*slots_[candidate].record).motion_unsettled;
+        if (candidate != keep && !unsettled) {
+            release_slot(candidate);
+            evicted = evicted + 1U;
+        }
+        candidate = next;
+    }
+    return evicted;
+}
+
 void EnginePartTable::write_lookup_text(std::string& text, std::string_view control_id, const PartKey& key) {
     text.clear();
     append_field(text, control_id);
@@ -35,6 +97,10 @@ PartRecordAcquisition EnginePartTable::acquire(std::string_view control_id, cons
     const std::unordered_map<std::string, std::uint32_t>::const_iterator found = index_.find(lookup);
     if (found != index_.end()) {
         const std::uint32_t slot = (*found).second;
+        if (slots_[slot].item && newest_item_ != slot) {
+            unlink(slot);
+            link_newest(slot);
+        }
         const PartRecordAcquisition existing{PartRecordHandle{slot, slots_[slot].generation}, false};
         return existing;
     }
@@ -69,7 +135,15 @@ PartRecordAcquisition EnginePartTable::acquire(std::string_view control_id, cons
     target.record = std::move(made);
     target.lookup = std::move(owned_lookup);
     live_ = live_ + 1U;
-    const PartRecordAcquisition acquired{PartRecordHandle{slot, target.generation}, true};
+    const bool item = !key.item.empty() || key.item_index.has_value();
+    std::size_t evicted = 0U;
+    if (item) {
+        target.item = true;
+        item_records_ = item_records_ + 1U;
+        link_newest(slot);
+        evicted = evict_items(slot);
+    }
+    const PartRecordAcquisition acquired{PartRecordHandle{slot, slots_[slot].generation}, true, evicted};
     return acquired;
 }
 
@@ -102,18 +176,9 @@ const EnginePartRecord* EnginePartTable::record(PartRecordHandle handle) const n
 std::size_t EnginePartTable::release_control(std::string_view control_id) noexcept {
     std::size_t released = 0U;
     for (std::size_t index = 0U; index < slots_.size(); ++index) {
-        RecordSlot& slot = slots_[index];
+        const RecordSlot& slot = slots_[index];
         if (!slot.record || (*slot.record).control != control_id) continue;
-        index_.erase(slot.lookup);
-        slot.record.reset();
-        slot.lookup.clear();
-        slot.generation = slot.generation + 1U;
-        // A generation that wraps to 0 would match default handles; skip it.
-        if (slot.generation == 0U) slot.generation = 1U;
-        // free_slots_ holds fewer entries than slots_, and acquire() reserves
-        // its capacity whenever slots_ grows, so this cannot allocate.
-        free_slots_.push_back(static_cast<std::uint32_t>(index));
-        live_ = live_ - 1U;
+        release_slot(static_cast<std::uint32_t>(index));
         released = released + 1U;
     }
     return released;
