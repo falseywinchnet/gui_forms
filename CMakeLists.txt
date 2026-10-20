@@ -126,6 +126,8 @@ add_library(gui_forms_core STATIC
     src/core/engine/part_table/engine_part_table.cpp
     src/core/engine/part_raster/part_raster.cpp
     src/core/engine/theme_engine/theme_engine.cpp
+    src/core/engine/motion_value/motion_value.cpp
+    src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2259,6 +2261,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
+    add_executable(gui_forms_motion_clock_tests tests/motion_clock_tests.cpp)
+    target_link_libraries(gui_forms_motion_clock_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_motion_clock_tests COMMAND gui_forms_motion_clock_tests)
     add_executable(gui_forms_engine_math_tests tests/engine_math_tests.cpp)
     target_link_libraries(gui_forms_engine_math_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_math_tests COMMAND gui_forms_engine_math_tests)
@@ -2834,6 +2839,9 @@ if(GUI_FORMS_BUILD_TESTS)
         gui_forms_host_headless
     )
     add_test(NAME gui_forms_host_protocol_tests COMMAND gui_forms_host_protocol_tests)
+    add_executable(gui_forms_window_teardown_tests tests/window_teardown_tests.cpp)
+    target_link_libraries(gui_forms_window_teardown_tests PRIVATE gui_forms_controls gui_forms_host_headless)
+    add_test(NAME gui_forms_window_teardown_tests COMMAND gui_forms_window_teardown_tests)
     add_executable(gui_forms_runtime_windows_tests tests/runtime_windows_tests.cpp)
     target_link_libraries(gui_forms_runtime_windows_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_runtime_windows_tests COMMAND gui_forms_runtime_windows_tests)

@@ -1882,6 +1882,8 @@ void Window::detach_subtree_state(const Control::Ptr& control,
     // The control's part records go with it; their handles become stale.
     const std::size_t released = engine_parts_.release_control((*control).stable_id_.value());
     if (released > 0U) metrics_.record_engine_parts_released(released, engine_parts_.record_count());
+    // So do its motion values: they jump to their ends, without listeners.
+    motion_clock_.release_owner(*control);
     (*control).on_detaching_from_window(*this);
     (*control).window_ = nullptr;
     {
@@ -3034,7 +3036,8 @@ void Window::update_display_cache_metrics() noexcept {
 
 void Window::compact_frame_requests() noexcept {
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
-        if ((*request).kind == detail::FrameRequestKind::ui_timer) {
+        if ((*request).kind == detail::FrameRequestKind::ui_timer ||
+            (*request).kind == detail::FrameRequestKind::motion_clock) {
             continue;
         }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
