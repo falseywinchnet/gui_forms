@@ -26,4 +26,9 @@ std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept {
     return result;
 }
 
+bool is_virtual_semantic_runtime_id(std::uint64_t runtime_id) noexcept {
+    const bool virtual_id = (runtime_id & virtual_id_bit) != 0U;
+    return virtual_id;
+}
+
 } // namespace gui_forms

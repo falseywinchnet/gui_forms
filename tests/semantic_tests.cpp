@@ -1,4 +1,5 @@
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/collection_controls.hpp"
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
@@ -392,6 +393,118 @@ void test_virtual_runtime_ids_are_unchanged() {
                 virtual_semantic_runtime_id("site.stack.3") == 0xe9a74df8c42ada75ULL &&
                 virtual_semantic_runtime_id("café") == 0x8385b6459d53dff7ULL,
             "the virtual runtime IDs keep their recorded values");
+    require(is_virtual_semantic_runtime_id(virtual_semantic_runtime_id("a")) &&
+                !is_virtual_semantic_runtime_id(1U) && !is_virtual_semantic_runtime_id(0U),
+            "a virtual runtime ID is told from a control's and from zero");
+}
+
+// Two trees showing one model publish items with the same stable IDs, as the
+// Gallery's tree and tree list do. An action named by a tree's runtime
+// identity reaches that tree's item; one named by stable identity alone
+// reaches the first tree in tree order.
+void test_trees_sharing_item_identities_route_by_owner() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("trees.root"));
+    std::shared_ptr<TreeView> left = make_control<TreeView>(StableId("trees.left"));
+    std::shared_ptr<TreeView> right = make_control<TreeView>(StableId("trees.right"));
+    std::vector<TreeViewItem> items;
+    items.push_back(TreeViewItem{"src", "src", 0U, false, false, true, {}});
+    items.push_back(TreeViewItem{"docs", "docs", 0U, false, false, true, {}});
+    (*left).set_items(items);
+    (*right).set_items(items);
+    (*left).set_requested_bounds({10.0, 10.0, 180.0, 120.0});
+    (*right).set_requested_bounds({210.0, 10.0, 180.0, 120.0});
+    (*root).add_child(left);
+    (*root).add_child(right);
+    Window window(root, {420.0, 160.0});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* left_node = find_node(snapshot.roots, "trees.left");
+    const SemanticNode* right_node = find_node(snapshot.roots, "trees.right");
+    require(left_node != nullptr && right_node != nullptr &&
+                find_node((*left_node).children, "docs") != nullptr &&
+                find_node((*right_node).children, "docs") != nullptr,
+            "both trees publish an item docs");
+    require(window.perform_semantic_action((*right).runtime_id(), "docs", SemanticAction::select) &&
+                (*right).selected_id() == "docs" && (*left).selected_id() != "docs",
+            "an action named by the right tree's runtime identity reaches its item");
+    require(window.perform_semantic_action("docs", SemanticAction::select) &&
+                (*left).selected_id() == "docs",
+            "an action named by stable identity alone reaches the first tree's item");
+}
+
+// A control that publishes virtual children without runtime IDs, as the
+// Ribbon and BackstageView do: a group with a nested item, and one item that
+// carries its own runtime ID.
+class UnnumberedVirtualChildren final : public Control {
+public:
+    explicit UnnumberedVirtualChildren(StableId stable_id) : Control(std::move(stable_id)) {}
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.exposed = true;
+        return descriptor;
+    }
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        SemanticNode item;
+        item.stable_id = "unnumbered.group.item";
+        item.role = SemanticRole::button;
+        item.actions = {SemanticAction::press};
+        SemanticNode group;
+        group.stable_id = "unnumbered.group";
+        group.role = SemanticRole::group;
+        group.children.push_back(item);
+        SemanticNode numbered;
+        numbered.stable_id = "unnumbered.numbered";
+        numbered.runtime_id = numbered_runtime_id;
+        numbered.role = SemanticRole::button;
+        std::vector<SemanticNode> nodes;
+        nodes.push_back(group);
+        nodes.push_back(numbered);
+        return nodes;
+    }
+    bool on_semantic_child_action(std::string_view stable_id, SemanticAction action,
+                                  std::string_view) override {
+        if (stable_id != "unnumbered.group.item" || action != SemanticAction::press) return false;
+        ++presses_;
+        return true;
+    }
+    [[nodiscard]] int presses() const noexcept { return presses_; }
+
+    // Deliberately not a value virtual_semantic_runtime_id gives, so the test
+    // sees that a published runtime ID is kept as it is.
+    static constexpr std::uint64_t numbered_runtime_id = 0x8000000000000005ULL;
+
+private:
+    int presses_{};
+};
+
+// The window gives a virtual child published with runtime ID zero, at any
+// depth, the runtime ID its stable ID gives, so hosts never confuse it with
+// the window's own object (zero), and keeps a runtime ID a control set.
+void test_unnumbered_virtual_children_get_runtime_ids() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("unnumbered.root"));
+    std::shared_ptr<UnnumberedVirtualChildren> owner =
+        make_control<UnnumberedVirtualChildren>(StableId("unnumbered.owner"));
+    (*owner).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+    (*root).add_child(owner);
+    Window window(root, {100.0, 60.0});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* group = find_node(snapshot.roots, "unnumbered.group");
+    const SemanticNode* item = find_node(snapshot.roots, "unnumbered.group.item");
+    const SemanticNode* numbered = find_node(snapshot.roots, "unnumbered.numbered");
+    require(group != nullptr && item != nullptr && numbered != nullptr,
+            "the virtual children are published");
+    require((*group).runtime_id == virtual_semantic_runtime_id("unnumbered.group") &&
+                (*item).runtime_id == virtual_semantic_runtime_id("unnumbered.group.item"),
+            "a virtual child published with runtime ID zero gets the one its stable ID gives");
+    require(is_virtual_semantic_runtime_id((*group).runtime_id) &&
+                is_virtual_semantic_runtime_id((*item).runtime_id),
+            "an assigned runtime ID is told from a control's");
+    require((*numbered).runtime_id == UnnumberedVirtualChildren::numbered_runtime_id,
+            "a runtime ID the control published is kept");
+    require(window.perform_semantic_action((*owner).runtime_id(), "unnumbered.group.item",
+                                           SemanticAction::press) &&
+                (*owner).presses() == 1,
+            "a nested virtual child is reached through its owner's runtime identity");
 }
 
 } // namespace
@@ -405,6 +518,8 @@ int main() {
         test_semantic_actions_use_control_behavior();
         test_virtual_list_items_are_selectable();
         test_runtime_identity_semantic_actions();
+        test_trees_sharing_item_identities_route_by_owner();
+        test_unnumbered_virtual_children_get_runtime_ids();
         test_semantics_enforce_ui_thread();
         std::cout << "gui_forms_semantic_tests: all tests passed\n";
         return EXIT_SUCCESS;
