@@ -52,14 +52,24 @@ are the next step and are not checked here.
 
 ## Result
 
-Green run: head `95e1aa1f`, programs run 39462104430.
+Green run: head `cb4edb45` (the head that adds this record; the code is
+that of `95e1aa1f`), programs run 39464522866 and source run 39464522834,
+every job green on all four platforms and in the Linux sanitizer job.
 
 ```text
-linux-x64:   175/175 Test #175: gui_forms_linux_accessibility_gallery_tests ......   Passed    5.97 sec
-             100% tests passed, 0 tests failed out of 175
-linux-arm64: 175/175 Test #175: gui_forms_linux_accessibility_gallery_tests ......   Passed    6.85 sec
-             100% tests passed, 0 tests failed out of 175
+programs linux-x64:   175/175 Test #175: gui_forms_linux_accessibility_gallery_tests ......   Passed    8.19 sec
+                      100% tests passed, 0 tests failed out of 175
+programs linux-arm64: 175/175 Test #175: gui_forms_linux_accessibility_gallery_tests ......   Passed    6.44 sec
+                      100% tests passed, 0 tests failed out of 175
+programs macos-arm64: 100% tests passed out of 190
+programs windows-x64: 100% tests passed out of 173
+Sanitizers (Linux, ASan + UBSan + LSan): 158/158 Test #158: gui_forms_linux_accessibility_tests ..............   Passed    0.39 sec
+                      100% tests passed, 0 tests failed out of 158
 ```
+
+The head `95e1aa1f` (programs run 39462104430) had already passed on
+linux-x64 (5.97 s) and linux-arm64 (6.85 s); its macOS jobs were cancelled
+by the next push.
 
 ctest prints a test's output only when it fails, so the per-type table
 below is the client's own output from the run before (head `fe636c05`,
@@ -84,7 +94,7 @@ fixture, adapter and Gallery were the same).
 | Types compared that publish no action on any enabled instance | 29 (labels, panels, pictures, progress bars and similar) |
 | Generational identity | the old object was refused and is defunct; the replacement was pressed once |
 | AT-SPI round trip (200 name reads of the frame) | 0.040 ms mean |
-| Test time | 4.77 s (fe636c05, x64); 5.97 s x64 and 6.85 s arm64 (95e1aa1f) |
+| Test time | 4.77 s (fe636c05, x64); 5.97 s x64 and 6.85 s arm64 (95e1aa1f); 8.19 s x64 and 6.44 s arm64 (cb4edb45) |
 
 The types not exposed by the semantic tree are `range_control` (the
 supplement's bare RangeControl), `property_grid` (its descriptor is not
@@ -128,6 +138,7 @@ belongs in the core routing (#200's file); it is not made here.
 | `e9e5ed08` | 39452743009 | the watchdog showed the client stuck for 14 minutes in its first name read of the fixture's application (`find_frames`) | the client had set libatspi's cache mask to none; A-L1's client sets none and reads the same property at once. `fe636c05` sets no cache mask (without one and without libatspi's event loop, every read but an object's interfaces is a D-Bus call) and sets libatspi's call timeout. Why the mask stopped the read was not investigated further. The same head merges #200 and uses its `is_virtual_semantic_runtime_id` |
 | `fe636c05` | 39458834852 | completed in 4.8 s: 0 node mismatches; 6 mismatches (the five refusals reported as succeeded; `visual_inspector_overlay` not found) | at-spi2-atk answered `DoAction` with true for actions the window refused, so the answer says nothing: `95e1aa1f` judges every action by its observed effect and keeps a false answer as a mismatch. The fixture now reports whether each control's descriptor is exposed, and a control that is not is accounted as not exposed, visible or not |
 | `95e1aa1f` | 39462104430 | passed on linux-x64 and linux-arm64 | |
+| `cb4edb45` (this record) | 39464522866 | passed on linux-x64 and linux-arm64; all other jobs green | |
 
 ## Not covered
 
