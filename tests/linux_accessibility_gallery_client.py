@@ -41,6 +41,7 @@ Exit 0 when everything matches; 1 with every mismatch listed otherwise.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import faulthandler
 import json
 import os
 from pathlib import Path
@@ -63,6 +64,10 @@ ANSWER_SECONDS: float = 60.0
 # reports what it found, and that it ran out of time, before ctest's TIMEOUT
 # for the test (900 s, CMakeLists.txt) stops it without output.
 BUDGET_SECONDS: float = 780.0
+# After this many seconds the client writes every thread's Python stack
+# to standard error and exits with status 1 (faulthandler), so a call that
+# never returns is named instead of ending in ctest's silent timeout.
+WATCHDOG_SECONDS: float = 840.0
 # AT-SPI round trips timed once at the start, to report the bus latency.
 LATENCY_PROBES: int = 200
 VIRTUAL_RUNTIME_BIT: int = 1 << 63
@@ -417,10 +422,11 @@ class Results:
 class Comparer:
     """Compares published AT-SPI subtrees with report nodes."""
 
-    def __init__(self, atspi: ModuleType, glib: ModuleType, results: Results) -> None:
+    def __init__(self, atspi: ModuleType, glib: ModuleType, results: Results, progress: Progress) -> None:
         self.atspi: ModuleType = atspi
         self.glib: ModuleType = glib
         self.results: Results = results
+        self.progress: Progress = progress
         self.value_text: bool = hasattr(atspi.Value, 'get_text')
 
     def mismatch(self, where: str, message: str) -> None:
@@ -525,6 +531,9 @@ class Comparer:
         roots: list[dict[str, Any]] = report['roots']
         self.compare_children(frame, roots, label, pending)
         while pending:
+            if self.progress.exhausted():
+                raise ClientFailure('time budget of ' + str(BUDGET_SECONDS) + ' s spent while comparing ' + label +
+                                    ' after ' + str(self.results.nodes_compared) + ' nodes in all')
             obj: Any
             node: dict[str, Any]
             where: str
@@ -895,14 +904,17 @@ def run_client(fixture_path: str, registry_path: str) -> int:
     fixture: Fixture | None = None
     results: Results = Results()
     progress: Progress = Progress()
+    faulthandler.dump_traceback_later(WATCHDOG_SECONDS, exit=True)
     try:
+        progress.note('starting the AT-SPI bus')
         session.start(Gio, GLib)
         from gi.repository import Atspi
         fixture = Fixture(fixture_path)
         fixture.start()
+        progress.note('fixture ready; finding its frames')
         frames: tuple[Any, Any] = find_frames(Atspi, fixture)
         session_support.require_registry(Gio, GLib, session.address)
-        comparer: Comparer = Comparer(Atspi, GLib, results)
+        comparer: Comparer = Comparer(Atspi, GLib, results, progress)
         progress.note('fixture published; ' + str(len(fixture.pages)) + ' Gallery pages')
         probe_latency(frames[0], progress)
         reports: dict[str, dict[str, Any]] = {}
