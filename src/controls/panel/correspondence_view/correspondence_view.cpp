@@ -732,7 +732,7 @@ void CorrespondenceView::on_pointer(PointerEvent& event) {
             if (pressed_button_ == PointerButton::secondary) {
                 context_requested_.emit({item.stable_id, event.position});
             } else if (pressed_click_count_ >= 2U) {
-                item_activated_.emit(item.stable_id);
+                emit_item_activated(item.stable_id);
             } else {
                 set_pinned_id(item.stable_id == pinned_id_ ? std::string_view{}
                                                            : item.stable_id);
@@ -755,7 +755,7 @@ void CorrespondenceView::on_key(KeyEvent& event) {
     std::size_t index = item_index(focused_id_)
         .value_or(item_index(selected_id_).value_or(0U));
     if (event.physical_key == PhysicalKey::enter) {
-        if (items_[index].enabled) item_activated_.emit(items_[index].stable_id);
+        if (items_[index].enabled) emit_item_activated(items_[index].stable_id);
         event.handled = true;
         return;
     }
@@ -913,6 +913,14 @@ CorrespondenceView::semantic_virtual_children() const {
     return nodes;
 }
 
+// Emits item_activated with a copy of the ID: a handler may replace the
+// items (the Gallery's ledger does), which would free the item's own string
+// while the handler still reads it.
+void CorrespondenceView::emit_item_activated(const std::string& stable_id) {
+    const std::string activated_id = stable_id;
+    item_activated_.emit(activated_id);
+}
+
 bool CorrespondenceView::on_semantic_child_action(
     std::string_view stable_id, SemanticAction action, std::string_view) {
     constexpr std::string_view activate_suffix = ".activate";
@@ -929,7 +937,7 @@ bool CorrespondenceView::on_semantic_child_action(
                     CorrespondenceExpansionReason::keyboard_focus);
         set_selected_id(item_id);
         if (items_[*activate_index].enabled) {
-            item_activated_.emit(items_[*activate_index].stable_id);
+            emit_item_activated(items_[*activate_index].stable_id);
         }
         return true;
     }
@@ -946,7 +954,7 @@ bool CorrespondenceView::on_semantic_child_action(
         set_selected_id(stable_id);
     } else if (action == SemanticAction::press) {
         set_selected_id(stable_id);
-        item_activated_.emit(items_[*index].stable_id);
+        emit_item_activated(items_[*index].stable_id);
     } else if (action == SemanticAction::show_menu) {
         set_selected_id(stable_id);
         const Rect local = item_bounds(*index);

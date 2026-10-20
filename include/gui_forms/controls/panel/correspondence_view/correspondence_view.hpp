@@ -192,6 +192,7 @@ protected:
                                         std::span<PartGeometry> geometry) const override;
 
 private:
+    void emit_item_activated(const std::string& stable_id);
     struct HoverIntentCallback;
     struct ScrollAnchor final {
         std::string stable_id;
