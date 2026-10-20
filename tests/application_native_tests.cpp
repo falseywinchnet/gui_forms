@@ -13,6 +13,7 @@
 #endif
 #include <windows.h>
 #include "gui_forms/platform/windows_host.hpp"
+#include "support/windows_own_window.hpp"
 #endif
 
 namespace {
@@ -43,7 +44,7 @@ struct DirectTitleReady final {
                 "direct title callback accepted malformed UTF-8");
         require(title(std::string(65537, 'x')).error == HostServiceError::invalid_argument,
                 "direct title callback accepted excess source bytes");
-        require(FindWindowW(L"GUIForms.Window.v1", L"Direct Unicode \u65e5") != nullptr,
+        require(test_support::own_gui_forms_window(L"Direct Unicode \u65e5") != nullptr,
                 "rejected direct title updates changed native title");
         HostServiceStatus wrong_thread{};
         std::thread worker(DirectTitleThread{retained, &wrong_thread});
@@ -91,7 +92,7 @@ struct Ready final {
         (*probe).attached_services = window.host_services() != nullptr;
         require(handle.set_title("Updated \xe6\x97\xa5 \xf0\x9f\x98\x80").accepted(), "native Unicode title update refused");
 #if defined(_WIN32)
-        require(FindWindowW(L"GUIForms.Window.v1", L"Updated \u65e5 \U0001f600") != nullptr,
+        require(test_support::own_gui_forms_window(L"Updated \u65e5 \U0001f600") != nullptr,
             "native Unicode title not applied");
 #endif
         require(handle.set_title("GUI.Forms portable application contract").accepted(), "native title restore refused");
@@ -107,7 +108,7 @@ struct Ready final {
         if ((*probe).fail) throw std::runtime_error("intentional ready failure");
 #if defined(_WIN32)
         if ((*probe).system_close) {
-            const HWND native = FindWindowW(L"GUIForms.Window.v1", L"GUI.Forms portable application contract");
+            const HWND native = test_support::own_gui_forms_window(L"GUI.Forms portable application contract");
             require(native != nullptr, "native close fixture window missing");
             const BOOL posted = PostMessageW(native, WM_SYSKEYDOWN, VK_F4,
                 static_cast<LPARAM>(1ULL << 29U));
@@ -200,7 +201,7 @@ struct CharacterReady final {
     void operator()(Window& window, ApplicationWindowHandle handle) const {
         const bool focused = window.request_focus(editor);
         require(focused, "character fixture focus failed");
-        const HWND native = FindWindowW(L"GUIForms.Window.v1", L"GUI.Forms character normalization fixture");
+        const HWND native = test_support::own_gui_forms_window(L"GUI.Forms character normalization fixture");
         require(native != nullptr, "character fixture window missing");
         DWORD process_id = 0;
         GetWindowThreadProcessId(native, &process_id);

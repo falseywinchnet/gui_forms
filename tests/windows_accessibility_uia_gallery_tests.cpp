@@ -34,6 +34,7 @@
 #include "gallery_page_specs.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/windows_host.hpp"
+#include "support/windows_own_window.hpp"
 
 #include <windows.h>
 #include <ole2.h>
@@ -64,7 +65,7 @@ namespace {
 
 using namespace gui_forms;
 
-constexpr const wchar_t* fixture_title = L"GUI.Forms UI Automation Gallery client";
+// The window title, followed by the process ID (test_support::process_title).
 constexpr std::string_view fixture_title_utf8 = "GUI.Forms UI Automation Gallery client";
 constexpr const wchar_t* framework_id = L"GUI.Forms";
 
@@ -486,7 +487,7 @@ struct PreparePage final {
         std::vector<VirtualOwner> owners;
         collect_virtual_owners((*window).root(), owners);
         out.client = ExpectedNode{};
-        out.client.node.name = std::string(fixture_title_utf8);
+        out.client.node.name = test_support::process_title(fixture_title_utf8);
         out.client.control_type = "(window client)";
         out.client.children.resize(snapshot.roots.size());
         for (std::size_t index = 0; index < snapshot.roots.size(); ++index) {
@@ -1501,7 +1502,7 @@ struct HostReady final {
                     std::function<void()>, std::function<HostClipboardTextResult()>,
                     std::function<HostServiceStatus(std::string_view)>) const {
         (*run).request_close = std::move(request_close);
-        (*run).hwnd = FindWindowW(L"GUIForms.Window.v1", fixture_title);
+        (*run).hwnd = test_support::own_gui_forms_window(test_support::process_title_wide(fixture_title_utf8).c_str());
         if ((*run).hwnd == nullptr) {
             (*(*run).report).failure = "the window's native handle does not exist";
             (*run).request_close();
@@ -1559,7 +1560,7 @@ void run_window(Report& report, std::string_view window_kind, const std::vector<
     run.jobs = jobs;
     std::thread client;
     host::WindowsHostOptions options;
-    options.title = std::string(fixture_title_utf8);
+    options.title = test_support::process_title(fixture_title_utf8);
     options.initial_size = gallery::gallery_default_size;
     options.minimum_size = gallery::gallery_minimum_size;
     options.print_metrics_on_close = false;

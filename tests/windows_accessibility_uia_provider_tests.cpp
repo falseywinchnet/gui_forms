@@ -18,12 +18,14 @@
 
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/windows_host.hpp"
+#include "support/windows_own_window.hpp"
 
 #include <windows.h>
 #include <ole2.h>
 #include <uiautomation.h>
 
 #include <chrono>
+#include <cstddef>
 #include <cstdlib>
 #include <exception>
 #include <functional>
@@ -214,6 +216,9 @@ struct ClientContext final {
     std::function<void()> request_close;
     std::vector<std::string> failures;
     int checks{};
+    // How many windows with the fixture's class and title the desktop held
+    // when the client started, in every process.
+    std::size_t desktop_windows{};
 };
 
 ModelState read_model(ClientContext& context) {
@@ -499,6 +504,14 @@ void run_client_checks(ClientContext& context) {
     ComReference<IUIAutomationElement> window;
     const HRESULT found = (*automation.get()).ElementFromHandle(context.hwnd, window.receive());
     require(SUCCEEDED(found) && window.get() != nullptr, "the window has a UI Automation element");
+    // The decoy process shows a window with the same class and title, so a
+    // desktop-wide lookup could have chosen either; the client must be
+    // reading this process's window.
+    expect(context, context.desktop_windows >= 2U,
+           "a second process shows a window with the fixture's class and title");
+    DWORD owner = 0;
+    GetWindowThreadProcessId(context.hwnd, &owner);
+    expect(context, owner == GetCurrentProcessId(), "the window the client reads belongs to this process");
     check_root_and_identity(context, *automation.get(), *window.get());
     check_invoke(context, *automation.get(), *window.get());
     check_toggle(context, *automation.get(), *window.get());
@@ -541,7 +554,8 @@ struct HostReady final {
                     std::function<void()>, std::function<HostClipboardTextResult()>,
                     std::function<HostServiceStatus(std::string_view)>) const {
         (*context).request_close = std::move(request_close);
-        (*context).hwnd = FindWindowW(L"GUIForms.Window.v1", fixture_title);
+        (*context).hwnd = test_support::own_gui_forms_window(fixture_title);
+        (*context).desktop_windows = test_support::desktop_gui_forms_windows(fixture_title);
         if ((*context).hwnd == nullptr) {
             (*context).failures.push_back("the fixture's native window does not exist");
             (*context).request_close();
@@ -551,10 +565,161 @@ struct HostReady final {
     }
 };
 
+// -- the decoy process -----------------------------------------------------------
+//
+// Two copies of a test can run at once (other workspaces run the same
+// tests). The test starts a copy of itself with --decoy, which shows a
+// window with the same class and title until the test is done, so the
+// client's window lookup meets that collision on every run.
+
+// The names of the two events the processes share, made unique by the
+// test process's ID: the decoy sets "ready" once its window is shown, and
+// waits for "done".
+std::wstring decoy_event_name(DWORD test_process, const wchar_t* which) {
+    const std::wstring name =
+        L"GUIForms.UiaProviderTest." + std::to_wstring(test_process) + L"." + which;
+    return name;
+}
+
+// An owned Win32 handle, closed when the owner goes.
+class HandleOwner final {
+public:
+    explicit HandleOwner(HANDLE value) noexcept : value_(value) {}
+    ~HandleOwner() {
+        if (value_ != nullptr) CloseHandle(value_);
+    }
+    HandleOwner(const HandleOwner&) = delete;
+    HandleOwner& operator=(const HandleOwner&) = delete;
+    [[nodiscard]] HANDLE get() const noexcept { return value_; }
+
+private:
+    HANDLE value_{};
+};
+
+struct DecoyClose final {
+    std::function<void()>* request_close{};
+    void operator()() const { (*request_close)(); }
+};
+
+// Waits on its own thread for the test to finish (two minutes at most),
+// then closes the decoy's window through the UI thread.
+struct DecoyWait final {
+    HANDLE done{};
+    Window* window{};
+    std::function<void()>* request_close{};
+    void operator()() const {
+        static_cast<void>(WaitForSingleObject(done, 120000U));
+        (*window).invoke(std::function<void()>(DecoyClose{request_close}));
+    }
+};
+
+struct DecoyReady final {
+    HANDLE ready{};
+    HANDLE done{};
+    Window* window{};
+    std::function<void()>* request_close{};
+    std::thread* waiter{};
+    void operator()(std::function<void()>, std::function<void()> close,
+                    std::function<HostDialogResult(const HostDialogRequest&)>,
+                    std::function<HostServiceStatus(const HostTooltipRequest&)>,
+                    std::function<void()>, std::function<HostClipboardTextResult()>,
+                    std::function<HostServiceStatus(std::string_view)>) const {
+        *request_close = std::move(close);
+        *waiter = std::thread(DecoyWait{done, window, request_close});
+        SetEvent(ready);
+    }
+};
+
+int run_decoy(const char* test_process_text) {
+    const DWORD test_process = static_cast<DWORD>(std::strtoul(test_process_text, nullptr, 10));
+    const std::wstring ready_name = decoy_event_name(test_process, L"ready");
+    const std::wstring done_name = decoy_event_name(test_process, L"done");
+    const HandleOwner ready(OpenEventW(EVENT_MODIFY_STATE, FALSE, ready_name.c_str()));
+    const HandleOwner done(OpenEventW(SYNCHRONIZE, FALSE, done_name.c_str()));
+    if (ready.get() == nullptr || done.get() == nullptr) return EXIT_FAILURE;
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("uia.decoy.root"));
+    std::shared_ptr<Button> button = make_control<Button>(StableId("uia.decoy.button"), "Decoy");
+    (*button).set_requested_bounds({10.0, 10.0, 120.0, 28.0});
+    (*root).add_child(button);
+    std::unique_ptr<Window> window = std::make_unique<Window>(root, Size{420.0, 240.0});
+    Window* model = window.get();
+    std::function<void()> request_close;
+    std::thread waiter;
+    host::WindowsHostOptions options;
+    options.title = std::string(fixture_title_utf8);
+    options.initial_size = Size{420.0, 240.0};
+    options.print_metrics_on_close = false;
+    options.host_ready = DecoyReady{ready.get(), done.get(), model, &request_close, &waiter};
+    const int exit_code = host::run_windows(std::move(window), std::move(options));
+    if (waiter.joinable()) waiter.join();
+    return exit_code;
+}
+
+// The decoy process: started (and shown) by the constructor, stopped by
+// stop() or, on an early exit, by the destructor.
+class Decoy final {
+public:
+    Decoy();
+    ~Decoy();
+    Decoy(const Decoy&) = delete;
+    Decoy& operator=(const Decoy&) = delete;
+    // Tells the decoy to close and waits for it. Returns its exit code, or
+    // -1 when it did not exit within a minute.
+    int stop();
+
+private:
+    HandleOwner ready_;
+    HandleOwner done_;
+    PROCESS_INFORMATION process_{};
+    bool stopped_{};
+};
+
+Decoy::Decoy()
+    : ready_(CreateEventW(nullptr, TRUE, FALSE, decoy_event_name(GetCurrentProcessId(), L"ready").c_str())),
+      done_(CreateEventW(nullptr, TRUE, FALSE, decoy_event_name(GetCurrentProcessId(), L"done").c_str())) {
+    require(ready_.get() != nullptr && done_.get() != nullptr, "the decoy's events are created");
+    wchar_t path[MAX_PATH]{};
+    const DWORD length = GetModuleFileNameW(nullptr, path, MAX_PATH);
+    require(length > 0U && length < MAX_PATH, "the test knows its own executable");
+    std::wstring command =
+        L"\"" + std::wstring(path) + L"\" --decoy " + std::to_wstring(GetCurrentProcessId());
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    const BOOL started = CreateProcessW(path, command.data(), nullptr, nullptr, FALSE, 0, nullptr,
+                                        nullptr, &startup, &process_);
+    require(started != FALSE, "the decoy process starts");
+    const HANDLE waits[2] = {ready_.get(), process_.hProcess};
+    const DWORD signalled = WaitForMultipleObjects(2U, waits, FALSE, 60000U);
+    require(signalled == WAIT_OBJECT_0, "the decoy shows its window within a minute");
+}
+
+int Decoy::stop() {
+    stopped_ = true;
+    SetEvent(done_.get());
+    if (WaitForSingleObject(process_.hProcess, 60000U) != WAIT_OBJECT_0) return -1;
+    DWORD code = 0;
+    GetExitCodeProcess(process_.hProcess, &code);
+    return static_cast<int>(code);
+}
+
+Decoy::~Decoy() {
+    if (process_.hProcess == nullptr) return;
+    if (!stopped_) {
+        SetEvent(done_.get());
+        if (WaitForSingleObject(process_.hProcess, 60000U) != WAIT_OBJECT_0) {
+            TerminateProcess(process_.hProcess, 1U);
+        }
+    }
+    CloseHandle(process_.hThread);
+    CloseHandle(process_.hProcess);
+}
+
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 3 && std::string_view(argv[1]) == "--decoy") return run_decoy(argv[2]);
     try {
+        Decoy decoy;
         Fixture fixture;
         std::unique_ptr<Window> window = make_fixture(fixture);
         SubscriptionToken clicked = (*fixture.button).clicked().subscribe(CountClick{&fixture.clicks});
@@ -570,6 +735,7 @@ int main() {
         const int exit_code = host::run_windows(std::move(window), std::move(options));
         if (client.joinable()) client.join();
         require(exit_code == 0, "the fixture window did not run");
+        require(decoy.stop() == 0, "the decoy process closes its window and exits cleanly");
         if (!context.failures.empty()) {
             for (const std::string& failure : context.failures) {
                 std::cerr << "gui_forms_windows_accessibility_uia_provider_tests: " << failure << '\n';

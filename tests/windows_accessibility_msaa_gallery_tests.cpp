@@ -27,6 +27,7 @@
 #include "gallery_page_specs.hpp"
 #include "gui_forms/gui_forms.hpp"
 #include "gui_forms/platform/windows_host.hpp"
+#include "support/windows_own_window.hpp"
 
 #include <windows.h>
 #include <oleacc.h>
@@ -53,7 +54,7 @@ namespace {
 
 using namespace gui_forms;
 
-constexpr const wchar_t* fixture_title = L"GUI.Forms MSAA Gallery client";
+// The window title, followed by the process ID (test_support::process_title).
 constexpr std::string_view fixture_title_utf8 = "GUI.Forms MSAA Gallery client";
 
 // The page whose buttons open the host's modal dialogs, write the system
@@ -724,7 +725,7 @@ void compare_tree(PageWalk& walk, IAccessible& object, const SemanticNode& node,
 SemanticNode client_node(HWND hwnd, SemanticSnapshot snapshot, double scale) {
     SemanticNode node;
     node.role = SemanticRole::group;
-    node.name = std::string(fixture_title_utf8);
+    node.name = test_support::process_title(fixture_title_utf8);
     node.states = SemanticState::enabled | SemanticState::visible;
     RECT client{};
     GetClientRect(hwnd, &client);
@@ -1146,7 +1147,7 @@ struct HostReady final {
 };
 
 void HostReady::run(Window& window) const {
-    HWND hwnd = FindWindowW(L"GUIForms.Window.v1", fixture_title);
+    HWND hwnd = test_support::own_gui_forms_window(test_support::process_title_wide(fixture_title_utf8).c_str());
     if (hwnd == nullptr) throw std::runtime_error("the Gallery's native window does not exist");
     const UINT dpi = GetDpiForWindow(hwnd);
     const double scale = dpi == 0U ? 1.0 : std::max(1.0, dpi / 96.0);
@@ -1212,7 +1213,7 @@ void run_gallery(Report& report, std::string_view window_kind,
     }
     Window* window = gallery_window.get();
     host::WindowsHostOptions options;
-    options.title = std::string(fixture_title_utf8);
+    options.title = test_support::process_title(fixture_title_utf8);
     options.initial_size = gallery::gallery_default_size;
     options.minimum_size = gallery::gallery_minimum_size;
     options.print_metrics_on_close = false;
