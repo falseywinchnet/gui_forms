@@ -1,5 +1,6 @@
 """Control schema tests: real-manifest check, stale-page detection, event scan and spelling."""
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -65,7 +66,7 @@ public:
         schema = cs.load_schema()
         types = [dict(record) for record in schema["types"]]
         types[0]["interactions"] = types[0]["interactions"][:-1]
-        findings = cs.validate({"types": types, "vocabulary": schema["vocabulary"]},
+        findings = cs.validate({"types": types, "vocabulary": schema["vocabulary"], "engine": schema["engine"]},
                                cr.load_registry(), cs.scan_classes())
         self.assertEqual(len(findings), 1)
         self.assertIn(types[0]["id"], findings[0])
@@ -80,7 +81,8 @@ public:
             self.assertIn(family, vocabulary["families"])
         self.assertIn("split_button", vocabulary["semantic_roles"])
         self.assertIn("menu_button", vocabulary["semantic_roles"])
-        findings = cs.validate({"types": schema["types"]}, cr.load_registry(), cs.scan_classes())
+        findings = cs.validate({"types": schema["types"], "engine": schema["engine"]}, cr.load_registry(),
+                               cs.scan_classes())
         self.assertEqual(len(findings), 1)
         self.assertIn("vocabulary", findings[0])
 
@@ -101,10 +103,35 @@ public:
             self.assertIn(field, vocabulary["semantic_fields"])
         shortened = dict(vocabulary)
         del shortened["semantic_actions"]
-        findings = cs.validate({"types": schema["types"], "vocabulary": shortened},
+        findings = cs.validate({"types": schema["types"], "vocabulary": shortened, "engine": schema["engine"]},
                                cr.load_registry(), cs.scan_classes())
         self.assertEqual(len(findings), 1)
         self.assertIn("semantic_actions", findings[0])
+
+    def test_the_engine_lists_its_primitives_within_budget(self) -> None:
+        schema = cs.load_schema()
+        engine = schema["engine"]
+        self.assertEqual(engine["cascade_levels"][0], "built_in")
+        self.assertEqual(engine["cascade_levels"][-1], "forced_high_contrast")
+        self.assertEqual(engine["budgets"]["operations_per_device_pixel"], 512)
+        names = [primitive["name"] for primitive in engine["primitives"]]
+        self.assertEqual(names, ["bulge", "dithered_bulge"])
+        bulge = engine["primitives"][0]
+        self.assertEqual(bulge["roles"], ["face"])
+        amplitude = next(item for item in bulge["parameters"] if item["name"] == "amplitude")
+        self.assertTrue(amplitude["animated"])
+        registry = cr.load_registry()
+        classes = cs.scan_classes()
+        self.assertEqual(cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"]},
+                                     registry, classes)[0][:32], "the schema has no engine section")
+        broken = json.loads(json.dumps(engine))
+        broken["primitives"][0]["roles"] = ["sparkle"]
+        broken["primitives"][1]["cost"]["per_device_pixel"] = 600
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               registry, classes)
+        self.assertEqual(len(findings), 2)
+        self.assertIn("sparkle", findings[0])
+        self.assertIn("budget", findings[1])
 
 
 if __name__ == "__main__":

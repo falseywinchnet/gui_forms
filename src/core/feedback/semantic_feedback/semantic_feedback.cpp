@@ -70,7 +70,10 @@ SemanticFeedbackRecord SemanticFeedback::emit(SemanticFeedbackKind kind) {
         ++dropped_record_count_;
     }
     records_.push_back(record);
-    emitted_.emit(records_.back());
+    // The local record, not records_.back(): a handler that emits again,
+    // clears the history or lowers its bound reallocates or shrinks
+    // records_ while later handlers still read the record.
+    emitted_.emit(record);
     return record;
 }
 

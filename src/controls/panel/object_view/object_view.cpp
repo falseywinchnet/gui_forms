@@ -1095,7 +1095,10 @@ void ObjectView::on_pointer(PointerEvent& event) {
             } else if (pressed_button_ == PointerButton::primary &&
                        pressed_click_count_ >= 2U && items_[*index].enabled &&
                        is_alive()) {
-                item_activated_.emit(items_[*index].stable_id);
+                // A copy: a handler may replace the items, which frees the
+                // item's own string while later handlers still read it.
+                const std::string activated_id = items_[*index].stable_id;
+                item_activated_.emit(activated_id);
             }
             event.handled = true;
         } else if (!index && !pressed_index_ &&
@@ -1131,7 +1134,8 @@ void ObjectView::on_key(KeyEvent& event) {
     }
     if (event.physical_key == PhysicalKey::enter) {
         if (items_[index].enabled && is_alive()) {
-            item_activated_.emit(items_[index].stable_id);
+            const std::string activated_id = items_[index].stable_id;
+            item_activated_.emit(activated_id);
         }
         event.handled = true;
         return;

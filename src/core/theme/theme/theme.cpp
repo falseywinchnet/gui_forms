@@ -355,38 +355,63 @@ ControlRoleRecipes professional_role(Color top, Color bottom, Color border,
             MaterialBorder{Color::rgba(57, 117, 178), 1.0};
     }
 
-    const ControlVisualRecipe hc_normal = recipe(
-        Color::rgba(0, 0, 0), Color::rgba(0, 0, 0),
-        Color::rgba(255, 255, 255), Color::rgba(255, 255, 255), radius);
-    const ControlVisualRecipe hc_hot = recipe(
-        Color::rgba(0, 0, 0), Color::rgba(0, 0, 0),
-        Color::rgba(0, 255, 255), Color::rgba(255, 255, 255), radius);
-    const ControlVisualRecipe hc_pressed = recipe(
-        Color::rgba(255, 255, 255), Color::rgba(255, 255, 255),
-        Color::rgba(255, 255, 0), Color::rgba(0, 0, 0), radius);
-    result.high_contrast.fill(hc_normal);
-    result.high_contrast[static_cast<std::size_t>(ControlSurfaceState::hot)] =
-        hc_hot;
-    result.high_contrast[static_cast<std::size_t>(ControlSurfaceState::pressed)] =
-        hc_pressed;
-    result.high_contrast[static_cast<std::size_t>(ControlSurfaceState::pending)] =
-        hc_hot;
-    result.high_contrast[static_cast<std::size_t>(ControlSurfaceState::invalid)] =
-        recipe(Color::rgba(0, 0, 0), Color::rgba(0, 0, 0),
-               Color::rgba(255, 96, 96), Color::rgba(255, 255, 255), radius);
-    result.high_contrast[static_cast<std::size_t>(ControlSurfaceState::disabled)] =
-        recipe(Color::rgba(0, 0, 0), Color::rgba(0, 0, 0),
-               Color::rgba(128, 128, 128), Color::rgba(160, 160, 160), radius);
-    result.high_contrast_selected = result.high_contrast;
-    for (ControlVisualRecipe& selected : result.high_contrast_selected) {
-        const Color state_border = selected.material.border
-            ? (*selected.material.border).color : Color::rgba(255, 255, 0);
-        selected.material = surface(Color::rgba(255, 255, 255),
-                                    Color::rgba(255, 255, 255),
-                                    state_border, radius);
-        selected.text = Color::rgba(0, 0, 0);
-        selected.glyph = Color::rgba(0, 0, 0);
+    // The high-contrast records are derived from the ordinary ones when the
+    // theme is made (derive_high_contrast_recipes, the forced high-contrast
+    // pass of T2 E4), not authored here.
+    return result;
+}
+
+// GUI.Forms' own high-contrast mode (T2 plan, E4; design language 5.8): a
+// near-colourless palette by surface state. Under the host's own mode the
+// host palette is meant to win; no host reports one to the core yet.
+struct HighContrastColours final {
+    Color plate{};
+    Color edge{};
+    Color text{};
+};
+
+HighContrastColours high_contrast_colours(ControlSurfaceState state) noexcept {
+    const Color black = Color::rgba(0, 0, 0);
+    const Color white = Color::rgba(255, 255, 255);
+    HighContrastColours colours{black, white, white};
+    switch (state) {
+    case ControlSurfaceState::hot:
+    case ControlSurfaceState::pending:
+        colours.edge = Color::rgba(0, 255, 255);
+        break;
+    case ControlSurfaceState::pressed:
+        colours = HighContrastColours{white, Color::rgba(255, 255, 0), black};
+        break;
+    case ControlSurfaceState::invalid:
+        colours.edge = Color::rgba(255, 96, 96);
+        break;
+    case ControlSurfaceState::disabled:
+        colours.edge = Color::rgba(128, 128, 128);
+        colours.text = Color::rgba(160, 160, 160);
+        break;
+    case ControlSurfaceState::normal:
+    case ControlSurfaceState::deactivated:
+    case ControlSurfaceState::count:
+        break;
     }
+    return colours;
+}
+
+// One state's derived record: the ordinary record's geometry and cues (its
+// corner radius, edge width, focus and default rings, offsets) kept, its
+// material rebuilt as one solid plate inside one solid edge, so that every
+// gradient, image, keyline, per-edge border and shadow is dropped.
+ControlVisualRecipe derived_high_contrast(const ControlVisualRecipe& ordinary, Color plate, Color edge,
+                                          Color text) {
+    ControlVisualRecipe result = ordinary;
+    const double edge_width = ordinary.material.border ? (*ordinary.material.border).width : 1.0;
+    SurfaceMaterial material{};
+    material.fills = {MaterialFillLayer::solid(plate)};
+    material.border = MaterialBorder{edge, edge_width};
+    material.corner_radius = ordinary.material.corner_radius;
+    result.material = std::move(material);
+    result.text = text;
+    result.glyph = text;
     return result;
 }
 
@@ -691,6 +716,19 @@ Insets box_shadow_visual_outsets(std::span<const MaterialShadow> shadows) noexce
     return result;
 }
 
+ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes) {
+    for (std::size_t index = 0; index < control_surface_state_count; ++index) {
+        const ControlSurfaceState state = static_cast<ControlSurfaceState>(index);
+        const HighContrastColours colours = high_contrast_colours(state);
+        const ControlVisualRecipe& ordinary = recipes.ordinary[index];
+        recipes.high_contrast[index] = derived_high_contrast(ordinary, colours.plate, colours.edge, colours.text);
+        // Selected: a white plate inside the state's edge, with black text.
+        recipes.high_contrast_selected[index] =
+            derived_high_contrast(ordinary, Color::rgba(255, 255, 255), colours.edge, Color::rgba(0, 0, 0));
+    }
+    return recipes;
+}
+
 std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
     if (definition.id.empty() || definition.id.size() > 128U) {
         throw std::invalid_argument("theme id must contain 1 to 128 bytes");
@@ -699,13 +737,14 @@ std::shared_ptr<const Theme> Theme::create(ThemeDefinition definition) {
         if (!std::all_of(role.ordinary.begin(), role.ordinary.end(),
                          &valid_recipe) ||
             !std::all_of(role.selected.begin(), role.selected.end(),
-                         &valid_recipe) ||
-            !std::all_of(role.high_contrast.begin(),
-                         role.high_contrast.end(), &valid_recipe) ||
-            !std::all_of(role.high_contrast_selected.begin(),
-                         role.high_contrast_selected.end(), &valid_recipe)) {
+                         &valid_recipe)) {
             throw std::invalid_argument("theme contains an invalid visual recipe");
         }
+    }
+    // The forced high-contrast pass: every family's high-contrast records
+    // are derived from its ordinary ones, replacing whatever was authored.
+    for (ControlRoleRecipes& role : definition.roles) {
+        role = derive_high_contrast_recipes(std::move(role));
     }
     if (definition.accent_ramp.empty() || definition.accent_ramp.size() > 256U) {
         throw std::invalid_argument("theme accent ramp must hold 1 to 256 colours");
