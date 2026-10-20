@@ -26,8 +26,8 @@
 #include <memory>
 #include <string>
 
-using namespace gui_forms;
-using namespace gui_forms::host::linux_detail;
+// No `using namespace gui_forms`: Xlib declares a global `Window` typedef,
+// which would make gui_forms::Window ambiguous here.
 
 namespace {
 
@@ -59,8 +59,8 @@ int main() {
         return 1;
     }
     const ::Window gallery_native = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0,
-        static_cast<unsigned int>(gallery::gallery_default_size.width),
-        static_cast<unsigned int>(gallery::gallery_default_size.height), 0, 0, 0xffffff);
+        static_cast<unsigned int>(gui_forms::gallery::gallery_default_size.width),
+        static_cast<unsigned int>(gui_forms::gallery::gallery_default_size.height), 0, 0, 0xffffff);
     const ::Window supplement_native = XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 320, 140, 0, 0, 0xffffff);
     XMapWindow(display, gallery_native);
     XMapWindow(display, supplement_native);
@@ -69,20 +69,20 @@ int main() {
     {
         // Declared in dependency order: each borrower after what it borrows,
         // so it is destroyed first.
-        std::unique_ptr<Window> gallery_window = gallery::make_gallery();
-        std::unique_ptr<Window> supplement_window = accessibility_session::make_supplement();
-        host::HeadlessHost host(*gallery_window);
-        accessibility_session::GallerySession session(*gallery_window, host, *supplement_window);
-        LinuxAccessibility gallery_accessibility(display, gallery_native, *gallery_window,
-                                                 "GUI.Forms Gallery accessibility fixture");
-        LinuxAccessibility supplement_accessibility(display, supplement_native, *supplement_window,
-                                                    "GUI.Forms accessibility supplement");
+        std::unique_ptr<gui_forms::Window> gallery_window = gui_forms::gallery::make_gallery();
+        std::unique_ptr<gui_forms::Window> supplement_window = gui_forms::accessibility_session::make_supplement();
+        gui_forms::host::HeadlessHost host(*gallery_window);
+        gui_forms::accessibility_session::GallerySession session(*gallery_window, host, *supplement_window);
+        gui_forms::host::linux_detail::LinuxAccessibility gallery_accessibility(
+            display, gallery_native, *gallery_window, "GUI.Forms Gallery accessibility fixture");
+        gui_forms::host::linux_detail::LinuxAccessibility supplement_accessibility(
+            display, supplement_native, *supplement_window, "GUI.Forms accessibility supplement");
         std::cout << session.ready_line() << '\n' << std::flush;
         std::string pending;
         bool finished = false;
         while (!finished) {
-            accessibility_dispatch();
-            accessibility_wait(ConnectionNumber(display), STDIN_FILENO, 50);
+            gui_forms::host::linux_detail::accessibility_dispatch();
+            gui_forms::host::linux_detail::accessibility_wait(ConnectionNumber(display), STDIN_FILENO, 50);
             drain_x_events(display);
             if (!read_ready_input(pending)) break;
             std::size_t end = pending.find('\n');
