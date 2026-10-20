@@ -103,13 +103,15 @@ OPENERS: tuple[tuple[str, str, str], ...] = (
     ('anchored_popup_layer', 'anchored-popups', 'gallery.popups.anchor.0'),
 )
 
-# Semantic-tree defects this test finds and the ATK adapter cannot fix: the
-# default action a target publishes is refused by the window. Listed so the
-# test stays green while each is open; a listed target whose action starts to
-# work fails the test until it leaves the list. Each publishes the focus
-# action without the focusable state; its focus goes to an inner editor the
-# semantic tree does not publish (or, for TokenBox, publishes as a child), so
-# Window::perform_semantic_action(focus) refuses it.
+# Defects this test finds and the ATK adapter cannot fix: the default action
+# a target publishes is refused by the window. Listed so the test stays green
+# while each is open; a listed target whose action starts to show an effect
+# fails the test until it leaves the list. Each publishes the focus action
+# without the focusable state. Its own on_semantic_action would move focus to
+# its inner editor, but Window::perform_semantic_action handles focus itself
+# and asks for focus on the control, which is not focusable, so it refuses.
+# (Refused in the headless model on Windows too; AT-SPI does not report the
+# refusal, see perform_default.)
 KNOWN_REFUSALS: dict[str, str] = {
     'gallery.text.tokens.recipients': 'TokenBox publishes focus but is not focusable',
     'gallery.text.masked.phone': 'MaskedTextBox publishes focus but is not focusable',
@@ -118,9 +120,10 @@ KNOWN_REFUSALS: dict[str, str] = {
     'gallery.containers.split': 'SplitContainer publishes focus but is not focusable',
 }
 
-# Targets whose default action is accepted and changes nothing the semantic
-# tree or the fixture's counters show, with the reason. A listed target that
-# starts to show a change fails the test until it leaves the list.
+# Targets whose default action the window accepts (in the headless model)
+# and which changes nothing the semantic tree or the fixture's counters show,
+# with the reason. A listed target that starts to show a change fails the
+# test until it leaves the list.
 ACCEPTED_WITHOUT_CHANGE: dict[str, str] = {
     'gallery.value-editors.rack.lamp':
         'the first rack module asks to move earlier on decrement; the rack keeps the order',
@@ -560,7 +563,11 @@ class Comparer:
         published: set[str] = ids
         record: dict[str, Any]
         for record in report['controls']:
-            if record['visible'] and record['stable_id'] not in published:
+            if record['stable_id'] in published:
+                continue
+            # A visible control without a node, or one whose descriptor is not
+            # exposed (it would have none when shown either).
+            if record['visible'] or not record['exposed']:
                 self.results.unexposed.setdefault(record['type'], set()).add(record['stable_id'])
 
     def compare_children(self, obj: Any, children: list[dict[str, Any]], where: str,
@@ -798,27 +805,31 @@ def perform_default(atspi: ModuleType, glib: ModuleType, comparer: Comparer, fix
     changes: list[str] = describe_change(before, after, target)
     if target.opens != '' and target.opens not in opened_types(after):
         results.mismatches.append(where + ': ' + names[0] + ' did not open a visible ' + target.opens)
-    known_refusal: str = KNOWN_REFUSALS.get(target.stable_id, '')
-    known_quiet: str = ACCEPTED_WITHOUT_CHANGE.get(target.stable_id, '')
-    if not performed and known_refusal != '':
-        results.actions[target.kind] = names[0] + ' on ' + target.stable_id + ': refused (known: ' + known_refusal + ')'
-    elif not performed:
-        results.mismatches.append(where + ': ' + names[0] + ' (action 0) was refused')
-        results.actions[target.kind] = names[0] + ': refused'
-    elif known_refusal != '':
-        results.mismatches.append(where + ': ' + names[0] + ' now succeeds; remove it from KNOWN_REFUSALS')
-        results.actions[target.kind] = names[0] + ': performed'
-    elif not changes and known_quiet != '':
-        results.actions[target.kind] = names[0] + ' on ' + target.stable_id + ': accepted, no change (known: ' + known_quiet + ')'
-    elif not changes:
+    # An action is judged by its observed effect. DoAction's answer does not
+    # say whether the window performed it: at-spi2-atk on ubuntu-24.04
+    # answered true for the five KNOWN_REFUSALS targets, whose actions the
+    # window refuses (CI run of fe636c05). A false answer is still a mismatch.
+    if not performed:
+        results.mismatches.append(where + ': DoAction answered false for ' + names[0] + ' (action 0)')
+    known: str = ''
+    known_list: str = ''
+    if target.stable_id in KNOWN_REFUSALS:
+        known = 'refused: ' + KNOWN_REFUSALS[target.stable_id]
+        known_list = 'KNOWN_REFUSALS'
+    elif target.stable_id in ACCEPTED_WITHOUT_CHANGE:
+        known = 'accepted without change: ' + ACCEPTED_WITHOUT_CHANGE[target.stable_id]
+        known_list = 'ACCEPTED_WITHOUT_CHANGE'
+    if changes and known != '':
+        results.mismatches.append(where + ': ' + names[0] + ' now changes ' + '; '.join(changes) +
+                                  '; remove it from ' + known_list)
+        results.actions[target.kind] = names[0] + ': changed'
+    elif changes:
+        results.actions[target.kind] = names[0] + ' on ' + target.stable_id + ': ' + '; '.join(changes)
+    elif known != '':
+        results.actions[target.kind] = names[0] + ' on ' + target.stable_id + ': no change (known, ' + known + ')'
+    else:
         results.mismatches.append(where + ': ' + names[0] + ' (action 0) had no observable effect')
         results.actions[target.kind] = names[0] + ': no observable effect'
-    elif known_quiet != '':
-        results.mismatches.append(where + ': ' + names[0] + ' now changes ' + '; '.join(changes) +
-                                  '; remove it from ACCEPTED_WITHOUT_CHANGE')
-        results.actions[target.kind] = names[0] + ': changed'
-    else:
-        results.actions[target.kind] = names[0] + ' on ' + target.stable_id + ': ' + '; '.join(changes)
     if not supplement:
         try:
             fixture.report('reset')

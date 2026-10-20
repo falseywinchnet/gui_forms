@@ -128,8 +128,9 @@ inline void append_node(std::ostringstream& stream, const SemanticNode& node) {
 
 // Appends every control of the tree under `root`, root first, in
 // depth-first child order: its registry id (the anatomy's control id, as
-// manifests/controls.json names it), stable identity, runtime identity, and
-// whether it is visible (hidden pages' controls are in the tree too).
+// manifests/controls.json names it), stable identity, runtime identity,
+// whether it is visible (hidden pages' controls are in the tree too), and
+// whether its semantic descriptor is exposed.
 inline void append_controls(std::ostringstream& stream, const Control::Ptr& root, bool& first) {
     std::vector<Control::Ptr> pending{root};
     while (!pending.empty()) {
@@ -141,8 +142,10 @@ inline void append_controls(std::ostringstream& stream, const Control::Ptr& root
         append_string(stream, (*control).anatomy().control_id);
         stream << ",\"stable_id\":";
         append_string(stream, (*control).stable_id().value());
+        const SemanticDescriptor descriptor = (*control).semantic_descriptor();
         stream << ",\"runtime_id\":" << (*control).runtime_id().value << ",\"visible\":"
-               << ((*control).effectively_visible() ? "true" : "false") << '}';
+               << ((*control).effectively_visible() ? "true" : "false") << ",\"exposed\":"
+               << (descriptor.exposed ? "true" : "false") << '}';
         const std::span<const Control::Ptr> children = (*control).children();
         for (std::size_t index = children.size(); index > 0U; --index) {
             pending.push_back(children[index - 1U]);
