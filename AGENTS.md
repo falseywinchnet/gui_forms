@@ -228,3 +228,23 @@ gui_forms/build/.../gui_forms_gallery
 No benchmark result may be labelled fast or lightweight without recording the
 workload and measurement. A working demonstration is evidence only for the
 behaviors it exercises.
+
+## Owned deflate: remote phase-2 experiment
+
+From this checkout, with upstream zlib at the pin in
+`tests/compression/oracle_sha256.json` already available locally:
+
+```sh
+/Users/ultimussecundai/.local/bin/m4build -- env PATH=/opt/homebrew/opt/llvm@22/bin:/opt/homebrew/bin:/usr/bin:/bin python3 -B tools/validate_inflate.py --oracle build-zlib-study-sources/upstream-zlib --output build/inflate-study-strict --strict --seconds 60
+```
+
+Repeat without `--strict` and use `build/inflate-study-ordinary` for the ordinary
+oracle. This is an isolated instrumented experiment, not the full-project or
+24-hour acceptance gate. It uses the M4 selector and installs no host software.
+The script checks the oracle source digests and compiler version, retains logs
+and uses no leak suppressions. See `tests/compression/README.md` for scope.
+
+Do not resynchronize a worktree while a build is using its M4 mirror. `m4build`
+uses `rsync --delete`: remote-only dependency working files outside the excluded
+build directories can be removed. Store generated experiment output under
+`build/`; serialize mirror sync and full dependency builds.

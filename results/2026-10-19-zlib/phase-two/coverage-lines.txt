@@ -1,0 +1,525 @@
+    1|       |// Altered C++ implementation: canonical Huffman construction/decoding derived
+    2|       |// from Mark Adler's puff (zlib pin in PROVENANCE.md). Original notice is retained
+    3|       |// in LICENSE-puff.txt. Streaming, ownership, quotas and wrapper are rewritten.
+    4|       |#include "gui_forms/compression/inflate.hpp"
+    5|       |
+    6|       |#include <limits>
+    7|       |
+    8|       |namespace gui_forms::compression {
+    9|       |namespace {
+   10|       |
+   11|       |// Integer-address ordering is confined to this buffer-boundary overlap check.
+   12|       |// Subtraction avoids overflowing end-address arithmetic. Spans must themselves
+   13|       |// denote valid live storage; no decoder can validate arbitrary caller pointers.
+   14|       |bool overlaps(const void* first, std::size_t first_size,
+   15|  12.6M|              const void* second, std::size_t second_size) noexcept {
+   16|  12.6M|    if (first_size == 0 || second_size == 0) return false;
+   17|  12.6M|    const std::uintptr_t a = reinterpret_cast<std::uintptr_t>(first);
+   18|  12.6M|    const std::uintptr_t b = reinterpret_cast<std::uintptr_t>(second);
+   19|  12.6M|    if (a <= b) {
+   20|  12.6M|        const std::uintptr_t distance = b - a;
+   21|  12.6M|        const bool overlap = distance < first_size;
+   22|  12.6M|        return overlap;
+   23|  12.6M|    }
+   24|  2.31k|    const std::uintptr_t distance = a - b;
+   25|  2.31k|    const bool overlap = distance < second_size;
+   26|  2.31k|    return overlap;
+   27|  12.6M|}
+   28|       |
+   29|       |constexpr std::array<unsigned, 29> length_base{
+   30|       |    3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27,
+   31|       |    31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
+   32|       |constexpr std::array<unsigned, 29> length_extra{
+   33|       |    0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2,
+   34|       |    2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0};
+   35|       |constexpr std::array<unsigned, 30> distance_base{
+   36|       |    1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129,
+   37|       |    193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097,
+   38|       |    6145, 8193, 12289, 16385, 24577};
+   39|       |constexpr std::array<unsigned, 30> distance_extra{
+   40|       |    0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6,
+   41|       |    6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13};
+   42|       |constexpr std::array<unsigned, 19> alphabet_order{
+   43|       |    16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
+   44|       |
+   45|       |} // namespace
+   46|       |
+   47|    171|InflateError InflateStream::reset(const InflateOptions& options) noexcept {
+   48|    171|    const std::uint64_t unlimited = std::numeric_limits<std::uint64_t>::max();
+   49|    171|    if ((options.format != InflateFormat::zlib && options.format != InflateFormat::raw_deflate) ||
+   50|    171|        options.window_bits < 8 || options.window_bits > 15 ||
+   51|    170|        options.limits.input_bytes.value == unlimited ||
+   52|    170|        options.limits.output_bytes.value == unlimited || options.limits.work.value == unlimited) {
+   53|      1|        return InflateError::invalid_argument;
+   54|      1|    }
+   55|    170|    options_ = options;
+   56|    170|    phase_ = Phase::header;
+   57|    170|    if (options.format == InflateFormat::raw_deflate) phase_ = Phase::block;
+   58|    170|    error_ = InflateError::none;
+   59|    170|    input_total_ = ByteCount{};
+   60|    170|    output_total_ = ByteCount{};
+   61|    170|    work_total_ = WorkCount{};
+   62|    170|    history_next_ = 0;
+   63|    170|    history_live_ = 0;
+   64|    170|    window_size_ = std::size_t{1} << options.window_bits;
+   65|    170|    code_ = CodeCursor{};
+   66|    170|    bit_buffer_ = 0;
+   67|    170|    bit_count_ = 0;
+   68|    170|    literal_count_ = 0;
+   69|    170|    distance_count_ = 0;
+   70|    170|    alphabet_count_ = 0;
+   71|    170|    length_index_ = 0;
+   72|    170|    repeat_symbol_ = 0;
+   73|    170|    match_length_ = 0;
+   74|    170|    match_distance_ = 0;
+   75|    170|    extra_bits_ = 0;
+   76|    170|    literal_byte_ = 0;
+   77|    170|    stored_left_ = 0;
+   78|    170|    final_block_ = false;
+   79|    170|    adler_low_ = 1;
+   80|    170|    adler_high_ = 0;
+   81|    170|    trailer_ = 0;
+   82|    170|    trailer_bytes_ = 0;
+   83|    170|    dictionary_id_ = 0;
+   84|       |    // Old history and trees are outside the live ranges until replaced. Reset
+   85|       |    // does not clear caller output or read history belonging to an old stream.
+   86|    170|    return InflateError::none;
+   87|    171|}
+   88|       |
+   89|     55|bool InflateStream::fail(InflateError error) noexcept {
+   90|     55|    error_ = error;
+   91|     55|    phase_ = Phase::failed;
+   92|     55|    return false;
+   93|     55|}
+   94|       |
+   95|  12.7M|bool InflateStream::charge(std::uint64_t amount) noexcept {
+   96|  12.7M|    const std::uint64_t remaining = options_.limits.work.value - work_total_.value;
+   97|  12.7M|    if (amount > remaining) {
+   98|      2|        fail(InflateError::work_limit_exceeded);
+   99|      2|        return false;
+  100|      2|    }
+  101|  12.7M|    work_total_.value += amount;
+  102|  12.7M|    return true;
+  103|  12.7M|}
+  104|       |
+  105|  88.2k|bool InflateStream::bits(Call& call, unsigned count, unsigned& value) noexcept {
+  106|       |    // All callers request at most 16 bits. At most seven surplus bits survive.
+  107|   100k|    while (bit_count_ < count) {
+  108|  12.9k|        if (call.read == call.input.size()) {
+  109|    766|            if (call.final_input) fail(InflateError::truncated_input);
+  110|    766|            call.status = InflateStatus::need_input;
+  111|    766|            return false;
+  112|    766|        }
+  113|  12.1k|        if (input_total_.value == options_.limits.input_bytes.value) {
+  114|      2|            fail(InflateError::input_limit_exceeded);
+  115|      2|            return false;
+  116|      2|        }
+  117|  12.1k|        if (!charge(1)) return false;
+  118|  12.1k|        const std::uint32_t next = std::to_integer<std::uint32_t>(call.input[call.read]);
+  119|  12.1k|        bit_buffer_ |= next << bit_count_;
+  120|  12.1k|        bit_count_ += 8;
+  121|  12.1k|        ++call.read;
+  122|  12.1k|        ++input_total_.value;
+  123|  12.1k|    }
+  124|  87.4k|    if (!charge(1)) return false;
+  125|  87.4k|    const std::uint32_t mask = (std::uint32_t{1} << count) - 1U;
+  126|  87.4k|    value = bit_buffer_ & mask;
+  127|  87.4k|    bit_buffer_ >>= count;
+  128|  87.4k|    bit_count_ -= count;
+  129|  87.4k|    return true;
+  130|  87.4k|}
+  131|       |
+  132|  38.2k|bool InflateStream::symbol(Call& call, const Tree& tree, unsigned& value) noexcept {
+  133|  52.5k|    while (code_.length <= tree.maximum_length) {
+  134|  52.5k|        unsigned bit = 0;
+  135|  52.5k|        if (!bits(call, 1, bit)) return false;
+  136|  51.8k|        code_.code |= bit;
+  137|  51.8k|        const unsigned count = tree.counts[code_.length];
+  138|  51.8k|        const unsigned end = code_.first + count;
+  139|  51.8k|        if (code_.code >= code_.first && code_.code < end) {
+  140|  37.6k|            const unsigned offset = code_.code - code_.first;
+  141|  37.6k|            value = tree.symbols[code_.index + offset];
+  142|  37.6k|            code_ = CodeCursor{};
+  143|  37.6k|            return true;
+  144|  37.6k|        }
+  145|  14.2k|        code_.index += count;
+  146|  14.2k|        code_.first = end << 1U;
+  147|  14.2k|        code_.code <<= 1U;
+  148|  14.2k|        ++code_.length;
+  149|  14.2k|    }
+  150|      2|    fail(InflateError::invalid_huffman_code);
+  151|      2|    return false;
+  152|  38.2k|}
+  153|       |
+  154|       |bool InflateStream::build_tree(Tree& tree, std::span<const std::uint8_t> lengths,
+  155|    396|                               bool code_alphabet) noexcept {
+  156|       |    // Precharge all count/offset initialization, two symbol passes and 15
+  157|       |    // Kraft-space steps. No table size depends on unvalidated stream values.
+  158|    396|    const std::uint64_t work = 64U + 2U * lengths.size();
+  159|    396|    if (!charge(work)) return false;
+  160|    396|    tree.counts.fill(0);
+  161|    396|    tree.maximum_length = 0;
+  162|  43.9k|    for (std::size_t i = 0; i < lengths.size(); ++i) {
+  163|  43.5k|        const unsigned length = lengths[i];
+  164|  43.5k|        ++tree.counts[length];
+  165|  43.5k|        if (length > tree.maximum_length) tree.maximum_length = length;
+  166|  43.5k|    }
+  167|    396|    if (tree.maximum_length == 0) {
+  168|      5|        if (code_alphabet) {
+  169|      2|            fail(InflateError::incomplete_tree);
+  170|      2|            return false;
+  171|      2|        }
+  172|      3|        return true; // Empty distance alphabet is legal until a match uses it.
+  173|      5|    }
+  174|    391|    int available = 1;
+  175|  6.22k|    for (unsigned length = 1; length <= 15; ++length) {
+  176|  5.83k|        available *= 2;
+  177|  5.83k|        available -= tree.counts[length];
+  178|  5.83k|        if (available < 0) {
+  179|      2|            fail(InflateError::oversubscribed_tree);
+  180|      2|            return false;
+  181|      2|        }
+  182|  5.83k|    }
+  183|    389|    if (available != 0 && (code_alphabet || tree.maximum_length != 1)) {
+  184|      2|        fail(InflateError::incomplete_tree);
+  185|      2|        return false;
+  186|      2|    }
+  187|    387|    std::array<unsigned, 16> offsets{};
+  188|  5.80k|    for (unsigned length = 1; length < 15; ++length) {
+  189|  5.41k|        offsets[length + 1] = offsets[length] + tree.counts[length];
+  190|  5.41k|    }
+  191|  43.7k|    for (std::size_t i = 0; i < lengths.size(); ++i) {
+  192|  43.4k|        const unsigned length = lengths[i];
+  193|  43.4k|        if (length != 0) {
+  194|  12.1k|            const unsigned offset = offsets[length];
+  195|  12.1k|            tree.symbols[offset] = static_cast<std::uint16_t>(i);
+  196|  12.1k|            ++offsets[length];
+  197|  12.1k|        }
+  198|  43.4k|    }
+  199|    387|    return true;
+  200|    389|}
+  201|       |
+  202|     30|bool InflateStream::fixed_trees() noexcept {
+  203|     30|    if (!charge(320)) return false;
+  204|  4.35k|    for (unsigned i = 0; i < 144; ++i) lengths_[i] = 8;
+  205|  3.39k|    for (unsigned i = 144; i < 256; ++i) lengths_[i] = 9;
+  206|    750|    for (unsigned i = 256; i < 280; ++i) lengths_[i] = 7;
+  207|    270|    for (unsigned i = 280; i < 288; ++i) lengths_[i] = 8;
+  208|     30|    const std::span<const std::uint8_t> literal_lengths(lengths_.data(), 288);
+  209|     30|    if (!build_tree(literals_, literal_lengths, false)) return false;
+  210|    990|    for (unsigned i = 0; i < 32; ++i) lengths_[i] = 5;
+  211|     30|    const std::span<const std::uint8_t> distance_lengths(lengths_.data(), 32);
+  212|     30|    const bool built = build_tree(distances_, distance_lengths, false);
+  213|     30|    return built;
+  214|     30|}
+  215|       |
+  216|  8.40M|bool InflateStream::output_ready(Call& call) noexcept {
+  217|  8.40M|    if (output_total_.value == options_.limits.output_bytes.value) {
+  218|      2|        fail(InflateError::output_limit_exceeded);
+  219|      2|        return false;
+  220|      2|    }
+  221|  8.40M|    if (call.written == call.output.size()) {
+  222|  4.20M|        call.status = InflateStatus::need_output;
+  223|  4.20M|        return false;
+  224|  4.20M|    }
+  225|  4.20M|    const bool charged = charge(1);
+  226|  4.20M|    return charged;
+  227|  8.40M|}
+  228|       |
+  229|  4.20M|void InflateStream::emit(Call& call, std::byte value) noexcept {
+  230|  4.20M|    call.output[call.written] = value;
+  231|  4.20M|    ++call.written;
+  232|  4.20M|    ++output_total_.value;
+  233|  4.20M|    history_[history_next_] = value;
+  234|  4.20M|    history_next_ = (history_next_ + 1U) % history_.size();
+  235|  4.20M|    if (history_live_ < history_.size()) ++history_live_;
+  236|       |    // Each sum is less than 65521 before adding. The largest intermediate is
+  237|       |    // 131040, independent of stream length; no deferred-reduction overflow.
+  238|  4.20M|    adler_low_ += std::to_integer<std::uint32_t>(value);
+  239|  4.20M|    if (adler_low_ >= 65521U) adler_low_ -= 65521U;
+  240|  4.20M|    adler_high_ += adler_low_;
+  241|  4.20M|    if (adler_high_ >= 65521U) adler_high_ -= 65521U;
+  242|  4.20M|}
+  243|       |
+  244|    118|void InflateStream::end_block() noexcept {
+  245|    118|    phase_ = Phase::block;
+  246|    118|    if (final_block_) {
+  247|       |        // No speculative byte reads: only unused bits of the final byte remain.
+  248|    118|        bit_buffer_ = 0;
+  249|    118|        bit_count_ = 0;
+  250|    118|        phase_ = Phase::trailer;
+  251|    118|        if (options_.format == InflateFormat::raw_deflate) phase_ = Phase::done;
+  252|    118|    }
+  253|    118|}
+  254|       |
+  255|  8.49M|bool InflateStream::step(Call& call) noexcept {
+  256|  8.49M|    unsigned value = 0;
+  257|  8.49M|    switch (phase_) {
+  258|     16|    case Phase::header: {
+  259|     16|        if (!bits(call, 16, value)) return false;
+  260|     10|        const unsigned cmf = value & 255U;
+  261|     10|        const unsigned flags = value >> 8U;
+  262|     10|        if ((cmf & 15U) != 8) {
+  263|      2|            fail(InflateError::invalid_method);
+  264|      2|            return false;
+  265|      2|        }
+  266|      8|        const unsigned window_bits = (cmf >> 4U) + 8U;
+  267|      8|        if (window_bits > options_.window_bits || window_bits > 15) {
+  268|      2|            fail(InflateError::invalid_window);
+  269|      2|            return false;
+  270|      2|        }
+  271|      6|        const unsigned header = (cmf << 8U) | flags;
+  272|      6|        if (header % 31U != 0) {
+  273|      2|            fail(InflateError::invalid_header_check);
+  274|      2|            return false;
+  275|      2|        }
+  276|      4|        window_size_ = std::size_t{1} << window_bits;
+  277|      4|        phase_ = Phase::block;
+  278|      4|        if ((flags & 32U) != 0) phase_ = Phase::dictionary;
+  279|      4|        return true;
+  280|      6|    }
+  281|      8|    case Phase::dictionary:
+  282|      8|        if (!bits(call, 8, value)) return false;
+  283|      4|        dictionary_id_ = (dictionary_id_ << 8U) | value;
+  284|      4|        ++trailer_bytes_;
+  285|      4|        if (trailer_bytes_ == 4) {
+  286|      1|            fail(InflateError::dictionary_required);
+  287|      1|            return false;
+  288|      1|        }
+  289|      3|        return true;
+  290|    164|    case Phase::block: {
+  291|    164|        if (!bits(call, 3, value)) return false;
+  292|    157|        final_block_ = (value & 1U) != 0;
+  293|    157|        const unsigned type = value >> 1U;
+  294|    157|        if (type == 3) {
+  295|      2|            fail(InflateError::invalid_block_type);
+  296|      2|            return false;
+  297|      2|        }
+  298|    155|        if (type == 0) {
+  299|      3|            bit_buffer_ = 0;
+  300|      3|            bit_count_ = 0;
+  301|      3|            phase_ = Phase::stored_length;
+  302|    152|        } else if (type == 1) {
+  303|     30|            if (!fixed_trees()) return false;
+  304|     30|            phase_ = Phase::literal;
+  305|    122|        } else {
+  306|    122|            phase_ = Phase::dynamic_counts;
+  307|    122|        }
+  308|    155|        return true;
+  309|    155|    }
+  310|      7|    case Phase::stored_length:
+  311|      7|        if (!bits(call, 16, stored_left_)) return false;
+  312|      3|        phase_ = Phase::stored_complement;
+  313|      3|        return true;
+  314|      7|    case Phase::stored_complement:
+  315|      7|        if (!bits(call, 16, value)) return false;
+  316|      3|        if ((stored_left_ ^ value) != 65535U) {
+  317|      2|            fail(InflateError::stored_length_mismatch);
+  318|      2|            return false;
+  319|      2|        }
+  320|      1|        phase_ = Phase::stored_bytes;
+  321|      1|        return true;
+  322|      7|    case Phase::stored_bytes:
+  323|      7|        if (stored_left_ == 0) {
+  324|      1|            end_block();
+  325|      1|            return true;
+  326|      1|        }
+  327|      6|        if (!output_ready(call)) return false;
+  328|      4|        if (!bits(call, 8, value)) return false;
+  329|      3|        emit(call, static_cast<std::byte>(value));
+  330|      3|        --stored_left_;
+  331|      3|        return true;
+  332|    143|    case Phase::dynamic_counts:
+  333|    143|        if (!bits(call, 14, value)) return false;
+  334|    122|        literal_count_ = (value & 31U) + 257U;
+  335|    122|        distance_count_ = ((value >> 5U) & 31U) + 1U;
+  336|    122|        alphabet_count_ = (value >> 10U) + 4U;
+  337|    122|        if (literal_count_ > 286 || distance_count_ > 30) {
+  338|      2|            fail(InflateError::invalid_code_counts);
+  339|      2|            return false;
+  340|      2|        }
+  341|    120|        if (!charge(19)) return false;
+  342|    120|        alphabet_lengths_.fill(0);
+  343|    120|        length_index_ = 0;
+  344|    120|        phase_ = Phase::code_lengths;
+  345|    120|        return true;
+  346|  2.18k|    case Phase::code_lengths:
+  347|  2.18k|        if (length_index_ < alphabet_count_) {
+  348|  2.06k|            if (!bits(call, 3, value)) return false;
+  349|  2.02k|            const unsigned index = alphabet_order[length_index_];
+  350|  2.02k|            alphabet_lengths_[index] = static_cast<std::uint8_t>(value);
+  351|  2.02k|            ++length_index_;
+  352|  2.02k|            return true;
+  353|  2.06k|        }
+  354|    120|        if (!build_tree(code_lengths_, alphabet_lengths_, true)) return false;
+  355|    114|        length_index_ = 0;
+  356|    114|        phase_ = Phase::expanded_lengths;
+  357|    114|        return true;
+  358|  2.88k|    case Phase::expanded_lengths: {
+  359|  2.88k|        const unsigned total = literal_count_ + distance_count_;
+  360|  2.88k|        if (length_index_ == total) {
+  361|    110|            if (lengths_[256] == 0) {
+  362|      2|                fail(InflateError::missing_end_of_block);
+  363|      2|                return false;
+  364|      2|            }
+  365|    108|            const std::span<const std::uint8_t> literal_lengths(lengths_.data(), literal_count_);
+  366|    108|            if (!build_tree(literals_, literal_lengths, false)) return false;
+  367|    108|            const std::span<const std::uint8_t> distance_lengths(lengths_.data() + literal_count_, distance_count_);
+  368|    108|            if (!build_tree(distances_, distance_lengths, false)) return false;
+  369|    108|            phase_ = Phase::literal;
+  370|    108|            return true;
+  371|    108|        }
+  372|  2.77k|        if (!symbol(call, code_lengths_, value)) return false;
+  373|  2.66k|        if (value < 16) {
+  374|  2.02k|            lengths_[length_index_] = static_cast<std::uint8_t>(value);
+  375|  2.02k|            ++length_index_;
+  376|  2.02k|        } else {
+  377|    636|            if (value == 16 && length_index_ == 0) {
+  378|      2|                fail(InflateError::invalid_code_length_repeat);
+  379|      2|                return false;
+  380|      2|            }
+  381|    634|            repeat_symbol_ = value;
+  382|    634|            phase_ = Phase::repeat;
+  383|    634|        }
+  384|  2.65k|        return true;
+  385|  2.66k|    }
+  386|    651|    case Phase::repeat: {
+  387|    651|        unsigned count_bits = 2;
+  388|    651|        unsigned base = 3;
+  389|    651|        std::uint8_t length = 0;
+  390|    651|        if (repeat_symbol_ == 16) length = lengths_[length_index_ - 1];
+  391|    651|        if (repeat_symbol_ == 17) count_bits = 3;
+  392|    651|        if (repeat_symbol_ == 18) {
+  393|    327|            count_bits = 7;
+  394|    327|            base = 11;
+  395|    327|        }
+  396|    651|        if (!bits(call, count_bits, value)) return false;
+  397|    634|        const unsigned repeat = base + value;
+  398|    634|        const unsigned remaining = literal_count_ + distance_count_ - length_index_;
+  399|    634|        if (repeat > remaining) {
+  400|      2|            fail(InflateError::invalid_code_length_repeat);
+  401|      2|            return false;
+  402|      2|        }
+  403|    632|        if (!charge(repeat)) return false;
+  404|  31.0k|        for (unsigned i = 0; i < repeat; ++i) {
+  405|  30.4k|            lengths_[length_index_] = length;
+  406|  30.4k|            ++length_index_;
+  407|  30.4k|        }
+  408|    632|        phase_ = Phase::expanded_lengths;
+  409|    632|        return true;
+  410|    632|    }
+  411|  19.2k|    case Phase::literal:
+  412|  19.2k|        if (!symbol(call, literals_, value)) return false;
+  413|  18.6k|        if (value < 256) {
+  414|  2.25k|            literal_byte_ = value;
+  415|  2.25k|            phase_ = Phase::emit_literal;
+  416|  16.4k|        } else if (value == 256) {
+  417|    117|            end_block();
+  418|  16.2k|        } else {
+  419|  16.2k|            if (value > 285) {
+  420|      2|                fail(InflateError::invalid_literal_length);
+  421|      2|                return false;
+  422|      2|            }
+  423|  16.2k|            const unsigned index = value - 257U;
+  424|  16.2k|            match_length_ = length_base[index];
+  425|  16.2k|            extra_bits_ = length_extra[index];
+  426|  16.2k|            phase_ = Phase::length_extra;
+  427|  16.2k|        }
+  428|  18.6k|        return true;
+  429|  3.61k|    case Phase::emit_literal:
+  430|  3.61k|        if (!output_ready(call)) return false;
+  431|  2.25k|        emit(call, static_cast<std::byte>(literal_byte_));
+  432|  2.25k|        phase_ = Phase::literal;
+  433|  2.25k|        return true;
+  434|  16.2k|    case Phase::length_extra:
+  435|  16.2k|        if (!bits(call, extra_bits_, value)) return false;
+  436|  16.2k|        match_length_ += value;
+  437|  16.2k|        phase_ = Phase::distance;
+  438|  16.2k|        return true;
+  439|  16.2k|    case Phase::distance:
+  440|  16.2k|        if (!symbol(call, distances_, value)) return false;
+  441|  16.2k|        if (value > 29) {
+  442|      2|            fail(InflateError::invalid_distance_code);
+  443|      2|            return false;
+  444|      2|        }
+  445|  16.2k|        match_distance_ = distance_base[value];
+  446|  16.2k|        extra_bits_ = distance_extra[value];
+  447|  16.2k|        phase_ = Phase::distance_extra;
+  448|  16.2k|        return true;
+  449|  16.2k|    case Phase::distance_extra:
+  450|  16.2k|        if (!bits(call, extra_bits_, value)) return false;
+  451|  16.2k|        match_distance_ += value;
+  452|  16.2k|        if (match_distance_ > window_size_) {
+  453|      2|            fail(InflateError::distance_exceeds_window);
+  454|      2|            return false;
+  455|      2|        }
+  456|  16.2k|        if (match_distance_ > history_live_) {
+  457|      3|            fail(InflateError::distance_before_history);
+  458|      3|            return false;
+  459|      3|        }
+  460|  16.2k|        phase_ = Phase::match;
+  461|  16.2k|        return true;
+  462|  8.41M|    case Phase::match: {
+  463|  8.41M|        if (match_length_ == 0) {
+  464|  16.2k|            phase_ = Phase::literal;
+  465|  16.2k|            return true;
+  466|  16.2k|        }
+  467|  8.40M|        if (!output_ready(call)) return false;
+  468|  4.20M|        const std::size_t source = (history_next_ + history_.size() - match_distance_) % history_.size();
+  469|  4.20M|        const std::byte byte = history_[source];
+  470|  4.20M|        emit(call, byte);
+  471|  4.20M|        --match_length_;
+  472|  4.20M|        return true;
+  473|  8.40M|    }
+  474|     20|    case Phase::trailer:
+  475|     20|        if (!bits(call, 8, value)) return false;
+  476|     12|        trailer_ = (trailer_ << 8U) | value;
+  477|     12|        ++trailer_bytes_;
+  478|     12|        if (trailer_bytes_ == 4) {
+  479|      3|            const std::uint32_t adler = (adler_high_ << 16U) | adler_low_;
+  480|      3|            if (trailer_ != adler) {
+  481|      2|                fail(InflateError::adler_mismatch);
+  482|      2|                return false;
+  483|      2|            }
+  484|      1|            phase_ = Phase::done;
+  485|      1|        }
+  486|     10|        return true;
+  487|      0|    case Phase::idle:
+  488|      0|        fail(InflateError::invalid_state);
+  489|      0|        return false;
+  490|      0|    case Phase::failed:
+  491|      0|    case Phase::done:
+  492|      0|        return false;
+  493|  8.49M|    }
+  494|      0|    fail(InflateError::invalid_state);
+  495|      0|    return false;
+  496|  8.49M|}
+  497|       |
+  498|       |InflateResult InflateStream::process(std::span<const std::byte> input,
+  499|       |                                     std::span<std::byte> output,
+  500|  4.20M|                                     bool final_input) noexcept {
+  501|  4.20M|    Call call{.input = input, .output = output, .final_input = final_input};
+  502|  4.20M|    const bool input_output_overlap = overlaps(input.data(), input.size(), output.data(), output.size());
+  503|  4.20M|    const bool input_state_overlap = overlaps(input.data(), input.size(), this, sizeof(*this));
+  504|  4.20M|    const bool output_state_overlap = overlaps(output.data(), output.size(), this, sizeof(*this));
+  505|  4.20M|    if (phase_ != Phase::failed && phase_ != Phase::done &&
+  506|  4.20M|        (input_output_overlap || input_state_overlap || output_state_overlap)) {
+  507|      2|        fail(InflateError::invalid_argument);
+  508|      2|    }
+  509|  4.20M|    if (phase_ == Phase::idle) fail(InflateError::invalid_state);
+  510|  8.49M|    while (phase_ != Phase::done && phase_ != Phase::failed) {
+  511|  8.49M|        if (!charge(1)) break;
+  512|  8.49M|        if (!step(call)) break;
+  513|  8.49M|    }
+  514|  4.20M|    if (phase_ == Phase::done) call.status = InflateStatus::stream_end;
+  515|  4.20M|    if (phase_ == Phase::failed) call.status = InflateStatus::error;
+  516|  4.20M|    const InflateResult result{
+  517|  4.20M|        .status = call.status, .error = error_,
+  518|  4.20M|        .input_consumed = call.read, .output_produced = call.written,
+  519|  4.20M|        .total_input = input_total_, .total_output = output_total_,
+  520|  4.20M|        .total_work = work_total_, .dictionary_id = dictionary_id_};
+  521|  4.20M|    return result;
+  522|  4.20M|}
+  523|       |
+  524|       |} // namespace gui_forms::compression
+
