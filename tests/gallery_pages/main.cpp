@@ -110,6 +110,7 @@ int main() {
         test_registry_pages_gallery();
         test_anatomy_coverage();
         test_schema_export();
+        test_display_commands_unchanged();
         std::cout << "gui_forms_gallery_pages_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

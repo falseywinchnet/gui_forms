@@ -2897,6 +2897,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/main.cpp
             tests/gallery_pages/catalog_tests.cpp
             tests/gallery_pages/shell_tests.cpp
+            tests/gallery_pages/display_trace_tests.cpp
             tests/gallery_pages/ranges-and-progress_tests.cpp
             tests/gallery_pages/containers-and-focus_tests.cpp
             tests/gallery_pages/animation-laboratory_tests.cpp
