@@ -368,6 +368,8 @@ Bytes international_field(const Bytes& content, const Bytes& translated, bool co
 void text_metadata() {
     const image::PngDecodeLimits limits{.metadata_bytes=4096};
     const Bytes word{std::byte{'a'}};
+    std::unique_ptr<compression::InflateStream> measured_workspace = std::make_unique<compression::InflateStream>();
+    std::array<std::byte, 1> measured_scratch{};
     for (unsigned method = 0; method < 256; ++method) {
         const Bytes plain = text_image("iTXt", international_field(word, {}, false, method));
         require(decode(plain, limits).result.error == image::PngDecodeError::none,
@@ -399,6 +401,12 @@ void text_metadata() {
             require(inspection.error == inspected_error, "text validation occurred at the wrong boundary");
             require(decode(png, limits).result.error == image::PngDecodeError::invalid_metadata,
                     "invalid iTXt text accepted");
+            if (compressed) {
+                const image::PngDecodeResult measured = image::measure_png_samples(
+                    png, limits, *measured_workspace, measured_scratch);
+                require(measured.error == image::PngDecodeError::invalid_metadata,
+                        "streamed metadata preflight accepted invalid UTF-8");
+            }
             // A zero in a translated keyword is its delimiter, not UTF-8 data.
             if (malformed[0] == std::byte{0}) continue;
             const Bytes translated = text_image("iTXt", international_field(word, malformed, compressed));
@@ -406,6 +414,12 @@ void text_metadata() {
                     "invalid translated keyword accepted");
         }
     }
+    const Bytes split_scalar{std::byte{0xf0}, std::byte{0x9f}, std::byte{0x99}, std::byte{0x82}};
+    const Bytes split_png = text_image("iTXt", international_field(split_scalar, {}, true));
+    const image::PngDecodeResult split_measurement = image::measure_png_samples(
+        split_png, limits, *measured_workspace, measured_scratch);
+    require(split_measurement.error == image::PngDecodeError::none &&
+            split_measurement.metadata_bytes == split_scalar.size(), "split UTF-8 preflight failed");
     Bytes latin{};
     for (unsigned value = 1; value < 256; ++value) latin.push_back(static_cast<std::byte>(value));
     for (bool compressed : {false, true}) {
@@ -455,9 +469,17 @@ void text_metadata() {
         }
     }
     const image::PngDecodeLimits large{.metadata_bytes=8ULL * 1024 * 1024};
+    std::array<std::byte, 4096> unicode_scratch{};
     for (bool compressed : {false, true}) {
-        require(decode(text_image("iTXt", international_field(unicode, {}, compressed)), large).result.error ==
+        const Bytes unicode_png = text_image("iTXt", international_field(unicode, {}, compressed));
+        require(decode(unicode_png, large).result.error ==
                 image::PngDecodeError::none, "valid Unicode scalar rejected");
+        if (compressed) {
+            const image::PngDecodeResult measured = image::measure_png_samples(
+                unicode_png, large, *measured_workspace, unicode_scratch);
+            require(measured.error == image::PngDecodeError::none &&
+                    measured.metadata_bytes == unicode.size(), "Unicode preflight byte count changed");
+        }
     }
     require(decode(text_image("iTXt", international_field({}, unicode, false)), large).result.error ==
             image::PngDecodeError::none, "valid translated Unicode scalar rejected");
@@ -480,6 +502,17 @@ void metadata_and_storage() {
     require(decoded.result.error == image::PngDecodeError::none, "compressed metadata rejected");
     require(decoded.result.metadata_bytes == 192 && decoded.records.size() == 3, "metadata accounting mismatch");
     for (std::size_t index = 0; index < 192; ++index) require(decoded.metadata[index] == std::byte{65}, "metadata byte mismatch");
+    std::unique_ptr<compression::InflateStream> measured_workspace = std::make_unique<compression::InflateStream>();
+    std::array<std::byte, 1> measured_scratch{};
+    const image::PngDecodeResult measured = image::measure_png_samples(
+        png, {}, *measured_workspace, measured_scratch);
+    require(measured.error == image::PngDecodeError::none && measured.metadata_bytes == 192 &&
+            measured.layout.metadata_records == 3, "exact metadata preflight failed");
+    require(image::measure_png_samples(png, {}, *measured_workspace, {}).error ==
+            image::PngDecodeError::invalid_argument, "empty metadata scratch accepted");
+    const std::span<std::byte> aliased_scratch(png.data(), 1);
+    require(image::measure_png_samples(png, {}, *measured_workspace, aliased_scratch).error ==
+            image::PngDecodeError::invalid_argument, "aliased metadata scratch accepted");
     image::PngDecodeLimits limits{};
     limits.inflate_work.value = decoded.result.inflate_work.value - 1;
     require(decode(png, limits).result.inflate_error == compression::InflateError::work_limit_exceeded, "metadata reset restored work budget");
@@ -495,6 +528,11 @@ void metadata_and_storage() {
     limits = {}; limits.metadata_bytes = 6000;
     require(decode(bomb, limits).result.inflate_error == compression::InflateError::output_limit_exceeded,
             "metadata reset restored output budget");
+    const image::PngDecodeResult measured_bomb = image::measure_png_samples(
+        bomb, limits, *measured_workspace, measured_scratch);
+    require(measured_bomb.error == image::PngDecodeError::inflate_failure &&
+            measured_bomb.inflate_error == compression::InflateError::output_limit_exceeded,
+            "metadata preflight restored output budget");
     Bytes policy_image = header(1, 1, formats[13], false);
     Bytes policy_field{std::byte{65}, std::byte{0}, std::byte{0}};
     const Bytes policy_stream = stored(Bytes(16, std::byte{65}));
@@ -527,7 +565,7 @@ void metadata_and_storage() {
     Bytes rows(inspection.layout.row_storage_bytes, std::byte{0});
     std::array<std::uint16_t,4> pixels{91,91,91,91};
     std::array<image::PngMetadataRecord,3> records{};
-    Bytes output(192, std::byte{0});
+    Bytes output(measured.metadata_bytes, std::byte{0});
     std::unique_ptr<compression::InflateStream> workspace = std::make_unique<compression::InflateStream>();
     const image::PngDecodeResult exact = image::decode_png_samples(png, {}, *workspace, rows, pixels, output, records);
     require(exact.error == image::PngDecodeError::none, "exact metadata buffer rejected");

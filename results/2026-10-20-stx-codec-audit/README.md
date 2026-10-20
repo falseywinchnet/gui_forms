@@ -1,7 +1,7 @@
 # `stx_zlib` / `stx_png` focused audit record
 
-Date: 2026-10-20. Source: `codex/png-owned-codec` at `3cff2bcb`, plus the
-uncommitted protocol harness and seed generator listed below. Host: M4 Mac
+Date: 2026-10-20. Source: `codex/png-owned-codec` at `80f72514` for the
+protocol harness, plus the following PNG preflight increment. Host: M4 Mac
 mini (`m4mini` selected by `m4host`), macOS arm64, LLVM 22.1.8 from the pinned
 GUI.Forms toolchain. All fuzz targets were built with ASan and UBSan; leak
 detection was enabled in their execution environment. These results cover the
@@ -67,3 +67,43 @@ tool-runtime result, not suppressed evidence from the codec.
 
 No claim of full security audit or production readiness is made while these
 gates remain open.
+
+## Exact metadata-capacity preflight increment
+
+The previous structural `inspect_png_samples` could report row, sample and
+record counts, but not the decoded size of compressed iCCP/zTXt/iTXt fields.
+The optional `measure_png_samples` now parses the full chunk envelope and
+inflates only compressed metadata into reusable caller scratch. It returns the
+exact metadata byte count on success, rejects empty/overlapping scratch,
+validates zlib checksums and text across scratch boundaries, and charges the
+same aggregate metadata-output and work limits across fields. The caller can
+allocate exactly that size before `decode_png_samples`, which independently
+revalidates the input. This is an API addition; it does not yet establish an
+independent `stx_png` package.
+
+On the same M4/LLVM 22 host, a five-minute run of the preceding decoder fuzz
+binary completed 4,005,177 executions, adding 673 units, with ASan, UBSan
+and leak detection enabled and no report. After adding the preflight and a
+fuzzer assertion that every successful decode agrees with its measurement,
+the rebuilt target completed 1,684,140 executions in 60 seconds, adding 246
+units, with no sanitizer report. Both runs used the checked-in/generated PNG
+corpus, `-timeout=5 -rss_limit_mb=0 -max_len=65536`, and exit code 0. The
+second seed corpus contained 1,283 files after earlier mutations. The two
+counts are separate runs on different binaries, not one continuous campaign.
+
+The PNG decoder CTest passed in the focused ASan/UBSan tree with leak detection.
+It now checks one-byte-scratch UTF-8 boundaries, invalid compressed text,
+alias and empty-scratch rejection, aggregate output quota, and exact allocation
+followed by decode. A further test measured compressed text containing all
+1,112,063 nonzero Unicode scalar values with 4 KiB scratch; the sanitized PNG
+CTest passed after that addition. LLVM 22 static analysis of the changed
+translation unit emitted no diagnostic. These are bounded checks, not a
+substitute for the sustained, cross-platform PNG campaign.
+
+After the final explicit work/output arithmetic guards, the expanded 1,491-file
+corpus replayed with `-runs=0`, exit 0. A final 60-second ASan/UBSan/leak
+mutation run on that exact code completed 1,692,453 executions, added 144
+units, reported 193 MiB peak RSS, and exited 0 without a sanitizer finding.
+The exhaustive Unicode and PNG decoder CTest passed again on the final code
+under the same sanitizers. Whole-tree house-style and lifetime checks still
+reported zero findings across 1,181 files; `git diff --check` was clean.

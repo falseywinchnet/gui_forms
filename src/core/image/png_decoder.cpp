@@ -219,6 +219,45 @@ bool valid_png_text(std::span<const std::byte> data) noexcept {
     }
 }
 
+// Carries an incomplete UTF-8 scalar between bounded inflate output spans.
+// Latin-1 PNG text has only the NUL exclusion; UTF-8 also checks shortest
+// encodings, scalar range and surrogate exclusion.
+struct TextScan final {
+    unsigned remaining = 0;
+    unsigned lower = 0x80;
+    unsigned upper = 0xbf;
+
+    bool accept(std::span<const std::byte> data, bool unicode) noexcept {
+        for (std::byte item : data) {
+            const unsigned value = byte(item);
+            if (value == 0) return false;
+            if (!unicode) continue;
+            if (remaining != 0) {
+                if (value < lower || value > upper) return false;
+                --remaining;
+                lower = 0x80;
+                upper = 0xbf;
+                continue;
+            }
+            if (value < 0x80) continue;
+            if (value >= 0xc2 && value <= 0xdf) {
+                remaining = 1;
+            } else if (value >= 0xe0 && value <= 0xef) {
+                remaining = 2;
+                if (value == 0xe0) lower = 0xa0;
+                if (value == 0xed) upper = 0x9f;
+            } else if (value >= 0xf0 && value <= 0xf4) {
+                remaining = 3;
+                if (value == 0xf0) lower = 0x90;
+                if (value == 0xf4) upper = 0x8f;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+};
+
 // Parsing validates raw text once. Metadata extraction reuses that proof and
 // validates only newly inflated text, avoiding a second scan of large strings.
 template<bool ValidateText>
@@ -695,6 +734,68 @@ PngDecodeError decode_metadata(std::span<const std::byte> encoded, const PngDeco
     }
     return PngDecodeError::none;
 }
+
+PngDecodeError measure_metadata(std::span<const std::byte> encoded, const PngDecodeLimits& limits,
+    InflateStream& workspace, std::span<std::byte> scratch, PngDecodeResult& result) noexcept {
+    std::size_t offset = 8;
+    while (offset < encoded.size()) {
+        const Chunk chunk = chunk_at(encoded, offset);
+        offset = chunk.next;
+        if ((chunk.type & 0x20000000U) == 0) continue;
+        const std::span<const std::byte> data = encoded.subspan(chunk.data_offset, chunk.length);
+        bool compressed = false;
+        std::size_t start = 0;
+        const PngDecodeError field_error = metadata_field<false>(chunk.type, data, compressed, start);
+        if (field_error != PngDecodeError::none) return field_error;
+        if (!compressed) continue;
+
+        InflateOptions options{};
+        options.limits.input_bytes.value = chunk.length - start;
+        options.limits.output_bytes.value = limits.metadata_bytes - result.metadata_bytes;
+        options.limits.work.value = limits.inflate_work.value - result.inflate_work.value;
+        result.inflate_error = workspace.reset(options);
+        if (result.inflate_error != InflateError::none) return PngDecodeError::inflate_failure;
+
+        const std::span<const std::byte> input = data.subspan(start);
+        const std::size_t completed_bytes = result.metadata_bytes;
+        const std::uint64_t completed_work = result.inflate_work.value;
+        const std::size_t size_max = std::numeric_limits<std::size_t>::max();
+        TextScan text_scan{};
+        std::size_t consumed = 0;
+        for (;;) {
+            const std::span<const std::byte> pending = input.subspan(consumed);
+            const InflateResult step = workspace.process(pending, scratch, true);
+            result.inflate_error = step.error;
+            if (step.input_consumed > pending.size() || step.output_produced > scratch.size()) {
+                return PngDecodeError::inflate_failure;
+            }
+            if (step.total_work.value > limits.inflate_work.value - completed_work) {
+                return PngDecodeError::inflate_failure;
+            }
+            result.inflate_work.value = completed_work + step.total_work.value;
+            consumed += step.input_consumed;
+            if (step.status == InflateStatus::error) return PngDecodeError::inflate_failure;
+            if (step.total_output.value > limits.metadata_bytes - completed_bytes) {
+                return PngDecodeError::resource_limit;
+            }
+            if (step.total_output.value > size_max - completed_bytes) return PngDecodeError::resource_limit;
+            if (chunk.type == ztxt || chunk.type == itxt) {
+                const std::span<const std::byte> decoded = scratch.first(step.output_produced);
+                if (!text_scan.accept(decoded, chunk.type == itxt)) return PngDecodeError::invalid_metadata;
+            }
+            if (step.status == InflateStatus::stream_end) {
+                if (consumed != input.size()) return PngDecodeError::trailing_data;
+                if (text_scan.remaining != 0) return PngDecodeError::invalid_metadata;
+                result.metadata_bytes = completed_bytes + static_cast<std::size_t>(step.total_output.value);
+                break;
+            }
+            if (step.input_consumed == 0 && step.output_produced == 0) {
+                return PngDecodeError::inflate_failure;
+            }
+        }
+    }
+    return PngDecodeError::none;
+}
 } // namespace
 
 PngDecodeResult inspect_png_samples(std::span<const std::byte> encoded,
@@ -703,6 +804,24 @@ PngDecodeResult inspect_png_samples(std::span<const std::byte> encoded,
     PngDecodeResult result{};
     result.error = parse(encoded, limits, plan);
     if (result.error == PngDecodeError::none) result.layout = plan.layout;
+    return result;
+}
+
+PngDecodeResult measure_png_samples(std::span<const std::byte> encoded,
+    PngDecodeLimits limits, InflateStream& workspace, std::span<std::byte> scratch) noexcept {
+    PngDecodeResult result{};
+    const std::span<const InflateStream> workspace_objects(&workspace, 1);
+    const std::span<const std::byte> workspace_bytes = std::as_bytes(workspace_objects);
+    if (scratch.empty() || overlaps(encoded, workspace_bytes) ||
+        overlaps(encoded, scratch) || overlaps(workspace_bytes, scratch)) {
+        result.error = PngDecodeError::invalid_argument;
+        return result;
+    }
+    Plan plan{};
+    result.error = parse(encoded, limits, plan);
+    if (result.error != PngDecodeError::none) return result;
+    result.layout = plan.layout;
+    result.error = measure_metadata(encoded, limits, workspace, scratch, result);
     return result;
 }
 

@@ -23,7 +23,12 @@ It is not yet a replacement for any production colour-managed renderer.
 
 Input is an immutable whole-file span. Inspection validates signature, chunk
 bounds/types/order/CRCs and computes exact output and row-storage requirements.
-Decode revalidates rather than trusting a caller-modifiable inspection record.
+An optional measurement call uses caller-owned reusable scratch to validate
+compressed metadata and report its exact decoded byte count before output
+allocation. Its UTF-8 state spans scratch boundaries, and all compressed
+fields share the metadata and work quotas. It does not validate IDAT or
+palette indices. Decode revalidates the source independently rather than
+trusting a caller-modifiable measurement result.
 IDAT payloads feed one owned inflate stream without concatenation. Two reusable
 rows suffice; each Adam7 pass resets the previous row. Exact filtered size is
 sum((ceil(pass_width * channels * depth / 8) + 1) * pass_height) over nonempty

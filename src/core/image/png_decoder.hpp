@@ -63,6 +63,19 @@ struct PngDecodeResult final {
 [[nodiscard]] PngDecodeResult inspect_png_samples(
     std::span<const std::byte> encoded, PngDecodeLimits limits) noexcept;
 
+// Optional preflight for exact decoded metadata capacity. Structural parsing
+// runs first; then each compressed metadata field is validated into reusable
+// caller scratch, including its checksum and text encoding. Scratch must be
+// nonempty and disjoint from encoded bytes and workspace. The call retains no
+// borrow and may overwrite scratch and workspace. metadata_bytes is exact on
+// success and counts only complete compressed fields on failure; scratch then
+// contains an unverified prefix. inflate_work charges this preflight only.
+// IDAT and palette indices are validated later by decode, which does not
+// trust this result.
+[[nodiscard]] PngDecodeResult measure_png_samples(
+    std::span<const std::byte> encoded, PngDecodeLimits limits,
+    compression::InflateStream& workspace, std::span<std::byte> scratch) noexcept;
+
 // Private lossless sample seam: native uint16 RGBA, top row first, straight alpha,
 // no colour conversion. All spans and workspace must be mutually disjoint.
 // Limits are copied at entry, so output cannot mutate the active policy.

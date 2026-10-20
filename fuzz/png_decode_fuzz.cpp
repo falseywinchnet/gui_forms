@@ -1,5 +1,6 @@
 #include "../src/core/image/png_decoder.hpp"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -17,13 +18,26 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     const image::PngDecodeResult inspected = image::inspect_png_samples(bytes, limits);
     if (inspected.error != image::PngDecodeError::none) return 0;
     std::unique_ptr<compression::InflateStream> workspace = std::make_unique<compression::InflateStream>();
+    std::array<std::byte, 32> scratch{};
+    const std::span<std::byte> bounded_scratch(scratch.data(), 1 + size % scratch.size());
+    const image::PngDecodeResult measured = image::measure_png_samples(
+        bytes, limits, *workspace, bounded_scratch);
     std::vector<std::byte> rows(inspected.layout.row_storage_bytes);
     std::vector<std::uint16_t> pixels(inspected.layout.rgba_samples);
-    std::vector<std::byte> metadata(static_cast<std::size_t>(limits.metadata_bytes));
+    const std::size_t metadata_capacity = measured.error == image::PngDecodeError::none
+        ? measured.metadata_bytes : static_cast<std::size_t>(limits.metadata_bytes);
+    std::vector<std::byte> metadata(metadata_capacity);
     std::vector<image::PngMetadataRecord> records(inspected.layout.metadata_records);
     const image::PngDecodeResult decoded = image::decode_png_samples(bytes, limits,
         *workspace, rows, pixels, metadata, records);
     if (decoded.inflate_work.value > limits.inflate_work.value || decoded.metadata_bytes > limits.metadata_bytes) {
+        std::abort();
+    }
+    if (measured.inflate_work.value > limits.inflate_work.value || measured.metadata_bytes > limits.metadata_bytes) {
+        std::abort();
+    }
+    if (decoded.error == image::PngDecodeError::none &&
+        (measured.error != image::PngDecodeError::none || measured.metadata_bytes != decoded.metadata_bytes)) {
         std::abort();
     }
     return 0;
