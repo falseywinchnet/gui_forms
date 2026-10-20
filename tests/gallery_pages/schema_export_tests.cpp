@@ -1,8 +1,12 @@
 #include "support.hpp"
 
+#include "gui_forms/engine.hpp"
 #include "gui_forms/schema.hpp"
 
+#include <array>
+#include <charconv>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
@@ -184,6 +188,156 @@ void append_vocabulary(std::string& out) {
     names.push_back("orientation");
     append_key(out, "    ", "semantic_fields");
     append_name_list(out, names);
+    out += "\n  },\n";
+}
+
+// A number in its shortest round-trip form, which std::to_chars gives the
+// same on every host.
+void append_number(std::string& out, double value) {
+    std::array<char, 32> text{};
+    const std::to_chars_result written = std::to_chars(text.data(), text.data() + text.size(), value);
+    out.append(text.data(), static_cast<std::size_t>(written.ptr - text.data()));
+}
+
+void append_unsigned(std::string& out, std::uint64_t value) {
+    out += std::to_string(value);
+}
+
+void append_version(std::string& out, EngineVersion version) {
+    const std::string text = std::to_string(version.major) + "." + std::to_string(version.minor);
+    append_json_string(out, text);
+}
+
+// A colour as #rrggbbaa.
+void append_colour(std::string& out, Color colour) {
+    constexpr std::string_view digits = "0123456789abcdef";
+    const std::array<std::uint8_t, 4> channels{colour.red, colour.green, colour.blue, colour.alpha};
+    std::string text = "#";
+    for (const std::uint8_t channel : channels) {
+        text += digits[channel >> 4U];
+        text += digits[channel & 0x0FU];
+    }
+    append_json_string(out, text);
+}
+
+void append_parameters(std::string& out, std::span<const PrimitiveParameterDeclaration> parameters) {
+    out += '[';
+    for (std::size_t index = 0; index < parameters.size(); ++index) {
+        const PrimitiveParameterDeclaration& parameter = parameters[index];
+        out += index == 0U ? "\n" : ",\n";
+        out += "          {";
+        append_json_string(out, "name");
+        out += ": ";
+        append_json_string(out, parameter.name);
+        out += ", ";
+        append_json_string(out, "kind");
+        out += ": ";
+        if (parameter.kind == PrimitiveParameterKind::number) {
+            append_json_string(out, "number");
+            out += ", ";
+            append_json_string(out, "minimum");
+            out += ": ";
+            append_number(out, parameter.minimum);
+            out += ", ";
+            append_json_string(out, "maximum");
+            out += ": ";
+            append_number(out, parameter.maximum);
+            out += ", ";
+            append_json_string(out, "default");
+            out += ": ";
+            append_number(out, parameter.default_number);
+        } else {
+            append_json_string(out, "colour");
+            out += ", ";
+            append_json_string(out, "default");
+            out += ": ";
+            append_colour(out, parameter.default_colour);
+        }
+        out += ", ";
+        append_json_string(out, "animated");
+        out += ": ";
+        append_bool(out, parameter.animated);
+        out += '}';
+    }
+    out += parameters.empty() ? "]" : "\n        ]";
+}
+
+// The engine (T2 plan, E4): the version this build implements, the
+// cascade's levels, the budgets of GIVEN F1-1, and every registered
+// primitive with its atoms, parameters, cost and outsets, in registration
+// order.
+void append_engine(std::string& out) {
+    out += "  \"engine\": {\n";
+    append_key(out, "    ", "version");
+    append_version(out, current_engine_version);
+    out += ",\n";
+    std::vector<std::string_view> names;
+    for (std::size_t index = 0; index < static_cast<std::size_t>(CascadeLevel::count); ++index) {
+        names.push_back(cascade_level_name(static_cast<CascadeLevel>(index)));
+    }
+    append_key(out, "    ", "cascade_levels");
+    append_name_list(out, names);
+    out += ",\n";
+    append_key(out, "    ", "budgets");
+    out += '{';
+    append_json_string(out, "operations_per_device_pixel");
+    out += ": ";
+    append_unsigned(out, maximum_operations_per_device_pixel);
+    out += ", ";
+    append_json_string(out, "animated_operations_per_frame");
+    out += ": ";
+    append_unsigned(out, maximum_animated_operations_per_frame);
+    out += "},\n";
+    append_key(out, "    ", "primitives");
+    out += '[';
+    const std::span<const EnginePrimitive* const> primitives = builtin_primitive_registry().primitives();
+    for (std::size_t index = 0; index < primitives.size(); ++index) {
+        const PrimitiveDescriptor& descriptor = (*primitives[index]).descriptor();
+        out += index == 0U ? "\n" : ",\n";
+        out += "      {\n";
+        append_key(out, "        ", "name");
+        append_json_string(out, descriptor.name);
+        out += ",\n";
+        append_key(out, "        ", "introduced");
+        append_version(out, descriptor.introduced);
+        out += ",\n";
+        names.clear();
+        for (const PartRole role : descriptor.roles) names.push_back(part_role_name(role));
+        append_key(out, "        ", "roles");
+        append_name_list(out, names);
+        out += ",\n";
+        append_key(out, "        ", "states_read");
+        append_state_list(out, descriptor.states_read);
+        out += ",\n";
+        append_key(out, "        ", "cost");
+        out += '{';
+        append_json_string(out, "per_device_pixel");
+        out += ": ";
+        append_unsigned(out, descriptor.cost.per_device_pixel);
+        out += ", ";
+        append_json_string(out, "fixed");
+        out += ": ";
+        append_unsigned(out, descriptor.cost.fixed);
+        out += ", ";
+        append_json_string(out, "preparation_per_device_pixel");
+        out += ": ";
+        append_unsigned(out, descriptor.cost.preparation_per_device_pixel);
+        out += "},\n";
+        append_key(out, "        ", "outsets");
+        out += '[';
+        append_number(out, descriptor.outsets.left);
+        out += ", ";
+        append_number(out, descriptor.outsets.top);
+        out += ", ";
+        append_number(out, descriptor.outsets.right);
+        out += ", ";
+        append_number(out, descriptor.outsets.bottom);
+        out += "],\n";
+        append_key(out, "        ", "parameters");
+        append_parameters(out, descriptor.parameters);
+        out += "\n      }";
+    }
+    out += primitives.empty() ? "]" : "\n    ]";
     out += "\n  },\n";
 }
 
@@ -392,6 +546,7 @@ std::string render_schema(std::span<const TypeRecord> records) {
            "documents write it in kebab-case and displays in PascalCase.\"\n";
     out += "  ],\n";
     append_vocabulary(out);
+    append_engine(out);
     out += "  \"types\": [";
     for (std::size_t index = 0; index < records.size(); ++index) {
         const TypeRecord& record = records[index];

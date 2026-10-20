@@ -189,6 +189,66 @@ def _interactions_of(record: Mapping[str, object]) -> list[Interaction]:
     return found
 
 
+_VERSION = re.compile(r"[0-9]+\.[0-9]+")
+_CASCADE_LEVELS: tuple[str, ...] = ("built_in", "theme_sheet", "class_rule", "stable_id_rule",
+                                    "inline_style", "forced_high_contrast")
+
+
+def _engine_findings(engine: object, vocabulary: object) -> list[str]:
+    """The engine section (T2 E4): the version, the cascade levels in order, the
+    budgets, and every primitive declaring against the vocabulary within budget."""
+    if not isinstance(engine, dict):
+        return ["the schema has no engine section (version, cascade levels, budgets and primitives)"]
+    findings: list[str] = []
+    if not _VERSION.fullmatch(str(engine.get("version"))):
+        findings.append(f"engine: version {engine.get('version')!r} is not major.minor")
+    if tuple(engine.get("cascade_levels", [])) != _CASCADE_LEVELS:
+        findings.append("engine: cascade_levels are not " + ", ".join(_CASCADE_LEVELS) + " in that order")
+    budgets: object = engine.get("budgets")
+    per_pixel_budget: int = 0
+    if not isinstance(budgets, dict) or not isinstance(budgets.get("operations_per_device_pixel"), int):
+        findings.append("engine: budgets are missing")
+    else:
+        per_pixel_budget = int(budgets["operations_per_device_pixel"])
+    roles: set[str] = set()
+    states: set[str] = set()
+    if isinstance(vocabulary, dict):
+        roles = {str(name) for name in vocabulary.get("part_roles", [])}
+        states = {str(name) for name in vocabulary.get("states", [])}
+    primitives: object = engine.get("primitives")
+    if not isinstance(primitives, list) or not primitives:
+        findings.append("engine: no primitives are registered")
+        return findings
+    seen: set[str] = set()
+    for primitive in primitives:
+        name: str = str(primitive.get("name"))
+        if not _SNAKE.fullmatch(name) or name in seen:
+            findings.append(f"engine: primitive name {name!r} is not snake_case or repeats")
+        seen.add(name)
+        if not _VERSION.fullmatch(str(primitive.get("introduced"))):
+            findings.append(f"engine: {name}: introduced {primitive.get('introduced')!r} is not major.minor")
+        painted: list[object] = list(primitive.get("roles", []))
+        if not painted:
+            findings.append(f"engine: {name} paints no part role")
+        for role in painted:
+            if roles and str(role) not in roles:
+                findings.append(f"engine: {name} paints {role!r}, which is not a vocabulary part role")
+        for state in primitive.get("states_read", []):
+            if states and str(state) not in states:
+                findings.append(f"engine: {name} reads {state!r}, which is not a vocabulary state")
+        cost: Mapping[str, object] = primitive.get("cost", {})
+        per_pixel: object = cost.get("per_device_pixel")
+        if not isinstance(per_pixel, int) or per_pixel <= 0 or (per_pixel_budget and per_pixel > per_pixel_budget):
+            findings.append(f"engine: {name}: per_device_pixel cost {per_pixel!r} is not within the budget")
+        parameter_names: list[str] = [str(item.get("name")) for item in primitive.get("parameters", [])]
+        if len(set(parameter_names)) != len(parameter_names):
+            findings.append(f"engine: {name} repeats a parameter")
+        for parameter in parameter_names:
+            if not _SNAKE.fullmatch(parameter):
+                findings.append(f"engine: {name}: parameter {parameter!r} is not snake_case")
+    return findings
+
+
 def validate(schema: Mapping[str, object], registry: control_registry.Registry,
              classes: Mapping[str, ScannedClass]) -> list[str]:
     """Every finding; an empty list means the manifest is consistent."""
@@ -218,6 +278,7 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
             for name in names:
                 if not _SNAKE.fullmatch(str(name)):
                     findings.append(f"vocabulary: {key} name {name!r} is not snake_case")
+    findings.extend(_engine_findings(schema.get("engine"), vocabulary))
     by_id: dict[str, control_registry.ControlRecord] = {record.id: record for record in registry.records}
     for record in types:
         identity: str = str(record.get("id"))
@@ -322,6 +383,24 @@ def render_page(schema: Mapping[str, object]) -> str:
             names: Sequence[object] = vocabulary.get(key, [])  # type: ignore[assignment]
             lines.append(f"{title}: " + ", ".join(_code(str(name)) for name in names) + ".")
             lines.append("")
+    engine: Mapping[str, object] = schema.get("engine", {})  # type: ignore[assignment]
+    if engine:
+        lines.append("## Engine")
+        lines.append("")
+        lines.append(f"Theme engine {engine.get('version')} (T2): the primitives a theme's rules may select, "
+                     "the atoms each declares against, and its cost. Cascade levels, lowest first: "
+                     + ", ".join(_code(str(level)) for level in engine.get("cascade_levels", [])) + ".")
+        lines.append("")
+        lines.append("| Primitive | Since | Paints | Reads | Cost per device pixel | Parameters |")
+        lines.append("|---|---|---|---|---|---|")
+        for primitive in engine.get("primitives", []):  # type: ignore[union-attr]
+            painted: str = ", ".join(_code(str(role)) for role in primitive.get("roles", []))
+            read: str = ", ".join(_code(str(state)) for state in primitive.get("states_read", [])) or "none"
+            parameters: str = ", ".join(_code(str(item["name"])) for item in primitive.get("parameters", []))
+            cost: Mapping[str, object] = primitive.get("cost", {})
+            lines.append(f"| {_code(str(primitive['name']))} | {primitive['introduced']} | {painted} | {read} | "
+                         f"{cost.get('per_device_pixel')} | {parameters or 'none'} |")
+        lines.append("")
     for record in types:
         identity: str = str(record["id"])
         lines.append(f"## {_code(identity)} ({record['type']}, {record['kind']})")
