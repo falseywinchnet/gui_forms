@@ -164,6 +164,9 @@ void Window::set_theme(std::shared_ptr<const Theme> theme) {
 void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
     if (theme_ == theme) return;
     theme_ = theme;
+    // Another theme draws parts differently: no cached part raster is
+    // current.
+    engine_parts_.invalidate_rasters();
     // Themes include structural spacing/geometry/type tokens as well as paint
     // recipes, so replacement must remeasure and re-hit-test inherited content.
     mark_subtree_dirty(*root_, invalidation::conservative_subtree);

@@ -123,6 +123,9 @@ add_library(gui_forms_core STATIC
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
+    src/core/engine/part_table/engine_part_table.cpp
+    src/core/engine/part_raster/part_raster.cpp
+    src/core/engine/theme_engine/theme_engine.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2172,6 +2175,19 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_part_composite_tests tests/windows_part_composite_tests.cpp)
+        target_compile_definitions(gui_forms_windows_part_composite_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_part_composite_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_part_composite_tests COMMAND gui_forms_windows_part_composite_tests)
+        add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
+        target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_content_pixels_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_content_pixels_tests COMMAND gui_forms_windows_content_pixels_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
     endif()
 
@@ -2226,6 +2242,12 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
+    add_executable(gui_forms_engine_raster_cache_tests tests/engine_raster_cache_tests.cpp)
+    target_link_libraries(gui_forms_engine_raster_cache_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_raster_cache_tests COMMAND gui_forms_engine_raster_cache_tests)
+    add_executable(gui_forms_engine_part_table_tests tests/engine_part_table_tests.cpp)
+    target_link_libraries(gui_forms_engine_part_table_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_part_table_tests COMMAND gui_forms_engine_part_table_tests)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
@@ -2301,6 +2323,9 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_doc_examples_compile_only PRIVATE gui_forms_application)
     endif()
 
+    add_executable(gui_forms_part_composite_tests tests/part_composite_tests.cpp)
+    target_link_libraries(gui_forms_part_composite_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_part_composite_tests COMMAND gui_forms_part_composite_tests)
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)
@@ -2897,6 +2922,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/main.cpp
             tests/gallery_pages/catalog_tests.cpp
             tests/gallery_pages/shell_tests.cpp
+            tests/gallery_pages/display_trace_tests.cpp
             tests/gallery_pages/ranges-and-progress_tests.cpp
             tests/gallery_pages/containers-and-focus_tests.cpp
             tests/gallery_pages/animation-laboratory_tests.cpp
@@ -2938,6 +2964,11 @@ if(GUI_FORMS_BUILD_TESTS)
         # manifest (stage T1).
         set_tests_properties(gui_forms_gallery_pages_tests PROPERTIES ENVIRONMENT
             "GUI_FORMS_CONTROL_SCHEMA=${CMAKE_CURRENT_SOURCE_DIR}/manifests/control-schema.json")
+        # Every Gallery page's display commands against the table recorded
+        # before the theme engine (T2 E2). A process of its own, so that no
+        # other test makes a control first (see display_trace_tests.cpp).
+        add_test(NAME gui_forms_gallery_display_trace_tests
+                 COMMAND gui_forms_gallery_pages_tests --display-trace)
         # The policy script takes one comma-separated argument; a CMake list
         # would be split into separate COMMAND arguments.
         set(gui_forms_gallery_policy_files
@@ -3223,6 +3254,9 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_opaque_live_surface_raster_tests tests/opaque_live_surface_raster_tests.cpp)
         target_link_libraries(gui_forms_opaque_live_surface_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
         add_test(NAME gui_forms_opaque_live_surface_raster_tests COMMAND gui_forms_opaque_live_surface_raster_tests)
+        add_executable(gui_forms_part_composite_identity_tests tests/part_composite_identity_tests.cpp)
+        target_link_libraries(gui_forms_part_composite_identity_tests PRIVATE gui_forms_controls gui_forms_skia)
+        add_test(NAME gui_forms_part_composite_identity_tests COMMAND gui_forms_part_composite_identity_tests)
         if(TARGET gui_forms_text_engine)
             add_executable(gui_forms_text_identity_raster_tests tests/text_identity_raster_tests.cpp)
             target_link_libraries(gui_forms_text_identity_raster_tests PRIVATE gui_forms_controls gui_forms_skia)

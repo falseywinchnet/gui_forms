@@ -1866,6 +1866,9 @@ void Window::detach_subtree_state(const Control::Ptr& control,
                                   ControlList& detached) {
     (*control).lifecycle_notification_ = true;
     detached.push_back(control);
+    // The control's part records go with it; their handles become stale.
+    const std::size_t released = engine_parts_.release_control((*control).stable_id_.value());
+    if (released > 0U) metrics_.record_engine_parts_released(released, engine_parts_.record_count());
     (*control).on_detaching_from_window(*this);
     (*control).window_ = nullptr;
     {

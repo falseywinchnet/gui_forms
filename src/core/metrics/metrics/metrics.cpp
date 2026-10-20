@@ -23,7 +23,9 @@ void Metrics::reset_activity() noexcept {
     const std::uint64_t display_cache_entries = values_.display_cache_entries;
     const std::uint64_t display_generation = values_.display_generation;
     const std::uint64_t active_surfaces = values_.active_surface_count;
+    const std::uint64_t engine_part_records = values_.engine_part_records;
     values_ = {};
+    values_.engine_part_records = engine_part_records;
     values_.control_count = controls;
     values_.stable_id_count = stable_ids;
     values_.update_scope_depth = depth;
@@ -107,6 +109,21 @@ void Metrics::record_focus_scope_rejection() noexcept {
 }
 void Metrics::record_activation() noexcept { ++values_.activations; }
 void Metrics::record_disposal(std::uint64_t count) noexcept { values_.disposals += count; }
+
+void Metrics::record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept {
+    if (index_fallback) values_.engine_part_index_fallbacks = values_.engine_part_index_fallbacks + 1U;
+    values_.engine_part_records = live;
+}
+
+void Metrics::record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept {
+    values_.engine_part_records_released = values_.engine_part_records_released + released;
+    values_.engine_part_records = live;
+}
+
+void Metrics::record_engine_parts_evicted(std::uint64_t evicted, std::uint64_t live) noexcept {
+    values_.engine_part_records_evicted = values_.engine_part_records_evicted + evicted;
+    values_.engine_part_records = live;
+}
 void Metrics::record_wrong_thread_rejection() noexcept {
     wrong_thread_rejections_.fetch_add(1, std::memory_order_relaxed);
 }

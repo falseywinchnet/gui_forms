@@ -53,6 +53,8 @@ VisualPaintOperation public_operation(detail::DisplayOperation operation) {
         return VisualPaintOperation::fill_image_pattern;
     case Private::draw_live_surface:
         return VisualPaintOperation::draw_live_surface;
+    case Private::draw_part_raster:
+        return VisualPaintOperation::draw_part_raster;
     }
     throw std::logic_error("GUI.Forms display operation has no inspection spelling");
 }

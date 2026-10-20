@@ -243,4 +243,103 @@ TextCompositeStatus composite_text_coverage(const TextCoverage coverage, const T
     return TextCompositeStatus::success;
 }
 
+std::uint8_t part_composite_opacity(const double opacity) noexcept {
+    if (!(opacity > 0.0)) return 0U;
+    const double clamped = std::min(opacity, 1.0);
+    const double scaled = std::floor(clamped * 255.0 + 0.5);
+    const std::uint8_t byte = static_cast<std::uint8_t>(scaled);
+    return byte;
+}
+
+namespace {
+
+// d * (255 - a) / 255, rounded: the destination's share under coverage a.
+unsigned destination_share(const unsigned destination, const unsigned remaining) noexcept {
+    const unsigned share = (destination * remaining + 127U) / 255U;
+    return share;
+}
+
+// s * w / 65280, rounded: one premultiplied channel at weight w.
+unsigned weighted_channel(const std::uint64_t channel, const std::uint64_t weight) noexcept {
+    const unsigned weighted = static_cast<unsigned>((channel * weight + 32640U) / 65280U);
+    return weighted;
+}
+
+// Whether every row of the source lies inside its buffer: the last row
+// starts at (height - 1) * row_bytes and needs width * 4 bytes.
+bool part_source_fits(const PartRasterSource& source) noexcept {
+    const std::size_t row_pixel_bytes = static_cast<std::size_t>(source.width) * 4U;
+    if (source.row_bytes < row_pixel_bytes || source.pixels.size() < row_pixel_bytes) return false;
+    const std::size_t last_row = static_cast<std::size_t>(source.height) - 1U;
+    const std::size_t room = source.pixels.size() - row_pixel_bytes;
+    const bool fits = last_row <= room / source.row_bytes;
+    return fits;
+}
+
+} // namespace
+
+TextCompositeStatus composite_part_raster(const PartRasterSource source, const TextCompositeTarget target,
+                                          const TextCompositeClip clip, const std::uint8_t opacity) noexcept {
+    if (target.width == 0 || target.height == 0 || target.stride < target.width ||
+        target.height > target.pixels.size() / target.stride || !valid_rect(clip.rect) ||
+        (clip.rounded && (!valid_rect(clip.rounded_rect) || !valid_coordinate(clip.radius) || clip.radius < 0.0)) ||
+        std::abs(source.left) > static_cast<std::int64_t>(coordinate_limit) ||
+        std::abs(source.top) > static_cast<std::int64_t>(coordinate_limit)) {
+        return TextCompositeStatus::invalid_geometry;
+    }
+    if (source.width == 0 || source.height == 0) return TextCompositeStatus::success;
+    if (!part_source_fits(source)) return TextCompositeStatus::invalid_geometry;
+    if (opacity == 0U) return TextCompositeStatus::success;
+    const PreparedClip prepared = prepare_clip(clip);
+    FixedRect limit = prepared.rect;
+    if (prepared.rounded) {
+        limit.left = std::max(limit.left, prepared.rounded_rect.left);
+        limit.top = std::max(limit.top, prepared.rounded_rect.top);
+        limit.right = std::min(limit.right, prepared.rounded_rect.right);
+        limit.bottom = std::min(limit.bottom, prepared.rounded_rect.bottom);
+    }
+    const std::int64_t left = std::max<std::int64_t>({0, floor_pixel(limit.left), source.left});
+    const std::int64_t top = std::max<std::int64_t>({0, floor_pixel(limit.top), source.top});
+    const std::int64_t right = std::min<std::int64_t>({static_cast<std::int64_t>(target.width), ceil_pixel(limit.right),
+                                                       source.left + static_cast<std::int64_t>(source.width)});
+    const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
+                                                        source.top + static_cast<std::int64_t>(source.height)});
+    const ChannelShifts shifts = channel_shifts(target.order);
+    const std::uint64_t opacity_weight = opacity;
+    for (std::int64_t y = top; y < bottom; ++y) {
+        const std::size_t source_row = static_cast<std::size_t>(y - source.top) * source.row_bytes;
+        const std::size_t target_row = static_cast<std::size_t>(y) * target.stride;
+        for (std::int64_t x = left; x < right; ++x) {
+            const std::size_t offset = source_row + static_cast<std::size_t>(x - source.left) * 4U;
+            const std::uint64_t source_alpha = source.pixels[offset + 3U];
+            if (source_alpha == 0) continue;
+            const std::uint64_t clipped = static_cast<std::uint64_t>(prepared_clip_coverage(prepared, x, y));
+            if (clipped == 0) continue;
+            // One weight for opacity x clip (unit = 256), applied to every
+            // premultiplied channel with one rounding each.
+            const std::uint64_t weight = opacity_weight * clipped;
+            const unsigned alpha = weighted_channel(source_alpha, weight);
+            if (alpha == 0) continue;
+            const unsigned red = weighted_channel(source.pixels[offset], weight);
+            const unsigned green = weighted_channel(source.pixels[offset + 1U], weight);
+            const unsigned blue = weighted_channel(source.pixels[offset + 2U], weight);
+            std::uint32_t& pixel = target.pixels[target_row + static_cast<std::size_t>(x)];
+            const std::uint32_t previous = pixel;
+            const unsigned remaining = 255U - alpha;
+            const unsigned out_red = std::min(255U, red + destination_share((previous >> shifts.red) & 255U, remaining));
+            const unsigned out_green =
+                std::min(255U, green + destination_share((previous >> shifts.green) & 255U, remaining));
+            const unsigned out_blue =
+                std::min(255U, blue + destination_share((previous >> shifts.blue) & 255U, remaining));
+            unsigned out_alpha = 255U;
+            if (!target.opaque) {
+                out_alpha = std::min(255U, alpha + destination_share((previous >> shifts.alpha) & 255U, remaining));
+            }
+            pixel = (out_red << shifts.red) | (out_green << shifts.green) | (out_blue << shifts.blue) |
+                    (out_alpha << shifts.alpha);
+        }
+    }
+    return TextCompositeStatus::success;
+}
+
 } // namespace gui_forms::detail

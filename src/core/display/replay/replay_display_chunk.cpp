@@ -101,6 +101,9 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
             painter.draw_live_surface(
                 command.live_surface, command.rect, command.scalar);
             break;
+        case DisplayOperation::draw_part_raster:
+            painter.draw_part_raster(command.part_raster, command.first, command.scalar);
+            break;
         case DisplayOperation::draw_image_region:
             painter.draw_image_region(
                 command.image,

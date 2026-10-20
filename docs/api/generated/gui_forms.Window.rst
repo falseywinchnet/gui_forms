@@ -200,6 +200,9 @@ gui_forms::Window
          mutations, damage, input, focus, disposals, wrong-thread rejections and
          more. ``MetricsSnapshot::to_json`` serializes it.
 
+      **engine_parts** : ``EnginePartTable``, read-only
+         The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
       **semantic_generation** : ``std::uint64_t``, read-only
          A number that changes whenever the semantic (accessibility) tree may
          have changed.
@@ -753,6 +756,10 @@ gui_forms::Window
       A copy of the window's instrumentation counters: layout passes, flushes,
       mutations, damage, input, focus, disposals, wrong-thread rejections and
       more. ``MetricsSnapshot::to_json`` serializes it.
+
+   .. cpp:function:: const EnginePartTable& engine_parts() const noexcept
+
+      The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
 
    .. cpp:function:: std::uint64_t semantic_generation() const noexcept
 
