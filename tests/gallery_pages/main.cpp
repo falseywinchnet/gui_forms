@@ -103,8 +103,7 @@ int main(int argc, char** argv) {
         // process made before it, so no other test may run first.
         if (argc == 2 && std::string_view(argv[1]) == "--display-trace") {
             test_display_commands_unchanged();
-            std::cout << "gui_forms_gallery_pages_tests --display-trace: passed
-";
+            std::cout << "gui_forms_gallery_pages_tests --display-trace: passed\n";
             return EXIT_SUCCESS;
         }
         test_page_contract_and_rendering();
