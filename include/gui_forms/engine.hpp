@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/engine/engine_expression/engine_expression.hpp"
 #include "gui_forms/engine/engine_math/engine_math.hpp"
 #include "gui_forms/engine/motion_clock/motion_clock.hpp"
 #include "gui_forms/engine/motion_value/motion_value.hpp"

@@ -74,7 +74,8 @@
           {"name": "gold_shaded_3", "kind": "colour", "default": "#aa7018ff", "animated": false}
         ]
       }
-    ]
+    ],
+    "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]}
   },
   "types": [
     {

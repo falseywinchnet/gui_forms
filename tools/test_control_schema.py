@@ -133,6 +133,21 @@ public:
         self.assertIn("sparkle", findings[0])
         self.assertIn("budget", findings[1])
 
+    def test_the_engine_lists_its_expression_operations(self) -> None:
+        schema = cs.load_schema()
+        expressions = schema["engine"]["expressions"]
+        self.assertEqual(expressions["maximum_operations"], 64)
+        for operation in ("clamp", "mix", "smoothstep", "choose", "less"):
+            self.assertIn(operation, expressions["operations"])
+        broken = json.loads(json.dumps(schema["engine"]))
+        broken["expressions"]["maximum_stack"] = 0
+        broken["expressions"]["operations"].append("Loop")
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 2)
+        self.assertIn("maximum_stack", findings[0])
+        self.assertIn("Loop", findings[1])
+
 
 if __name__ == "__main__":
     unittest.main()

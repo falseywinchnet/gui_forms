@@ -338,6 +338,27 @@ void append_engine(std::string& out) {
         out += "\n      }";
     }
     out += primitives.empty() ? "]" : "\n    ]";
+    out += ",\n";
+    // Bounded expressions (E5): the budget a program is checked against at
+    // load and the operations, in enum order.
+    append_key(out, "    ", "expressions");
+    out += '{';
+    append_json_string(out, "maximum_operations");
+    out += ": ";
+    append_unsigned(out, maximum_expression_operations);
+    out += ", ";
+    append_json_string(out, "maximum_stack");
+    out += ": ";
+    append_unsigned(out, maximum_expression_stack);
+    out += ", ";
+    append_json_string(out, "operations");
+    out += ": ";
+    names.clear();
+    for (std::size_t index = 0; index < expression_operation_count; ++index) {
+        names.push_back(expression_operation_name(static_cast<ExpressionOperation>(index)));
+    }
+    append_name_list(out, names);
+    out += '}';
     out += "\n  },\n";
 }
 

@@ -50,6 +50,8 @@ Types
      - A raster's size in device pixels.
    * - :cpp:class:`DeviceScale <gui_forms::DeviceScale>`
      - Device pixels per logical unit.
+   * - :cpp:class:`EngineExpression <gui_forms::EngineExpression>`
+     - A compiled program: immutable, a fixed-size value with no allocation, so it can be copied into a rule table and evaluated from any number of parts on the UI thread.
    * - :cpp:class:`EnginePartRecord <gui_forms::EnginePartRecord>`
      - One painted part's record.
    * - :cpp:class:`EnginePartTable <gui_forms::EnginePartTable>`
@@ -60,6 +62,22 @@ Types
      - The sine and cosine of ``x`` radians, computed together (E3's springs).
    * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
      - The engine version a primitive was introduced in, and the version a theme declares it needs.
+   * - :cpp:class:`ExpressionCompilation <gui_forms::ExpressionCompilation>`
+     - A compilation's outcome: the program when ``defect`` is none, otherwise the defect and the position of the instruction it concerns (0 for a defect of the whole program).
+   * - :cpp:class:`ExpressionDependencies <gui_forms::ExpressionDependencies>`
+     - What a program reads, found when it is compiled: bit i of ``inputs`` for the input at position i, bit i of ``parameters`` for the parameter at position i, and the standard states in ``states``.
+   * - :cpp:class:`ExpressionEnvironment <gui_forms::ExpressionEnvironment>`
+     - What one evaluation reads.
+   * - :cpp:class:`ExpressionInputIndex <gui_forms::ExpressionInputIndex>`
+     - The position of an engine input in the inputs an expression is evaluated with (E6 defines which input sits at which position).
+   * - :cpp:class:`ExpressionInstruction <gui_forms::ExpressionInstruction>`
+     - One instruction.
+   * - :cpp:class:`ExpressionLimits <gui_forms::ExpressionLimits>`
+     - How many inputs and parameters the program may address: an index at or beyond either count is refused when the program is compiled.
+   * - :cpp:class:`ExpressionParameterIndex <gui_forms::ExpressionParameterIndex>`
+     - The position of a number parameter among a primitive's declared parameters (PrimitiveDescriptor::parameters).
+   * - :cpp:class:`ExpressionResult <gui_forms::ExpressionResult>`
+     -  
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
      - FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
    * - :cpp:class:`GradientStop <gui_forms::GradientStop>`
@@ -604,6 +622,45 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: EngineExpression final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   A compiled program: immutable, a fixed-size value with no allocation, so it can be copied into a rule table and evaluated from any number of parts on the UI thread.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: EngineExpression() noexcept
+
+      The program ``1`` with fallback 0, which reads nothing.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const ExpressionInstruction> instructions() const noexcept
+
+   .. cpp:function:: std::size_t operation_count() const noexcept
+
+   .. cpp:function:: double fallback() const noexcept
+
+   .. cpp:function:: const ExpressionDependencies& dependencies() const noexcept
+
+   .. cpp:function:: const ExpressionLimits& limits() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: ExpressionCompilation compile(std::span<const ExpressionInstruction> program, double fallback, ExpressionLimits limits) noexcept
+
+      Checks ``program`` against :cpp:func:`limits <gui_forms::EngineExpression::limits>` and the budget, then replaces this expression with it. Anything but ``none`` leaves the expression unchanged. :cpp:func:`fallback <gui_forms::EngineExpression::fallback>` is the value an evaluation gives on a division by zero or a value that is not finite.
+
+   .. cpp:function:: ExpressionResult evaluate(const ExpressionEnvironment& environment) const noexcept
+
+      Evaluates the program. Its cost is one operation per instruction (operation_count). Never fails: a defect of the inputs gives the fallback, with the reason.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: EnginePartRecord final
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
@@ -754,6 +811,130 @@ Types
    .. cpp:member:: std::uint16_t major
 
    .. cpp:member:: std::uint16_t minor
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionCompilation final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   A compilation's outcome: the program when ``defect`` is none, otherwise the defect and the position of the instruction it concerns (0 for a defect of the whole program).
+
+   .. cpp:member:: ExpressionDefect defect
+
+      Default: ``{ExpressionDefect::none}``.
+
+   .. cpp:member:: std::size_t instruction
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionDependencies final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   What a program reads, found when it is compiled: bit i of ``inputs`` for the input at position i, bit i of ``parameters`` for the parameter at position i, and the standard states in ``states``.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: constexpr bool reads_input(ExpressionInputIndex input) const noexcept
+
+   .. cpp:function:: constexpr bool reads_parameter(ExpressionParameterIndex parameter) const noexcept
+
+   .. cpp:member:: std::uint64_t inputs
+
+   .. cpp:member:: std::uint32_t parameters
+
+   .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionEnvironment final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   What one evaluation reads. Every view is borrowed for the call. ``inputs`` and ``parameters`` must hold at least the program's limits.
+
+   .. cpp:member:: std::span<const double> inputs
+
+   .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: std::span<const double> parameters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionInputIndex final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   The position of an engine input in the inputs an expression is evaluated with (E6 defines which input sits at which position). Distinct from a parameter's position and from a state.
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionInstruction final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   One instruction. Make it with the named factories, which keep the operation and its operand together: ``index`` is read by input, state and parameter, ``constant`` by constant.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static constexpr ExpressionInstruction number(double value) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction input(ExpressionInputIndex input) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction state(AnatomyState state) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction parameter(ExpressionParameterIndex parameter) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction apply(ExpressionOperation operation) noexcept
+
+      An operation that takes its operands from the stack.
+
+   .. cpp:member:: ExpressionOperation operation
+
+      Default: ``{ExpressionOperation::constant}``.
+
+   .. cpp:member:: std::uint8_t index
+
+   .. cpp:member:: double constant
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionLimits final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   How many inputs and parameters the program may address: an index at or beyond either count is refused when the program is compiled. Each is at most its maximum_expression_* bound.
+
+   .. cpp:member:: std::size_t inputs
+
+   .. cpp:member:: std::size_t parameters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionParameterIndex final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   The position of a number parameter among a primitive's declared parameters (PrimitiveDescriptor::parameters).
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionResult final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:member:: double value
+
+   .. cpp:member:: ExpressionFallback fallback
+
+      Default: ``{ExpressionFallback::none}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2418,6 +2599,102 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ExpressionDefect
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: empty_program
+
+   .. cpp:enumerator:: over_budget
+
+   .. cpp:enumerator:: unknown_operation
+
+   .. cpp:enumerator:: constant_not_finite
+
+   .. cpp:enumerator:: fallback_not_finite
+
+   .. cpp:enumerator:: limits_out_of_range
+
+   .. cpp:enumerator:: input_out_of_range
+
+   .. cpp:enumerator:: state_out_of_range
+
+   .. cpp:enumerator:: parameter_out_of_range
+
+   .. cpp:enumerator:: missing_operand
+
+   .. cpp:enumerator:: stack_too_deep
+
+   .. cpp:enumerator:: unbalanced
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ExpressionFallback
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: division_by_zero
+
+   .. cpp:enumerator:: not_finite
+
+   .. cpp:enumerator:: environment_too_short
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ExpressionOperation
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: constant
+
+   .. cpp:enumerator:: input
+
+   .. cpp:enumerator:: state
+
+   .. cpp:enumerator:: parameter
+
+   .. cpp:enumerator:: negate
+
+   .. cpp:enumerator:: add
+
+   .. cpp:enumerator:: subtract
+
+   .. cpp:enumerator:: multiply
+
+   .. cpp:enumerator:: divide
+
+   .. cpp:enumerator:: minimum
+
+   .. cpp:enumerator:: maximum
+
+   .. cpp:enumerator:: less
+
+   .. cpp:enumerator:: less_equal
+
+   .. cpp:enumerator:: greater
+
+   .. cpp:enumerator:: greater_equal
+
+   .. cpp:enumerator:: equal
+
+   .. cpp:enumerator:: not_equal
+
+   .. cpp:enumerator:: clamp
+
+   .. cpp:enumerator:: mix
+
+   .. cpp:enumerator:: smoothstep
+
+   .. cpp:enumerator:: choose
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: FontRole
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -2882,6 +3159,42 @@ Functions, constants and aliases
    Renderer-neutral material composition used by ButtonBase and available to custom controls which need the same explicit connected physical grammar.
 
 .. cpp:function:: Insets connected_surface_visual_outsets(const SurfaceMaterial& material, std::optional<ConnectedControlTopology> topology) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+.. cpp:function:: const char* expression_operation_name(ExpressionOperation operation) noexcept
+
+   Registered (snake_case) name of an operation, for diagnostics and the schema.
+
+.. cpp:function:: std::size_t expression_operand_count(ExpressionOperation operation) noexcept
+
+   How many operands an operation pops.
+
+.. cpp:function:: const char* expression_defect_name(ExpressionDefect defect) noexcept
+
+.. cpp:function:: const char* expression_fallback_name(ExpressionFallback fallback) noexcept
+
+.. cpp:var:: constexpr std::size_t maximum_expression_operations
+
+   The most instructions a program may have: its fixed operation budget. Value: ``64``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_stack
+
+   The deepest the evaluation stack may grow. Value: ``16``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_inputs
+
+   The most inputs and parameters an expression can address, so that what it reads fits a 64-bit and a 32-bit set. Value: ``64``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_parameters
+
+   Value: ``32``.
+
+.. cpp:var:: constexpr std::size_t expression_operation_count
+
+   Value: ``static_cast<std::size_t>(ExpressionOperation::count)``.
 
 .. cpp:namespace:: gui_forms
 

@@ -246,6 +246,28 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         for parameter in parameter_names:
             if not _SNAKE.fullmatch(parameter):
                 findings.append(f"engine: {name}: parameter {parameter!r} is not snake_case")
+    findings.extend(_expression_findings(engine.get("expressions")))
+    return findings
+
+
+def _expression_findings(expressions: object) -> list[str]:
+    """The bounded expressions (T2 E5): a positive operation budget and stack
+    bound, and the operations by snake_case name, each once."""
+    if not isinstance(expressions, dict):
+        return ["engine: no expressions section (budget and operations)"]
+    findings: list[str] = []
+    for key in ("maximum_operations", "maximum_stack"):
+        bound: object = expressions.get(key)
+        if not isinstance(bound, int) or bound <= 0:
+            findings.append(f"engine: expressions: {key} {bound!r} is not a positive bound")
+    operations: list[str] = [str(name) for name in expressions.get("operations", [])]
+    if not operations:
+        findings.append("engine: expressions list no operations")
+    if len(set(operations)) != len(operations):
+        findings.append("engine: expressions repeat an operation")
+    for operation in operations:
+        if not _SNAKE.fullmatch(operation):
+            findings.append(f"engine: expressions: operation {operation!r} is not snake_case")
     return findings
 
 
@@ -401,6 +423,12 @@ def render_page(schema: Mapping[str, object]) -> str:
             lines.append(f"| {_code(str(primitive['name']))} | {primitive['introduced']} | {painted} | {read} | "
                          f"{cost.get('per_device_pixel')} | {parameters or 'none'} |")
         lines.append("")
+        expressions: Mapping[str, object] = engine.get("expressions", {})  # type: ignore[assignment]
+        if expressions:
+            operations: str = ", ".join(_code(str(name)) for name in expressions.get("operations", []))
+            lines.append(f"Bounded expressions: at most {expressions.get('maximum_operations')} operations and a "
+                         f"stack of {expressions.get('maximum_stack')}, from {operations}.")
+            lines.append("")
     for record in types:
         identity: str = str(record["id"])
         lines.append(f"## {_code(identity)} ({record['type']}, {record['kind']})")
