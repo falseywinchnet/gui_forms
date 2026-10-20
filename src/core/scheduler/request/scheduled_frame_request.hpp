@@ -11,6 +11,9 @@ enum class FrameRequestKind : std::uint8_t {
     deadline,
     active_surface,
     ui_timer,
+    // The window's motion clock: no target and no callback; each frame
+    // advances the clock.
+    motion_clock,
 };
 
 class ScheduledFrameRequest final : public Revocable {

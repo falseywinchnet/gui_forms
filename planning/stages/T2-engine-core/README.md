@@ -252,6 +252,31 @@ Recorded in `planning/interview/T2_INTERVIEW_ROUND_001.md`, answered on
 ### The plan
 - **GIVEN Z1-1.** E1 to E11 are the T2 plan, revised by these decisions.
 
+## Decisions taken in E3 (#201; they stand, coordinator, 2026-10-20)
+
+Built in `include/gui_forms/engine/motion_clock/` and `motion_value/`. Where
+the plan left a number or a form open, E3 chose:
+
+1. **The follow time constant is 75 ms.** The gap shrinks by a factor of e
+   each 75 ms, so 63 % of what remains is covered (D3-1 said only "a fixed
+   fraction").
+2. **The settled tolerance is half a device pixel** at the window's scale.
+   A spring must also move less than half a device pixel over one 60 Hz
+   frame.
+3. **The easings:**
+   - the timed exponential approach is (1 − e^(−5p)) / (1 − e^(−5));
+   - ease is cubic ease-in-out;
+   - overshoot is back-out with c = 1.5, whose single overshoot is exactly
+     8 %.
+4. **The 400 ms ceiling clamps every duration parameter**, the time
+   constants of follow, spring and decay included. A settling value is not
+   cut off at 400 ms; it ends when its settled condition holds.
+5. **A spring's response is 1/ω**, the inverse of its natural angular
+   frequency.
+6. **The flyout slide stays linear**, so DK's behaviour is unchanged. The
+   design language would give an opening surface smoothstep; that choice is
+   DK D8's or T4's.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,
