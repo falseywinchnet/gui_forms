@@ -1,8 +1,9 @@
 // The engine's deterministic elementary functions (T2 plan, phase E1): their
 // error against the host library stays inside the stated bounds, their exact
-// cases are exact, and a fixed table of results has the same bits on every
-// CI platform. GUI_FORMS_ENGINE_IDENTITY_PRINT=1 prints the observed hash
-// instead of checking it.
+// cases are exact, and fixed tables of results (the sine and cosine of E3
+// among them) have the same bits on every CI platform.
+// GUI_FORMS_ENGINE_IDENTITY_PRINT=1 prints the observed hashes instead of
+// checking them.
 
 #include "gui_forms/engine/engine_math/engine_math.hpp"
 
@@ -100,9 +101,33 @@ void test_power() {
     require(std::isnan(engine_power(-0.5, 2.0)), "a negative base is NaN");
 }
 
-// The bits of a fixed table, the same on every host. The expected value was
-// produced on Windows x64 and is checked by every CI platform.
+void test_sine_cosine() {
+    const EngineSineCosine zero = engine_sine_cosine(0.0);
+    require(zero.sine == 0.0 && zero.cosine == 1.0, "sine and cosine of 0 are exact");
+    for (int step = -200000; step <= 200000; ++step) {
+        const double x = static_cast<double>(step) * 0.00517;
+        const EngineSineCosine observed = engine_sine_cosine(x);
+        require(std::fabs(observed.sine - std::sin(x)) <= 2e-15 && std::fabs(observed.cosine - std::cos(x)) <= 2e-15,
+                "sine and cosine within their bound on [-1034, 1034]");
+    }
+    for (int step = 1; step <= 2000; ++step) {
+        const double x = static_cast<double>(step) * 524.287;
+        const EngineSineCosine observed = engine_sine_cosine(x);
+        require(std::fabs(observed.sine - std::sin(x)) <= 1e-14 && std::fabs(observed.cosine - std::cos(x)) <= 1e-14,
+                "sine and cosine within their bound up to 2^20");
+    }
+    const EngineSineCosine beyond = engine_sine_cosine(2.0e6);
+    const EngineSineCosine infinite = engine_sine_cosine(std::numeric_limits<double>::infinity());
+    const EngineSineCosine missing = engine_sine_cosine(std::numeric_limits<double>::quiet_NaN());
+    require(std::isnan(beyond.sine) && std::isnan(beyond.cosine) && std::isnan(infinite.sine) &&
+                std::isnan(missing.cosine),
+            "beyond 2^20, infinities and NaN give NaN");
+}
+
+// The bits of fixed tables, the same on every host. The expected values were
+// produced on Windows x64 and are checked by every CI platform.
 constexpr std::uint64_t expected_table_hash = 0xa2d6d4ebca4d01adULL;
+constexpr std::uint64_t expected_trigonometry_hash = 0x04da5e7f92123dc0ULL;
 
 void test_identity() {
     BitHash hash{};
@@ -112,11 +137,21 @@ void test_identity() {
         hash.add(engine_logarithm(t * 37.0));
         hash.add(engine_exponential(t * 40.0 - 20.0));
     }
+    BitHash trigonometry{};
+    for (int step = 1; step <= 512; ++step) {
+        const double t = static_cast<double>(step) / 512.0;
+        const EngineSineCosine angle = engine_sine_cosine(t * 300.0 - 150.0);
+        trigonometry.add(angle.sine);
+        trigonometry.add(angle.cosine);
+    }
     if (print_mode()) {
         std::cout << "engine math table hash 0x" << std::hex << hash.value << std::dec << '\n';
+        std::cout << "engine sine and cosine table hash 0x" << std::hex << trigonometry.value << std::dec << '\n';
         return;
     }
     require(hash.value == expected_table_hash, "the math table has the same bits on every host");
+    require(trigonometry.value == expected_trigonometry_hash,
+            "the sine and cosine table has the same bits on every host");
 }
 
 } // namespace
@@ -125,6 +160,7 @@ int main() {
     test_logarithm();
     test_exponential();
     test_power();
+    test_sine_cosine();
     test_identity();
     std::cout << "engine math tests passed\n";
     return 0;

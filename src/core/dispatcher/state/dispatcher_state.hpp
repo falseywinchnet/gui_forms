@@ -45,8 +45,17 @@ struct DispatcherState final {
     std::uint64_t inline_invocations{};
     std::uint64_t marshalled_invocations{};
     std::size_t maximum_pending{};
+    // Work refused while the window is being destroyed (see `closing`).
+    std::uint64_t teardown_refusals{};
     bool accepting{true};
     bool wake_pending{};
+    // Set when the window's destructor starts. A post that finds the
+    // dispatcher shut down while this holds is refused by name (the
+    // operation is returned already cancelled) instead of throwing: work
+    // posted from a teardown notification could never run, so it meets the
+    // fate it would have met a moment earlier, when shutdown cancelled
+    // everything pending. Outside teardown, posting after shutdown throws.
+    bool closing{};
 };
 
 [[nodiscard]] DispatchOperation post_dispatch(

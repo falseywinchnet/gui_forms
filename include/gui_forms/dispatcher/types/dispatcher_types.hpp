@@ -37,6 +37,10 @@ struct DispatcherSnapshot final {
     std::uint64_t marshalled_invocations{};
     std::size_t pending{};
     std::size_t maximum_pending{};
+    // Posts refused, already cancelled, because they reached a shut-down
+    // dispatcher while its window was being destroyed (counted in
+    // `cancelled` too).
+    std::uint64_t teardown_refusals{};
     bool accepting{};
     bool wake_pending{};
 };

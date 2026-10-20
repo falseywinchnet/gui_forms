@@ -280,10 +280,13 @@ void HostSession::DispatchVisitor::operator()(
         (*session).snapshot_.closed = true;
         (*session).snapshot_.active = false;
         (*session).snapshot_.occluded = false;
-        (*(*session).window_).shutdown_dispatcher();
-        (*(*session).window_).cancel_frame_requests();
+        // Controls hear of the released capture, and may post work about
+        // it, while the dispatcher still accepts; the shutdown then cancels
+        // that work. Shutting down first would make the post throw.
         (*(*session).window_).release_pointer();
         (*(*session).window_).cancel_drag();
+        (*(*session).window_).cancel_frame_requests();
+        (*(*session).window_).shutdown_dispatcher();
     } else if constexpr (std::is_same_v<Payload, HostShutdownEvent>) {
         (*session).shutdown();
     }
@@ -419,10 +422,11 @@ void HostSession::shutdown() noexcept {
     snapshot_.occluded = false;
     if (window_ != nullptr) {
         (*window_).invalidate_cursor_interaction(CursorError::closing);
-        (*window_).shutdown_dispatcher();
-        (*window_).cancel_frame_requests();
+        // As for the closed event: release, then shut the dispatcher down.
         (*window_).release_pointer();
         (*window_).cancel_drag();
+        (*window_).cancel_frame_requests();
+        (*window_).shutdown_dispatcher();
         if ((*window_).host_services_ == services_) (*window_).host_services_ = nullptr;
     }
     snapshot_.shutdown = true;
