@@ -174,6 +174,54 @@ bool keyword_end(std::span<const std::byte> data, std::size_t& end) noexcept {
     return false;
 }
 
+// PNG text excludes U+0000. UTF-8 additionally requires shortest encodings of
+// Unicode scalar values; noncharacters and discouraged controls remain valid.
+// This validates borrowed live bytes without allocation or normalization.
+template<bool Unicode>
+bool valid_png_text(std::span<const std::byte> data) noexcept {
+    if constexpr (!Unicode) {
+        const bool valid = std::find(data.begin(), data.end(), std::byte{0}) == data.end();
+        return valid;
+    } else {
+        std::size_t offset = 0;
+        while (offset < data.size()) {
+            const unsigned lead = byte(data[offset]);
+            ++offset;
+            if (lead == 0) return false;
+            if (lead < 0x80) continue;
+            unsigned count = 0;
+            unsigned lower = 0x80;
+            unsigned upper = 0xbf;
+            if (lead >= 0xc2 && lead <= 0xdf) {
+                count = 1;
+            } else if (lead >= 0xe0 && lead <= 0xef) {
+                count = 2;
+                if (lead == 0xe0) lower = 0xa0;
+                if (lead == 0xed) upper = 0x9f;
+            } else if (lead >= 0xf0 && lead <= 0xf4) {
+                count = 3;
+                if (lead == 0xf0) lower = 0x90;
+                if (lead == 0xf4) upper = 0x8f;
+            } else {
+                return false;
+            }
+            if (count > data.size() - offset) return false;
+            const unsigned second = byte(data[offset]);
+            if (second < lower || second > upper) return false;
+            ++offset;
+            for (unsigned index = 1; index < count; ++index) {
+                const unsigned continuation = byte(data[offset]);
+                if (continuation < 0x80 || continuation > 0xbf) return false;
+                ++offset;
+            }
+        }
+        return true;
+    }
+}
+
+// Parsing validates raw text once. Metadata extraction reuses that proof and
+// validates only newly inflated text, avoiding a second scan of large strings.
+template<bool ValidateText>
 PngDecodeError metadata_field(std::uint32_t type, std::span<const std::byte> data,
                              bool& compressed, std::size_t& start) noexcept {
     compressed = false;
@@ -182,7 +230,12 @@ PngDecodeError metadata_field(std::uint32_t type, std::span<const std::byte> dat
         return PngDecodeError::none;
     }
     if (!keyword_end(data, start)) return PngDecodeError::invalid_metadata;
-    if (type == text) return PngDecodeError::none;
+    if (type == text) {
+        if constexpr (ValidateText) {
+            if (!valid_png_text<false>(data.subspan(start))) return PngDecodeError::invalid_metadata;
+        }
+        return PngDecodeError::none;
+    }
     if (type == iccp || type == ztxt) {
         if (start == data.size() || data[start] != std::byte{0}) {
             return PngDecodeError::invalid_metadata;
@@ -191,16 +244,27 @@ PngDecodeError metadata_field(std::uint32_t type, std::span<const std::byte> dat
         compressed = true;
         return PngDecodeError::none;
     }
-    if (data.size() - start < 2 || byte(data[start]) > 1 || data[start + 1] != std::byte{0}) {
+    if (data.size() - start < 2 || byte(data[start]) > 1) {
         return PngDecodeError::invalid_metadata;
     }
     compressed = data[start] == std::byte{1};
+    // PNG requires decoders to ignore this byte when compression is disabled.
+    if (compressed && data[start + 1] != std::byte{0}) return PngDecodeError::invalid_metadata;
     start += 2;
-    // Language tag and translated keyword remain in the preserved raw chunk.
+    // Language-tag registry semantics remain outside this text-encoding check.
     for (unsigned field = 0; field < 2; ++field) {
+        const std::size_t begin = start;
         while (start < data.size() && data[start] != std::byte{0}) ++start;
         if (start == data.size()) return PngDecodeError::invalid_metadata;
+        if constexpr (ValidateText) {
+            if (field == 1 && !valid_png_text<true>(data.subspan(begin, start - begin))) {
+                return PngDecodeError::invalid_metadata;
+            }
+        }
         ++start;
+    }
+    if constexpr (ValidateText) {
+        if (!compressed && !valid_png_text<true>(data.subspan(start))) return PngDecodeError::invalid_metadata;
     }
     return PngDecodeError::none;
 }
@@ -249,7 +313,7 @@ PngDecodeError parse(std::span<const std::byte> encoded,
             ++plan.layout.metadata_records;
             bool compressed = false;
             std::size_t start = 0;
-            const PngDecodeError error = metadata_field(chunk.type, data, compressed, start);
+            const PngDecodeError error = metadata_field<true>(chunk.type, data, compressed, start);
             if (error != PngDecodeError::none) return error;
         }
         switch (chunk.type) {
@@ -603,7 +667,7 @@ PngDecodeError decode_metadata(std::span<const std::byte> encoded, const PngDeco
         record.encoded_length = chunk.length;
         const std::span<const std::byte> data = encoded.subspan(chunk.data_offset, chunk.length);
         std::size_t start = 0;
-        const PngDecodeError field_error = metadata_field(chunk.type, data, record.compressed, start);
+        const PngDecodeError field_error = metadata_field<false>(chunk.type, data, record.compressed, start);
         if (field_error != PngDecodeError::none) return field_error;
         if (record.compressed) {
             InflateOptions options{};
@@ -619,6 +683,9 @@ PngDecodeError decode_metadata(std::span<const std::byte> encoded, const PngDeco
             if (step.status == InflateStatus::error) return PngDecodeError::inflate_failure;
             if (step.status != InflateStatus::stream_end) return PngDecodeError::insufficient_storage;
             if (step.input_consumed != input.size()) return PngDecodeError::trailing_data;
+            const std::span<const std::byte> decoded = output.subspan(result.metadata_bytes, step.output_produced);
+            if (chunk.type == ztxt && !valid_png_text<false>(decoded)) return PngDecodeError::invalid_metadata;
+            if (chunk.type == itxt && !valid_png_text<true>(decoded)) return PngDecodeError::invalid_metadata;
             record.decoded_offset = result.metadata_bytes;
             record.decoded_length = step.output_produced;
             result.metadata_bytes += step.output_produced;

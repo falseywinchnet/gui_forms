@@ -57,3 +57,11 @@ The no-vector comparison disables loop and SLP vectorization for all candidate
 C++ (including inflate), so its difference is not attributable to one filter.
 The x64 output is generic SSE2/no-AVX assembly inspection, not execution.
 No result implies an audited replacement or a complete PNG-phase gate.
+
+Text metadata regression coverage checks all 256 iTXt method-byte values with
+compression on/off; truncated, overlong, surrogate and out-of-range UTF-8;
+embedded NULs; empty text; nonzero Latin-1; and all 1,112,063 nonzero Unicode
+scalar values in plain/compressed text and translated keywords. Six small text
+seeds supplement the image matrix in the fuzz corpus. These tests validate the
+owned strict text policy; libpng remains the sample oracle and is not claimed
+to validate those metadata semantics.

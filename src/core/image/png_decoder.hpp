@@ -67,8 +67,10 @@ struct PngDecodeResult final {
 // no colour conversion. All spans and workspace must be mutually disjoint.
 // Limits are copied at entry, so output cannot mutate the active policy.
 // No allocation or retained borrow. One execution context per workspace.
-// On any failure, discard all output (possibly partial); inspection and storage
-// errors occur before output mutation. Metadata semantics are not ICC validation.
+// On any failure, discard all output (possibly partial). Structural validation
+// and row/sample/record capacity checks precede mutation; compressed metadata
+// exhaustion can follow partial output. Text encoding is checked without
+// normalization; ICC profiles and language tags are not semantically validated.
 [[nodiscard]] PngDecodeResult decode_png_samples(
     std::span<const std::byte> encoded, PngDecodeLimits limits,
     compression::InflateStream& workspace, std::span<std::byte> rows,

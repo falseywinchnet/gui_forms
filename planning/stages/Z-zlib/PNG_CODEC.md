@@ -34,7 +34,13 @@ Finite encoded/chunk/dimension/pixel/filtered-byte limits bound parsing and
 reconstruction; an aggregate inflate work budget survives metadata resets.
 Compressed iCCP/zTXt/iTXt content shares one metadata-output budget. Descriptors
 retain encoded offsets for all ancillary chunks and decoded offsets for those
-compressed fields; no parser-created borrow outlives the call.
+compressed fields; no parser-created borrow outlives the call. Text chunks reject
+embedded NULs; iTXt translated keywords and text require well-formed UTF-8.
+Raw text is checked during parsing and inflated text immediately after decoding,
+without normalization or a repeated raw-text scan. Uncompressed iTXt ignores
+its compression-method byte as PNG requires. Language-tag registry/semantic
+validation remains open. Compressed metadata storage exhaustion can follow
+partial image/metadata output, which the caller must discard.
 
 Filters select their kernel once per row. Up has independent byte additions;
 Sub uses a channel-strided 16-byte prefix scan for byte strides 1 and 4,
@@ -57,8 +63,8 @@ references, with provenance and restrictions in the phase-2 optimization record.
 
 - Full malformed/valid corpus, pinned-libpng differential samples, fuzz targets,
   leak/undefined-behaviour checks, platform suite and measured filter kernels.
-- ICC semantic validation and agreed colour-management integration, text encoding
-  semantics and all admitted ancillary policy; raw preservation alone is not
+- ICC semantic validation and agreed colour-management integration, language-tag
+  validation and all remaining admitted ancillary policy; raw preservation alone is not
   colour-management acceptance. Static default image is the scope already used
   by the existing PNG paths; this does not introduce animation playback.
 - Shared decode output conversion/premultiplication, metadata limits chosen from

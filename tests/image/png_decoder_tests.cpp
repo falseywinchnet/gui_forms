@@ -344,6 +344,125 @@ void malformed_and_limits() {
     chunk(png, "IEND", {});
     require(decode(png).result.error == image::PngDecodeError::invalid_palette_index, "palette overrun accepted");
 }
+Bytes text_image(const char* kind, const Bytes& field) {
+    Bytes png = header(1, 1, formats[13], false);
+    chunk(png, kind, field);
+    chunk(png, "IDAT", stored(Bytes{std::byte{0},std::byte{1},std::byte{2},std::byte{3},std::byte{4}}));
+    chunk(png, "IEND", {});
+    return png;
+}
+Bytes international_field(const Bytes& content, const Bytes& translated, bool compressed,
+                          unsigned method = 0) {
+    Bytes field{std::byte{'K'}, std::byte{0}, compressed ? std::byte{1} : std::byte{0},
+        static_cast<std::byte>(method), std::byte{0}};
+    field.insert(field.end(), translated.begin(), translated.end());
+    field.push_back(std::byte{0});
+    if (compressed) {
+        const Bytes stream = stored(content);
+        field.insert(field.end(), stream.begin(), stream.end());
+    } else {
+        field.insert(field.end(), content.begin(), content.end());
+    }
+    return field;
+}
+void text_metadata() {
+    const image::PngDecodeLimits limits{.metadata_bytes=4096};
+    const Bytes word{std::byte{'a'}};
+    for (unsigned method = 0; method < 256; ++method) {
+        const Bytes plain = text_image("iTXt", international_field(word, {}, false, method));
+        require(decode(plain, limits).result.error == image::PngDecodeError::none,
+                "uncompressed iTXt compression method was not ignored");
+        const Bytes compressed = text_image("iTXt", international_field(word, {}, true, method));
+        const image::PngDecodeError expected = method == 0
+            ? image::PngDecodeError::none : image::PngDecodeError::invalid_metadata;
+        require(decode(compressed, limits).result.error == expected, "compressed iTXt method validation failed");
+    }
+    const std::array<Bytes, 23> invalid{{
+        {std::byte{0}}, {std::byte{0x80}}, {std::byte{0xbf}}, {std::byte{0xc0},std::byte{0x80}},
+        {std::byte{0xc1},std::byte{0xbf}}, {std::byte{0xc2}}, {std::byte{0xc2},std::byte{0x7f}},
+        {std::byte{0xc2},std::byte{0xc0}}, {std::byte{0xe0}}, {std::byte{0xe0},std::byte{0xa0}},
+        {std::byte{0xe0},std::byte{0x9f},std::byte{0xbf}},
+        {std::byte{0xed},std::byte{0xa0},std::byte{0x80}}, {std::byte{0xed},std::byte{0xbf},std::byte{0xbf}},
+        {std::byte{0xef},std::byte{0xbf},std::byte{0x7f}}, {std::byte{0xf0}},
+        {std::byte{0xf0},std::byte{0x90}}, {std::byte{0xf0},std::byte{0x90},std::byte{0x80}},
+        {std::byte{0xf0},std::byte{0x8f},std::byte{0xbf},std::byte{0xbf}},
+        {std::byte{0xf4},std::byte{0x90},std::byte{0x80},std::byte{0x80}},
+        {std::byte{0xf5},std::byte{0x80},std::byte{0x80},std::byte{0x80}},
+        {std::byte{0xf8},std::byte{0x88},std::byte{0x80},std::byte{0x80},std::byte{0x80}},
+        {std::byte{0xfe}}, {std::byte{0xff}}}};
+    for (const Bytes& malformed : invalid) {
+        for (bool compressed : {false, true}) {
+            const Bytes png = text_image("iTXt", international_field(malformed, {}, compressed));
+            const image::PngDecodeResult inspection = image::inspect_png_samples(png, limits);
+            const image::PngDecodeError inspected_error = compressed
+                ? image::PngDecodeError::none : image::PngDecodeError::invalid_metadata;
+            require(inspection.error == inspected_error, "text validation occurred at the wrong boundary");
+            require(decode(png, limits).result.error == image::PngDecodeError::invalid_metadata,
+                    "invalid iTXt text accepted");
+            // A zero in a translated keyword is its delimiter, not UTF-8 data.
+            if (malformed[0] == std::byte{0}) continue;
+            const Bytes translated = text_image("iTXt", international_field(word, malformed, compressed));
+            require(decode(translated, limits).result.error == image::PngDecodeError::invalid_metadata,
+                    "invalid translated keyword accepted");
+        }
+    }
+    Bytes latin{};
+    for (unsigned value = 1; value < 256; ++value) latin.push_back(static_cast<std::byte>(value));
+    for (bool compressed : {false, true}) {
+        Bytes field{std::byte{'K'}, std::byte{0}};
+        if (compressed) field.push_back(std::byte{0});
+        const std::size_t prefix = field.size();
+        const Bytes content = compressed ? stored(latin) : latin;
+        field.insert(field.end(), content.begin(), content.end());
+        const char* kind = compressed ? "zTXt" : "tEXt";
+        require(decode(text_image(kind, field), limits).result.error == image::PngDecodeError::none,
+                "nonzero Latin-1 text rejected");
+        field.resize(prefix);
+        const Bytes zero = compressed ? stored(Bytes{std::byte{0}}) : Bytes{std::byte{0}};
+        field.insert(field.end(), zero.begin(), zero.end());
+        require(decode(text_image(kind, field), limits).result.error == image::PngDecodeError::invalid_metadata,
+                "embedded Latin-1 NUL accepted");
+        field.resize(prefix);
+        if (compressed) {
+            const Bytes empty = stored({});
+            field.insert(field.end(), empty.begin(), empty.end());
+        }
+        require(decode(text_image(kind, field), limits).result.error == image::PngDecodeError::none,
+                "empty Latin-1 text rejected");
+        require(decode(text_image("iTXt", international_field({}, {}, compressed)), limits).result.error ==
+                image::PngDecodeError::none, "empty UTF-8 text rejected");
+    }
+    // Encode every permitted Unicode scalar independently of the byte-class
+    // validator, including noncharacters. U+0000 and surrogates are excluded.
+    Bytes unicode{};
+    unicode.reserve(4 * 0x110000);
+    for (unsigned scalar = 1; scalar <= 0x10ffff; ++scalar) {
+        if (scalar >= 0xd800 && scalar <= 0xdfff) continue;
+        if (scalar <= 0x7f) {
+            unicode.push_back(static_cast<std::byte>(scalar));
+        } else if (scalar <= 0x7ff) {
+            unicode.push_back(static_cast<std::byte>(0xc0U | (scalar >> 6)));
+            unicode.push_back(static_cast<std::byte>(0x80U | (scalar & 63U)));
+        } else if (scalar <= 0xffff) {
+            unicode.push_back(static_cast<std::byte>(0xe0U | (scalar >> 12)));
+            unicode.push_back(static_cast<std::byte>(0x80U | ((scalar >> 6) & 63U)));
+            unicode.push_back(static_cast<std::byte>(0x80U | (scalar & 63U)));
+        } else {
+            unicode.push_back(static_cast<std::byte>(0xf0U | (scalar >> 18)));
+            unicode.push_back(static_cast<std::byte>(0x80U | ((scalar >> 12) & 63U)));
+            unicode.push_back(static_cast<std::byte>(0x80U | ((scalar >> 6) & 63U)));
+            unicode.push_back(static_cast<std::byte>(0x80U | (scalar & 63U)));
+        }
+    }
+    const image::PngDecodeLimits large{.metadata_bytes=8ULL * 1024 * 1024};
+    for (bool compressed : {false, true}) {
+        require(decode(text_image("iTXt", international_field(unicode, {}, compressed)), large).result.error ==
+                image::PngDecodeError::none, "valid Unicode scalar rejected");
+    }
+    require(decode(text_image("iTXt", international_field({}, unicode, false)), large).result.error ==
+            image::PngDecodeError::none, "valid translated Unicode scalar rejected");
+    std::cout << "PNG text: 256 methods, malformed UTF-8/NUL, and all nonzero Unicode scalars passed\n";
+}
 void metadata_and_storage() {
     Bytes png = header(1, 1, formats[13], false);
     const Bytes content(64, std::byte{65});
@@ -412,6 +531,10 @@ void metadata_and_storage() {
     std::unique_ptr<compression::InflateStream> workspace = std::make_unique<compression::InflateStream>();
     const image::PngDecodeResult exact = image::decode_png_samples(png, {}, *workspace, rows, pixels, output, records);
     require(exact.error == image::PngDecodeError::none, "exact metadata buffer rejected");
+    const image::PngDecodeResult short_metadata = image::decode_png_samples(png, {}, *workspace,
+        rows, pixels, std::span<std::byte>(output).first(output.size() - 1), records);
+    require(short_metadata.error == image::PngDecodeError::insufficient_storage,
+            "short metadata output accepted");
     const image::PngDecodeResult short_rows = image::decode_png_samples(png, {}, *workspace,
         std::span<std::byte>(rows).first(rows.size() - 1), pixels, output, records);
     require(short_rows.error == image::PngDecodeError::insufficient_storage, "short rows accepted");
@@ -434,6 +557,23 @@ void write_corpus(const std::filesystem::path& directory) {
                 ++index;
             }
         }
+    }
+    struct TextSeed final { const char* name = nullptr; Bytes png{}; };
+    const Bytes valid{std::byte{'A'}, std::byte{0xe2}, std::byte{0x82}, std::byte{0xac}};
+    const Bytes invalid{std::byte{0xed}, std::byte{0xa0}, std::byte{0x80}};
+    const std::array<TextSeed, 6> text_seeds{{
+        {.name="text-plain-utf8", .png=text_image("iTXt", international_field(valid, valid, false))},
+        {.name="text-compressed-utf8", .png=text_image("iTXt", international_field(valid, {}, true))},
+        {.name="text-ignored-method", .png=text_image("iTXt", international_field(valid, {}, false, 255))},
+        {.name="text-invalid-plain", .png=text_image("iTXt", international_field(invalid, {}, false))},
+        {.name="text-invalid-compressed", .png=text_image("iTXt", international_field(invalid, {}, true))},
+        {.name="text-nul", .png=text_image("tEXt", Bytes{std::byte{'K'}, std::byte{0}, std::byte{'A'}, std::byte{0}})}
+    }};
+    for (const TextSeed& seed : text_seeds) {
+        const std::filesystem::path path = directory / (std::string(seed.name) + ".png");
+        std::ofstream stream(path, std::ios::binary);
+        stream.write(reinterpret_cast<const char*>(seed.png.data()), static_cast<std::streamsize>(seed.png.size()));
+        require(static_cast<bool>(stream), "could not write text corpus seed");
     }
 }
 void write_benchmarks(const std::filesystem::path& directory) {
@@ -460,6 +600,7 @@ int main(int argc, char** argv) {
         checksum_boundaries();
         malformed_and_limits();
         metadata_and_storage();
+        text_metadata();
         if (argc == 2) {
             const std::filesystem::path corpus(argv[1]);
             write_corpus(corpus);
