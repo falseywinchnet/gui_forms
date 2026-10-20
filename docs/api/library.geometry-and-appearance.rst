@@ -642,7 +642,7 @@ Types
 
    ``#include <gui_forms/engine/engine_math/engine_math.hpp>``
 
-   The sine and cosine of ``x`` radians, computed together (E3's springs). For |x| at most 2^20 the absolute error of each is at most 2^-50; beyond that, and for infinities and NaN, both are NaN. Exact case: x = 0 gives sine 0 and cosine 1. The argument is reduced by the nearest multiple of π/2, with π/2 split in three parts (Cody and Waite) so that the reduction is exact to about 2^-100 relative.
+   The sine and cosine of ``x`` radians, computed together (E3's springs). For x of magnitude at most 2^20 the absolute error of each is at most 2^-50; beyond that, and for infinities and NaN, both are NaN. Exact case: x = 0 gives sine 0 and cosine 1. The argument is reduced by the nearest multiple of π/2, with π/2 split in three parts (Cody and Waite) so that the reduction is exact to about 2^-100 relative.
 
    .. cpp:member:: double sine
 
