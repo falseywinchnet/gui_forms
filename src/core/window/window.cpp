@@ -76,6 +76,18 @@ double bounded_visual_outset(double value) noexcept {
            (*control).parent().get() == expected_parent;
 }
 
+// A virtual child published without a runtime ID takes the one its stable ID
+// gives, so every node of a snapshot has a nonzero runtime ID; hosts keep
+// zero for the window's own object.
+void assign_missing_virtual_runtime_ids(std::vector<SemanticNode>& nodes) {
+    for (SemanticNode& node : nodes) {
+        if (node.runtime_id == 0U) {
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        }
+        assign_missing_virtual_runtime_ids(node.children);
+    }
+}
+
 void append_semantic_nodes(const Control::Ptr& control,
                            const Control* expected_parent,
                            const Window* owner,
@@ -100,6 +112,7 @@ void append_semantic_nodes(const Control::Ptr& control,
         std::vector<SemanticNode> virtual_children =
             (*control).semantic_virtual_children();
         if (!current_semantic_identity(control, expected_parent, owner)) return;
+        assign_missing_virtual_runtime_ids(virtual_children);
         count += virtual_children.size();
         descendants.insert(descendants.end(),
                             std::make_move_iterator(virtual_children.begin()),
@@ -223,6 +236,9 @@ void Window::DeferredInputVisitor::operator()(InputEvent&& event) const {
         static_cast<void>((*window).dispatch_text(std::move(event)));
     } else if constexpr (std::is_same_v<EventType, DragEvent>) {
         static_cast<void>((*window).dispatch_drag(std::move(event)));
+    } else if (event.owner.value != 0U) {
+        static_cast<void>((*window).perform_semantic_action(
+            event.owner, event.stable_id, event.action, event.value));
     } else {
         static_cast<void>((*window).perform_semantic_action(
             event.stable_id, event.action, event.value));
@@ -2332,6 +2348,61 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         return request_focus(control);
     }
     return (*control).on_semantic_action(action, value);
+}
+
+bool Window::perform_semantic_action(RuntimeId control_id,
+                                     std::string_view virtual_child,
+                                     SemanticAction action,
+                                     std::string_view value) {
+    require_ui_thread("semantic action");
+    if (in_paint_) {
+        return defer_input(DeferredInput{DeferredSemanticInput{
+            std::string(virtual_child), action, std::string(value), control_id}});
+    }
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return false;
+    if (virtual_child.empty()) {
+        // Stable identities are unique within a window, so this reaches
+        // `control` itself; a replaced control's successor is never found by
+        // the old runtime identity.
+        const std::string_view stable_id = (*control).stable_id().value();
+        if (find(stable_id) != control) return false;
+        const bool performed = perform_semantic_action(stable_id, action, value);
+        return performed;
+    }
+    // The virtual child is published by `control` or, when the semantic tree
+    // does not expose the control that publishes it, by a control inside it.
+    if (!semantic_scope_reaches(control)) return false;
+    const bool claimed = dispatch_semantic_child_action(control, virtual_child, action, value);
+    return claimed;
+}
+
+Control::Ptr Window::find_runtime_control(RuntimeId control) const {
+    ControlList pending{root_};
+    pending.reserve(1U + popups_.size());
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        pending.push_back((*popup).popup());
+    }
+    while (!pending.empty()) {
+        const Control::Ptr current = pending.back();
+        pending.pop_back();
+        if (!current || !(*current).is_alive() || (*current).window_ != this) continue;
+        if ((*current).runtime_id() == control) return current;
+        const std::span<const Control::Ptr> children = (*current).children();
+        for (std::size_t index = 0; index < children.size(); ++index) {
+            pending.push_back(children[index]);
+        }
+    }
+    return {};
+}
+
+bool Window::semantic_scope_reaches(const Control::Ptr& control) const {
+    const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
+    if (!scoped || contains_control(scoped, control)) return true;
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (contains_control(scoped, (*popup).owner()) && contains_control((*popup).popup(), control)) return true;
+    }
+    return false;
 }
 
 void Window::apply_subtree_dirty(Control& control, Dirty requested_dirty,

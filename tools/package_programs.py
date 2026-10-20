@@ -50,6 +50,7 @@ WINDOWS_SYSTEM_DLLS: frozenset[str] = frozenset({
     "msvcrt.dll", "ucrtbase.dll", "bcrypt.dll", "secur32.dll", "rpcrt4.dll", "setupapi.dll",
     "winspool.drv", "winmm.dll", "crypt32.dll", "normaliz.dll", "uxtheme.dll", "msimg32.dll",
     "shcore.dll", "dbghelp.dll", "psapi.dll", "userenv.dll", "iphlpapi.dll",
+    "uiautomationcore.dll",
 })
 LINUX_FALLBACK_DEPENDS: str = "libc6, libx11-6, libxcursor1, libatk1.0-0t64 | libatk1.0-0, libatk-bridge2.0-0t64 | libatk-bridge2.0-0"
 

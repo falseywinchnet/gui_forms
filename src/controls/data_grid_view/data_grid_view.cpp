@@ -2287,7 +2287,11 @@ bool DataGridView::on_semantic_child_action(std::string_view id, SemanticAction 
         }
         const std::size_t column = current_ ? (*current_).column : 0U;
         const bool moved = move_current({DataGridViewRowPosition{*row}, column}, SelectionGesture::replace);
-        return moved;
+        if (!moved) return false;
+        // A row's select selects the row, as its published state reports it:
+        // in cell mode moving the current cell selects only that cell.
+        if (action == SemanticAction::select) set_row_selected(DataGridViewRowPosition{*row}, true);
+        return true;
     }
     Window* const host = window();
     if (action == SemanticAction::focus && host != nullptr) {
