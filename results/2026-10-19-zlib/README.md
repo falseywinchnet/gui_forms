@@ -198,3 +198,14 @@ was begun. Fuzz hours remain 0; no performance or platform result is claimed.
 
 Follow-up validation: both full first-party checker commands above were rerun;
 each checked 1171 files with 0 findings. `git diff --check` passed.
+
+
+## Follow-up: memory-leak evidence filter
+
+The owner narrowed alternatives to those properly audited for leaks. The audit
+now separates a qualified shortlist (none confirmed by the inspected evidence)
+from the ten retained references. Published Beast assessments were reviewed
+for scope; libdeflate's explicit Valgrind leak gate, zlib-ng's analyzer options
+and libspng's testing claims were inspected. Configuration and generic audits
+are not reported as a successful leak audit. No upstream test execution or
+new implementation was performed. The accepted six decisions are unchanged.
