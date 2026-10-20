@@ -248,3 +248,18 @@ Do not resynchronize a worktree while a build is using its M4 mirror. `m4build`
 uses `rsync --delete`: remote-only dependency working files outside the excluded
 build directories can be removed. Store generated experiment output under
 `build/`; serialize mirror sync and full dependency builds.
+
+For the isolated release benchmark, export the baseline from this checkout
+before using the M4 mirror (its linked-worktree Git metadata is not portable):
+
+```sh
+mkdir -p build-zlib-study-sources/baseline
+git archive 123f13cd include/gui_forms/compression/inflate.hpp src/core/compression/inflate.cpp | tar -x -C build-zlib-study-sources/baseline
+/Users/ultimussecundai/.local/bin/m4build -- env PATH=/opt/homebrew/opt/llvm@22/bin:/opt/homebrew/bin:/usr/bin:/bin python3 -B tools/benchmark_inflate.py --oracle build-zlib-study-sources/upstream-zlib --baseline build-zlib-study-sources/baseline --output build/inflate-benchmark --inspect-x64
+```
+
+The runner verifies baseline and oracle hashes. `--inspect-x64` only emits
+assembly using the installed macOS SDK, generic SSE2 and no AVX; it does not
+execute an x64 test. Decoder SIMD design targets common 128-bit SSE/NEON lane
+groups in portable C++, following the owner's BFFT/Airspy direction. Do not
+introduce platform-specific intrinsic forks or wider-register algorithms.

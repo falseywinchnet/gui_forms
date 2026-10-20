@@ -22,7 +22,7 @@ python3 -B tools/validate_inflate.py --oracle build-zlib-study-sources/upstream-
 Provide upstream zlib at `51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf`; the script
 never fetches it. M4 execution uses `m4build` with LLVM 22.1.8 on PATH. The oracle
 adds 700 positive streaming cases: 10 levels, 7 windows (9–15), 5 strategies and
-2 wrapper modes, each with one-byte input/output. Window 8 is covered by the
+2 wrapper modes, each with both one-byte input/output and whole-buffer decoding. Window 8 is covered by the
 native contract tests; upstream deflate's window-8 behavior is not relabelled
 as a window-8 oracle. The fuzz harness compares whole-buffer and byte-split
 execution, then checks acceptance, exact output and stream boundary against
@@ -43,3 +43,17 @@ has no process-RSS watchdog; the candidate's finite per-stream budgets remain
 active. Preserve the original failure and use external process supervision for
 long campaigns. LLVM 22.1.8 `FuzzerDriver.cpp:StartRssThread` documents this
 zero-limit path. This is not a source-level fix to libFuzzer.
+
+Bulk-kernel tests also exercise 19 match distances against 19 output chunk
+sizes, history wrap, exact trailing bytes, 300 chunk sizes on the dynamic
+fixture, and maximal stored blocks of 0xff around Adler's 4096-byte batch
+boundary. Two additional seeds contain 16384 bytes of i modulo 13, encoded
+with Python zlib 1.2.12 in raw/zlib framing, within the fuzzer's output cap.
+
+`tools/benchmark_inflate.py` builds the original owned implementation, current
+implementation and a compiler-vectorization-disabled ablation with the same
+release flags, each also timing pinned upstream zlib. See the
+[measurement record](../../results/2026-10-19-zlib/phase-two/optimization/README.md)
+for limitations. On an M4 mirror, provide `--baseline` pointing to the exported
+`123f13cd` header/source; the runner verifies their hashes. The normal checkout
+can omit that option to read the same revision from Git.

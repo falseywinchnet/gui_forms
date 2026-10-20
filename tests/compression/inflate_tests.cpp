@@ -271,6 +271,10 @@ void dynamic_fixture_and_window() {
         require(result.result.status == InflateStatus::stream_end, "dynamic fixture rejected");
         require(result.bytes == expected, "dynamic fixture bytes differ");
     }
+    for (std::size_t chunk = 1; chunk <= 300; ++chunk) {
+        const Decoded result = decode(dynamic_fixture, options(), dynamic_fixture.size(), chunk);
+        require(result.result.status == InflateStatus::stream_end && result.bytes == expected, "match bulk boundary mismatch");
+    }
     Bits distant{};
     distant.put(3, 3);
     for (unsigned i = 0; i < 257; ++i) distant.fixed('a');
@@ -283,6 +287,95 @@ void dynamic_fixture_and_window() {
     check_error(distant.bytes, InflateError::distance_exceeds_window, small);
     const Decoded valid = decode(distant.bytes, options(), 1, 1);
     require(valid.result.status == InflateStatus::stream_end && valid.bytes.size() == 260, "distance 257 rejected");
+}
+
+void stored_checksum_boundaries() {
+    // Worst byte sum at the 4096-byte Adler batch bound, multiple ring wraps,
+    // and a following stored block exercise both the reduction and its carry.
+    constexpr unsigned size = 65535;
+    std::vector<std::byte> encoded{std::byte{0x78}, std::byte{0x01}};
+    for (unsigned block = 0; block < 2; ++block) {
+        encoded.push_back(static_cast<std::byte>(block));
+        encoded.push_back(std::byte{0xff});
+        encoded.push_back(std::byte{0xff});
+        encoded.push_back(std::byte{0});
+        encoded.push_back(std::byte{0});
+        encoded.insert(encoded.end(), size, std::byte{0xff});
+    }
+    std::uint64_t low = 1;
+    std::uint64_t high = 0;
+    for (unsigned i = 0; i < size * 2U; ++i) {
+        low = (low + 255U) % 65521U;
+        high = (high + low) % 65521U;
+    }
+    const std::uint32_t checksum = static_cast<std::uint32_t>((high << 16U) | low);
+    for (unsigned i = 0; i < 4; ++i) {
+        const unsigned shift = 24U - i * 8U;
+        encoded.push_back(static_cast<std::byte>((checksum >> shift) & 255U));
+    }
+    constexpr std::array<std::size_t, 7> chunks{1, 15, 4095, 4096, 4097, 32768, 200000};
+    for (const std::size_t chunk : chunks) {
+        const Decoded result = decode(encoded, options(InflateFormat::zlib), encoded.size(), chunk);
+        require(result.result.status == InflateStatus::stream_end && result.bytes.size() == size * 2U, "stored Adler batch mismatch");
+        for (const std::byte value : result.bytes) require(value == std::byte{0xff}, "stored copy mismatch");
+    }
+    InflateOptions limited = options(InflateFormat::zlib);
+    limited.limits.input_bytes = ByteCount{4103};
+    check_error(encoded, InflateError::input_limit_exceeded, limited);
+    limited = options(InflateFormat::zlib);
+    limited.limits.output_bytes = ByteCount{4097};
+    check_error(encoded, InflateError::output_limit_exceeded, limited);
+}
+
+void match_copy_boundaries() {
+    constexpr std::array<unsigned, 19> distances{
+        1, 2, 3, 4, 7, 8, 15, 16, 17, 31, 32, 127, 128, 129, 257, 258, 259, 32767, 32768};
+    constexpr std::array<std::size_t, 19> chunks{
+        1, 2, 3, 7, 15, 16, 17, 31, 32, 127, 128, 129, 257, 258, 259, 4095, 4096, 4097, 200000};
+    for (const unsigned distance : distances) {
+        Bits bits{};
+        bits.put(3, 3);
+        std::vector<std::byte> expected{};
+        // Position 137 in the ring makes a number of match seeds straddle its
+        // physical end. The full-window cases also test overwritten history.
+        for (unsigned i = 0; i < 32768 + 137; ++i) {
+            const unsigned value = (i * 17U + i / 251U) & 255U;
+            bits.fixed(value);
+            expected.push_back(static_cast<std::byte>(value));
+        }
+        unsigned code = 0;
+        unsigned extra = 0;
+        unsigned base = 1;
+        if (distance <= 4) code = distance - 1;
+        else {
+            for (unsigned candidate = 4; candidate < 30; ++candidate) {
+                const unsigned width = candidate / 2U - 1U;
+                const unsigned first = (1U << (width + 1U)) + 1U + (candidate & 1U) * (1U << width);
+                if (distance >= first) {
+                    code = candidate;
+                    extra = width;
+                    base = first;
+                }
+            }
+        }
+        for (unsigned repeat = 0; repeat < 3; ++repeat) {
+            bits.fixed(285);
+            bits.canonical(code, 5);
+            if (extra != 0) bits.put(distance - base, extra);
+            for (unsigned i = 0; i < 258; ++i) {
+                const std::byte value = expected[expected.size() - distance];
+                expected.push_back(value);
+            }
+        }
+        bits.fixed(256);
+        bits.bytes.push_back(std::byte{0xa5});
+        bits.bytes.push_back(std::byte{0x5a});
+        for (const std::size_t chunk : chunks) {
+            const Decoded decoded = decode(bits.bytes, options(), bits.bytes.size(), chunk);
+            require(decoded.result.status == InflateStatus::stream_end && decoded.bytes == expected, "match kernel boundary mismatch");
+            require(decoded.result.total_input.value == bits.bytes.size() - 2, "lookup consumed stream tail");
+        }
+    }
 }
 
 void lifecycle() {
@@ -372,6 +465,8 @@ void differential() {
                     const Decoded result = decode(encoded, options(format), 1, 1);
                     require(result.result.status == InflateStatus::stream_end, "oracle stream rejected");
                     require(result.bytes == input, "oracle stream bytes differ");
+                    const Decoded bulk = decode(encoded, options(format), encoded.size(), 200000);
+                    require(bulk.result.status == InflateStatus::stream_end && bulk.bytes == input, "bulk oracle mismatch");
                     ++cases;
                 }
             }
@@ -389,6 +484,8 @@ int main() {
         malformed_blocks();
         dynamic_and_wrapper();
         lifecycle();
+        match_copy_boundaries();
+        stored_checksum_boundaries();
         dynamic_fixture_and_window();
 #if defined(GUI_FORMS_INFLATE_ORACLE)
         differential();

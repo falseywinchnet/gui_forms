@@ -1,4 +1,9 @@
-# Phase 2: bounded scalar inflate (gate open)
+# Phase 2: bounded streaming inflate (gate open)
+
+The measurements below describe the initial scalar baseline at `123f13cd`.
+The owner subsequently requested optimization; the [optimization evidence](optimization/README.md)
+records the newer kernels, workspace, checks, measurements and remaining gaps.
+Do not apply the baseline coverage or workspace numbers to the optimized source.
 
 Owner direction: reuse suitable non-GPL source material and rewrite both PNG
 and deflate in the complete house style. This authorizes implementation and

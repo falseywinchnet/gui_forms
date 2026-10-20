@@ -8,6 +8,8 @@
 namespace gui_forms::compression {
 
 struct ByteCount final { std::uint64_t value = 0; };
+// Implementation-specific effort units, not CPU cycles or stable counts
+// across buffer schedules/decoder versions. All configured limits are finite.
 struct WorkCount final { std::uint64_t value = 0; };
 
 enum class InflateFormat { zlib, raw_deflate };
@@ -72,6 +74,9 @@ private:
     struct Tree final {
         std::array<std::uint16_t, 16> counts{};
         std::array<std::uint16_t, 288> symbols{};
+        // Nine low-order stream bits select a packed symbol/length. Zero
+        // entries use canonical traversal (long codes or an invalid prefix).
+        std::array<std::uint16_t, 512> lookup{};
         unsigned maximum_length = 0;
     };
     struct CodeCursor final {
@@ -102,8 +107,13 @@ private:
     bool build_tree(Tree& tree, std::span<const std::uint8_t> lengths,
                     bool code_alphabet) noexcept;
     bool fixed_trees() noexcept;
+    static constexpr Tree make_fixed_tree(bool distance_alphabet) noexcept;
     bool output_ready(Call& call) noexcept;
     void emit(Call& call, std::byte value) noexcept;
+    void publish(Call& call, std::size_t count) noexcept;
+    bool stored_bytes(Call& call) noexcept;
+    bool copy_match(Call& call) noexcept;
+    bool literal_run(Call& call) noexcept;
     void end_block() noexcept;
     bool step(Call& call) noexcept;
 

@@ -12,7 +12,7 @@ not thereby certified leak-free. The PNG decision now calls for an owned codec.
 |---|---|
 | `inflate.cpp`: canonical tree construction and symbol decoding | Derived from Mark Adler's `contrib/puff/puff.c`, version 2.3, in upstream zlib commit `51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf`. This is an altered C++ implementation, not original puff. Count/offset construction and canonical bit traversal retain the algorithm; resumable code state, fixed storage, explicit results, checked quotas and error handling replace puff's whole-buffer/longjmp interface. |
 | `inflate.cpp`: block parser and RFC tables | RFC 1951 fields and length/distance tables, informed by the same puff reference and pinned upstream `inflate.c`/`inftrees.c`. Conservatively covered by the retained puff notice. No Chromium optimizations, Boost, miniz, zlib-ng or libdeflate source was copied into this phase. |
-| `inflate.cpp`: zlib header/trailer, history ownership, quotas, streaming orchestration | Newly written GUI.Forms implementation against RFC 1950/1951 and the approved study. No heap allocation, setjmp/longjmp or exceptions. Scalar Adler arithmetic here is the wrapper baseline; consolidation/acceleration follows in phase 4. |
+| `inflate.cpp`: zlib header/trailer, history ownership, quotas, streaming orchestration | Newly written GUI.Forms implementation against RFC 1950/1951 and the approved study. No heap allocation, setjmp/longjmp or exceptions. The owner subsequently requested early acceleration: the bounded bulk copy, literal-run/root-lookup and batched Adler code is newly written. Consolidation of checksum APIs and additional ISA comparisons remain in phase 4. |
 | `include/gui_forms/compression/inflate.hpp` | New native API and explicit owner/state layout. Not the eventual C ABI. |
 | Tests and fuzz harness | Newly authored test logic; fixture provenance below. The test-only zlib oracle is external, pinned by the source digests in `tests/compression/oracle_sha256.json`; it is never linked into production. |
 
@@ -32,3 +32,13 @@ introduced as a runtime dependency by this phase.
 House-style conformance improves reviewability; leak freedom, bounds and
 format conformance still require the accepted executable gates. No reference's
 security history transfers automatically to a rewritten implementation.
+
+## Early optimization reference
+
+The owner explicitly requested BFFT paradigms. The already pinned subset at
+`0f75ca79fbdc9176af729fc67afed59dca436ff1` informed prepared tables, caller-owned
+workspace, preflighted kernels, mode selection and bounded tails. No BFFT source
+was copied into this codec. The new nine-bit table is constructed from the same
+canonical code ordering described above; puff attribution remains. The
+[optimization record](../../../results/2026-10-19-zlib/phase-two/optimization/README.md)
+separates generated SIMD evidence, synthetic measurements and the PNG inspection.

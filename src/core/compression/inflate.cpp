@@ -4,6 +4,8 @@
 #include "gui_forms/compression/inflate.hpp"
 
 #include <limits>
+#include <algorithm>
+#include <cstring>
 
 namespace gui_forms::compression {
 namespace {
@@ -130,6 +132,31 @@ bool InflateStream::bits(Call& call, unsigned count, unsigned& value) noexcept {
 }
 
 bool InflateStream::symbol(Call& call, const Tree& tree, unsigned& value) noexcept {
+    if (code_.length == 1) {
+        // Peek only live, budget-admitted bytes, without consuming a trailer or
+        // the next stream. bits() below consumes exactly the matched code.
+        const unsigned bytes_needed = (16U - bit_count_) / 8U;
+        const std::size_t available = call.input.size() - call.read;
+        const std::uint64_t budget = options_.limits.input_bytes.value - input_total_.value;
+        if (available >= bytes_needed && budget >= bytes_needed) {
+            if (!charge(1)) return false;
+            std::uint32_t peek = bit_buffer_;
+            const std::uint32_t first = std::to_integer<std::uint32_t>(call.input[call.read]);
+            peek |= first << bit_count_;
+            if (bytes_needed == 2) {
+                const std::uint32_t second = std::to_integer<std::uint32_t>(call.input[call.read + 1]);
+                peek |= second << (bit_count_ + 8U);
+            }
+            const unsigned entry = tree.lookup[peek & 511U];
+            const unsigned length = entry & 15U;
+            if (length != 0) {
+                unsigned discarded = 0;
+                if (!bits(call, length, discarded)) return false;
+                value = entry >> 4U;
+                return true;
+            }
+        }
+    }
     while (code_.length <= tree.maximum_length) {
         unsigned bit = 0;
         if (!bits(call, 1, bit)) return false;
@@ -155,9 +182,12 @@ bool InflateStream::build_tree(Tree& tree, std::span<const std::uint8_t> lengths
                                bool code_alphabet) noexcept {
     // Precharge all count/offset initialization, two symbol passes and 15
     // Kraft-space steps. No table size depends on unvalidated stream values.
-    const std::uint64_t work = 64U + 2U * lengths.size();
+    // Lookup construction is bounded by 512 entries plus at most nine bit
+    // reversals per live symbol; reserve that whole cost before mutation.
+    const std::uint64_t work = 1088U + 11U * lengths.size();
     if (!charge(work)) return false;
     tree.counts.fill(0);
+    tree.lookup.fill(0);
     tree.maximum_length = 0;
     for (std::size_t i = 0; i < lengths.size(); ++i) {
         const unsigned length = lengths[i];
@@ -196,21 +226,84 @@ bool InflateStream::build_tree(Tree& tree, std::span<const std::uint8_t> lengths
             ++offsets[length];
         }
     }
+    unsigned code = 0;
+    unsigned symbol_index = 0;
+    const unsigned root_length = std::min(tree.maximum_length, 9U);
+    for (unsigned length = 1; length <= root_length; ++length) {
+        const unsigned end = symbol_index + tree.counts[length];
+        while (symbol_index < end) {
+            unsigned forward = code;
+            unsigned reversed = 0;
+            for (unsigned bit = 0; bit < length; ++bit) {
+                reversed = (reversed << 1U) | (forward & 1U);
+                forward >>= 1U;
+            }
+            const unsigned symbol_value = tree.symbols[symbol_index];
+            const std::uint16_t entry = static_cast<std::uint16_t>((symbol_value << 4U) | length);
+            const unsigned stride = 1U << length;
+            for (unsigned index = reversed; index < 512; index += stride) tree.lookup[index] = entry;
+            ++code;
+            ++symbol_index;
+        }
+        code <<= 1U;
+    }
     return true;
 }
 
+constexpr InflateStream::Tree InflateStream::make_fixed_tree(bool distance_alphabet) noexcept {
+    // RFC 1951's immutable fixed alphabets are prepared at compile time. Their
+    // canonical ordering is independent of input, stream lifetime or ISA.
+    Tree tree{};
+    unsigned count = 288;
+    tree.maximum_length = 9;
+    if (distance_alphabet) {
+        count = 32;
+        tree.maximum_length = 5;
+    }
+    for (unsigned symbol_value = 0; symbol_value < count; ++symbol_value) {
+        unsigned length = 5;
+        unsigned code = symbol_value;
+        unsigned index = symbol_value;
+        if (!distance_alphabet) {
+            if (symbol_value < 144) {
+                length = 8;
+                code = 48U + symbol_value;
+                index = 24U + symbol_value;
+            } else if (symbol_value < 256) {
+                length = 9;
+                code = 400U + symbol_value - 144U;
+                index = 176U + symbol_value - 144U;
+            } else if (symbol_value < 280) {
+                length = 7;
+                code = symbol_value - 256U;
+                index = symbol_value - 256U;
+            } else {
+                length = 8;
+                code = 192U + symbol_value - 280U;
+                index = 168U + symbol_value - 280U;
+            }
+        }
+        ++tree.counts[length];
+        tree.symbols[index] = static_cast<std::uint16_t>(symbol_value);
+        unsigned reversed = 0;
+        for (unsigned bit = 0; bit < length; ++bit) {
+            reversed = (reversed << 1U) | (code & 1U);
+            code >>= 1U;
+        }
+        const std::uint16_t entry = static_cast<std::uint16_t>((symbol_value << 4U) | length);
+        const unsigned stride = 1U << length;
+        for (unsigned slot = reversed; slot < 512; slot += stride) tree.lookup[slot] = entry;
+    }
+    return tree;
+}
+
 bool InflateStream::fixed_trees() noexcept {
-    if (!charge(320)) return false;
-    for (unsigned i = 0; i < 144; ++i) lengths_[i] = 8;
-    for (unsigned i = 144; i < 256; ++i) lengths_[i] = 9;
-    for (unsigned i = 256; i < 280; ++i) lengths_[i] = 7;
-    for (unsigned i = 280; i < 288; ++i) lengths_[i] = 8;
-    const std::span<const std::uint8_t> literal_lengths(lengths_.data(), 288);
-    if (!build_tree(literals_, literal_lengths, false)) return false;
-    for (unsigned i = 0; i < 32; ++i) lengths_[i] = 5;
-    const std::span<const std::uint8_t> distance_lengths(lengths_.data(), 32);
-    const bool built = build_tree(distances_, distance_lengths, false);
-    return built;
+    static constexpr Tree literal_tree = make_fixed_tree(false);
+    static constexpr Tree distance_tree = make_fixed_tree(true);
+    if (!charge(2U * sizeof(Tree))) return false;
+    literals_ = literal_tree;
+    distances_ = distance_tree;
+    return true;
 }
 
 bool InflateStream::output_ready(Call& call) noexcept {
@@ -233,6 +326,7 @@ void InflateStream::emit(Call& call, std::byte value) noexcept {
     history_[history_next_] = value;
     history_next_ = (history_next_ + 1U) % history_.size();
     if (history_live_ < history_.size()) ++history_live_;
+    if (options_.format == InflateFormat::raw_deflate) return;
     // Each sum is less than 65521 before adding. The largest intermediate is
     // 131040, independent of stream length; no deferred-reduction overflow.
     adler_low_ += std::to_integer<std::uint32_t>(value);
@@ -241,10 +335,148 @@ void InflateStream::emit(Call& call, std::byte value) noexcept {
     if (adler_high_ >= 65521U) adler_high_ -= 65521U;
 }
 
+void InflateStream::publish(Call& call, std::size_t count) noexcept {
+    // The caller has filled and charged a disjoint output span of at most 4096
+    // bytes. Publish it to the ring in two contiguous pieces, with no wrap test
+    // inside a copy loop. No input/output borrow survives this call.
+    const std::byte* source = call.output.data() + call.written;
+    const std::size_t first = std::min(count, history_.size() - history_next_);
+    std::memcpy(history_.data() + history_next_, source, first);
+    std::memcpy(history_.data(), source + first, count - first);
+    history_next_ = (history_next_ + count) % history_.size();
+    history_live_ = std::min(history_live_ + count, history_.size());
+    call.written += count;
+    output_total_.value += count;
+    if (options_.format == InflateFormat::raw_deflate) return;
+
+    // For n <= 4096, n*65520 + 255*n*(n+1)/2 + 65520 fits uint32.
+    // Independent reductions expose SIMD without a serial per-byte Adler
+    // dependency. Unaligned bytes and arbitrary tails are valid inputs.
+    std::uint32_t sum = 0;
+    std::uint32_t weighted = 0;
+    const std::uint32_t length = static_cast<std::uint32_t>(count);
+    for (std::uint32_t i = 0; i < length; ++i) {
+        const std::uint32_t byte = std::to_integer<std::uint32_t>(source[i]);
+        sum += byte;
+        weighted += (length - i) * byte;
+    }
+    const std::uint32_t high = adler_high_ + length * adler_low_ + weighted;
+    adler_high_ = high % 65521U;
+    adler_low_ = (adler_low_ + sum) % 65521U;
+}
+
+bool InflateStream::literal_run(Call& call) noexcept {
+    if (code_.length != 1) return false;
+    // At most two input bytes and five work units per literal. All capacities
+    // are proved before the loop. A long code, match or end marker is left for
+    // the resumable parser, without consuming any part of that symbol.
+    std::size_t capacity = std::min<std::size_t>(4096, call.output.size() - call.written);
+    capacity = std::min(capacity, (call.input.size() - call.read) / 2U);
+    const std::uint64_t input_left = (options_.limits.input_bytes.value - input_total_.value) / 2U;
+    const std::uint64_t output_left = options_.limits.output_bytes.value - output_total_.value;
+    const std::uint64_t work_left = (options_.limits.work.value - work_total_.value) / 5U;
+    if (input_left < capacity) capacity = static_cast<std::size_t>(input_left);
+    if (output_left < capacity) capacity = static_cast<std::size_t>(output_left);
+    if (work_left < capacity) capacity = static_cast<std::size_t>(work_left);
+    if (capacity == 0) return false;
+    std::size_t read = call.read;
+    std::size_t written = 0;
+    std::uint32_t buffer = bit_buffer_;
+    unsigned live_bits = bit_count_;
+    while (written < capacity) {
+        const std::uint32_t low = std::to_integer<std::uint32_t>(call.input[read]);
+        const std::uint32_t high = std::to_integer<std::uint32_t>(call.input[read + 1]);
+        const std::uint32_t pair = low | (high << 8U);
+        const std::uint32_t peek = buffer | (pair << live_bits);
+        const unsigned entry = literals_.lookup[peek & 511U];
+        if (entry == 0 || entry >= 4096) break;
+        const unsigned length = entry & 15U;
+        const unsigned consumed = (length + 7U - live_bits) / 8U;
+        live_bits += consumed * 8U;
+        live_bits -= length;
+        const std::uint32_t mask = (std::uint32_t{1} << live_bits) - 1U;
+        buffer = (peek >> length) & mask;
+        read += consumed;
+        call.output[call.written + written] = static_cast<std::byte>(entry >> 4U);
+        ++written;
+    }
+    if (written == 0) return false;
+    const std::size_t consumed = read - call.read;
+    // The preflight bound proves these additions cannot exceed any quota.
+    work_total_.value += 3U * written + consumed;
+    input_total_.value += consumed;
+    call.read = read;
+    bit_buffer_ = buffer;
+    bit_count_ = live_bits;
+    publish(call, written);
+    return true;
+}
+
+bool InflateStream::stored_bytes(Call& call) noexcept {
+    if (!output_ready(call)) return false;
+    if (call.read == call.input.size()) {
+        if (call.final_input) fail(InflateError::truncated_input);
+        call.status = InflateStatus::need_input;
+        return false;
+    }
+    if (input_total_.value == options_.limits.input_bytes.value) {
+        fail(InflateError::input_limit_exceeded);
+        return false;
+    }
+    // Stored-block headers leave the bit buffer empty. Bounds and quotas are
+    // settled once for this kernel, before it writes any caller storage.
+    std::size_t count = std::min<std::size_t>(stored_left_, 4096);
+    count = std::min(count, call.output.size() - call.written);
+    count = std::min(count, call.input.size() - call.read);
+    const std::uint64_t input_left = options_.limits.input_bytes.value - input_total_.value;
+    const std::uint64_t output_left = options_.limits.output_bytes.value - output_total_.value;
+    if (input_left < count) count = static_cast<std::size_t>(input_left);
+    if (output_left < count) count = static_cast<std::size_t>(output_left);
+    // One output byte was charged by output_ready; charge the rest plus input.
+    if (!charge(2U * count - 1U)) return false;
+    std::memcpy(call.output.data() + call.written, call.input.data() + call.read, count);
+    call.read += count;
+    input_total_.value += count;
+    stored_left_ -= static_cast<unsigned>(count);
+    publish(call, count);
+    return true;
+}
+
+bool InflateStream::copy_match(Call& call) noexcept {
+    if (!output_ready(call)) return false;
+    std::size_t count = std::min<std::size_t>(match_length_, call.output.size() - call.written);
+    const std::uint64_t output_left = options_.limits.output_bytes.value - output_total_.value;
+    if (output_left < count) count = static_cast<std::size_t>(output_left);
+    if (!charge(count - 1U)) return false;
+    const std::size_t source = (history_next_ + history_.size() - match_distance_) % history_.size();
+    std::byte* destination = call.output.data() + call.written;
+    if (match_distance_ == 1) {
+        const int byte = std::to_integer<int>(history_[source]);
+        std::memset(destination, byte, count);
+    } else {
+        const std::size_t seed = std::min<std::size_t>(count, match_distance_);
+        const std::size_t first = std::min(seed, history_.size() - source);
+        std::memcpy(destination, history_.data() + source, first);
+        std::memcpy(destination + first, history_.data(), seed - first);
+        // LZ copies repeat newly produced bytes. Grow the initialized prefix;
+        // every memcpy is disjoint, including distance < length. A memmove of
+        // the original history would not implement this recurrence.
+        std::size_t filled = seed;
+        while (filled < count) {
+            const std::size_t copied = std::min(filled, count - filled);
+            std::memcpy(destination + filled, destination, copied);
+            filled += copied;
+        }
+    }
+    match_length_ -= static_cast<unsigned>(count);
+    publish(call, count);
+    return true;
+}
+
 void InflateStream::end_block() noexcept {
     phase_ = Phase::block;
     if (final_block_) {
-        // No speculative byte reads: only unused bits of the final byte remain.
+        // No speculative byte consumption: only final-byte padding remains.
         bit_buffer_ = 0;
         bit_count_ = 0;
         phase_ = Phase::trailer;
@@ -319,16 +551,14 @@ bool InflateStream::step(Call& call) noexcept {
         }
         phase_ = Phase::stored_bytes;
         return true;
-    case Phase::stored_bytes:
+    case Phase::stored_bytes: {
         if (stored_left_ == 0) {
             end_block();
             return true;
         }
-        if (!output_ready(call)) return false;
-        if (!bits(call, 8, value)) return false;
-        emit(call, static_cast<std::byte>(value));
-        --stored_left_;
-        return true;
+        const bool copied = stored_bytes(call);
+        return copied;
+    }
     case Phase::dynamic_counts:
         if (!bits(call, 14, value)) return false;
         literal_count_ = (value & 31U) + 257U;
@@ -409,23 +639,26 @@ bool InflateStream::step(Call& call) noexcept {
         return true;
     }
     case Phase::literal:
+        if (literal_run(call)) return true;
         if (!symbol(call, literals_, value)) return false;
-        if (value < 256) {
-            literal_byte_ = value;
-            phase_ = Phase::emit_literal;
-        } else if (value == 256) {
+        if (value == 256) {
             end_block();
-        } else {
-            if (value > 285) {
-                fail(InflateError::invalid_literal_length);
-                return false;
-            }
+            return true;
+        }
+        if (value > 285) {
+            fail(InflateError::invalid_literal_length);
+            return false;
+        }
+        if (value > 256) {
             const unsigned index = value - 257U;
             match_length_ = length_base[index];
             extra_bits_ = length_extra[index];
             phase_ = Phase::length_extra;
+            return true;
         }
-        return true;
+        literal_byte_ = value;
+        phase_ = Phase::emit_literal;
+        [[fallthrough]];
     case Phase::emit_literal:
         if (!output_ready(call)) return false;
         emit(call, static_cast<std::byte>(literal_byte_));
@@ -464,12 +697,8 @@ bool InflateStream::step(Call& call) noexcept {
             phase_ = Phase::literal;
             return true;
         }
-        if (!output_ready(call)) return false;
-        const std::size_t source = (history_next_ + history_.size() - match_distance_) % history_.size();
-        const std::byte byte = history_[source];
-        emit(call, byte);
-        --match_length_;
-        return true;
+        const bool copied = copy_match(call);
+        return copied;
     }
     case Phase::trailer:
         if (!bits(call, 8, value)) return false;

@@ -127,6 +127,10 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "The bounded first-party XML reader and writer that GUI.Forms uses "
           "for its own files, such as saved docking layouts.",
           ("xml",)),
+    Group("compression", "Bounded compression",
+          "Caller-owned streaming raw-deflate and zlib decoding with finite "
+          "input, output and work limits. Output is unverified until stream end.",
+          ("compression",)),
     Group("images-and-resources", "Images and resources",
           "The window-owned image registry and its PNG resource records.",
           ("resources",)),

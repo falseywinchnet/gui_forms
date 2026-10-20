@@ -628,7 +628,7 @@ verification or licence/provenance requirements.
    B — owner supplies different ceilings/campaign duration before coding.
 
 Five A answers remain accepted; choice 2 is superseded by the owned-PNG
-rewrite direction. Phase 2 now contains a scalar streaming inflate derived
+rewrite direction. Phase 2 now contains a bounded streaming inflate derived
 from the pinned upstream puff canonical-Huffman algorithm, with new ownership,
 quota and streaming state. [Provenance](../../../src/core/compression/PROVENANCE.md)
 and [phase-2 evidence](../../../results/2026-10-19-zlib/phase-two/README.md)
@@ -649,3 +649,13 @@ These links supplement the repository-relative pointers and exact pins above:
 - [Upstream Huffman table validation](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/inftrees.c),
   [inflate state machine](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/inflate.c),
   and [C API contract](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/zlib.h).
+
+## 13. Owner-requested early optimization
+
+The owner subsequently requested optimal decoders, BFFT-style compiler
+visibility, reduced nested branching, useful vectorization and appropriate
+hinting. This authorizes measured inflate/Adler acceleration within the current
+phase-2 PR. It does not turn a synthetic benchmark into the full acceptance
+matrix. The [kernel inspection and measurements](../../../results/2026-10-19-zlib/phase-two/optimization/README.md)
+record bounded copy/literal kernels, canonical root tables, compiler-vectorized
+Adler, and the PNG filter reference inspection for the later owned parser.
