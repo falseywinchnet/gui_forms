@@ -3512,6 +3512,27 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
         set_tests_properties(gui_forms_linux_accessibility_tests PROPERTIES
             SKIP_RETURN_CODE 77)
     endif()
+    # A-L2: the whole Gallery through AT-SPI (every stock control's node and
+    # default action). The Gallery model exists only with
+    # GUI_FORMS_BUILD_GALLERY, which the programs workflow sets; without it
+    # there is no Gallery to publish and the test is not configured. It walks
+    # every page over D-Bus, so it gets a longer timeout than the suite's.
+    if(gui_forms_linux_accessibility_test_ready AND GUI_FORMS_SYSTEM_PYTHON3 AND TARGET gui_forms_gallery_model)
+        add_executable(gui_forms_linux_accessibility_gallery_fixture
+            tests/linux_accessibility_gallery_fixture.cpp
+            src/host/linux/accessibility/linux_accessibility.cpp)
+        target_include_directories(gui_forms_linux_accessibility_gallery_fixture PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR})
+        target_link_libraries(gui_forms_linux_accessibility_gallery_fixture PRIVATE
+            gui_forms_gallery_model gui_forms_host_headless PkgConfig::GUI_FORMS_TEST_ATK X11::X11)
+        add_test(NAME gui_forms_linux_accessibility_gallery_tests
+                 COMMAND ${GUI_FORMS_SYSTEM_PYTHON3} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_gallery_client.py
+                         $<TARGET_FILE:gui_forms_linux_accessibility_gallery_fixture>
+                         ${CMAKE_CURRENT_SOURCE_DIR}/manifests/controls.json)
+        set_tests_properties(gui_forms_linux_accessibility_gallery_tests PROPERTIES
+            SKIP_RETURN_CODE 77 TIMEOUT 900)
+    endif()
 endif()
 
 if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
