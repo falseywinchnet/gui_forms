@@ -674,6 +674,18 @@ public:
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
+    // Performs `action` on a semantic node a host published, named by the
+    // runtime identity of the control that published it: that control's own
+    // node when `virtual_child` is empty, otherwise its virtual child with
+    // that stable identity. Runtime identities are never reused, so a host
+    // still holding the node of a disposed or replaced control is refused
+    // (false) instead of reaching another control (interview GF017), and a
+    // virtual child whose stable identity another control's virtual child
+    // repeats reaches its own owner only. Otherwise the same rules as the
+    // overload above: UI thread only, deferred while painting, and refused
+    // outside the active focus scope.
+    bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
+                                 SemanticAction action, std::string_view value = {});
 
 private:
     friend class HostSession;
@@ -808,11 +820,25 @@ private:
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
     void update_paint_lease_state() noexcept;
+    // A semantic action that arrived during paint. `owner` is zero for one
+    // named by stable identity alone; otherwise it is the publishing
+    // control's runtime identity and `stable_id` the virtual child (empty for
+    // the control's own node).
     struct DeferredSemanticInput final {
         std::string stable_id;
         SemanticAction action{SemanticAction::focus};
         std::string value;
+        RuntimeId owner{};
     };
+    // The attached control, in the root tree or a popup, with runtime
+    // identity `control`, or empty.
+    [[nodiscard]] Control::Ptr find_runtime_control(RuntimeId control) const;
+    // Offers a virtual child's action to the controls in the active focus
+    // scope (or the root tree) and its popups, in that order; only `owner`
+    // may claim it when it is not null.
+    [[nodiscard]] bool dispatch_virtual_semantic_action(
+        std::string_view stable_id, SemanticAction action,
+        std::string_view value, const Control* owner);
     using DeferredInput = std::variant<
         PointerEvent, KeyEvent, TextInputEvent, DragEvent,
         DeferredSemanticInput>;
