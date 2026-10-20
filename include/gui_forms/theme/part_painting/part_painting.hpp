@@ -136,12 +136,18 @@ struct PartPaint final {
 // surface they belong to draws them. An empty or non-finite `bounds` paints
 // nothing.
 //
-// The image role (T2 GIVEN H1-1) is a content picture, such as the docking
-// stamp's snapshot: it is drawn exactly as given, never tinted, dimmed or
-// resized by a theme, into `bounds`, also when the part is disabled (the
-// disabled state shows through what surrounds it, as for a content colour,
-// GIVEN E2-1). An icon is the theme's or the command's symbol and is drawn
-// at 45 % opacity when disabled; an image is the application's content.
+// What disabled means (owner, 2026-10-20: "a change in font color or control
+// highlighting. greyed out"): a disabled part greys the control's chrome,
+// through the recipes' disabled states: the text colour of labels and
+// captions, and the highlighting (edge, well, hot and selected plates).
+// Content never changes:
+// - the image role (T2 GIVEN H1-1) is a content picture, such as the docking
+//   stamp's snapshot, drawn exactly as given into `bounds`, never tinted,
+//   dimmed or resized by a theme, disabled or not;
+// - a content colour (GIVEN E2-1) is drawn exactly as given, disabled or
+//   not.
+// An icon is chrome, the theme's or the command's symbol, and keeps its
+// disabled treatment: 45 % opacity.
 //
 // The shadow role paints the theme's overlay shadow (owner decision RB-37):
 // `bounds` is the rect of the surface that casts it (a tooltip's face, a
