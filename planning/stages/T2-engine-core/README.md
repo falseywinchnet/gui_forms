@@ -1,9 +1,9 @@
 # Stage T2: engine core
 
 Release: 0.3 Themeable. Depends on: T1 (anatomy and schema). Unblocks T3,
-T4, T5, C. Status 2026-10-19: interview round 001 answered and the phase
-plan E1 to E11 accepted ("Owner decisions" below); E1 (#161) is revised to
-the decisions, then E2 starts. Earlier status, 2026-10-13: not started; ready, since T1's gate is recorded
+T4, T5, C. Status 2026-10-19: interview round 001 answered and the phased
+build plan ([`PLAN.md`](PLAN.md)) accepted, revised to the decisions below;
+E1 (#161) is revised to them, then E2 starts. T1's gate is recorded
 (`results/2026-10-13-t1-anatomy-gate`). T1 hands T2 hit regions derived from
 part geometry and text published as layout slots (T1 brief, "Hand-off").
 Authority:
