@@ -76,6 +76,18 @@ double bounded_visual_outset(double value) noexcept {
            (*control).parent().get() == expected_parent;
 }
 
+// A virtual child published without a runtime ID takes the one its stable ID
+// gives, so every node of a snapshot has a nonzero runtime ID; hosts keep
+// zero for the window's own object.
+void assign_missing_virtual_runtime_ids(std::vector<SemanticNode>& nodes) {
+    for (SemanticNode& node : nodes) {
+        if (node.runtime_id == 0U) {
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        }
+        assign_missing_virtual_runtime_ids(node.children);
+    }
+}
+
 void append_semantic_nodes(const Control::Ptr& control,
                            const Control* expected_parent,
                            const Window* owner,
@@ -100,6 +112,7 @@ void append_semantic_nodes(const Control::Ptr& control,
         std::vector<SemanticNode> virtual_children =
             (*control).semantic_virtual_children();
         if (!current_semantic_identity(control, expected_parent, owner)) return;
+        assign_missing_virtual_runtime_ids(virtual_children);
         count += virtual_children.size();
         descendants.insert(descendants.end(),
                             std::make_move_iterator(virtual_children.begin()),
