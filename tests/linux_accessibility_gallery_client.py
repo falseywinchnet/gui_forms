@@ -59,6 +59,12 @@ import linux_accessibility_client as session_support  # noqa: E402
 APPLICATION_NAME: str = 'GUI.Forms Gallery accessibility fixture'
 SUPPLEMENT_NAME: str = 'GUI.Forms accessibility supplement'
 ANSWER_SECONDS: float = 60.0
+# The client starts no new page or action after this many seconds, so it
+# reports what it found, and that it ran out of time, before ctest's TIMEOUT
+# for the test (900 s, CMakeLists.txt) stops it without output.
+BUDGET_SECONDS: float = 780.0
+# AT-SPI round trips timed once at the start, to report the bus latency.
+LATENCY_PROBES: int = 200
 VIRTUAL_RUNTIME_BIT: int = 1 << 63
 
 # Registry entries without a semantic node of their own: components, and the
@@ -154,6 +160,38 @@ DERIVED_STATE_NAMES: tuple[str, ...] = (
 
 class ClientFailure(Exception):
     """The fixture or the bus stopped answering as the protocol requires."""
+
+
+class Progress:
+    """Elapsed time since the client started, and the time budget.
+
+    note() writes one line to standard output at once, so a run that ctest
+    stops still shows how far it got.
+    """
+
+    def __init__(self) -> None:
+        self.started: float = time.monotonic()
+
+    def elapsed(self) -> float:
+        seconds: float = time.monotonic() - self.started
+        return seconds
+
+    def exhausted(self) -> bool:
+        over: bool = self.elapsed() > BUDGET_SECONDS
+        return over
+
+    def note(self, text: str) -> None:
+        print('[' + format(self.elapsed(), '7.1f') + ' s] ' + text, flush=True)
+
+
+def probe_latency(frame: Any, progress: Progress) -> None:
+    """Times LATENCY_PROBES uncached name reads of `frame` and notes the mean."""
+    started: float = time.monotonic()
+    index: int
+    for index in range(LATENCY_PROBES):
+        frame.get_name()
+    mean_ms: float = (time.monotonic() - started) * 1000.0 / LATENCY_PROBES
+    progress.note('AT-SPI round trip: ' + format(mean_ms, '.3f') + ' ms mean over ' + str(LATENCY_PROBES) + ' name reads')
 
 
 # --- what the ATK adapter publishes for a semantic node ----------------------
@@ -856,6 +894,7 @@ def run_client(fixture_path: str, registry_path: str) -> int:
     session: session_support.Session = session_support.Session()
     fixture: Fixture | None = None
     results: Results = Results()
+    progress: Progress = Progress()
     try:
         session.start(Gio, GLib)
         from gi.repository import Atspi
@@ -864,22 +903,36 @@ def run_client(fixture_path: str, registry_path: str) -> int:
         frames: tuple[Any, Any] = find_frames(Atspi, fixture)
         session_support.require_registry(Gio, GLib, session.address)
         comparer: Comparer = Comparer(Atspi, GLib, results)
+        progress.note('fixture published; ' + str(len(fixture.pages)) + ' Gallery pages')
+        probe_latency(frames[0], progress)
         reports: dict[str, dict[str, Any]] = {}
         page: str
         for page in fixture.pages:
+            if progress.exhausted():
+                results.mismatches.append('time budget of ' + str(BUDGET_SECONDS) + ' s spent before page ' + page)
+                break
+            before_nodes: int = results.nodes_compared
             report: dict[str, Any] = fixture.report('page ' + page)
             reports[page] = report
             comparer.compare_tree(frames[0], report, page)
+            progress.note('page ' + page + ': ' + str(results.nodes_compared - before_nodes) + ' nodes compared')
         supplement: dict[str, Any] = fixture.report('supplement')
         comparer.compare_tree(frames[1], supplement, 'supplement')
         targets: list[Target]
         reasons: dict[str, str]
         targets, reasons = choose_targets(registry, reports, supplement)
+        progress.note(str(len(targets)) + ' default-action targets')
         target: Target
         for target in targets:
+            if progress.exhausted():
+                results.mismatches.append('time budget of ' + str(BUDGET_SECONDS) + ' s spent before the action on ' +
+                                          target.stable_id)
+                break
             perform_default(Atspi, GLib, comparer, fixture, frames, target, results)
+            progress.note(target.kind + ': ' + results.actions.get(target.kind, 'no outcome recorded'))
         check_generational_identity(Atspi, GLib, fixture, frames[0], results)
         summarize(registry, results, reasons)
+        progress.note('done')
         status: int = fixture.finish()
         errors: str = fixture.error_text()
         if status != 0:
