@@ -55,6 +55,12 @@ enum class PartRole : std::uint8_t {
     selection,
     validation,
     drop,
+    // A content picture drawn exactly as given, never tinted, dimmed or
+    // resized by a theme (T2 GIVEN H1-1), such as the docking stamp's
+    // snapshot. Disabled greys a control's chrome (its labels' text colour
+    // and its highlighting: edge, well, plates), never its content; an icon
+    // is chrome, an image is content.
+    image,
     count,
 };
 

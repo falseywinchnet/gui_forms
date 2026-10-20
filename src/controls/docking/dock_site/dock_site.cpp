@@ -2404,7 +2404,7 @@ constexpr std::array<PartField<DockSite::Parts>, 11> site_part_fields{{
     {.declaration = {.name = "drag_stamp_label", .role = PartRole::label, .composed_from = {}},
      .member = &DockSite::Parts::drag_stamp_label},
     // The panel's picture: an image part; icon is the nearest role.
-    {.declaration = {.name = "drag_stamp_image", .role = PartRole::icon, .composed_from = {}},
+    {.declaration = {.name = "drag_stamp_image", .role = PartRole::image, .composed_from = {}},
      .member = &DockSite::Parts::drag_stamp_image},
     {.declaration = {.name = "drop_area", .role = PartRole::drop, .composed_from = {},
                      .states = drop_area_states},

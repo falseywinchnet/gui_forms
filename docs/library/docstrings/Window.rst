@@ -323,12 +323,11 @@ semantic_snapshot
     Builds the semantic tree that assistive technology and automation see:
     roles, names, values, states and bounds, keyed by stable ID.
 perform_semantic_action
-    Performs an automation action, such as focus or press, on the control
-    with a stable ID, and returns whether it was performed.
-perform_scoped_semantic_action
-    As perform_semantic_action, for a node inside one control: a virtual
-    item is looked for only in that control, since two controls' items may
-    share a stable ID.
+    Performs an automation action, such as focus or press, and returns
+    whether it was performed. One overload names the control by stable ID.
+    The overload native accessibility hosts use names a published node by
+    its control's runtime ID and, for a virtual child, the child's stable
+    ID; a disposed or replaced control's runtime ID is refused.
 metrics
     The live instrumentation counters, for hosts and renderers that record
     into them.

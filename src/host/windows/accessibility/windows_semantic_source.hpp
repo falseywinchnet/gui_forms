@@ -100,9 +100,11 @@ struct SemanticSource final {
     // area. Returns false, with `client` unspecified, when the window has
     // gone or the snapshot failed.
     [[nodiscard]] bool snapshot(SemanticNode& client) noexcept;
-    // Performs `action` on the located node through the window, scoped to
-    // the node's control so a virtual child reaches its own owner. Returns
-    // true when the control took it.
+    // Performs `action` on the located node through the window, named by
+    // its scope's runtime ID (Window::perform_semantic_action(RuntimeId,
+    // ...)), so a virtual child reaches its own owner and a disposed or
+    // replaced control is refused. A virtual node with no scope is named by
+    // its stable ID alone. Returns true when the control took it.
     [[nodiscard]] bool perform(const SemanticLocation& location, SemanticAction action,
                                std::string_view value) noexcept;
 };

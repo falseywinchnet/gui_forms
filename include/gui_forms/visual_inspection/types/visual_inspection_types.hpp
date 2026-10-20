@@ -38,6 +38,7 @@ enum class VisualPaintOperation : std::uint8_t {
     draw_image_region_sampled,
     fill_image_pattern,
     draw_live_surface,
+    draw_part_raster,
 #if defined(GUI_FORMS_PREPARED_TEXT)
     draw_prepared_text,
 #endif

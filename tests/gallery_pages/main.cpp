@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <memory>
+#include <string_view>
 
 namespace gallery_pages_tests {
 namespace {
@@ -94,8 +95,17 @@ void test_registry_pages_gallery() {
 
 using namespace gallery_pages_tests;
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        // The display trace runs alone, in a process of its own (its own
+        // ctest entry, gui_forms_gallery_display_trace_tests): the
+        // typography page shows a RuntimeId, which counts every control the
+        // process made before it, so no other test may run first.
+        if (argc == 2 && std::string_view(argv[1]) == "--display-trace") {
+            test_display_commands_unchanged();
+            std::cout << "gui_forms_gallery_pages_tests --display-trace: passed\n";
+            return EXIT_SUCCESS;
+        }
         test_page_contract_and_rendering();
         test_catalog_pages_resolve_and_headers_describe_pages();
         test_gallery_semantic_surface();

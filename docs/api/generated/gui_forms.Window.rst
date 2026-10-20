@@ -200,6 +200,9 @@ gui_forms::Window
          mutations, damage, input, focus, disposals, wrong-thread rejections and
          more. ``MetricsSnapshot::to_json`` serializes it.
 
+      **engine_parts** : ``EnginePartTable``, read-only
+         The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
       **semantic_generation** : ``std::uint64_t``, read-only
          A number that changes whenever the semantic (accessibility) tree may
          have changed.
@@ -375,9 +378,7 @@ gui_forms::Window
       * - :cpp:func:`semantic_snapshot <gui_forms::Window::semantic_snapshot>`
         - Builds the semantic tree that assistive technology and automation see: roles, names, values, states and bounds, keyed by stable ID.
       * - :cpp:func:`perform_semantic_action <gui_forms::Window::perform_semantic_action>`
-        - Performs an automation action, such as focus or press, on the control with a stable ID, and returns whether it was performed.
-      * - :cpp:func:`perform_scoped_semantic_action <gui_forms::Window::perform_scoped_semantic_action>`
-        - As perform_semantic_action, for a node inside one control: a virtual item is looked for only in that control, since two controls' items may share a stable ID.
+        - Performs an automation action, such as focus or press, and returns whether it was performed.
       * - :cpp:func:`set_text_scale <gui_forms::Window::set_text_scale>`
         -  
       * - :cpp:func:`set_framebuffer_painter <gui_forms::Window::set_framebuffer_painter>`
@@ -755,6 +756,10 @@ gui_forms::Window
       A copy of the window's instrumentation counters: layout passes, flushes,
       mutations, damage, input, focus, disposals, wrong-thread rejections and
       more. ``MetricsSnapshot::to_json`` serializes it.
+
+   .. cpp:function:: const EnginePartTable& engine_parts() const noexcept
+
+      The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
 
    .. cpp:function:: std::uint64_t semantic_generation() const noexcept
 
@@ -1139,14 +1144,19 @@ gui_forms::Window
 
    .. cpp:function:: bool perform_semantic_action(std::string_view stable_id, SemanticAction action, std::string_view value = {})
 
-      Performs an automation action, such as focus or press, on the control
-      with a stable ID, and returns whether it was performed.
+      Performs an automation action, such as focus or press, and returns
+      whether it was performed. One overload names the control by stable ID.
+      The overload native accessibility hosts use names a published node by
+      its control's runtime ID and, for a virtual child, the child's stable
+      ID; a disposed or replaced control's runtime ID is refused.
 
-   .. cpp:function:: bool perform_scoped_semantic_action(std::string_view scope_stable_id, std::string_view stable_id, SemanticAction action, std::string_view value = {})
+   .. cpp:function:: bool perform_semantic_action(RuntimeId control, std::string_view virtual_child, SemanticAction action, std::string_view value = {})
 
-      As perform_semantic_action, for a node inside one control: a virtual
-      item is looked for only in that control, since two controls' items may
-      share a stable ID.
+      Performs an automation action, such as focus or press, and returns
+      whether it was performed. One overload names the control by stable ID.
+      The overload native accessibility hosts use names a published node by
+      its control's runtime ID and, for a virtual child, the child's stable
+      ID; a disposed or replaced control's runtime ID is refused.
 
    .. cpp:function:: void set_text_scale(double text_scale)
 

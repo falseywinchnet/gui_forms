@@ -835,9 +835,9 @@ void DockSite::paint_drag_layer(Painter& painter) {
         part.text = {};
         part.bounds = drag_image_bounds();
         if (drag_.picture) {
-            // The panel's picture, scaled with the stamp. An image part has
-            // no role of its own; icon (an image) is the nearest atom.
-            part.role = PartRole::icon;
+            // The panel's picture, scaled with the stamp: content, drawn as
+            // given (the image role, T2 GIVEN H1-1).
+            part.role = PartRole::image;
             part.image = (*drag_.picture).image;
             paint_part(painter, *this, part);
             part.image = {};

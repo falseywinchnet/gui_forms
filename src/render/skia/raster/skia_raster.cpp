@@ -1,4 +1,5 @@
 #include "skia_raster.hpp"
+#include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/paint_framebuffer.hpp"
 
 #include "gui_forms/live_surface.hpp"
@@ -207,6 +208,22 @@ public:
     // pixels under the recorded clips. False when the canvas cannot be
     // addressed or its clips are unknown.
     bool composite_coverage(SkCanvas& target, const detail::TextCoverage& source, Color color);
+
+    // The canvas pixels and the recorded clip as the shared blends take
+    // them, for text coverage and part rasters alike.
+    struct SharedComposite final {
+        TextClipState* state{};
+        detail::TextCompositeTarget target{};
+        detail::TextCompositeClip clip{};
+    };
+    // None when the canvas cannot be addressed as premultiplied 8-bit RGBA
+    // or BGRA, or its clips are unknown.
+    [[nodiscard]] std::optional<SharedComposite> shared_composite(SkCanvas& target);
+
+    // A part raster into the canvas pixels under the recorded clips. False
+    // when the canvas is not a uniform scale and translation equal to the
+    // raster's scale, or cannot be addressed.
+    bool composite_part(SkCanvas& target, const PartRaster& raster, Point origin, double opacity);
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
     // Lets prepared text composite through composite_coverage.
@@ -1082,16 +1099,15 @@ bool SkiaRaster::Impl::composite_run(SkCanvas& target, const text::ShapedText& s
     return composited;
 }
 
-bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCoverage& source, const Color color) {
+std::optional<SkiaRaster::Impl::SharedComposite> SkiaRaster::Impl::shared_composite(SkCanvas& target) {
     TextClipState* const state = current_text_clip(target);
-    if (state == nullptr) return false;
+    if (state == nullptr) return std::nullopt;
     SkPixmap pixmap{};
     if (!target.peekPixels(&pixmap) || pixmap.alphaType() != kPremul_SkAlphaType ||
         (pixmap.colorType() != kRGBA_8888_SkColorType && pixmap.colorType() != kBGRA_8888_SkColorType) ||
         pixmap.rowBytes() % 4U != 0U) {
-        return false;
+        return std::nullopt;
     }
-    if ((*state).rect.isEmpty()) return true;
     const std::size_t stride = pixmap.rowBytes() / 4U;
     const std::size_t pixel_count = stride * static_cast<std::size_t>(pixmap.height());
     detail::TextCompositeTarget composite_target{};
@@ -1111,6 +1127,17 @@ bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCo
                              static_cast<double>((*state).rounded_rect.width()), static_cast<double>((*state).rounded_rect.height())};
         clip.radius = (*state).radius;
     }
+    const SharedComposite shared{state, composite_target, clip};
+    return shared;
+}
+
+bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCoverage& source, const Color color) {
+    const std::optional<SharedComposite> shared = shared_composite(target);
+    if (!shared) return false;
+    const TextClipState* const state = (*shared).state;
+    if ((*state).rect.isEmpty()) return true;
+    const detail::TextCompositeTarget composite_target = (*shared).target;
+    const detail::TextCompositeClip clip = (*shared).clip;
     if (!(*state).region_limited) {
         static_cast<void>(detail::composite_text_coverage(source, composite_target, clip, color));
         return true;
@@ -1124,6 +1151,44 @@ bool SkiaRaster::Impl::composite_coverage(SkCanvas& target, const detail::TextCo
         piece_clip.rect = Rect::intersection(clip.rect, piece_rect);
         if (piece_clip.rect.empty()) continue;
         static_cast<void>(detail::composite_text_coverage(source, composite_target, piece_clip, color));
+    }
+    return true;
+}
+
+bool SkiaRaster::Impl::composite_part(SkCanvas& target, const PartRaster& raster, const Point origin,
+                                      const double opacity) {
+    const SkMatrix matrix = target.getTotalMatrix();
+    const SkScalar raster_scale = static_cast<SkScalar>(raster.scale().value);
+    if (!matrix.isScaleTranslate() || matrix.getScaleX() != raster_scale || matrix.getScaleY() != raster_scale) {
+        return false;
+    }
+    const std::optional<SharedComposite> shared = shared_composite(target);
+    if (!shared) return false;
+    const TextClipState* const state = (*shared).state;
+    if ((*state).rect.isEmpty()) return true;
+    // The raster's first pixel goes on the device pixel nearest its origin.
+    const SkPoint device = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y)));
+    const DeviceExtent extent = raster.extent();
+    const detail::PartRasterSource source{.pixels = raster.pixels(), .width = extent.width, .height = extent.height,
+                                          .row_bytes = raster.row_bytes(),
+                                          .left = std::llround(static_cast<double>(device.x())),
+                                          .top = std::llround(static_cast<double>(device.y()))};
+    const std::uint8_t byte = detail::part_composite_opacity(opacity);
+    const detail::TextCompositeTarget composite_target = (*shared).target;
+    const detail::TextCompositeClip clip = (*shared).clip;
+    if (!(*state).region_limited) {
+        static_cast<void>(detail::composite_part_raster(source, composite_target, clip, byte));
+        return true;
+    }
+    // Disjoint region rectangles: no pixel is blended twice.
+    for (SkRegion::Iterator piece((*state).region); !piece.done(); piece.next()) {
+        const SkIRect bounds = piece.rect();
+        detail::TextCompositeClip piece_clip = clip;
+        const Rect piece_rect{static_cast<double>(bounds.left()), static_cast<double>(bounds.top()),
+                              static_cast<double>(bounds.width()), static_cast<double>(bounds.height())};
+        piece_clip.rect = Rect::intersection(clip.rect, piece_rect);
+        if (piece_clip.rect.empty()) continue;
+        static_cast<void>(detail::composite_part_raster(source, composite_target, piece_clip, byte));
     }
     return true;
 }
@@ -1181,6 +1246,13 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
         (*canvas).drawImageRect((*found).second.image.get(), to_sk_rect(destination),
                               SkSamplingOptions(SkFilterMode::kLinear), &paint);
     }
+}
+
+void SkiaRaster::draw_part_raster(const std::shared_ptr<const PartRaster>& raster, const Point origin,
+                                  const double opacity) {
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || !raster) return;
+    static_cast<void>((*impl_).composite_part(*canvas, *raster, origin, opacity));
 }
 
 void SkiaRaster::draw_live_surface(const std::shared_ptr<LiveSurface> surface,

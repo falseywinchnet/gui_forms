@@ -294,6 +294,21 @@ void RecordingPainter::draw_live_surface(std::shared_ptr<LiveSurface> surface,
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
+                                        double opacity) {
+    if (!raster) return;
+    const DeviceExtent extent = (*raster).extent();
+    const double scale = (*raster).scale().value;
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_part_raster;
+    command.part_raster = raster;
+    command.first = origin;
+    command.rect = {origin.x, origin.y, static_cast<double>(extent.width) / scale,
+                    static_cast<double>(extent.height) / scale};
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::draw_image_region(ImageId image, Rect source,
                                           Rect destination, double opacity) {
     DisplayCommand command;

@@ -154,10 +154,21 @@ bool SemanticSource::perform(const SemanticLocation& location, SemanticAction ac
     if (model == nullptr || (*location.node).runtime_id == 0U) return false;
     try {
         if (action == SemanticAction::focus) SetFocus(hwnd);
-        std::string_view scope_id;
-        if (location.scope != nullptr) scope_id = (*location.scope).stable_id;
-        const bool handled = (*model).perform_scoped_semantic_action(
-            scope_id, (*location.node).stable_id, action, value);
+        const SemanticNode& node = *location.node;
+        bool handled = false;
+        if (location.scope == nullptr) {
+            // A virtual child with no control-backed node above it: no
+            // control names it, so the window looks for it by stable ID
+            // under its root and popups.
+            handled = (*model).perform_semantic_action(node.stable_id, action, value);
+        } else {
+            // The window refuses a scope whose control was disposed or
+            // replaced since the snapshot (interview GF017).
+            const RuntimeId scope{(*location.scope).runtime_id};
+            std::string_view virtual_child;
+            if (location.scope != location.node) virtual_child = node.stable_id;
+            handled = (*model).perform_semantic_action(scope, virtual_child, action, value);
+        }
         if (handled) NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, hwnd, OBJID_CLIENT, CHILDID_SELF);
         return handled;
     } catch (...) {

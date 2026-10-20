@@ -7,6 +7,7 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
@@ -655,6 +656,9 @@ public:
     void cancel_drag() noexcept;
 
     [[nodiscard]] MetricsSnapshot metrics_snapshot() const { return metrics_.snapshot(); }
+    // The theme engine's records of this window's keyed parts (T2 plan,
+    // EnginePartTable), for inspection. The engine alone changes them.
+    [[nodiscard]] const EnginePartTable& engine_parts() const noexcept { return engine_parts_; }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
     // Captures the committed retained visual state without exposing a renderer
@@ -670,19 +674,21 @@ public:
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
-    // As perform_semantic_action, for the node `stable_id` inside the
-    // control `scope_stable_id`: a virtual child is looked for only in that
-    // control and its descendants. A virtual child's stable ID is unique
-    // within the control that publishes it, not within the window (a tree
-    // and a list showing one model may both publish an item "src"), so a
-    // host that knows a node's nearest control-backed node names it here.
-    // An empty scope is perform_semantic_action; so is a scope equal to
-    // `stable_id`. A scope that is not an attached control, or lies outside
-    // the active focus scope, refuses the action (false).
-    bool perform_scoped_semantic_action(std::string_view scope_stable_id,
-                                        std::string_view stable_id,
-                                        SemanticAction action,
-                                        std::string_view value = {});
+    // Performs `action` on a semantic node a host published, named by the
+    // runtime identity of a control: that control's own node when
+    // `virtual_child` is empty, otherwise the virtual child with that stable
+    // identity published by the control or by a control inside it (the
+    // semantic tree publishes an unexposed control's virtual children at its
+    // nearest exposed ancestor, so hosts name that ancestor). Runtime
+    // identities are never reused, so a host still holding the node of a
+    // disposed or replaced control is refused (false) instead of reaching
+    // another control (interview GF017), and a virtual child whose stable
+    // identity another control's virtual child repeats is searched for only
+    // under the named control. Otherwise the same rules as the overload
+    // above: UI thread only, deferred while painting, and refused outside the
+    // active focus scope.
+    bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
+                                 SemanticAction action, std::string_view value = {});
 
 private:
     friend class HostSession;
@@ -709,6 +715,10 @@ private:
     friend class NotifyIcon;
     friend class BindingContext;
     friend class detail::PopupAttachment;
+    friend class ThemeEngine;
+    // Called by ThemeEngine::paint for a part painted with a key: makes or
+    // updates its record and counts a new record's index fallback.
+    void note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states);
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;
@@ -813,12 +823,24 @@ private:
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
     void update_paint_lease_state() noexcept;
+    // A semantic action that arrived during paint. `owner` is zero for one
+    // named by stable identity alone; otherwise it is the publishing
+    // control's runtime identity and `stable_id` the virtual child (empty for
+    // the control's own node).
     struct DeferredSemanticInput final {
-        std::string scope_id;
         std::string stable_id;
         SemanticAction action{SemanticAction::focus};
         std::string value;
+        RuntimeId owner{};
     };
+    // The attached control, in the root tree or a popup, with runtime
+    // identity `control`, or empty.
+    [[nodiscard]] Control::Ptr find_runtime_control(RuntimeId control) const;
+    // Whether a semantic action may reach `control` under the active focus
+    // scope: no scope contains focus, `control` lies inside the scope, or it
+    // lies in a popup whose owner does (the reach of the stable-identity
+    // overload's virtual-child search).
+    [[nodiscard]] bool semantic_scope_reaches(const Control::Ptr& control) const;
     using DeferredInput = std::variant<
         PointerEvent, KeyEvent, TextInputEvent, DragEvent,
         DeferredSemanticInput>;
@@ -1011,6 +1033,9 @@ private:
     LiveSurfaceRegistrationMap live_surface_registrations_;
     std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
+    // The theme engine's records of this window's keyed parts. A control's
+    // records are released when it leaves the window.
+    EnginePartTable engine_parts_;
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

@@ -152,7 +152,11 @@ struct SemanticSnapshot final {
 [[nodiscard]] std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept;
 
 // True for a runtime ID virtual_semantic_runtime_id gives (its top bit is
-// set), false for a control's own runtime ID and for zero.
+// set), false for a control's own runtime ID and for zero. A host uses it to
+// tell a control's own node, which it names to
+// Window::perform_semantic_action by that runtime ID, from a virtual child,
+// which it names by the runtime ID of the nearest control's node above it
+// and the child's stable ID.
 [[nodiscard]] bool is_virtual_semantic_runtime_id(std::uint64_t runtime_id) noexcept;
 
 } // namespace gui_forms

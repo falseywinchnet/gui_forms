@@ -1062,7 +1062,7 @@ Functions, constants and aliases
 
 .. cpp:function:: bool is_virtual_semantic_runtime_id(std::uint64_t runtime_id) noexcept
 
-   True for a runtime ID virtual_semantic_runtime_id gives (its top bit is set), false for a control's own runtime ID and for zero.
+   True for a runtime ID virtual_semantic_runtime_id gives (its top bit is set), false for a control's own runtime ID and for zero. A host uses it to tell a control's own node, which it names to Window::perform_semantic_action by that runtime ID, from a virtual child, which it names by the runtime ID of the nearest control's node above it and the child's stable ID.
 
 .. cpp:var:: constexpr std::size_t semantic_role_count
 

@@ -120,6 +120,13 @@ public:
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_live_surface(const std::shared_ptr<LiveSurface> surface,
                            const Rect destination, const double opacity) override;
+    // Composites the raster into the canvas pixels with the shared blend
+    // (detail::composite_part_raster) under the recorded clips, as text is
+    // composited. Draws nothing when the canvas is not a plain scale and
+    // translation at the raster's own scale, or its pixels cannot be
+    // addressed.
+    void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
+                          double opacity) override;
     // Internal host seam: keep the coverage promise and sampled pixels in the
     // same read lease through rasterization, even during producer reconfigure.
     [[nodiscard]] bool draw_live_surface_frame(const LiveSurfaceFrame& frame,

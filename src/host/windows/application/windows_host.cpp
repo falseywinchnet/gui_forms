@@ -19,6 +19,7 @@
 #include "../../../../tests/prepared_text_test_support.hpp"
 #endif
 
+#include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/live_surface.hpp"
 #include "gui_forms/text.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
@@ -2079,14 +2080,8 @@ private:
         }
         blend_run_coverage(*coverage, placement, color);
     }
-    // Blends a run's coverage, placed at `placement`, into the DIB under the
-    // current clip.
-    void blend_run_coverage(const text::GlyphRunCoverage& coverage, const text::GlyphRunOrigin placement,
-                            const Color color) {
-        if (coverage.pixels.empty()) return;
-        const State& current = state();
-        // Finish batched GDI writes before blending through the CPU pointer.
-        GdiFlush();
+    // The DIB as the shared blends take it: BGRA, alpha not maintained.
+    gui_forms::detail::TextCompositeTarget shared_composite_target() const noexcept {
         const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
         gui_forms::detail::TextCompositeTarget target{};
         target.pixels = std::span<std::uint32_t>(pixels_, pixel_count);
@@ -2095,6 +2090,11 @@ private:
         target.stride = static_cast<std::size_t>(width_);
         target.order = gui_forms::detail::TextPixelOrder::bgra;
         target.opaque = true;
+        return target;
+    }
+    // The current clip in device pixels, as the shared blends take it.
+    gui_forms::detail::TextCompositeClip shared_composite_clip() const noexcept {
+        const State& current = state();
         gui_forms::detail::TextCompositeClip clip{};
         clip.rect = {current.clip.x * scale_, current.clip.y * scale_, current.clip.width * scale_,
                      current.clip.height * scale_};
@@ -2104,11 +2104,40 @@ private:
             clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
             clip.radius = (*current.rounded_clip).radius * scale_;
         }
+        return clip;
+    }
+    // Blends a run's coverage, placed at `placement`, into the DIB under the
+    // current clip.
+    void blend_run_coverage(const text::GlyphRunCoverage& coverage, const text::GlyphRunOrigin placement,
+                            const Color color) {
+        if (coverage.pixels.empty()) return;
+        // Finish batched GDI writes before blending through the CPU pointer.
+        GdiFlush();
+        const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
+        const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
         const gui_forms::detail::TextCoverage source{.pixels = coverage.pixels, .width = coverage.width,
                                           .height = coverage.height,
                                           .left = placement.pixel_x + coverage.left,
                                           .top = placement.pixel_y + coverage.top};
         static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
+    }
+    // Composites a part raster with the shared blend under the current
+    // clip, its first pixel on the device pixel nearest its origin. A raster
+    // made for another scale is not drawn.
+    void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, const Point origin,
+                          const double opacity) override {
+        if (!raster || pixels_ == nullptr || width_ <= 0 || height_ <= 0) return;
+        if ((*raster).scale().value != scale_) return;
+        GdiFlush();
+        const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
+        const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
+        const DeviceExtent extent = (*raster).extent();
+        const gui_forms::detail::PartRasterSource source{.pixels = (*raster).pixels(), .width = extent.width,
+                                                         .height = extent.height,
+                                                         .row_bytes = (*raster).row_bytes(),
+                                                         .left = logical_x(origin.x), .top = logical_y(origin.y)};
+        const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
+        static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
     }
     void apply_gdi_clip() const {
         const Rect clip = state().clip;

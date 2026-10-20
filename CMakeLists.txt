@@ -123,6 +123,9 @@ add_library(gui_forms_core STATIC
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
+    src/core/engine/part_table/engine_part_table.cpp
+    src/core/engine/part_raster/part_raster.cpp
+    src/core/engine/theme_engine/theme_engine.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2176,6 +2179,19 @@ if(GUI_FORMS_BUILD_TESTS)
             gui_forms_controls gui_forms_host_windows)
         add_test(NAME gui_forms_windows_text_tests COMMAND gui_forms_windows_text_tests
             "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
+        add_executable(gui_forms_windows_part_composite_tests tests/windows_part_composite_tests.cpp)
+        target_compile_definitions(gui_forms_windows_part_composite_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_part_composite_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_part_composite_tests COMMAND gui_forms_windows_part_composite_tests)
+        add_executable(gui_forms_windows_content_pixels_tests tests/windows_content_pixels_tests.cpp)
+        target_compile_definitions(gui_forms_windows_content_pixels_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_content_pixels_tests PRIVATE
+            gui_forms_controls gui_forms_host_windows)
+        add_test(NAME gui_forms_windows_content_pixels_tests COMMAND gui_forms_windows_content_pixels_tests
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
 
     endif()
 
@@ -2230,6 +2246,12 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
+    add_executable(gui_forms_engine_raster_cache_tests tests/engine_raster_cache_tests.cpp)
+    target_link_libraries(gui_forms_engine_raster_cache_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_raster_cache_tests COMMAND gui_forms_engine_raster_cache_tests)
+    add_executable(gui_forms_engine_part_table_tests tests/engine_part_table_tests.cpp)
+    target_link_libraries(gui_forms_engine_part_table_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_part_table_tests COMMAND gui_forms_engine_part_table_tests)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)
@@ -2305,6 +2327,9 @@ if(GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_doc_examples_compile_only PRIVATE gui_forms_application)
     endif()
 
+    add_executable(gui_forms_part_composite_tests tests/part_composite_tests.cpp)
+    target_link_libraries(gui_forms_part_composite_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_part_composite_tests COMMAND gui_forms_part_composite_tests)
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)
@@ -2901,6 +2926,7 @@ if(GUI_FORMS_BUILD_TESTS)
             tests/gallery_pages/main.cpp
             tests/gallery_pages/catalog_tests.cpp
             tests/gallery_pages/shell_tests.cpp
+            tests/gallery_pages/display_trace_tests.cpp
             tests/gallery_pages/ranges-and-progress_tests.cpp
             tests/gallery_pages/containers-and-focus_tests.cpp
             tests/gallery_pages/animation-laboratory_tests.cpp
@@ -2942,6 +2968,11 @@ if(GUI_FORMS_BUILD_TESTS)
         # manifest (stage T1).
         set_tests_properties(gui_forms_gallery_pages_tests PROPERTIES ENVIRONMENT
             "GUI_FORMS_CONTROL_SCHEMA=${CMAKE_CURRENT_SOURCE_DIR}/manifests/control-schema.json")
+        # Every Gallery page's display commands against the table recorded
+        # before the theme engine (T2 E2). A process of its own, so that no
+        # other test makes a control first (see display_trace_tests.cpp).
+        add_test(NAME gui_forms_gallery_display_trace_tests
+                 COMMAND gui_forms_gallery_pages_tests --display-trace)
         # The policy script takes one comma-separated argument; a CMake list
         # would be split into separate COMMAND arguments.
         set(gui_forms_gallery_policy_files
@@ -3227,6 +3258,9 @@ if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_opaque_live_surface_raster_tests tests/opaque_live_surface_raster_tests.cpp)
         target_link_libraries(gui_forms_opaque_live_surface_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
         add_test(NAME gui_forms_opaque_live_surface_raster_tests COMMAND gui_forms_opaque_live_surface_raster_tests)
+        add_executable(gui_forms_part_composite_identity_tests tests/part_composite_identity_tests.cpp)
+        target_link_libraries(gui_forms_part_composite_identity_tests PRIVATE gui_forms_controls gui_forms_skia)
+        add_test(NAME gui_forms_part_composite_identity_tests COMMAND gui_forms_part_composite_identity_tests)
         if(TARGET gui_forms_text_engine)
             add_executable(gui_forms_text_identity_raster_tests tests/text_identity_raster_tests.cpp)
             target_link_libraries(gui_forms_text_identity_raster_tests PRIVATE gui_forms_controls gui_forms_skia)
@@ -3418,7 +3452,18 @@ endif()
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
 
 # The accessibility service adapter is independently testable without a renderer.
+# Stage A on Linux: a real AT-SPI client (tests/linux_accessibility_client.py)
+# drives the fixture over D-Bus inside its own session bus with the AT-SPI bus
+# launcher and registry. It runs under the system Python, which carries
+# PyGObject and the Atspi typelib (not a toolcache Python earlier on PATH).
+# On CI a missing prerequisite fails the test; elsewhere the client reports
+# the platform as unsupported with ctest's skip code, 77.
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
+    find_program(GUI_FORMS_SYSTEM_PYTHON3 NAMES python3 PATHS /usr/bin /usr/local/bin NO_DEFAULT_PATH)
+    if(NOT GUI_FORMS_SYSTEM_PYTHON3)
+        find_program(GUI_FORMS_SYSTEM_PYTHON3 NAMES python3)
+    endif()
+    set(gui_forms_linux_accessibility_test_ready OFF)
     find_package(PkgConfig QUIET)
     if(PkgConfig_FOUND)
         pkg_check_modules(GUI_FORMS_TEST_ATK QUIET IMPORTED_TARGET atk atk-bridge-2.0)
@@ -3429,7 +3474,28 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND GUI_FORMS_BUILD_TESTS)
                 src/host/linux/accessibility/linux_accessibility.cpp)
             target_link_libraries(gui_forms_linux_accessibility_fixture PRIVATE
                 gui_forms_controls gui_forms_core PkgConfig::GUI_FORMS_TEST_ATK X11::X11)
+            set(gui_forms_linux_accessibility_test_ready ON)
         endif()
+    endif()
+    if(NOT GUI_FORMS_SYSTEM_PYTHON3)
+        if("$ENV{CI}" STREQUAL "true")
+            message(FATAL_ERROR "The Linux accessibility test needs python3 on CI")
+        endif()
+        message(STATUS "Linux accessibility test: unsupported (no python3)")
+    elseif(gui_forms_linux_accessibility_test_ready)
+        add_test(NAME gui_forms_linux_accessibility_tests
+                 COMMAND ${GUI_FORMS_SYSTEM_PYTHON3} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_client.py
+                         $<TARGET_FILE:gui_forms_linux_accessibility_fixture>)
+    else()
+        add_test(NAME gui_forms_linux_accessibility_tests
+                 COMMAND ${GUI_FORMS_SYSTEM_PYTHON3} -B
+                         ${CMAKE_CURRENT_SOURCE_DIR}/tests/linux_accessibility_client.py
+                         --unsupported "ATK, atk-bridge-2.0 or X11 development files were not found")
+    endif()
+    if(TEST gui_forms_linux_accessibility_tests)
+        set_tests_properties(gui_forms_linux_accessibility_tests PROPERTIES
+            SKIP_RETURN_CODE 77)
     endif()
 endif()
 
