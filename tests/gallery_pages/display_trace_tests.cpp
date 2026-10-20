@@ -36,9 +36,10 @@ namespace {
 //   the other platforms, which differ only in that word;
 // - typography-and-inspection's inspector shows the inspected control's
 //   RuntimeId, a process-wide counter of every control made so far. The
-//   test therefore runs first in its binary (main.cpp), before any other
-//   test has made a control, so the counter has the same value on every
-//   run and host.
+//   test therefore runs alone in a process of its own, its own ctest entry
+//   (gui_forms_gallery_display_trace_tests, running
+//   gui_forms_gallery_pages_tests --display-trace), so the counter has the
+//   same value on every run and host whatever other tests do.
 
 class TracePainter final : public Painter {
 public:
