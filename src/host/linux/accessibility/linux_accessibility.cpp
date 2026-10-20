@@ -17,21 +17,12 @@ namespace {
 // called by the AT-SPI bridge from the default GLib main context, which the
 // host iterates there (see linux_accessibility.hpp).
 
-// The top bit of a virtual child's runtime identity (see
-// virtual_semantic_runtime_id); a control's own runtime identity, counted up
-// from one, never has it. Some controls leave a virtual child's runtime
-// identity zero, and controls that show one model repeat their virtual
-// children's identities, so neither identifies a virtual child alone.
-constexpr std::uint64_t virtual_runtime_bit = 1ULL << 63U;
-
-bool virtual_runtime_identity(std::uint64_t runtime_id) {
-    const bool result = runtime_id == 0U || (runtime_id & virtual_runtime_bit) != 0U;
-    return result;
-}
-
 // A published object's identity: the runtime identity of the control that
-// publishes it and, for a virtual child, the child's stable identity (empty
-// for the control's own node). Unique within one window's tree.
+// publishes it and, for a virtual child (is_virtual_semantic_runtime_id),
+// the child's stable identity (empty for the control's own node). Controls
+// that show one model repeat their virtual children's identities, so a
+// virtual child's identity alone does not name it. Unique within one
+// window's tree.
 struct NodeKey final {
     std::uint64_t control{};
     std::string virtual_child;
@@ -436,7 +427,7 @@ struct LinuxAccessibility::Impl {
     // runtime identity of the nearest control at or above `parent`, which
     // owns `node` when `node` is a virtual child.
     void sync(const SemanticNode& node, AtkObject* parent, int index, std::uint64_t owner_control) {
-        const bool virtual_child = virtual_runtime_identity(node.runtime_id);
+        const bool virtual_child = is_virtual_semantic_runtime_id(node.runtime_id);
         NodeKey key;
         key.control = virtual_child ? owner_control : node.runtime_id;
         if (virtual_child) key.virtual_child = node.stable_id;

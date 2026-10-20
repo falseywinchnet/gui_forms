@@ -17,8 +17,7 @@ tests/linux_accessibility_client.py's.
 The test, in order:
 
 1. Every Gallery page, then the supplement window: the published AT-SPI tree
-   under the fixture's frame is walked over D-Bus, with libatspi's cache
-   off, and compared node by node with the semantic tree: child order,
+   under the fixture's frame is walked over D-Bus, and compared node by node with the semantic tree: child order,
    accessible id (the stable identity), role, name, description, states,
    interfaces, actions in published order, numeric value and range, value
    text, position in set and set size, and the tab-to-panel relation.
@@ -34,6 +33,14 @@ The test, in order:
    same stable identity. The old object must be refused (an error or a
    false result, never a crash or an action on the new button); the new
    object answers to its own action.
+
+Caching: libatspi answers a property from its cache only while its own
+event main loop runs or once a cache mask has been set; this client does
+neither, so every read except the object's interfaces (which never change
+for one published object) is a D-Bus call to the fixture. No cache mask is
+set: with one set (to none), the client's first name read of the fixture's
+application did not return within 14 minutes on CI (the run of e9e5ed08),
+while A-L1's client, which sets none, reads the same property at once.
 
 Exit 0 when everything matches; 1 with every mismatch listed otherwise.
 """
@@ -70,6 +77,11 @@ BUDGET_SECONDS: float = 780.0
 WATCHDOG_SECONDS: float = 840.0
 # AT-SPI round trips timed once at the start, to report the bus latency.
 LATENCY_PROBES: int = 200
+# libatspi's method-call timeout (atspi_set_timeout), and the time it allows
+# an application to start, in milliseconds: a call the fixture does not
+# answer fails with a GLib error instead of waiting.
+CALL_TIMEOUT_MS: int = 10000
+STARTUP_TIMEOUT_MS: int = 15000
 VIRTUAL_RUNTIME_BIT: int = 1 << 63
 
 # Registry entries without a semantic node of their own: components, and the
@@ -190,7 +202,7 @@ class Progress:
 
 
 def probe_latency(frame: Any, progress: Progress) -> None:
-    """Times LATENCY_PROBES uncached name reads of `frame` and notes the mean."""
+    """Times LATENCY_PROBES name reads of `frame` (D-Bus calls) and notes the mean."""
     started: float = time.monotonic()
     index: int
     for index in range(LATENCY_PROBES):
@@ -203,7 +215,9 @@ def probe_latency(frame: Any, progress: Progress) -> None:
 
 
 def is_virtual(runtime_id: int) -> bool:
-    result: bool = runtime_id == 0 or (runtime_id & VIRTUAL_RUNTIME_BIT) != 0
+    """is_virtual_semantic_runtime_id: the top bit. The window numbers every
+    virtual child, so no node has runtime identity 0."""
+    result: bool = (runtime_id & VIRTUAL_RUNTIME_BIT) != 0
     return result
 
 
@@ -571,14 +585,12 @@ class Comparer:
 def find_frames(atspi: ModuleType, fixture: Fixture) -> tuple[Any, Any]:
     deadline: float = time.monotonic() + session_support.STARTUP_SECONDS
     desktop: Any = atspi.get_desktop(0)
-    desktop.set_cache_mask(atspi.Cache.NONE)
     while time.monotonic() < deadline and fixture.process.poll() is None:
         index: int
         for index in range(desktop.get_child_count()):
             application: Any = desktop.get_child_at_index(index)
             if application is None or application.get_name() != APPLICATION_NAME:
                 continue
-            application.set_cache_mask(atspi.Cache.NONE)
             gallery: Any = None
             supplement: Any = None
             child: int
@@ -909,6 +921,7 @@ def run_client(fixture_path: str, registry_path: str) -> int:
         progress.note('starting the AT-SPI bus')
         session.start(Gio, GLib)
         from gi.repository import Atspi
+        Atspi.set_timeout(CALL_TIMEOUT_MS, STARTUP_TIMEOUT_MS)
         fixture = Fixture(fixture_path)
         fixture.start()
         progress.note('fixture ready; finding its frames')
