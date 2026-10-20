@@ -55,6 +55,9 @@ enum class PartRole : std::uint8_t {
     selection,
     validation,
     drop,
+    // A content picture drawn exactly as given, never tinted or resized by
+    // a theme (T2 GIVEN H1-1), such as the docking stamp's snapshot.
+    image,
     count,
 };
 

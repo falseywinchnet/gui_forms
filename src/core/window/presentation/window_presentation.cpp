@@ -298,6 +298,16 @@ bool covered_by(Rect pending, std::span<const Rect> painted) noexcept {
 
 } // namespace
 
+void Window::note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states) {
+    const PartRecordAcquisition acquired = engine_parts_.acquire(control.stable_id().value(), key);
+    if (acquired.created) metrics_.record_engine_part_created(key.index_fallback(), engine_parts_.record_count());
+    EnginePartRecord* const record = engine_parts_.record(acquired.handle);
+    if (record == nullptr) return;
+    (*record).states = states;
+    // The paint in progress, counted as the paints completed before it.
+    (*record).last_painted = paint_leases_completed_;
+}
+
 std::optional<PaintReceipt> Window::paint(Painter& painter,
                                           Rect requested_damage) {
     // One rectangle: the request, or else the bounds of all damage.

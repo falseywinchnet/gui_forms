@@ -1,5 +1,6 @@
 #pragma once
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/theme/types/theme_types.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
 
@@ -16,11 +17,12 @@ class Painter;
 // The by-role paint path (owner ruling, 2026-10-14: the atom vocabulary is the
 // canonical source). A control describes each part it paints with words from
 // the vocabulary (its PartRole, the AnatomyStates it is in) plus the content
-// it shows, and paint_part draws it. A control never draws a part itself, so
-// when the engine (T2) and the default theme (T4) arrive, they replace this
-// path's body and no control changes.
+// it shows, and paint_part draws it. A control never draws a part itself:
+// paint_part hands the part to its theme's engine (ThemeEngine), which draws
+// it with a primitive where a theme rule selects one (from T3) and with the
+// built-in recipe otherwise.
 //
-// Until then the path draws from today's theme records: `family` names the
+// The built-in recipe draws from today's theme records: `family` names the
 // ControlVisualRole whose recipe the part uses, and the part's states select
 // the recipe's surface state, focus and default cues.
 
@@ -72,7 +74,7 @@ enum class DockShapeRegion : std::uint8_t { top, bottom, left, right, tab_into }
 
 // One part to paint, in the control's local coordinates. `text`, `image` and
 // `mark` are read only by roles that show them (label, caption and content;
-// icon; glyph and indicator). `text` is borrowed for the call. `font` is an
+// icon and image; glyph and indicator). `text` is borrowed for the call. `font` is an
 // effective font (Control::effective_font). `corner_radius`, when set, gives
 // a surface part its shape; the theme (T4) will own shapes, so a control sets
 // it only where today's recipe has no shape for the part. `orientation` and
@@ -111,6 +113,12 @@ struct PartPaint final {
     // high-contrast recipe, so the sample stays outlined), and at 45 %
     // opacity when the part is disabled, as a disabled icon is.
     std::optional<Color> content_color{};
+    // The part's identity across frames (T2 GIVEN H3-1), or none. A part
+    // with a key has a record in its window's engine part table; one without
+    // is drawn statically, with no transitions and no cached raster. It is
+    // identity, not vocabulary: it changes nothing a part looks like today.
+    // Its views are borrowed for the call.
+    std::optional<PartKey> key{};
 };
 
 // The theme context a part's states select: hot, pressed or captured,
@@ -121,10 +129,17 @@ struct PartPaint final {
 [[nodiscard]] ControlVisualContext part_visual_context(
     const Control& control, AnatomyStateSet states) noexcept;
 
-// Paints one part of `control` by its role (see PartPaint). Roles that draw
-// nothing of their own (region, edge, perimeter, sheen) are no-ops: the
-// material of the surface they belong to draws them. An empty or non-finite
-// `bounds` paints nothing.
+// Paints one part of `control` by its role (see PartPaint), through the
+// engine of the control's effective theme. Roles that draw nothing of their
+// own (region, edge, perimeter, sheen) are no-ops: the material of the
+// surface they belong to draws them. An empty or non-finite `bounds` paints
+// nothing.
+//
+// The image role (T2 GIVEN H1-1) is a content picture, such as the docking
+// stamp's snapshot: it is drawn exactly as given, never tinted or resized by
+// a theme, into `bounds`, and at 45 % opacity when the part is disabled, as
+// a disabled icon and a content colour are. An icon is the theme's or the
+// command's symbol; an image is the application's content.
 //
 // The shadow role paints the theme's overlay shadow (owner decision RB-37):
 // `bounds` is the rect of the surface that casts it (a tooltip's face, a

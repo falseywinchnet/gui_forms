@@ -123,6 +123,8 @@ add_library(gui_forms_core STATIC
     src/core/engine/engine_math/engine_math.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
+    src/core/engine/part_table/engine_part_table.cpp
+    src/core/engine/theme_engine/theme_engine.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
     src/core/surface_material/types/surface_material_types.cpp
     src/core/text/text_store/text_store.cpp
@@ -2226,6 +2228,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
+    add_executable(gui_forms_engine_part_table_tests tests/engine_part_table_tests.cpp)
+    target_link_libraries(gui_forms_engine_part_table_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_part_table_tests COMMAND gui_forms_engine_part_table_tests)
     add_executable(gui_forms_part_painting_tests tests/part_painting_tests.cpp)
     target_link_libraries(gui_forms_part_painting_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_painting_tests COMMAND gui_forms_part_painting_tests)

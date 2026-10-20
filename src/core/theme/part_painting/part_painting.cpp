@@ -1,6 +1,8 @@
 #include "gui_forms/theme/part_painting/part_painting.hpp"
 
+#include "built_in_recipe.hpp"
 #include "gui_forms/control/control/control.hpp"
+#include "gui_forms/engine/theme_engine/theme_engine.hpp"
 #include "gui_forms/surface_material/painting/surface_material_painting.hpp"
 #include "gui_forms/theme/theme/theme.hpp"
 #include "gui_forms/types/painter/painter.hpp"
@@ -514,7 +516,17 @@ Insets overlay_shadow_outsets(const Control& control) noexcept {
     return result;
 }
 
+bool part_bounds_paintable(Rect bounds) noexcept {
+    const bool result = paintable(bounds);
+    return result;
+}
+
 void paint_part(Painter& painter, const Control& control, const PartPaint& part) {
+    const Theme& theme = control.effective_theme();
+    theme.engine().paint(painter, control, part);
+}
+
+void paint_part_with_built_in_recipe(Painter& painter, const Control& control, const PartPaint& part) {
     if (!paintable(part.bounds)) return;
     const ControlVisualContext context = part_visual_context(control, part.states);
     const Theme& theme = control.effective_theme();
@@ -590,6 +602,7 @@ void paint_part_from_recipe(Painter& painter, const PartPaint& part,
         paint_text(painter, part, disabled ? recipe.muted_text : recipe.text);
         return;
     case PartRole::icon:
+    case PartRole::image:
         if (part.image.value != 0U) painter.draw_image(part.image, part.bounds, disabled ? 0.45 : 1.0);
         return;
     case PartRole::caret:

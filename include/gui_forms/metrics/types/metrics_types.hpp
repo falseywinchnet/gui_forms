@@ -98,6 +98,15 @@ struct MetricsSnapshot {
     // above also cover painting and composing; this one compares the copy
     // itself across hosts.
     std::uint64_t screen_copy_nanoseconds{};
+    // The theme engine's part records (T2 plan, EnginePartTable): those
+    // live now, those made with the index fallback (an item part without a
+    // stable ID, whose record follows its position rather than the item;
+    // GIVEN H3-1), and those released because their control left the
+    // window. Records made and released are activity; the live count is
+    // population and survives reset_activity.
+    std::uint64_t engine_part_records{};
+    std::uint64_t engine_part_index_fallbacks{};
+    std::uint64_t engine_part_records_released{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

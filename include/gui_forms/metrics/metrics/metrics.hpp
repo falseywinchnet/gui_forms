@@ -41,6 +41,10 @@ public:
     void record_focus_scope_rejection() noexcept;
     void record_activation() noexcept;
     void record_disposal(std::uint64_t count = 1) noexcept;
+    // A theme engine part record was made; `live` records remain.
+    void record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept;
+    // `released` part records were released; `live` records remain.
+    void record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept;
     void record_wrong_thread_rejection() noexcept;
     void record_subscription_connected() noexcept;
     void record_subscription_disconnected() noexcept;

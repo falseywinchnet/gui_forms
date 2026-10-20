@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
+#include <string_view>
 
 namespace gui_forms {
 
@@ -86,5 +88,33 @@ enum class RasterViewDefect : std::uint8_t {
 
 // Registered (snake_case) name of a defect, for diagnostics.
 [[nodiscard]] const char* raster_view_defect_name(RasterViewDefect defect) noexcept;
+
+// A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets
+// the engine keep a record for it: its states and when it entered them, its
+// transitions, its preparation and its cached raster.
+//
+// The full identity is the control's stable ID, the declared part, and for
+// an item part the item's stable ID. The engine takes the control's stable
+// ID from the control painting the part, so a key cannot name another
+// control; the key carries the rest:
+// - `part`: the part's declared name, as in the control's anatomy;
+// - `item`: the item's stable ID, empty for a part that is not an item's or
+//   for an item without one;
+// - `item_index`: the item's index. It is part of the identity only when
+//   `item` is empty: the index fallback, which the window counts in its
+//   metrics, because the record then follows the position, not the item.
+//
+// Every view is borrowed for the call that paints the part.
+struct PartKey final {
+    std::string_view part{};
+    std::string_view item{};
+    std::optional<std::size_t> item_index{};
+
+    // Whether the key falls back to an item index.
+    [[nodiscard]] constexpr bool index_fallback() const noexcept {
+        const bool fallback = item.empty() && item_index.has_value();
+        return fallback;
+    }
+};
 
 } // namespace gui_forms

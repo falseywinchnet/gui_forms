@@ -796,6 +796,7 @@ owner direction; §12.1 item 1).
 | indicator | binary or tri-state mark | check mark, radio dot, switch knob |
 | activity | authored indeterminate-progress object | busy indicator (C164) |
 | glyph, icon | vector symbol; image slot | arrows, close; command and object icons |
+| image | content picture, drawn exactly as given and never tinted or resized by a theme (§12.12, T2 H1-1) | the docking stamp's snapshot, thumbnails |
 | label, content | text in the control role; text in the content role | caption, menu text; field value, list item |
 | caret | insertion point | editors |
 | disclosure | open/close affordance | menu arrow, tree expander |
