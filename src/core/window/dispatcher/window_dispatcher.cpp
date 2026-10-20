@@ -195,6 +195,7 @@ DispatcherSnapshot Window::dispatcher_snapshot() const noexcept {
         (*dispatcher_state_).marshalled_invocations,
         (*dispatcher_state_).queue.size(),
         (*dispatcher_state_).maximum_pending,
+        (*dispatcher_state_).teardown_refusals,
         (*dispatcher_state_).accepting,
         (*dispatcher_state_).wake_pending,
     };
@@ -232,6 +233,17 @@ void Window::set_dispatch_wake_handler(std::function<void()> wake_handler) {
         }
     }
     if (wake) wake();
+}
+
+void Window::begin_dispatcher_teardown() noexcept {
+    if (!dispatcher_state_) return;
+    std::scoped_lock lock((*dispatcher_state_).mutex);
+    (*dispatcher_state_).closing = true;
+    // No host is woken from here on: the host may be going too. Work posted
+    // during the teardown is queued and then cancelled by the shutdown that
+    // ends it.
+    (*dispatcher_state_).wake = {};
+    (*dispatcher_state_).wake_pending = false;
 }
 
 void Window::shutdown_dispatcher() noexcept {

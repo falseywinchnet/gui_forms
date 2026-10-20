@@ -4,7 +4,8 @@
 // deactivation, a layout change, an invalid drop, Ctrl); the place closing
 // up at the start with the model unchanged, and Escape leaving the saved
 // layout byte-identical; one transaction and one layout pass per drop; the
-// stamp's interpolation and reduced motion; caption, tool-tab and
+// stamp's interpolation and reduced motion, and its frames on the window's
+// motion clock (T2 E3) from a test time source; caption, tool-tab and
 // document-tab drags; the keyboard move mode reaching exactly the targets
 // the pointer reaches; restrictions refusing targets.
 
@@ -508,6 +509,92 @@ void stamp_motion() {
     require((*(*reduced).site).drag_phase() == DockDragPhase::idle, "under reduced motion nothing settles");
 }
 
+// The test's time for the window's motion clock: moves start at it and the
+// window is polled at it, never at the wall clock.
+class ManualTime final : public MotionTimeSource {
+public:
+    [[nodiscard]] FrameTime now() const noexcept override { return time; }
+    FrameTime time{std::chrono::seconds(1000)};
+};
+
+// Polls every 16 ms of the test's time, laying out after each, until
+// nothing is scheduled; returns the motion clock's frames.
+std::size_t run_frames(Window& window, ManualTime& time) {
+    std::size_t frames = 0U;
+    for (int k = 0; k < 100; ++k) {
+        time.time += std::chrono::milliseconds(16);
+        const FramePollResult result = window.poll_frame_schedule(time.time);
+        window.perform_layout();
+        require(result.motion_clock_ticks <= 1U && result.active_surface_ticks == 0U,
+                "the drag's motion runs on the clock's one request");
+        frames += result.motion_clock_ticks;
+        if (!result.next_wake) break;
+    }
+    return frames;
+}
+
+// The stamp's frames (T2 E3, GIVEN D1-1): the shrink and the settling are
+// each 220 ms, so 14 frames of 16 ms, with the tiles' 100 ms fade inside the
+// shrink's on the same request; afterwards nothing is scheduled. Under
+// reduced motion and in an occluded window there are none at all.
+void stamp_frames() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockSite& site = *(*fixture).site;
+    Window& window = *(*fixture).window;
+    ManualTime time{};
+    window.motion_clock().set_time_source(&time);
+    // The press arms a request of its own (not the clock's); count from
+    // after it.
+    const Point from = centre(caption_of(site, stack_of(*(*fixture).workspace, "output")));
+    press(window, from);
+    const std::uint64_t requests = window.metrics_snapshot().scheduled_frame_requests;
+    move(window, {from.x + 10.0, from.y + 10.0});
+    move(window, {400.0, 200.0});
+    require(site.drag_phase() == DockDragPhase::dragging && window.motion_clock().moving_count() == 2U,
+            "the stamp shrinks and the hovered pane's tiles fade in");
+    const std::size_t shrink = run_frames(window, time);
+    const Rect stamp = site.drag_stamp();
+    require(shrink == 14U && std::fabs(std::max(stamp.width, stamp.height) - 100.0) < 0.5,
+            "the shrink takes 14 frames, the tile fade inside them, and ends about 100 units long");
+    require(window.metrics_snapshot().scheduled_frame_requests - requests == 1U && !window.motion_clock().armed(),
+            "the stamp and the tiles shared one frame request, now disconnected");
+    time.time += std::chrono::milliseconds(16);
+    require(window.poll_frame_schedule(time.time).motion_clock_ticks == 0U, "a still drag has no frames");
+    require(key(window, PhysicalKey::escape) && site.drag_phase() == DockDragPhase::settling, "Escape settles");
+    window.perform_layout();
+    const std::size_t settling = run_frames(window, time);
+    require(settling == 14U && site.drag_phase() == DockDragPhase::idle && site.drag_stamp().empty(),
+            "the settling takes 14 frames, then the drag is over");
+    time.time += std::chrono::milliseconds(16);
+    require(window.poll_frame_schedule(time.time).motion_clock_ticks == 0U && !window.motion_clock().armed(),
+            "and nothing is scheduled");
+
+    std::unique_ptr<Fixture> reduced = make_fixture();
+    Window& calm = *(*reduced).window;
+    PresentationSettings settings = calm.presentation_settings();
+    settings.reduced_motion = true;
+    calm.set_presentation_settings(settings);
+    calm.perform_layout();
+    drag_caption(*reduced, "output", {400.0, 200.0});
+    require(!calm.motion_clock().armed(), "under reduced motion the drag schedules no frames");
+    require(key(calm, PhysicalKey::escape), "Escape is taken");
+    calm.perform_layout();
+    require((*(*reduced).site).drag_phase() == DockDragPhase::idle && !calm.motion_clock().armed(),
+            "and ends without settling frames");
+
+    std::unique_ptr<Fixture> hidden = make_fixture();
+    Window& occluded = *(*hidden).window;
+    occluded.set_occluded(true, FrameClock::now());
+    drag_caption(*hidden, "output", {400.0, 200.0});
+    const Rect immediate = (*(*hidden).site).drag_stamp();
+    require(!occluded.motion_clock().armed() && std::fabs(std::max(immediate.width, immediate.height) - 100.0) < 0.5,
+            "in an occluded window the stamp is small at once and nothing is scheduled");
+    require(key(occluded, PhysicalKey::escape), "Escape is taken");
+    occluded.perform_layout();
+    require((*(*hidden).site).drag_phase() == DockDragPhase::idle && !occluded.motion_clock().armed(),
+            "and the drag ends at once");
+}
+
 // -- tab drags -----------------------------------------------------------------
 
 void tab_drags() {
@@ -806,6 +893,7 @@ int main() {
     target_table();
     cancellations();
     stamp_motion();
+    stamp_frames();
     tab_drags();
     keyboard_reaches_every_target();
     restrictions_refuse_targets();
@@ -813,7 +901,7 @@ int main() {
     auto_hide_meets_dragging();
     stamp_picture();
     std::cout << "DockSite dragging: geometry, the target table, threshold, Escape, capture loss, deactivation, "
-                 "layout changes, invalid drops, Ctrl, one transaction per drop, the stamp, tab drags, the "
+                 "layout changes, invalid drops, Ctrl, one transaction per drop, the stamp and its frames, tab drags, the "
                  "keyboard move mode and restrictions passed\n";
     return EXIT_SUCCESS;
 }

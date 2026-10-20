@@ -118,11 +118,11 @@ gates as their own rows. "Done" means the deliverable exists and a test in
 | Basic Forms controls | Panel, GroupBox, Label, LinkLabel, Button, CheckBox, RadioButton, TextBox, ListBox, ComboBox, NumericUpDown, scroll bars, TrackBar, ProgressBar, PictureBox, ContainerControl, UserControl, Timer, ToolTip, ErrorProvider, HelpProvider, ImageList and commands, with initialization scopes, mnemonics and accept/cancel targets | done |
 | Collection, command and data controls | TreeView, ObjectView, CheckedListBox, TabControl, SplitContainer, MasterDetailView, MenuStrip, ContextMenu, CommandBar, DateTimePicker and a metadata-driven PropertyGrid; `Value<T>` and `Command` bindings with record currency and validation | in progress: a data grid and a status strip are not implemented |
 | Semantic tree | A retained semantic graph with stable-ID snapshots, default adapters for stock controls, virtual children and semantic actions, independent of authored metadata | done |
-| Native accessibility on every host | Publication of the semantic tree through each platform's accessibility API, exercised by tests | in progress: macOS, Windows (MSAA) and Linux (ATK/AT-SPI) publish; only Windows has a registered test; no host advertises the capability; no UI Automation provider |
+| Native accessibility on every host | Publication of the semantic tree through each platform's accessibility API, exercised by tests | in progress: macOS, Windows (MSAA and UI Automation) and Linux (ATK/AT-SPI) publish; no host advertises the capability; no UI Automation TextPattern |
 | Themes, assets and localization | Immutable theme records with named visual roles and high-contrast recipes, atomic theme replacement, layered surface materials, OKLab/OKLCH colour and a fixed bundled font set | in progress: data-only theme and language packs, message catalogues and runtime configuration are not implemented |
 | Authoring manifest for compiled forms | A versioned manifest of controls, properties, events, layout and resources that form compilers consume, with conformance fixtures | in progress: the control registry lists every public control type; member-level entries and conformance fixtures are open |
 | Stable C ABI | Versioned function tables and an error model that pass a breaking-change audit, an export allowlist, and C++ wrappers as RAII conveniences over them | planned; an experimental 0.x C ABI is built and tested but not installed |
-| Windows and Linux hosts | The same protocol on Win32 (DIB presentation, MSAA, dialogs, clipboard, automation channel) and X11 (XDND drops, ATK/AT-SPI, dialogs, clipboard) | in progress: Windows lacks preedit, OLE drag and drop, occlusion and UI Automation; X11 lacks preedit and run-time scale notifications |
+| Windows and Linux hosts | The same protocol on Win32 (DIB presentation, MSAA, dialogs, clipboard, automation channel) and X11 (XDND drops, ATK/AT-SPI, dialogs, clipboard) | in progress: Windows lacks preedit, OLE drag and drop, occlusion and the UI Automation TextPattern; X11 lacks preedit and run-time scale notifications |
 | Packaging and release | A pipeline that builds, tests, packages and launch-tests every program on every platform, then publishes archives, installers, checksums and licence notices | in progress: release signing and notarization, a software bill of materials and reproducible builds remain |
 | Coherent latest-state presentation | Separate content, rendered and presented revisions; one paint lease, one coalesced wake and one deferred follow-up per window; exact presentation receipts; owner-callback failure restores the previous chunks | done |
 | Pressure, input and stall conformance | Under 100 mutations per frame, nested paints, resize during replay, occlusion, backend faults and owner retirement: one queued drain, latest-state rendering and a return to idle; input deferred outside the paint lease with a fixed bound | in progress: the deterministic gates pass; a native wall-clock soak remains |
@@ -179,7 +179,7 @@ Demonstration programs
   program's status file.
 
 Hosts
-: Input-method preedit on Windows and X11, a Windows UI Automation provider,
+: Input-method preedit on Windows and X11, the Windows UI Automation TextPattern,
   drag and drop on Windows, outbound drag on every host, and advertising the
   accessibility capability where native publication already exists.
 
@@ -201,7 +201,7 @@ not yet been built or tested.
 ## Known gaps
 
 Outbound drag initiation on every host, and inbound drag and drop on Windows;
-a separate Windows UIA provider (MSAA is implemented); preedit composition on
+the Windows UI Automation TextPattern (MSAA and the other UIA patterns are implemented); preedit composition on
 Windows and X11; occlusion notifications on Windows and run-time scale
 notifications on X11; native menu-bar publication; per-monitor DPI policy as
 a host service beyond scale notifications; designer serialization; preserving

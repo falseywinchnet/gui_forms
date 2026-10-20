@@ -66,7 +66,14 @@ public:
     void record_frame_request() noexcept;
     void record_frame_poll(std::uint64_t deadlines_fired,
                            std::uint64_t active_surface_ticks,
+                           std::uint64_t motion_clock_ticks,
                            std::uint64_t coalesced_requests) noexcept;
+    // The motion clock: a move started, a value settled on a frame, a value
+    // jumped to its end at once, and the values moving now.
+    void record_motion_started() noexcept;
+    void record_motion_settled() noexcept;
+    void record_motion_finished() noexcept;
+    void set_motion_values_moving(std::uint64_t moving) noexcept;
     void record_frame_callback_fault() noexcept;
     void record_reentrant_frame_poll() noexcept;
     void set_active_surface_count(std::size_t count) noexcept;

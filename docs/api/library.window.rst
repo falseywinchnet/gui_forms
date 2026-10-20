@@ -294,6 +294,10 @@ Related types
 
    .. cpp:member:: std::size_t maximum_pending
 
+   .. cpp:member:: std::uint64_t teardown_refusals
+
+      Posts refused, already cancelled, because they reached a shut-down dispatcher while its window was being destroyed (counted in ``cancelled`` too).
+
    .. cpp:member:: bool accepting
 
    .. cpp:member:: bool wake_pending
@@ -442,6 +446,10 @@ Related types
    .. cpp:member:: std::uint64_t active_surface_ticks
 
    .. cpp:member:: std::uint64_t ui_timer_ticks
+
+   .. cpp:member:: std::uint64_t motion_clock_ticks
+
+      Frames of the window's motion clock: at most one per poll, however many values move.
 
    .. cpp:member:: std::uint64_t coalesced_requests
 
