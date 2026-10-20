@@ -1,6 +1,8 @@
 # Engine core: plan
 
-Date: 2026-10-18. Status: **proposed, awaiting the owner's acceptance**.
+Date: 2026-10-18, revised 2026-10-19. Status: **accepted** (GIVEN Z1-1),
+revised to the owner's answers in `planning/interview/T2_INTERVIEW_ROUND_001.md`.
+The GIVEN list is in `README.md`, and each decision is cited here by its ID.
 Sources:
 - the T2 brief (`README.md`) and `planning/FORWARD_PROGRAMME.md` §4 T2;
 - the design language (`planning/DESIGN_LANGUAGE_SPECIFICATION.md`): §1.2, §2.6–§2.9, §3, §4, §5.8, §8, §9, §12.3 and §12.7;
@@ -66,7 +68,7 @@ From `control` the engine reads:
 
 T2 adds one optional field to `PartPaint`. It is identity, not vocabulary:
 
-- `std::optional<PartKey> key`. This is the part's declared position (`PartIndex`), or for an item part, the item system, the part, and the item's stable key.
+- `std::optional<PartKey> key`. It is the control's stable ID, the declared part, and for an item part the item's stable ID (GIVEN H3-1). An item without a stable ID falls back to its index; the fallback is counted in the window's metrics and reported, because motion then follows the position rather than the item.
 
 A part painted without a key is drawn statically. It gets no transitions, no
 time since state entry and no cached raster. Every existing control therefore
@@ -85,15 +87,15 @@ before T4.
 ## How the vocabulary atoms are consumed
 
 The engine declares against the vocabulary and never defines it (§12.7):
-- A `PrimitiveDescriptor` names the `PartRole`s it paints, the `AnatomyState`s it reads, the value atoms it reads (mark, accent, content colour) and, once admitted, the engine inputs it reads (open question 1). Because these are the vocabulary's own enums, a primitive cannot name an atom that does not exist.
+- A `PrimitiveDescriptor` names the `PartRole`s it paints, the `AnatomyState`s it reads, the value atoms it reads (mark, accent, content colour) and the engine inputs it reads (E6, GIVEN B1-1). Because these are the vocabulary's own enums, a primitive cannot name an atom that does not exist.
 - A rule that binds a primitive to a part whose role the primitive does not paint is refused at load, and the part keeps the built-in recipe.
 - The schema export gains an `engine` section listing every primitive with its atoms, parameters and version, beside `vocabulary`. `tools/control_schema.py check` covers it.
-- **Gaps found so far:**
-  - **Engine inputs are not atoms yet.** The schema has no `inputs` list, and the code has no input type.
-  - **Density** is named in §8.4, but no code carries it.
-  - **No surface is marked ceremonial.** §10 lets ceremonial surfaces exceed the ambient cap, but nothing in the code marks a surface as ceremonial.
-
-  All three are vocabulary changes, so they are asked as open question 1. No phase before E6 needs them.
+- **Atoms admitted by the owner (§12.12), added where their phase needs them:**
+  - the engine inputs (GIVEN B1-1, B2-1), in E6: `pointer_x` and `pointer_y` in part-local logical units (published only while the part is hot), `time_in_state`, `display_scale`, `text_scale`, and published application values (named, numeric, read-only);
+  - the `ceremonial` surface flag (GIVEN B3-1), in E7;
+  - the `image` part role (GIVEN H1-1), in E2: a content picture drawn exactly as given, never tinted or resized by a theme;
+  - the grip primitive (GIVEN H2-1), in E8: it fills its part's box with the dot pattern, so NavigationPane's grip becomes one part.
+- **Not admitted:** density, which waits for stage L or T4 (GIVEN B4-2). Part opacity is an engine property, not an atom (GIVEN C1-1).
 
 ## How motion is driven
 
@@ -103,7 +105,7 @@ There are two drivers, and they share one clock per window.
    built-in rule table before T3, declares a transition on a property for a
    part's states. Examples:
    - the tile fade: the `actuator` tile's opacity, from 0 to 1 over *quick* when the part appears;
-   - the ribbon's dithered rise: the bulge's `amplitude`, from 0 at rest to 1 while `hot`, by exponential approach.
+   - the ribbon's dithered rise: the bulge's `amplitude`, from 0 at rest to 1 while `hot`, by exponential approach, a fixed fraction of the remaining gap per about 75 ms (GIVEN D3-1). A ribbon button is flat at rest, and hover is the rise: there is no separate brightness lift (GIVEN G4-1).
 
    When a part's published states change, the engine starts the transition
    from the value currently shown. Every transition retargets in this way and
@@ -126,22 +128,19 @@ Shared rules:
 - Every duration is clamped to the 400 ms ceiling.
 - Easings are smoothstep, exponential approach (a fixed fraction of the gap per about 75 ms), linear, ease, and overshoot of at most 8 %.
 - Each settling primitive has a stated settled condition. When the condition is met, the value snaps to its exact target, so the last frame is byte-identical to the static rendering.
-- Under reduced motion, every transition and motion value jumps to its end in the same frame, and ambient effects stop.
-- While a window is occluded or minimized, its clock jumps everything to the end and schedules nothing.
+- Under reduced motion (§9.5, GIVEN D2-1), every transition and motion value jumps to its end in the same frame, ambient effects stop, and an activity object holds a static pose beside its stage text. Today's `MotionPolicy::reduced` (0.35 speed, half the excursion) moves to this in T4.
+- While a window is occluded or minimized, its clock jumps everything to the end and schedules nothing (GIVEN D4-1).
+- A presentational scale is a capability, never a default (GIVEN D5-1). It is drawn about the part's centre, inside its granted overflow, with the hit region and layout unchanged.
 - Timers, settling and damage publication run on the UI thread. The clock is cancelled by name when a window closes. A record whose control has gone is rejected by its generation.
 
-**The opacity input owed to the docking tiles.** D3 (#144) publishes the
-tiles' 100 ms fade as `expanding` but cannot draw it, because `PartPaint` has
-no opacity. (The request named this "DK-52". No decision with that number is
-recorded on any branch, and this plan takes it to mean the D3 gap.) In this
-plan, opacity is not something a control supplies:
+**The opacity owed to the docking tiles** (GIVEN C1-1, C2-1). D3 (#144)
+publishes the tiles' 100 ms fade as `expanding` but cannot draw it, because
+`PartPaint` has no opacity. Opacity is not something a control supplies:
 - It is an engine presentational property: one multiplier on the part's whole composite, applied in the shared blend (E2).
 - A transition drives it (E7), keyed on the part's appearance. That appearance is a new `PartKey` in the window's part table, or the published `expanding` state.
 - D3 changes only to pass its tiles' keys.
 
-The alternative would be a control-supplied `opacity` field in `PartPaint`.
-That is a new value atom, which would need the owner, and it would put motion
-back into controls. This plan does not take it.
+The built-in rules draw the fade once transitions exist (E7), before T4.
 
 ## Numerics and identical pixels
 
@@ -152,7 +151,7 @@ pinned LLVM 22. Identity is designed in, not hoped for:
 - **One precision.** Every kernel computes in `double` and quantizes once, at the end, to 8-bit premultiplied values with `floor(v·255 + 0.5)`. There is no fast-math.
 - **No fused multiply-add.** Clang contracts `a·b + c` into an FMA by default on arm64, but not on baseline x86-64. Every engine kernel source turns contraction off with `#pragma clang fp contract(off)`, and arithmetic kernels live in `.cpp` files, not in headers that other translation units would compile under their own flags.
 - **No host libm in kernels.** `pow`, `exp`, `log` and the trigonometric functions differ between macOS libm, glibc and the Windows runtime. The engine has its own `power`, `exponential` and `logarithm`. They are built only from `+ − × ÷` and `sqrt` (IEEE-exact) and from `frexp` and `ldexp` (exact), each with a stated error bound.
-- **One blend.** Part rasters composite by premultiplied source-over, using the arithmetic that ADR-004 already made bit-identical across the Skia raster and the Windows DIB compositor for text. A composite test compares the bytes on every host, as `text_identity_raster_tests` does.
+- **One blend.** Part rasters composite by premultiplied source-over, using the arithmetic that ADR-004 already made bit-identical across the Skia raster and the Windows DIB compositor for text. A composite test compares the bytes on every host, as `text_identity_raster_tests` does. The identity gate covers both the primitive's raster bytes and this composite through each host's painter (GIVEN A2-2).
 - **The reference images** are FNV-1a hashes of each primitive's raster for a fixed set of parameters and display scales. The expected table is checked on all four platforms. Setting `GUI_FORMS_ENGINE_IDENTITY_PRINT=1` prints the observed hashes instead of checking them.
 
 The built-in recipe (today's `Painter` path) is not an engine primitive, and
@@ -172,16 +171,19 @@ own pull request (or stack).
   - `dithered_bulge`.
 
   Each has its dent when `pressed` and its gold form for `active_tool`. Each has an `amplitude` parameter from 0 to 1, which is the input the ribbon's rise animates in E7.
-- **The dithered lattice at fractional scales.** The reference leaves this rule to the engine. The lattice stays at exactly 2 logical px. A dot at logical (x, y) covers device pixels `[floor(x·s), floor(x·s) + D)` on each axis, with `D = max(1, floor(s + 0.5))`. Its tone is sampled at the dot's logical position, as the reference formula reads. At integer scales the lattice is exact. At fractional scales a dot's position may vary by one device pixel.
+- **Rescaled quantization** (GIVEN G1-3, rendering reference §3): each side of the dithered tone is divided by the part's own full-amplitude extreme (P for the lit side, N for the shaded side), computed once per part geometry, so every step is used whatever the gains, and the rise still grows the dither.
+- **Fractional display scales** (GIVEN G3-3, rendering reference §3): a dithered part is drawn at its nearest integer scale k = max(1, floor(s + 0.5)), on a lattice of period 2k device px with k × k dots, sampling the fields at logical (2n + 1)·k / s. At integer scales this is the studies' rule exactly.
+- **The shade field** keeps the reference formula, as the approved studies drew it (GIVEN G2-1).
 - Nothing is wired into `paint_part` yet, and no control's pixels change.
 
 Tests:
 - registry refusals;
 - parameter refusals;
 - destination validation;
-- amplitude 0 paints nothing;
+- amplitude 0 paints nothing, and the dot count grows with amplitude;
 - dots only on the lattice;
-- at least three tones on each side;
+- all three tones on each side, for the light default too (G1-3);
+- the integer-scale lattice equals the old rule at scales 1 and 2 (G3-3);
 - the dent mirrors the bulge;
 - the cross-host hash table at scales 1, 1.25, 1.5 and 2;
 - the math functions against bounds and their own cross-host hash.
@@ -189,10 +191,11 @@ Tests:
 **E2. The entry point, part keys, the part cache and the composite.**
 - `ThemeEngine` is owned by the application's theme, so every window shares one (DK W0 made the theme application-scoped).
 - `paint_part` calls `ThemeEngine::paint`, with today's body as the built-in recipe.
-- `PartKey` joins `PartPaint`, and the window's `EnginePartTable` keeps its records.
+- `PartKey` (GIVEN H3-1) joins `PartPaint`, and the window's `EnginePartTable` keeps its records.
+- The `image` part role (GIVEN H1-1) and content colour (GIVEN E2-1) are drawn exactly as given; a theme styles only what surrounds them.
 - Records are released when their control detaches, and stale generations are rejected.
 - A retained `Painter` command composites a part raster at device-aligned bounds, with an opacity, through the shared blend. It is implemented in the recording painter, the Skia adapter and the Windows DIB compositor.
-- Per-part framebuffers: the cache keeps a part's raster while its resolved style and inputs are unchanged, reuses the storage, and stays within a fixed memory cap. Passthrough transparency is the premultiplied alpha of the raster itself.
+- Per-part framebuffers: the cache keeps a part's raster while its resolved style and inputs are unchanged, reuses the storage, and stays within 8 MB per window, evicting the least recently painted parts first (GIVEN F2-1). Passthrough transparency is the premultiplied alpha of the raster itself.
 
 Tests:
 - every Gallery page records the same display commands before and after the change;
@@ -228,6 +231,7 @@ Tests:
 - Controls gain a `classes` property, which the class rule needs.
 - Loading validates everything before it replaces anything. An invalid declaration is dropped with a diagnostic naming its rule. A part whose primitive is unknown, invalid or over budget keeps the built-in recipe. The old sheet stays in force until the new one is completely built.
 - A theme declares the engine version it needs, and on an older engine the parts that need a newer one fall back.
+- Cost budgets (GIVEN F1-1): each primitive declares its bound in operations per device pixel plus a fixed cost; a part's stack is at most 512 operations per device pixel, and an animated part at most 4 million per frame. A part over budget, or whose cost cannot be bounded, keeps the built-in recipe.
 - Forced high contrast is derived as a rule pass, replacing today's hand-authored arrays:
   - under the host's mode, the host palette and metrics win;
   - GUI.Forms' own mode keeps geometry and state composition, drops gradients, texture, glow, sheen, reflection, glass and cast shadows, and draws every edge solid.
@@ -258,8 +262,8 @@ Tests:
 - dependency extraction;
 - division by zero and non-finite values give the declared fallback.
 
-**E6. Inputs and damage by dependency** (needs open question 1).
-- Engine inputs as engine-set custom properties: part-local pointer position while the part is hot, time since state entry, display and text scale, density, accessibility flags, and named values the application publishes. Nothing but the engine writes them.
+**E6. Inputs and damage by dependency.**
+- Engine inputs as engine-set custom properties (GIVEN B1-1, B2-1): part-local pointer position in logical units while the part is hot, time since state entry, display and text scale, and named values the application publishes. Nothing but the engine writes them. Density is not among them (GIVEN B4-2).
 - Each resolved part knows which inputs it reads (from its primitive and its expressions). A change to an input damages only the parts that read it, within their declared extent.
 
 Tests:
@@ -273,7 +277,7 @@ Tests:
 - Transitions on resolved properties include opacity (the tile fade) and the bulge amplitude (the ribbon's rise).
 - Ambient effects declare a region, a period and a frame cap:
   - at most 30 fps;
-  - over at most 10 % of the window on everyday surfaces, or the effect is refused at load;
+  - over at most 10 % of the window on everyday surfaces, or the effect is refused at load; a surface the application marks ceremonial (GIVEN B3-1) lifts this cap for that surface only;
   - stopped when the window is occluded or minimized, under reduced motion, and when the application's motion switch is off.
 - Under reduced motion, sheen rests static, pop changes elevation without motion, and an activity object holds a static pose.
 
@@ -295,7 +299,9 @@ Tests:
   - seam;
   - actuator.
 - The material stack of §4.2 rendered by engine kernels.
+- The grip primitive (GIVEN H2-1), filling its part's box with the dot pattern.
 - The engine's shape parameters (corner radius, circle, pill, cap). The engine derives the hit region from the geometry it computes, which is T1's hand-off. Themes choose among shapes and never set hit regions.
+- The presentational scale capability (GIVEN D5-1).
 - Text is published as layout slots, which is the other half of T1's hand-off.
 
 Tests:
@@ -311,6 +317,7 @@ Tests:
 - Translucency.
 - Reflection, a bounded copy of the part's own content or of the backplane within its grant.
 - Glass, a bounded blur of radius at most 8 logical px that samples only the backplane, cached against the backplane's damage generation.
+- The overlay shadow (GIVEN E1-1): an engine primitive with the first-party blur, identical on every host, keeping `ThemeDefinition::overlay_shadow`'s two layers, their damage outsets and the high-contrast rule (none). It replaces `paint_part`'s `shadow` role path through `Painter::draw_box_shadow`.
 
 Tests:
 - reference images;
@@ -337,46 +344,17 @@ Tests:
 ## Order and dependencies
 
 - E1 comes first. E2 needs E1. E3 needs E2 and can run beside E4. E5 needs only E1's numerics.
-- E4 needs E2. E6 needs E4, E5 and open question 1. E7 needs E3, E4 and E6.
+- E4 needs E2. E6 needs E4 and E5. E7 needs E3, E4 and E6.
 - E8, E9 and E10 need E2 for their rasters and E4 for their rules. They can run in parallel once both exist.
 - T3 can start against E4's rule tables and E5's expression program. T4 needs E4, E7 and E8. T5 needs E9's backplane sampling.
 - DK D8 and RB phase 7 take their motion from E3 and E7.
 
-## Open questions for the owner
+## Decided (2026-10-19)
 
-1. **Admit the engine inputs as atoms** (§12.7: adding an atom is an owner decision).
-
-   Proposed set:
-   - `pointer_x` and `pointer_y`: part-local logical units, published only while the part is hot;
-   - `time_in_state`: milliseconds since the part entered its current state set;
-   - `display_scale` and `text_scale`;
-   - `density`: compact, standard or touch;
-   - published application values: named, numeric, read-only, written by the application and never by a theme.
-
-   The proposed set also includes:
-   - a `ceremonial` flag that the application sets on a surface. It lifts the ambient region cap for that surface, because §10 lets the application decide when a surface is ceremonial.
-   - High contrast and reduced motion stay states, as they are.
-
-   **Recommendation:** admit this set with these names and units. E6 waits for this; E1 to E5 do not.
-2. **Reduced motion and the activity object.** Today `MotionPolicy` keeps animating under reduced motion, at 0.35 speed with half the excursion. §9.5 (proposed) and the T2 gate say ambient effects stop and an activity object holds a static pose beside its stage text. **Recommendation:** §9.5 governs the engine, and the existing `MotionPolicy` consumers move to it in T4.
-3. **Cost budget tokens.**
-   - Each primitive declares its bound in operations per device pixel, plus a fixed cost.
-   - A part's cost is the sum over its stack, multiplied by its device area.
-   - **Proposed starting tokens:**
-     - a part's stack at most 512 operations per device pixel;
-     - an animated part at most 4 million operations per frame;
-     - a window's ambient effects together within the accepted 30 fps and 10 % tokens.
-   - **Recommendation:** accept these as starting tokens, to be revisited against the specimen sheet. E4 enforces only "cannot be bounded" until the owner answers.
-4. **A presentational scale for loud themes.** §9.1 rejects scale transitions, and the T3 scenario shows `scale: 0.97` on press. **Recommendation:** the engine offers it only as a capability:
-   - the part is drawn scaled about its centre and must stay inside its granted overflow;
-   - the hit region and layout do not change;
-   - the default theme does not use it.
-
-## Notes for T4 (not questions)
-
-- **The bulge's shade field does not melt inside the bounds.** The rendering reference's shade ellipse is centred at (0.60, 0.64) with radii (0.50, 0.48), so it reaches 1.10 w and 1.12 h. At the middle of the bottom edge it is still at about 47 % of its peak. That matches "deepest at the lower right corner", but not §3.5's "melt back into the plane before the part's bounds". E1 implements the formula exactly, as the approved studies drew it. The specimen sheet settles which reading is right.
-- **The dithered bulge's deepest shaded step never appears with the default gains.** Sampled over the whole box, the tone of the reference fields runs from about −0.63 to +1.05 with lit, shade and crown gains of 1.0, 0.85 and 0.25. The third shaded step (`rgb(88, 122, 186)`) needs at least −0.68, so the light default shows three lit steps and only two shaded ones. The dark variant's gains (0.9, 1.0, 0.2) reach −0.80 and show all three. E1 implements the reference as written, and its tests record this. T4 may raise the shade gain if the owner wants the third step.
-- **Hover brightening is not part of E1's bulge primitives.** The studies use brightness 1.03–1.04 and saturation 1.15. This is a theme-level filter for E4 and E7.
+The open questions of the first draft (engine inputs, reduced motion, cost
+budgets, presentational scale) and the T4 notes on the reference (the shade
+field, the third shaded step, hover) were answered in interview round 001.
+The answers are woven into the phases above and listed in `README.md`.
 
 ## Gate
 
