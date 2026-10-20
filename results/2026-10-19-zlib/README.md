@@ -180,3 +180,21 @@ workspace ceilings and fuzz duration have not yet been approved.
 The study's source pointers, required verification commands and owner choices
 are the hand-off for the next phase. The owner relays this report to the
 coordinating session; no direct message was sent there.
+
+
+## Follow-up: accepted decisions and precursor alternatives audit
+
+On 2026-10-19 the owner accepted all six A recommendations and requested a light
+pass over non-GPL open-source replacements, with emphasis on C++ work already
+available. This supersedes the pending-decision statements in the original
+evidence above, including workspace ceilings and fuzz duration.
+
+The [audit](../../planning/stages/Z-zlib/ALTERNATIVES_LIGHT_AUDIT.md) records ten
+candidates from primary project documentation, licences and selected headers
+and implementation files. This was a source/API feasibility pass, not a full
+security audit, dependency-closure review or executable comparison. No source
+was imported into production, no dependency was selected, and no implementation
+was begun. Fuzz hours remain 0; no performance or platform result is claimed.
+
+Follow-up validation: both full first-party checker commands above were rerun;
+each checked 1171 files with 0 findings. `git diff --check` passed.

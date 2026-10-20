@@ -1,6 +1,6 @@
 # Z. Owned zlib replacement: phase 1 study and threat model
 
-Date: 2026-10-19. Status: **study submitted; owner review pending**.
+Date: 2026-10-19. Status: **six owner decisions accepted; precursor alternatives audit recorded**.
 This document proposes the implementation; it does not authorize phase 2.
 The owner requested one PR per phase, stacked while unmerged, no pushes to
 `main`, and a stop after this study. No implementation or dependency change
@@ -17,10 +17,9 @@ checksums, a libpng-compatible C subset, and one implementation on every host.
 No performance claim is made before measurements.
 
 **Given by the owner, 2026-10-19:** remove Windows WIC PNG decoding; use the
-owned zlib consistently across platforms. **Still open:** library name and
-location, a first-party PNG codec versus the pinned libpng everywhere, and
-whether FreeType compression is disabled or redirected. Section 11 presents
-these decisions explicitly.
+owned zlib consistently across platforms. **Accepted by the owner, 2026-10-19:** all six recommendations in section 11.
+The requested [light alternatives audit](ALTERNATIVES_LIGHT_AUDIT.md) examines
+existing implementations before code begins; it does not select an import.
 
 Read first: [AGENTS.md](../../../AGENTS.md), the complete
 [house style](../../PROGRAMMING_HOUSE_STYLE.md),
@@ -587,8 +586,10 @@ owner, choose the writer level from them, and do not conceal a regression.
 
 ## 11. Owner decisions before implementation
 
-These are proposals. Record the owner's choices here before starting phase 2;
-PNG/FreeType choices must be settled before their dependent implementation.
+The owner accepted all six recommended A options on 2026-10-19, and required
+a precursor light audit of non-GPL open-source replacements, prioritizing C++.
+That [audit is recorded separately](ALTERNATIVES_LIGHT_AUDIT.md). The alternatives
+below remain as decision history; each A is the accepted choice.
 
 1. **Name and boundary.** A — **recommend** GUI.Forms Deflate,
    `gui_forms_deflate`, public native declarations in
@@ -616,8 +617,9 @@ PNG/FreeType choices must be settled before their dependent implementation.
    return with corpus-derived PNG metadata/default budgets before integration.
    B — owner supplies different ceilings/campaign duration before coding.
 
-Phase 1 does not select these answers. Review acceptance, not this document's
-existence or a green documentation PR, is the gate to writing code.
+All six A answers are accepted. This follow-up completes the requested light
+audit only; no candidate has been adopted and implementation has not started.
+Acceptance of these choices does not certify any candidate against the gates.
 
 ## 12. Direct source references for review
 
