@@ -96,6 +96,10 @@ using namespace gallery_pages_tests;
 
 int main() {
     try {
+        // First, while the process has made no other control: the
+        // typography page shows a RuntimeId, which counts every control
+        // made before it.
+        test_display_commands_unchanged();
         test_page_contract_and_rendering();
         test_catalog_pages_resolve_and_headers_describe_pages();
         test_gallery_semantic_surface();
@@ -110,7 +114,6 @@ int main() {
         test_registry_pages_gallery();
         test_anatomy_coverage();
         test_schema_export();
-        test_display_commands_unchanged();
         std::cout << "gui_forms_gallery_pages_tests: all tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
