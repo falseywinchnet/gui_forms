@@ -7,7 +7,6 @@
 #include <cstring>
 #include <fstream>
 #include <iomanip>
-#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -30,16 +29,16 @@ namespace {
 // The month calendars show "today", which the system clock supplies; the
 // test pins it so that the trace does not depend on the date.
 //
-// Two pages differ between platforms by design or for a reason not yet found:
+// Two pages show values that the page's own content does not fix:
 // - live-surfaces reports its surface's pixel format, which is the
 //   platform's native one (native_live_surface_pixel_format: BGRA on
 //   Windows, RGBA elsewhere), so it has one digest for Windows and one for
 //   the other platforms, which differ only in that word;
-// - typography-and-inspection reports the window's control count and pending
-//   damage rectangles in its inspector. On Linux its digest differs from
-//   Windows and macOS, and the cause is not yet known, so it is recorded and
-//   written but not checked. Each run prints its digest and the inspector's
-//   readouts, so that CI's test log shows what differs.
+// - typography-and-inspection's inspector shows the inspected control's
+//   RuntimeId, a process-wide counter of every control made so far. The
+//   test therefore runs first in its binary (main.cpp), before any other
+//   test has made a control, so the counter has the same value on every
+//   run and host.
 
 class TracePainter final : public Painter {
 public:
@@ -308,6 +307,9 @@ struct PageDigest final {
 };
 
 // Recorded on main at 13d1c7e0, before the theme engine's entry point.
+// typography-and-inspection's entry is main's trace with the RuntimeId the
+// specimen has when this test runs first (#1251 rather than #19747); the
+// two traces differ in that number alone.
 constexpr std::array<PageDigest, 29> expected_digests{{
     {"basics", 0x6d537a7173ffd432ULL},
     {"values", 0x9262ff950cdb0bbaULL},
@@ -336,12 +338,9 @@ constexpr std::array<PageDigest, 29> expected_digests{{
     {"responsive-layouts", 0xa5fe70ebb0d4051eULL},
     {"anchored-popups", 0x53eef5309813b41aULL},
     {"live-surfaces", 0x5d366debbc32b5ffULL},
-    {"typography-and-inspection", 0xaf03a11988a78143ULL},
+    {"typography-and-inspection", 0x27adf74d8cf4ec14ULL},
     {"semantic-feedback", 0x819d5ed9aa229adaULL},
 }};
-
-// The page that is recorded but not checked (see above).
-constexpr std::string_view unchecked_page = "typography-and-inspection";
 
 // live-surfaces names the platform's native live-surface pixel format.
 #if defined(_WIN32)
@@ -349,22 +348,6 @@ constexpr std::uint64_t live_surfaces_digest = 0x5d366debbc32b5ffULL;
 #else
 constexpr std::uint64_t live_surfaces_digest = 0xc98130cb78ec491fULL;
 #endif
-
-// The text runs of a trace that hold a digit: the page's readouts.
-void print_readouts(std::string_view page, std::uint64_t hash, const std::string& trace) {
-    std::cout << "unchecked page " << page << " digest 0x" << std::hex << std::setw(16) << std::setfill('0') << hash
-              << std::dec << '\n';
-    std::istringstream lines(trace);
-    std::string line;
-    while (std::getline(lines, line)) {
-        if (line.rfind("draw_text", 0) != 0) continue;
-        const std::size_t quote = line.find('"');
-        if (quote == std::string::npos) continue;
-        const std::string_view text = std::string_view(line).substr(quote);
-        if (text.find_first_of("0123456789") == std::string_view::npos) continue;
-        std::cout << "  " << text << '\n';
-    }
-}
 
 std::uint64_t expected_digest(std::string_view page) {
     if (page == "live-surfaces") return live_surfaces_digest;
@@ -399,10 +382,6 @@ void test_display_commands_unchanged() {
         if (printing) {
             std::cout << "    {\"" << page.id << "\", 0x" << std::hex << std::setw(16) << std::setfill('0') << hash
                       << std::dec << "ULL},\n";
-            continue;
-        }
-        if (page.id == unchecked_page) {
-            print_readouts(page.id, hash, painter.trace);
             continue;
         }
         if (hash != expected_digest(page.id)) {
