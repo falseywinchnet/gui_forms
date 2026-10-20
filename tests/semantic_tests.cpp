@@ -265,6 +265,90 @@ void test_modal_semantic_scope() {
     require(find_node(outside_snapshot.roots, "outside"), "closing modal restores semantic tree");
 }
 
+// A control that publishes one virtual child, "shared", whose stable identity
+// every instance repeats (as tree and object views repeat their model's item
+// identities), and counts the presses that child receives.
+class SharedVirtualChild final : public Control {
+public:
+    explicit SharedVirtualChild(StableId stable_id) : Control(std::move(stable_id)) {}
+    [[nodiscard]] int presses() const noexcept { return presses_; }
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.exposed = true;
+        return descriptor;
+    }
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        SemanticNode node;
+        node.stable_id = "shared";
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        node.role = SemanticRole::button;
+        node.name = "Shared";
+        node.actions = {SemanticAction::press};
+        std::vector<SemanticNode> nodes{node};
+        return nodes;
+    }
+    bool on_semantic_child_action(std::string_view stable_id, SemanticAction action,
+                                  std::string_view) override {
+        if (stable_id != "shared" || action != SemanticAction::press) return false;
+        ++presses_;
+        return true;
+    }
+
+private:
+    int presses_{};
+};
+
+// Hosts name a published node by its control's runtime identity (interview
+// GF017): a disposed or replaced control's identity is refused, and a virtual
+// child reaches its own owner even when another control repeats its stable
+// identity.
+void test_runtime_identity_semantic_actions() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("identity.root"));
+    std::shared_ptr<SharedVirtualChild> first = make_control<SharedVirtualChild>(StableId("identity.first"));
+    std::shared_ptr<SharedVirtualChild> second = make_control<SharedVirtualChild>(StableId("identity.second"));
+    std::shared_ptr<Button> button = make_control<Button>(StableId("identity.button"), "Press");
+    (*first).set_requested_bounds({0, 0, 50, 20});
+    (*second).set_requested_bounds({0, 30, 50, 20});
+    (*button).set_requested_bounds({0, 60, 50, 20});
+    (*root).add_child(first);
+    (*root).add_child(second);
+    (*root).add_child(button);
+    Window window(root, {200, 120});
+    int clicks = 0;
+    SubscriptionToken clicked =
+        (*button).clicked().subscribe(test_support::IncrementCounter<int, ButtonBase&>(clicks));
+
+    require(window.perform_semantic_action((*second).runtime_id(), "shared", SemanticAction::press) &&
+                (*second).presses() == 1 && (*first).presses() == 0,
+            "a virtual child named by its owner's runtime identity reaches that owner only");
+    require(window.perform_semantic_action("shared", SemanticAction::press) && (*first).presses() == 1,
+            "a stable identity alone reaches the first control that claims it");
+    require(!window.perform_semantic_action((*first).runtime_id(), "missing", SemanticAction::press),
+            "a virtual child its owner does not claim is refused");
+    require(window.perform_semantic_action((*button).runtime_id(), "", SemanticAction::press) && clicks == 1,
+            "a control's own node is reached by its runtime identity");
+
+    const RuntimeId stale = (*button).runtime_id();
+    const Control::Ptr removed = (*root).remove_child(stale);
+    require(removed != nullptr, "the button leaves the tree");
+    require(!window.perform_semantic_action(stale, "", SemanticAction::press) && clicks == 1,
+            "a removed control's runtime identity is refused");
+    std::shared_ptr<Button> replacement = make_control<Button>(StableId("identity.button"), "Press");
+    (*replacement).set_requested_bounds({0, 60, 50, 20});
+    (*root).add_child(replacement);
+    int replacement_clicks = 0;
+    SubscriptionToken replacement_clicked = (*replacement).clicked().subscribe(
+        test_support::IncrementCounter<int, ButtonBase&>(replacement_clicks));
+    require(!window.perform_semantic_action(stale, "", SemanticAction::press) && replacement_clicks == 0,
+            "a replaced control's old runtime identity never reaches its successor");
+    require(window.perform_semantic_action((*replacement).runtime_id(), "", SemanticAction::press) &&
+                replacement_clicks == 1,
+            "the successor answers to its own runtime identity");
+    require(!window.perform_semantic_action(RuntimeId{}, "", SemanticAction::press),
+            "the zero runtime identity names no control");
+}
+
 // The helper every control's virtual semantic children used to copy, kept
 // verbatim as the reference the shared helper must match byte for byte.
 std::uint64_t former_copy(std::string_view id) noexcept {
@@ -304,6 +388,7 @@ int main() {
         test_snapshot_roles_states_hierarchy_and_json();
         test_semantic_actions_use_control_behavior();
         test_virtual_list_items_are_selectable();
+        test_runtime_identity_semantic_actions();
         test_semantics_enforce_ui_thread();
         std::cout << "gui_forms_semantic_tests: all tests passed\n";
         return EXIT_SUCCESS;

@@ -139,14 +139,22 @@ void append_semantic_nodes(const Control::Ptr& control,
     ++count;
 }
 
+// Offers a virtual child's action to `control` and then its descendants in
+// child order, through visible and enabled controls only. When `claimant`
+// is not null only that control may claim it; otherwise the first control
+// that accepts it does.
 bool dispatch_semantic_child_action(Control::Ptr control,
                                     std::string_view stable_id,
                                     SemanticAction action,
-                                    std::string_view value) {
+                                    std::string_view value,
+                                    const Control* claimant) {
     if (!control || !(*control).effectively_visible() ||
         !(*control).effectively_enabled()) return false;
     Window* const owner = (*control).attached_window();
-    if ((*control).on_semantic_child_action(stable_id, action, value)) return true;
+    if (claimant == nullptr || control.get() == claimant) {
+        if ((*control).on_semantic_child_action(stable_id, action, value)) return true;
+        if (control.get() == claimant) return false;
+    }
     if (!(*control).is_alive() || (*control).attached_window() != owner) return false;
     const std::vector<Control::Ptr> children((*control).children().begin(),
                                              (*control).children().end());
@@ -155,7 +163,7 @@ bool dispatch_semantic_child_action(Control::Ptr control,
             (*child).attached_window() != owner) {
             continue;
         }
-        if (dispatch_semantic_child_action(child, stable_id, action, value)) return true;
+        if (dispatch_semantic_child_action(child, stable_id, action, value, claimant)) return true;
     }
     return false;
 }
@@ -223,6 +231,9 @@ void Window::DeferredInputVisitor::operator()(InputEvent&& event) const {
         static_cast<void>((*window).dispatch_text(std::move(event)));
     } else if constexpr (std::is_same_v<EventType, DragEvent>) {
         static_cast<void>((*window).dispatch_drag(std::move(event)));
+    } else if (event.owner.value != 0U) {
+        static_cast<void>((*window).perform_semantic_action(
+            event.owner, event.stable_id, event.action, event.value));
     } else {
         static_cast<void>((*window).perform_semantic_action(
             event.stable_id, event.action, event.value));
@@ -2297,21 +2308,8 @@ bool Window::perform_semantic_action(std::string_view stable_id,
     const Control::Ptr control = find(stable_id);
     const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
     if (!control) {
-        if (dispatch_semantic_child_action(scoped ? scoped : root_, stable_id, action, value)) {
-            return true;
-        }
-        ControlList popup_roots;
-        popup_roots.reserve(popups_.size());
-        for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
-            if (!scoped || contains_control(scoped, (*popup).owner())) { popup_roots.push_back((*popup).popup()); }
-        }
-        for (ControlList::reverse_iterator popup = popup_roots.rbegin();
-             popup != popup_roots.rend();
-             ++popup) {
-            if (dispatch_semantic_child_action(
-                    *popup, stable_id, action, value)) return true;
-        }
-        return false;
+        const bool claimed = dispatch_virtual_semantic_action(stable_id, action, value, nullptr);
+        return claimed;
     }
     if (!eligible(control)) return false;
     if (!focus_allowed_by_active_scope(control)) {
@@ -2327,6 +2325,71 @@ bool Window::perform_semantic_action(std::string_view stable_id,
         return request_focus(control);
     }
     return (*control).on_semantic_action(action, value);
+}
+
+bool Window::perform_semantic_action(RuntimeId control_id,
+                                     std::string_view virtual_child,
+                                     SemanticAction action,
+                                     std::string_view value) {
+    require_ui_thread("semantic action");
+    if (in_paint_) {
+        return defer_input(DeferredInput{DeferredSemanticInput{
+            std::string(virtual_child), action, std::string(value), control_id}});
+    }
+    const Control::Ptr control = find_runtime_control(control_id);
+    if (!control) return false;
+    if (virtual_child.empty()) {
+        // Stable identities are unique within a window, so this reaches
+        // `control` itself; a replaced control's successor is never found by
+        // the old runtime identity.
+        const std::string_view stable_id = (*control).stable_id().value();
+        if (find(stable_id) != control) return false;
+        const bool performed = perform_semantic_action(stable_id, action, value);
+        return performed;
+    }
+    const bool claimed = dispatch_virtual_semantic_action(virtual_child, action, value, control.get());
+    return claimed;
+}
+
+Control::Ptr Window::find_runtime_control(RuntimeId control) const {
+    ControlList pending{root_};
+    pending.reserve(1U + popups_.size());
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        pending.push_back((*popup).popup());
+    }
+    while (!pending.empty()) {
+        const Control::Ptr current = pending.back();
+        pending.pop_back();
+        if (!current || !(*current).is_alive() || (*current).window_ != this) continue;
+        if ((*current).runtime_id() == control) return current;
+        const std::span<const Control::Ptr> children = (*current).children();
+        for (std::size_t index = 0; index < children.size(); ++index) {
+            pending.push_back(children[index]);
+        }
+    }
+    return {};
+}
+
+bool Window::dispatch_virtual_semantic_action(std::string_view stable_id,
+                                              SemanticAction action,
+                                              std::string_view value,
+                                              const Control* owner) {
+    const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
+    if (dispatch_semantic_child_action(scoped ? scoped : root_, stable_id, action, value, owner)) {
+        return true;
+    }
+    ControlList popup_roots;
+    popup_roots.reserve(popups_.size());
+    for (const std::shared_ptr<gui_forms::detail::PopupAttachment>& popup : popups_) {
+        if (!scoped || contains_control(scoped, (*popup).owner())) { popup_roots.push_back((*popup).popup()); }
+    }
+    for (ControlList::reverse_iterator popup = popup_roots.rbegin();
+         popup != popup_roots.rend();
+         ++popup) {
+        if (dispatch_semantic_child_action(
+                *popup, stable_id, action, value, owner)) return true;
+    }
+    return false;
 }
 
 void Window::apply_subtree_dirty(Control& control, Dirty requested_dirty,
