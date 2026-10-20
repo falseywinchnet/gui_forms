@@ -156,7 +156,7 @@ default actions (96):
   breadcrumb_trail / button [tree-and-object-views root] Press: changed (a popup opened)
   breadcrumb_trail / group [tree-and-object-views gallery.tree.trail] accSelect(TAKEFOCUS): changed (focused)
   button / radio_button [tree-and-object-views gallery.tree.view-mode.item.0] Check: changed (checked)
-  correspondence_view / button [tree-and-object-views button.cpp.activate] Press: changed (the semantic tree changed; alone in a fresh window)
+  correspondence_view / button [tree-and-object-views button.cpp.activate] Press: changed (the semantic tree changed)
   correspondence_view / list [tree-and-object-views gallery.tree.ledger] accSelect(TAKEFOCUS): changed (focused)
   correspondence_view / list_item [tree-and-object-views button.cpp] Press: changed (the semantic tree changed)
   data_grid_view / button [tree-and-object-views gallery.tree.grid.column.name] Press: changed (the semantic tree changed)

@@ -3512,7 +3512,10 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_accessibility_msaa_gallery_tests PRIVATE
             gui_forms_gallery_model gui_forms_host_windows oleacc oleaut32 uuid)
         add_test(NAME gui_forms_windows_accessibility_msaa_gallery_tests COMMAND gui_forms_windows_accessibility_msaa_gallery_tests)
-        # Every page, then one fresh Gallery window per page of actions.
-        set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 300)
+        # Every page, then one fresh Gallery window per page of actions:
+        # about 10 s in a release tree, about 340 s in the sanitizer tree
+        # (measured 2026-10-20 on the owner's machine with other builds
+        # running), whose ctest budget is 900 s.
+        set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 900)
     endif()
 endif()

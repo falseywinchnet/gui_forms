@@ -80,7 +80,11 @@ mismatches; a node can count in more than one row):
 - Configuration: worker workspace `D:\gui_forms_w3` (`build.sh`: Ninja,
   Release, `cmake/llvm22.cmake`, Gallery, tests, HarfBuzz text, Windows host,
   Skia off).
-- Source: branch `claude/a-w1-msaa-client-test` on main `13d1c7e0`.
+- Source: branch `claude/a-w1-msaa-client-test`, first on main `13d1c7e0`;
+  rerun on 2026-10-20 after merging A-core (#200, on main `df0d5396`), which
+  is the run `msaa-run.txt` now holds. The counts are unchanged. One line
+  differs: the CorrespondenceView ledger entry's Press was seen on the first
+  try, where the 2026-10-19 run saw it only when it ran again alone.
 
 ## Commands
 
