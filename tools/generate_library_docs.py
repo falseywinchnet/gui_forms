@@ -106,9 +106,10 @@ LIBRARY_GROUPS: tuple[Group, ...] = (
           "management and binding events.",
           ("binding",)),
     Group("geometry-and-appearance", "Geometry and appearance",
-          "Geometry, colour and font value types, theme recipes, surface "
-          "materials and connected-control geometry.",
-          ("types", "theme", "surface_material", "connected_controls")),
+          "Geometry, colour and font value types, theme recipes, the theme "
+          "engine's primitives and deterministic kernels, surface materials "
+          "and connected-control geometry.",
+          ("types", "theme", "engine", "surface_material", "connected_controls")),
     Group("drawing", "Drawing",
           "The renderer-neutral drawing vocabulary: bitmaps, brushes, paths, "
           "painters, framebuffers and live surfaces.",
