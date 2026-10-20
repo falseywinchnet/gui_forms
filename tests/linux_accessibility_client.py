@@ -109,14 +109,19 @@ def missing_prerequisite() -> str | None:
     return None
 
 
-def run_in_session(arguments: list[str]) -> int:
-    """Re-executes this script inside a private session bus; returns its status."""
+def run_in_session(arguments: list[str], script: str | None = None) -> int:
+    """Re-executes `script` (by default this one) inside a private session bus.
+
+    Returns its exit status.
+    """
+    if script is None:
+        script = str(Path(__file__).resolve())
     environment: dict[str, str] = dict(os.environ)
     environment[SESSION_MARKER] = '1'
     # The fixture and the client must find the bus this script starts, not
     # an address inherited from a desktop session or a previous launcher.
     environment.pop('AT_SPI_BUS_ADDRESS', None)
-    command: list[str] = ['dbus-run-session', '--', sys.executable, str(Path(__file__).resolve())]
+    command: list[str] = ['dbus-run-session', '--', sys.executable, script]
     command.extend(arguments)
     completed: subprocess.CompletedProcess[bytes] = subprocess.run(command, env=environment, check=False)
     return completed.returncode
@@ -220,7 +225,7 @@ def action_index(atspi: ModuleType, node: object, name: str) -> int:
     count: int = atspi.Action.get_n_actions(node)
     index: int
     for index in range(count):
-        if atspi.Action.get_action_name(node, index) == name:
+        if atspi.Action.get_name(node, index) == name:
             return index
     return -1
 
