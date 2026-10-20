@@ -1015,9 +1015,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
         _node.states, SemanticState::protected_content);
 }
 // AppKit declares no constant for the tab-panel subrole; WebKit publishes
-// ARIA tab panels with this one.
+// ARIA tab panels with this one. A tab is a radio button with AppKit's
+// tab-button subrole, as NSTabView's tabs are.
 - (NSString*)accessibilitySubrole {
     if (_node.role == SemanticRole::tab_panel) return @"AXTabPanel";
+    if (_node.role == SemanticRole::tab) return NSAccessibilityTabButtonSubrole;
     return [super accessibilitySubrole];
 }
 // A tab list's orientation.
@@ -1058,6 +1060,11 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
             return @2;
         }
         return @(gui_forms::has_semantic_state(_node.states, SemanticState::checked));
+    }
+    // A tab publishes AppKit's radio-button value: 1 when it is the
+    // selected tab.
+    if (_node.role == SemanticRole::tab) {
+        return @(gui_forms::has_semantic_state(_node.states, SemanticState::selected));
     }
     if (_node.numeric_value) return @(*_node.numeric_value);
     return native_string(_node.value);

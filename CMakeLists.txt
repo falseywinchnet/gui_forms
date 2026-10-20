@@ -3180,6 +3180,20 @@ if(GUI_FORMS_BUILD_TESTS)
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_macos_activated_test.cmake)
         set_tests_properties(gui_forms_macos_message_dialog_key_tests PROPERTIES TIMEOUT 60)
 
+        # Stage A: the NSAccessibility tree of every stock control, read in
+        # process (no Accessibility permission needed).
+        add_executable(gui_forms_macos_accessibility_tests MACOSX_BUNDLE
+            tests/macos_accessibility_tests.mm
+            tests/support/stock_control_fixture.cpp)
+        target_compile_options(gui_forms_macos_accessibility_tests PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_tests PRIVATE
+            gui_forms_host_macos gui_forms_controls)
+        add_test(NAME gui_forms_macos_accessibility_tests
+                 COMMAND gui_forms_macos_accessibility_tests)
+        set_tests_properties(gui_forms_macos_accessibility_tests PROPERTIES TIMEOUT 60)
+
         add_executable(gui_forms_macos_multi_window_tests
             tests/macos_multi_window_tests.mm)
         target_compile_options(gui_forms_macos_multi_window_tests PRIVATE -fobjc-arc)
