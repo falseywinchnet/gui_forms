@@ -87,6 +87,15 @@ Each stage has a working brief in `planning/stages/<stage>/README.md` with
 the owner's reasons, the current code, the agreed approach, house-style
 points and open decisions. Read `planning/stages/README.md` first.
 
+Added by owner request, 2026-10-19: **Z, the owned zlib replacement**,
+starts with a document-only study and threat model. Its
+[brief](stages/Z-zlib/README.md) records the source audit, proposed phases and
+open decisions; phase 1 evidence is in `results/2026-10-19-zlib`. The owner
+has decided to remove WIC PNG decoding and use one owned zlib on every host.
+Library naming/location, PNG codec ownership and the FreeType compression
+route remain open. Each phase gets its own PR; implementation waits for the
+owner's review of the study. This addition does not change other stage gates.
+
 ## 3. Foundations
 
 ### A. Accessibility verified on every host
