@@ -294,6 +294,10 @@ Related types
 
    .. cpp:member:: std::size_t maximum_pending
 
+   .. cpp:member:: std::uint64_t teardown_refusals
+
+      Posts refused, already cancelled, because they reached a shut-down dispatcher while its window was being destroyed (counted in ``cancelled`` too).
+
    .. cpp:member:: bool accepting
 
    .. cpp:member:: bool wake_pending

@@ -639,6 +639,12 @@ void DockSite::on_capture_changed(const PointerCaptureChange& change) {
     Window* const host = attached_window();
     if (host == nullptr) return;
     static_cast<void>(capture_check_.cancel());
+    // The check waits a turn, in case the capture comes back at once. A
+    // window whose dispatcher no longer runs has no next turn: decide now.
+    if (!(*host).dispatcher_snapshot().accepting) {
+        check_capture_after_release();
+        return;
+    }
     capture_check_ = (*host).begin_invoke(shared_from_this(), CaptureCheck{weak_from_this()});
 }
 
