@@ -1821,6 +1821,49 @@ void Control::set_cursor(std::optional<CursorKind> cursor) {
     invalidate(Dirty::semantics);
 }
 
+void Control::set_classes(std::vector<std::string> classes) {
+    require_mutable();
+    std::vector<std::string> unique;
+    unique.reserve(classes.size());
+    for (std::string& name : classes) {
+        if (!valid_style_class_name(name)) {
+            throw std::invalid_argument("GUI.Forms style class names are lowercase letters, digits, '-' and '_'");
+        }
+        const bool repeated = std::find(unique.begin(), unique.end(), name) != unique.end();
+        if (!repeated) unique.push_back(std::move(name));
+    }
+    if (unique == classes_) return;
+    classes_ = std::move(unique);
+    invalidate(Dirty::style | Dirty::paint);
+}
+
+bool Control::add_class(std::string_view name) {
+    require_mutable();
+    if (!valid_style_class_name(name)) {
+        throw std::invalid_argument("GUI.Forms style class names are lowercase letters, digits, '-' and '_'");
+    }
+    if (has_class(name)) return false;
+    classes_.emplace_back(name);
+    invalidate(Dirty::style | Dirty::paint);
+    return true;
+}
+
+bool Control::remove_class(std::string_view name) {
+    require_mutable();
+    const std::vector<std::string>::iterator found = std::find(classes_.begin(), classes_.end(), name);
+    if (found == classes_.end()) return false;
+    classes_.erase(found);
+    invalidate(Dirty::style | Dirty::paint);
+    return true;
+}
+
+bool Control::has_class(std::string_view name) const noexcept {
+    for (const std::string& present : classes_) {
+        if (present == name) return true;
+    }
+    return false;
+}
+
 void Control::set_custom_cursor(CursorImagesPtr images, CursorKind fallback) {
     require_mutable();
     if (cursor_images_ == images && cursor_ == fallback) return;

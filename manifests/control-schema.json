@@ -15,6 +15,67 @@
     "semantic_actions": ["focus", "press", "select", "increment", "decrement", "expand", "collapse", "show_menu", "set_value", "close"],
     "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation"]
   },
+  "engine": {
+    "version": "0.1",
+    "cascade_levels": ["built_in", "theme_sheet", "class_rule", "stable_id_rule", "inline_style", "forced_high_contrast"],
+    "budgets": {"operations_per_device_pixel": 512, "animated_operations_per_frame": 4000000},
+    "primitives": [
+      {
+        "name": "bulge",
+        "introduced": "0.1",
+        "roles": ["face"],
+        "states_read": ["pressed", "active_tool"],
+        "cost": {"per_device_pixel": 320, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "amplitude", "kind": "number", "minimum": 0, "maximum": 1, "default": 1, "animated": true},
+          {"name": "exponent", "kind": "number", "minimum": 1, "maximum": 8, "default": 2.2, "animated": false},
+          {"name": "light_colour", "kind": "colour", "default": "#ffffffff", "animated": false},
+          {"name": "light_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.55, "animated": false},
+          {"name": "shade_colour", "kind": "colour", "default": "#375a96ff", "animated": false},
+          {"name": "shade_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.22, "animated": false},
+          {"name": "crown_colour", "kind": "colour", "default": "#ffffffff", "animated": false},
+          {"name": "crown_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.12, "animated": false},
+          {"name": "gold_light_colour", "kind": "colour", "default": "#fffae1ff", "animated": false},
+          {"name": "gold_light_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.7, "animated": false},
+          {"name": "gold_shade_colour", "kind": "colour", "default": "#be8219ff", "animated": false},
+          {"name": "gold_shade_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.3, "animated": false},
+          {"name": "gold_crown_colour", "kind": "colour", "default": "#ffd66eff", "animated": false},
+          {"name": "gold_crown_peak", "kind": "number", "minimum": 0, "maximum": 1, "default": 0.45, "animated": false}
+        ]
+      },
+      {
+        "name": "dithered_bulge",
+        "introduced": "0.1",
+        "roles": ["face"],
+        "states_read": ["pressed", "active_tool"],
+        "cost": {"per_device_pixel": 280, "fixed": 64, "preparation_per_device_pixel": 250},
+        "outsets": [0, 0, 0, 0],
+        "parameters": [
+          {"name": "amplitude", "kind": "number", "minimum": 0, "maximum": 1, "default": 1, "animated": true},
+          {"name": "exponent", "kind": "number", "minimum": 1, "maximum": 8, "default": 2.2, "animated": false},
+          {"name": "lit_1", "kind": "colour", "default": "#ecf4feff", "animated": false},
+          {"name": "lit_2", "kind": "colour", "default": "#f6faffff", "animated": false},
+          {"name": "lit_3", "kind": "colour", "default": "#ffffffff", "animated": false},
+          {"name": "shaded_1", "kind": "colour", "default": "#b0c6e8ff", "animated": false},
+          {"name": "shaded_2", "kind": "colour", "default": "#84a2d4ff", "animated": false},
+          {"name": "shaded_3", "kind": "colour", "default": "#587abaff", "animated": false},
+          {"name": "lit_gain", "kind": "number", "minimum": 0, "maximum": 4, "default": 1, "animated": false},
+          {"name": "shade_gain", "kind": "number", "minimum": 0, "maximum": 4, "default": 0.85, "animated": false},
+          {"name": "crown_gain", "kind": "number", "minimum": 0, "maximum": 4, "default": 0.25, "animated": false},
+          {"name": "gold_lit_1", "kind": "colour", "default": "#ffeab0ff", "animated": false},
+          {"name": "gold_lit_2", "kind": "colour", "default": "#fff4d4ff", "animated": false},
+          {"name": "gold_lit_3", "kind": "colour", "default": "#fffcf0ff", "animated": false},
+          {"name": "gold_body_1", "kind": "colour", "default": "#facd68ff", "animated": false},
+          {"name": "gold_body_2", "kind": "colour", "default": "#ffdc8cff", "animated": false},
+          {"name": "gold_body_3", "kind": "colour", "default": "#ffe8b2ff", "animated": false},
+          {"name": "gold_shaded_1", "kind": "colour", "default": "#e8ac3eff", "animated": false},
+          {"name": "gold_shaded_2", "kind": "colour", "default": "#ce8e28ff", "animated": false},
+          {"name": "gold_shaded_3", "kind": "colour", "default": "#aa7018ff", "animated": false}
+        ]
+      }
+    ]
+  },
   "types": [
     {
       "id": "button_base",

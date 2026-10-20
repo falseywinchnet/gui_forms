@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/surface_material.hpp"
 
 #include <array>
@@ -149,6 +150,18 @@ struct ControlRoleRecipes final {
     }
 };
 
+// The forced high-contrast pass (T2 plan, E4; design language 5.8):
+// `recipes` with its high_contrast and high_contrast_selected records
+// derived from its ordinary ones. GUI.Forms' own high-contrast mode keeps
+// each state's geometry and cues (corner radius, edge width, focus and
+// default rings, offsets) and rebuilds the material as one solid plate
+// inside one solid edge from a near-colourless palette by state, dropping
+// gradients, images, keylines, per-edge borders and shadows. Selected parts
+// take a white plate and black text inside their state's edge.
+// Theme::create applies it to every family, so authored high-contrast
+// records are replaced.
+[[nodiscard]] ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes);
+
 struct ThemeSpacingTokens final {
     double micro{2.0};
     double xsmall{4.0};
@@ -276,6 +289,11 @@ struct ThemeDefinition final {
     // default: high contrast draws no cast shadow, and the overlay's
     // high-contrast edge separates it from the content below.
     std::vector<MaterialShadow> high_contrast_overlay_shadow{};
+    // The theme's rules (the cascade, T2 E4): which primitive draws which
+    // part. Empty by default: every part keeps the built-in recipe. They are
+    // compiled when the theme is made; an invalid rule or declaration is
+    // dropped with a diagnostic (Theme::engine().rules().diagnostics()).
+    ThemeRuleSheet rules{};
     friend bool operator==(const ThemeDefinition& left,
                            const ThemeDefinition& right) noexcept(noexcept(
         left.id == right.id && left.compatibility == right.compatibility &&
@@ -285,7 +303,8 @@ struct ThemeDefinition final {
                left.roles == right.roles && left.structure == right.structure &&
                left.accent_ramp == right.accent_ramp &&
                left.overlay_shadow == right.overlay_shadow &&
-               left.high_contrast_overlay_shadow == right.high_contrast_overlay_shadow;
+               left.high_contrast_overlay_shadow == right.high_contrast_overlay_shadow &&
+               left.rules == right.rules;
     }
 };
 

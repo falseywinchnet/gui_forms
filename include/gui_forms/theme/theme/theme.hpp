@@ -46,8 +46,10 @@ public:
     [[nodiscard]] const ThemeEngine& engine() const noexcept { return engine_; }
 
 private:
+    // The engine compiles the definition's rules: a theme is made whole or
+    // not at all, so the theme it replaces stays in force until it exists.
     explicit Theme(ThemeDefinition definition)
-        : definition_(std::move(definition)) {}
+        : definition_(std::move(definition)), engine_(definition_.rules) {}
     ThemeDefinition definition_;
     ThemeEngine engine_;
 };
