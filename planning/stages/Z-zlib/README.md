@@ -538,6 +538,9 @@ sanitized corpus replay on Linux, macOS and Windows. This is a proposed
 minimum, not a safety proof. Record actual hours/execs/edges/features and
 source region/branch coverage; inspect unvisited parser/error branches and
 add targeted vectors. Phase 1 hours: **0**; coverage: **not measured**.
+The [source-locked sustained campaign](INFLATE_CAMPAIGN.md) now defines the
+initial x64/arm64 shard execution and accounting; planned hours are not completed
+hours and its scope does not replace the remaining corpus/API-sequence gates.
 
 Use the repository's pinned LLVM 22.1.8 and build helpers. Required targeted
 command once tests exist:
