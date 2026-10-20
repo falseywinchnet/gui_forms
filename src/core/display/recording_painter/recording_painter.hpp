@@ -58,6 +58,8 @@ public:
     void draw_image(ImageId image, Rect destination, double opacity) override;
     void draw_live_surface(std::shared_ptr<LiveSurface> surface,
                            Rect destination, double opacity) override;
+    void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
+                          double opacity) override;
     void draw_image_region(ImageId image, Rect source, Rect destination,
                            double opacity) override;
     void draw_image_region_sampled(ImageId image, Rect source,
