@@ -225,7 +225,7 @@ def action_index(atspi: ModuleType, node: object, name: str) -> int:
     count: int = atspi.Action.get_n_actions(node)
     index: int
     for index in range(count):
-        if atspi.Action.get_name(node, index) == name:
+        if atspi.Action.get_action_name(node, index) == name:
             return index
     return -1
 

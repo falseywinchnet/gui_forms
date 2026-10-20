@@ -427,7 +427,7 @@ class Comparer:
             names: list[str] = []
             index: int
             for index in range(count):
-                names.append(atspi.Action.get_name(obj, index))
+                names.append(atspi.Action.get_action_name(obj, index))
             if names != published_actions(node['actions']):
                 self.mismatch(where, 'actions ' + str(names) + ', expected ' + str(published_actions(node['actions'])))
         if 'Value' in interfaces:
@@ -732,7 +732,7 @@ def perform_default(atspi: ModuleType, glib: ModuleType, comparer: Comparer, fix
     names: list[str] = []
     index: int
     for index in range(atspi.Action.get_n_actions(obj)):
-        names.append(atspi.Action.get_name(obj, index))
+        names.append(atspi.Action.get_action_name(obj, index))
     performed: bool = atspi.Action.do_action(obj, 0)
     after: dict[str, Any] = fixture.report('supplement' if supplement else 'report')
     comparer.compare_tree(frame, after, target.page + ' after ' + names[0] + ' on ' + target.stable_id)
