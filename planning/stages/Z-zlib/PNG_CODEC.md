@@ -5,6 +5,11 @@ This advances phase 5b alongside the still-open inflate verification gate;
 it does not assert that phase 2's sustained fuzz gate passed. Separate stacked
 PR; production cutover remains phase 6.
 
+The owner named the eventual independent libraries `stx_zlib` and `stx_png`
+on 2026-10-20. `stx_vorbis` is the packaging and API precedent. The current
+`gui_forms::compression` and `gui_forms::image` seams are proving interfaces,
+not evidence that either standalone library or its production cutover exists.
+
 ## Contract reviewed before implementation
 
 The first implementation boundary is a private, lossless **sample decoder**.
