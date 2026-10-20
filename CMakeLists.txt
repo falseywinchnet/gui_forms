@@ -2242,6 +2242,9 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_page_set_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_page_set_tests COMMAND gui_forms_page_set_tests)
 
+    add_executable(gui_forms_engine_raster_cache_tests tests/engine_raster_cache_tests.cpp)
+    target_link_libraries(gui_forms_engine_raster_cache_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_raster_cache_tests COMMAND gui_forms_engine_raster_cache_tests)
     add_executable(gui_forms_engine_part_table_tests tests/engine_part_table_tests.cpp)
     target_link_libraries(gui_forms_engine_part_table_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_part_table_tests COMMAND gui_forms_engine_part_table_tests)
@@ -2961,6 +2964,11 @@ if(GUI_FORMS_BUILD_TESTS)
         # manifest (stage T1).
         set_tests_properties(gui_forms_gallery_pages_tests PROPERTIES ENVIRONMENT
             "GUI_FORMS_CONTROL_SCHEMA=${CMAKE_CURRENT_SOURCE_DIR}/manifests/control-schema.json")
+        # Every Gallery page's display commands against the table recorded
+        # before the theme engine (T2 E2). A process of its own, so that no
+        # other test makes a control first (see display_trace_tests.cpp).
+        add_test(NAME gui_forms_gallery_display_trace_tests
+                 COMMAND gui_forms_gallery_pages_tests --display-trace)
         # The policy script takes one comma-separated argument; a CMake list
         # would be split into separate COMMAND arguments.
         set(gui_forms_gallery_policy_files
