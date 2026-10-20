@@ -29,6 +29,11 @@ enum class PrimitiveParameterKind : std::uint8_t {
 
 // One declared parameter. A number must lie in [minimum, maximum]. A colour's
 // alpha scales whatever the primitive uses the colour for.
+//
+// An `animated` parameter is one a transition drives from frame to frame,
+// such as the bulge's amplitude during the ribbon's rise. A primitive's
+// preparation never reads it, so changing it never makes a preparation
+// stale (see PrimitivePreparation).
 struct PrimitiveParameterDeclaration final {
     std::string_view name;
     PrimitiveParameterKind kind{PrimitiveParameterKind::number};
@@ -36,14 +41,19 @@ struct PrimitiveParameterDeclaration final {
     double maximum{};
     double default_number{};
     Color default_colour{};
+    bool animated{};
 };
 
-// A declared upper bound on the work of one rasterization: at most
-// `per_device_pixel` arithmetic operations for each destination pixel, plus
-// `fixed` for the whole part. Budgets are checked against it at load (E4).
+// A declared upper bound on a primitive's work. One rasterization costs at
+// most `per_device_pixel` arithmetic operations for each destination pixel,
+// plus `fixed` for the whole part. One preparation costs at most
+// `preparation_per_device_pixel` for each device pixel of the part's box; it
+// runs once per part geometry, not once per frame. Budgets are checked
+// against these at load (E4).
 struct PrimitiveCost final {
     std::uint32_t per_device_pixel{};
     std::uint32_t fixed{};
+    std::uint32_t preparation_per_device_pixel{};
 };
 
 // What a primitive is. Every span refers to static storage owned by the
@@ -64,9 +74,13 @@ struct PrimitiveDescriptor final {
     // How far the primitive draws outside the part's bounds, in logical
     // units; zero for a primitive that stays inside them.
     Insets outsets{};
+    // How many values the primitive's preparation derives, at most
+    // maximum_prepared_values; zero for a primitive that derives none.
+    std::size_t prepared_values{};
 };
 
 inline constexpr std::size_t maximum_primitive_parameters = 24;
+inline constexpr std::size_t maximum_prepared_values = 4;
 
 // One parameter's value. `number` is read for a number parameter and
 // `colour` for a colour parameter.
@@ -139,6 +153,48 @@ struct PrimitiveTarget final {
     AnatomyStateSet states{};
 };
 
+class EnginePrimitive;
+
+// What a primitive derives once from a part's geometry and fixed
+// parameters, and reuses for every rasterization in which only animated
+// parameters change. The dithered bulge, for example, derives its tone's
+// full-amplitude extremes here, so that the rise does not recompute them
+// each frame.
+//
+// The caller owns a preparation and keeps it beside the part's raster (in
+// E2, the part's record in the window's EnginePartTable). It records what it
+// was derived from: the primitive, the part's logical size and scale, the
+// read states it saw, and every parameter value. A rasterization whose
+// primitive, size, scale, read states or non-animated parameters differ is
+// refused as stale; the caller prepares again. A preparation borrows
+// nothing: `primitive` is compared, never called through.
+struct PrimitivePreparation final {
+    // The primitive that derived the values; null until the first
+    // successful prepare().
+    const EnginePrimitive* primitive{};
+    Size logical_size{};
+    DeviceScale scale{};
+    // The target's states restricted to the descriptor's states_read.
+    AnatomyStateSet states_read{};
+    // The parameters as they were at preparation. Only non-animated values
+    // are compared.
+    PrimitiveParameterBlock parameters{};
+    // `count` live values, as many as the descriptor's prepared_values; what
+    // each means is the primitive's own business.
+    std::array<double, maximum_prepared_values> values{};
+    std::size_t count{};
+};
+
+enum class PreparationOutcome : std::uint8_t {
+    // The preparation now holds values for this primitive, target and
+    // parameters.
+    prepared,
+    // Nothing was changed: the size or scale is out of range.
+    invalid_target,
+    // Nothing was changed: the parameters do not match the declarations.
+    invalid_parameters,
+};
+
 enum class RasterOutcome : std::uint8_t {
     // Every pixel of the destination was written.
     painted,
@@ -150,29 +206,48 @@ enum class RasterOutcome : std::uint8_t {
     invalid_target,
     // Nothing was written: the parameters do not match the declarations.
     invalid_parameters,
+    // Nothing was written: the preparation was made by another primitive,
+    // or for another size, scale, read state or non-animated parameter.
+    stale_preparation,
 };
 
 // One kind of effect. A primitive is immutable and holds no per-part state:
-// one instance serves every part, on the UI thread.
+// one instance serves every part, on the UI thread. Per-part derived values
+// live in the caller's PrimitivePreparation.
 class EnginePrimitive {
 public:
     virtual ~EnginePrimitive() = default;
 
     [[nodiscard]] virtual const PrimitiveDescriptor& descriptor() const noexcept = 0;
 
-    // Validates the destination, the target and the parameters once, then
-    // fills every pixel of the destination with premultiplied RGBA8.
-    // Anything but `painted` leaves the destination's bytes unchanged.
+    // Validates the target and the parameters, then derives the
+    // preparation's values. Anything but `prepared` leaves `preparation`
+    // unchanged. Its cost is the descriptor's preparation_per_device_pixel
+    // for each device pixel of the part's box.
+    [[nodiscard]] PreparationOutcome prepare(const PrimitiveParameterBlock& parameters,
+                                             const PrimitiveTarget& target,
+                                             PrimitivePreparation& preparation) const noexcept;
+
+    // Validates the destination, the target, the parameters and the
+    // preparation once, then fills every pixel of the destination with
+    // premultiplied RGBA8. Anything but `painted` leaves the destination's
+    // bytes unchanged.
     [[nodiscard]] RasterOutcome rasterize(const PrimitiveParameterBlock& parameters,
                                           const PrimitiveTarget& target,
+                                          const PrimitivePreparation& preparation,
                                           const PartRasterView& destination) const noexcept;
 
 private:
-    // Called only with a validated, non-empty destination, a target whose
-    // size is positive and finite and whose scale is in range, and
-    // parameters that match the descriptor.
+    // Called only with a target whose size is positive and finite and whose
+    // scale is in range, and parameters that match the descriptor. Writes
+    // exactly the descriptor's prepared_values entries of `values`.
+    virtual void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
+                        std::span<double> values) const noexcept = 0;
+
+    // Called only with a validated, non-empty destination, a target and
+    // parameters as for derive(), and the values derive() gave for them.
     virtual void fill(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
-                      const PartRasterView& destination) const noexcept = 0;
+                      std::span<const double> prepared, const PartRasterView& destination) const noexcept = 0;
 };
 
 enum class RegistrationOutcome : std::uint8_t {
@@ -189,6 +264,7 @@ enum class RegistrationOutcome : std::uint8_t {
     parameter_range_invalid,
     default_out_of_range,
     introduced_after_engine,
+    too_many_prepared_values,
 };
 
 [[nodiscard]] const char* registration_outcome_name(RegistrationOutcome outcome) noexcept;

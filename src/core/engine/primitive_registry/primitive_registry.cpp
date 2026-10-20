@@ -59,6 +59,7 @@ RegistrationOutcome check_descriptor(const PrimitiveDescriptor& descriptor) noex
         if (static_cast<std::size_t>(state) >= anatomy_state_count) return RegistrationOutcome::state_out_of_range;
     }
     if (current_engine_version < descriptor.introduced) return RegistrationOutcome::introduced_after_engine;
+    if (descriptor.prepared_values > maximum_prepared_values) return RegistrationOutcome::too_many_prepared_values;
     const RegistrationOutcome parameters = check_parameters(descriptor);
     return parameters;
 }
@@ -76,6 +77,35 @@ PrimitiveRegistry make_builtin_registry() {
     // build, not a runtime condition.
     if (bulge != RegistrationOutcome::registered || dithered != RegistrationOutcome::registered) std::abort();
     return registry;
+}
+
+// The target's states that the descriptor declares it reads; a change to any
+// other state never makes a preparation stale.
+AnatomyStateSet read_states_of(const PrimitiveDescriptor& descriptor, const PrimitiveTarget& target) noexcept {
+    AnatomyStateSet read{};
+    for (const AnatomyState state : descriptor.states_read) {
+        if (target.states.contains(state)) read.insert(state);
+    }
+    return read;
+}
+
+// Whether `preparation` was derived by `primitive` for this target and these
+// parameters. Animated parameters are not compared. `parameters` has
+// already been validated against the descriptor.
+bool preparation_matches(const EnginePrimitive& primitive, const PrimitiveParameterBlock& parameters,
+                         const PrimitiveTarget& target, const PrimitivePreparation& preparation) noexcept {
+    const PrimitiveDescriptor& descriptor = primitive.descriptor();
+    if (preparation.primitive != &primitive) return false;
+    if (preparation.count != descriptor.prepared_values) return false;
+    if (!(preparation.logical_size == target.logical_size)) return false;
+    if (!(preparation.scale == target.scale)) return false;
+    if (!(preparation.states_read == read_states_of(descriptor, target))) return false;
+    if (preparation.parameters.count != parameters.count) return false;
+    for (std::size_t index = 0U; index < parameters.count; ++index) {
+        if (descriptor.parameters[index].animated) continue;
+        if (!(preparation.parameters.values[index] == parameters.values[index])) return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -135,14 +165,38 @@ ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const P
     return ParameterAssignment::assigned;
 }
 
+PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
+                                            PrimitivePreparation& preparation) const noexcept {
+    const PrimitiveDescriptor& described = descriptor();
+    if (!target_in_range(target)) return PreparationOutcome::invalid_target;
+    const ParameterValidation validation = validate_parameters(described, parameters);
+    if (validation.defect != ParameterDefect::none) return PreparationOutcome::invalid_parameters;
+    // Derive into a local record and publish it whole, so that the caller's
+    // preparation is never seen half written.
+    PrimitivePreparation prepared{};
+    prepared.primitive = this;
+    prepared.logical_size = target.logical_size;
+    prepared.scale = target.scale;
+    prepared.states_read = read_states_of(described, target);
+    prepared.parameters = parameters;
+    prepared.count = described.prepared_values;
+    const std::span<double> values(prepared.values.data(), prepared.count);
+    derive(parameters, target, values);
+    preparation = prepared;
+    return PreparationOutcome::prepared;
+}
+
 RasterOutcome EnginePrimitive::rasterize(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
+                                         const PrimitivePreparation& preparation,
                                          const PartRasterView& destination) const noexcept {
     if (validate_raster_view(destination) != RasterViewDefect::none) return RasterOutcome::invalid_view;
     if (!target_in_range(target)) return RasterOutcome::invalid_target;
     const ParameterValidation validation = validate_parameters(descriptor(), parameters);
     if (validation.defect != ParameterDefect::none) return RasterOutcome::invalid_parameters;
+    if (!preparation_matches(*this, parameters, target, preparation)) return RasterOutcome::stale_preparation;
     if (destination.extent.width == 0U || destination.extent.height == 0U) return RasterOutcome::empty;
-    fill(parameters, target, destination);
+    const std::span<const double> prepared(preparation.values.data(), preparation.count);
+    fill(parameters, target, prepared, destination);
     return RasterOutcome::painted;
 }
 
@@ -161,6 +215,7 @@ const char* registration_outcome_name(RegistrationOutcome outcome) noexcept {
     case RegistrationOutcome::parameter_range_invalid: return "parameter_range_invalid";
     case RegistrationOutcome::default_out_of_range: return "default_out_of_range";
     case RegistrationOutcome::introduced_after_engine: return "introduced_after_engine";
+    case RegistrationOutcome::too_many_prepared_values: return "too_many_prepared_values";
     }
     return "unknown";
 }
