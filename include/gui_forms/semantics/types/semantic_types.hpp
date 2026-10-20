@@ -146,6 +146,13 @@ struct SemanticSnapshot final {
 // 64-bit FNV-1a-style hash of the ID's bytes with the top bit set, so it
 // never meets a control's own runtime ID (those count up from 1). The same
 // stable ID always gives the same runtime ID, on every host.
+// A virtual child the control publishes with runtime ID zero is given this
+// one when the window assembles its snapshot, so no node below the window
+// has runtime ID zero.
 [[nodiscard]] std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept;
+
+// True for a runtime ID virtual_semantic_runtime_id gives (its top bit is
+// set), false for a control's own runtime ID and for zero.
+[[nodiscard]] bool is_virtual_semantic_runtime_id(std::uint64_t runtime_id) noexcept;
 
 } // namespace gui_forms

@@ -1106,6 +1106,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     add_library(gui_forms_host_windows STATIC
         src/host/windows/application/windows_host.cpp
         src/host/windows/accessibility/windows_accessibility.cpp
+        src/host/windows/accessibility/windows_semantic_source.cpp
         src/host/windows/services/windows_clipboard_image.cpp
         src/host/windows/services/windows_notify_icons.cpp
         src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2011,6 +2012,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 tests/windows_dib_lifecycle_tests.cpp
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
+                src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2030,6 +2032,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 tests/windows_tooltip_tests.cpp
                 src/host/windows/application/windows_host.cpp
                 src/host/windows/accessibility/windows_accessibility.cpp
+                src/host/windows/accessibility/windows_semantic_source.cpp
                 src/host/windows/services/windows_clipboard_image.cpp
                 src/host/windows/services/windows_notify_icons.cpp
                 src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -2050,6 +2053,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     tests/windows_prepared_text_tests.cpp
                     src/host/windows/application/windows_host.cpp
                     src/host/windows/accessibility/windows_accessibility.cpp
+                    src/host/windows/accessibility/windows_semantic_source.cpp
                     src/host/windows/services/windows_clipboard_image.cpp
                     src/host/windows/services/windows_notify_icons.cpp
                     src/host/windows/paint_endpoint/windows_compatibility_paint_endpoint.cpp
@@ -3433,4 +3437,16 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_windows_accessibility_tests tests/windows_accessibility_tests.cpp)
     target_link_libraries(gui_forms_windows_accessibility_tests PRIVATE GUIForms::Application oleacc oleaut32 uuid)
     add_test(NAME gui_forms_windows_accessibility_tests COMMAND gui_forms_windows_accessibility_tests)
+    # Stage A, A-W1: an MSAA client enumerates every Gallery page in a real
+    # Win32 window and performs each control's default action.
+    if(TARGET gui_forms_gallery_model)
+        add_executable(gui_forms_windows_accessibility_msaa_gallery_tests tests/windows_accessibility_msaa_gallery_tests.cpp)
+        target_compile_definitions(gui_forms_windows_accessibility_msaa_gallery_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_accessibility_msaa_gallery_tests PRIVATE
+            gui_forms_gallery_model gui_forms_host_windows oleacc oleaut32 uuid)
+        add_test(NAME gui_forms_windows_accessibility_msaa_gallery_tests COMMAND gui_forms_windows_accessibility_msaa_gallery_tests)
+        # Every page, then one fresh Gallery window per page of actions.
+        set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 300)
+    endif()
 endif()

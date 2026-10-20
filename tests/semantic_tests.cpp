@@ -1,4 +1,6 @@
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/collection_controls.hpp"
+#include "gui_forms/container_controls.hpp"
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
@@ -292,6 +294,46 @@ void test_virtual_runtime_ids_are_unchanged() {
                 virtual_semantic_runtime_id("site.stack.3") == 0xe9a74df8c42ada75ULL &&
                 virtual_semantic_runtime_id("café") == 0x8385b6459d53dff7ULL,
             "the virtual runtime IDs keep their recorded values");
+    require(is_virtual_semantic_runtime_id(virtual_semantic_runtime_id("a")) &&
+                !is_virtual_semantic_runtime_id(1U) && !is_virtual_semantic_runtime_id(0U),
+            "a virtual runtime ID is told from a control's and from zero");
+}
+
+// Two trees showing one model publish items with the same stable IDs, as
+// the Gallery's tree and tree list do. A scoped action reaches the named
+// tree's item; an unscoped one reaches the first tree in tree order.
+void test_scoped_semantic_actions_reach_their_owner() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("scoped.root"));
+    std::shared_ptr<TreeView> left = make_control<TreeView>(StableId("scoped.left"));
+    std::shared_ptr<TreeView> right = make_control<TreeView>(StableId("scoped.right"));
+    std::vector<TreeViewItem> items;
+    items.push_back(TreeViewItem{"src", "src", 0U, false, false, true, {}});
+    items.push_back(TreeViewItem{"docs", "docs", 0U, false, false, true, {}});
+    (*left).set_items(items);
+    (*right).set_items(items);
+    (*left).set_requested_bounds({10.0, 10.0, 180.0, 120.0});
+    (*right).set_requested_bounds({210.0, 10.0, 180.0, 120.0});
+    (*root).add_child(left);
+    (*root).add_child(right);
+    Window window(root, {420.0, 160.0});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* left_node = find_node(snapshot.roots, "scoped.left");
+    const SemanticNode* right_node = find_node(snapshot.roots, "scoped.right");
+    require(left_node != nullptr && right_node != nullptr &&
+                find_node((*left_node).children, "docs") != nullptr &&
+                find_node((*right_node).children, "docs") != nullptr,
+            "both trees publish an item docs");
+    require(window.perform_scoped_semantic_action("scoped.right", "docs", SemanticAction::select) &&
+                (*right).selected_id() == "docs" && (*left).selected_id() != "docs",
+            "a scoped action reaches the named tree's item");
+    require(window.perform_semantic_action("docs", SemanticAction::select) &&
+                (*left).selected_id() == "docs",
+            "an unscoped action reaches the first tree's item");
+    require(!window.perform_scoped_semantic_action("scoped.missing", "src", SemanticAction::select),
+            "an unknown scope refuses the action");
+    require(window.perform_scoped_semantic_action("scoped.left", "scoped.left", SemanticAction::focus) &&
+                window.focused_control() == left,
+            "a scope equal to the node's own stable ID acts on the control itself");
 }
 
 } // namespace
@@ -299,6 +341,7 @@ void test_virtual_runtime_ids_are_unchanged() {
 int main() {
     try {
         test_virtual_runtime_ids_are_unchanged();
+        test_scoped_semantic_actions_reach_their_owner();
         test_modal_semantic_scope();
         test_subtree_visibility_advances_semantic_generation();
         test_snapshot_roles_states_hierarchy_and_json();

@@ -1,7 +1,10 @@
 # Stage A: accessibility verified on every host
 
 Release: 0.2 Verified. Depends on: nothing. Runs beside every other stage.
-Status 2026-10-12: not started. Authority: `planning/FORWARD_PROGRAMME.md`
+Status 2026-10-19: started. Windows: the MSAA client test enumerates the
+whole Gallery and performs every control's default action (A-W1,
+`results/2026-10-19-a-w1-msaa-gallery`); the UI Automation provider (A-W2)
+and its client test (A-W3) are next. macOS and Linux not started. Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -42,7 +45,9 @@ is never turned off (accessibility round A3).
 - **Windows.** MSAA (`IAccessible`) in
   `src/host/windows/accessibility/windows_accessibility.cpp`. Test
   `tests/windows_accessibility_tests.cpp`, registered in `CMakeLists.txt` as
-  `gui_forms_windows_accessibility_tests`. There is no UI Automation provider.
+  `gui_forms_windows_accessibility_tests`; since A-W1 also the Gallery-wide
+  client test `tests/windows_accessibility_msaa_gallery_tests.cpp`. There is
+  no UI Automation provider yet.
 - **Linux.** ATK/AT-SPI in `src/host/linux/accessibility/`. A fixture
   (`tests/linux_accessibility_fixture.cpp`, built when ATK and X11 are found)
   and a Python AT-SPI client (`tests/linux_accessibility_client.py`) exist

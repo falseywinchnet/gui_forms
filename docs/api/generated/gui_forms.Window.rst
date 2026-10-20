@@ -376,6 +376,8 @@ gui_forms::Window
         - Builds the semantic tree that assistive technology and automation see: roles, names, values, states and bounds, keyed by stable ID.
       * - :cpp:func:`perform_semantic_action <gui_forms::Window::perform_semantic_action>`
         - Performs an automation action, such as focus or press, on the control with a stable ID, and returns whether it was performed.
+      * - :cpp:func:`perform_scoped_semantic_action <gui_forms::Window::perform_scoped_semantic_action>`
+        - As perform_semantic_action, for a node inside one control: a virtual item is looked for only in that control, since two controls' items may share a stable ID.
       * - :cpp:func:`set_text_scale <gui_forms::Window::set_text_scale>`
         -  
       * - :cpp:func:`set_framebuffer_painter <gui_forms::Window::set_framebuffer_painter>`
@@ -1139,6 +1141,12 @@ gui_forms::Window
 
       Performs an automation action, such as focus or press, on the control
       with a stable ID, and returns whether it was performed.
+
+   .. cpp:function:: bool perform_scoped_semantic_action(std::string_view scope_stable_id, std::string_view stable_id, SemanticAction action, std::string_view value = {})
+
+      As perform_semantic_action, for a node inside one control: a virtual
+      item is looked for only in that control, since two controls' items may
+      share a stable ID.
 
    .. cpp:function:: void set_text_scale(double text_scale)
 

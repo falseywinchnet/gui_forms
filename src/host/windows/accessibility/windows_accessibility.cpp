@@ -1,342 +1,746 @@
 #include "windows_accessibility.hpp"
+
+#include "windows_semantic_source.hpp"
+
 #include <oleacc.h>
-#include <algorithm>
+
 #include <atomic>
+#include <climits>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <new>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
+// MSAA publication (stage A).
+//
+// Objects: one MsaaElement per object a client asks for. Each names its
+// node by SemanticElementId and reads a fresh snapshot for every call, so a
+// client never sees a tree older than the call, and an object whose node has
+// gone answers CO_E_OBJNOTCONNECTED. Children are full objects (get_accChild
+// returns an IDispatch); a positive child ID in a VARIANT also reaches child
+// `id` of the object, for clients that use simple-element addressing.
+//
+// Ownership: an element holds a shared reference to its window's
+// SemanticSource and nothing else; COM reference counting (atomic, as COM
+// requires) ends its life. The source observes the window and is cleared
+// when the window goes.
+//
+// Errors: E_POINTER for a null out-parameter; E_INVALIDARG for a VARIANT
+// that is not VT_I4 or names no child; CO_E_OBJNOTCONNECTED when the object's
+// node is no longer in the tree; DISP_E_MEMBERNOTFOUND when the node has no
+// default action or takes no value; E_FAIL when the control refuses an
+// action; S_FALSE with an empty result for a property the node does not
+// have.
+
 namespace gui_forms::host {
+
 namespace {
-const SemanticNode* find_node(const SemanticNode& node, std::uint64_t id) {
-    if (node.runtime_id == id) { return &node; }
-    for (const SemanticNode& child : node.children) {
-        const SemanticNode* found = find_node(child, id);
-        if (found) { return found; }
-    }
-    return nullptr;
-}
-const SemanticNode* parent_node(const SemanticNode& node, std::uint64_t id) {
-    for (const SemanticNode& child : node.children) {
-        if (child.runtime_id == id) { return &node; }
-        const SemanticNode* found = parent_node(child, id);
-        if (found) { return found; }
-    }
-    return nullptr;
-}
-const SemanticNode* state_node(const SemanticNode& node, SemanticState state) {
-    if (has_semantic_state(node.states, state)) { return &node; }
-    for (const SemanticNode& child : node.children) {
-        const SemanticNode* found = state_node(child, state);
-        if (found) { return found; }
-    }
-    return nullptr;
-}
-const SemanticNode* hit_node(const SemanticNode& node, double x, double y) {
-    for (std::size_t i = node.children.size(); i > 0; --i) {
-        const SemanticNode* hit = hit_node(node.children[i - 1], x, y);
-        if (hit) { return hit; }
-    }
-    if (has_semantic_state(node.states, SemanticState::visible) && x >= node.bounds.x &&
-        y >= node.bounds.y && x < node.bounds.x + node.bounds.width && y < node.bounds.y + node.bounds.height) { return &node; }
-    return nullptr;
-}
-HRESULT bstr(std::string_view value, BSTR* result) noexcept {
-    if (!result) { return E_POINTER; }
+
+// The longest text a client may set through put_accValue, in UTF-16 code
+// units.
+constexpr UINT maximum_value_length = 1024U * 1024U;
+
+HRESULT utf8_to_bstr(std::string_view value, BSTR* result) noexcept {
     *result = nullptr;
-    if (value.empty()) { return S_FALSE; }
-    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
-    if (count <= 0) { return E_FAIL; }
-    *result = SysAllocStringLen(nullptr, count);
-    if (!*result) { return E_OUTOFMEMORY; }
-    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), *result, count);
+    if (value.empty()) return S_FALSE;
+    if (value.size() > static_cast<std::size_t>(INT_MAX)) return E_FAIL;
+    const int size = static_cast<int>(value.size());
+    const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size,
+                                          nullptr, 0);
+    if (count <= 0) return E_FAIL;
+    BSTR text = SysAllocStringLen(nullptr, static_cast<UINT>(count));
+    if (text == nullptr) return E_OUTOFMEMORY;
+    MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), size, text, count);
+    *result = text;
     return S_OK;
 }
-LONG role(SemanticRole value) noexcept {
-    switch (value) {
+
+// Converts a client's text to UTF-8. Returns false for text longer than
+// maximum_value_length or not valid UTF-16, leaving `text` empty.
+bool utf8_from_bstr(BSTR value, std::string& text) {
+    text.clear();
+    if (value == nullptr) return true;
+    const UINT length = SysStringLen(value);
+    if (length == 0U) return true;
+    if (length > maximum_value_length) return false;
+    const int units = static_cast<int>(length);
+    const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, units, nullptr, 0,
+                                         nullptr, nullptr);
+    if (size <= 0) return false;
+    text.resize(static_cast<std::size_t>(size));
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, units, text.data(), size, nullptr,
+                        nullptr);
+    return true;
+}
+
+bool has_action(const SemanticNode& node, SemanticAction action) noexcept {
+    for (const SemanticAction published : node.actions) {
+        if (published == action) return true;
+    }
+    return false;
+}
+
+bool button_role(SemanticRole role) noexcept {
+    const bool button = role == SemanticRole::button || role == SemanticRole::split_button ||
+                        role == SemanticRole::menu_button;
+    return button;
+}
+
+bool check_role(SemanticRole role) noexcept {
+    const bool check = role == SemanticRole::check_box || role == SemanticRole::check_list_item;
+    return check;
+}
+
+LONG msaa_role(SemanticRole role) noexcept {
+    switch (role) {
+    case SemanticRole::generic: return ROLE_SYSTEM_GROUPING;
+    case SemanticRole::group: return ROLE_SYSTEM_GROUPING;
+    case SemanticRole::static_text: return ROLE_SYSTEM_STATICTEXT;
     case SemanticRole::button: return ROLE_SYSTEM_PUSHBUTTON;
-    case SemanticRole::check_box: case SemanticRole::check_list_item: return ROLE_SYSTEM_CHECKBUTTON;
+    case SemanticRole::check_box: return ROLE_SYSTEM_CHECKBUTTON;
     case SemanticRole::radio_button: return ROLE_SYSTEM_RADIOBUTTON;
-    case SemanticRole::toolbar: return ROLE_SYSTEM_TOOLBAR;
-    case SemanticRole::radio_group: return ROLE_SYSTEM_GROUPING;
+    case SemanticRole::link: return ROLE_SYSTEM_LINK;
     case SemanticRole::text_box: return ROLE_SYSTEM_TEXT;
-    case SemanticRole::numeric_field: return ROLE_SYSTEM_SPINBUTTON;
-    case SemanticRole::combo_box: return ROLE_SYSTEM_COMBOBOX;
-    case SemanticRole::slider: return ROLE_SYSTEM_SLIDER;
     case SemanticRole::list: return ROLE_SYSTEM_LIST;
     case SemanticRole::list_item: return ROLE_SYSTEM_LISTITEM;
-    case SemanticRole::tab_group: return ROLE_SYSTEM_PAGETABLIST;
-    case SemanticRole::tab: return ROLE_SYSTEM_PAGETAB;
-    case SemanticRole::menu_bar: return ROLE_SYSTEM_MENUBAR;
-    case SemanticRole::menu: return ROLE_SYSTEM_MENUPOPUP;
-    case SemanticRole::menu_bar_item: case SemanticRole::menu_item: return ROLE_SYSTEM_MENUITEM;
-    case SemanticRole::static_text: return ROLE_SYSTEM_STATICTEXT;
-    case SemanticRole::image: return ROLE_SYSTEM_GRAPHIC;
+    case SemanticRole::check_list_item: return ROLE_SYSTEM_CHECKBUTTON;
+    case SemanticRole::combo_box: return ROLE_SYSTEM_COMBOBOX;
+    case SemanticRole::slider: return ROLE_SYSTEM_SLIDER;
     case SemanticRole::scroll_bar: return ROLE_SYSTEM_SCROLLBAR;
     case SemanticRole::progress_bar: return ROLE_SYSTEM_PROGRESSBAR;
-    case SemanticRole::link: return ROLE_SYSTEM_LINK;
+    case SemanticRole::image: return ROLE_SYSTEM_GRAPHIC;
+    case SemanticRole::tab_group: return ROLE_SYSTEM_PAGETABLIST;
+    case SemanticRole::tab: return ROLE_SYSTEM_PAGETAB;
+    // A split container is a pane holding two panes.
+    case SemanticRole::split_pane: return ROLE_SYSTEM_PANE;
+    case SemanticRole::numeric_field: return ROLE_SYSTEM_SPINBUTTON;
     case SemanticRole::tool_tip: return ROLE_SYSTEM_TOOLTIP;
+    // A date field with a drop-down calendar, as a Win32 date picker is.
+    case SemanticRole::date_picker: return ROLE_SYSTEM_DROPLIST;
+    // A month calendar is a table of day cells.
+    case SemanticRole::calendar: return ROLE_SYSTEM_TABLE;
+    case SemanticRole::date_cell: return ROLE_SYSTEM_CELL;
+    // A property grid is a table of property rows grouped by category.
+    case SemanticRole::property_grid: return ROLE_SYSTEM_TABLE;
+    case SemanticRole::property_group: return ROLE_SYSTEM_GROUPING;
+    case SemanticRole::property_row: return ROLE_SYSTEM_ROW;
+    case SemanticRole::menu_bar: return ROLE_SYSTEM_MENUBAR;
+    case SemanticRole::menu_bar_item: return ROLE_SYSTEM_MENUITEM;
+    case SemanticRole::menu: return ROLE_SYSTEM_MENUPOPUP;
+    case SemanticRole::menu_item: return ROLE_SYSTEM_MENUITEM;
     case SemanticRole::separator: return ROLE_SYSTEM_SEPARATOR;
+    case SemanticRole::toolbar: return ROLE_SYSTEM_TOOLBAR;
+    case SemanticRole::radio_group: return ROLE_SYSTEM_GROUPING;
     case SemanticRole::split_button: return ROLE_SYSTEM_SPLITBUTTON;
     case SemanticRole::menu_button: return ROLE_SYSTEM_BUTTONMENU;
     // A tab's content is MSAA's property page, as a Win32 tab dialog's page
     // is. MSAA has no relation, orientation or second action: the
     // tab-to-panel relation, a tab list's orientation and the close action
-    // wait for UIA (stage A); a node's default action stays its press,
-    // select or expand.
+    // are published through UI Automation.
     case SemanticRole::pane: return ROLE_SYSTEM_PANE;
     case SemanticRole::tab_panel: return ROLE_SYSTEM_PROPERTYPAGE;
-    default: return ROLE_SYSTEM_GROUPING;
+    case SemanticRole::count: return ROLE_SYSTEM_GROUPING;
     }
+    return ROLE_SYSTEM_GROUPING;
 }
-SemanticAction default_action(const SemanticNode& node) noexcept {
-    for (SemanticAction action : {SemanticAction::press, SemanticAction::show_menu, SemanticAction::select,
-                                  SemanticAction::expand, SemanticAction::focus}) {
-        if (std::find(node.actions.begin(), node.actions.end(), action) != node.actions.end()) { return action; }
+
+LONG msaa_state(const SemanticNode& node) noexcept {
+    const SemanticState states = node.states;
+    LONG bits = 0;
+    if (!has_semantic_state(states, SemanticState::enabled)) bits |= STATE_SYSTEM_UNAVAILABLE;
+    if (!has_semantic_state(states, SemanticState::visible)) bits |= STATE_SYSTEM_INVISIBLE;
+    if (has_semantic_state(states, SemanticState::focused)) bits |= STATE_SYSTEM_FOCUSED;
+    if (has_semantic_state(states, SemanticState::focusable)) bits |= STATE_SYSTEM_FOCUSABLE;
+    // A toggle button (a button with checked) is pressed, as a Win32
+    // push-like check box is; every other checked node is checked.
+    if (has_semantic_state(states, SemanticState::checked)) {
+        bits |= button_role(node.role) ? STATE_SYSTEM_PRESSED : STATE_SYSTEM_CHECKED;
     }
-    return SemanticAction::focus;
+    if (has_semantic_state(states, SemanticState::mixed)) bits |= STATE_SYSTEM_MIXED;
+    if (has_semantic_state(states, SemanticState::selected)) bits |= STATE_SYSTEM_SELECTED;
+    if (has_action(node, SemanticAction::select)) bits |= STATE_SYSTEM_SELECTABLE;
+    if (has_semantic_state(states, SemanticState::read_only)) bits |= STATE_SYSTEM_READONLY;
+    // A node that can expand and is not expanded is collapsed.
+    if (has_semantic_state(states, SemanticState::expanded)) {
+        bits |= STATE_SYSTEM_EXPANDED;
+    } else if (has_action(node, SemanticAction::expand)) {
+        bits |= STATE_SYSTEM_COLLAPSED;
+    }
+    if (has_semantic_state(states, SemanticState::protected_content)) bits |= STATE_SYSTEM_PROTECTED;
+    if (has_semantic_state(states, SemanticState::busy)) bits |= STATE_SYSTEM_BUSY;
+    // MSAA has a has-popup state but no position-in-set field; UI
+    // Automation carries PositionInSet and SizeOfSet. It has no invalid
+    // state either.
+    if (node.has_popup) bits |= STATE_SYSTEM_HASPOPUP;
+    if (node.role == SemanticRole::link) bits |= STATE_SYSTEM_LINKED;
+    return bits;
 }
+
+// A node's MSAA default action: the first of press, show menu and select it
+// publishes, else expand or collapse by its expanded state. Focus is not a
+// default action; a client reaches it through accSelect.
+std::optional<SemanticAction> default_action(const SemanticNode& node) noexcept {
+    if (has_action(node, SemanticAction::press)) return SemanticAction::press;
+    if (has_action(node, SemanticAction::show_menu)) return SemanticAction::show_menu;
+    if (has_action(node, SemanticAction::select)) return SemanticAction::select;
+    const bool expanded = has_semantic_state(node.states, SemanticState::expanded);
+    if (expanded && has_action(node, SemanticAction::collapse)) return SemanticAction::collapse;
+    if (!expanded && has_action(node, SemanticAction::expand)) return SemanticAction::expand;
+    return std::nullopt;
 }
-struct WindowsAccessibility::State {
-    HWND hwnd = nullptr;
-    Window* model = nullptr;
-    double scale = 1;
-    std::uint64_t generation = 0, focus = 0;
-    bool observed = false;
-    bool snapshot(SemanticNode& root) noexcept {
-        if (!model || !hwnd) { return false; }
-        try {
-            SemanticSnapshot tree = (*model).semantic_snapshot();
-            root.runtime_id = 0;
-            root.role = SemanticRole::group;
-            root.children = std::move(tree.roots);
-            root.states = SemanticState::enabled | SemanticState::visible;
-            wchar_t title[1024]{}; GetWindowTextW(hwnd, title, 1024);
-            char utf8[4096]{}; WideCharToMultiByte(CP_UTF8, 0, title, -1, utf8, 4096, nullptr, nullptr);
-            root.name = utf8;
-            RECT bounds{}; GetClientRect(hwnd, &bounds);
-            root.bounds = {0, 0, bounds.right / scale, bounds.bottom / scale};
-            return true;
-        } catch (...) { return false; }
+
+// The verb a client reads for the default action: the words the Win32
+// control proxies use. Null when the node has none.
+const wchar_t* default_action_verb(const SemanticNode& node) noexcept {
+    const std::optional<SemanticAction> action = default_action(node);
+    if (!action) return nullptr;
+    switch (*action) {
+    case SemanticAction::press: {
+        const bool opens = node.has_popup &&
+                           (node.role == SemanticRole::menu_item ||
+                            node.role == SemanticRole::menu_bar_item ||
+                            node.role == SemanticRole::menu_button);
+        if (opens) return L"Open";
+        if (check_role(node.role)) {
+            const bool checked = has_semantic_state(node.states, SemanticState::checked);
+            return checked ? L"Uncheck" : L"Check";
+        }
+        if (node.role == SemanticRole::radio_button) return L"Check";
+        if (node.role == SemanticRole::link) return L"Jump";
+        if (node.role == SemanticRole::menu_item) return L"Execute";
+        return L"Press";
     }
-    bool perform(const SemanticNode& node, SemanticAction action, BSTR value = nullptr) noexcept {
-        if (!model || node.runtime_id == 0) { return false; }
-        try {
-            std::string text;
-            if (value) {
-                const UINT length = SysStringLen(value);
-                if (length > 1024 * 1024) { return false; }
-                const int size = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, length, nullptr, 0, nullptr, nullptr);
-                if (size == 0 && length != 0) { return false; }
-                text.resize(size);
-                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value, length, text.data(), size, nullptr, nullptr);
-            }
-            if (action == SemanticAction::focus) { SetFocus(hwnd); }
-            const bool handled = (*model).perform_semantic_action(node.stable_id, action, text);
-            if (handled) { NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, hwnd, OBJID_CLIENT, CHILDID_SELF); }
-            return handled;
-        } catch (...) { return false; }
+    case SemanticAction::show_menu: return L"Open";
+    case SemanticAction::select: return L"Select";
+    case SemanticAction::expand: return L"Expand";
+    case SemanticAction::collapse: return L"Collapse";
+    case SemanticAction::focus:
+    case SemanticAction::increment:
+    case SemanticAction::decrement:
+    case SemanticAction::set_value:
+    case SemanticAction::close:
+    case SemanticAction::count:
+        return nullptr;
     }
+    return nullptr;
+}
+
+bool contains_point(const SemanticNode& node, double x, double y) noexcept {
+    const Rect bounds = node.bounds;
+    const bool inside = x >= bounds.x && y >= bounds.y && x < bounds.x + bounds.width &&
+                        y < bounds.y + bounds.height;
+    return inside;
+}
+
+// The deepest visible node at (x, y), in logical window coordinates, at or
+// below `at`; later children are above earlier ones.
+bool hit_location(const SemanticLocation& at, double x, double y, SemanticLocation& hit) noexcept {
+    const std::size_t count = (*at.node).children.size();
+    for (std::size_t index = count; index > 0U; --index) {
+        const SemanticLocation child = child_location(at, index - 1U);
+        if (hit_location(child, x, y, hit)) return true;
+    }
+    const bool visible = has_semantic_state((*at.node).states, SemanticState::visible);
+    if (visible && contains_point(*at.node, x, y)) {
+        hit = at;
+        return true;
+    }
+    return false;
+}
+
+// The first node at or below `at`, in tree order, with `state`.
+bool state_location(const SemanticLocation& at, SemanticState state,
+                    SemanticLocation& found) noexcept {
+    if (has_semantic_state((*at.node).states, state)) {
+        found = at;
+        return true;
+    }
+    const std::size_t count = (*at.node).children.size();
+    for (std::size_t index = 0; index < count; ++index) {
+        const SemanticLocation child = child_location(at, index);
+        if (state_location(child, state, found)) return true;
+    }
+    return false;
+}
+
+// Which text property a text getter reads.
+enum class TextProperty : std::uint8_t { name, value, description };
+
+class MsaaElement final : public IAccessible {
+public:
+    MsaaElement(std::shared_ptr<SemanticSource> source, SemanticElementId id) noexcept
+        : source_(std::move(source)), id_(id) {}
+    MsaaElement(const MsaaElement&) = delete;
+    MsaaElement& operator=(const MsaaElement&) = delete;
+
+    // IUnknown and IDispatch. The dispatch interface carries no type
+    // information: clients call IAccessible directly.
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override;
+    ULONG STDMETHODCALLTYPE AddRef() override;
+    ULONG STDMETHODCALLTYPE Release() override;
+    HRESULT STDMETHODCALLTYPE GetTypeInfoCount(UINT* out) override;
+    HRESULT STDMETHODCALLTYPE GetTypeInfo(UINT, LCID, ITypeInfo** out) override;
+    HRESULT STDMETHODCALLTYPE GetIDsOfNames(REFIID, LPOLESTR*, UINT, LCID, DISPID*) override;
+    HRESULT STDMETHODCALLTYPE Invoke(DISPID, REFIID, LCID, WORD, DISPPARAMS*, VARIANT*,
+                                     EXCEPINFO*, UINT*) override;
+
+    // IAccessible.
+    HRESULT STDMETHODCALLTYPE get_accParent(IDispatch** out) override;
+    HRESULT STDMETHODCALLTYPE get_accChildCount(LONG* out) override;
+    HRESULT STDMETHODCALLTYPE get_accChild(VARIANT child, IDispatch** out) override;
+    HRESULT STDMETHODCALLTYPE get_accName(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE get_accValue(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE get_accDescription(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE get_accRole(VARIANT child, VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE get_accState(VARIANT child, VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE get_accHelp(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE get_accHelpTopic(BSTR* file, VARIANT child, LONG* topic) override;
+    HRESULT STDMETHODCALLTYPE get_accKeyboardShortcut(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE get_accFocus(VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE get_accSelection(VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE get_accDefaultAction(VARIANT child, BSTR* out) override;
+    HRESULT STDMETHODCALLTYPE accSelect(LONG flags, VARIANT child) override;
+    HRESULT STDMETHODCALLTYPE accLocation(LONG* x, LONG* y, LONG* width, LONG* height,
+                                          VARIANT child) override;
+    HRESULT STDMETHODCALLTYPE accNavigate(LONG direction, VARIANT start, VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE accHitTest(LONG x, LONG y, VARIANT* out) override;
+    HRESULT STDMETHODCALLTYPE accDoDefaultAction(VARIANT child) override;
+    HRESULT STDMETHODCALLTYPE put_accName(VARIANT child, BSTR value) override;
+    HRESULT STDMETHODCALLTYPE put_accValue(VARIANT child, BSTR value) override;
+
+private:
+    ~MsaaElement() = default;
+
+    // Takes a snapshot into `client` and finds this object's node.
+    HRESULT resolve_self(SemanticNode& client, SemanticLocation& self) noexcept;
+    // As resolve_self, then the node `child` names: this object's node for
+    // CHILDID_SELF, else its child `child.lVal` (counting from one).
+    HRESULT resolve(const VARIANT& child, SemanticNode& client, SemanticLocation& target) noexcept;
+    // A new object for the located node, returned as IDispatch.
+    HRESULT object_for(const SemanticLocation& location, IDispatch** out) noexcept;
+    // The VARIANT a navigation result takes: VT_I4 CHILDID_SELF for this
+    // object's own node (a new object for it would make focus and hit-test
+    // descent recurse forever), VT_DISPATCH for another node.
+    HRESULT variant_for(const SemanticLocation& found, VARIANT* out) noexcept;
+    HRESULT text_property(const VARIANT& child, BSTR* out, TextProperty property) noexcept;
+
+    std::atomic<ULONG> references_{1U};
+    std::shared_ptr<SemanticSource> source_;
+    SemanticElementId id_;
 };
-class WindowsAccessibility::Accessible final : public IAccessible {
-    std::atomic<ULONG> references_{1};
-    std::shared_ptr<State> state_;
-    std::uint64_t id_;
-    const SemanticNode* node(SemanticNode& root, VARIANT child) noexcept {
-        if (child.vt != VT_I4 || child.lVal < 0 || !(*state_).snapshot(root)) { return nullptr; }
-        const SemanticNode* self = find_node(root, id_);
-        if (!self || child.lVal == CHILDID_SELF) { return self; }
-        const std::size_t index = static_cast<std::size_t>(child.lVal - 1);
-        return index < (*self).children.size() ? &(*self).children[index] : nullptr;
-    }
-    HRESULT dispatch(std::uint64_t id, IDispatch** result) noexcept {
-        if (!result) { return E_POINTER; }
-        *result = new(std::nothrow) Accessible(state_, id);
-        return *result ? S_OK : E_OUTOFMEMORY;
-    }
-    HRESULT variant(const SemanticNode* found, VARIANT* result) noexcept {
-        if (!result) { return E_POINTER; }
-        VariantInit(result);
-        if (!found) { return S_FALSE; }
-        // MSAA clients descend through VT_DISPATCH. Returning a new wrapper for
-        // this same object makes focus and hit-test traversal recurse forever.
-        if ((*found).runtime_id == id_) {
-            (*result).vt = VT_I4;
-            (*result).lVal = CHILDID_SELF;
-            return S_OK;
-        }
-        (*result).vt = VT_DISPATCH;
-        return dispatch((*found).runtime_id, &(*result).pdispVal);
-    }
-    HRESULT property(VARIANT child, BSTR* value, int kind) noexcept {
-        if (!value) { return E_POINTER; } *value = nullptr;
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!found) { return CO_E_OBJNOTCONNECTED; }
-        return bstr(kind == 0 ? (*found).name : kind == 1 ? (*found).value : (*found).description, value);
-    }
-  public:
-    Accessible(std::shared_ptr<State> state, std::uint64_t id) : state_(std::move(state)), id_(id) {}
-    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
-        if (!out) { return E_POINTER; } *out = nullptr;
-        if (iid == IID_IUnknown || iid == IID_IDispatch || iid == IID_IAccessible) {
-            *out = static_cast<IAccessible*>(this); AddRef(); return S_OK;
-        }
-        return E_NOINTERFACE;
-    }
-    ULONG STDMETHODCALLTYPE AddRef() override { return ++references_; }
-    ULONG STDMETHODCALLTYPE Release() override { const ULONG n = --references_; if (!n) { delete this; } return n; }
-    HRESULT STDMETHODCALLTYPE GetTypeInfoCount(UINT* out) override { if (!out) { return E_POINTER; } *out = 0; return S_OK; }
-    HRESULT STDMETHODCALLTYPE GetTypeInfo(UINT, LCID, ITypeInfo** out) override { if (out) { *out = nullptr; } return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE GetIDsOfNames(REFIID, LPOLESTR*, UINT, LCID, DISPID*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE Invoke(DISPID, REFIID, LCID, WORD, DISPPARAMS*, VARIANT*, EXCEPINFO*, UINT*) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE get_accParent(IDispatch** out) override {
-        if (!out) { return E_POINTER; } *out = nullptr;
-        SemanticNode root; if (!(*state_).snapshot(root)) { return CO_E_OBJNOTCONNECTED; }
-        if (id_ == 0) { return CreateStdAccessibleObject((*state_).hwnd, OBJID_WINDOW, IID_IDispatch, reinterpret_cast<void**>(out)); }
-        const SemanticNode* parent = parent_node(root, id_);
-        return parent ? dispatch((*parent).runtime_id, out) : CO_E_OBJNOTCONNECTED;
-    }
-    HRESULT STDMETHODCALLTYPE get_accChildCount(LONG* out) override {
-        if (!out) { return E_POINTER; } *out = 0;
-        SemanticNode root; VARIANT self{}; self.vt = VT_I4;
-        const SemanticNode* found = node(root, self);
-        if (!found) { return CO_E_OBJNOTCONNECTED; } *out = static_cast<LONG>((*found).children.size()); return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE get_accChild(VARIANT child, IDispatch** out) override {
-        if (!out) { return E_POINTER; } *out = nullptr;
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        return found ? dispatch((*found).runtime_id, out) : E_INVALIDARG;
-    }
-    HRESULT STDMETHODCALLTYPE get_accName(VARIANT child, BSTR* out) override { return property(child, out, 0); }
-    HRESULT STDMETHODCALLTYPE get_accValue(VARIANT child, BSTR* out) override { return property(child, out, 1); }
-    HRESULT STDMETHODCALLTYPE get_accDescription(VARIANT child, BSTR* out) override { return property(child, out, 2); }
-    HRESULT STDMETHODCALLTYPE get_accRole(VARIANT child, VARIANT* out) override {
-        if (!out) { return E_POINTER; } VariantInit(out);
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!found) { return CO_E_OBJNOTCONNECTED; }
-        (*out).vt = VT_I4; (*out).lVal = (*found).runtime_id == 0 ? ROLE_SYSTEM_CLIENT : role((*found).role); return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE get_accState(VARIANT child, VARIANT* out) override {
-        if (!out) { return E_POINTER; } VariantInit(out);
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!found) { return CO_E_OBJNOTCONNECTED; }
-        const SemanticState state = (*found).states;
-        LONG bits = 0;
-        if (!has_semantic_state(state, SemanticState::enabled)) { bits |= STATE_SYSTEM_UNAVAILABLE; }
-        if (!has_semantic_state(state, SemanticState::visible)) { bits |= STATE_SYSTEM_INVISIBLE; }
-        if (has_semantic_state(state, SemanticState::focused)) { bits |= STATE_SYSTEM_FOCUSED; }
-        if (has_semantic_state(state, SemanticState::focusable)) { bits |= STATE_SYSTEM_FOCUSABLE; }
-        if (has_semantic_state(state, SemanticState::checked)) { bits |= STATE_SYSTEM_CHECKED; }
-        if (has_semantic_state(state, SemanticState::mixed)) { bits |= STATE_SYSTEM_MIXED; }
-        if (has_semantic_state(state, SemanticState::selected)) { bits |= STATE_SYSTEM_SELECTED; }
-        if (has_semantic_state(state, SemanticState::read_only)) { bits |= STATE_SYSTEM_READONLY; }
-        if (has_semantic_state(state, SemanticState::expanded)) { bits |= STATE_SYSTEM_EXPANDED; }
-        if (has_semantic_state(state, SemanticState::protected_content)) { bits |= STATE_SYSTEM_PROTECTED; }
-        if (has_semantic_state(state, SemanticState::busy)) { bits |= STATE_SYSTEM_BUSY; }
-        // MSAA has a has-popup state but no position-in-set field; UIA (stage A)
-        // will carry PositionInSet and SizeOfSet.
-        if ((*found).has_popup) { bits |= STATE_SYSTEM_HASPOPUP; }
-        (*out).vt = VT_I4; (*out).lVal = bits; return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE get_accHelp(VARIANT child, BSTR* out) override { return property(child, out, 2); }
-    HRESULT STDMETHODCALLTYPE get_accHelpTopic(BSTR* file, VARIANT, LONG* topic) override { if (file) { *file = nullptr; } if (topic) { *topic = 0; } return S_FALSE; }
-    HRESULT STDMETHODCALLTYPE get_accKeyboardShortcut(VARIANT, BSTR* out) override { if (!out) { return E_POINTER; } *out = nullptr; return S_FALSE; }
-    HRESULT STDMETHODCALLTYPE get_accFocus(VARIANT* out) override {
-        SemanticNode root; VARIANT self{}; self.vt = VT_I4; const SemanticNode* found = node(root, self);
-        return variant(found ? state_node(*found, SemanticState::focused) : nullptr, out);
-    }
-    HRESULT STDMETHODCALLTYPE get_accSelection(VARIANT* out) override {
-        SemanticNode root; VARIANT self{}; self.vt = VT_I4; const SemanticNode* found = node(root, self);
-        return variant(found ? state_node(*found, SemanticState::selected) : nullptr, out);
-    }
-    HRESULT STDMETHODCALLTYPE get_accDefaultAction(VARIANT child, BSTR* out) override {
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!out) { return E_POINTER; } *out = nullptr;
-        return found && !(*found).actions.empty() ? bstr(semantic_action_name(default_action(*found)), out) : S_FALSE;
-    }
-    HRESULT STDMETHODCALLTYPE accSelect(LONG flags, VARIANT child) override {
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!found) { return CO_E_OBJNOTCONNECTED; }
-        if ((flags & ~(SELFLAG_TAKEFOCUS | SELFLAG_TAKESELECTION)) != 0 || flags == 0) { return E_INVALIDARG; }
-        bool done = true;
-        if (flags & SELFLAG_TAKEFOCUS) { done = (*state_).perform(*found, SemanticAction::focus); }
-        if (flags & SELFLAG_TAKESELECTION) { done = (*state_).perform(*found, SemanticAction::select) && done; }
-        return done ? S_OK : S_FALSE;
-    }
-    HRESULT STDMETHODCALLTYPE accLocation(LONG* x, LONG* y, LONG* width, LONG* height, VARIANT child) override {
-        if (!x || !y || !width || !height) { return E_POINTER; }
-        *x = *y = *width = *height = 0;
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        if (!found) { return CO_E_OBJNOTCONNECTED; }
-        POINT origin{}; ClientToScreen((*state_).hwnd, &origin);
-        *x = origin.x + static_cast<LONG>(std::lround((*found).bounds.x * (*state_).scale));
-        *y = origin.y + static_cast<LONG>(std::lround((*found).bounds.y * (*state_).scale));
-        *width = static_cast<LONG>(std::lround((*found).bounds.width * (*state_).scale));
-        *height = static_cast<LONG>(std::lround((*found).bounds.height * (*state_).scale)); return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE accNavigate(LONG direction, VARIANT start, VARIANT* out) override {
-        SemanticNode root; const SemanticNode* found = node(root, start); const SemanticNode* target = nullptr;
-        if (found && direction == NAVDIR_FIRSTCHILD && !(*found).children.empty()) { target = &(*found).children.front(); }
-        if (found && direction == NAVDIR_LASTCHILD && !(*found).children.empty()) { target = &(*found).children.back(); }
-        if (found && (direction == NAVDIR_NEXT || direction == NAVDIR_PREVIOUS)) {
-            const SemanticNode* parent = parent_node(root, (*found).runtime_id);
-            if (parent) {
-                for (std::size_t i = 0; i < (*parent).children.size(); ++i) {
-                    if ((*parent).children[i].runtime_id != (*found).runtime_id) { continue; }
-                    if (direction == NAVDIR_NEXT && i + 1 < (*parent).children.size()) { target = &(*parent).children[i + 1]; }
-                    if (direction == NAVDIR_PREVIOUS && i > 0) { target = &(*parent).children[i - 1]; }
-                }
-            }
-        }
-        return variant(target, out);
-    }
-    HRESULT STDMETHODCALLTYPE accHitTest(LONG x, LONG y, VARIANT* out) override {
-        SemanticNode root; VARIANT self{}; self.vt = VT_I4; const SemanticNode* found = node(root, self);
-        POINT origin{}; ClientToScreen((*state_).hwnd, &origin);
-        return variant(found ? hit_node(*found, (x - origin.x) / (*state_).scale, (y - origin.y) / (*state_).scale) : nullptr, out);
-    }
-    HRESULT STDMETHODCALLTYPE accDoDefaultAction(VARIANT child) override {
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        return found && (*state_).perform(*found, default_action(*found)) ? S_OK : S_FALSE;
-    }
-    HRESULT STDMETHODCALLTYPE put_accName(VARIANT, BSTR) override { return E_NOTIMPL; }
-    HRESULT STDMETHODCALLTYPE put_accValue(VARIANT child, BSTR value) override {
-        SemanticNode root; const SemanticNode* found = node(root, child);
-        return found && (*state_).perform(*found, SemanticAction::set_value, value) ? S_OK : S_FALSE;
-    }
-};
-WindowsAccessibility::WindowsAccessibility() : state_(std::make_shared<State>()) {}
-WindowsAccessibility::~WindowsAccessibility() { detach(); }
-void WindowsAccessibility::attach(HWND hwnd, Window& model, double scale) {
-    (*state_).hwnd = hwnd; (*state_).model = &model; (*state_).scale = scale;
+
+HRESULT MsaaElement::resolve_self(SemanticNode& client, SemanticLocation& self) noexcept {
+    if (!(*source_).snapshot(client)) return CO_E_OBJNOTCONNECTED;
+    if (!locate_semantic_element(client, id_, self)) return CO_E_OBJNOTCONNECTED;
+    return S_OK;
 }
-void WindowsAccessibility::detach() noexcept { (*state_).model = nullptr; (*state_).hwnd = nullptr; }
-LRESULT WindowsAccessibility::object(WPARAM parameter) noexcept {
-    if (!(*state_).model) { return 0; }
-    (*state_).observed = true;
-    Accessible* root = new(std::nothrow) Accessible(state_, 0);
-    if (!root) { return 0; }
-    const LRESULT result = LresultFromObject(IID_IAccessible, parameter, root);
-    (*root).Release(); return result;
+
+HRESULT MsaaElement::resolve(const VARIANT& child, SemanticNode& client,
+                             SemanticLocation& target) noexcept {
+    if (child.vt != VT_I4) return E_INVALIDARG;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    if (child.lVal == CHILDID_SELF) {
+        target = self;
+        return S_OK;
+    }
+    const std::size_t count = (*self.node).children.size();
+    if (child.lVal < 0 || static_cast<std::size_t>(child.lVal) > count) return E_INVALIDARG;
+    target = child_location(self, static_cast<std::size_t>(child.lVal) - 1U);
+    return S_OK;
 }
-void WindowsAccessibility::notify(double scale) noexcept {
-    (*state_).scale = scale;
-    if (!(*state_).model || !(*state_).observed ||
-        (*(*state_).model).semantic_generation() == (*state_).generation) { return; }
+
+HRESULT MsaaElement::object_for(const SemanticLocation& location, IDispatch** out) noexcept {
+    MsaaElement* element = new (std::nothrow) MsaaElement(source_, location.id);
+    if (element == nullptr) return E_OUTOFMEMORY;
+    *out = static_cast<IDispatch*>(element);
+    return S_OK;
+}
+
+HRESULT MsaaElement::variant_for(const SemanticLocation& found, VARIANT* out) noexcept {
+    if (found.id == id_) {
+        (*out).vt = VT_I4;
+        (*out).lVal = CHILDID_SELF;
+        return S_OK;
+    }
+    IDispatch* dispatch = nullptr;
+    const HRESULT status = object_for(found, &dispatch);
+    if (FAILED(status)) return status;
+    (*out).vt = VT_DISPATCH;
+    (*out).pdispVal = dispatch;
+    return S_OK;
+}
+
+HRESULT MsaaElement::text_property(const VARIANT& child, BSTR* out,
+                                   TextProperty property) noexcept {
+    if (out == nullptr) return E_POINTER;
+    *out = nullptr;
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    const SemanticNode& node = *target.node;
+    switch (property) {
+    case TextProperty::name: return utf8_to_bstr(node.name, out);
+    case TextProperty::value: return utf8_to_bstr(node.value, out);
+    case TextProperty::description: return utf8_to_bstr(node.description, out);
+    }
+    return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::QueryInterface(REFIID iid, void** out) {
+    if (out == nullptr) return E_POINTER;
+    *out = nullptr;
+    const bool known = iid == IID_IUnknown || iid == IID_IDispatch || iid == IID_IAccessible;
+    if (!known) return E_NOINTERFACE;
+    *out = static_cast<IAccessible*>(this);
+    AddRef();
+    return S_OK;
+}
+
+ULONG STDMETHODCALLTYPE MsaaElement::AddRef() {
+    const ULONG count = ++references_;
+    return count;
+}
+
+ULONG STDMETHODCALLTYPE MsaaElement::Release() {
+    const ULONG count = --references_;
+    if (count == 0U) delete this;
+    return count;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::GetTypeInfoCount(UINT* out) {
+    if (out == nullptr) return E_POINTER;
+    *out = 0U;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::GetTypeInfo(UINT, LCID, ITypeInfo** out) {
+    if (out != nullptr) *out = nullptr;
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::GetIDsOfNames(REFIID, LPOLESTR*, UINT, LCID, DISPID*) {
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::Invoke(DISPID, REFIID, LCID, WORD, DISPPARAMS*, VARIANT*,
+                                             EXCEPINFO*, UINT*) {
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accParent(IDispatch** out) {
+    if (out == nullptr) return E_POINTER;
+    *out = nullptr;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    if (self.parent == nullptr) {
+        // The client object's parent is the window's standard object.
+        return CreateStdAccessibleObject((*source_).hwnd, OBJID_WINDOW, IID_IDispatch,
+                                         reinterpret_cast<void**>(out));
+    }
+    SemanticLocation parent;
+    if (!parent_semantic_location(client, self, parent)) return CO_E_OBJNOTCONNECTED;
+    return object_for(parent, out);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accChildCount(LONG* out) {
+    if (out == nullptr) return E_POINTER;
+    *out = 0;
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    *out = static_cast<LONG>((*self.node).children.size());
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accChild(VARIANT child, IDispatch** out) {
+    if (out == nullptr) return E_POINTER;
+    *out = nullptr;
+    if (child.vt == VT_I4 && child.lVal == CHILDID_SELF) return E_INVALIDARG;
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    return object_for(target, out);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accName(VARIANT child, BSTR* out) {
+    return text_property(child, out, TextProperty::name);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accValue(VARIANT child, BSTR* out) {
+    return text_property(child, out, TextProperty::value);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accDescription(VARIANT child, BSTR* out) {
+    return text_property(child, out, TextProperty::description);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accRole(VARIANT child, VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    const bool client_object = target.parent == nullptr;
+    (*out).vt = VT_I4;
+    (*out).lVal = client_object ? ROLE_SYSTEM_CLIENT : msaa_role((*target.node).role);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accState(VARIANT child, VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    (*out).vt = VT_I4;
+    (*out).lVal = msaa_state(*target.node);
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accHelp(VARIANT child, BSTR* out) {
+    return text_property(child, out, TextProperty::description);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accHelpTopic(BSTR* file, VARIANT, LONG* topic) {
+    if (file != nullptr) *file = nullptr;
+    if (topic != nullptr) *topic = 0;
+    return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accKeyboardShortcut(VARIANT, BSTR* out) {
+    if (out == nullptr) return E_POINTER;
+    // The semantic tree carries no access key (stage A gap list).
+    *out = nullptr;
+    return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accFocus(VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    SemanticLocation found;
+    if (!state_location(self, SemanticState::focused, found)) return S_FALSE;
+    return variant_for(found, out);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accSelection(VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    SemanticLocation found;
+    if (!state_location(self, SemanticState::selected, found)) return S_FALSE;
+    return variant_for(found, out);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accDefaultAction(VARIANT child, BSTR* out) {
+    if (out == nullptr) return E_POINTER;
+    *out = nullptr;
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    if (target.parent == nullptr) return S_FALSE;
+    const wchar_t* verb = default_action_verb(*target.node);
+    if (verb == nullptr) return S_FALSE;
+    *out = SysAllocString(verb);
+    if (*out == nullptr) return E_OUTOFMEMORY;
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::accSelect(LONG flags, VARIANT child) {
+    const LONG supported = SELFLAG_TAKEFOCUS | SELFLAG_TAKESELECTION;
+    if (flags == 0 || (flags & ~supported) != 0) return E_INVALIDARG;
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    bool done = true;
+    if ((flags & SELFLAG_TAKEFOCUS) != 0) {
+        done = (*source_).perform(target, SemanticAction::focus, {});
+    }
+    if ((flags & SELFLAG_TAKESELECTION) != 0) {
+        // The focus action may have changed the tree; select reads it again.
+        SemanticNode current;
+        SemanticLocation selected;
+        const HRESULT again = resolve(child, current, selected);
+        if (FAILED(again)) return again;
+        const bool taken = (*source_).perform(selected, SemanticAction::select, {});
+        done = done && taken;
+    }
+    return done ? S_OK : E_FAIL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::accLocation(LONG* x, LONG* y, LONG* width, LONG* height,
+                                                  VARIANT child) {
+    if (x == nullptr || y == nullptr || width == nullptr || height == nullptr) return E_POINTER;
+    *x = 0;
+    *y = 0;
+    *width = 0;
+    *height = 0;
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    const Rect bounds = (*target.node).bounds;
+    const double scale = (*source_).scale;
+    POINT origin{};
+    ClientToScreen((*source_).hwnd, &origin);
+    *x = origin.x + static_cast<LONG>(std::lround(bounds.x * scale));
+    *y = origin.y + static_cast<LONG>(std::lround(bounds.y * scale));
+    *width = static_cast<LONG>(std::lround(bounds.width * scale));
+    *height = static_cast<LONG>(std::lround(bounds.height * scale));
+    return S_OK;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::accNavigate(LONG direction, VARIANT start, VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation from;
+    const HRESULT status = resolve(start, client, from);
+    if (FAILED(status)) return status;
+    const std::size_t count = (*from.node).children.size();
+    if (direction == NAVDIR_FIRSTCHILD || direction == NAVDIR_LASTCHILD) {
+        if (count == 0U) return S_FALSE;
+        const std::size_t index = direction == NAVDIR_FIRSTCHILD ? 0U : count - 1U;
+        return variant_for(child_location(from, index), out);
+    }
+    if (direction != NAVDIR_NEXT && direction != NAVDIR_PREVIOUS) return S_FALSE;
+    SemanticLocation parent;
+    if (!parent_semantic_location(client, from, parent)) return S_FALSE;
+    const std::size_t siblings = (*parent.node).children.size();
+    if (direction == NAVDIR_NEXT && from.index + 1U < siblings) {
+        return variant_for(child_location(parent, from.index + 1U), out);
+    }
+    if (direction == NAVDIR_PREVIOUS && from.index > 0U) {
+        return variant_for(child_location(parent, from.index - 1U), out);
+    }
+    return S_FALSE;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::accHitTest(LONG x, LONG y, VARIANT* out) {
+    if (out == nullptr) return E_POINTER;
+    VariantInit(out);
+    SemanticNode client;
+    SemanticLocation self;
+    const HRESULT status = resolve_self(client, self);
+    if (FAILED(status)) return status;
+    POINT origin{};
+    ClientToScreen((*source_).hwnd, &origin);
+    const double scale = (*source_).scale;
+    const double logical_x = (x - origin.x) / scale;
+    const double logical_y = (y - origin.y) / scale;
+    SemanticLocation hit;
+    if (!hit_location(self, logical_x, logical_y, hit)) return S_FALSE;
+    return variant_for(hit, out);
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::accDoDefaultAction(VARIANT child) {
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    if (target.parent == nullptr) return DISP_E_MEMBERNOTFOUND;
+    const std::optional<SemanticAction> action = default_action(*target.node);
+    if (!action) return DISP_E_MEMBERNOTFOUND;
+    const bool handled = (*source_).perform(target, *action, {});
+    return handled ? S_OK : E_FAIL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::put_accName(VARIANT, BSTR) {
+    return E_NOTIMPL;
+}
+
+HRESULT STDMETHODCALLTYPE MsaaElement::put_accValue(VARIANT child, BSTR value) {
+    SemanticNode client;
+    SemanticLocation target;
+    const HRESULT status = resolve(child, client, target);
+    if (FAILED(status)) return status;
+    if (!has_action(*target.node, SemanticAction::set_value)) return DISP_E_MEMBERNOTFOUND;
+    std::string text;
     try {
-        const SemanticSnapshot snapshot = (*(*state_).model).semantic_snapshot();
-        if (snapshot.generation == (*state_).generation) { return; }
-        (*state_).generation = snapshot.generation;
-        NotifyWinEvent(EVENT_OBJECT_REORDER, (*state_).hwnd, OBJID_CLIENT, CHILDID_SELF);
-        NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, (*state_).hwnd, OBJID_CLIENT, CHILDID_SELF);
-        NotifyWinEvent(EVENT_OBJECT_STATECHANGE, (*state_).hwnd, OBJID_CLIENT, CHILDID_SELF);
-        std::uint64_t focused = 0;
+        if (!utf8_from_bstr(value, text)) return E_INVALIDARG;
+    } catch (...) {
+        return E_OUTOFMEMORY;
+    }
+    const bool handled = (*source_).perform(target, SemanticAction::set_value, text);
+    return handled ? S_OK : E_FAIL;
+}
+
+} // namespace
+
+WindowsAccessibility::WindowsAccessibility() : source_(std::make_shared<SemanticSource>()) {}
+
+WindowsAccessibility::~WindowsAccessibility() { detach(); }
+
+void WindowsAccessibility::attach(HWND hwnd, Window& model, double scale) {
+    (*source_).hwnd = hwnd;
+    (*source_).model = &model;
+    (*source_).scale = scale;
+}
+
+void WindowsAccessibility::detach() noexcept {
+    (*source_).model = nullptr;
+    (*source_).hwnd = nullptr;
+}
+
+LRESULT WindowsAccessibility::object(WPARAM parameter) noexcept {
+    if ((*source_).model == nullptr) return 0;
+    (*source_).observed = true;
+    MsaaElement* root = new (std::nothrow) MsaaElement(source_, SemanticElementId{});
+    if (root == nullptr) return 0;
+    const LRESULT result = LresultFromObject(IID_IAccessible, parameter, root);
+    (*root).Release();
+    return result;
+}
+
+void WindowsAccessibility::notify(double scale) noexcept {
+    SemanticSource& source = *source_;
+    source.scale = scale;
+    if (source.model == nullptr || !source.observed) return;
+    if ((*source.model).semantic_generation() == source.generation) return;
+    try {
+        const SemanticSnapshot snapshot = (*source.model).semantic_snapshot();
+        if (snapshot.generation == source.generation) return;
+        source.generation = snapshot.generation;
+        NotifyWinEvent(EVENT_OBJECT_REORDER, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
+        NotifyWinEvent(EVENT_OBJECT_VALUECHANGE, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
+        NotifyWinEvent(EVENT_OBJECT_STATECHANGE, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
+        std::uint64_t focused = 0U;
         for (const SemanticNode& root : snapshot.roots) {
-            const SemanticNode* found = state_node(root, SemanticState::focused);
-            if (found) { focused = (*found).runtime_id; break; }
+            const SemanticLocation root_at = client_location(root);
+            SemanticLocation found;
+            if (state_location(root_at, SemanticState::focused, found)) {
+                focused = (*found.node).runtime_id;
+                break;
+            }
         }
-        if (focused != (*state_).focus) {
-            (*state_).focus = focused;
-            NotifyWinEvent(EVENT_OBJECT_FOCUS, (*state_).hwnd, OBJID_CLIENT, CHILDID_SELF);
+        if (focused != source.focus) {
+            source.focus = focused;
+            NotifyWinEvent(EVENT_OBJECT_FOCUS, source.hwnd, OBJID_CLIENT, CHILDID_SELF);
         }
-    } catch (...) {}
+    } catch (...) {
+    }
 }
-}
+
+} // namespace gui_forms::host

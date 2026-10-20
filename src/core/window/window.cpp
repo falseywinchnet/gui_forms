@@ -76,6 +76,18 @@ double bounded_visual_outset(double value) noexcept {
            (*control).parent().get() == expected_parent;
 }
 
+// A virtual child published without a runtime ID takes the one its stable ID
+// gives, so every node of a snapshot has a nonzero runtime ID; hosts keep
+// zero for the window's own object.
+void assign_missing_virtual_runtime_ids(std::vector<SemanticNode>& nodes) {
+    for (SemanticNode& node : nodes) {
+        if (node.runtime_id == 0U) {
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        }
+        assign_missing_virtual_runtime_ids(node.children);
+    }
+}
+
 void append_semantic_nodes(const Control::Ptr& control,
                            const Control* expected_parent,
                            const Window* owner,
@@ -100,6 +112,7 @@ void append_semantic_nodes(const Control::Ptr& control,
         std::vector<SemanticNode> virtual_children =
             (*control).semantic_virtual_children();
         if (!current_semantic_identity(control, expected_parent, owner)) return;
+        assign_missing_virtual_runtime_ids(virtual_children);
         count += virtual_children.size();
         descendants.insert(descendants.end(),
                             std::make_move_iterator(virtual_children.begin()),
@@ -224,8 +237,8 @@ void Window::DeferredInputVisitor::operator()(InputEvent&& event) const {
     } else if constexpr (std::is_same_v<EventType, DragEvent>) {
         static_cast<void>((*window).dispatch_drag(std::move(event)));
     } else {
-        static_cast<void>((*window).perform_semantic_action(
-            event.stable_id, event.action, event.value));
+        static_cast<void>((*window).perform_scoped_semantic_action(
+            event.scope_id, event.stable_id, event.action, event.value));
     }
 }
 
@@ -2289,13 +2302,31 @@ SemanticSnapshot Window::semantic_snapshot() {
 bool Window::perform_semantic_action(std::string_view stable_id,
                                      SemanticAction action,
                                      std::string_view value) {
+    const bool handled = perform_scoped_semantic_action({}, stable_id, action, value);
+    return handled;
+}
+
+bool Window::perform_scoped_semantic_action(std::string_view scope_stable_id,
+                                            std::string_view stable_id,
+                                            SemanticAction action,
+                                            std::string_view value) {
     require_ui_thread("semantic action");
     if (in_paint_) {
         return defer_input(DeferredInput{DeferredSemanticInput{
-            std::string(stable_id), action, std::string(value)}});
+            std::string(scope_stable_id), std::string(stable_id), action,
+            std::string(value)}});
     }
     const Control::Ptr control = find(stable_id);
     const Control::Ptr scoped = focus_allowed_by_active_scope(root_) ? Control::Ptr{} : active_focus_scope_root();
+    if (!control && !scope_stable_id.empty()) {
+        // A virtual child named with its scope: only that control's subtree
+        // is asked, so an item that shares its stable ID with another
+        // control's item reaches its own owner.
+        const Control::Ptr scope = find(scope_stable_id);
+        if (!scope || !focus_allowed_by_active_scope(scope)) return false;
+        const bool handled = dispatch_semantic_child_action(scope, stable_id, action, value);
+        return handled;
+    }
     if (!control) {
         if (dispatch_semantic_child_action(scoped ? scoped : root_, stable_id, action, value)) {
             return true;

@@ -670,6 +670,19 @@ public:
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
+    // As perform_semantic_action, for the node `stable_id` inside the
+    // control `scope_stable_id`: a virtual child is looked for only in that
+    // control and its descendants. A virtual child's stable ID is unique
+    // within the control that publishes it, not within the window (a tree
+    // and a list showing one model may both publish an item "src"), so a
+    // host that knows a node's nearest control-backed node names it here.
+    // An empty scope is perform_semantic_action; so is a scope equal to
+    // `stable_id`. A scope that is not an attached control, or lies outside
+    // the active focus scope, refuses the action (false).
+    bool perform_scoped_semantic_action(std::string_view scope_stable_id,
+                                        std::string_view stable_id,
+                                        SemanticAction action,
+                                        std::string_view value = {});
 
 private:
     friend class HostSession;
@@ -801,6 +814,7 @@ private:
     void touch_paint() noexcept;
     void update_paint_lease_state() noexcept;
     struct DeferredSemanticInput final {
+        std::string scope_id;
         std::string stable_id;
         SemanticAction action{SemanticAction::focus};
         std::string value;

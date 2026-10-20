@@ -325,6 +325,10 @@ semantic_snapshot
 perform_semantic_action
     Performs an automation action, such as focus or press, on the control
     with a stable ID, and returns whether it was performed.
+perform_scoped_semantic_action
+    As perform_semantic_action, for a node inside one control: a virtual
+    item is looked for only in that control, since two controls' items may
+    share a stable ID.
 metrics
     The live instrumentation counters, for hosts and renderers that record
     into them.
