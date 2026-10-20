@@ -878,13 +878,15 @@ void compare_element(PageWalk& walk, IUIAutomationElement& element, const Expect
         const double scale = walk.expectation.scale;
         LONG left = walk.expectation.origin.x + device_coordinate(node.bounds.x, scale);
         LONG top = walk.expectation.origin.y + device_coordinate(node.bounds.y, scale);
-        const LONG width = device_coordinate(node.bounds.width, scale);
-        const LONG height = device_coordinate(node.bounds.height, scale);
-        // A node with no area reads as the empty rectangle at the origin
-        // (an overflowed tab, a gallery item scrolled out).
+        LONG width = device_coordinate(node.bounds.width, scale);
+        LONG height = device_coordinate(node.bounds.height, scale);
+        // A node with no area (an overflowed tab, a gallery item scrolled
+        // out, a label squeezed to no width) reads as the empty rectangle.
         if (width == 0 || height == 0) {
             left = 0;
             top = 0;
+            width = 0;
+            height = 0;
         }
         const bool located = bounds.left == left && bounds.top == top &&
                              bounds.right - bounds.left == width && bounds.bottom - bounds.top == height;

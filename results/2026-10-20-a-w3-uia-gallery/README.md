@@ -94,6 +94,11 @@ The per-control table and every action with its evidence are in
 | Nodes with no area (overflowed page-strip tabs, ribbon gallery items scrolled out) read as the empty rectangle at 0,0, while the client expected the window origin with zero size | 11 | UI Automation reports an empty rectangle for no area. The provider now answers one explicitly (`get_BoundingRectangle`), and the client expects it. |
 | The timing page's tick label and progress bar, the easing preview and the motion target changed while the client read them | 4 | The comparison windows are frozen (above); not a provider defect |
 
+The first CI run (GitHub's windows-2022 runner, a different screen size)
+compared 2,800 elements and performed 94 actions. It found one more node with
+no area, a label with zero width and nonzero height. The client had kept that
+node's height, and now expects the whole rectangle to be empty.
+
 ## Workload and environment
 
 - Machine: the owner's Windows 11 desktop, x64, shared with other build
