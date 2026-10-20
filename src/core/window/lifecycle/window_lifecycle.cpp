@@ -176,7 +176,12 @@ void Window::apply_theme(const std::shared_ptr<const Theme>& theme) {
                                Dirty::style | Dirty::paint | Dirty::semantics);
         }
     }
-    theme_changed_.emit(*theme_);
+    // Held here: a handler that sets another theme replaces theme_, which
+    // can release this theme while later handlers of this emission still
+    // read it. They see this theme, after the handlers of the nested
+    // emission have seen the newer one.
+    const std::shared_ptr<const Theme> emitted = theme_;
+    theme_changed_.emit(*emitted);
 }
 
 void Window::set_active(bool active) {
