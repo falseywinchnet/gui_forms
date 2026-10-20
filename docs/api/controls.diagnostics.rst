@@ -195,6 +195,14 @@ Related types
 
       Adds one or more disposed controls.
 
+   .. cpp:function:: void record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept
+
+      A theme engine part record was made; ``live`` records remain.
+
+   .. cpp:function:: void record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept
+
+      ``released`` part records were released; ``live`` records remain.
+
    .. cpp:function:: void record_wrong_thread_rejection() noexcept
 
       Atomically counts a rejected cross-thread operation.
@@ -479,6 +487,14 @@ Related types
    .. cpp:member:: std::uint64_t screen_copy_nanoseconds
 
       The time hosts spent only copying pixels to the screen (conversion and the native copy), retained and live together. The present durations above also cover painting and composing; this one compares the copy itself across hosts.
+
+   .. cpp:member:: std::uint64_t engine_part_records
+
+      The theme engine's part records (T2 plan, EnginePartTable): those live now, those made with the index fallback (an item part without a stable ID, whose record follows its position rather than the item; GIVEN H3-1), and those released because their control left the window. Records made and released are activity; the live count is population and survives reset_activity.
+
+   .. cpp:member:: std::uint64_t engine_part_index_fallbacks
+
+   .. cpp:member:: std::uint64_t engine_part_records_released
 
    .. cpp:member:: std::string renderer_name
 
