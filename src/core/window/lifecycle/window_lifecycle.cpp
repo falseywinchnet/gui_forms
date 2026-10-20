@@ -62,7 +62,13 @@ Window::~Window() {
     paint_wake_handler_ = {};
     paint_wake_pending_ = false;
     abandon_deferred_input();
-    shutdown_dispatcher();
+    // Teardown order (house style §6): the controls are told everything
+    // (popups closing, capture and focus revoked, the tree detached) while
+    // the dispatcher still accepts work, and the dispatcher is shut down
+    // only after them, which cancels whatever they posted. If a host shut it
+    // down already (it closed the window), a post from these notifications
+    // is refused by name instead of throwing out of this destructor.
+    begin_dispatcher_teardown();
     while (!accelerators_.empty()) {
         (*accelerators_.back()).disconnect();
     }
@@ -80,6 +86,7 @@ Window::~Window() {
     if (root_) {
         detach_subtree(root_);
     }
+    shutdown_dispatcher();
     (*resources_).detach(*this);
     (*lifetime_).window = nullptr;
 }

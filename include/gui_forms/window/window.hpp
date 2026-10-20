@@ -485,6 +485,9 @@ public:
     // Wakes coalesce until the host consumes damage and remain suppressed while
     // the model is explicitly occluded.
     void set_paint_wake_handler(std::function<void()> wake);
+    // Stops accepting posted work and cancels everything pending. A host
+    // releases pointer capture first (see HostSession), so that controls
+    // that post about the release meet an accepting dispatcher.
     void shutdown_dispatcher() noexcept;
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
@@ -693,6 +696,10 @@ private:
     // defaults unless they are seeded already.
     void install_host_key_map(const KeyMap& defaults);
     void initialize_cursor_identity() noexcept;
+    // The destructor's first dispatcher step: stops host wakes and marks the
+    // dispatcher closing, so that a post reaching it after shutdown is
+    // refused by name instead of throwing (DispatcherState::closing).
+    void begin_dispatcher_teardown() noexcept;
     void invalidate_cursor_interaction(CursorError cause) noexcept;
     friend class Control;
     friend class UpdateScope;
