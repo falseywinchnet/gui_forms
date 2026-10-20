@@ -2345,7 +2345,20 @@ bool Window::perform_semantic_action(std::string_view stable_id,
     }
     if (action == SemanticAction::focus) {
         set_focus_cue_visible(true);
-        return request_focus(control);
+        if ((*control).focusable_) {
+            const bool focused = request_focus(control);
+            return focused;
+        }
+        // A control that cannot take focus itself, such as a composite over
+        // an inner editor, decides in its own on_semantic_action where focus
+        // goes. The action is performed only if focus then lies in the
+        // control's subtree, so focus is still refused where nothing there
+        // can take it.
+        const bool handled = (*control).on_semantic_action(action, value);
+        if (!handled || !(*control).is_alive() || (*control).window_ != this) return false;
+        const Control::Ptr now_focused = focused_.lock();
+        const bool inside = contains_control(control, now_focused);
+        return inside;
     }
     return (*control).on_semantic_action(action, value);
 }
