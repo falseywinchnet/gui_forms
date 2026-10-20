@@ -18,12 +18,15 @@ def main() -> None:
     parser.add_argument('--zlib', type=Path, required=True)
     parser.add_argument('--workloads', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--baseline', type=Path, default=ROOT / 'results/2026-10-19-zlib/png/non-crc-optimization/baseline-png_decoder.cpp.txt')
     args = parser.parse_args()
     png = args.libpng.resolve()
     zlib = args.zlib.resolve()
     workloads = args.workloads.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    baseline = args.baseline.resolve()
+    shutil.copyfile(baseline, output / 'baseline.cpp')
     png_pin = verify(png, ROOT / 'tests/image/libpng_oracle_sha256.json')
     zlib_pin = verify(zlib, ROOT / 'tests/compression/oracle_sha256.json')
     version = subprocess.check_output(['clang++', '--version'], text=True)
@@ -31,13 +34,15 @@ def main() -> None:
         raise RuntimeError('LLVM 22.1.8 required')
     record = {'libpng_revision': png_pin['revision'], 'zlib_revision': zlib_pin['revision'],
               'machine': platform.platform(), 'compiler': version, 'commands': [],
+              'baseline_sha256': hashlib.sha256(baseline.read_bytes()).hexdigest(),
+              'timing': '50ms calibration, rotating order, 2 warmup + 7 paired rounds',
               'workloads': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in workloads.glob('*.png')},
               'sources': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in (
                   'src/core/image/png_decoder.cpp','src/core/image/png_decoder.hpp',
                   'src/core/image/png_writer.cpp','src/core/compression/inflate.cpp',
                   'include/gui_forms/compression/inflate.hpp',
                   'tests/image/png_benchmark.cpp','tests/image/png_oracle.c','tools/benchmark_png.py')}}
-    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include')]
+    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'src/core/image')]
     shutil.copyfile(png / 'scripts/pnglibconf.h.prebuilt', output / 'pnglibconf.h')
     native_neon = platform.machine().lower() in ('arm64', 'aarch64')
     record['oracle_simd'] = 'NEON intrinsics' if native_neon else 'portable C'
@@ -65,12 +70,19 @@ def main() -> None:
         command = ['clang', '-O3', *includes, '-c', str(ROOT / 'tests/image/png_oracle.c'), '-o', str(oracle)]
         record['commands'].append(command)
         subprocess.run(command, check=True)
-        for mode, flags in (('vector', []), ('no-vector', ['-fno-vectorize', '-fno-slp-vectorize'])):
+        for mode, flags in (('vector', []), ('no-vector', ['-fno-vectorize', '-fno-slp-vectorize', '-DGUI_FORMS_DISABLE_VECTOR_HINTS=1'])):
+            baseline_object = output / ('baseline-' + mode + '.o')
+            command = ['clang++', '-std=c++20', '-O3', *includes, *flags,
+                       '-Ddecode_png_samples=baseline_decode_png_samples',
+                       '-Dinspect_png_samples=baseline_inspect_png_samples',
+                       '-c', str(output / 'baseline.cpp'), '-o', str(baseline_object)]
+            record['commands'].append(command)
+            subprocess.run(command, check=True)
             binary = output / ('benchmark-' + mode)
             command = ['clang++', '-std=c++20', '-O3', *includes, *flags,
                        str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
                        str(ROOT / 'src/core/compression/inflate.cpp'), str(ROOT / 'tests/image/png_benchmark.cpp'),
-                       str(oracle), *objects, '-o', str(binary)]
+                       str(baseline_object), str(oracle), *objects, '-o', str(binary)]
             record['commands'].append(command)
             subprocess.run(command, check=True)
             command = [str(binary), str(workloads)]

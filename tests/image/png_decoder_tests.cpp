@@ -227,7 +227,7 @@ void compare_oracle(const Bytes& png, const Decoded& decoded) {
 }
 void matrix() {
     const image::PngDecodeLimits limits{.metadata_bytes = 4096};
-    constexpr std::array<unsigned, 10> widths{1,2,3,4,5,7,8,9,17,33};
+    constexpr std::array<unsigned, 17> widths{1,2,3,4,5,7,8,9,15,16,17,31,32,33,63,64,65};
     std::size_t cases = 0;
     for (const Format& format : formats) {
         for (bool interlaced : {false, true}) {

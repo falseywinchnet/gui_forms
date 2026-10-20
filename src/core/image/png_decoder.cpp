@@ -369,11 +369,57 @@ void unfilter_left(std::span<std::byte> row, std::span<const std::byte> previous
         row[index] = static_cast<std::byte>((byte(row[index]) + predictor) & 255U);
     }
 }
+// A 16-byte block contains independent channel-prefix sums. Each stage reads
+// only the previous stage, so the compiler sees parallel additions modulo 256.
+template<unsigned Shift>
+std::array<std::uint8_t, 16> prefix_stage(const std::array<std::uint8_t, 16>& input) noexcept {
+    std::array<std::uint8_t, 16> shifted{};
+    std::copy_n(input.begin(), 16 - Shift, shifted.begin() + Shift);
+    std::array<std::uint8_t, 16> output{};
+    for (unsigned lane = 0; lane < 16; ++lane) {
+        output[lane] = static_cast<std::uint8_t>(input[lane] + shifted[lane]);
+    }
+    return output;
+}
+template<unsigned Stride>
+void unfilter_sub(std::span<std::byte> row) noexcept {
+    if (row.size() <= Stride) return;
+    std::size_t index = Stride;
+    for (; row.size() - index >= 16; index += 16) {
+        std::array<std::uint8_t, 16> block{};
+        for (unsigned lane = 0; lane < 16; ++lane) block[lane] = static_cast<std::uint8_t>(row[index + lane]);
+        // Seed one value per channel from the preceding reconstructed bytes.
+        for (unsigned lane = 0; lane < Stride; ++lane) {
+            block[lane] = static_cast<std::uint8_t>(block[lane] + byte(row[index - Stride + lane]));
+        }
+        block = prefix_stage<Stride>(block);
+        if constexpr (Stride * 2 < 16) block = prefix_stage<Stride * 2>(block);
+        if constexpr (Stride * 4 < 16) block = prefix_stage<Stride * 4>(block);
+        if constexpr (Stride * 8 < 16) block = prefix_stage<Stride * 8>(block);
+        for (unsigned lane = 0; lane < 16; ++lane) row[index + lane] = static_cast<std::byte>(block[lane]);
+    }
+    for (; index < row.size(); ++index) {
+        row[index] = static_cast<std::byte>((byte(row[index]) + byte(row[index - Stride])) & 255U);
+    }
+}
+void unfilter_sub_row(std::span<std::byte> row, unsigned stride) noexcept {
+    // Measured useful prefix widths. Other channel strides keep the original
+    // recurrence: stride eight regressed, and two/three/six are not qualified.
+    if (stride == 1) {
+        unfilter_sub<1>(row);
+        return;
+    }
+    if (stride == 4) {
+        unfilter_sub<4>(row);
+        return;
+    }
+    unfilter_left<1>(row, {}, stride);
+}
 PngDecodeError unfilter(unsigned filter, std::span<std::byte> row,
                         std::span<const std::byte> previous, unsigned stride) noexcept {
     switch (filter) {
         case 0: break;
-        case 1: unfilter_left<1>(row, previous, stride); break;
+        case 1: unfilter_sub_row(row, stride); break;
         case 2: unfilter_up(row, previous); break;
         case 3: unfilter_left<3>(row, previous, stride); break;
         case 4: unfilter_left<4>(row, previous, stride); break;

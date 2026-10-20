@@ -283,3 +283,25 @@ helper supplies its logical workspace layout on the hashed M4 mirror:
 ```sh
 /Users/ultimussecundai/.local/bin/m4build -- sh results/2026-10-19-zlib/png/full-suite-driver.sh
 ```
+
+## PNG CRC suitability experiment
+
+The standalone comparison is first-party experimental code, not a new runtime
+library dependency. It compiles the existing pinned upstream zlib both natively
+and with its ARM CRC opcode path disabled, verifies complete CRCs under
+sanitizers, and compares chunk costs and whole PNG decoding. Run it after
+`validate_png.py` has generated the workload directory:
+
+```text
+/Users/ultimussecundai/.local/bin/m4build -- env PATH=/opt/homebrew/opt/llvm@22/bin:/opt/homebrew/bin:/usr/bin:/bin python3 -B experiments/png-crc-suitability/run.py --zlib build-zlib-study-sources/upstream-zlib --workloads build/png-hinted-check/workloads --output build/png-crc-suitability-final
+```
+
+Keep performance trials sequential with builds, fuzzing and suite execution.
+Inspect assembly before crediting the degree-261 quartet with register-resident
+state; source arrays alone do not establish that allocation. See
+`experiments/png-crc-suitability/README.md` for provenance and measurement limits.
+
+Repeat the CRC experiment with `--baseline-isa` and a separate output directory
+to measure baseline Armv8-A candidate code without Apple-target three-input XOR
+fusion. This option is specific to the arm64 measurement host; the candidate
+algorithm itself has no platform intrinsics.

@@ -4,10 +4,12 @@
 #include "../src/core/image/png_writer.hpp"
 #include "gui_forms/resources/types/image_resource_types.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
+#include <limits>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -170,6 +172,33 @@ void rejects_invalid_input() {
     require(!image::encode_png(input, png) && png.empty(), "zero width accepted");
 }
 
+void rejects_stride_overflow_and_alias() {
+    const std::array<std::byte, 4> pixel{std::byte{1}, std::byte{2}, std::byte{3}, std::byte{255}};
+    image::PngEncodeInput input{.width=1, .height=3,
+        .row_bytes=std::uint64_t{1} << 63, .pixels=pixel};
+    std::vector<std::byte> png{std::byte{7}};
+    require(!image::encode_png(input, png) && png.empty(), "wrapped stride multiplication accepted");
+    input.height = 2;
+    input.row_bytes = std::numeric_limits<std::uint64_t>::max();
+    require(!image::encode_png(input, png) && png.empty(), "wrapped final row addition accepted");
+    input.height = 1;
+    require(image::encode_png(input, png), "unused one-row stride rejected");
+    const std::vector<std::byte> decoded = inflate_stored(idat_payload(png));
+    require(decoded.size() == 5 && std::equal(pixel.begin(), pixel.end(), decoded.begin() + 1),
+            "one-row pixels changed");
+    input.order = static_cast<image::PngChannelOrder>(255);
+    require(!image::encode_png(input, png) && png.empty(), "invalid channel order accepted");
+    input.order = image::PngChannelOrder::rgba;
+    input.row_bytes = 4;
+    for (std::size_t offset : {std::size_t{0}, std::size_t{3}}) {
+        png.assign(8, std::byte{9});
+        input.pixels = std::span<const std::byte>(png.data() + offset, 4);
+        const bool accepted = image::encode_png(input, png);
+        input.pixels = pixel;
+        require(!accepted && png.empty(), "aliased pixel input accepted");
+    }
+}
+
 void checksums_match_reference_values() {
     const std::array<std::uint8_t, 9> text{'1', '2', '3', '4', '5', '6', '7', '8', '9'};
     const std::span<const std::byte> bytes = std::as_bytes(std::span<const std::uint8_t>(text));
@@ -186,6 +215,7 @@ int main() {
         rgba_round_trip();
         bgra_opaque_round_trip();
         rejects_invalid_input();
+        rejects_stride_overflow_and_alias();
     } catch (const std::exception& error) {
         std::cerr << "png_writer_tests: " << error.what() << '\n';
         return 1;

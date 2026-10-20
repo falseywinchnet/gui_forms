@@ -37,8 +37,13 @@ retain encoded offsets for all ancillary chunks and decoded offsets for those
 compressed fields; no parser-created borrow outlives the call.
 
 Filters select their kernel once per row. Up has independent byte additions;
-Sub/Average/Paeth retain their true left dependencies and Paeth's exact tie
-order. Common 128-bit portable loops may be vectorized after bounds proof.
+Sub uses a channel-strided 16-byte prefix scan for byte strides 1 and 4,
+seeded from preceding reconstructed bytes. Separate stages add modulo 256; exact
+tails and other strides retain the scalar recurrence. An explicit 128-bit Clang
+hint produced SIMD instructions but lost to the unhinted scan in a direct paired
+comparison; it was removed. Stride 8 and contiguous RGBA expansion trials were
+also rejected on measured regressions. Average/Paeth retain their true left dependencies
+and Paeth's exact tie order. Common 128-bit portable loops may be vectorized after bounds proof.
 No speculative wide loads, platform intrinsics, blind branch hints or blanket
 fast-math. Start with measured scalar/dependency-correct kernels, then compare
 compiler output and benchmark actual rows before selecting acceleration.

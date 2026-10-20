@@ -1,7 +1,7 @@
 # Owned PNG sample-decoder verification
 
-The native `gui_forms_png_decoder_tests` target runs 9,000 exact sample cases:
-15 legal colour/depth pairs × two interlace modes × ten widths × six heights ×
+The native `gui_forms_png_decoder_tests` target runs 15,300 exact sample cases:
+15 legal colour/depth pairs × two interlace modes × seventeen widths × six heights ×
 five filters. Each starts from separately constructed source samples and an
 independent forward-filter implementation. Additional cases exercise opaque
 versus keyed transparency, single-byte IDAT fragments, a dynamic-Huffman image,
@@ -38,8 +38,15 @@ each filter and interlace choice, stored deflate blocks. It reuses the owned
 workspace and output buffers; it times a complete CRC-checked decode. The C
 libpng oracle creates/destroys its native decoder and row-pointer table per
 call, as recorded in its wrapper. Both return lossless RGBA16, with output
-sample equality checked outside timing. Each result is the median/range of
-five 32-image batches following two warmup batches. Throughput is **RGBA16
+sample equality checked outside timing. By default the historical decoder at
+`38390afb` is compiled beside the candidate with renamed entry points, sharing
+identical CRC and inflate code. `--baseline` selects a recorded trial for a
+direct comparison, such as the hinted versus unhinted Sub scan. Each decoder
+calibrates batches to at least 50 ms before seven retained rounds, with two
+warmup rounds and rotating order. Results include medians/ranges and paired
+candidate/baseline ratios; calibration does not guarantee constant later CPU
+frequency or scheduling. The no-vector control disables explicit loop hints as
+well as automatic loop/SLP vectorization. Throughput is **RGBA16
 output MiB/s**, not input bytes/s. Fixtures and allocations for the owned path
 are outside timing. These stored-block workloads are useful for isolating PNG
 work but do not represent a photographic/dynamic-compression corpus.
