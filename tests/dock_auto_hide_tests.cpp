@@ -599,6 +599,69 @@ void slide() {
             "close_flyout closes it");
 }
 
+// The slide's frames on the window's motion clock (T2 E3, GIVEN D1-1),
+// from a test time source: 180 ms, linear, so 12 frames of 16 ms, each
+// showing exactly its share; then nothing is scheduled. In an occluded
+// window (GIVEN D4-1) it is all out at once with no frames, and occlusion
+// mid-slide ends it.
+class ManualTime final : public MotionTimeSource {
+public:
+    [[nodiscard]] FrameTime now() const noexcept override { return time; }
+    FrameTime time{std::chrono::seconds(1000)};
+};
+
+void slide_frames() {
+    std::unique_ptr<Fixture> fixture = make_fixture();
+    DockWorkspace& workspace = *(*fixture).workspace;
+    DockSite& site = *(*fixture).site;
+    Window& window = *(*fixture).window;
+    ManualTime time{};
+    window.motion_clock().set_time_source(&time);
+    apply(workspace, DockEdit::auto_hide(DockSubject::of_stack(stack_of(workspace, "output")), DockSide::bottom, 150.0));
+    window.perform_layout();
+    const std::uint64_t requests = window.metrics_snapshot().scheduled_frame_requests;
+    require(site.open_flyout(DockPanelId("output"), DockFlyoutCause::programmatic) && site.flyout_reveal() == 0.0,
+            "the slide starts under the strip");
+    std::size_t frames = 0U;
+    for (int k = 1; k <= 40 && window.motion_clock().armed(); ++k) {
+        time.time += std::chrono::milliseconds(16);
+        const FramePollResult result = window.poll_frame_schedule(time.time);
+        window.perform_layout();
+        require(result.motion_clock_ticks == 1U && result.ui_timer_ticks == 0U, "each frame is the motion clock's");
+        frames += result.motion_clock_ticks;
+        const double share = std::min(1.0, 16.0 * k / 180.0);
+        require(std::abs(site.flyout_reveal() - share) < 1e-12, "each frame shows exactly its share of the slide");
+    }
+    require(frames == 12U && site.flyout_reveal() == 1.0 &&
+                std::abs((*site.flyout_control()).absolute_bounds().height - 150.0) < 1e-6,
+            "the slide takes 12 frames and ends all out");
+    require(window.metrics_snapshot().scheduled_frame_requests - requests == 1U && !window.motion_clock().armed(),
+            "one frame request, disconnected at the end");
+    time.time += std::chrono::milliseconds(16);
+    require(window.poll_frame_schedule(time.time).motion_clock_ticks == 0U, "an open flyout at rest has no frames");
+    site.close_flyout();
+
+    window.set_occluded(true, time.time);
+    require(site.open_flyout(DockPanelId("output"), DockFlyoutCause::programmatic) && site.flyout_reveal() == 1.0 &&
+                !window.motion_clock().armed(),
+            "in an occluded window the flyout is all out at once and nothing is scheduled");
+    site.close_flyout();
+    window.set_occluded(false, time.time);
+
+    require(site.open_flyout(DockPanelId("output"), DockFlyoutCause::programmatic), "the flyout opens again");
+    for (int k = 0; k < 3; ++k) {
+        time.time += std::chrono::milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(time.time));
+    }
+    require(site.flyout_reveal() > 0.2 && site.flyout_reveal() < 0.3, "three frames in");
+    window.set_occluded(true, time.time);
+    window.perform_layout();
+    require(site.flyout_reveal() == 1.0 && !window.motion_clock().armed() &&
+                std::abs((*site.flyout_control()).absolute_bounds().height - 150.0) < 1e-6,
+            "occlusion mid-slide puts it all out");
+    site.close_flyout();
+}
+
 // -- semantics --------------------------------------------------------------------------------
 
 void semantics() {
@@ -647,8 +710,9 @@ int main() {
     group_grip_and_keyboard();
     collapse_into_side_tabs();
     slide();
+    slide_frames();
     semantics();
     std::cout << "DockSite auto-hide: pin round trip, hover, click, focus, Escape, outside press, grip, keyboard, "
-                 "collapse into side tabs, slide and semantics passed\n";
+                 "collapse into side tabs, slide, its frames and semantics passed\n";
     return 0;
 }
