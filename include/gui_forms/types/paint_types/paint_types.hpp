@@ -118,4 +118,15 @@ enum class ImageSampling : std::uint8_t {
     linear,
 };
 
+// The direction a line of text reads in (design language 8.5; owner
+// decision DK-35, question J4). The two vertical orientations are the
+// horizontal run turned a quarter about its origin: `bottom_to_top` reads
+// up the surface with the tops of the glyphs facing left (a left side
+// tab), `top_to_bottom` reads down it with the tops facing right.
+enum class TextOrientation : std::uint8_t {
+    horizontal,
+    bottom_to_top,
+    top_to_bottom,
+};
+
 } // namespace gui_forms

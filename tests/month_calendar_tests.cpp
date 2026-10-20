@@ -42,6 +42,7 @@ const MonthCalendar::Day* find_day(const std::vector<MonthCalendar::Day>& days, 
     }
     return nullptr;
 }
+const MonthCalendar::Day* find_day(std::vector<MonthCalendar::Day>&& days, DateTimeValue date) = delete;
 
 Rect day_bounds(const MonthCalendar& calendar, DateTimeValue date) {
     const std::vector<MonthCalendar::Day> days = calendar.realized_days();

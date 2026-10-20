@@ -606,3 +606,167 @@ owner, verbatim:
 - **GIVEN:** the plan is accepted; stage DK's gate is closed. Building
   starts with W0 (the window layer) and V0 (vocabulary and the command
   chain), with PageView P1 onward and docking D1 alongside.
+
+## Part 16. Review of the builders' conservative choices, 2026-10-19
+
+The coordinator raised review items R1 to R21 from the build reports
+(R1 the native drag-smoothness probe; R2 sanitizers in CI; R3 the key map
+per window or per application; R4 ribbon scroll-button hysteresis; R5 the
+caption close hides; R6 Ctrl+F6 order; R7 the selected ribbon tab's
+minimize no longer reachable by assistive technology; R8 commands not yet
+routed; R9 a virtual grid republishing its whole order; R10 comments in
+layout XML; R11 unknown fields in newer layouts; R12 to R21 kept as built;
+and the unchecked macOS and Linux behaviours). The owner, verbatim:
+
+> drag smoothness probe is not human auditable remote, local only a mac neo. better technical forensic probe needed. R2: memory bugs in tests or code are not permitted. determine if it was due to disobedience to house style, and if there was a rule that could have prevented it. R3: approved. R4: approved. R5: approved. R6: approved. R7: why did tabs stop publishing press? R8: approved. R9: some kind of floating state machine maybe that adjusts on the fly? R10: approved. R11: approved. unchecked: i can get a sibling model to check these things. we'll need a script we can run and a prompt document to give said sibling and we will use lima for the linux and the m4 for the mac.
+
+- **GIVEN R1.** No human-watched probe: the owner works remotely and the
+  only local machine is a Mac. Drag smoothness is measured by an automated
+  forensic probe (synthetic input, host-confirmed frames and presentation
+  timestamps, a machine-readable verdict).
+- **GIVEN R2.** Memory bugs are not permitted, in tests or in code. The
+  coordinator determines whether each sanitizer finding came from
+  disobeying the house style and which rule would have prevented it.
+- **GIVEN R3-1.** One key map per application, shared by all its windows.
+- **GIVEN R4-1.** The ribbon's scroll buttons take the same 8 units of
+  hysteresis as the hide rule (RB decision 45).
+- **GIVEN R5-1.** The caption's close button hides a tool panel.
+- **GIVEN R6-2.** Ctrl+F6 steps documents in most-recently-used order.
+- **R7 asked back** (why tabs stopped publishing press).
+- **GIVEN R8-1.** Every command path routes through the command chain.
+- **R9, direction:** an adaptive order model that adjusts on the fly
+  instead of republishing the whole order; designed by the coordinator.
+- **GIVEN R10-1.** Layout XML accepts comments.
+- **GIVEN R11-2.** Unknown fields in newer layouts are kept and written
+  back.
+- **GIVEN, unchecked behaviours.** A sibling model verifies the macOS and
+  Linux behaviours on the owner's M4 Mac and a Lima VM, from a script and a
+  prompt document the coordinator prepares.
+
+### Note, 2026-10-19: R2's determination, R7 and R9
+
+The coordinator reported that the four real sanitizer findings each broke
+an existing house-style rule (§5 keep borrows valid through use and §2
+break chains that hide allocation, for two pointers into temporaries in
+tests; §5 the lifetime guarantee for a borrower that outlived what it
+borrowed, in a test; §9 foreign interfaces state types, for hand-retyped
+function pointers in the Windows GDI shim), and proposed four additions
+(rvalue overloads deleted on functions returning a borrow of an argument;
+borrowers declared after what they borrow; foreign entry-point types taken
+from their declarations; mandatory sanitizer runs). R7 was explained (the
+owner's J6/P35.6: a tab item exposes selection, never invoke), with the
+option of an expand and collapse state on the ribbon's command plane; R9
+was proposed as an order model switching between an edit mode (delta
+edits on a chunked order index) and a window mode (the grid asks for the
+visible window only), automatically by size and change rate. The owner,
+verbatim:
+
+> accepted on these changes to house policy. additional tools that we can write to check for them are fine too. r7 accepted.r9: accepted.
+
+- **GIVEN:** the four house-style additions, made in both copies (this
+  repository and EpistemicGPT); tools that check them mechanically are
+  welcome.
+- **GIVEN R7-1.** The ribbon's command plane publishes an expand and
+  collapse state; clicking the selected tab keeps working by pointer.
+- **GIVEN R9.** The adaptive order model as proposed.
+
+### Note, 2026-10-19: the second review (N1 to N10)
+
+Raised from the D3, D5, layout and TextBox reports, each with a
+recommendation: N1-1 keep TextBox's Escape and Enter passing on with
+opt-in `accepts_escape`/`accepts_enter`; N2-1 an empty TokenBox passes
+Enter on; N3-2 the tiles' fade is left to T2/T4; N4-1 a "refused" mark
+(a circle with a slash) for the rejected-drop cue; N5-1 a live-region
+semantic role, mapped with stage A; N6-1 Ctrl+Alt+Shift+M starts the
+keyboard move mode; N7-1 a document tab tears off 16 units outside its
+strip; N8-1 the auto-hide edge tie order left, right, bottom, top; N9-1 a
+flyout's resized extent is saved with the layout in D7; N10-1 an `open`
+item state for side tabs, and the Alt+F7 navigator lists auto-hidden
+panels. The owner, verbatim:
+
+> accepted.
+
+- **GIVEN N1-1 to N10-1** as recommended.
+
+### Note, 2026-10-19: C1, content colour
+
+Asked: the ribbon colour picker paints its swatches directly because no part
+role or paint field carries a content colour; (1) a content-colour field on
+the shared paint path (recommended), (2) a swatch part role carrying a
+colour, (3) keep the documented exception. The owner, verbatim:
+
+> accepted.
+
+- **GIVEN C1-1.** A content-colour field on `PartPaint` (W decision 7).
+
+### Note, 2026-10-19: the cleanup reviews' findings (V1 to V4)
+
+From the house-style cleanup review of the window layer (#172) and of PageView
+and docking (#173): (V1) a use-after-free in `WorkspaceTransaction::open_window`
+when macOS or X11 refuses an entry after taking ownership of it; fix by adding
+a way to abandon an `UpdateScope` without closing it (recommended), or by a
+liveness check in the transaction; (V2) Objective-C blocks in the macOS host
+are anonymous callbacks, which §2 forbids: replace them with named functions
+and explicit context (`dispatch_async_f`) and teach the checker to flag blocks
+(recommended), or admit them as an AppKit-adapter exception; (V3) tray icon
+ids and device versus logical desktop points are plain types: add wrapper
+types while the APIs are provisional (recommended); (V4) fixes needing no
+decision: a Windows runtime window whose creation fails is never released;
+releasing a control snapshot lacks the UI-thread check and the repaint; the
+house-style checker skips `.inc` files; a floating window cancels its own
+close when no main site is bound; `PageSetBatch`'s destructor lets a
+handler's exception end the program; the keyboard context menu of a
+scrolled-out tab opens at the strip's corner; the runtime-ID hash is copied in
+ten sources; `DockSite::arrange` is not split into stages. The owner,
+verbatim:
+
+> v1: approved. v2: approved. v3: approved. v4: understood.
+
+- **GIVEN V1-1.** `UpdateScope` gains a way to be abandoned without closing;
+  the transaction uses it when a host refuses an entry after taking it.
+- **GIVEN V2-1.** No Objective-C blocks: the macOS host uses named functions
+  with explicit context; the checker flags blocks.
+- **GIVEN V3-1.** Wrapper types for tray icon identities and for device and
+  logical desktop points.
+- **GIVEN V4.** The listed fixes go ahead.
+
+### Note, 2026-10-19: V2a, the one AppKit block (open)
+
+V2's change (#181) removed every Objective-C block from the macOS host but
+one: `add_escape_stops_modal_monitor` in
+`src/host/macos/services/appkit_host_services.mm`, which installs
+`[NSEvent addLocalMonitorForEventsMatchingMask:handler:]`, an API that takes
+only a block. The owner did not admit it ("you can merge other standout work
+except v2a"), so #181 is held.
+
+What the monitor intercepts: key-down events only, only while the host's
+message dialog runs `[alert runModal]`, and of those only Escape (key code
+53): Escape ends the alert with the cancel choice's response and is
+consumed; every other key passes on. It and the cancel button's Escape key
+equivalent arrived together (e42bab4a, 2026-08-06), beside setting the
+window's default button cell for the declared default choice. The likely
+reason, unverified: when Cancel is also the declared default, making it the
+default button cell gives it Return as its key equivalent and displaces
+Escape, so the monitor keeps Escape reaching the cancel choice.
+
+Replacements without a block, for the owner:
+
+1. **The alert's own modal session** (recommended). Lay out the alert, begin
+   a modal session for its window, and pump it: take each event with
+   `nextEventMatchingMask:untilDate:inMode:dequeue:` in
+   `NSModalPanelRunLoopMode`, end the session with the cancel response on
+   Escape, and send every other event with `sendEvent:`; `runModalSession:`
+   reports the button's response. This sees exactly the events the local
+   monitor sees, before dispatch, and changes nothing outside this one
+   function.
+2. **An `NSApplication` subclass overriding `sendEvent:`** (a sibling's
+   suggestion). Not recommended: it changes the whole application for one
+   dialog and fails when the embedding application has its own
+   `NSApplication` class.
+3. **No monitor at all.** If AppKit still cancels on Escape when Cancel is
+   also the default (or the default cell can be kept off the Cancel button
+   without losing Return), the monitor can simply go. One test on the Mac
+   decides this.
+
+Checking 3 first is cheapest, then 1 if the monitor proves necessary. Both
+need the M4: a local instance runs them and reports back.

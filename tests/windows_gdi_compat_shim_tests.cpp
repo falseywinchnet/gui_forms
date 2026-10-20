@@ -12,17 +12,19 @@
 
 namespace {
 
-using ShimGetDC = HDC(WINAPI*)(HWND);
-using ShimReleaseDC = int(WINAPI*)(HWND, HDC);
-using ShimBitBlt = BOOL(WINAPI*)(HDC, int, int, int, int, HDC, int, int, DWORD);
-using ShimCreateCompatibleBitmap = HBITMAP(WINAPI*)(HDC, int, int);
-using ShimCreateCompatibleDC = HDC(WINAPI*)(HDC);
-using ShimScrollWindowEx = int(WINAPI*)(HWND, int, int, const RECT*,
-                                        const RECT*, HRGN, LPRECT, UINT);
-using ShimSendMessageW = LRESULT(WINAPI*)(HWND, UINT, WPARAM, LPARAM);
-using ShimSelectObject = HGDIOBJ(WINAPI*)(HDC, HGDIOBJ);
-using ShimDeleteObject = BOOL(WINAPI*)(HGDIOBJ);
-using ShimDeleteDC = BOOL(WINAPI*)(HDC);
+// The shim exports user32's and gdi32's own names and signatures, so each
+// entry-point type comes from that function's declaration (house style
+// section 9).
+using ShimGetDC = decltype(&::GetDC);
+using ShimReleaseDC = decltype(&::ReleaseDC);
+using ShimBitBlt = decltype(&::BitBlt);
+using ShimCreateCompatibleBitmap = decltype(&::CreateCompatibleBitmap);
+using ShimCreateCompatibleDC = decltype(&::CreateCompatibleDC);
+using ShimScrollWindowEx = decltype(&::ScrollWindowEx);
+using ShimSendMessageW = decltype(&::SendMessageW);
+using ShimSelectObject = decltype(&::SelectObject);
+using ShimDeleteObject = decltype(&::DeleteObject);
+using ShimDeleteDC = decltype(&::DeleteDC);
 
 template <typename Function>
 Function entry(HMODULE module, const char* name) {

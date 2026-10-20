@@ -64,7 +64,8 @@ struct RibbonToolTipHelpRequest final {
 // per control, or per item of a ToolStrip (and so of a QuickAccessToolbar),
 // shown after a hover delay or at once when keyboard focus reaches the
 // target, in a retained, input-transparent overlay owned by the target.
-// Ribbon commands will attach the same way when the Ribbon exists.
+// A Ribbon can be mapped as a whole control; its commands cannot be mapped
+// one by one yet.
 class RibbonToolTip final : public Component {
 public:
     explicit RibbonToolTip(Window& window);

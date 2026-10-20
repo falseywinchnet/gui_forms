@@ -24,6 +24,7 @@ const SemanticNode* find_role(const std::vector<SemanticNode>& nodes,
     }
     return nullptr;
 }
+const SemanticNode* find_role(std::vector<SemanticNode>&& nodes, SemanticRole role) = delete;
 
 std::size_t count_role(const std::vector<SemanticNode>& nodes,
                        SemanticRole role) {
@@ -108,8 +109,9 @@ void test_hover_delay_cancel_and_accessible_overlay() {
             "a due hover must open a named semantic, input-transparent overlay");
 
     hover(fixture, {390.0, 210.0});
+    const SemanticSnapshot after_leave = fixture.window.semantic_snapshot();
     require(!tips.visible() && shown == 1 && hidden == 1 &&
-                !find_role(fixture.window.semantic_snapshot().roots,
+                !find_role(after_leave.roots,
                            SemanticRole::tool_tip),
             "leave must remove both the retained popup and its semantic node");
 }
@@ -192,7 +194,8 @@ void test_explicit_show_multiple_providers_and_owner_disposal() {
     require(!first.visible() && !second.visible() && !first.active_control() &&
                 !second.active_control(),
             "disposing a target must synchronously revoke every provider popup");
-    require(!find_role(fixture.window.semantic_snapshot().roots,
+    const SemanticSnapshot after_owner_disposal = fixture.window.semantic_snapshot();
+    require(!find_role(after_owner_disposal.roots,
                        SemanticRole::tool_tip),
             "owner disposal must leave no stale tooltip semantic nodes");
 }
@@ -215,8 +218,9 @@ void test_mapping_removal_and_provider_disposal_are_quiescent() {
     require(explicit_tip && (*explicit_tip).bounds.x >= (*fixture.button).absolute_bounds().x,
             "programmatic ToolTip show must anchor to its target, not the client origin");
     (*tips).dispose();
+    const SemanticSnapshot after_provider_disposal = fixture.window.semantic_snapshot();
     require(!fixture.window.next_wake() &&
-                !find_role(fixture.window.semantic_snapshot().roots,
+                !find_role(after_provider_disposal.roots,
                            SemanticRole::tool_tip),
             "provider disposal must synchronously remove popup and scheduled work");
 }

@@ -74,6 +74,94 @@ Native host tests that open real windows run in CI on each platform. On a
 development machine without a display, configure with the host option off
 and the renderer-free tests still cover the retained engine.
 
+## Sanitized test runs
+
+`python3 -B tools/ci_build.py --sanitize [--tests REGEX]` is the standard
+sanitized tree on every platform: AddressSanitizer and
+UndefinedBehaviorSanitizer everywhere, LeakSanitizer on Linux and macOS,
+every report stopping its test ([Contributing](../dev/contributing.md) has
+the details). On macOS the sanitizer flags reach CMake through `CFLAGS`,
+`CXXFLAGS`, `OBJCXXFLAGS` and `LDFLAGS` rather than `-DCMAKE_<LANG>_FLAGS`.
+`cmake/llvm22.cmake` puts the pinned libc++ headers and runtime link flags
+in `CMAKE_<LANG>_FLAGS_INIT`, which a command-line `-DCMAKE_<LANG>_FLAGS`
+replaces: the tree then compiles against Homebrew's libc++ headers (the
+first macOS attempt failed in `dock_site.cpp` with "'from_chars' is
+unavailable: introduced in macOS 26.0") and leaves the Objective-C++ host
+uninstrumented. CMake reads those variables only when it first configures a
+tree, so delete a macOS `gui-forms-sanitize` tree configured before this
+change.
+
+On macOS LeakSanitizer reports thousands of blocks that Apple's
+frameworks keep for the life of the process: caches, per-thread state,
+class initialisation, XPC connections, and work still queued in libdispatch
+at exit, whose queue pointers are signed on arm64e so LeakSanitizer cannot
+follow them. The first macOS run (2026-10-19, Apple M4, macOS 26.5,
+Xcode 26.5, the seven macOS host tests) had between 23 and about 900 such
+reports per test, none allocated directly by GUI.Forms code.
+`tools/sanitizer/lsan.supp` carries a macOS baseline for them, under one
+rule: a suppression matches any frame of a leak's allocation stack, and
+AppKit, CoreFoundation, Foundation, CoreGraphics, QuartzCore, HIToolbox,
+libdispatch and the Objective-C runtime call into GUI.Forms (event
+dispatch, drawing, timers, dispatch), so those libraries are never named
+whole; only their internal allocation sites are. Whole libraries are listed
+only where they never call into GUI.Forms (ColorSync, vImage, CoreUI,
+SwiftUICore, the XPC and service frameworks and similar). Deliberate leaks
+added for the check were all still reported: in `main`, in a dispatch
+callback inside the AppKit run loop, in `-[GUIFormsView drawRect:]` during
+a Core Animation commit, and a leaked Objective-C object and CF string. One
+category is knowingly hidden: what a GUI.Forms work item still queued in
+libdispatch at exit owns. When a new macOS release adds reports, name the
+internal allocation site that holds them, never a library that calls into
+GUI.Forms or a function on the path from it, and check that the deliberate
+leaks above are still reported.
+
+The baseline's first run also found a GUI.Forms leak, now fixed: a
+completed `DispatchWork` kept its callable, because moving a
+`std::function` need not empty the source (libc++ copies a callable held in
+its small buffer), so a callable that owned a holder of its own
+`DispatchOperation` formed a cycle (`gui_forms_macos_host_close_tests`).
+`gui_forms_owned_event_tests` skips its allocation-balance assertion under
+AddressSanitizer on macOS as on Windows: the pinned libc++ dylib's
+allocations do not reach the test's replacement `operator new` (-24000
+blocks over its 1000 buttons), and LeakSanitizer found nothing there.
+`gui_forms_macos_idle_visibility_tests` exceeded its own 15-second limit
+once while LeakSanitizer scanned at exit; rerun it alone before treating
+that as a finding.
+
+`tools/run_sanitizer_suite.sh <build-directory>` builds the toolkit, the
+Gallery and every test with AddressSanitizer and UndefinedBehaviorSanitizer
+(`-fsanitize=address,undefined -fno-omit-frame-pointer`, RelWithDebInfo)
+and runs the whole suite. Use a build directory of its own; sanitized
+objects do not mix with a normal build. It is a local procedure; CI does not
+run it.
+
+```sh
+sh tools/run_sanitizer_suite.sh .build/sanitize
+```
+
+Both sanitizers link on the pinned Windows toolchain (MSYS2 CLANG64, LLVM
+22.1.8). The defaults are the Windows native configuration, and further
+CMake arguments after the directory reach the first configure; only the
+Windows configuration has been run so far. Its `-DCMAKE_<LANG>_FLAGS`
+replace the macOS toolchain flags as described above, so on macOS use
+`ci_build.py --sanitize`. ASan stops a test at its first
+report. UBSan reports without stopping, so a UBSan report does not fail its
+test: the script reads ctest's `Testing/Temporary/LastTest.log`, prints
+every sanitizer report it finds and exits non-zero on a report or a failed
+test. LeakSanitizer is not available on Windows, so leaks are not checked
+there.
+
+On a Windows 11 machine with 8 cores, a full sanitized build took 30 to 40
+minutes (6 and 3 compile jobs) and the suite about 140 seconds, three tests
+at a time (`GUI_FORMS_SANITIZER_JOBS`, default 3). Some sanitized tests run
+much longer than normal (`gui_forms_windows_gdi_compat_shim_tests` took 85
+seconds), and a test that overlaps them can exceed its own fixed timeout.
+`gui_forms_live_surface_idle_wake_tests` (15-second limit) passes alone in
+about 0.1 seconds, takes 4.5 to 7 seconds while the shim test runs (about 5
+seconds in a normal build too) and timed out once. Rerun a test that fails
+only under parallel load on its own (`ctest --test-dir <dir> -R <name>`)
+before treating it as a finding.
+
 ## Windows builds and Wine
 
 Use the native MSYS2 CLANG64 instructions in [Installation](../user/install). The older

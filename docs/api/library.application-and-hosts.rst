@@ -55,10 +55,18 @@ Related types
      -  
    * - :cpp:class:`CursorStatus <gui_forms::CursorStatus>`
      -  
+   * - :cpp:class:`DesktopDevicePoint <gui_forms::DesktopDevicePoint>`
+     - A point on the host's device desktop: Win32 screen pixels of a per-monitor-aware process, X11 root-window pixels.
+   * - :cpp:class:`DesktopLogicalPoint <gui_forms::DesktopLogicalPoint>`
+     - A point in desktop logical units: where window frames, the pointer's desktop position and logical work areas are published.
    * - :cpp:class:`HostActivationEvent <gui_forms::HostActivationEvent>`
      - HostActivationEvent carries portable top-level activation state.
    * - :cpp:class:`HostAttachEvent <gui_forms::HostAttachEvent>`
      - HostAttachEvent is the sole constructed-to-attached transition and carries initial logical client size and device scale.
+   * - :cpp:class:`HostAutoCompleteRequest <gui_forms::HostAutoCompleteRequest>`
+     - ``prefix_utf8`` is borrowed for the call.
+   * - :cpp:class:`HostAutoCompleteResult <gui_forms::HostAutoCompleteResult>`
+     -  
    * - :cpp:class:`HostCapabilities <gui_forms::HostCapabilities>`
      - HostCapabilities declares protocol version, platform label, and exact available portable service/event bits; absence is authoritative.
    * - :cpp:class:`HostClipboardFilesResult <gui_forms::HostClipboardFilesResult>`
@@ -135,6 +143,8 @@ Related types
      - HostTooltipRequest carries UTF-8 text, root-client logical anchor, and bounded lifetime while adapters own screen clamping/nonactivation.
    * - :cpp:class:`HostTrayIconEvent <gui_forms::HostTrayIconEvent>`
      -  
+   * - :cpp:class:`HostTrayIconId <gui_forms::HostTrayIconId>`
+     - The identity of one notification-area icon (owner decision V3-1): assigned by HostServices::add_tray_icon from 1 and never reused by that HostServices; zero is no icon.
    * - :cpp:class:`HostTrayIconRequest <gui_forms::HostTrayIconRequest>`
      - Notification-area (system tray) icons.
    * - :cpp:class:`HostTrayIconResult <gui_forms::HostTrayIconResult>`
@@ -365,6 +375,30 @@ Related types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: DesktopDevicePoint final
+
+   ``#include <gui_forms/host/windowing/desktop_coordinates.hpp>``
+
+   A point on the host's device desktop: Win32 screen pixels of a per-monitor-aware process, X11 root-window pixels.
+
+   .. cpp:member:: double x
+
+   .. cpp:member:: double y
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: DesktopLogicalPoint final
+
+   ``#include <gui_forms/host/windowing/desktop_coordinates.hpp>``
+
+   A point in desktop logical units: where window frames, the pointer's desktop position and logical work areas are published.
+
+   .. cpp:member:: double x
+
+   .. cpp:member:: double y
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: HostActivationEvent final
 
    ``#include <gui_forms/host/types/host_types.hpp>``
@@ -386,6 +420,34 @@ Related types
    .. cpp:member:: double scale
 
       Default: ``{1.0}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostAutoCompleteRequest final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   ``prefix_utf8`` is borrowed for the call. A host returns at most ``maximum_candidates`` strings, each valid UTF-8, in its own order.
+
+   .. cpp:member:: HostAutoCompleteSource source
+
+      Default: ``{HostAutoCompleteSource::file_system}``.
+
+   .. cpp:member:: std::string_view prefix_utf8
+
+   .. cpp:member:: std::size_t maximum_candidates
+
+      Default: ``{256U}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostAutoCompleteResult final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:member:: HostServiceStatus status
+
+   .. cpp:member:: std::vector<std::string> candidates_utf8
 
 .. cpp:namespace:: gui_forms
 
@@ -411,7 +473,7 @@ Related types
 
    .. cpp:member:: constexpr std::uint32_t current_protocol_version
 
-      Default: ``7``.
+      8: the host's keyboard-command defaults (``key_map``). Default: ``8``.
 
    .. cpp:member:: std::uint32_t protocol_version
 
@@ -424,6 +486,10 @@ Related types
    .. cpp:member:: HostCapability available
 
       Default: ``{HostCapability::none}``.
+
+   .. cpp:member:: KeyMap key_map
+
+      The keys this host's convention gives the named keyboard commands (owner decision DK-30, interview G5-1): host data, not core policy. The first HostSession of an application seeds the application's KeyBindings with it (owner decision DK-44); the application's rebindings stay over it. Default: ``{pc_key_map()}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -865,7 +931,7 @@ Related types
 
    .. cpp:member:: HostServiceStatus status
 
-   .. cpp:member:: Point position
+   .. cpp:member:: DesktopLogicalPoint position
 
 .. cpp:namespace:: gui_forms
 
@@ -945,6 +1011,10 @@ Related types
 
       Reads local file references without opening or decoding their contents.
 
+   .. cpp:function:: HostAutoCompleteResult query_auto_complete(const HostAutoCompleteRequest& request)
+
+      Completion candidates from a host-owned source (TextBox and ComboBox auto-complete). No host adapter supplies any yet: the base implementation reports unsupported. Accepted results are bounded to the request's maximum and to valid, non-empty UTF-8 strings without NUL; anything else is reported as backend_failure with no candidates.
+
    .. cpp:function:: HostServiceStatus write_clipboard_image(HostImageView image)
 
       Copies an image to the native clipboard before returning. Does not retain the borrowed view. Replaces clipboard contents on successful publication.
@@ -961,19 +1031,19 @@ Related types
 
       Notification-area icons (capability notification_area). The base class assigns identities, validates images and text, bounds the icon count and removes every live icon at shutdown, so adapters agree on those rules. An unknown or removed identity is an invalid_argument.
 
-   .. cpp:function:: HostServiceStatus update_tray_icon(std::uint64_t icon_id, const HostTrayIconRequest& request)
+   .. cpp:function:: HostServiceStatus update_tray_icon(HostTrayIconId icon_id, const HostTrayIconRequest& request)
 
-   .. cpp:function:: HostServiceStatus remove_tray_icon(std::uint64_t icon_id)
+   .. cpp:function:: HostServiceStatus remove_tray_icon(HostTrayIconId icon_id)
 
-   .. cpp:function:: HostServiceStatus show_tray_notification(std::uint64_t icon_id, const HostTrayNotificationRequest& request)
+   .. cpp:function:: HostServiceStatus show_tray_notification(HostTrayIconId icon_id, const HostTrayNotificationRequest& request)
 
       Capability notification_area_messages.
 
-   .. cpp:function:: HostTrayMenuResult show_tray_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request)
+   .. cpp:function:: HostTrayMenuResult show_tray_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request)
 
       Capability notification_area_menus. Shows a native menu at the icon and returns when it closes, as show_dialog does.
 
-   .. cpp:function:: bool tray_icon_live(std::uint64_t icon_id) const noexcept
+   .. cpp:function:: bool tray_icon_live(HostTrayIconId icon_id) const noexcept
 
    .. cpp:function:: void shutdown() noexcept
 
@@ -1056,6 +1126,10 @@ Related types
 
       *Protected.*
 
+   .. cpp:function:: virtual HostAutoCompleteResult query_auto_complete_impl(const HostAutoCompleteRequest& request)
+
+      *Protected.*
+
    .. cpp:function:: virtual HostServiceStatus write_clipboard_image_impl(HostImageView image)
 
       *Protected.*
@@ -1078,27 +1152,27 @@ Related types
 
       Lets the concrete adapter release native resources after portable terminal state commits.
 
-   .. cpp:function:: virtual HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request)
+   .. cpp:function:: virtual HostServiceStatus add_tray_icon_impl(HostTrayIconId icon_id, const HostTrayIconRequest& request)
 
       *Protected.*
 
       Tray adapters: called with a validated request and an identity the base class assigned. The defaults refuse as unsupported.
 
-   .. cpp:function:: virtual HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id, const HostTrayIconRequest& request)
+   .. cpp:function:: virtual HostServiceStatus update_tray_icon_impl(HostTrayIconId icon_id, const HostTrayIconRequest& request)
 
       *Protected.*
 
-   .. cpp:function:: virtual void remove_tray_icon_impl(std::uint64_t icon_id) noexcept
+   .. cpp:function:: virtual void remove_tray_icon_impl(HostTrayIconId icon_id) noexcept
 
       *Protected.*
 
       Must not fail in a way that leaves the icon shown; called at shutdown.
 
-   .. cpp:function:: virtual HostServiceStatus show_tray_notification_impl(std::uint64_t icon_id, const HostTrayNotificationRequest& request)
+   .. cpp:function:: virtual HostServiceStatus show_tray_notification_impl(HostTrayIconId icon_id, const HostTrayNotificationRequest& request)
 
       *Protected.*
 
-   .. cpp:function:: virtual HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id, const HostTrayMenuRequest& request)
+   .. cpp:function:: virtual HostTrayMenuResult show_tray_menu_impl(HostTrayIconId icon_id, const HostTrayMenuRequest& request)
 
       *Protected.*
 
@@ -1401,11 +1475,26 @@ Related types
 
    ``#include <gui_forms/host/types/host_types.hpp>``
 
-   .. cpp:member:: std::uint64_t icon_id
+   .. cpp:member:: HostTrayIconId icon_id
 
    .. cpp:member:: HostTrayIconAction action
 
       Default: ``{HostTrayIconAction::click}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: HostTrayIconId final
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   The identity of one notification-area icon (owner decision V3-1): assigned by HostServices::add_tray_icon from 1 and never reused by that HostServices; zero is no icon. A distinct type, so it cannot be confused with a window, runtime or request identity, or with a host's own native icon number.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool valid() const noexcept
+
+   .. cpp:member:: std::uint64_t value
 
 .. cpp:namespace:: gui_forms
 
@@ -1427,7 +1516,7 @@ Related types
 
    .. cpp:member:: HostServiceStatus status
 
-   .. cpp:member:: std::uint64_t icon_id
+   .. cpp:member:: HostTrayIconId icon_id
 
 .. cpp:namespace:: gui_forms
 
@@ -1628,7 +1717,7 @@ Related types
 
    .. cpp:function:: HostScreenPointResult pointer_position()
 
-   .. cpp:function:: HostWindowAtResult window_at(Point point)
+   .. cpp:function:: HostWindowAtResult window_at(DesktopLogicalPoint point)
 
       The run's window that is topmost at ``point`` (desktop logical units), counting native decorations where the host can.
 
@@ -1717,7 +1806,7 @@ Related types
 
       *Protected.*
 
-   .. cpp:function:: virtual HostWindowAtResult window_at_impl(Point point) = 0
+   .. cpp:function:: virtual HostWindowAtResult window_at_impl(DesktopLogicalPoint point) = 0
 
       *Protected.*
 
@@ -2355,7 +2444,7 @@ Related types
 
    .. cpp:function:: ApplicationWindowOpenResult open_window(ApplicationWindow&& entry)
 
-      Opens a window, hidden, and includes its model. It is shown at the commit when ``entry.options.initially_visible`` was true. The refusals are ApplicationWindows::open_window's.
+      Opens a window, hidden, and includes its model. It is shown at the commit when ``entry.options.initially_visible`` was true. The refusals are ApplicationWindows::open_window's; on a refusal the model is no longer included (its scope is closed when the entry is still the caller's, abandoned when the host had taken it).
 
    .. cpp:function:: HostServiceStatus show_window(const ApplicationWindowHandle& window)
 
@@ -2455,6 +2544,24 @@ Enumerations
    .. cpp:enumerator:: released
 
    .. cpp:enumerator:: revoked
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: HostAutoCompleteSource
+
+   ``#include <gui_forms/host/types/host_types.hpp>``
+
+   .. cpp:enumerator:: file_system
+
+   .. cpp:enumerator:: file_system_directories
+
+   .. cpp:enumerator:: history_list
+
+   .. cpp:enumerator:: recently_used_list
+
+   .. cpp:enumerator:: all_url
+
+   .. cpp:enumerator:: all_system_sources
 
 .. cpp:namespace:: gui_forms
 
@@ -2863,15 +2970,17 @@ Functions, constants and aliases
 
    The monitor ``device`` in logical units: same id, origin and scale; frame and work area extents divided by the scale. The work area keeps its offset from the monitor origin divided by the scale, so it stays inside the logical frame.
 
-.. cpp:function:: std::size_t nearest_monitor(std::span<const HostMonitor> monitors, Point point) noexcept
+.. cpp:function:: std::size_t nearest_device_monitor(std::span<const HostMonitor> device_monitors, DesktopDevicePoint point) noexcept
 
-   Index of the monitor whose frame contains ``point``, else of the monitor whose frame is nearest to it (squared distance to the rectangle; the first such monitor on a tie). ``monitors`` must not be empty.
+   Index of the monitor whose frame contains ``point``, else of the monitor whose frame is nearest to it (squared distance to the rectangle; the first such monitor on a tie). ``monitors`` must not be empty. The device form reads device monitor records (HostServices::query_monitors), the logical form logical ones (HostWindowing::query_monitors).
 
-.. cpp:function:: Point desktop_logical_point(std::span<const HostMonitor> device_monitors, Point device_point) noexcept
+.. cpp:function:: std::size_t nearest_logical_monitor(std::span<const HostMonitor> logical_monitors, DesktopLogicalPoint point) noexcept
+
+.. cpp:function:: DesktopLogicalPoint desktop_logical_point(std::span<const HostMonitor> device_monitors, DesktopDevicePoint device_point) noexcept
 
    Converts a device desktop point to desktop logical units through the monitor that contains it (or the nearest one). Returns the point unchanged when ``device_monitors`` is empty.
 
-.. cpp:function:: Point desktop_device_point(std::span<const HostMonitor> device_monitors, Point logical_point, double& scale) noexcept
+.. cpp:function:: DesktopDevicePoint desktop_device_point(std::span<const HostMonitor> device_monitors, DesktopLogicalPoint logical_point, double& scale) noexcept
 
    The inverse: finds the monitor whose logical frame contains the point (or the nearest logical frame) and maps it back to device units. Returns the point unchanged when ``device_monitors`` is empty. ``scale`` receives that monitor's scale (1 when there is none), which a caller uses to convert an extent placed at that point.
 

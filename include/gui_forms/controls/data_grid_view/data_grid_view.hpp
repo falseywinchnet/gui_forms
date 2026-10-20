@@ -8,15 +8,18 @@
 #include "gui_forms/controls/panel/text_box/text_box.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/h_scroll_bar/h_scroll_bar.hpp"
 #include "gui_forms/controls/range_control/scroll_bar/v_scroll_bar/v_scroll_bar.hpp"
+#include "gui_forms/controls/data_grid_view/data_grid_view_row_order.hpp"
 #include "gui_forms/event.hpp"
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -78,17 +81,16 @@ struct DataGridViewColumn final {
 // replaced by a generated one ("row.1", "row.2", ...). `cells` holds one value
 // per column in column order; a shorter list is padded with empty values.
 struct DataGridViewRow final {
-    std::string stable_id{};
+    DataGridViewRowId stable_id{};
     std::vector<BindingValue> cells{};
     std::string header_text{};
     bool read_only{};
 };
 
-// A cell by row and column position. Positions are indices into the current
-// rows and columns, not identities: inserting, removing or sorting rows moves
-// them.
+// A cell by row position and column index, as the rows are presented now.
+// Inserting, removing or sorting rows moves the row a position names.
 struct DataGridViewCellAddress final {
-    std::size_t row{};
+    DataGridViewRowPosition row{};
     std::size_t column{};
 
     friend constexpr bool operator==(const DataGridViewCellAddress& left,
@@ -97,15 +99,19 @@ struct DataGridViewCellAddress final {
     }
 };
 
-// The cell an event concerns.
+// The cell an event concerns: its row's identity, the row's position when
+// the event is raised (the position it had, for a row just removed), and the
+// column.
 struct DataGridViewCellEvent final {
-    std::size_t row{};
+    DataGridViewRowId row_id{};
+    DataGridViewRowPosition row{};
     std::size_t column{};
 };
 
 // Raised before an edit begins; setting `cancel` keeps the cell out of edit.
 struct DataGridViewCellCancelEvent final {
-    std::size_t row{};
+    DataGridViewRowId row_id{};
+    DataGridViewRowPosition row{};
     std::size_t column{};
     bool cancel{};
 };
@@ -113,40 +119,45 @@ struct DataGridViewCellCancelEvent final {
 // Raised before an edited text cell commits, with the text as typed. Setting
 // `cancel` refuses the text: the cell stays in edit and is marked invalid.
 struct DataGridViewCellValidatingEvent final {
-    std::size_t row{};
+    DataGridViewRowId row_id{};
+    DataGridViewRowPosition row{};
     std::size_t column{};
     std::string formatted_value{};
     bool cancel{};
 };
 
 // The application side of virtual mode (Windows Forms' CellValueNeeded and
-// CellValuePushed). The grid asks for the values of the cells it shows, of the
-// current cell and of cells semantics or the application read; it never asks
-// for a row it does not show. Calls arrive on the grid's UI thread, from
-// paint, layout, input and the grid's own methods. The provider may not
-// mutate the grid from inside a call.
+// CellValuePushed), on ObjectView's stable-ID model: the application owns the
+// rows and their order and gives the order to the grid as row IDs (in full
+// with set_virtual_rows and set_virtual_row_order, by change with
+// insert_virtual_rows, remove_virtual_rows and move_virtual_row, or on demand
+// through a DataGridViewRowWindowSource); the grid asks for values by ID.
+// It asks for the cells it shows, the current cell, and cells semantics or the
+// application read through the grid; it never asks for any other row. Calls
+// arrive on the grid's UI thread, from paint, layout, input and the grid's own
+// methods. The provider may not mutate the grid from inside a call.
 class DataGridViewCellValueProvider {
 public:
     virtual ~DataGridViewCellValueProvider();
-    // The value of one cell; `row` is below the grid's row count.
-    [[nodiscard]] virtual BindingValue cell_value(std::size_t row, std::size_t column) const = 0;
+    // The value of one cell; `row` is in the grid's current order.
+    [[nodiscard]] virtual BindingValue cell_value(const DataGridViewRowId& row, std::size_t column) const = 0;
     // Stores a committed value. Returning false refuses it: the cell keeps its
     // old value and no cell_value_changed is raised.
-    virtual bool push_cell_value(std::size_t row, std::size_t column, const BindingValue& value) = 0;
-    // The stable ID of a row, for selection, events and accessibility. The
-    // default names row n "row.n"; a provider whose rows move overrides it.
-    [[nodiscard]] virtual std::string row_stable_id(std::size_t row) const;
+    virtual bool push_cell_value(const DataGridViewRowId& row, std::size_t column, const BindingValue& value) = 0;
 };
 
 // A grid of rows and typed columns (Windows Forms' DataGridView): text,
 // check box, combo box and button columns over unbound rows the grid owns,
 // virtual rows whose values an application provider supplies on demand, or a
-// BindingSource's records. The column header row and the row header column
-// stay in place while the cells scroll beneath them. Cells are records, not
-// controls: only the visible rows and columns are realized, as the "row",
-// "cell" and "column" item systems, and every part is painted through the
-// by-role paint path. A text cell edits in a hosted TextBox placed over it; a
-// combo box cell chooses from a ContextMenu of its column's items.
+// BindingSource's records. Every row has a stable ID (DataGridViewRowId), and
+// the grid keeps its selection, current cell and edit by ID; row numbers in
+// the API are presentation positions (DataGridViewRowPosition). The column
+// header row and the row header column stay in place while the cells scroll
+// beneath them. Cells are records, not controls: only the visible rows and
+// columns are realized, as the "row", "cell" and "column" item systems, and
+// every part is painted through the by-role paint path. A text cell edits in
+// a hosted TextBox placed over it; a combo box cell chooses from a
+// ContextMenu of its column's items.
 class DataGridView final : public Control {
 public:
     static constexpr bool initialize_tree_after_construction = true;
@@ -177,40 +188,108 @@ public:
     // -- rows ------------------------------------------------------------
     [[nodiscard]] DataGridViewRowSource row_source() const noexcept { return row_source_; }
     [[nodiscard]] std::size_t row_count() const noexcept;
-    // Unbound rows grow with generated rows or are cut from the end; virtual
-    // rows take the count. Throws std::logic_error for bound rows.
+    // Unbound rows grow with generated rows or are cut from the end; cutting
+    // the current row makes the new last row current. Throws
+    // std::logic_error for virtual rows (counted by their order) and bound
+    // rows (counted by their source).
     void set_row_count(std::size_t count);
     // Unbound rows only (std::logic_error otherwise). Throws
     // std::invalid_argument for a duplicate stable ID, invalid UTF-8 or more
-    // values than columns, and std::out_of_range for an insertion index past
-    // the end. Returns the new row's index.
-    std::size_t add_row(DataGridViewRow row);
-    void insert_row(std::size_t index, DataGridViewRow row);
+    // values than columns, and std::out_of_range for an insertion position
+    // past the end. add_row returns the new row's position.
+    DataGridViewRowPosition add_row(DataGridViewRow row);
+    void insert_row(DataGridViewRowPosition position, DataGridViewRow row);
     void set_rows(std::vector<DataGridViewRow> rows);
-    void remove_row_at(std::size_t row);
+    // When the removed row held the current cell, the row that takes its
+    // position, or the new last row, becomes current.
+    void remove_row_at(DataGridViewRowPosition position);
     // Removes every row of any source and returns to unbound rows.
     void clear_rows();
-    [[nodiscard]] std::string row_stable_id(std::size_t row) const;
-    [[nodiscard]] std::optional<std::size_t> row_index(std::string_view stable_id) const;
+    // The ID of the row at a position. Throws std::out_of_range past the end.
+    [[nodiscard]] DataGridViewRowId row_id(DataGridViewRowPosition position) const;
+    // The position of the row with an ID, or none.
+    [[nodiscard]] std::optional<DataGridViewRowPosition> row_position(const DataGridViewRowId& row) const;
     // Throws std::out_of_range for a cell past the rows or columns.
-    [[nodiscard]] BindingValue cell_value(std::size_t row, std::size_t column) const;
+    [[nodiscard]] BindingValue cell_value(DataGridViewRowPosition row, std::size_t column) const;
     // The text a cell shows: its value as text, a button column's text for
     // an empty button cell.
-    [[nodiscard]] std::string cell_text(std::size_t row, std::size_t column) const;
+    [[nodiscard]] std::string cell_text(DataGridViewRowPosition row, std::size_t column) const;
     // Stores a value from the program (read-only does not apply) and raises
     // cell_value_changed when it differs. Returns false when a provider or
     // binding source refuses it.
-    bool set_cell_value(std::size_t row, std::size_t column, BindingValue value);
+    bool set_cell_value(DataGridViewRowPosition row, std::size_t column, BindingValue value);
     // Orders unbound rows stably by one column's values (empty values
     // first, then booleans, numbers and text) and shows the sort glyph on
-    // that column alone. The current cell and the selection follow their
+    // that column alone. The current cell and the selection stay on their
     // rows. Returns false, changing nothing, for virtual or bound rows or
     // when an edit in progress does not commit.
     bool sort(std::size_t column, DataGridViewSortDirection direction);
 
-    // Switches to virtual rows asked of `provider`, `count` of them; a null
-    // provider throws std::invalid_argument. Unbound rows are discarded.
-    void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider, std::size_t count);
+    // Switches to virtual rows: `order` lists the rows' IDs in presentation
+    // order, and their values are asked of `provider` by ID. Unbound rows are
+    // discarded and any edit, the selection and the current cell end. Throws
+    // std::invalid_argument, changing nothing, for a null provider or an
+    // empty, repeated or invalid UTF-8 ID.
+    void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider,
+                          std::vector<DataGridViewRowId> order);
+    // Replaces the virtual rows' order after the application inserted,
+    // removed, filtered or sorted rows (ObjectView's complete replacement).
+    // Selected rows and cells, the current cell, an edit in progress and the
+    // first displayed row stay on their IDs. A selected row that is gone
+    // leaves the selection; when the current row is gone, its edit is
+    // discarded and the row now at its position, or the new last row, becomes
+    // current. Throws std::logic_error unless the rows are virtual, and
+    // std::invalid_argument, changing nothing, for an empty, repeated or
+    // invalid UTF-8 ID.
+    void set_virtual_row_order(std::vector<DataGridViewRowId> order);
+
+    // -- the virtual row order (owner decision W-5) ----------------------
+    // Virtual rows whose order a window source keeps: the grid starts in the
+    // mode the order policy gives (window, unless it is pinned to edit or the
+    // automatic policy finds few rows) and asks the source for IDs. Throws
+    // std::invalid_argument for a null provider or source.
+    void set_virtual_rows(std::shared_ptr<DataGridViewCellValueProvider> provider,
+                          std::shared_ptr<DataGridViewRowWindowSource> source);
+    // Gives the virtual rows a window source, which window mode needs, or
+    // takes it away (null): in window mode the grid first fetches every ID
+    // from the old source and goes to edit mode. Throws std::logic_error
+    // unless the rows are virtual.
+    void set_virtual_row_window_source(std::shared_ptr<DataGridViewRowWindowSource> source);
+    [[nodiscard]] std::shared_ptr<DataGridViewRowWindowSource> virtual_row_window_source() const noexcept {
+        return window_source_;
+    }
+    // Reports changes the application made to its order, each costing in
+    // proportion to the change (see DataGridViewRowOrder). The rows are
+    // already in their new places: the inserted IDs stand at [position,
+    // position + ids.size()), a moved row at `position`. Selected rows and
+    // cells, the current cell, an edit and the first displayed row stay on
+    // their IDs; a removed selected row leaves the selection, and when the
+    // current row is removed its edit is discarded and the row now at its
+    // position, or the new last row, becomes current. In edit mode an
+    // invalid report (an empty, repeated or invalid UTF-8 ID, a removed or
+    // moved row that is not there) throws std::invalid_argument and a position
+    // past the end std::out_of_range, changing nothing; in window mode the
+    // source is trusted. Throws std::logic_error unless the rows are virtual.
+    void insert_virtual_rows(DataGridViewRowPosition position, std::vector<DataGridViewRowId> ids);
+    void remove_virtual_rows(std::vector<DataGridViewRowId> ids);
+    void move_virtual_row(const DataGridViewRowId& row, DataGridViewRowPosition position);
+    // The order's mode, and who chooses it. The automatic policy switches by
+    // the thresholds after each report, reset and policy or source change
+    // (never during layout), raising row_order_mode_changed; pinning a mode
+    // switches to it at once. Pinning window throws std::logic_error without
+    // a window source.
+    [[nodiscard]] DataGridViewRowOrderMode row_order_mode() const noexcept { return virtual_order_.mode(); }
+    [[nodiscard]] DataGridViewRowOrderPolicy row_order_policy() const noexcept { return row_order_policy_; }
+    void set_row_order_policy(DataGridViewRowOrderPolicy policy);
+    [[nodiscard]] const DataGridViewRowOrderThresholds& row_order_thresholds() const noexcept {
+        return row_order_thresholds_;
+    }
+    // Throws std::invalid_argument when edit_rows exceeds window_rows or
+    // edit_changes exceeds window_changes.
+    void set_row_order_thresholds(DataGridViewRowOrderThresholds thresholds);
+    [[nodiscard]] const DataGridViewRowOrderStatistics& row_order_statistics() const noexcept {
+        return virtual_order_.statistics();
+    }
     // Repaints after the provider's values changed outside the grid.
     void refresh_rows();
     // Shows a BindingSource's records as rows: a column shows the field its
@@ -241,14 +320,18 @@ public:
     void set_allow_user_to_resize_columns(bool allow);
 
     // -- scrolling -------------------------------------------------------
-    // The first row shown under the column headers.
-    [[nodiscard]] std::size_t first_displayed_row() const noexcept { return first_row_; }
-    void set_first_displayed_row(std::size_t row);
+    // The position of the first row shown under the column headers.
+    [[nodiscard]] DataGridViewRowPosition first_displayed_row() const noexcept {
+        const DataGridViewRowPosition first{first_row_};
+        return first;
+    }
+    void set_first_displayed_row(DataGridViewRowPosition row);
     // How far the cells are scrolled left, in logical units at text scale 1.
     [[nodiscard]] double horizontal_scroll_offset() const noexcept { return horizontal_offset_; }
     void set_horizontal_scroll_offset(double offset);
-    // The rows a paint shows, partly visible ones included: [first, end).
-    [[nodiscard]] std::size_t displayed_row_end() const;
+    // The rows a paint shows, partly visible ones included: positions
+    // [first_displayed_row, displayed_row_end).
+    [[nodiscard]] DataGridViewRowPosition displayed_row_end() const;
     [[nodiscard]] std::shared_ptr<VScrollBar> vertical_scroll_bar() const noexcept { return vertical_bar_; }
     [[nodiscard]] std::shared_ptr<HScrollBar> horizontal_scroll_bar() const noexcept { return horizontal_bar_; }
 
@@ -259,23 +342,27 @@ public:
     [[nodiscard]] bool multi_select() const noexcept { return multi_select_; }
     // Turning it off keeps only the current cell (or row) selected.
     void set_multi_select(bool multi_select);
-    [[nodiscard]] std::optional<DataGridViewCellAddress> current_cell() const noexcept { return current_; }
+    // The current cell at its row's present position, or none. The grid keeps
+    // it by row ID, so it stays on its row when rows move.
+    [[nodiscard]] std::optional<DataGridViewCellAddress> current_cell() const;
+    // The current cell's row ID, or none.
+    [[nodiscard]] std::optional<DataGridViewRowId> current_row_id() const;
     // Moves the current cell, committing any edit first, and selects it alone.
     // Returns false, changing nothing, when the edit does not commit. Throws
     // std::out_of_range for a cell past the rows or columns.
     bool set_current_cell(std::optional<DataGridViewCellAddress> cell);
-    [[nodiscard]] bool is_cell_selected(std::size_t row, std::size_t column) const noexcept;
-    [[nodiscard]] bool is_row_selected(std::size_t row) const noexcept;
+    [[nodiscard]] bool is_cell_selected(DataGridViewRowPosition row, std::size_t column) const;
+    [[nodiscard]] bool is_row_selected(DataGridViewRowPosition row) const;
     // In full-row mode a cell's selection is its row's. Throws
     // std::out_of_range for a cell past the rows or columns.
-    void set_cell_selected(std::size_t row, std::size_t column, bool selected);
-    void set_row_selected(std::size_t row, bool selected);
-    // The selected cells, by row then column; in full-row mode every cell of
-    // every selected row.
+    void set_cell_selected(DataGridViewRowPosition row, std::size_t column, bool selected);
+    void set_row_selected(DataGridViewRowPosition row, bool selected);
+    // The selected cells at their rows' present positions, by row then
+    // column; in full-row mode every cell of every selected row.
     [[nodiscard]] std::vector<DataGridViewCellAddress> selected_cells() const;
-    // The selected rows in order: full-row selections, or in cell mode the
-    // rows whose every cell is selected.
-    [[nodiscard]] std::vector<std::size_t> selected_rows() const;
+    // The selected rows' present positions in order: full-row selections, or
+    // in cell mode the rows whose every cell is selected.
+    [[nodiscard]] std::vector<DataGridViewRowPosition> selected_rows() const;
     void clear_selection();
     // Selects every cell (or row); allowed only with multi_select.
     void select_all();
@@ -301,7 +388,8 @@ public:
     // -- events ----------------------------------------------------------
     // Raised once after an operation changes which cells or rows are selected.
     [[nodiscard]] Event<>& selection_changed() noexcept { return selection_changed_; }
-    // Raised after the current cell moves, with the new cell or none.
+    // Raised after the current cell moves to another cell, with the new cell
+    // or none; not when only its row's position changes.
     [[nodiscard]] Event<std::optional<DataGridViewCellAddress>>& current_cell_changed() noexcept {
         return current_cell_changed_;
     }
@@ -320,6 +408,10 @@ public:
     // user.
     [[nodiscard]] Event<const DataGridViewCellEvent&>& cell_content_click() noexcept {
         return cell_content_click_;
+    }
+    // Raised after the virtual row order switched mode, with the reason.
+    [[nodiscard]] Event<const DataGridViewRowOrderModeChange&>& row_order_mode_changed() noexcept {
+        return row_order_mode_changed_;
     }
     // Raised when a column header is clicked, with the column's index.
     [[nodiscard]] Event<std::size_t>& column_header_click() noexcept { return column_header_click_; }
@@ -383,7 +475,7 @@ public:
         bool read_only{};
     };
     struct Row final {
-        std::size_t index{};
+        DataGridViewRowPosition position{};
         std::string stable_id;
         RowParts parts;
         RowStates states;
@@ -483,7 +575,7 @@ private:
     };
     struct HitResult final {
         HitZone zone{HitZone::none};
-        std::size_t row{};
+        DataGridViewRowPosition row{};
         std::size_t column{};
     };
     // How a key or click moves the current cell and the selection.
@@ -491,25 +583,89 @@ private:
     // The kind of edit in progress.
     enum class EditKind : std::uint8_t { none, text, choice };
 
-    // Model access over the three row sources.
-    [[nodiscard]] bool row_read_only(std::size_t row) const;
-    [[nodiscard]] bool cell_read_only(std::size_t row, std::size_t column) const;
-    [[nodiscard]] BindingValue stored_value(std::size_t row, std::size_t column) const;
-    bool store_value(std::size_t row, std::size_t column, const BindingValue& value);
+    // Row identity, as ObjectView keeps it: lookups by ID text without
+    // building a string.
+    struct RowIdHash final {
+        using is_transparent = void;
+        [[nodiscard]] std::size_t operator()(std::string_view id) const noexcept {
+            const std::size_t result = std::hash<std::string_view>{}(id);
+            return result;
+        }
+    };
+    // Row ID text to the row's position in presentation order.
+    using RowPositions = std::unordered_map<std::string, std::size_t, RowIdHash, std::equal_to<>>;
+    using RowIdSet = std::unordered_set<std::string, RowIdHash, std::equal_to<>>;
+    // The column indices of one row's selected cells, sorted and unique.
+    using SelectedColumns = std::vector<std::size_t>;
+    using SelectedCells = std::unordered_map<std::string, SelectedColumns, RowIdHash, std::equal_to<>>;
+    // A cell by its row's identity: the current cell, the selection anchor
+    // and a pressed button cell, which stay on their row when rows move.
+    struct CellKey final {
+        std::string row_id{};
+        std::size_t column{};
+
+        friend bool operator==(const CellKey& left, const CellKey& right) {
+            const bool equal = left.row_id == right.row_id && left.column == right.column;
+            return equal;
+        }
+    };
+
+    // Model access over the three row sources, by present position. The ID
+    // is a copy: a virtual order in window mode may replace its window
+    // while the caller still uses it.
+    [[nodiscard]] std::string row_id_text(DataGridViewRowPosition row) const;
+    [[nodiscard]] bool row_read_only(DataGridViewRowPosition row) const;
+    [[nodiscard]] bool cell_read_only(DataGridViewRowPosition row, std::size_t column) const;
+    [[nodiscard]] BindingValue stored_value(DataGridViewRowPosition row, std::size_t column) const;
+    bool store_value(DataGridViewRowPosition row, std::size_t column, const BindingValue& value);
     void validate_column(const DataGridViewColumn& column) const;
-    using RowIdentities = std::unordered_set<std::string>;
-    [[nodiscard]] RowIdentities row_identities() const;
-    void validate_row(const DataGridViewRow& row, const RowIdentities& used) const;
-    // Fills an empty stable ID with a generated one not in `used`, adds it to
-    // `used`, and pads the cells to the column count.
-    void prepare_row(DataGridViewRow& row, RowIdentities& used);
-    [[nodiscard]] std::string generated_row_id(RowIdentities& used);
-    void require_cell(std::size_t row, std::size_t column) const;
+    // Throws std::invalid_argument for invalid UTF-8 or more values than
+    // columns.
+    void validate_row_text(const DataGridViewRow& row) const;
+    [[nodiscard]] std::string generated_row_id(const RowPositions& used);
+    // Throws std::invalid_argument for an empty, repeated or invalid UTF-8
+    // ID in a virtual order.
+    static void validate_virtual_order(const std::vector<DataGridViewRowId>& order);
+    void require_virtual_rows(const char* what) const;
+    // Before a reported change: the first displayed row's ID, when held
+    // without asking a source.
+    [[nodiscard]] std::optional<std::string> held_top_row() const;
+    // After a reported change: the first displayed row back on its ID, the
+    // change counted, and the mode chosen again.
+    void after_reported_change(const std::optional<std::string>& top, std::size_t changed);
+    // Chooses the mode by the policy and the thresholds, switching and
+    // raising row_order_mode_changed when it changes. `cause` is the reason
+    // reported for a switch the policy or a source made.
+    void update_row_order_mode(DataGridViewRowOrderSwitchReason cause);
+    void switch_row_order(DataGridViewRowOrderMode mode, DataGridViewRowOrderSwitchReason reason);
+    void require_cell(DataGridViewRowPosition row, std::size_t column) const;
     void structure_changed();
     void reset_row_state();
     void detach_data_source() noexcept;
     void on_source_list_changed(const BindingListChange& change);
     void on_source_position_changed(std::ptrdiff_t position);
+
+    // The identity index. row_positions_ maps every row's ID to its position
+    // and is rebuilt whenever rows are added, removed or reordered; a lookup
+    // is checked against the row at the position it finds.
+    void rebuild_row_index();
+    // Writes the positions of the rows from `first` to the end (unbound).
+    void index_rows_from(std::size_t first);
+    [[nodiscard]] std::optional<std::size_t> find_row(std::string_view row_id) const;
+    // The position an event reports for a row: its indexed position, which
+    // for a row being removed is the position it had.
+    [[nodiscard]] DataGridViewRowPosition event_position(std::string_view row_id) const;
+    [[nodiscard]] DataGridViewCellEvent cell_event(const CellKey& cell) const;
+    [[nodiscard]] CellKey key_of(DataGridViewCellAddress cell) const;
+    [[nodiscard]] std::optional<DataGridViewCellAddress> address_of(const CellKey& cell) const;
+    [[nodiscard]] std::optional<std::size_t> current_position() const;
+    [[nodiscard]] bool is_current_row(DataGridViewRowPosition row) const;
+    [[nodiscard]] bool is_current_cell(DataGridViewRowPosition row, std::size_t column) const;
+    // After rows left the index: drops the selections, anchor and pressed
+    // button of rows that are gone, and moves a current cell whose row is
+    // gone to the row now at `former_current` (its row's old position), the
+    // new last row, or none.
+    void drop_missing_rows(std::optional<std::size_t> former_current);
 
     // Layout and geometry: one function per part, used by paint and by the
     // published anatomy.
@@ -517,8 +673,9 @@ private:
     [[nodiscard]] double content_width() const noexcept;
     [[nodiscard]] double column_left(std::size_t column, const GridLayout& layout) const noexcept;
     [[nodiscard]] Rect column_header_bounds(std::size_t column, const GridLayout& layout) const noexcept;
-    [[nodiscard]] Rect row_header_bounds(std::size_t row, const GridLayout& layout) const noexcept;
-    [[nodiscard]] Rect cell_bounds(std::size_t row, std::size_t column, const GridLayout& layout) const noexcept;
+    [[nodiscard]] Rect row_header_bounds(DataGridViewRowPosition row, const GridLayout& layout) const noexcept;
+    [[nodiscard]] Rect cell_bounds(DataGridViewRowPosition row, std::size_t column,
+                                   const GridLayout& layout) const noexcept;
     [[nodiscard]] std::size_t first_visible_column(const GridLayout& layout) const noexcept;
     [[nodiscard]] std::size_t visible_column_end(const GridLayout& layout) const noexcept;
     [[nodiscard]] std::size_t visible_row_end(const GridLayout& layout) const noexcept;
@@ -526,43 +683,49 @@ private:
     [[nodiscard]] std::size_t maximum_first_row(const GridLayout& layout) const noexcept;
     [[nodiscard]] double maximum_horizontal_offset(const GridLayout& layout) const noexcept;
     [[nodiscard]] Parts grid_parts(const GridLayout& layout) const;
-    [[nodiscard]] RowParts row_parts(std::size_t row, const GridLayout& layout) const;
-    [[nodiscard]] CellParts cell_parts(std::size_t row, std::size_t column, const GridLayout& layout) const;
+    [[nodiscard]] RowParts row_parts(DataGridViewRowPosition row, const GridLayout& layout) const;
+    [[nodiscard]] CellParts cell_parts(DataGridViewRowPosition row, std::size_t column,
+                                       const GridLayout& layout) const;
     [[nodiscard]] ColumnParts column_parts(std::size_t column, const GridLayout& layout) const;
-    [[nodiscard]] AnatomyStateSet row_states(std::size_t row) const;
-    [[nodiscard]] AnatomyStateSet cell_states(std::size_t row, std::size_t column) const;
+    [[nodiscard]] AnatomyStateSet row_states(DataGridViewRowPosition row) const;
+    [[nodiscard]] AnatomyStateSet cell_states(DataGridViewRowPosition row, std::size_t column) const;
     [[nodiscard]] AnatomyStateSet column_states(std::size_t column) const;
     [[nodiscard]] HitResult hit_test(Point local) const;
     // Realized items in paint order: rows, then cells row by row, then
-    // column headers.
+    // column headers. A slot names one: its item system, the row of a row or
+    // cell, and the column of a cell or header.
+    struct RealizedSlot final {
+        ItemSystemIndex system{};
+        DataGridViewRowPosition row{};
+        std::size_t column{};
+    };
+    [[nodiscard]] RealizedSlot realized_slot(const GridLayout& layout, std::size_t item) const;
     [[nodiscard]] std::size_t realized_row_count(const GridLayout& layout) const noexcept;
     [[nodiscard]] std::size_t realized_column_count(const GridLayout& layout) const noexcept;
-    void paint_row(Painter& painter, std::size_t row, const GridLayout& layout) const;
-    void paint_cell(Painter& painter, std::size_t row, std::size_t column, const GridLayout& layout) const;
+    void paint_row(Painter& painter, DataGridViewRowPosition row, const GridLayout& layout) const;
+    void paint_cell(Painter& painter, DataGridViewRowPosition row, std::size_t column,
+                    const GridLayout& layout) const;
     void paint_column_header(Painter& painter, std::size_t column, const GridLayout& layout) const;
     void synchronize_scroll_bars(const GridLayout& layout);
     void on_vertical_scroll(double value);
     void on_horizontal_scroll(double value);
     void scroll_into_view(DataGridViewCellAddress cell);
 
-    // Selection.
-    [[nodiscard]] bool cell_in_selection(std::size_t row, std::size_t column) const noexcept;
-    [[nodiscard]] bool row_in_selection(std::size_t row) const noexcept;
-    void insert_selected_cell(DataGridViewCellAddress cell);
-    void erase_selected_cell(DataGridViewCellAddress cell);
-    void insert_selected_row(std::size_t row);
-    void erase_selected_row(std::size_t row);
+    // Selection, kept by row ID.
+    [[nodiscard]] bool cell_in_selection(std::string_view row_id, std::size_t column) const;
+    [[nodiscard]] bool row_in_selection(std::string_view row_id) const;
+    [[nodiscard]] std::size_t selected_cell_count() const noexcept;
+    void insert_selected_cell(const std::string& row_id, std::size_t column);
+    void erase_selected_cell(std::string_view row_id, std::size_t column);
+    void insert_selected_row(const std::string& row_id);
+    void erase_selected_row(std::string_view row_id);
     void select_range(DataGridViewCellAddress from, DataGridViewCellAddress to);
     bool move_current(DataGridViewCellAddress target, SelectionGesture gesture);
-    void apply_current(std::optional<DataGridViewCellAddress> cell);
+    void apply_current(std::optional<CellKey> cell);
     void clear_selection_state() noexcept;
     void select_current_alone();
     // Raises selection_changed when the selection revision moved past `before`.
     void publish_selection(std::uint64_t before);
-    void shift_rows_after_insert(std::size_t row);
-    void shift_rows_after_remove(std::size_t row);
-    // Drops selections, the current cell and the anchor at or past `count`.
-    void trim_rows(std::size_t count);
 
     // Editing and activation.
     bool begin_text_edit(std::string initial_text, bool select_all);
@@ -580,20 +743,33 @@ private:
     [[nodiscard]] bool tab_key(bool backward);
 
     // Semantics.
-    [[nodiscard]] std::string cell_stable_id(std::size_t row, std::size_t column) const;
+    [[nodiscard]] std::string cell_stable_id(DataGridViewRowPosition row, std::size_t column) const;
     [[nodiscard]] std::string column_stable_id(std::size_t column) const;
     [[nodiscard]] std::optional<DataGridViewCellAddress> cell_from_stable_id(std::string_view id) const;
 
     std::vector<DataGridViewColumn> columns_{};
     DataGridViewRowSource row_source_{DataGridViewRowSource::unbound};
+    // Unbound rows, in presentation order.
     std::vector<DataGridViewRow> rows_{};
     std::uint64_t next_row_number_{1U};
     std::shared_ptr<DataGridViewCellValueProvider> provider_{};
-    std::size_t virtual_row_count_{};
+    // Virtual rows: the application's order of row IDs (owner decision W-5),
+    // the window source window mode asks, the policy and its thresholds, the
+    // changes reported since the last layout pass and in the pass before,
+    // and the reason the order last went to window mode.
+    DataGridViewRowOrder virtual_order_{};
+    std::shared_ptr<DataGridViewRowWindowSource> window_source_{};
+    DataGridViewRowOrderPolicy row_order_policy_{DataGridViewRowOrderPolicy::automatic};
+    DataGridViewRowOrderThresholds row_order_thresholds_{};
+    std::size_t changes_this_pass_{};
+    std::size_t changes_last_pass_{};
+    DataGridViewRowOrderSwitchReason window_reason_{DataGridViewRowOrderSwitchReason::row_count};
     std::shared_ptr<BindingSource> data_source_{};
     SubscriptionToken source_list_changed_{};
     SubscriptionToken source_position_changed_{};
     bool synchronizing_position_{};
+    // The identity index of whichever source holds the rows.
+    RowPositions row_positions_{};
 
     std::shared_ptr<TextBox> editor_{};
     std::shared_ptr<VScrollBar> vertical_bar_{};
@@ -618,17 +794,22 @@ private:
     bool read_only_{};
     bool allow_column_resize_{true};
 
+    // The position of the first displayed row.
     std::size_t first_row_{};
     double horizontal_offset_{};
 
     DataGridViewSelectionMode selection_mode_{DataGridViewSelectionMode::cell_select};
     bool multi_select_{true};
-    std::optional<DataGridViewCellAddress> current_{};
-    std::optional<DataGridViewCellAddress> anchor_{};
-    // Sorted by row, then column; holds cell-mode selections only.
-    std::vector<DataGridViewCellAddress> selected_cells_{};
-    // Sorted; holds full-row selections only.
-    std::vector<std::size_t> selected_rows_{};
+    // The current cell, the anchor of an extended selection and a held
+    // button cell, by row ID. Each names a row in the index or is empty.
+    std::optional<CellKey> current_{};
+    std::optional<CellKey> anchor_{};
+    std::optional<CellKey> pressed_button_{};
+    // Cell-mode selections by row ID; a row with no selected cell has no
+    // entry.
+    SelectedCells selected_cells_{};
+    // Full-row selections by row ID.
+    RowIdSet selected_rows_{};
     // Counts selection changes, so an operation raises selection_changed once.
     std::uint64_t selection_revision_{};
 
@@ -642,7 +823,6 @@ private:
     std::optional<std::size_t> resizing_column_{};
     double resize_start_x_{};
     double resize_start_width_{};
-    std::optional<DataGridViewCellAddress> pressed_button_{};
 
     Event<> selection_changed_{};
     Event<std::optional<DataGridViewCellAddress>> current_cell_changed_{};
@@ -651,6 +831,7 @@ private:
     Event<DataGridViewCellValidatingEvent&> cell_validating_{};
     Event<const DataGridViewCellEvent&> cell_value_changed_{};
     Event<const DataGridViewCellEvent&> cell_content_click_{};
+    Event<const DataGridViewRowOrderModeChange&> row_order_mode_changed_{};
     Event<std::size_t> column_header_click_{};
     Event<std::size_t> column_width_changed_{};
 };

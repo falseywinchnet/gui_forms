@@ -32,9 +32,17 @@ RULES: tuple[tuple[str, str], ...] = (
     ("coroutine", r"\bco_(?:await|yield|return)\b"),
     ("ranges-or-views", r"\bstd\s*::\s*(?:ranges|views)\s*::"),
     ("defaulted-comparison", r"\boperator\s*(?:==|!=|<=>|<=|>=|<|>)\s*\([^;{}]*?=\s*default\b"),
+    # Objective-C block literals (^{ ... }, ^(arguments) { ... } and
+    # ^Return(arguments) { ... }) are anonymous callbacks, which section 2
+    # forbids (owner decision V2-1). Checked in every file: C++ exclusive-or
+    # never puts a brace, or a parameter list and then a brace, after `^`, so
+    # in C++ sources the rule finds nothing; the macOS host's run file is
+    # Objective-C++ in a ".inc".
+    ("objective-c-block", r"\^\s*\{|\^\s*\([^()]*\)\s*\{|\^\s*[A-Za-z_]\w*\s*\*?\s*\([^()]*\)\s*\{"),
     ("lambda-review", r"\[(?:\s*|[^\[\];]*?)\]\s*(?:<[^;{}]+>\s*)?(?:\([^;{}]*?\)\s*)?(?:mutable\s*)?(?:noexcept\s*)?(?:->[^{};]+)?\{"),
 )
-EXTENSIONS: tuple[str, ...] = (".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h", ".mm")
+# ".inc" holds C++ included into a translation unit (the hosts' run files).
+EXTENSIONS: tuple[str, ...] = (".cpp", ".cc", ".cxx", ".hpp", ".hh", ".h", ".mm", ".m", ".inc")
 EXCLUDED: tuple[str, ...] = (".git", ".build", "build", "third_party", "vendor", "node_modules")
 
 

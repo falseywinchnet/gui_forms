@@ -9,8 +9,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <atomic>
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <utility>
@@ -68,11 +70,105 @@ Rect live_change_in_window(const LiveSurface& surface,
                        widened.width * horizontal, widened.height * vertical};
     return changed;
 }
+// Replaces `bgra` with the framebuffer's pixels as tightly packed
+// premultiplied BGRA rows of width * 4 bytes, the image registry's layout;
+// an RGBA raster has red and blue swapped as it is copied. False, leaving
+// `bgra` empty, for an empty framebuffer or one whose pixel span is shorter
+// than its rows. The framebuffer is only read.
+bool copy_framebuffer_bgra(PaintFramebuffer& framebuffer, std::vector<std::byte>& bgra) {
+    bgra.clear();
+    const std::size_t width = framebuffer.width();
+    const std::size_t height = framebuffer.height();
+    const std::size_t source_row = framebuffer.row_bytes();
+    const std::span<std::byte> pixels = framebuffer.pixels();
+    const std::size_t row = width * 4U;
+    if (width == 0U || height == 0U || source_row < row || pixels.size() < source_row * height) return false;
+    bgra.resize(row * height);
+    const bool swap = framebuffer.channel_order() == FramebufferChannelOrder::rgba;
+    if (!swap) {
+        for (std::size_t y = 0; y < height; ++y) {
+            const std::byte* const from = pixels.data() + y * source_row;
+            std::copy(from, from + row, bgra.data() + y * row);
+        }
+        return true;
+    }
+    for (std::size_t y = 0; y < height; ++y) {
+        const std::byte* const from = pixels.data() + y * source_row;
+        std::byte* const to = bgra.data() + y * row;
+        std::copy(from, from + row, to);
+        for (std::size_t x = 0; x < width; ++x) std::swap(to[x * 4U], to[x * 4U + 2U]);
+    }
+    return true;
+}
 } // namespace detail
 
 void Window::set_framebuffer_painter(Painter* const painter) {
     require_ui_thread("set_framebuffer_painter");
     framebuffer_painter_ = painter;
+}
+
+// Four stages: validate the request; record the subtree's planes into one
+// display chunk; replay that chunk into an offscreen framebuffer; copy the
+// pixels into the image registry as premultiplied BGRA.
+std::optional<ControlSnapshot> Window::snapshot_control(const Control::Ptr& control, const double scale) {
+    require_ui_thread("snapshot_control");
+    if (in_paint_ || framebuffer_painter_ == nullptr || !control) return std::nullopt;
+    if (!(*control).is_alive() || (*control).window_ != this || !(*control).effectively_visible()) return std::nullopt;
+    if (!std::isfinite(scale) || scale <= 0.0 || scale > 8.0) return std::nullopt;
+    const Rect bounds = absolute_bounds_of(*control);
+    if (bounds.empty() || !bounds.finite()) return std::nullopt;
+    const Size logical{bounds.width, bounds.height};
+    const std::unique_ptr<PaintFramebuffer> framebuffer = create_framebuffer(logical, scale);
+    if (!framebuffer) return std::nullopt;
+    // Record: the subtree's planes, each in order, into one command list in
+    // the subtree's own coordinates.
+    detail::RecordingPainter candidate(text_metrics_provider_);
+    std::uint64_t visited_nodes = 0;
+    std::uint64_t painted_controls = 0;
+    std::uint64_t consumed_invalidations = 0;
+    std::uint64_t chunks_rebuilt = 0;
+    std::uint64_t chunks_reused = 0;
+    std::uint64_t commands_replayed = 0;
+    candidate.save();
+    candidate.translate({-bounds.x, -bounds.y});
+    for (std::size_t index = 0; index < paint_plane_count; ++index) {
+        const PaintPlane plane = static_cast<PaintPlane>(index);
+        paint_recursive(control, candidate, bounds, plane, visited_nodes, painted_controls, consumed_invalidations,
+                        chunks_rebuilt, chunks_reused, commands_replayed);
+    }
+    candidate.restore();
+    const Rect local{0.0, 0.0, logical.width, logical.height};
+    const std::shared_ptr<const detail::DisplayChunk> recorded =
+        candidate.finish(display_generation_, PaintPlane::control, local);
+    // Rebuilt chunks consumed their paint dirt without reaching the screen.
+    if (consumed_invalidations > 0U && (*control).is_alive()) mark_subtree_dirty(*control, Dirty::paint);
+    // Replay into the offscreen raster.
+    if (!(*framebuffer).begin(image_resources(), local)) return std::nullopt;
+    static_cast<void>(detail::replay_display_chunk(*recorded, (*framebuffer).painter()));
+    (*framebuffer).end();
+    // Register the pixels in the registry's layout.
+    std::vector<std::byte> bgra;
+    if (!detail::copy_framebuffer_bgra(*framebuffer, bgra)) return std::nullopt;
+    const std::uint32_t width = (*framebuffer).width();
+    const std::uint32_t height = (*framebuffer).height();
+    const std::uint64_t row = static_cast<std::uint64_t>(width) * 4U;
+    const ImageLoadResult loaded = (*resources_).registry().load_bgra32_premultiplied(width, height, row, bgra);
+    if (!loaded) return std::nullopt;
+    ControlSnapshot snapshot{};
+    snapshot.image = loaded.image;
+    snapshot.logical_size = logical;
+    snapshot.scale = scale;
+    snapshot.pixel_width = width;
+    snapshot.pixel_height = height;
+    return snapshot;
+}
+
+bool Window::release_control_snapshot(ImageId image) {
+    require_ui_thread("release_control_snapshot");
+    // The repainting removal: a stamp that showed the picture may still be
+    // in a retained chunk.
+    const bool removed = (*resources_).remove_image(image);
+    return removed;
 }
 
 std::unique_ptr<PaintFramebuffer> Window::create_framebuffer(const Size logical_size, const double scale) {

@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdio>
 #include <exception>
+#include <memory>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -182,23 +183,64 @@ HostPathDialogResult native_path_result(NSModalResponse response,
     return result;
 }
 
+// Test cancellation on the main queue without Objective-C blocks (owner
+// decision V2-1): a named context, adopted and deleted by a named
+// dispatch_function_t; the context keeps the panel or alert alive until the
+// work runs, as the replaced blocks did.
+struct PanelCancelWork final {
+    NSSavePanel* panel;
+};
+
+void cancel_panel_on_main(void* context) {
+    const std::unique_ptr<PanelCancelWork> work(static_cast<PanelCancelWork*>(context));
+    [(*work).panel cancel:nil];
+}
+
+struct AlertCancelWork final {
+    NSAlert* alert;
+};
+
+void cancel_alert_on_main(void* context) {
+    const std::unique_ptr<AlertCancelWork> work(static_cast<AlertCancelWork*>(context));
+    [(*work).alert.window orderOut:nil];
+    [NSApp abortModal];
+}
+
+// Keeps Escape on the cancel choice when Cancel is also the declared
+// default: the window's default button cell then gives Cancel Return as its
+// key equivalent, and AppKit ignores Escape
+// (tests/macos_message_dialog_key_tests.mm). A second button carries Escape
+// and clicks Cancel through its target and action, in place of a block-only
+// event monitor (owner decision V2-1); [alert runModal] then handles every
+// key itself. Hidden views take no key equivalents, so the button is
+// zero-sized rather than hidden, and it is kept out of the accessibility
+// tree. It joins the content view after [alert layout], which runModal's own
+// layout keeps; as the accessory view it would make the alert 16 pt taller.
+// The alert's view tree owns the button; the button only observes Cancel.
+void add_escape_clicks_cancel(NSAlert* alert, NSButton* cancel_button) {
+    [alert layout];
+    NSButton* escape = [[NSButton alloc] initWithFrame:NSZeroRect];
+    escape.keyEquivalent = @"\e";
+    escape.target = cancel_button;
+    escape.action = @selector(performClick:);
+    [escape setAccessibilityElement:NO];
+    [alert.window.contentView addSubview:escape];
+}
+
 void schedule_test_panel_cancel(NSSavePanel* panel, bool enabled) {
     if (!enabled) {
         return;
     }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [panel cancel:nil];
-    });
+    PanelCancelWork* const work = new PanelCancelWork{panel};
+    dispatch_async_f(dispatch_get_main_queue(), work, &cancel_panel_on_main);
 }
 
 void schedule_test_alert_cancel(NSAlert* alert, bool enabled) {
     if (!enabled) {
         return;
     }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [alert.window orderOut:nil];
-        [NSApp abortModal];
-    });
+    AlertCancelWork* const work = new AlertCancelWork{alert};
+    dispatch_async_f(dispatch_get_main_queue(), work, &cancel_alert_on_main);
 }
 
 class AppKitHostServices final : public HostServices {
@@ -418,7 +460,7 @@ protected:
                     break;
                 }
                 NSButton* defaultButton = nil;
-                NSModalResponse cancelResponse = 0;
+                NSButton* cancelButton = nil;
                 for (std::size_t index = 0U; index < buttons.size(); ++index) {
                     const std::pair<NSString*, HostDialogChoice>& button_choice =
                         buttons[index];
@@ -432,28 +474,16 @@ protected:
                     button.keyEquivalent = choice == HostDialogChoice::cancel
                         ? @"\e" : @"";
                     if (choice == payload.default_choice) defaultButton = button;
-                    if (choice == HostDialogChoice::cancel) {
-                        cancelResponse = NSAlertFirstButtonReturn +
-                            static_cast<NSModalResponse>(index);
-                    }
+                    if (choice == HostDialogChoice::cancel) cancelButton = button;
                 }
                 if (defaultButton != nil) {
                     alert.window.defaultButtonCell = defaultButton.cell;
                 }
-                schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
-                id escapeMonitor = nil;
-                if (cancelResponse != 0) {
-                    escapeMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:
-                        NSEventMaskKeyDown handler:^NSEvent* (NSEvent* event) {
-                            if (event.keyCode == 53U) {
-                                [NSApp stopModalWithCode:cancelResponse];
-                                return nil;
-                            }
-                            return event;
-                        }];
+                if (cancelButton != nil && defaultButton == cancelButton) {
+                    add_escape_clicks_cancel(alert, cancelButton);
                 }
+                schedule_test_alert_cancel(alert, cancel_dialogs_for_testing_);
                 const NSModalResponse response = [alert runModal];
-                if (escapeMonitor != nil) [NSEvent removeMonitor:escapeMonitor];
                 HostMessageDialogResult value;
                 const NSInteger index = response - NSAlertFirstButtonReturn;
                 if (index >= 0 && static_cast<std::size_t>(index) < buttons.size()) {
@@ -573,7 +603,7 @@ protected:
 
     // Notification-area icons: NSStatusItems in the menu bar, created with the
     // first icon. Notification text is not offered (see AppKitStatusItems).
-    HostServiceStatus add_tray_icon_impl(std::uint64_t icon_id,
+    HostServiceStatus add_tray_icon_impl(gui_forms::HostTrayIconId icon_id,
                                          const gui_forms::HostTrayIconRequest& request) override {
         if (!status_items_) {
             status_items_ = std::make_unique<gui_forms::host::detail::AppKitStatusItems>(
@@ -582,15 +612,15 @@ protected:
         }
         return (*status_items_).add(icon_id, request);
     }
-    HostServiceStatus update_tray_icon_impl(std::uint64_t icon_id,
+    HostServiceStatus update_tray_icon_impl(gui_forms::HostTrayIconId icon_id,
                                             const gui_forms::HostTrayIconRequest& request) override {
         if (!status_items_) return {HostServiceError::backend_failure};
         return (*status_items_).update(icon_id, request);
     }
-    void remove_tray_icon_impl(std::uint64_t icon_id) noexcept override {
+    void remove_tray_icon_impl(gui_forms::HostTrayIconId icon_id) noexcept override {
         if (status_items_) (*status_items_).remove(icon_id);
     }
-    gui_forms::HostTrayMenuResult show_tray_menu_impl(std::uint64_t icon_id,
+    gui_forms::HostTrayMenuResult show_tray_menu_impl(gui_forms::HostTrayIconId icon_id,
                                                       const gui_forms::HostTrayMenuRequest& request) override {
         if (!status_items_) {
             gui_forms::HostTrayMenuResult refused;

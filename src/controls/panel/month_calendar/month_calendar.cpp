@@ -33,6 +33,17 @@ constexpr double arrow_size = 22.0;
 constexpr double glyph_size = 7.0;
 constexpr std::uint32_t maximum_months = 12U;
 
+// One month block's size, unscaled: the margins, the week-number column
+// when shown and seven day columns across; the margins, the title and
+// weekday rows and six rows of days down.
+Size month_block_size(bool week_numbers) noexcept {
+    const double week = week_numbers ? week_column_width : 0.0;
+    const double width = block_margin * 2.0 + week + cell_width * 7.0;
+    const double height = block_margin * 2.0 + title_height + weekday_height + cell_height * 6.0;
+    const Size result{width, height};
+    return result;
+}
+
 Rect scaled(Rect bounds, double scale) noexcept {
     const Rect result{bounds.x * scale, bounds.y * scale, bounds.width * scale, bounds.height * scale};
     return result;
@@ -414,11 +425,9 @@ void MonthCalendar::ensure_visible(DateTimeValue date) {
 
 Size MonthCalendar::measure(Size available) {
     const double scale = effective_text_scale();
-    const double week = show_week_numbers_ ? week_column_width : 0.0;
-    const double block_width = block_margin * 2.0 + week + cell_width * 7.0;
-    const double block_height = block_margin * 2.0 + title_height + weekday_height + cell_height * 6.0;
-    const double width = block_width * static_cast<double>(dimensions_.columns) * scale;
-    double height = block_height * static_cast<double>(dimensions_.rows) * scale;
+    const Size block = month_block_size(show_week_numbers_);
+    const double width = block.width * static_cast<double>(dimensions_.columns) * scale;
+    double height = block.height * static_cast<double>(dimensions_.rows) * scale;
     if (show_today_) height += today_height * scale;
     const Size result{std::min(available.width, width), std::min(available.height, height)};
     return result;
@@ -426,12 +435,10 @@ Size MonthCalendar::measure(Size available) {
 
 // A month's block, unscaled.
 Rect MonthCalendar::month_block(std::size_t month) const noexcept {
-    const double week = show_week_numbers_ ? week_column_width : 0.0;
-    const double block_width = block_margin * 2.0 + week + cell_width * 7.0;
-    const double block_height = block_margin * 2.0 + title_height + weekday_height + cell_height * 6.0;
+    const Size size = month_block_size(show_week_numbers_);
     const double column = static_cast<double>(month % dimensions_.columns);
     const double row = static_cast<double>(month / dimensions_.columns);
-    const Rect block{column * block_width, row * block_height, block_width, block_height};
+    const Rect block{column * size.width, row * size.height, size.width, size.height};
     return block;
 }
 
@@ -792,7 +799,8 @@ void MonthCalendar::on_pointer(PointerEvent& event) {
     }
     if (event.button != PointerButton::primary) return;
     if (event.action == PointerAction::down) {
-        if (window() != nullptr) static_cast<void>((*window()).request_focus(shared_from_this()));
+        Window* const host = window();
+        if (host != nullptr) static_cast<void>((*host).request_focus(shared_from_this()));
         if (zone == Zone::previous || zone == Zone::next) {
             const std::int32_t direction = zone == Zone::previous ? -1 : 1;
             pressed_zone_ = zone;
@@ -885,7 +893,7 @@ std::vector<SemanticNode> MonthCalendar::semantic_virtual_children() const {
     for (const int direction : directions) {
         SemanticNode node{};
         node.stable_id = prefix + (direction < 0 ? ".previous_month" : ".next_month");
-        node.runtime_id = date_time_detail::virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.name = direction < 0 ? "Previous month" : "Next month";
         const Rect bounds = direction < 0 ? control.previous_arrow.bounds : control.next_arrow.bounds;
@@ -906,7 +914,7 @@ std::vector<SemanticNode> MonthCalendar::semantic_virtual_children() const {
             const AnatomyStateSet states = day_states(date);
             SemanticNode node{};
             node.stable_id = day_stable_id(date);
-            node.runtime_id = date_time_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::date_cell;
             node.name = date_time_detail::format_date_time(date, provider_.long_date_pattern, provider_);
             node.value = iso_date(date);
@@ -938,10 +946,13 @@ bool MonthCalendar::on_semantic_action(SemanticAction action, std::string_view v
 bool MonthCalendar::on_semantic_child_action(std::string_view id, SemanticAction action, std::string_view) {
     if (!effectively_enabled()) return false;
     const std::string prefix(stable_id().value());
-    if (action == SemanticAction::press && (id == prefix + ".previous_month" || id == prefix + ".next_month")) {
-        const std::int32_t direction = id == prefix + ".previous_month" ? -1 : 1;
+    const std::string previous_id = prefix + ".previous_month";
+    const std::string next_id = prefix + ".next_month";
+    if (action == SemanticAction::press && (id == previous_id || id == next_id)) {
+        const std::int32_t direction = id == previous_id ? -1 : 1;
         if (!can_scroll(direction)) return false;
-        return scroll_months(direction * scroll_step());
+        const bool scrolled = scroll_months(direction * scroll_step());
+        return scrolled;
     }
     if (action != SemanticAction::select && action != SemanticAction::press) return false;
     const std::string day_prefix = prefix + ".day.";

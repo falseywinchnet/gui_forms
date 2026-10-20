@@ -1,5 +1,11 @@
 #include "pages.hpp"
 
+#include <algorithm>
+#include <array>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 namespace gui_forms::gallery::pages {
 namespace {
 
@@ -73,6 +79,70 @@ constexpr std::string_view column_modified = "modified";
     if (column == column_size) return node.size;
     return node.modified;
 }
+
+// The DataGridView's rows on the stable-ID virtual model, as ObjectView's: the
+// page owns each file's values, keyed by row ID, and the order the rows are
+// presented in. The grid holds only the order and asks for the values of the
+// cells it shows by ID.
+class ProjectFileRows final : public DataGridViewCellValueProvider {
+public:
+    // Name, kind, size, keep, note and the button column's empty value.
+    static constexpr std::size_t column_count = 6U;
+    using FileValues = std::array<BindingValue, column_count>;
+    using ValuesById = std::unordered_map<std::string, FileValues>;
+
+    ProjectFileRows() {
+        for (const ProjectNode& node : project) {
+            if (node.folder) continue;
+            const DataGridViewRowId row{std::string(node.id)};
+            const FileValues values{BindingValue{std::string(node.name)}, BindingValue{std::string(node.kind)},
+                                    BindingValue{std::string(node.size)}, BindingValue{true},
+                                    BindingValue{std::string(node.note)}, BindingValue{}};
+            values_.emplace(row.value, values);
+            order_.push_back(row);
+        }
+    }
+
+    [[nodiscard]] BindingValue cell_value(const DataGridViewRowId& row, std::size_t column) const override {
+        const ValuesById::const_iterator found = values_.find(row.value);
+        if (found == values_.end() || column >= column_count) return BindingValue{};
+        return (*found).second[column];
+    }
+
+    bool push_cell_value(const DataGridViewRowId& row, std::size_t column, const BindingValue& value) override {
+        const ValuesById::iterator found = values_.find(row.value);
+        if (found == values_.end() || column >= column_count) return false;
+        (*found).second[column] = value;
+        return true;
+    }
+
+    // The rows' IDs in presentation order, for set_virtual_rows and
+    // set_virtual_row_order.
+    [[nodiscard]] const std::vector<DataGridViewRowId>& order() const noexcept { return order_; }
+
+    // Orders the rows stably by one column's text; the values stay keyed by ID.
+    void sort(std::size_t column, bool descending) {
+        const RowTextOrder compare{&values_, column, descending};
+        std::stable_sort(order_.begin(), order_.end(), compare);
+    }
+
+private:
+    struct RowTextOrder final {
+        const ValuesById* values{};
+        std::size_t column{};
+        bool descending{};
+
+        bool operator()(const DataGridViewRowId& left, const DataGridViewRowId& right) const {
+            const std::string left_text = binding_value_to_string((*values).at(left.value)[column]);
+            const std::string right_text = binding_value_to_string((*values).at(right.value)[column]);
+            if (descending) return right_text < left_text;
+            return left_text < right_text;
+        }
+    };
+
+    ValuesById values_{};
+    std::vector<DataGridViewRowId> order_{};
+};
 
 class TreeAndObjectViewsPage final : public Component {
 public:
@@ -180,8 +250,9 @@ private:
         on((*ledger_).item_activated(), *this, &TreeAndObjectViewsPage::on_file_activated);
     }
 
-    // A DataGridView over the fixture's files: a text name, a combo box kind,
-    // a read-only size, a check box and a button column.
+    // A DataGridView over the fixture's files in virtual mode: a text name, a
+    // combo box kind, a read-only size, a check box and a button column. The
+    // rows are the page's, by stable row ID.
     void build_grid(const std::shared_ptr<Surface>& body) {
         std::shared_ptr<LayoutGroup> grid_group = group(
             "gallery.tree.grid-group", "DataGridView · the project's files as typed, editable columns",
@@ -205,15 +276,8 @@ private:
             {.name = "open", .header_text = "", .kind = DataGridViewColumnKind::button, .width = 70.0,
              .button_text = "Open"},
         });
-        std::vector<DataGridViewRow> rows;
-        for (const ProjectNode& node : project) {
-            if (node.folder) continue;
-            rows.push_back({.stable_id = std::string(node.id),
-                            .cells = {BindingValue{std::string(node.name)}, BindingValue{std::string(node.kind)},
-                                      BindingValue{std::string(node.size)}, BindingValue{true},
-                                      BindingValue{std::string(node.note)}}});
-        }
-        (*grid_).set_rows(std::move(rows));
+        grid_rows_ = std::make_shared<ProjectFileRows>();
+        (*grid_).set_virtual_rows(grid_rows_, (*grid_rows_).order());
         (*grid_group).add_at(grid_, {18.0, 36.0, 894.0, 184.0});
         on((*grid_).cell_value_changed(), *this, &TreeAndObjectViewsPage::on_grid_value_changed);
         on((*grid_).cell_content_click(), *this, &TreeAndObjectViewsPage::on_grid_content_click);
@@ -507,7 +571,7 @@ private:
 
     // DataGridView
     void on_grid_value_changed(const DataGridViewCellEvent& event) {
-        (*status_).set_text("Grid cell " + (*grid_).row_stable_id(event.row) + "." +
+        (*status_).set_text("Grid cell " + event.row_id.value + "." +
                             (*grid_).columns()[event.column].name + " is now \"" +
                             (*grid_).cell_text(event.row, event.column) + "\"");
     }
@@ -517,12 +581,18 @@ private:
         (*status_).set_text("Open " + (*grid_).cell_text(event.row, 0U) + " · a button cell's click");
     }
 
-    // A header click sorts by that column, toggling the direction.
+    // A header click sorts by that column, toggling the direction. The page
+    // sorts its own rows and publishes the new order; the grid keeps the
+    // selection, the current cell and any edit on their row IDs.
     void on_grid_header_click(const std::size_t column) {
         const DataGridViewSortDirection shown = (*grid_).columns()[column].sort_glyph;
         const DataGridViewSortDirection next = shown == DataGridViewSortDirection::ascending
             ? DataGridViewSortDirection::descending : DataGridViewSortDirection::ascending;
-        if (!(*grid_).sort(column, next)) return;
+        (*grid_rows_).sort(column, next == DataGridViewSortDirection::descending);
+        (*grid_).set_virtual_row_order((*grid_rows_).order());
+        for (std::size_t index = 0; index < (*grid_).columns().size(); ++index) {
+            (*grid_).set_column_sort_glyph(index, index == column ? next : DataGridViewSortDirection::none);
+        }
         (*status_).set_text("Grid sorted by " + (*grid_).columns()[column].name +
                             (next == DataGridViewSortDirection::ascending ? " ascending" : " descending"));
     }
@@ -562,6 +632,8 @@ private:
     std::shared_ptr<ObjectView> objects_;
     std::shared_ptr<CorrespondenceView> ledger_;
     std::shared_ptr<DataGridView> grid_;
+    // Shared with grid_, which asks it for values while it shows the rows.
+    std::shared_ptr<ProjectFileRows> grid_rows_;
     std::shared_ptr<TreeListView> tree_list_;
     std::shared_ptr<Label> status_;
     Value<int> view_mode_{1};

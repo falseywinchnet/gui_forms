@@ -77,7 +77,11 @@ void RibbonGallery::on_dispose() noexcept {
     command_state_.disconnect();
     more_open_changed_.disconnect();
     if (more_gallery_) (*more_gallery_).dispose();
+    release_layer_content();
     if (layer_) (*layer_).dispose();
+    // The layer's content was this gallery: dropping the layer ends the
+    // pair even if its content could not be cleared above.
+    layer_.reset();
     Control::on_dispose();
 }
 
@@ -299,7 +303,12 @@ void RibbonGallery::commit(std::size_t position) {
     const std::string item_id = items_[order_[position]].stable_id;
     if (command_) {
         const std::shared_ptr<GalleryCommand> command = command_;
-        static_cast<void>((*command).commit(item_id, source_of(*this)));
+        // Through the window's command chain (owner decision DK-47).
+        if (window() != nullptr) {
+            static_cast<void>((*command).commit_routed(item_id, *window(), source_of(*this)));
+        } else {
+            static_cast<void>((*command).commit(item_id, source_of(*this)));
+        }
     } else if (!(own_selection_ && *own_selection_ == item_id)) {
         own_selection_ = item_id;
         invalidate(Dirty::paint | Dirty::semantics);
@@ -320,6 +329,8 @@ void RibbonGallery::start_dwell(std::size_t position) {
     if (previewing && *previewing == item_id) return;
     dwell_item_ = item_id;
     const std::weak_ptr<Control> weak = shared_from_this();
+    // A UI timer repeats at its interval; a day's interval makes it fire
+    // once, at the dwell's end, and dwell_elapsed disconnects it then.
     dwell_timer_ = (*attached_window()).schedule_ui_timer(
         *this, std::chrono::hours(24), FrameClock::now() + preview_dwell, DwellCallback{weak, item_id});
 }
@@ -488,7 +499,12 @@ void RibbonGallery::on_pointer(PointerEvent& event) {
     if (event.action == PointerAction::wheel) {
         const double delta = event.wheel_delta.y;
         if (delta == 0.0) return;
-        const std::size_t lines = static_cast<std::size_t>(std::max(1.0, std::abs(delta) <= 8.0 ? std::abs(delta) : 1.0));
+        // A delta of up to 8 counts lines (whole lines, at least one); a
+        // larger one, such as a pixel delta, scrolls one line.
+        const double magnitude = std::abs(delta);
+        double counted = 1.0;
+        if (magnitude <= 8.0) counted = std::max(1.0, magnitude);
+        const std::size_t lines = static_cast<std::size_t>(counted);
         if (delta > 0.0) {
             scroll_to_line(first_line_ > lines ? first_line_ - lines : 0U);
         } else if (can_scroll_down()) {
@@ -536,16 +552,23 @@ bool RibbonGallery::open_popup(const Control::Ptr& anchor) {
     if (!layer_) {
         layer_ = make_control<AnchoredPopupLayer>(StableId(std::string(stable_id().value()) + ".layer"), anchor,
                                                   placement);
-        (*layer_).set_content(shared_from_this());
         layer_dismissed_ = (*layer_).dismiss_requested().subscribe(
             Delegate<PopupDismissReason>::bind<RibbonGallery, &RibbonGallery::on_layer_dismissed>(*this));
     } else {
         (*layer_).set_anchor(anchor);
         (*layer_).set_placement(placement);
     }
+    // The gallery owns its layer, and is the layer's content only while
+    // open (release_layer_content).
+    (*layer_).set_content(shared_from_this());
     const Size client = window.client_size();
     (*layer_).set_requested_bounds({0.0, 0.0, client.width, client.height});
-    popup_ = window.open_popup(anchor, layer_);
+    try {
+        popup_ = window.open_popup(anchor, layer_);
+    } catch (...) {
+        release_layer_content();
+        throw;
+    }
     popup_open_ = true;
     if (Event<>* closed = popup_.closed_event()) {
         popup_revoked_ = (*closed).subscribe(Delegate<>::bind<RibbonGallery, &RibbonGallery::on_popup_revoked>(*this));
@@ -566,6 +589,7 @@ void RibbonGallery::close_popup() {
     scope_ = {};
     popup_revoked_.disconnect();
     popup_.disconnect();
+    release_layer_content();
     hot_.reset();
     pressed_.reset();
     invalidate(Dirty::paint | Dirty::semantics);
@@ -582,8 +606,22 @@ void RibbonGallery::on_popup_revoked() {
     popup_open_ = false;
     scope_ = {};
     popup_revoked_.disconnect();
+    release_layer_content();
     invalidate(Dirty::paint | Dirty::semantics);
     popup_open_changed_.emit(false);
+}
+
+// The gallery owns its layer (layer_), and while open the layer holds the
+// gallery as its content. Closed, the gallery leaves the layer, so the two
+// never hold each other and both are freed when the gallery's owner lets
+// go (house style §5, §6). A layer already being disposed refuses the
+// change; on_dispose then drops the layer instead.
+void RibbonGallery::release_layer_content() noexcept {
+    if (!layer_ || !(*layer_).content()) return;
+    try {
+        (*layer_).clear_content();
+    } catch (...) {
+    }
 }
 
 bool RibbonGallery::show_more() {
@@ -652,7 +690,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         if (entry.kind == LineKind::caption) {
             SemanticNode group{};
             group.stable_id = prefix + ".category." + categories_[entry.category].stable_id;
-            group.runtime_id = scrolling_detail::virtual_runtime_id(group.stable_id);
+            group.runtime_id = virtual_semantic_runtime_id(group.stable_id);
             group.role = SemanticRole::group;
             group.name = categories_[entry.category].caption;
             group.states = SemanticState::visible | SemanticState::enabled;
@@ -666,7 +704,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
             const RibbonGalleryItem& item = items_[order_[position]];
             SemanticNode node{};
             node.stable_id = item.stable_id;
-            node.runtime_id = scrolling_detail::virtual_runtime_id(node.stable_id);
+            node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
             node.role = SemanticRole::list_item;
             node.name = item.label.empty() ? item.stable_id : item.label;
             if (in_view) {
@@ -698,7 +736,7 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
     if (placed.scroll_up.present) {
         SemanticNode up{};
         up.stable_id = prefix + ".scroll_up";
-        up.runtime_id = scrolling_detail::virtual_runtime_id(up.stable_id);
+        up.runtime_id = virtual_semantic_runtime_id(up.stable_id);
         up.role = SemanticRole::button;
         up.name = "Scroll up";
         up.bounds = {absolute.x + placed.scroll_up.bounds.x, absolute.y + placed.scroll_up.bounds.y,
@@ -707,20 +745,22 @@ std::vector<SemanticNode> RibbonGallery::semantic_virtual_children() const {
         if (can_scroll_up()) up.states |= SemanticState::enabled;
         up.actions = {SemanticAction::press};
         nodes.push_back(std::move(up));
-        SemanticNode down = nodes.back();
+        SemanticNode down{};
         down.stable_id = prefix + ".scroll_down";
-        down.runtime_id = scrolling_detail::virtual_runtime_id(down.stable_id);
+        down.runtime_id = virtual_semantic_runtime_id(down.stable_id);
+        down.role = SemanticRole::button;
         down.name = "Scroll down";
         down.bounds = {absolute.x + placed.scroll_down.bounds.x, absolute.y + placed.scroll_down.bounds.y,
                        placed.scroll_down.bounds.width, placed.scroll_down.bounds.height};
         down.states = SemanticState::visible;
         if (can_scroll_down()) down.states |= SemanticState::enabled;
+        down.actions = {SemanticAction::press};
         nodes.push_back(std::move(down));
     }
     if (placed.more_button.present) {
         SemanticNode more{};
         more.stable_id = prefix + ".more_button";
-        more.runtime_id = scrolling_detail::virtual_runtime_id(more.stable_id);
+        more.runtime_id = virtual_semantic_runtime_id(more.stable_id);
         more.role = SemanticRole::menu_button;
         more.name = "More";
         more.has_popup = true;

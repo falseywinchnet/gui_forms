@@ -28,6 +28,11 @@ public:
     void set_anchor(Control::Ptr anchor);
     [[nodiscard]] Control::Ptr content() const noexcept { return content_; }
     void set_content(Control::Ptr content);
+    // Removes the content and releases the layer's reference to it, leaving
+    // the layer empty. A control that owns its own layer (a drop-down that
+    // is the layer's content) calls this when its popup closes: otherwise
+    // the owner and its layer would hold each other and never be freed.
+    void clear_content();
     [[nodiscard]] AnchoredPopupPlacement placement() const noexcept {
         return placement_;
     }

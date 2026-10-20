@@ -23,7 +23,6 @@ using detail::property_group_height;
 using detail::property_padding;
 using detail::property_row_height;
 using detail::property_validation_height;
-using detail::property_virtual_runtime_id;
 using detail::require_property_text;
 
 struct PropertyList::Impl final {
@@ -316,6 +315,10 @@ struct PropertyList::Impl final {
     void connect_row(RowState& state) {
         const std::string row_id = spec(state).stable_id;
         if (const std::shared_ptr<gui_forms::TextBox> text = std::dynamic_pointer_cast<TextBox>(state.editor)) {
+            // Enter commits the row (TextCommitted) and Escape reverts it
+            // (TextCancelled); neither goes further.
+            (*text).set_accepts_enter(true);
+            (*text).set_accepts_escape(true);
             state.value_subscription = (*text).text_changed().subscribe(
                 owner, TextValueChanged{this, row_id});
             state.commit_subscription = (*text).committed().subscribe(
@@ -1087,7 +1090,7 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
         const PropertyGroupSpec& group = (*impl_).groups[group_index];
         SemanticNode header;
         header.stable_id = group.stable_id;
-        header.runtime_id = property_virtual_runtime_id(header.stable_id);
+        header.runtime_id = virtual_semantic_runtime_id(header.stable_id);
         header.role = SemanticRole::property_group;
         header.name = group.title;
         header.bounds = {absolute.x, absolute.y + y, absolute.width,
@@ -1107,7 +1110,7 @@ std::vector<SemanticNode> PropertyList::semantic_virtual_children() const {
             if (row.editor == PropertyEditorKind::read_only) {
                 SemanticNode node;
                 node.stable_id = row.stable_id;
-                node.runtime_id = property_virtual_runtime_id(node.stable_id);
+                node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
                 node.role = SemanticRole::property_row;
                 node.name = row.name;
                 node.value = row.value;

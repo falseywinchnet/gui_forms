@@ -1,0 +1,117 @@
+# LeakSanitizer suppressions for the sanitized suite (tools/ci_build.py
+# --sanitize). Only system libraries the tests load, and their internal
+# allocation sites, are listed: their process-lifetime caches are not
+# GUI.Forms leaks. Never add a first-party frame here; a GUI.Forms leak is a
+# defect to fix (house style section 5). docs/building/index.md says how the
+# macOS baseline was checked.
+
+# Linux.
+leak:libX11.so
+leak:libxcb.so
+leak:libXcursor.so
+leak:libXrender.so
+leak:libfontconfig.so
+leak:libglib-2.0.so
+leak:libgobject-2.0.so
+leak:libgio-2.0.so
+leak:libatk-1.0.so
+leak:libatk-bridge-2.0.so
+leak:libatspi.so
+leak:libdbus-1.so
+leak:libasound.so
+leak:libpulse.so
+
+# macOS. AppKit, CoreFoundation, Foundation, CoreGraphics, QuartzCore,
+# HIToolbox, libdispatch and the Objective-C runtime call into GUI.Forms
+# (event dispatch, drawing, timers, notifications, dispatch), and a
+# suppression matches any frame of a leak's allocation stack, so naming one
+# of those libraries would hide a GUI.Forms leak made inside a callback.
+# They are suppressed only at named internal allocation sites: caches,
+# per-thread state and class initialisation that live for the process.
+# Whole libraries are listed only where they never call into GUI.Forms.
+leak:/ColorSync.framework/
+leak:/vImage.framework/
+leak:/libCGInterfaces.dylib
+leak:/CoreUI.framework/
+leak:/SwiftUICore.framework/
+leak:/UIFoundation.framework/
+leak:/CoreText.framework/
+leak:/libFontRegistry.dylib
+leak:/LinkServices.framework/
+leak:/AppIntents.framework/
+leak:/BoardServices.framework/
+leak:/RunningBoardServices.framework/
+leak:/ViewBridge.framework/
+leak:/LaunchServices.framework/
+leak:/CoreAnalytics.framework/
+leak:/DFRFoundation.framework/
+leak:/SkyLight.framework/
+leak:/Metal.framework/
+leak:/libxpc.dylib
+leak:/libswiftXPC.dylib
+leak:/libswift_Concurrency.dylib
+leak:/libswiftDispatch.dylib
+# libdispatch: the storage of work still queued when the process exits.
+# The arm64e system libraries sign the pointers their queues hold, so
+# LeakSanitizer cannot follow them and reports every pending item, posted
+# by Core Animation, CoreFoundation or AppKit at the moment of exit. This
+# also hides what a GUI.Forms work item still queued at exit owns.
+leak:_dispatch_continuation_alloc_from_heap
+# Objective-C runtime: class initialisation and method caches.
+leak:_fetchInitializingClassList
+leak:look_up_class
+leak:fetch_cache
+# A pool page for objects autoreleased outside any pool (AppKit's event thread).
+leak:AutoreleasePoolPage::autoreleaseNoPage
+# Swift runtime (AppKit's Swift parts): per-thread context, weak-reference
+# side tables. GUI.Forms has no Swift.
+leak:SwiftTLSContext
+leak:formWeakReference
+# dyld and libc per-thread and per-process state.
+leak:dyld::ThreadLocalVariables::instantiateVariable
+leak:dyld4::APIs::setErrorString
+leak:__parsefloat_buf
+leak:localtime
+# CoreFoundation: per-thread tables, preferences, observer registrations,
+# and the cancel handler of each run-loop mode's timer source (GUI.Forms
+# never sets a dispatch cancel handler).
+leak:dispatch_source_set_cancel_handler
+leak:__CFTSDGetTable
+leak:CFPrefs
+leak:_CFXNotificationRegisterObserver
+# Foundation: XPC connections and interfaces, thread and activity objects.
+leak:NSXPC
+leak:setProtocolMetadataWithSignature
+leak:_NSThreadGet0
+leak:-[NSThread init]
+leak:_getStringAtMarker
+leak:-[_NSActivityAssertion
+# CoreGraphics: colour-conversion and image-data caches.
+leak:CGCMS
+leak:CGColorConversionInfoIterateFunctionsWithCallbacks
+leak:create_colorsync_profile_sequence
+leak:conversion_cache_get_retained_conversion_params
+leak:colorspace_from_ICC_data_data_key_retain
+leak:colorsync_transform_data_key_retain
+leak:CGvImage_converter_data_key_retain
+leak:rip_image_data_key_retain
+leak:ripc_AcquireRIPImageData
+leak:img_data_lock
+leak:create_image_data_handle
+leak:CGDisplayColorCurveCreate
+# AppKit and HIToolbox: text measurement cache, colour gamuts, window
+# server, Dock and input-method connections, application start-up.
+leak:NSStringMeasurementCacheKey
+leak:NSCellRectForString
+leak:_NSAxisAlignedVolumeColorGamut
+leak:NSWMWindowCoordinator
+leak:-[NSDockConnection
+leak:__initialize_quiet_safe_quit_block_invoke
+leak:-[NSApplication(NSUbiquity)
+leak:-[NSApplication(NSPersistentUISupport)
+leak:IMKClient
+leak:IMKInputSession
+leak:CreateEventLoop
+# QuartzCore: per-thread transactions and cached contexts.
+leak:CA::Transaction::create
+leak:CAReleaseCachedCGContext

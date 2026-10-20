@@ -7,8 +7,10 @@ beneath and, when authored, a dialog launcher in the caption's corner.
 Commands are `RibbonCommandSpec` records bound to shared `Command` objects:
 buttons, toggles, split buttons and drop-down buttons at a large or small
 size, hosted combo boxes, numeric spinners, check boxes and text boxes, and
-in-ribbon `RibbonGallery` controls, which are real child controls the ribbon
-places. As the ribbon narrows its groups shrink through their layouts in the
+in-ribbon `RibbonGallery` controls, `RibbonFontControl`s and
+`RibbonColorPicker`s, which are real child controls the ribbon places. The
+File tab opens the application menu (in two panes beside recent items) or,
+when the ribbon has one, a `BackstageView`. As the ribbon narrows its groups shrink through their layouts in the
 tab's reduction order, down to collapsed group buttons that open the group in
 a popup, and below the narrowest layout the plane scrolls. Every part is
 painted through the by-role paint path.
@@ -23,8 +25,11 @@ stable_id
 Properties
 ----------
 tabs
-    The core tabs, each with its groups and their commands. `set_tabs`
-    replaces them, keeps the selection on a tab with the same ID, keeps a
+    The tabs, each with its groups and their commands: the core tabs, then
+    the contextual tabs, each set's together in the sets' order.
+    `set_tabs(tabs, sets)` replaces them and the tab sets, keeps each set's
+    availability by ID, keeps the selection on a shown tab with the same ID
+    (else the first core tab shown), keeps a
     hosted control while a command of the same ID and kind remains, and
     throws `std::invalid_argument` for an empty or repeated ID (one namespace
     across tabs, groups and commands), invalid UTF-8, a button, toggle or
@@ -40,8 +45,15 @@ tabs
     gallery past its minimum (owner decision 29), or more than the
     development bounds. A refused definition leaves the previous tabs.
 selected_tab
-    The selected tab, or none without tabs. `set_selected_tab` throws
-    `std::out_of_range` for a tab past the end.
+    The selected tab, or none while no tab shows. `set_selected_tab` throws
+    `std::out_of_range` for a tab past the end and `std::invalid_argument`
+    for a tab not shown.
+tab_sets
+    The contextual tab sets (`RibbonTabSetSpec`: ID and caption).
+application_modes : default ``1``
+    The application modes shown, one bit per mode. Tabs and groups whose
+    `modes` share a bit with it show. `set_application_modes` throws
+    `std::invalid_argument` for zero.
 minimized : default ``false``
     Whether the command plane is hidden, leaving the tab row.
 document_minimum_height : default ``0``
@@ -55,8 +67,9 @@ ladder_step
     The selected tab's ladder entry the plane shows, or none while it is
     hidden or minimized.
 scrolling
-    Whether even the narrowest entry is wider than the plane, so that the
-    plane scrolls.
+    Whether the plane scrolls: from when even the narrowest entry is wider
+    than the plane until the plane is `Ribbon::scroll_hysteresis` (8 units)
+    wider than that entry (owner decision 45).
 first_visible_group
     The first group shown while the plane scrolls.
 scaling_counters
@@ -71,9 +84,29 @@ application_text : default ``"File"``
     The File tab's text, with an optional mnemonic.
 application_menu
     The File tab's menu. `set_application_menu` throws
-    `std::invalid_argument` for an invalid menu.
+    `std::invalid_argument` for an invalid menu, or for items other than
+    commands and separators beside recent items.
+recent_items
+    The application menu's recent pane (`RibbonRecentItem`: ID, text and a
+    description such as its folder), numbered under `recent_caption`. While
+    there are recent items the File tab opens a two-pane menu: the
+    application menu's commands on the left, the recent items on the right.
+    `set_recent_items` throws `std::invalid_argument` for an empty or
+    repeated ID, invalid or multi-line UTF-8, more than
+    `Ribbon::maximum_recent_items` (50), or an application menu holding other
+    kinds than commands and separators.
+recent_caption : default ``"Recent documents"``
+    The recent pane's caption.
+application_menu_popup
+    The two-pane menu's content control, null before its first opening.
+backstage
+    The `BackstageView` the File tab opens instead of the application menu,
+    or null. `set_backstage` throws `std::invalid_argument` for a view that
+    already has a parent.
+backstage_open
+    Whether Backstage is open.
 menu_open
-    Whether the application menu or a command's menu is open.
+    Whether the application menu (either form) or a command's menu is open.
 focus_region : default ``true``
     Whether the ribbon adds itself to its window's F6 regions when it is
     attached.
@@ -104,13 +137,25 @@ selected_tab_changed
 minimized_changed
     Raised after the command plane is hidden or shown.
 application_menu_item_invoked
-    Raised when the user chooses from the application menu.
+    Raised when the user chooses from the application menu (either form),
+    after the item's command ran.
+recent_item_invoked
+    Raised when the user chooses a recent item.
+backstage_open_changed
+    Raised when Backstage opens or closes.
 
 Methods
 -------
 show_application_menu
-    Opens the application menu over the ribbon, below the File tab. Returns
-    false without items or a window.
+    Opens the File tab's file area: Backstage when the ribbon has one,
+    otherwise the application menu over the ribbon, below the File tab (in
+    two panes beside recent items). Returns false without items (or
+    Backstage) or a window.
+show_backstage
+    Opens Backstage over everything below the tab row, with focus in it.
+    Returns false without a view or a window.
+close_backstage
+    Closes Backstage; focus returns to where it was.
 show_drop_down
     Opens a split or drop-down command's menu below it. Returns false for
     another kind, a disabled command or one not on the selected tab.
@@ -129,6 +174,16 @@ group_layouts
 reduction_ladder
     A tab's `RibbonLadderEntry` list from the widest to the narrowest, built
     if needed. Throws `std::out_of_range` for a tab past the end.
+tab_set_availability
+    A set's `RibbonTabSetAvailability`. `set_tab_set_availability` changes it
+    and applies the selection rules (see Notes). Both throw
+    `std::out_of_range` for an unknown set.
+tab_set_accent
+    The `AccentIndex` a shown set is tinted with, or none while it is hidden.
+    Throws `std::out_of_range` for an unknown set.
+tab_shown
+    Whether a tab shows now, by its modes and its set's availability. Throws
+    `std::out_of_range` for a tab past the end.
 combo_box
     The `ComboBox` a combo box command holds. `numeric_up_down`, `check_box`
     and `text_box` return the other hosted controls. Each throws
@@ -168,7 +223,9 @@ wrapping, where a group with a gallery above its minimum gives up one column
 (decision 8) before it changes layout. A step that does not narrow the tab is
 folded into the next entry, so widths strictly decrease. The plane shows the
 widest entry no wider than itself. Below the narrowest entry it scrolls at
-any width (decision 35): scroll buttons at the ends move by one group, a
+any width (decision 35), and it keeps scrolling until it is 8 units wider
+than that entry (decision 45; in that band the right button covers the last
+group): scroll buttons at the ends move by one group, a
 group that does not fit whole before the right button is not shown (the
 first is clipped), and the keyboard's stop scrolls its group into view.
 
@@ -204,8 +261,9 @@ The ribbon publishes ``region``, ``tab_rail``, ``application_button``,
 (``command_face``, ``command_icon``, ``command_label``, ``command_arrow``,
 ``command_arrow_glyph``, ``command_focus`` and the hosted
 ``command_combo_box``, ``command_numeric_up_down``, ``command_check_box``,
-``command_text_box`` and ``command_gallery``; hot, pressed, checked, open,
-disabled, focus_visible).
+``command_text_box``, ``command_gallery``, ``command_font_control`` and
+``command_color_picker``; hot, pressed, checked, open, disabled,
+focus_visible).
 Until the default theme (T4), command faces use the menu-item family (flat
 at rest), the plane and tab row the panel family and the File tab the
 accent-button family. A command whose enabled or checked state changes
@@ -223,8 +281,10 @@ command texts (``&Home``) open, select or activate them. The ribbon adds
 itself to its window's F6 regions.
 
 To accessibility the ribbon is a group holding the File tab (a
-`menu_button` with a popup), the tab row (a `tab_group` of positioned tabs)
-and, while shown, the command plane (a group named after the selected tab)
+`menu_button` with a popup), the tab row (a `tab_group` of the shown tabs:
+core tabs positioned among the core tabs, a contextual tab among its set's,
+described by the set's caption)
+and the command plane (a group named after the selected tab, expanded while shown and collapsed while minimized or hidden; its expand and collapse actions restore and minimize it as a click on the selected tab does, owner decision 46)
 with its groups, named by caption, and their commands: `button`,
 `split_button` or `menu_button`, with positions in their group and
 has-popup, and each launcher as a button. A collapsed group is a
@@ -232,9 +292,38 @@ has-popup, and each launcher as a button. A collapsed group is a
 buttons. Hosted controls describe themselves as children of the ribbon, or
 of the popup while it is open.
 
-Not yet: contextual tabs, the Quick Access Toolbar, the minimized popup,
-Backstage, the application menu's recent-items pane (the File tab opens a
-`ContextMenu`), right-to-left mirroring of the cycle, two-line large labels
+Contextual tab sets (owner decisions 14, 22 and 25). A tab whose
+`tab_set` names a set shows while the application makes the set available
+or active (for example while a picture is selected); the ribbon never infers
+it. A shown set is marked by a tint on its tabs' faces and on the command
+plane of its selected tab, from the theme's accent ramp: each `tab` part and
+the `command_plane` part carry the set's `AccentIndex`. There is no captioned
+band over the set (T4-2). A newly shown set takes an accent no other shown
+set has, keeping its previous one when that is free. The built-in selection
+rules (F3-1): a set becoming active selects the set's tab the user chose
+last, else its first tab; becoming available changes no selection; a set
+leaving while one of its tabs is selected selects the core tab chosen last,
+else the first core tab shown. The remembered set tab is forgotten when the
+user chooses a core tab or another set's tab.
+
+Application modes (F2-1, after the Windows Ribbon Framework). Every tab and
+group belongs to the modes in its `modes` bit set (every mode by default),
+and shows while one of them is in `application_modes`. A mode switch
+replaces the tabs shown at once; a selected tab that no longer shows gives
+way as above, and groups that leave take no room and no ladder steps.
+
+The file area (phase 6; owner decisions 3, 23, 26). Without recent items or
+Backstage the File tab opens a `ContextMenu`. With recent items it opens a
+two-pane menu below the File tab, over the ribbon: Up and Down move within a
+pane, Left and Right between them, Enter, Space or a click activates (after
+which the menu closes), and Escape or a press away closes it. With a
+`BackstageView` it opens Backstage over everything below the tab row: Escape
+or a definitive command closes it, a press on the File tab closes it, a
+press on a tab closes it and selects that tab, and it follows the window's
+size.
+
+Not yet: the Quick Access Toolbar, the minimized popup, icons in the
+two-pane menu, right-to-left mirroring of the cycle, two-line large labels
 and ellipsized tab labels (decision 30 allows them; tabs past the row's end
 are clipped).
 

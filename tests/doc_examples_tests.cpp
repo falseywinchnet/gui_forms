@@ -67,6 +67,21 @@ void example() {
 }
 }  // namespace doc_example_AnchoredPopupLayer_1
 
+namespace doc_example_AutoCompleteStringCollection_1 {
+void example() {
+    std::shared_ptr<gf::AutoCompleteStringCollection> towns =
+        std::make_shared<gf::AutoCompleteStringCollection>();
+    (*towns).add_range({"Dartmouth", "Dover", "Durham"});
+    std::shared_ptr<gf::TextBox> from =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.from"));
+    std::shared_ptr<gf::TextBox> to =
+        gf::make_control<gf::TextBox>(gf::StableId("trip.to"));
+    (*from).set_auto_complete_custom_source(towns);
+    (*to).set_auto_complete_custom_source(towns);
+    (*towns).add("Derby");   // both fields offer it from now on
+}
+}  // namespace doc_example_AutoCompleteStringCollection_1
+
 namespace doc_example_BackgroundWorker_1 {
 struct Sums final {
     void work(gf::BackgroundWorkerTask& task) {
@@ -89,6 +104,18 @@ void example() {
     // run_worker_completed reports 5050 when the window's dispatcher runs.
 }
 }  // namespace doc_example_BackgroundWorker_1
+
+namespace doc_example_BackstageView_1 {
+void example() {
+    std::shared_ptr<gf::Command> save = std::make_shared<gf::Command>("doc.save", "&Save");
+    std::shared_ptr<gf::Label> info = gf::make_control<gf::Label>(gf::StableId("doc.info"), "Two pages");
+    std::shared_ptr<gf::BackstageView> view = gf::make_control<gf::BackstageView>(gf::StableId("doc.backstage"));
+    (*view).set_items({{.stable_id = "save", .command = save},
+                       {.stable_id = "info", .kind = gf::BackstageItemKind::topic, .text = "&Info", .page = info}});
+    std::shared_ptr<gf::Ribbon> ribbon = gf::make_control<gf::Ribbon>(gf::StableId("doc.ribbon"));
+    (*ribbon).set_backstage(view);
+}
+}  // namespace doc_example_BackstageView_1
 
 namespace doc_example_Binding_1 {
 void example() {
@@ -523,6 +550,14 @@ void example() {
 }
 }  // namespace doc_example_ChoiceGroup_2
 
+namespace doc_example_ColorCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> colour = std::make_shared<gf::Command>("doc.colour", "Font colour");
+    std::shared_ptr<gf::ColorCommand> command = std::make_shared<gf::ColorCommand>(colour);
+    (*command).commit(gf::Color::rgba(192, 0, 0), "doc.picker");   // dark red, now the first recent colour
+}
+}  // namespace doc_example_ColorCommand_1
+
 namespace doc_example_ColorValueEditor_1 {
 void example() {
     std::shared_ptr<gf::ColorValueEditor> tint =
@@ -600,6 +635,37 @@ void example() {
     (*field.combo).set_items({"Compact", "Comfortable"});  // and now ""
 }
 }  // namespace doc_example_ComboBox_2
+
+namespace doc_example_ComboBox_3 {
+void example() {
+    std::shared_ptr<gf::ComboBox> band =
+        gf::make_control<gf::ComboBox>(gf::StableId("radio.band"));
+    (*band).set_items({"Long wave", "Medium wave", "Short wave"});
+    (*band).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*band).set_auto_complete_source(gf::AutoCompleteSource::list_items);
+    (*band).set_auto_complete_mode(gf::AutoCompleteMode::append);
+    gf::Window window(band, gf::Size{220.0, 30.0});
+    window.request_focus((*band).editor());
+    window.dispatch_text(gf::TextInputEvent{"m"});
+    // The field shows "medium wave" with "edium wave" selected, and the
+    // text equals the second item, so (*band).selected_index() is 1.
+}
+}  // namespace doc_example_ComboBox_3
+
+namespace doc_example_ComboBox_4 {
+void example() {
+    std::shared_ptr<gf::ComboBox> station =
+        gf::make_control<gf::ComboBox>(gf::StableId("trip.station"));
+    (*station).set_items({"Hamburg Hbf", "Köln Hbf", "Paris Nord", "Zürich HB"});
+    (*station).set_drop_down_style(gf::ComboBoxStyle::drop_down);
+    (*station).set_drop_down_filter(gf::ComboBoxFilter::substring);
+    gf::Window window(station, gf::Size{240.0, 200.0});
+    window.request_focus((*station).editor());
+    window.dispatch_text(gf::TextInputEvent{"hb"});
+    // The list is open on Hamburg Hbf, Köln Hbf and Zürich HB:
+    // (*station).drop_down_items() is {0, 1, 3}.
+}
+}  // namespace doc_example_ComboBox_4
 
 namespace doc_example_Command_1 {
 struct Document final : gf::Component {
@@ -942,15 +1008,37 @@ void example() {
         {.name = "mode", .header_text = "Mode", .kind = gf::DataGridViewColumnKind::combo_box,
          .width = 90.0, .items = {"AM", "FM", "USB"}},
     });
-    (*grid).add_row({.stable_id = "wqxr", .cells = {gf::BindingValue{std::string("WQXR")},
-                                                    gf::BindingValue{true},
-                                                    gf::BindingValue{std::string("FM")}}});
-    (*grid).add_row({.stable_id = "bbc4", .cells = {gf::BindingValue{std::string("BBC Radio 4")},
-                                                    gf::BindingValue{false},
-                                                    gf::BindingValue{std::string("AM")}}});
+    (*grid).add_row({.stable_id = {"wqxr"}, .cells = {gf::BindingValue{std::string("WQXR")},
+                                                      gf::BindingValue{true},
+                                                      gf::BindingValue{std::string("FM")}}});
+    (*grid).add_row({.stable_id = {"bbc4"}, .cells = {gf::BindingValue{std::string("BBC Radio 4")},
+                                                      gf::BindingValue{false},
+                                                      gf::BindingValue{std::string("AM")}}});
     (*grid).sort(0U, gf::DataGridViewSortDirection::ascending);   // BBC Radio 4 first
+    // row_position({"wqxr"}) is now position 1
 }
 }  // namespace doc_example_DataGridView_1
+
+namespace doc_example_DataGridView_2 {
+struct Stations final : gf::DataGridViewCellValueProvider {
+    gf::BindingValue cell_value(const gf::DataGridViewRowId& row, std::size_t) const override {
+        return gf::BindingValue{"Station " + row.value};
+    }
+    bool push_cell_value(const gf::DataGridViewRowId&, std::size_t, const gf::BindingValue&) override {
+        return false;
+    }
+};
+
+void example() {
+    std::shared_ptr<gf::DataGridView> grid =
+        gf::make_control<gf::DataGridView>(gf::StableId("radio.virtual"));
+    (*grid).set_columns({{.name = "name", .header_text = "Station", .width = 160.0}});
+    (*grid).set_virtual_rows(std::make_shared<Stations>(), {{"a"}, {"b"}, {"c"}});
+    (*grid).set_current_cell(gf::DataGridViewCellAddress{gf::DataGridViewRowPosition{1U}, 0U});
+    (*grid).set_virtual_row_order({{"c"}, {"d"}, {"b"}, {"a"}});   // the application sorted and added
+    // current_row_id() is still {"b"}, now at position 2
+}
+}  // namespace doc_example_DataGridView_2
 
 namespace doc_example_DateTimePicker_1 {
 void example() {
@@ -993,6 +1081,185 @@ void example() {
     // has_date is true again and date is January 2, 2000
 }
 }  // namespace doc_example_DateTimePicker_2
+
+namespace doc_example_DockEdit_1 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor solution;
+    solution.id = gf::DockPanelId("tools.solution");
+    layout.register_panel(solution);
+    gf::DockPanelDescriptor classes;
+    classes.id = gf::DockPanelId("tools.classes");
+    layout.register_panel(classes);
+
+    gf::DockTransaction start;
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.solution")));
+    layout.apply(start);
+    gf::DockNodeId stack = layout.locate(gf::DockPanelId("tools.solution")).stack;
+
+    gf::DockTransaction group;
+    group.edits.push_back(gf::DockEdit::dock_into(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.classes")), stack));
+    group.edits.push_back(gf::DockEdit::select(gf::DockPanelId("tools.solution")));
+    gf::DockTransactionResult result = layout.apply(group);   // both or neither
+    static_cast<void>(result);
+}
+}  // namespace doc_example_DockEdit_1
+
+namespace doc_example_DockLayout_1 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor solution;
+    solution.id = gf::DockPanelId("tools.solution");
+    solution.default_placement.side = gf::DockSide::left;
+    layout.register_panel(solution);
+    gf::DockPanelDescriptor readme;
+    readme.id = gf::DockPanelId("doc:readme");
+    readme.kind = gf::DockPanelKind::document;
+    layout.register_panel(readme);
+
+    gf::DockTransaction start;
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.solution")));
+    start.edits.push_back(gf::DockEdit::show(gf::DockPanelId("doc:readme")));
+    gf::DockTransactionResult shown = layout.apply(start);   // one change for both
+
+    gf::DockTransaction tear_off;
+    tear_off.edits.push_back(gf::DockEdit::float_subject(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.solution")),
+        gf::Rect{200.0, 120.0, 320.0, 480.0}, "DISPLAY1"));
+    gf::DockTransactionResult floated = layout.apply(tear_off);
+    std::string saved = layout.write_xml().text;
+    static_cast<void>(shown);
+    static_cast<void>(floated);
+    static_cast<void>(saved);
+}
+}  // namespace doc_example_DockLayout_1
+
+namespace doc_example_DockLayout_2 {
+void example() {
+    gf::DockLayout layout;
+    gf::DockPanelDescriptor output;
+    output.id = gf::DockPanelId("tools.output");
+    output.allowed.floating = false;
+    layout.register_panel(output);
+    gf::DockTransaction show;
+    show.edits.push_back(gf::DockEdit::show(gf::DockPanelId("tools.output")));
+    layout.apply(show);
+
+    gf::DockTransaction tear_off;
+    tear_off.edits.push_back(gf::DockEdit::float_subject(
+        gf::DockSubject::of_panel(gf::DockPanelId("tools.output")),
+        gf::Rect{0.0, 0.0, 300.0, 200.0}, ""));
+    gf::DockTransactionResult refused = layout.apply(tear_off);
+    bool panel_layer = refused.refusal.layer == gf::DockRefusalLayer::panel;   // true
+    static_cast<void>(panel_layer);
+}
+}  // namespace doc_example_DockLayout_2
+
+namespace doc_example_DockNavigator_1 {
+void example() {
+    std::shared_ptr<gf::DockNavigator> navigator =
+        gf::make_control<gf::DockNavigator>(gf::StableId("switcher"));
+    std::vector<gf::DockNavigatorEntry> tools{{gf::DockPanelId("output"), "Output"}};
+    std::vector<gf::DockNavigatorEntry> files{{gf::DockPanelId("b.txt"), "b.txt"},
+                                              {gf::DockPanelId("a.txt"), "a.txt"}};
+    (*navigator).set_entries(std::move(tools), std::move(files));
+    static_cast<void>((*navigator).step(1));        // a.txt is current
+    static_cast<void>((*navigator).switch_list());  // Output is current
+    (*navigator).set_release_modifier(gf::Modifier::control);
+}
+}  // namespace doc_example_DockNavigator_1
+
+namespace doc_example_DockPanelDescriptor_1 {
+void example() {
+    gf::DockPanelDescriptor toolbox;
+    toolbox.id = gf::DockPanelId("tools.toolbox");
+    toolbox.allowed.floating = false;
+    toolbox.allowed.tabbed = false;
+    toolbox.minimum_size = gf::Size{180.0, 120.0};
+    toolbox.default_placement.side = gf::DockSide::left;
+    toolbox.default_placement.ratio = 0.2;
+}
+}  // namespace doc_example_DockPanelDescriptor_1
+
+namespace doc_example_DockSite_1 {
+struct Views final {
+    void make(gf::DockPanelCreation& creation) {
+        creation.content = gf::make_control<gf::TextBox>(gf::StableId("view." + creation.panel.value));
+    }
+};
+
+void example() {
+    Views views;
+    gf::DockWorkspace workspace("ide");
+    const gf::Delegate<gf::DockPanelCreation&> factory =
+        gf::Delegate<gf::DockPanelCreation&>::bind<Views, &Views::make>(views);
+    gf::DockPanelRegistration files{};
+    files.descriptor.id = gf::DockPanelId("files");
+    files.descriptor.default_placement.side = gf::DockSide::left;
+    files.descriptor.minimum_size = {120.0, 80.0};
+    files.title = "Files";
+    files.factory = factory;
+    gf::DockPanelRegistration readme{};
+    readme.descriptor.id = gf::DockPanelId("readme");
+    readme.descriptor.kind = gf::DockPanelKind::document;
+    readme.title = "README";
+    readme.factory = factory;
+    static_cast<void>(workspace.register_panel(files));
+    static_cast<void>(workspace.register_panel(readme));
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("readme")));
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("files")));
+    std::shared_ptr<gf::DockSite> site = gf::make_control<gf::DockSite>(gf::StableId("ide.site"), workspace);
+    gf::Window window(site, {640.0, 400.0});
+    window.perform_layout();
+    // Two stacks and one seam; both panels' views were made on layout.
+    (*site).set_document_area_maximized(true);
+    window.perform_layout();
+    // The Files stack is hidden; the document fills the site.
+    (*site).set_document_area_maximized(false);
+    static_cast<void>((*site).run_position_command(gf::DockPanelId("files"), gf::DockPositionCommand::auto_hide));
+    window.perform_layout();
+    // Files is behind a side tab on the left edge.
+    static_cast<void>((*site).open_flyout(gf::DockPanelId("files")));
+    // Its flyout slides out over the document, with focus inside.
+}
+}  // namespace doc_example_DockSite_1
+
+namespace doc_example_DockWorkspace_1 {
+struct Views final {
+    int made = 0;
+    void make(gf::DockPanelCreation& creation) {
+        ++made;
+        creation.content = gf::make_control<gf::TextBox>(gf::StableId("view." + creation.panel.value));
+    }
+};
+
+void example() {
+    Views views;
+    gf::DockWorkspace workspace("editor");
+    const gf::Delegate<gf::DockPanelCreation&> factory =
+        gf::Delegate<gf::DockPanelCreation&>::bind<Views, &Views::make>(views);
+    gf::DockPanelRegistration outline{};
+    outline.descriptor.id = gf::DockPanelId("outline");
+    outline.descriptor.default_placement.side = gf::DockSide::left;
+    outline.title = "Outline";
+    outline.factory = factory;
+    static_cast<void>(workspace.register_panel(outline));
+    const std::array<std::string_view, 2> files{"a.txt", "b.txt"};
+    for (const std::string_view file : files) {
+        gf::DockPanelRegistration document{};
+        document.descriptor.id = gf::DockPanelId(std::string(file));
+        document.descriptor.kind = gf::DockPanelKind::document;
+        document.title = std::string(file);
+        document.factory = factory;
+        static_cast<void>(workspace.register_panel(document));
+        static_cast<void>(workspace.show_panel(document.descriptor.id));
+    }
+    static_cast<void>(workspace.show_panel(gf::DockPanelId("outline")));
+    // views.made is 0: nothing is shown until a site lays the workspace out.
+    // The active panel is the outline and the active document b.txt.
+}
+}  // namespace doc_example_DockWorkspace_1
 
 namespace doc_example_DomainUpDown_1 {
 void example() {
@@ -1327,6 +1594,15 @@ void example() {
     // fixed stays 20 wide; narrow becomes 30 wide and wide 50 wide
 }
 }  // namespace doc_example_FlowLayoutPanel_2
+
+namespace doc_example_FontCommand_1 {
+void example() {
+    std::shared_ptr<gf::Command> font = std::make_shared<gf::Command>("doc.font", "Font");
+    std::shared_ptr<gf::FontCommand> command = std::make_shared<gf::FontCommand>(font);
+    (*command).set_value({"Portsmouth Rapids", 11.0});   // value_changed, no invocation
+    (*command).commit({"Carlito", 11.0}, "doc.font_control");   // value_changed, then font's invoked
+}
+}  // namespace doc_example_FontCommand_1
 
 namespace doc_example_FontDialog_1 {
 void example() {
@@ -1834,6 +2110,29 @@ void example() {
 }
 }  // namespace doc_example_MonthCalendar_1
 
+namespace doc_example_NavigationPane_1 {
+void example() {
+    std::shared_ptr<gf::NavigationPane> pane =
+        gf::make_control<gf::NavigationPane>(gf::StableId("areas"));
+    constexpr std::array<std::string_view, 3> areas{"mail", "calendar", "contacts"};
+    for (const std::string_view area : areas) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{std::string(area)};
+        record.title = std::string(area);
+        static_cast<void>((*pane).pages().insert(record, gf::PagePlacement::end_of_group()));
+        std::unique_ptr<gf::PageContent> content = std::make_unique<gf::PageControlContent>(
+            gf::make_control<gf::Label>(gf::StableId(std::string(area) + ".view"), std::string(area)));
+        static_cast<void>((*pane).pages().set_content(record.id, content));
+    }
+    gf::NavigationPaneState saved{};
+    saved.button_count = 2U;
+    saved.page_order = {gf::PageId{"calendar"}, gf::PageId{"mail"}, gf::PageId{"contacts"}};
+    const gf::NavigationPaneRestore restored = (*pane).apply_state(saved);
+    // Calendar now comes first; nothing in the saved state was unknown.
+    static_cast<void>(restored.unknown_pages);
+}
+}  // namespace doc_example_NavigationPane_1
+
 namespace doc_example_NotifyIcon_1 {
 void example() {
     std::shared_ptr<gf::Panel> root = gf::make_control<gf::Panel>(gf::StableId("doc.root"));
@@ -1941,6 +2240,124 @@ void example() {
     // (*table.view).details_sort() now shows Name, ascending
 }
 }  // namespace doc_example_ObjectView_2
+
+namespace doc_example_PageSet_1 {
+void example() {
+    gf::PageSet pages;
+    gf::PageRecord home{};
+    home.id = gf::PageId{"home"};
+    home.title = "Home";
+    gf::PageRecord view{};
+    view.id = gf::PageId{"view"};
+    view.title = "View";
+    gf::PageRecord help{};
+    help.id = gf::PageId{"help"};
+    help.title = "Help";
+    gf::PageEditStatus status = pages.insert(home, gf::PagePlacement::end_of_group());
+    status = pages.insert(view, gf::PagePlacement::end_of_group());
+    status = pages.insert(help, gf::PagePlacement::end_of_group());
+    // "home" was selected when it entered the empty set.
+    status = pages.select(gf::PageId{"view"}, gf::PageSelectionCause::programmatic);
+    status = pages.remove(gf::PageId{"view"});
+    // The selection fell back to "help", the page that took its position.
+    bool fell_back = *pages.selected_page() == gf::PageId{"help"};
+    static_cast<void>(status);
+    static_cast<void>(fell_back);
+}
+}  // namespace doc_example_PageSet_1
+
+namespace doc_example_PageSet_2 {
+void example() {
+    gf::PageSet left;
+    gf::PageSet right;
+    gf::PageRecord record{};
+    record.id = gf::PageId{"notes"};
+    record.title = "Notes";
+    gf::PageEditStatus status = left.insert(record, gf::PagePlacement::end_of_group());
+    gf::PageTakeResult taken = left.take(gf::PageId{"notes"});
+    {
+        gf::PageSetBatch batch(right);
+        status = right.put(taken.page, gf::PagePlacement::end_of_group());
+        status = right.select(gf::PageId{"notes"}, gf::PageSelectionCause::programmatic);
+    }
+    // One pages_changed and one selected_page_changed were published by
+    // `right` when the batch closed.
+    static_cast<void>(status);
+}
+}  // namespace doc_example_PageSet_2
+
+namespace doc_example_PageStrip_1 {
+void example() {
+    gf::PageSet pages{};
+    const std::array<std::string_view, 3> titles{"&General", "&Advanced", "Ab&out"};
+    for (std::size_t index = 0; index < titles.size(); ++index) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{"settings." + std::to_string(index)};
+        record.title = std::string(titles[index]);
+        static_cast<void>(pages.insert(record, gf::PagePlacement::end_of_group()));
+    }
+    std::shared_ptr<gf::PageStrip> strip =
+        gf::make_control<gf::PageStrip>(gf::StableId("settings.tabs"), pages);
+    (*strip).set_activation(gf::PageStripActivation::manual);
+    static_cast<void>((*strip).select_relative(1, gf::PageSelectionCause::programmatic));
+    // pages.selected_page() is now "settings.1", titled "&Advanced".
+}
+}  // namespace doc_example_PageStrip_1
+
+namespace doc_example_PageView_1 {
+void example() {
+    gf::PageViewOptions options{};
+    options.preset = gf::PageViewPreset::document;
+    std::shared_ptr<gf::PageView> documents =
+        gf::make_control<gf::PageView>(gf::StableId("documents"), options);
+    const std::array<std::string_view, 3> names{"notes.txt", "plan.md", "main.cpp"};
+    for (const std::string_view name : names) {
+        gf::PageRecord record{};
+        record.id = gf::PageId{std::string(name)};
+        record.title = std::string(name);
+        record.closable = true;
+        static_cast<void>((*documents).add_page(record, gf::Control::Ptr{}));
+    }
+    static_cast<void>((*documents).pages().set_modified(gf::PageId{"plan.md"}, true));
+    static_cast<void>((*(*documents).strip()).request_close(gf::PageId{"notes.txt"},
+                                                          gf::PageCloseCause::keyboard));
+    // Nobody handled the request, so the view removed notes.txt.
+}
+}  // namespace doc_example_PageView_1
+
+namespace doc_example_PageView_2 {
+struct Settings final : gf::Component {
+    std::shared_ptr<gf::PageView> view =
+        gf::make_control<gf::PageView>(gf::StableId("settings"));
+
+    void build() {
+        gf::on((*view).content_requested(), *this, &Settings::make_page);
+        gf::PageRecord general{};
+        general.id = gf::PageId{"general"};
+        general.title = "&General";
+        static_cast<void>((*view).add_page(
+            general, gf::make_control<gf::Label>(gf::StableId("general.text"), "General")));
+        gf::PageRecord advanced{};
+        advanced.id = gf::PageId{"advanced"};
+        advanced.title = "&Advanced";
+        static_cast<void>((*view).add_page(advanced, gf::Control::Ptr{}));
+    }
+
+    void make_page(const gf::PageContentRequest& request) {
+        static_cast<void>((*view).set_page_content(
+            request.page, gf::make_control<gf::Label>(gf::StableId("advanced.text"), "Advanced")));
+    }
+};
+
+void example() {
+    Settings settings{};
+    settings.build();
+    static_cast<void>((*settings.view).pages().select(
+        gf::PageId{"advanced"}, gf::PageSelectionCause::programmatic));
+    // The request ran: the advanced page now has its label.
+    static_cast<void>((*settings.view).page_content(gf::PageId{"advanced"}));
+}
+}  // namespace doc_example_PageView_2
 
 namespace doc_example_Panel_1 {
 void example() {
@@ -2356,6 +2773,28 @@ void example() {
     (*ribbon).set_document_minimum_height(120.0);
 }
 }  // namespace doc_example_Ribbon_1
+
+namespace doc_example_RibbonColorPicker_1 {
+void example() {
+    std::shared_ptr<gf::ColorCommand> command =
+        std::make_shared<gf::ColorCommand>(std::make_shared<gf::Command>("doc.colour", "Font colour"));
+    std::shared_ptr<gf::RibbonColorPicker> picker =
+        gf::make_control<gf::RibbonColorPicker>(gf::StableId("doc.colour_picker"));
+    (*picker).set_text("Font &colour");
+    (*picker).set_command(command);
+}
+}  // namespace doc_example_RibbonColorPicker_1
+
+namespace doc_example_RibbonFontControl_1 {
+void example() {
+    std::shared_ptr<gf::FontCommand> command =
+        std::make_shared<gf::FontCommand>(std::make_shared<gf::Command>("doc.font", "Font"));
+    std::shared_ptr<gf::RibbonFontControl> font =
+        gf::make_control<gf::RibbonFontControl>(gf::StableId("doc.font_control"));
+    (*font).set_families({"Portsmouth Rapids", "Carlito"});
+    (*font).set_command(command);
+}
+}  // namespace doc_example_RibbonFontControl_1
 
 namespace doc_example_RibbonGallery_1 {
 void example() {
@@ -2809,6 +3248,7 @@ struct Search final : gf::Component {
     Search() {
         (*field).set_placeholder_text("Search");
         (*field).set_accessible_name("Search");
+        (*field).set_accepts_enter(true);
         gf::on((*field).committed(), *this, &Search::on_commit);
     }
     void on_commit(const std::string& text) { query = text; }
@@ -2835,6 +3275,23 @@ void example() {
     (*note).undo();   // the text is "Draft" again, and can_redo() is true
 }
 }  // namespace doc_example_TextBox_2
+
+namespace doc_example_TextBox_3 {
+void example() {
+    std::shared_ptr<gf::TextBox> city =
+        gf::make_control<gf::TextBox>(gf::StableId("address.city"));
+    (*(*city).auto_complete_custom_source()).add_range({"Calgary", "Cambridge", "Edmonton"});
+    (*city).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*city).set_auto_complete_mode(gf::AutoCompleteMode::suggest_append);
+    gf::Window window(city, gf::Size{240.0, 200.0});
+    window.request_focus(city);
+    window.dispatch_text(gf::TextInputEvent{"ca"});
+    // The box shows "calgary" with "lgary" selected, and the list offers
+    // Calgary and Cambridge.
+    window.dispatch_key(gf::KeyEvent{gf::KeyAction::down, gf::PhysicalKey::tab});
+    // Tab accepted the completion: the text is "calgary", the caret at its end.
+}
+}  // namespace doc_example_TextBox_3
 
 namespace doc_example_Timer_1 {
 struct Clock final : gf::Component {
@@ -2883,6 +3340,22 @@ void example() {
     StatusClock clock(window, status);
 }
 }  // namespace doc_example_Timer_2
+
+namespace doc_example_TokenBox_1 {
+void example() {
+    std::shared_ptr<gf::TokenBox> recipients =
+        gf::make_control<gf::TokenBox>(gf::StableId("mail.to"));
+    (*(*recipients).auto_complete_custom_source()).add_range({"Ada Lovelace", "Alan Turing"});
+    (*recipients).set_auto_complete_source(gf::AutoCompleteSource::custom_source);
+    (*recipients).set_auto_complete_mode(gf::AutoCompleteMode::suggest);
+    const gf::TokenId grace = (*recipients).add_token("Grace Hopper");
+    gf::Window window(recipients, gf::Size{400.0, 60.0});
+    window.request_focus((*recipients).editor());
+    window.dispatch_text(gf::TextInputEvent{"Barbara Liskov,"});
+    // The box holds "Grace Hopper" and "Barbara Liskov"; the editor is empty.
+    (*recipients).remove_token(grace);   // now only "Barbara Liskov"
+}
+}  // namespace doc_example_TokenBox_1
 
 namespace doc_example_ToolStrip_1 {
 void example() {
@@ -3362,6 +3835,58 @@ void example() {
 }
 }  // namespace doc_example_Worker_2
 
+namespace doc_example_XmlElement_1 {
+void example() {
+    gf::XmlReadResult read = gf::read_xml(
+        "<layout format=\"2\"><panel id=\"tools.output\"/></layout>");
+    if (!read) {
+        return;   // read.error, read.position.line and read.position.column say why
+    }
+    const gf::XmlAttribute* format = read.root.find_attribute("format");   // "2"
+    std::size_t panels = read.root.children.size();                       // 1
+    gf::XmlWriteResult written = gf::write_xml(read.root);
+    // written.text:
+    // <?xml version="1.0" encoding="UTF-8"?>
+    // <layout format="2">
+    //   <panel id="tools.output"/>
+    // </layout>
+    static_cast<void>(format);
+    static_cast<void>(panels);
+}
+}  // namespace doc_example_XmlElement_1
+
+namespace doc_example_XmlElement_2 {
+void example() {
+    gf::XmlElement root;
+    root.name = "settings";
+    root.attributes.push_back(gf::XmlAttribute{.name = "theme", .value = "a & b"});
+    gf::XmlElement note;
+    note.name = "note";
+    note.text = "x < y";
+    root.children.push_back(note);
+    gf::XmlWriteResult written = gf::write_xml(root);   // escapes & and <
+
+    gf::XmlElement mixed = root;
+    mixed.text = "text beside a child";
+    gf::XmlWriteResult refused = gf::write_xml(mixed);
+    bool is_mixed = refused.error == gf::XmlError::mixed_content;   // true
+    static_cast<void>(written);
+    static_cast<void>(is_mixed);
+}
+}  // namespace doc_example_XmlElement_2
+
+namespace doc_example_XmlLimits_1 {
+void example() {
+    gf::XmlLimits limits;
+    limits.maximum_depth = 2;
+    gf::XmlReadResult shallow = gf::read_xml("<a><b/></a>", limits);        // accepted
+    gf::XmlReadResult deep = gf::read_xml("<a><b><c/></b></a>", limits);   // refused
+    bool refused = deep.error == gf::XmlError::depth_exceeded;              // true
+    static_cast<void>(shallow);
+    static_cast<void>(refused);
+}
+}  // namespace doc_example_XmlLimits_1
+
 namespace {
 
 int run(const char* name, void (*example)()) {
@@ -3380,7 +3905,9 @@ int run(const char* name, void (*example)()) {
 int main() {
     int failures = 0;
     failures += run("AnchoredPopupLayer example 1", &doc_example_AnchoredPopupLayer_1::example);
+    failures += run("AutoCompleteStringCollection example 1", &doc_example_AutoCompleteStringCollection_1::example);
     failures += run("BackgroundWorker example 1", &doc_example_BackgroundWorker_1::example);
+    failures += run("BackstageView example 1", &doc_example_BackstageView_1::example);
     failures += run("Binding example 1", &doc_example_Binding_1::example);
     failures += run("Binding example 2", &doc_example_Binding_2::example);
     failures += run("BindingContext example 1", &doc_example_BindingContext_1::example);
@@ -3404,10 +3931,13 @@ int main() {
     failures += run("CheckedListBox example 2", &doc_example_CheckedListBox_2::example);
     failures += run("ChoiceGroup example 1", &doc_example_ChoiceGroup_1::example);
     failures += run("ChoiceGroup example 2", &doc_example_ChoiceGroup_2::example);
+    failures += run("ColorCommand example 1", &doc_example_ColorCommand_1::example);
     failures += run("ColorValueEditor example 1", &doc_example_ColorValueEditor_1::example);
     failures += run("ColorValueEditor example 2", &doc_example_ColorValueEditor_2::example);
     failures += run("ComboBox example 1", &doc_example_ComboBox_1::example);
     failures += run("ComboBox example 2", &doc_example_ComboBox_2::example);
+    failures += run("ComboBox example 3", &doc_example_ComboBox_3::example);
+    failures += run("ComboBox example 4", &doc_example_ComboBox_4::example);
     failures += run("Command example 1", &doc_example_Command_1::example);
     failures += run("Command example 2", &doc_example_Command_2::example);
     failures += run("CommandBar example 1", &doc_example_CommandBar_1::example);
@@ -3423,8 +3953,16 @@ int main() {
     failures += run("CorrespondenceView example 1", &doc_example_CorrespondenceView_1::example);
     failures += run("CorrespondenceView example 2", &doc_example_CorrespondenceView_2::example);
     failures += run("DataGridView example 1", &doc_example_DataGridView_1::example);
+    failures += run("DataGridView example 2", &doc_example_DataGridView_2::example);
     failures += run("DateTimePicker example 1", &doc_example_DateTimePicker_1::example);
     failures += run("DateTimePicker example 2", &doc_example_DateTimePicker_2::example);
+    failures += run("DockEdit example 1", &doc_example_DockEdit_1::example);
+    failures += run("DockLayout example 1", &doc_example_DockLayout_1::example);
+    failures += run("DockLayout example 2", &doc_example_DockLayout_2::example);
+    failures += run("DockNavigator example 1", &doc_example_DockNavigator_1::example);
+    failures += run("DockPanelDescriptor example 1", &doc_example_DockPanelDescriptor_1::example);
+    failures += run("DockSite example 1", &doc_example_DockSite_1::example);
+    failures += run("DockWorkspace example 1", &doc_example_DockWorkspace_1::example);
     failures += run("DomainUpDown example 1", &doc_example_DomainUpDown_1::example);
     failures += run("DrawingSurface example 1", &doc_example_DrawingSurface_1::example);
     failures += run("DrawingSurface example 2", &doc_example_DrawingSurface_2::example);
@@ -3440,6 +3978,7 @@ int main() {
     failures += run("FlagsValueEditor example 2", &doc_example_FlagsValueEditor_2::example);
     failures += run("FlowLayoutPanel example 1", &doc_example_FlowLayoutPanel_1::example);
     failures += run("FlowLayoutPanel example 2", &doc_example_FlowLayoutPanel_2::example);
+    failures += run("FontCommand example 1", &doc_example_FontCommand_1::example);
     failures += run("FontDialog example 1", &doc_example_FontDialog_1::example);
     failures += run("GalleryCommand example 1", &doc_example_GalleryCommand_1::example);
     failures += run("GroupBox example 1", &doc_example_GroupBox_1::example);
@@ -3466,11 +4005,17 @@ int main() {
     failures += run("MetricsView example 1", &doc_example_MetricsView_1::example);
     failures += run("MetricsView example 2", &doc_example_MetricsView_2::example);
     failures += run("MonthCalendar example 1", &doc_example_MonthCalendar_1::example);
+    failures += run("NavigationPane example 1", &doc_example_NavigationPane_1::example);
     failures += run("NotifyIcon example 1", &doc_example_NotifyIcon_1::example);
     failures += run("NumericUpDown example 1", &doc_example_NumericUpDown_1::example);
     failures += run("NumericUpDown example 2", &doc_example_NumericUpDown_2::example);
     failures += run("ObjectView example 1", &doc_example_ObjectView_1::example);
     failures += run("ObjectView example 2", &doc_example_ObjectView_2::example);
+    failures += run("PageSet example 1", &doc_example_PageSet_1::example);
+    failures += run("PageSet example 2", &doc_example_PageSet_2::example);
+    failures += run("PageStrip example 1", &doc_example_PageStrip_1::example);
+    failures += run("PageView example 1", &doc_example_PageView_1::example);
+    failures += run("PageView example 2", &doc_example_PageView_2::example);
     failures += run("Panel example 1", &doc_example_Panel_1::example);
     failures += run("Panel example 2", &doc_example_Panel_2::example);
     failures += run("PictureBox example 1", &doc_example_PictureBox_1::example);
@@ -3491,6 +4036,8 @@ int main() {
     failures += run("ReviewCard example 1", &doc_example_ReviewCard_1::example);
     failures += run("ReviewCard example 2", &doc_example_ReviewCard_2::example);
     failures += run("Ribbon example 1", &doc_example_Ribbon_1::example);
+    failures += run("RibbonColorPicker example 1", &doc_example_RibbonColorPicker_1::example);
+    failures += run("RibbonFontControl example 1", &doc_example_RibbonFontControl_1::example);
     failures += run("RibbonGallery example 1", &doc_example_RibbonGallery_1::example);
     failures += run("RibbonToolTip example 1", &doc_example_RibbonToolTip_1::example);
     failures += run("ScaledGroupBox example 1", &doc_example_ScaledGroupBox_1::example);
@@ -3515,8 +4062,10 @@ int main() {
     failures += run("TaskDialog example 1", &doc_example_TaskDialog_1::example);
     failures += run("TextBox example 1", &doc_example_TextBox_1::example);
     failures += run("TextBox example 2", &doc_example_TextBox_2::example);
+    failures += run("TextBox example 3", &doc_example_TextBox_3::example);
     failures += run("Timer example 1", &doc_example_Timer_1::example);
     failures += run("Timer example 2", &doc_example_Timer_2::example);
+    failures += run("TokenBox example 1", &doc_example_TokenBox_1::example);
     failures += run("ToolStrip example 1", &doc_example_ToolStrip_1::example);
     failures += run("ToolStripContainer example 1", &doc_example_ToolStripContainer_1::example);
     failures += run("ToolStripPanel example 1", &doc_example_ToolStripPanel_1::example);
@@ -3541,5 +4090,8 @@ int main() {
     failures += run("Window example 2", &doc_example_Window_2::example);
     failures += run("Worker example 1", &doc_example_Worker_1::example);
     failures += run("Worker example 2", &doc_example_Worker_2::example);
+    failures += run("XmlElement example 1", &doc_example_XmlElement_1::example);
+    failures += run("XmlElement example 2", &doc_example_XmlElement_2::example);
+    failures += run("XmlLimits example 1", &doc_example_XmlLimits_1::example);
     return failures == 0 ? 0 : 1;
 }

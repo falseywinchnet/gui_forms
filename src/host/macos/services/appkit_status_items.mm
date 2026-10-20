@@ -12,6 +12,8 @@
 // identity and borrows the owner's sink; the owner clears `sink` before it
 // releases the item, so a late action finds nothing to call.
 @interface GFStatusItemTarget : NSObject
+// The icon's HostTrayIconId value (an Objective-C property holds the plain
+// integer).
 @property(nonatomic) std::uint64_t iconIdentity;
 @property(nonatomic) gui_forms::host::detail::AppKitStatusItems::Sink* sink;
 - (void)buttonActivated:(id)sender;
@@ -24,7 +26,7 @@
     if (sink == nullptr) return;
     NSEvent* const event = [NSApp currentEvent];
     gui_forms::HostTrayIconEvent published{};
-    published.icon_id = self.iconIdentity;
+    published.icon_id = gui_forms::HostTrayIconId{self.iconIdentity};
     const bool secondary = event.type == NSEventTypeRightMouseUp ||
                            (event.modifierFlags & NSEventModifierFlagControl) != 0;
     if (secondary) {
@@ -100,7 +102,7 @@ NSImage* status_image(const HostTrayIconRequest& request) {
 
 struct AppKitStatusItems::Impl final {
     struct Entry final {
-        std::uint64_t id{};
+        HostTrayIconId id{};
         __strong NSStatusItem* item{};
         __strong GFStatusItemTarget* target{};
     };
@@ -108,7 +110,7 @@ struct AppKitStatusItems::Impl final {
     Sink sink{};
     std::vector<Entry> entries{};
 
-    Entry* find(std::uint64_t icon_id) noexcept {
+    Entry* find(HostTrayIconId icon_id) noexcept {
         for (Entry& entry : entries) {
             if (entry.id == icon_id) return &entry;
         }
@@ -132,13 +134,13 @@ AppKitStatusItems::~AppKitStatusItems() {
     (*impl_).entries.clear();
 }
 
-HostServiceStatus AppKitStatusItems::add(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus AppKitStatusItems::add(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     NSImage* image = status_image(request);
     if (image == nil) return {HostServiceError::backend_failure};
     NSStatusItem* item = [NSStatusBar.systemStatusBar statusItemWithLength:NSSquareStatusItemLength];
     if (item == nil || item.button == nil) return {HostServiceError::backend_failure};
     GFStatusItemTarget* target = [[GFStatusItemTarget alloc] init];
-    target.iconIdentity = icon_id;
+    target.iconIdentity = icon_id.value;
     target.sink = &(*impl_).sink;
     item.button.image = image;
     item.button.toolTip = native_text(request.tooltip);
@@ -153,7 +155,7 @@ HostServiceStatus AppKitStatusItems::add(std::uint64_t icon_id, const HostTrayIc
     return {};
 }
 
-HostServiceStatus AppKitStatusItems::update(std::uint64_t icon_id, const HostTrayIconRequest& request) {
+HostServiceStatus AppKitStatusItems::update(HostTrayIconId icon_id, const HostTrayIconRequest& request) {
     Impl::Entry* const entry = (*impl_).find(icon_id);
     if (entry == nullptr) return {HostServiceError::backend_failure};
     NSImage* image = status_image(request);
@@ -163,7 +165,7 @@ HostServiceStatus AppKitStatusItems::update(std::uint64_t icon_id, const HostTra
     return {};
 }
 
-void AppKitStatusItems::remove(std::uint64_t icon_id) noexcept {
+void AppKitStatusItems::remove(HostTrayIconId icon_id) noexcept {
     std::vector<Impl::Entry>& entries = (*impl_).entries;
     for (std::size_t index = 0; index < entries.size(); ++index) {
         if (entries[index].id != icon_id) continue;
@@ -173,7 +175,7 @@ void AppKitStatusItems::remove(std::uint64_t icon_id) noexcept {
     }
 }
 
-HostTrayMenuResult AppKitStatusItems::show_menu(std::uint64_t icon_id, const HostTrayMenuRequest& request) {
+HostTrayMenuResult AppKitStatusItems::show_menu(HostTrayIconId icon_id, const HostTrayMenuRequest& request) {
     HostTrayMenuResult result;
     Impl::Entry* const entry = (*impl_).find(icon_id);
     if (entry == nullptr || (*entry).item.button == nil) {

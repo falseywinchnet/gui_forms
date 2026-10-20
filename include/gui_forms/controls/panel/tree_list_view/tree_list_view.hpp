@@ -385,7 +385,6 @@ private:
     void rebuild_rows();
     [[nodiscard]] bool has_children(std::size_t index) const noexcept;
     [[nodiscard]] bool can_expand(std::size_t index) const noexcept;
-    [[nodiscard]] std::size_t row_index(std::size_t index) const noexcept;
     [[nodiscard]] std::size_t require_index(std::string_view node_id, const char* message) const;
     // Expands the collapsed ancestors of a node and appends one change per
     // ancestor to `changes`, outermost first. Rebuilds the rows when any
@@ -425,6 +424,17 @@ private:
     [[nodiscard]] AnatomyStateSet cell_states(std::size_t row) const;
     [[nodiscard]] AnatomyStateSet column_states(std::size_t column) const;
     [[nodiscard]] Hit hit_test(const Layout& placed, Point local) const;
+    // What one realized-item position names. The realized items are the
+    // rows in view (item system "row"), then each row's visible cells past
+    // the tree column, row by row (item system "cell"), then the visible
+    // column headers (item system "column"). `row` is the row of a row or
+    // cell; `column` the column of a cell or header.
+    struct RealizedSlot final {
+        ItemSystemIndex system{};
+        std::size_t row{};
+        std::size_t column{};
+    };
+    [[nodiscard]] RealizedSlot realized_slot(const Layout& placed, std::size_t item) const;
     [[nodiscard]] std::size_t realized_row_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_cell_count(const Layout& placed) const noexcept;
     [[nodiscard]] std::size_t realized_cell_column(const Layout& placed, std::size_t position) const noexcept;

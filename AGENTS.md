@@ -33,7 +33,10 @@ section, so a skim still covers all eleven:
    repeated processing and reuse; transfer ownership explicitly; raw
    addresses only at boundaries; name storage operations (fill, reserve,
    reset, clear, release) precisely; check size arithmetic; keep borrows
-   valid through use.
+   valid through use (a function returning a borrow of an argument deletes
+   its rvalue overload; declare a borrower after what it borrows); memory
+   errors and undefined behaviour are defects in tests too, checked by
+   sanitizer runs of the whole suite.
 6. **Objects and authority:** parents own children and back links only
    observe; cross authority boundaries through named capabilities; define
    the fallback when an owner disappears (reject stale identities, stop
@@ -49,7 +52,8 @@ section, so a skim still covers all eleven:
 9. **Failure and foreign interfaces:** say what a failure leaves behind;
    validate before mutating; explicit results for expected alternatives and
    exceptions only at subsystem boundaries; foreign interfaces state types,
-   counts, ownership and errors.
+   counts, ownership and errors, and take entry-point types from their
+   declarations, never retyped by hand.
 10. **C++ spelling:** no `auto`, trailing returns or structured bindings;
     `(*pointer).member` instead of `->`; no lambdas; hand-written comparisons
     (no `= default`); no coroutines or ranges pipelines.
@@ -66,9 +70,28 @@ finding:
 
 ```text
 python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis
+python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis
 ```
 
-The check covers spelling only. Ownership, lifetime, initialization and
+The second checks two rules of sections 5 and 9: a function returning a
+borrow of a container or snapshot argument deletes its rvalue overload, and a
+function pointer looked up by name takes its type from the declaration. The
+`sanitizers` CI job runs the whole suite under ASan, UBSan and LSan on Linux
+and fails on any report.
+
+Every build tree keeps a sanitizer tree beside its ordinary one, on every
+platform it builds on:
+
+```text
+python3 -B tools/ci_build.py --sanitize [--gallery] [--tests REGEX]
+```
+
+It builds `.build/native-<host>-<arch>/gui-forms-sanitize` with CI's flags
+(ASan and UBSan everywhere, LSan on Linux and macOS; the Windows MinGW runtime
+has none) and fails on any report. Run it over the tests your change touches
+before pushing C++, and the whole suite before a stage gate.
+
+The checks cover spelling and those two rules only. Ownership, lifetime, initialization and
 naming still need review against the full document.
 
 ## Forward programme (read before starting new work)

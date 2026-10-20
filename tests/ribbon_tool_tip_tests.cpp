@@ -31,6 +31,7 @@ const SemanticNode* find_role(const std::vector<SemanticNode>& nodes, SemanticRo
     }
     return nullptr;
 }
+const SemanticNode* find_role(std::vector<SemanticNode>&& nodes, SemanticRole role) = delete;
 
 void fire_next(Window& window) {
     const std::optional<FrameTime> wake = window.next_wake();

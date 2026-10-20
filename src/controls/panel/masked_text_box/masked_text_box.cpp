@@ -120,7 +120,10 @@ void MaskedTextBox::filter_typing(TextEdit& edit, MaskPosition start, MaskPositi
 void MaskedTextBox::filter_deletion(TextEdit& edit, MaskPosition start, MaskPosition end) {
     bool removes_edit_position = false;
     for (std::size_t index = start.value(); index < end.value(); ++index) {
-        if (provider_.is_edit_position(MaskPosition(index))) removes_edit_position = true;
+        if (provider_.is_edit_position(MaskPosition(index))) {
+            removes_edit_position = true;
+            break;
+        }
     }
     if (!removes_edit_position) {
         // A literal cannot be removed: Backspace (the caret was at the end of
@@ -302,8 +305,12 @@ MaskedTextProvider MaskedTextBox::configured_provider(std::string mask, MaskCult
 void MaskedTextBox::replace_provider(MaskedTextProvider next) {
     // The assigned characters, without prompts or literals, placed again;
     // under an empty mask, the plain text.
-    const std::string kept = provider_.length() == 0U
-        ? text() : provider_.to_string(MaskTextFormat::exclude_prompt_and_literals);
+    std::string kept{};
+    if (provider_.length() == 0U) {
+        kept = text();
+    } else {
+        kept = provider_.to_string(MaskTextFormat::exclude_prompt_and_literals);
+    }
     if (next.length() == 0U) {
         provider_ = std::move(next);
         if (editor_) {
@@ -502,8 +509,10 @@ bool MaskedTextBox::on_semantic_action(SemanticAction action, std::string_view v
         const MaskEditResult result = set_text(value);
         return result.succeeded();
     }
-    if (action == SemanticAction::focus && editor_ && window() != nullptr) {
-        return (*window()).request_focus(editor_);
+    Window* const host = window();
+    if (action == SemanticAction::focus && editor_ && host != nullptr) {
+        const bool focused = (*host).request_focus(editor_);
+        return focused;
     }
     return Panel::on_semantic_action(action, value);
 }
@@ -581,9 +590,10 @@ void MaskedTextBox::publish_part_geometry(std::span<PartGeometry> geometry) cons
 AnatomyStateSet MaskedTextBox::anatomy_states() const {
     AnatomyStateSet states = ScrollableControl::anatomy_states();
     if (read_only_) states.insert(AnatomyState::read_only);
-    if (visual_status() == ControlVisualStatus::invalid) {
+    const ControlVisualStatus status = visual_status();
+    if (status == ControlVisualStatus::invalid) {
         states.insert(AnatomyState::invalid);
-    } else if (visual_status() == ControlVisualStatus::pending) {
+    } else if (status == ControlVisualStatus::pending) {
         states.insert(AnatomyState::pending);
     }
     return states;

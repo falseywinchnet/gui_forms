@@ -94,10 +94,14 @@ void Command::clear_checked() {
 }
 
 namespace {
+// A shortcut routes its command through the window it is registered with;
+// the registration ends with the window or the command, whichever goes
+// first, so both references stay valid while it can run.
 struct InvokeShortcut final {
     Command& command;
+    Window& window;
     bool operator()() const {
-        const bool invoked = command.execute("shortcut");
+        const bool invoked = command.execute_routed(window, "shortcut");
         return invoked;
     }
 };
@@ -105,7 +109,7 @@ struct InvokeShortcut final {
 
 AcceleratorToken Command::bind_shortcut(Window& window, KeyGesture gesture) {
     AcceleratorToken token = window.register_accelerator(
-        *this, gesture, InvokeShortcut{*this});
+        *this, gesture, InvokeShortcut{*this, window});
     return token;
 }
 
@@ -127,6 +131,18 @@ bool Command::execute(std::string_view source_id) {
     }
     CommandInvocation invocation{stable_id_, std::string(source_id),
                                  next_sequence_++};
+    invoked_.emit(invocation);
+    return true;
+}
+
+bool Command::execute_routed(Window& window, std::string_view source_id) {
+    if (!is_alive() || !state_.enabled || !validate_utf8(source_id).valid()) {
+        return false;
+    }
+    const CommandInvocation invocation{stable_id_, std::string(source_id), next_sequence_++};
+    const CommandRouteResult routed = window.route_command(invocation);
+    if (routed.outcome == CommandRouteOutcome::refused) return false;
+    if (routed.outcome == CommandRouteOutcome::handled) return true;
     invoked_.emit(invocation);
     return true;
 }

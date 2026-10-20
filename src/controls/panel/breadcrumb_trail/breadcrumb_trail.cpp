@@ -54,6 +54,10 @@ void BreadcrumbTrail::initialize_control_tree() {
     (*editor_).set_border_style(BorderStyle::none);
     (*editor_).set_placeholder_text("Enter an exact path");
     (*editor_).set_accessible_name("Exact location path");
+    // Enter commits the path (editor_committed) and Escape ends the edit
+    // (editor_cancelled); neither goes further.
+    (*editor_).set_accepts_enter(true);
+    (*editor_).set_accepts_escape(true);
     (*editor_).set_visible(false);
     (*editor_).set_font(font_);
     add_child(editor_);
@@ -639,7 +643,7 @@ std::vector<SemanticNode> BreadcrumbTrail::semantic_virtual_children() const {
     for (const VisibleItem& item : visible_items_) {
         SemanticNode node{};
         node.stable_id = std::string(visible_stable_id(item));
-        node.runtime_id = virtual_runtime_id(node.stable_id);
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::button;
         node.bounds = {trail.x + item.bounds.x, trail.y + item.bounds.y,
                        item.bounds.width, item.bounds.height};

@@ -314,7 +314,7 @@ grants (REGIONS §2). Values are starting tokens (§12.3).
 | Relief | Construction | Typical parts | Source |
 |---|---|---|---|
 | Pill plate | soft vertical tinted gradient, one thin coloured border, inner light top/left and dark bottom/right lines, one-pixel contact shadow | push button, chip, thumb | owner revision 4 as clarified in §12.4; Plan Paint `action_material` |
-| Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; each holds near its peak across the bulge and falls off over a narrow band at the rim: intensity × (1 − t^q) with q about 2.2 over the half-width t (a tighter slope means a larger q; a curve concentrated at the centre, such as (1 − t)^p, reads looser and is wrong) and melt back into the plane before the part's bounds; pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
+| Bulge | no border, line or shadow: the plane itself swells, as if a fingertip were pushed into cloth from behind; a highlight on the slope facing the upper-left light, shade on the slope facing away, a faint crown; each holds near its peak across the bulge and falls off over a narrow band at the rim: intensity × (1 − t^q) with q about 2.2 over the half-width t (a tighter slope means a larger q; a curve concentrated at the centre, such as (1 − t)^p, reads looser and is wrong) and melt back into the plane, the lit slope and crown before the part's bounds, while the shaded slope may still hold part of its peak at the lower-right bounds (about 45 % at the middle of the bottom edge; owner, §12.12 G2); flat at rest, the bulge rises when hot (§12.12 G4); pressed, it becomes a dent (light and shade swapped); the active tool is the same bulge in gold | ribbon command buttons | owner, §12.4 |
 | Dithered bulge | the bulge field above, subsampled onto a regular lattice (1 logical px dots every 2 px) with a multi-tone ramp: the signed tone (lit minus shaded slope) is quantized onto at least three steps per side (for the default, deep, mid and light blue on the shaded side; pale tint, near-white and white on the lit side; ambers and creams for the active tool), and an ordered 4×4 threshold dithers between neighbouring steps so the gradation survives; a two-colour dither is wrong; the plane shows where the tone rounds to zero; no edge; pressed and active as for Bulge | ribbon command buttons (studies); a theme choice | owner, §12.4 |
 | Inset well | flat or lightly darker-top face, inner top shade, outer bottom highlight, thin border | text well, check box, track, gallery | M023; Plan Paint well |
 | Pressed | face darkened, inner lines inverted (dark top/left, light bottom/right), contact shadow removed | button, command, segment | Plan Paint pressed tile |
@@ -878,16 +878,21 @@ activation behaviour stays platform-owned (DDV-007-01).
 ### 8.5 Marks, values and semantic roles
 
 Besides part roles (§8.1) and states (§8.4), the atom vocabulary (§12.7)
-names the marks a glyph or indicator part shows, the values a part carries,
-and the semantic roles and node fields controls publish to accessibility.
-Their machine forms are `PartMark` (`gui_forms/theme/part_painting`),
-`AccentIndex` (`gui_forms/anatomy/types`) and `SemanticRole` and
-`SemanticNode` (`gui_forms/semantics/types`); the schema export lists the
-marks, values and roles under `vocabulary`, beside the recipe families a
-theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
-`panel`, `card`, `button`, `accent_button`, `command_button`, `choice`,
-`editor`, `menu_item`, `selection`, `progress` and, from RB-38 (§12.9),
-`tool_tip`).
+names the custom states admitted for shared use, the marks a glyph or
+indicator part shows, the values a part carries, and the semantic roles,
+actions and node fields controls publish to accessibility. Their machine
+forms are `admitted_custom_states` and `AccentIndex`
+(`gui_forms/anatomy/types`), `PartMark`, `DockShapeRegion` and the
+`PartPaint` fields (`gui_forms/theme/part_painting`; among them the content
+colour, `PartPaint::content_color` and `PartGeometry::content_color`),
+`TextOrientation`
+(`gui_forms/types/paint_types`), and `SemanticRole`, `SemanticAction` and
+`SemanticNode` (`gui_forms/semantics/types`); the schema export lists them
+under `vocabulary` (`custom_states`, `marks`, `values`, `semantic_roles`,
+`semantic_actions`, `semantic_fields`), beside the recipe families a theme
+supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`, `panel`,
+`card`, `button`, `accent_button`, `command_button`, `choice`, `editor`,
+`menu_item`, `selection`, `progress` and, from RB-38 (§12.9), `tool_tip`).
 
 | Mark | What it shows | Used by |
 |---|---|---|
@@ -900,10 +905,32 @@ theme supplies (`ControlVisualRole`, `gui_forms/theme/types`: `window`,
 | more | a bar over a solid down arrow | a gallery's "more" button |
 | overflow | a double chevron | a strip's overflow button (`ToolStrip` adopts it), a Quick Access Toolbar's overflow |
 | customize | a short bar over an open down chevron | a Quick Access Toolbar's customize button |
+| pin | a pushpin (a barrel, a collar across its open end, a needle): upright, needle down, when the part is `checked` (pinned); on its side, needle pointing left, otherwise (unpinned) | a docked panel's or group's pin; a pinned tab's pin (§12.10) |
+| dock_shape | a small window, its caption a two-unit bar, with the region a drop gives the panel filled: the top, bottom, left or right half, or the middle for `tab_into` (the `dock_region` value) | a docking target's tiles (§12.10) |
 
 Marks are drawn in one restrained style: one- or 1.5-unit strokes or solid
 fills in the recipe's glyph colour, inside the part's bounds, nothing drawn
 when the part is too small to read.
+
+**Admitted custom states.** `modified` (a document tab whose content has
+unsaved changes; the theme shows it, decision 42 as a dot in the close
+slot, and there is no mark for it) and `pinned` (a tab pinned to the front
+of its strip). They stay custom states, not §8.4 states: an item system that
+needs them declares these shared declarations among its custom states, so
+every control and theme means one thing by each name.
+
+**Text orientation.** A value carried by a part with text: `horizontal`,
+`bottom_to_top` (the line reads up the part, the tops of the glyphs facing
+left, as a left side tab) or `top_to_bottom` (reading down, the tops
+facing right). A turned label lies along the part's height with its line
+centred across the width, and its alignment runs from the end reading
+starts at. The painter draws the line turned a quarter about its origin
+(`Painter::draw_turned_text_utf8`), unhinted as every rotated run is; the
+recording, Windows and Skia painters turn it, and a minimal painter draws it
+unturned.
+
+**Dock region.** The value the `dock_shape` mark is drawn for: `top`,
+`bottom`, `left`, `right` or `tab_into`.
 
 **Accent index.** A value, not a state: a part's position in the theme's
 accent ramp, the ordered colours a theme offers for telling sets of items
@@ -915,6 +942,23 @@ the ramp and the engine (T2) the tint, the theme records carry a
 provisional six-colour ramp of translucent tints laid over the part's
 material.
 
+**Content colour** (owner decision W-7, §12.11). A value, not a state: the
+colour a part shows as its content, such as a colour picker's sample, which
+is data the user chose and not a look the theme supplies. Only the `fill`
+role honours it: a fill with a content colour is painted that colour, flat,
+in the part's shape, in place of the recipe's material; every other role
+ignores it. A swatch is therefore a `fill` part inside a `well` part that
+frames it. The colour is drawn as given in ordinary and high-contrast
+presentation alike, as an image is (the framing well follows the
+high-contrast recipe, so the sample stays outlined), and at 45 % opacity on
+a disabled part, as a disabled icon is. A part publishes it in its geometry
+record and a painter receives it with the part.
+
+| Value | Carried by | Honoured by | Used by |
+|---|---|---|---|
+| accent index | any part | surface roles (tint over the material) | a ribbon's contextual tab sets (RB-22) |
+| content colour | any part | `fill` only (the colour in place of the material) | a colour picker's bar and palette swatches (W-7) |
+
 **Semantic roles and node fields.** Besides the roles controls published
 before 2026-10-14, `split_button` (a button whose primary press acts, with a
 separate arrow that opens a menu) and `menu_button` (a button that opens a
@@ -925,6 +969,21 @@ popup. Each host maps them as far as its accessibility API allows: MSAA
 no position in a set; AppKit (macOS) has a menu-button role and an index
 but no split-button role or set size; ATK (Linux) has a has-popup state and
 the `posinset` and `setsize` object attributes.
+
+From 2026-10-17 (§12.10) `pane` (a tool panel or another F6 region) and
+`tab_panel` (the content a tab shows) are admitted, with the action `close`
+(a document tab's or a panel's close) and two node fields: on a tab, the
+stable identity of the tab panel it shows (`controlled_panel`, the
+tab-to-panel relation), and on a tab list, whether its tabs run in a row or
+a column (`orientation`). Tabs publish `select` and no longer `press`. The
+hosts map them so: MSAA has a pane role and, for a tab panel, the property
+page role, but no relation, orientation or second action (UIA, stage A,
+carries them); AppKit publishes both roles as groups, a tab panel with the
+`AXTabPanel` subrole, the relation as linked elements, the orientation, and
+close as a custom action named "Close"; ATK publishes a pane as a panel and
+a tab panel as a scroll pane (as GTK does), the relation as
+controller-for, the orientation as the horizontal or vertical state, and
+close as an action named "close".
 
 ## 9. Motion, effects and sound
 
@@ -1383,6 +1442,81 @@ From the ribbon interview's last note (stage RB, decisions 37 to 43):
   right of the client area over the content (RB-42). Its tooltip is the
   program's help card for the whole window (RB-43). A possible
   whole-screen help overlay is open.
+
+### 12.10 Owner decisions, eighth round, 2026-10-17 (docking and PageView)
+
+From the docking interview (`planning/interview/DOCKING_INTERVIEW_ROUND_001.md`;
+stage DK, decisions 35 and 40), admitted to the vocabulary together with the
+enums and the schema as §12.7 requires (§8.5), in phase V0 of the docking
+plan:
+
+- **Marks (DK-35, questions J1 and J2).** `pin`, drawn pinned under the
+  `checked` state and unpinned otherwise; and one `dock_shape` mark with
+  the resulting region (top, bottom, left, right, tab into) as a parameter
+  (`PartPaint::dock_region`), drawn as a small window outline with that
+  region filled, for the docking tiles. Float, dock and maximize marks wait
+  for taste T6 (J7). No new part roles (J8): guides and tiles use `face`,
+  `glyph` and `drop`; previews use `drop` with `drop_accepted` and
+  `drop_rejected`.
+- **Custom item states (DK-35 J3, DK-40 P35.8).** `modified`, shown by the
+  theme with no mark, and `pinned`; no `preview` state.
+- **Text orientation (DK-35 J4).** A text-orientation parameter in
+  `PartPaint` for vertical side-tab labels and the collapsed navigation
+  pane's caption.
+- **Semantics (DK-35 J5 and J6, DK-40 P35.4 and P35.5).** The roles `pane`
+  (tool panels and F6 regions) and `tab_panel` (page content), the action
+  `close`, a tab-to-panel relation field and a tab-list orientation field,
+  each mapped on MSAA, AX and ATK (§8.5) and to be verified with stage A.
+  Tabs stop publishing `press`: `TabControl`'s and the ribbon's tabs
+  publish `select`, their pages and the ribbon's command plane are tab
+  panels, and a selected tab names its panel. Tree roles are deferred to
+  stage A (P35.7).
+- **Families (DK-40 P35.9).** Tabs paint with the `menu_item` family until
+  T4 adds the tab stack's drawing; no new marks for the navigation pane
+  (P35.11).
+
+### 12.11 Owner decision W-7, 2026-10-19 (content colour)
+
+- **A content-colour value joins the vocabulary (W-7, option 1).** Raised by
+  the ribbon's colour picker (stage RB, phase 6), whose samples could not be
+  painted by role: `PartPaint` and `PartGeometry` carry an optional content
+  colour, honoured by the `fill` role only (§8.5), so that a swatch is a
+  fill inside a well and every part of a colour picker paints by role. The
+  schema export lists it under `vocabulary.values` as `content_color`.
+
+### 12.12 Owner decisions, T2 engine interview, 2026-10-19
+
+Recorded in `planning/interview/T2_INTERVIEW_ROUND_001.md`. The GIVEN list is
+in the T2 brief. Those that touch this document:
+
+- **Atoms (§12.7).** Admitted:
+  - the engine inputs: `pointer_x` and `pointer_y` in part-local logical
+    units (published only while hot), `time_in_state`, `display_scale`,
+    `text_scale`, and published application values;
+  - an `image` part role, a content picture drawn exactly as given;
+  - a grip primitive that fills its box.
+
+  Density waits for stage L or T4. Part opacity is an engine presentational
+  property, not an atom.
+- **Motion (§9).**
+  - Reduced motion follows §9.5 exactly.
+  - Occluded windows jump every transition to its end.
+  - The ribbon rise is an exponential approach, a fixed fraction of the
+    remaining gap per about 75 ms.
+  - A presentational scale exists only as a capability. It is drawn about
+    the part's centre, inside its granted overflow, with the hit region and
+    layout unchanged, and the default does not use it, so §9.1 still holds
+    for the default.
+  - An application may mark a surface ceremonial, lifting the 10 % ambient
+    cap (§10) for that surface only.
+- **The bulge (§3.5).**
+  - **G2:** the shade field keeps the approved formula, and the Bulge row
+    now says what it does at the bounds.
+  - **G4:** a ribbon button is flat at rest and its bulge rises when hot.
+    Hover is the rise, with no brightness lift.
+  - **G1, G3:** the dithered bulge rescales its quantization to the part's
+    own tone range, and is drawn at the nearest integer display scale. The
+    rules are in `T4-default-theme/RENDERING_REFERENCE.md` §3.
 
 ## Appendix A. Anti-models
 

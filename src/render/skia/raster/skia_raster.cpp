@@ -921,8 +921,11 @@ void SkiaRaster::draw_inset_box_shadow(
     const Rect outside{rect.x - reach, rect.y - reach,
                        rect.width + reach * 2.0,
                        rect.height + reach * 2.0};
-    SkPathBuilder complement_builder;
-    complement_builder.setFillType(SkPathFillType::kEvenOdd);
+    // The fill type goes to the constructor, as in the executor's builders.
+    // Set afterwards with setFillType, it did not reach the built path in
+    // the sanitized build, whose toolkit is instrumented while libskia is
+    // not: the even-odd hole was filled (#167).
+    SkPathBuilder complement_builder(SkPathFillType::kEvenOdd);
     complement_builder.addRect(to_sk_rect(outside));
     if (!hole.empty()) {
         complement_builder.addRRect(to_sk_rrect(
@@ -1134,6 +1137,26 @@ void SkiaRaster::draw_text_utf8(Point origin,
         if ((*impl_).composite_run(*canvas, shaped, font_spec, origin, color, nullptr, nullptr, nullptr)) return;
         (*impl_).draw_shaped_text(*canvas, shaped, origin, font_spec, color);
     }
+}
+
+void SkiaRaster::draw_turned_text_utf8(const Point origin, const std::string_view text, const FontSpec font_spec,
+                                       const Color color, const TextOrientation orientation) {
+    if (orientation == TextOrientation::horizontal) {
+        draw_text_utf8(origin, text, font_spec, color);
+        return;
+    }
+    SkCanvas* const canvas = (*impl_).canvas();
+    if (canvas == nullptr || text.empty()) return;
+    const text::ShapedText shaped = (*impl_).text_engine.shape(text, font_spec);
+    // A positive Skia rotation turns clockwise on the y-down surface:
+    // bottom_to_top is a quarter turn anticlockwise, top_to_bottom clockwise.
+    const SkScalar degrees = orientation == TextOrientation::bottom_to_top ? -90.0F : 90.0F;
+    (*canvas).save();
+    (*canvas).translate(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y));
+    (*canvas).rotate(degrees);
+    const Point run_origin{0.0, 0.0};
+    (*impl_).draw_shaped_text(*canvas, shaped, run_origin, font_spec, color);
+    (*canvas).restore();
 }
 
 Size SkiaRaster::measure_text_utf8(std::string_view text,

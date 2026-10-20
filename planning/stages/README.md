@@ -34,7 +34,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | not started |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | not started |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
-| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | started 2026-10-18: phased plan proposed (`T2-engine-core/PLAN.md`), awaiting the owner's acceptance |
+| T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | interview answered 2026-10-19; plan E1–E11 accepted (`T2-engine-core/PLAN.md`); E1 revision then E2 next |
 | T3 | [Theme language front end](T3-theme-language/README.md) | 0.3 Themeable | T1, T2 | not started |
 | T4 | [Default theme and Windows-familiar themes](T4-default-theme/README.md) | 0.3 Themeable | T1, T2, T3 | design decided, build not started |
 | T5 | [Compositor cooperation](T5-compositor/README.md) | 0.3 Themeable | T2 | not started |
@@ -47,6 +47,8 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 | S | [C# sibling: Windows Forms swap-in](S-csharp-swap-in/README.md) | 0.6 Bindings | R, C | not started |
 | RB | [Ribbon framework: study, interview, decisions, plan](RB-ribbon/README.md) | to be placed by its plan | none to start | complete 2026-10-14: study, interview round 001, 27 decisions and the plan, accepted by the owner; the ribbon is built in W (`RB-ribbon/PLAN.md`), phase 0 first |
 | DK | [Docking and windowing: study, interview, decisions, plan](DK-docking/README.md) | to be placed by its plan | none to start | started 2026-10-14 (admitted by the owner, matrix row 43): complete 2026-10-17: studies, interview round 001 (43 decisions, look studies published) and the plan, accepted by the owner; built in a DK window-layer stage (W0) and in W (`DK-docking/PLAN.md`) |
+| DG | [Diagram control: study, interview, decisions, plan](DG-diagram/README.md) | to be placed by its plan | none to start | started 2026-10-19 (matrix row 55): study written; the interview waits for the owner |
+| Z | [Owned zlib replacement: study and threat model](Z-zlib/README.md) | to be placed after owner review | none for study; owner acceptance before code | added 2026-10-19 at the owner's request; phase 1 source audit recorded in `results/2026-10-19-zlib`; six recommended decisions accepted; precursor alternatives audit recorded; no implementation started |
 | D | [Interface builder](D-interface-builder/README.md) | 0.7 Designers | T3, L, FD | not started |
 | H | [HTML import and layout designer](H-html-import/README.md) | 0.7 Designers | L, T3 | earlier attempt discarded |
 | V | [Theme designer](V-theme-designer/README.md) | 0.7 Designers | T4, D core | not started |

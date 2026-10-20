@@ -76,12 +76,24 @@ Point centre(const Control& control, Rect local) {
     return point;
 }
 
+// A borrow into `items`, which must outlive it: temporaries are refused
+// (house style §5).
 const RibbonGallery::Item* find_item(const std::vector<RibbonGallery::Item>& items, std::string_view id) {
     for (const RibbonGallery::Item& item : items) {
         if (item.stable_id == id) return &item;
     }
     return nullptr;
 }
+const RibbonGallery::Item* find_item(std::vector<RibbonGallery::Item>&& items, std::string_view id) = delete;
+
+// The item `id` names, which must be there: a missing one ends the test
+// rather than dereferencing null. A borrow into `items`, as find_item is.
+const RibbonGallery::Item& item_named(const std::vector<RibbonGallery::Item>& items, std::string_view id) {
+    const RibbonGallery::Item* const found = find_item(items, id);
+    require(found != nullptr, "the item the test names is realized");
+    return *found;
+}
+const RibbonGallery::Item& item_named(std::vector<RibbonGallery::Item>&& items, std::string_view id) = delete;
 
 void move_to(Window& window, Point point) {
     static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, point}));
@@ -183,7 +195,8 @@ void layout_and_columns() {
             "an item without labels shows a face and an image area");
     (*gallery).set_show_labels(true);
     window.perform_layout();
-    require((*find_item((*gallery).realized_items(), (*gallery).realized_items().front().stable_id)).parts.item_label.present,
+    const std::vector<RibbonGallery::Item> labelled = (*gallery).realized_items();
+    require(item_named(labelled, labelled.front().stable_id).parts.item_label.present,
             "labels show under the images when asked");
 }
 
@@ -225,12 +238,13 @@ void hover_preview_order() {
     Window window(root, {400.0, 200.0});
     window.perform_layout();
     std::vector<RibbonGallery::Item> items = (*gallery).realized_items();
-    const Point a = centre(*gallery, (*find_item(items, "item.0")).parts.item_face.bounds);
-    const Point b = centre(*gallery, (*find_item(items, "item.1")).parts.item_face.bounds);
-    const Point c = centre(*gallery, (*find_item(items, "item.2")).parts.item_face.bounds);
+    const Point a = centre(*gallery, item_named(items, "item.0").parts.item_face.bounds);
+    const Point b = centre(*gallery, item_named(items, "item.1").parts.item_face.bounds);
+    const Point c = centre(*gallery, item_named(items, "item.2").parts.item_face.bounds);
     move_to(window, a);
     require(fixture.log.entries.empty(), "no preview before the dwell");
-    require((*find_item((*gallery).realized_items(), "item.0")).states.hot, "the item under the pointer is hot");
+    const std::vector<RibbonGallery::Item> hovered = (*gallery).realized_items();
+    require(item_named(hovered, "item.0").states.hot, "the item under the pointer is hot");
     elapse_dwell(window);
     move_to(window, b);
     elapse_dwell(window);
@@ -243,8 +257,8 @@ void hover_preview_order() {
     click_at(window, c);
     require(fixture.log.joined() == "preview:item.2 value:item.2 invoked ",
             "a click commits without a cancellation, value before invocation");
-    require((*gallery).selected_id() == std::string("item.2") &&
-                (*find_item((*gallery).realized_items(), "item.2")).states.selected,
+    const std::vector<RibbonGallery::Item> chosen = (*gallery).realized_items();
+    require((*gallery).selected_id() == std::string("item.2") && item_named(chosen, "item.2").states.selected,
             "the selection follows the command's value");
     fixture.log.entries.clear();
     move_to(window, a);
@@ -319,7 +333,7 @@ void popups() {
             "the full gallery opens over the ribbon, below the in-ribbon gallery");
     const std::vector<RibbonGallery::Item> items = (*full).realized_items();
     require(items.size() == 24U, "the full gallery shows its rows");
-    const Point target = centre(*full, (*find_item(items, "item.9")).parts.item_face.bounds);
+    const Point target = centre(*full, item_named(items, "item.9").parts.item_face.bounds);
     move_to(window, target);
     elapse_dwell(window);
     require(key(window, PhysicalKey::escape), "Escape is taken");
@@ -328,7 +342,8 @@ void popups() {
     fixture.log.entries.clear();
     click_at(window, more);
     window.perform_layout();
-    const Point choice = centre(*full, (*find_item((*full).realized_items(), "item.11")).parts.item_face.bounds);
+    const std::vector<RibbonGallery::Item> reopened = (*full).realized_items();
+    const Point choice = centre(*full, item_named(reopened, "item.11").parts.item_face.bounds);
     click_at(window, choice);
     require(fixture.log.joined() == "popup:open value:item.11 invoked popup:closed ",
             "a click in the popup commits, then closes it");
