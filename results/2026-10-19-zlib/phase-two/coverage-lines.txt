@@ -522,4 +522,3 @@
   522|  4.20M|}
   523|       |
   524|       |} // namespace gui_forms::compression
-

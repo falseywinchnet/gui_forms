@@ -50,6 +50,8 @@ identifies the reviewed core, final tests and checked-in seed corpus. Extra
 lifecycle/malformed tests were added after the smoke campaigns and rerun under
 the instrumented coverage executable; decoder/fuzzer sources did not change.
 
+Log content is retained with trailing whitespace normalized for Git.
+
 ## Observed results
 
 - Native conformance/lifecycle fixtures pass under ASan/UBSan/LSan.
@@ -108,7 +110,11 @@ makes no throughput or compression-ratio claim.
    from their existing pins, declared patches reapplied by the fetch script,
    and the build retried without further sync. Do not overlap m4build syncs
    with active builds; AGENTS.md now records that constraint.
-4. Full project/platform validation and the accepted 24-hour campaigns on x64
+4. The restored full-project macOS sanitizer build succeeded and its targeted
+   CTest passed: 1/1 `gui_forms_inflate_tests`, 0.74 seconds. This builds the
+   toolkit using the prescribed toolchain/runtime; the full suite was not run.
+   The successful log is `full-project-retry.log`.
+5. Full project/platform validation and the accepted 24-hour campaigns on x64
    and arm64 remain required. The two passing one-minute smoke runs total
    **122 seconds (0.0339 hours)**, not 24 hours. No background campaign is
    implied by this report. No Linux/Windows local pass, full sanitizer-matrix
