@@ -168,6 +168,18 @@ public:
         length(opacity);
         end();
     }
+    void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double opacity) override {
+        begin("draw_part_raster");
+        if (raster) {
+            const DeviceExtent extent = (*raster).extent();
+            number(static_cast<long long>(extent.width));
+            number(static_cast<long long>(extent.height));
+            length((*raster).scale().value);
+        }
+        point(origin);
+        length(opacity);
+        end();
+    }
     void draw_image_region(ImageId image, Rect source, Rect destination, double opacity) override {
         begin("draw_image_region");
         number(static_cast<long long>(image.value));
