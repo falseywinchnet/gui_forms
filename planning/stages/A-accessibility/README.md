@@ -1,11 +1,13 @@
 # Stage A: accessibility verified on every host
 
 Release: 0.2 Verified. Depends on: nothing. Runs beside every other stage.
-Status 2026-10-19: started. Windows: the MSAA client test enumerates the
+Status 2026-10-20: started. Windows: the MSAA client test enumerates the
 whole Gallery and performs every control's default action (A-W1,
 `results/2026-10-19-a-w1-msaa-gallery`); the UI Automation provider is in
-place (A-W2, read by a provider-level client test) and its Gallery client
-test (A-W3) is next. macOS and Linux not started. Authority: `planning/FORWARD_PROGRAMME.md`
+place (A-W2) and its client test does the same through IUIAutomation, each
+default action through its pattern (A-W3,
+`results/2026-10-20-a-w3-uia-gallery`). TextPattern (item 5) is next on
+Windows. macOS and Linux not started. Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -55,8 +57,10 @@ is never turned off (accessibility round A3).
   ExpandCollapse, SelectionItem and Selection patterns from the semantic
   actions and states. Every provider uses COM threading, so calls arrive on
   the UI thread; Invoke posts through `Window::begin_invoke`. A stale element
-  answers `UIA_E_ELEMENTNOTAVAILABLE`. Test
-  `tests/windows_accessibility_uia_provider_tests.cpp`. No TextPattern yet.
+  answers `UIA_E_ELEMENTNOTAVAILABLE`. Tests
+  `tests/windows_accessibility_uia_provider_tests.cpp` and, over the whole
+  Gallery, `tests/windows_accessibility_uia_gallery_tests.cpp`. No
+  TextPattern yet.
 - **Linux.** ATK/AT-SPI in `src/host/linux/accessibility/`. A fixture
   (`tests/linux_accessibility_fixture.cpp`, built when ATK and X11 are found)
   and a Python AT-SPI client (`tests/linux_accessibility_client.py`) exist

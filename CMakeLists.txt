@@ -3535,5 +3535,19 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # (measured 2026-10-20 on the owner's machine with other builds
         # running), whose ctest budget is 900 s.
         set_tests_properties(gui_forms_windows_accessibility_msaa_gallery_tests PROPERTIES TIMEOUT 900)
+        # Stage A, A-W3: an IUIAutomation client on a thread of its own
+        # enumerates every Gallery page and performs each control's default
+        # action through its pattern.
+        add_executable(gui_forms_windows_accessibility_uia_gallery_tests tests/windows_accessibility_uia_gallery_tests.cpp)
+        target_compile_definitions(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
+            WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00)
+        target_link_libraries(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
+            gui_forms_gallery_model gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
+        add_test(NAME gui_forms_windows_accessibility_uia_gallery_tests COMMAND gui_forms_windows_accessibility_uia_gallery_tests)
+        # About 49 s in a release tree and 741 s in the sanitizer tree
+        # (measured 2026-10-20 with other builds running): every provider
+        # call takes a fresh snapshot of the whole Gallery. The limit leaves
+        # the sanitizer run room under heavier load.
+        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 1800)
     endif()
 endif()

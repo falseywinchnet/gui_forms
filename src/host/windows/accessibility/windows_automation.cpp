@@ -651,12 +651,17 @@ HRESULT STDMETHODCALLTYPE UiaElement::get_BoundingRectangle(UiaRect* out) {
     if (self.parent == nullptr) return S_OK;
     const Rect bounds = (*self.node).bounds;
     const double scale = (*source_).scale;
+    // A node with no area answers the empty rectangle, as UI Automation
+    // reports one to its clients.
+    const double width = std::round(bounds.width * scale);
+    const double height = std::round(bounds.height * scale);
+    if (width <= 0.0 || height <= 0.0) return S_OK;
     POINT origin{};
     ClientToScreen((*source_).hwnd, &origin);
     (*out).left = origin.x + std::round(bounds.x * scale);
     (*out).top = origin.y + std::round(bounds.y * scale);
-    (*out).width = std::round(bounds.width * scale);
-    (*out).height = std::round(bounds.height * scale);
+    (*out).width = width;
+    (*out).height = height;
     return S_OK;
 }
 
