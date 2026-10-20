@@ -741,8 +741,13 @@ private:
     friend class detail::PopupAttachment;
     friend class ThemeEngine;
     // Called by ThemeEngine::paint for a part painted with a key: makes or
-    // updates its record and counts a new record's index fallback.
-    void note_engine_part(const Control& control, const PartKey& key, AnatomyStateSet states);
+    // updates its record and counts a new record's index fallback. Returns
+    // the record's handle, or none when the table has no record for it.
+    std::optional<PartRecordHandle> note_engine_part(const Control& control, const PartKey& key,
+                                                     AnatomyStateSet states);
+    // Called by ThemeEngine::paint: the part's raster from its record's
+    // cache (EnginePartTable::raster_for), on the paint in progress.
+    [[nodiscard]] PartRasterResult engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request);
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;
