@@ -121,6 +121,13 @@ Linux (X11)
 : `src/host/linux/`, built with `-DGUI_FORMS_ENABLE_LINUX_HOST=ON`. Xlib
   window and event handling, Xcursor cursors, X11 clipboard selections,
   XDND drag destinations, and native ATK/AT-SPI accessibility publication.
+  The publication is checked from an AT-SPI client's side on CI:
+  `gui_forms_linux_accessibility_tests` drives a small fixture, and
+  `gui_forms_linux_accessibility_gallery_tests` compares every Gallery page
+  with the semantic tree (role, name, states, actions, values, children)
+  and performs one default action per control type
+  (`results/2026-10-20-a-l2-linux-gallery`). A text box's text is published
+  whole; editable text ranges are not implemented.
   The CPU raster is presented through X11 images. There is no Wayland adapter;
   Wayland sessions run the X11 host through XWayland.
 
