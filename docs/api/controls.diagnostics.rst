@@ -965,6 +965,8 @@ Enumerations
 
    .. cpp:enumerator:: draw_live_surface
 
+   .. cpp:enumerator:: draw_part_raster
+
 Functions, constants and aliases
 --------------------------------
 

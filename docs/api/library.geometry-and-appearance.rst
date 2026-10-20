@@ -76,6 +76,8 @@ Types
      - A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster.
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
+   * - :cpp:class:`PartRaster <gui_forms::PartRaster>`
+     - One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale.
    * - :cpp:class:`PartRasterView <gui_forms::PartRasterView>`
      - A borrowed destination for one part's pixels.
    * - :cpp:class:`PartRecordAcquisition <gui_forms::PartRecordAcquisition>`
@@ -905,6 +907,10 @@ Types
 
       A live raster is a retained renderer-neutral resource whose producer may publish independently of the UI dispatcher. Display lists retain the resource and terminal renderers sample only its newest complete frame.
 
+   .. cpp:function:: virtual void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double opacity = 1.0)
+
+      Composites one of the theme engine's part rasters (T2 plan, E2; GIVEN A2-2 and C1-1). ``origin`` is the raster's top-left corner in logical units; the painter places the raster's first pixel on the device pixel nearest to it, one raster pixel per device pixel, so the part is device-aligned and never resampled. ``opacity`` in [0, 1] is the part's opacity, one multiplier on its whole composite. The blend is the shared premultiplied source-over (detail::composite_part_raster) under the current clip, so every host writes the same bytes. A raster made for another display scale than the painter's is not drawn: the engine rasterizes a part for the scale it is shown at. The base implementation draws nothing; the recording, Skia and Windows DIB painters override it. A null raster draws nothing.
+
    .. cpp:function:: virtual void draw_image_region(ImageId image, Rect source, Rect destination, double opacity = 1.0)
 
       Source-region replay is the renderer-neutral primitive behind image strips, texture fills, and nine-patch materials. ``source`` is expressed in source-image pixels. Minimal painters may preserve coherence by falling back to whole-image scaling; production painters override it.
@@ -1005,6 +1011,36 @@ Types
    .. cpp:member:: std::optional<PartKey> key
 
       The part's identity across frames (T2 GIVEN H3-1), or none. A part with a key has a record in its window's engine part table; one without is drawn statically, with no transitions and no cached raster. It is identity, not vocabulary: it changes nothing a part looks like today. Its views are borrowed for the call.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: PartRaster final
+
+   ``#include <gui_forms/engine/part_raster/part_raster.hpp>``
+
+   One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale. Rows are tight: row_bytes is width * 4. Lifetime: create() makes a raster with every pixel transparent; its maker fills it through view() and then shares it read-only, as std::shared_ptr<const PartRaster>, with every recorded command that composites it (Painter::draw_part_raster). Recorded commands keep it alive until their display chunk is rebuilt or retired.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const std::uint8_t> pixels() const noexcept
+
+   .. cpp:function:: DeviceExtent extent() const noexcept
+
+   .. cpp:function:: std::size_t row_bytes() const noexcept
+
+   .. cpp:function:: DeviceScale scale() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static std::shared_ptr<PartRaster> create(DeviceExtent extent, DeviceScale scale)
+
+      A transparent raster of :cpp:func:`extent <gui_forms::PartRaster::extent>` for display scale :cpp:func:`scale <gui_forms::PartRaster::scale>`, or null when either side exceeds maximum_part_raster_side or the scale is not a finite value in [minimum_device_scale, maximum_device_scale]. An empty extent is allowed and has no pixels.
+
+   .. cpp:function:: PartRasterView view() noexcept
+
+      The raster as a destination for a primitive: valid while the raster lives and is not shared read-only.
 
 .. cpp:namespace:: gui_forms
 
