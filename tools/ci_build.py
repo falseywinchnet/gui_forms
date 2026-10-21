@@ -32,7 +32,14 @@ def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
     return value in ('1', 'true', 'on', 'yes')
 
 
-SANITIZER_FLAGS: str = '-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer'
+# The sanitized build type carries -g, and ccache then adds the build
+# directory to every object's hash (debug information records it), so no two
+# checkouts could share a sanitized object. -fdebug-compilation-dir=. records
+# "." instead; ccache recognizes the option and leaves the directory out, so
+# objects of identical sources hit across checkouts with the same layout.
+# Reports still name file and line, relative to the build directory.
+SANITIZER_FLAGS: str = ('-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer '
+                        '-fdebug-compilation-dir=.')
 
 
 SANITIZER_LINK_FLAGS: str = '-fsanitize=address,undefined'

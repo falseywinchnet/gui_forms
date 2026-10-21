@@ -32,6 +32,8 @@ class SanitizerOptionTests(unittest.TestCase):
         options, environment = ci_build.sanitizer_options('linux', Path('lsan.supp'))
         self.assertIn('-DCMAKE_CXX_FLAGS=' + ci_build.SANITIZER_FLAGS, options)
         self.assertIn('-fno-sanitize-recover=undefined', ci_build.SANITIZER_FLAGS)
+        # Without it ccache hashes the build directory into every -g object.
+        self.assertIn('-fdebug-compilation-dir=.', ci_build.SANITIZER_FLAGS)
         self.assertIn('detect_leaks=1', environment['ASAN_OPTIONS'])
         self.assertIn('halt_on_error=1', environment['UBSAN_OPTIONS'])
         self.assertIn('suppressions=lsan.supp', environment['LSAN_OPTIONS'])
