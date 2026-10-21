@@ -170,6 +170,7 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/image/png_decoder.cpp
     src/core/image/png_writer.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
@@ -2246,6 +2247,15 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
 
+    add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
+    target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_inflate_protocol_tests COMMAND gui_forms_inflate_protocol_tests)
+
+    add_executable(gui_forms_png_decoder_tests tests/image/png_decoder_tests.cpp)
+    target_link_libraries(gui_forms_png_decoder_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_decoder_tests COMMAND gui_forms_png_decoder_tests)
+
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
@@ -3394,6 +3404,33 @@ if(GUI_FORMS_BUILD_FUZZERS)
         target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
     else()
         target_compile_definitions(gui_forms_inflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_inflate_protocol_fuzz
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_png_decode_fuzz
+        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_png_decode_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_png_decode_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
     endif()
 
     add_executable(gui_forms_png_registry_fuzz

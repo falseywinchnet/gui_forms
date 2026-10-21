@@ -1,6 +1,9 @@
 # Z. Owned zlib replacement: phase 1 study and threat model
 
-Date: 2026-10-19. Status: **phase 2 authorized and implemented for review; verification gate open**.
+Date: 2026-10-19. Status: **phase 2 implemented for review; owned PNG phase started; verification gates open**.
+The owner explicitly requested starting PNG on 2026-10-19. The separate
+[PNG contract and remaining gates](PNG_CODEC.md) records the reordered phase,
+private lossless sample seam and outstanding colour/encoder integration.
 The owner subsequently authorized source reuse and a house-style rewrite of
 both deflate and PNG. The six decisions were accepted, with PNG ownership
 then revised to an owned codec. This authorizes phase 2; later phases still
@@ -535,6 +538,9 @@ sanitized corpus replay on Linux, macOS and Windows. This is a proposed
 minimum, not a safety proof. Record actual hours/execs/edges/features and
 source region/branch coverage; inspect unvisited parser/error branches and
 add targeted vectors. Phase 1 hours: **0**; coverage: **not measured**.
+The [source-locked sustained campaign](INFLATE_CAMPAIGN.md) now defines the
+initial x64/arm64 shard execution and accounting; planned hours are not completed
+hours and its scope does not replace the remaining corpus/API-sequence gates.
 
 Use the repository's pinned LLVM 22.1.8 and build helpers. Required targeted
 command once tests exist:

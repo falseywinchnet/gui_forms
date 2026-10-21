@@ -57,3 +57,11 @@ release flags, each also timing pinned upstream zlib. See the
 for limitations. On an M4 mirror, provide `--baseline` pointing to the exported
 `123f13cd` header/source; the runner verifies their hashes. The normal checkout
 can omit that option to read the same revision from Git.
+
+## Sustained campaign
+
+The [source-locked campaign](../../planning/stages/Z-zlib/INFLATE_CAMPAIGN.md)
+runs bounded four-hour shards on x64 and arm64 against ordinary and strict pinned
+zlib. It records source coverage, preserves failing inputs and uses an external
+RSS/time supervisor. Short runner validation has zero qualifying hours; successful
+shard accounting does not by itself close the phase gate.
