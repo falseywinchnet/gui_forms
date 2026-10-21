@@ -23,7 +23,6 @@ The rest of the public C++ library, grouped by area: the application and its hos
    library.text
    library.docking
    library.xml
-   library.compression
    library.images-and-resources
    library.animation-and-threading
    library.audio
