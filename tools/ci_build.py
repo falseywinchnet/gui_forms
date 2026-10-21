@@ -242,7 +242,7 @@ def configure_tree(toolkit: Path, configure: list[str]) -> None:
 
 
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
-                  sanitize: bool = False, tests: str = '') -> None:
+                  sanitize: bool = False, tests: str = '', test_jobs: int = 1) -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
 
     With sanitize, the toolkit is built in its own directory with the
@@ -250,6 +250,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     examples are not built. tests, a ctest -R pattern, narrows that run to
     the matching tests and the build to the outputs they read (fails when it
     matches none); empty builds everything and runs the whole suite.
+    test_jobs is how many tests ctest runs at once (1, the default, runs
+    them one after another).
     """
     toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
@@ -315,7 +317,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     if tests:
         # A pattern that matches no test is a mistake, not a pass.
         selection = ['-R', tests, '--no-tests=error']
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout, *selection)
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+        '--parallel', test_jobs, *selection)
     if sanitize:
         return
     run('cmake', '--install', toolkit)
@@ -330,6 +333,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--test-jobs', type=int, default=1,
+                        help='tests ctest runs at once (default 1: one after another)')
     parser.add_argument('--sanitize', action='store_true',
                         help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
                              'and macOS) and only test')
@@ -341,6 +346,8 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
+    if args.test_jobs < 1:
+        parser.error('--test-jobs must be positive')
     if args.tests and not args.sanitize:
         parser.error('--tests narrows the sanitized run only')
     hosts: dict[str, str] = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}
@@ -352,7 +359,8 @@ def main() -> None:
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
-                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests)
+                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
+                  args.test_jobs)
 
 
 if __name__ == '__main__':
