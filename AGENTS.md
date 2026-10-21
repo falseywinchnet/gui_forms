@@ -51,7 +51,8 @@ section, so a skim still covers all eleven:
    mutable state.
 9. **Failure and foreign interfaces:** say what a failure leaves behind;
    validate before mutating; explicit results for expected alternatives and
-   exceptions only at subsystem boundaries; foreign interfaces state types,
+   exceptions only at subsystem boundaries; switches and state machines keep
+   a default that reaches one fallback; foreign interfaces state types,
    counts, ownership and errors, and take entry-point types from their
    declarations, never retyped by hand.
 10. **C++ spelling:** no `auto`, trailing returns or structured bindings;
