@@ -1,7 +1,10 @@
 # Z. Owned zlib replacement: phase 1 study and threat model
 
-Date: 2026-10-19. Status: **six owner decisions accepted; precursor alternatives audit recorded**.
-This document proposes the implementation; it does not authorize phase 2.
+Date: 2026-10-19. Status: **phase 2 authorized and implemented for review; verification gate open**.
+The owner subsequently authorized source reuse and a house-style rewrite of
+both deflate and PNG. The six decisions were accepted, with PNG ownership
+then revised to an owned codec. This authorizes phase 2; later phases still
+receive their own reviewed PRs.
 The owner requested one PR per phase, stacked while unmerged, no pushes to
 `main`, and a stop after this study. No implementation or dependency change
 is part of phase 1.
@@ -17,7 +20,8 @@ checksums, a libpng-compatible C subset, and one implementation on every host.
 No performance claim is made before measurements.
 
 **Given by the owner, 2026-10-19:** remove Windows WIC PNG decoding; use the
-owned zlib consistently across platforms. **Accepted by the owner, 2026-10-19:** all six recommendations in section 11.
+owned zlib consistently across platforms. **Accepted by the owner, 2026-10-19:** the recommendations in section 11,
+with the subsequent owned-PNG revision recorded there.
 The requested [light alternatives audit](ALTERNATIVES_LIGHT_AUDIT.md) examines
 existing implementations before code begins; it does not select an import.
 
@@ -469,6 +473,7 @@ pulling unrelated changes into the stack.
 | **3 — deflate** | Levels/settings, finite workspace, streaming and canonical identity. Cross-platform compressed-byte hashes plus round trips against the oracle. Initial compression measurements. |
 | **4 — checksums and measured acceleration** | Consolidated portable CRC/Adler and x64/arm64 vector paths; every path matches baseline. Add optimized inflate/deflate kernels only with preserved bounds/identity and isolated measurements. |
 | **5 — C shim and candidate integration** | Ten-entry subset, ABI/allocator/error tests and shim libFuzzer target. Build unmodified pinned libpng against shim; prove budget propagation and sanitized candidate Skia graph. Retain old fetch/baseline until replacement acceptance is complete. |
+| **5b — owned PNG codec, separate PR** | Owner revision: implement the full admitted PNG decode/encode path in house style on owned deflate. Review PNG chunk/order/CRC rules, all admitted colour depths and Adam7, exact filtered-size arithmetic, metadata/resource limits and failure publication before coding; test malformed PNGs and differential pixels. libspng/LodePNG remain design references with per-file provenance required before copying. |
 | **6 — every platform and final cutover** | Chosen shared PNG path; remove WIC, migrate other PNG paths, apply FreeType decision, consolidate writer/registry checksums, select writer compression level from results. Full acceptance matrix and packaging/link-map audit precede removing Chromium's fetch. |
 
 ### Conformance and differential
@@ -584,21 +589,26 @@ no longer contact googlesource for zlib. No threshold for calling the library
 “high efficiency” is invented here: present the measured trade-offs to the
 owner, choose the writer level from them, and do not conceal a regression.
 
-## 11. Owner decisions before implementation
+## 11. Owner decisions and subsequent source-use authorization
 
 The owner accepted all six recommended A options on 2026-10-19, and required
 a precursor light audit of non-GPL open-source replacements, prioritizing C++.
 That [audit is recorded separately](ALTERNATIVES_LIGHT_AUDIT.md). The alternatives
-below remain as decision history; each A is the accepted choice.
+below remain as decision history. Subsequently the owner authorized taking
+suitable reference material for both libraries and rewriting it in house
+style. This changes choice 2 to B (owned PNG), permits source reuse despite
+the lack of a verified leak audit, and starts phase 2. It does not waive
+verification or licence/provenance requirements.
 
 1. **Name and boundary.** A — **recommend** GUI.Forms Deflate,
    `gui_forms_deflate`, public native declarations in
    `include/gui_forms/compression/`, private implementation/shim in
    `src/core/compression/`. B — a separately named standalone library subtree
    with its own packaging contract. C — owner-supplied name/location.
-2. **PNG ownership.** A — **recommend** pinned libpng on the owned zlib on
-   every host, through a shared bounded adapter. B — first-party full admitted
-   PNG codec, with an additional parser study and acceptance stage.
+2. **PNG ownership (revised).** A — initially recommended and accepted:
+   pinned libpng on owned zlib on every host. **B — now accepted:** first-party
+   full admitted PNG codec, with an additional parser study and acceptance
+   stage. The owner's later instruction to rewrite both supersedes A.
 3. **FreeType.** A — **recommend** compile out `FT_CONFIG_OPTION_USE_ZLIB`
    and explicitly reject compressed font formats. B — redirect FreeType to
    our shim and include raw deflate/gzip/autodetect support and font budgets.
@@ -617,9 +627,13 @@ below remain as decision history; each A is the accepted choice.
    return with corpus-derived PNG metadata/default budgets before integration.
    B — owner supplies different ceilings/campaign duration before coding.
 
-All six A answers are accepted. This follow-up completes the requested light
-audit only; no candidate has been adopted and implementation has not started.
-Acceptance of these choices does not certify any candidate against the gates.
+Five A answers remain accepted; choice 2 is superseded by the owned-PNG
+rewrite direction. Phase 2 now contains a bounded streaming inflate derived
+from the pinned upstream puff canonical-Huffman algorithm, with new ownership,
+quota and streaming state. [Provenance](../../../src/core/compression/PROVENANCE.md)
+and [phase-2 evidence](../../../results/2026-10-19-zlib/phase-two/README.md)
+record the source decision and open gate. House style is mandatory; it is not
+a substitute for the accepted executable verification.
 
 ## 12. Direct source references for review
 
@@ -635,3 +649,13 @@ These links supplement the repository-relative pointers and exact pins above:
 - [Upstream Huffman table validation](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/inftrees.c),
   [inflate state machine](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/inflate.c),
   and [C API contract](https://github.com/madler/zlib/blob/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf/zlib.h).
+
+## 13. Owner-requested early optimization
+
+The owner subsequently requested optimal decoders, BFFT-style compiler
+visibility, reduced nested branching, useful vectorization and appropriate
+hinting. This authorizes measured inflate/Adler acceleration within the current
+phase-2 PR. It does not turn a synthetic benchmark into the full acceptance
+matrix. The [kernel inspection and measurements](../../../results/2026-10-19-zlib/phase-two/optimization/README.md)
+record bounded copy/literal kernels, canonical root tables, compiler-vectorized
+Adler, and the PNG filter reference inspection for the later owned parser.

@@ -1,6 +1,18 @@
 {
   "schema": 1,
   "types": {
+    "ByteCount": {
+      "summary": "A byte quantity used for cumulative input/output totals and finite stream limits."
+    },
+    "InflateLimits": {
+      "summary": "Finite per-stream limits on consumed input, produced output and implementation-defined work."
+    },
+    "InflateOptions": {
+      "summary": "The raw-deflate or zlib format, maximum window size and mandatory finite resource limits."
+    },
+    "InflateResult": {
+      "summary": "Progress for one call, cumulative totals, terminal error and any requested dictionary identity."
+    },
     "Panel": {
       "status": "OBSERVED: bundle 002 split; M4 build, focused tests, and Screen Sharing pass",
       "capture": "captures/basic_controls_overview.png",
