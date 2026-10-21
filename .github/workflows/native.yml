@@ -529,3 +529,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/publish_cache.py --platform "${{ matrix.platform }}"
+
+  # The demonstration programs, their tests, packages and (on main) the tested
+  # release, built after the native jobs from their objects. One failed native
+  # platform skips the programs of all four, as a release needs all four.
+  programs:
+    needs: native
+    uses: ./.github/workflows/release.yml
+    with:
+      from_native: true
+    permissions:
+      contents: write
+      actions: read
