@@ -56,7 +56,8 @@ gui_forms::Window
          Text scale, high contrast, reduced motion and sound preferences. The
          text scale must lie between 0.5 and 4.0, and changing it closes open
          popups. Any change remeasures the tree and raises
-         :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`.
+         :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`. Turning reduced motion on puts every motion
+         value of the window at its end in the same call.
 
       **text_metrics_provider** : ``TextMetricsProvider*``
 
@@ -115,7 +116,8 @@ gui_forms::Window
 
       **occluded** : ``bool``, default ``false``
          Whether the host reports the window as hidden from view. While occluded,
-         painting and paint wake-ups are suspended.
+         painting and paint wake-ups are suspended, and motion values jump to
+         their ends without scheduling frames.
 
       **check_access** : ``bool``, read-only
          Whether the calling thread is the window's UI thread: the thread that
@@ -199,6 +201,15 @@ gui_forms::Window
          A copy of the window's instrumentation counters: layout passes, flushes,
          mutations, damage, input, focus, disposals, wrong-thread rejections and
          more. ``MetricsSnapshot::to_json`` serializes it.
+
+      **engine_parts** : ``EnginePartTable``, read-only
+         The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
+      **motion_clock** : ``MotionClock``, read-only
+         The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+         control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+         has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+         it so that motion is sampled from their own time.
 
       **semantic_generation** : ``std::uint64_t``, read-only
          A number that changes whenever the semantic (accessibility) tree may
@@ -366,6 +377,8 @@ gui_forms::Window
         -  
       * - :cpp:func:`cancel_drag <gui_forms::Window::cancel_drag>`
         -  
+      * - :cpp:func:`motion_clock <gui_forms::Window::motion_clock>`
+        - The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are.
       * - :cpp:func:`metrics <gui_forms::Window::metrics>`
         - The live instrumentation counters, for hosts and renderers that record into them.
       * - :cpp:func:`reset_activity_metrics <gui_forms::Window::reset_activity_metrics>`
@@ -375,7 +388,7 @@ gui_forms::Window
       * - :cpp:func:`semantic_snapshot <gui_forms::Window::semantic_snapshot>`
         - Builds the semantic tree that assistive technology and automation see: roles, names, values, states and bounds, keyed by stable ID.
       * - :cpp:func:`perform_semantic_action <gui_forms::Window::perform_semantic_action>`
-        - Performs an automation action, such as focus or press, on the control with a stable ID, and returns whether it was performed.
+        - Performs an automation action, such as focus or press, and returns whether it was performed.
       * - :cpp:func:`set_text_scale <gui_forms::Window::set_text_scale>`
         -  
       * - :cpp:func:`set_framebuffer_painter <gui_forms::Window::set_framebuffer_painter>`
@@ -557,7 +570,8 @@ gui_forms::Window
       Text scale, high contrast, reduced motion and sound preferences. The
       text scale must lie between 0.5 and 4.0, and changing it closes open
       popups. Any change remeasures the tree and raises
-      :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`.
+      :cpp:func:`presentation_changed <gui_forms::Window::presentation_changed>`. Turning reduced motion on puts every motion
+      value of the window at its end in the same call.
 
    .. cpp:function:: void set_presentation_settings(PresentationSettings settings)
 
@@ -643,7 +657,8 @@ gui_forms::Window
    .. cpp:function:: bool occluded() const noexcept
 
       Whether the host reports the window as hidden from view. While occluded,
-      painting and paint wake-ups are suspended.
+      painting and paint wake-ups are suspended, and motion values jump to
+      their ends without scheduling frames.
 
    .. cpp:function:: void set_occluded(bool occluded, FrameTime transition_time)
 
@@ -753,6 +768,17 @@ gui_forms::Window
       A copy of the window's instrumentation counters: layout passes, flushes,
       mutations, damage, input, focus, disposals, wrong-thread rejections and
       more. ``MetricsSnapshot::to_json`` serializes it.
+
+   .. cpp:function:: const EnginePartTable& engine_parts() const noexcept
+
+      The theme engine's records of this window's keyed parts (T2 plan, EnginePartTable), for inspection. The engine alone changes them.
+
+   .. cpp:function:: const MotionClock& motion_clock() const noexcept
+
+      The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+      control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+      has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+      it so that motion is sampled from their own time.
 
    .. cpp:function:: std::uint64_t semantic_generation() const noexcept
 
@@ -1116,6 +1142,13 @@ gui_forms::Window
 
    .. cpp:function:: void cancel_drag() noexcept
 
+   .. cpp:function:: MotionClock& motion_clock() noexcept
+
+      The window's :cpp:class:`MotionClock <gui_forms::MotionClock>`: one frame request, armed only while some
+      control's :cpp:class:`MotionValue <gui_forms::MotionValue>` is moving, however many are. Once every value
+      has settled it schedules nothing. Tests install a :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>` on
+      it so that motion is sampled from their own time.
+
    .. cpp:function:: Metrics& metrics() noexcept
 
       The live instrumentation counters, for hosts and renderers that record
@@ -1137,8 +1170,25 @@ gui_forms::Window
 
    .. cpp:function:: bool perform_semantic_action(std::string_view stable_id, SemanticAction action, std::string_view value = {})
 
-      Performs an automation action, such as focus or press, on the control
-      with a stable ID, and returns whether it was performed.
+      Performs an automation action, such as focus or press, and returns
+      whether it was performed. One overload names the control by stable ID.
+      Focus on a control that is not focusable itself, such as a composite
+      over an inner editor, is left to the control, and is performed only if
+      focus then lies inside it.
+      The overload native accessibility hosts use names a published node by
+      its control's runtime ID and, for a virtual child, the child's stable
+      ID; a disposed or replaced control's runtime ID is refused.
+
+   .. cpp:function:: bool perform_semantic_action(RuntimeId control, std::string_view virtual_child, SemanticAction action, std::string_view value = {})
+
+      Performs an automation action, such as focus or press, and returns
+      whether it was performed. One overload names the control by stable ID.
+      Focus on a control that is not focusable itself, such as a composite
+      over an inner editor, is left to the control, and is performed only if
+      focus then lies inside it.
+      The overload native accessibility hosts use names a published node by
+      its control's runtime ID and, for a virtual child, the child's stable
+      ID; a disposed or replaced control's runtime ID is refused.
 
    .. cpp:function:: void set_text_scale(double text_scale)
 
@@ -1154,7 +1204,7 @@ gui_forms::Window
 
    .. cpp:function:: void set_dispatch_wake_handler(std::function<void()> wake)
 
-      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake.
+      Host adapters install a thread-safe wake primitive. Installing a handler after work was queued immediately publishes one coalesced wake. The handler runs under the dispatcher's lock, on whichever thread posted: it may only signal (set a flag, post a message, write a pipe) and must never call back into the window. In return, once this call replaces or removes a handler, no wake through the old one is under way or to come, so its target may be destroyed.
 
    .. cpp:function:: void set_paint_wake_handler(std::function<void()> wake)
 

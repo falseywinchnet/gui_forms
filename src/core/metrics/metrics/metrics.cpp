@@ -23,7 +23,11 @@ void Metrics::reset_activity() noexcept {
     const std::uint64_t display_cache_entries = values_.display_cache_entries;
     const std::uint64_t display_generation = values_.display_generation;
     const std::uint64_t active_surfaces = values_.active_surface_count;
+    const std::uint64_t engine_part_records = values_.engine_part_records;
+    const std::uint64_t motion_values_moving = values_.motion_values_moving;
     values_ = {};
+    values_.engine_part_records = engine_part_records;
+    values_.motion_values_moving = motion_values_moving;
     values_.control_count = controls;
     values_.stable_id_count = stable_ids;
     values_.update_scope_depth = depth;
@@ -107,6 +111,21 @@ void Metrics::record_focus_scope_rejection() noexcept {
 }
 void Metrics::record_activation() noexcept { ++values_.activations; }
 void Metrics::record_disposal(std::uint64_t count) noexcept { values_.disposals += count; }
+
+void Metrics::record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept {
+    if (index_fallback) values_.engine_part_index_fallbacks = values_.engine_part_index_fallbacks + 1U;
+    values_.engine_part_records = live;
+}
+
+void Metrics::record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept {
+    values_.engine_part_records_released = values_.engine_part_records_released + released;
+    values_.engine_part_records = live;
+}
+
+void Metrics::record_engine_parts_evicted(std::uint64_t evicted, std::uint64_t live) noexcept {
+    values_.engine_part_records_evicted = values_.engine_part_records_evicted + evicted;
+    values_.engine_part_records = live;
+}
 void Metrics::record_wrong_thread_rejection() noexcept {
     wrong_thread_rejections_.fetch_add(1, std::memory_order_relaxed);
 }
@@ -157,13 +176,27 @@ void Metrics::record_callback_arbitration_retry(bool limit_hit) noexcept {
 void Metrics::record_frame_request() noexcept { ++values_.scheduled_frame_requests; }
 void Metrics::record_frame_poll(std::uint64_t deadlines_fired,
                                 std::uint64_t active_surface_ticks,
+                                std::uint64_t motion_clock_ticks,
                                 std::uint64_t coalesced_requests) noexcept {
-    if (deadlines_fired != 0 || active_surface_ticks != 0) {
+    if (deadlines_fired != 0 || active_surface_ticks != 0 || motion_clock_ticks != 0) {
         ++values_.scheduler_wakes;
     }
     values_.frame_deadlines_fired += deadlines_fired;
     values_.active_surface_ticks += active_surface_ticks;
+    values_.motion_clock_ticks += motion_clock_ticks;
     values_.frame_requests_coalesced += coalesced_requests;
+}
+void Metrics::record_motion_started() noexcept {
+    values_.motion_values_started = values_.motion_values_started + 1U;
+}
+void Metrics::record_motion_settled() noexcept {
+    values_.motion_values_settled = values_.motion_values_settled + 1U;
+}
+void Metrics::record_motion_finished() noexcept {
+    values_.motion_values_finished = values_.motion_values_finished + 1U;
+}
+void Metrics::set_motion_values_moving(std::uint64_t moving) noexcept {
+    values_.motion_values_moving = moving;
 }
 void Metrics::record_frame_callback_fault() noexcept {
     ++values_.frame_callback_faults;

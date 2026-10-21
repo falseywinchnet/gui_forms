@@ -135,6 +135,13 @@ allow_drop : default ``false``
 hit_test_transparent : default ``false``
     Whether pointer input passes through the control to what lies beneath.
     The control is still painted, and its children are still hit tested.
+classes
+    The style classes a theme's class rules select (T2 cascade), in the order
+    they were added, each once. A name is 1 to 64 lowercase ASCII letters,
+    digits, '-' and '_', starting with a letter. `set_classes` replaces them
+    and throws `std::invalid_argument`, changing nothing, for an invalid
+    name; `add_class` and `remove_class` change one. A change repaints
+    the control.
 cursor
     The pointer shape over the control, or none to use the parent's.
     `effective_cursor` resolves it; the default at the root is the arrow.
@@ -231,6 +238,8 @@ help_requested
 
 Methods
 -------
+has_class
+    Whether the control has the style class.
 add_child
     Makes a control the frontmost child of this one, detaching it from its
     previous parent first. If this control is attached, the new subtree is

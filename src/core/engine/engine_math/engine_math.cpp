@@ -25,6 +25,16 @@ constexpr double sqrt_half = 7.07106781186547524401e-01;
 constexpr double largest_exponent = 709.782712893383973096;
 constexpr double smallest_exponent = -745.133219101941108420;
 
+// π/2 split in three (Cody and Waite; fdlibm's pio2_1, pio2_2 and pio2_2t):
+// the first two parts have at most 32 significant bits, so n times either
+// is exact for every |n| below 2^21, and the three sum to π/2 within 2^-122.
+constexpr double half_pi_first = 1.57079632673412561417e+00;
+constexpr double half_pi_second = 6.07710050630396597660e-11;
+constexpr double half_pi_rest = 2.02226624879595063154e-21;
+constexpr double inverse_half_pi = 6.36619772367581382433e-01;
+// The sine and cosine arguments the reduction serves.
+constexpr double largest_angle = 1048576.0;
+
 // ln m for m in [sqrt(1/2), sqrt(2)), as 2 atanh(s) with s = (m − 1)/(m + 1)
 // and |s| ≤ 0.1716. The series 2 s (1 + s²/3 + s⁴/5 + ... + s¹⁸/19) leaves out
 // at most 2 |s|²¹/21, below 2^-55.
@@ -63,6 +73,41 @@ double exponential_of_reduced(double r) noexcept {
     series = series * r + 1.0;
     series = series * r + 1.0;
     return series;
+}
+
+// sin r for |r| ≤ π/4 (plus the reduction's rounding), by its Taylor series
+// through r¹⁹/19!; the omitted tail is below (π/4)²¹/21!, about 2^-72.
+double sine_of_reduced(double r) noexcept {
+    const double r2 = r * r;
+    double series = -1.0 / 121645100408832000.0;
+    series = series * r2 + 1.0 / 355687428096000.0;
+    series = series * r2 - 1.0 / 1307674368000.0;
+    series = series * r2 + 1.0 / 6227020800.0;
+    series = series * r2 - 1.0 / 39916800.0;
+    series = series * r2 + 1.0 / 362880.0;
+    series = series * r2 - 1.0 / 5040.0;
+    series = series * r2 + 1.0 / 120.0;
+    series = series * r2 - 1.0 / 6.0;
+    series = series * r2 + 1.0;
+    const double sine = r * series;
+    return sine;
+}
+
+// cos r for |r| ≤ π/4, by its Taylor series through r¹⁸/18!; the omitted
+// tail is below (π/4)²⁰/20!, about 2^-68.
+double cosine_of_reduced(double r) noexcept {
+    const double r2 = r * r;
+    double series = 1.0 / 6402373705728000.0;
+    series = series * r2 - 1.0 / 20922789888000.0;
+    series = series * r2 + 1.0 / 87178291200.0;
+    series = series * r2 - 1.0 / 479001600.0;
+    series = series * r2 + 1.0 / 3628800.0;
+    series = series * r2 - 1.0 / 40320.0;
+    series = series * r2 + 1.0 / 720.0;
+    series = series * r2 - 1.0 / 24.0;
+    series = series * r2 + 1.0 / 2.0;
+    const double cosine = 1.0 - r2 * series;
+    return cosine;
 }
 
 } // namespace
@@ -110,6 +155,40 @@ double engine_power(double base, double exponent) noexcept {
     const double scaled = exponent * logarithm;
     const double power = engine_exponential(scaled);
     return power;
+}
+
+EngineSineCosine engine_sine_cosine(double x) noexcept {
+    EngineSineCosine result{};
+    if (!(std::fabs(x) <= largest_angle)) {
+        result.sine = std::numeric_limits<double>::quiet_NaN();
+        result.cosine = result.sine;
+        return result;
+    }
+    // x = n π/2 + r with n the nearest integer to x / (π/2), so |r| ≤ π/4
+    // up to rounding. Each product with a part of π/2 is exact.
+    const double n = std::floor(x * inverse_half_pi + 0.5);
+    const double first = x - n * half_pi_first;
+    const double second = first - n * half_pi_second;
+    const double r = second - n * half_pi_rest;
+    const double sine = sine_of_reduced(r);
+    const double cosine = cosine_of_reduced(r);
+    // The quadrant: n modulo 4, as 0 to 3 for negative n too.
+    const long long whole = static_cast<long long>(n);
+    const long long quadrant = ((whole % 4) + 4) % 4;
+    if (quadrant == 0) {
+        result.sine = sine;
+        result.cosine = cosine;
+    } else if (quadrant == 1) {
+        result.sine = cosine;
+        result.cosine = -sine;
+    } else if (quadrant == 2) {
+        result.sine = -sine;
+        result.cosine = -cosine;
+    } else {
+        result.sine = -cosine;
+        result.cosine = sine;
+    }
+    return result;
 }
 
 } // namespace gui_forms

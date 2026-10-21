@@ -137,3 +137,21 @@ later answers and corrections are added as dated notes.
   (G2).
 - **The E1 code (#161)** changes for G1 and G3, and gains the bulge
   amplitude; its reference images are regenerated on every CI platform.
+
+## Note, 2026-10-19: what disabled means for content
+
+Building E2a (#190) raised whether a disabled `image` part or a disabled
+content colour may dim, as the built-in recipe did at 45 %. E2-1 and H1-1
+already said no. The owner, verbatim:
+
+> disabled - usually- is a change in font color or control highlighting.
+> greyed out, you could say.
+
+- **Disabled greys the chrome:** label and caption text, the edge, the
+  well, and the hot and selected plates.
+- **Content stays exact:** an `image` part and content colour are drawn
+  exactly as given.
+- **Icons are chrome**, so they keep their disabled treatment.
+
+#190 removed the 45 % from images and content colour and tests both halves
+(`gui_forms_windows_content_pixels_tests`). The design language §8.5 says so.

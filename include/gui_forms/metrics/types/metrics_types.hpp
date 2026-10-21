@@ -67,6 +67,9 @@ struct MetricsSnapshot {
     std::uint64_t scheduler_wakes{};
     std::uint64_t frame_deadlines_fired{};
     std::uint64_t active_surface_ticks{};
+    // Frames of the window's motion clock (T2 plan, phase E3): at most one
+    // per frame poll, however many motion values move.
+    std::uint64_t motion_clock_ticks{};
     std::uint64_t frame_requests_coalesced{};
     std::uint64_t frame_callback_faults{};
     std::uint64_t reentrant_frame_polls_deferred{};
@@ -98,6 +101,28 @@ struct MetricsSnapshot {
     // above also cover painting and composing; this one compares the copy
     // itself across hosts.
     std::uint64_t screen_copy_nanoseconds{};
+    // The theme engine's part records (T2 plan, EnginePartTable): those
+    // live now, those made with the index fallback (an item part without a
+    // stable ID, whose record follows its position rather than the item;
+    // GIVEN H3-1), and those released because their control left the
+    // window. Records made, released and evicted are activity; the live
+    // count is population and survives reset_activity.
+    std::uint64_t engine_part_records{};
+    std::uint64_t engine_part_index_fallbacks{};
+    std::uint64_t engine_part_records_released{};
+    // Item-part records evicted, least recently painted first, to keep
+    // within the window's cap (maximum_item_part_records).
+    std::uint64_t engine_part_records_evicted{};
+    // The motion clock's values (T2 plan, phase E3): those moving now, moves
+    // started (a retarget is a start), those that reached their settled
+    // condition on a frame, and those that jumped to their end at once
+    // (reduced motion, an occluded or minimized window, a zero duration, or
+    // an end by finish_all). The moving count is population and survives
+    // reset_activity; zero means the window schedules no motion frames.
+    std::uint64_t motion_values_moving{};
+    std::uint64_t motion_values_started{};
+    std::uint64_t motion_values_settled{};
+    std::uint64_t motion_values_finished{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

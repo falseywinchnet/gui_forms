@@ -2,6 +2,7 @@
 
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
+#include "gui_forms/engine/part_raster/part_raster.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -41,6 +42,7 @@ enum class DisplayOperation : std::uint8_t {
 #if defined(GUI_FORMS_PREPARED_TEXT)
     draw_prepared_text = 21,
 #endif
+    draw_part_raster = 22,
 };
 
 struct DisplayCommand final {
@@ -65,6 +67,11 @@ struct DisplayCommand final {
     TextOrientation text_orientation{TextOrientation::horizontal};
     // Renderer-derived data shared by every replay copy of this recording.
     std::shared_ptr<RetainedDrawCache> retained_cache{};
+    // The raster of draw_part_raster, shared read-only with its maker. The
+    // command keeps it alive for as long as the recording lives. `first` is
+    // its logical origin, `rect` its logical bounds at its own scale (for
+    // inspection), and `scalar` its opacity.
+    std::shared_ptr<const PartRaster> part_raster{};
 #if defined(GUI_FORMS_PREPARED_TEXT)
     std::shared_ptr<const PreparedTextStorage> prepared_text{};
     LayoutAuthority prepared_authority{};

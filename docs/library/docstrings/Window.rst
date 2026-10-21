@@ -55,7 +55,8 @@ presentation_settings
     Text scale, high contrast, reduced motion and sound preferences. The
     text scale must lie between 0.5 and 4.0, and changing it closes open
     popups. Any change remeasures the tree and raises
-    `presentation_changed`.
+    `presentation_changed`. Turning reduced motion on puts every motion
+    value of the window at its end in the same call.
 theme
     The theme every control inherits unless it has its own override.
     Setting it sets the theme of every window sharing this window's
@@ -117,9 +118,15 @@ key_bindings
     another set; a null set throws `std::invalid_argument`.
 needs_frame
     Whether painting is pending.
+motion_clock
+    The window's `MotionClock`: one frame request, armed only while some
+    control's `MotionValue` is moving, however many are. Once every value
+    has settled it schedules nothing. Tests install a `MotionTimeSource` on
+    it so that motion is sampled from their own time.
 occluded : default ``false``
     Whether the host reports the window as hidden from view. While occluded,
-    painting and paint wake-ups are suspended.
+    painting and paint wake-ups are suspended, and motion values jump to
+    their ends without scheduling frames.
 metrics_snapshot
     A copy of the window's instrumentation counters: layout passes, flushes,
     mutations, damage, input, focus, disposals, wrong-thread rejections and
@@ -323,8 +330,14 @@ semantic_snapshot
     Builds the semantic tree that assistive technology and automation see:
     roles, names, values, states and bounds, keyed by stable ID.
 perform_semantic_action
-    Performs an automation action, such as focus or press, on the control
-    with a stable ID, and returns whether it was performed.
+    Performs an automation action, such as focus or press, and returns
+    whether it was performed. One overload names the control by stable ID.
+    Focus on a control that is not focusable itself, such as a composite
+    over an inner editor, is left to the control, and is performed only if
+    focus then lies inside it.
+    The overload native accessibility hosts use names a published node by
+    its control's runtime ID and, for a virtual child, the child's stable
+    ID; a disposed or replaced control's runtime ID is refused.
 metrics
     The live instrumentation counters, for hosts and renderers that record
     into them.

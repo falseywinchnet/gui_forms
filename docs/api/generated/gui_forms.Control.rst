@@ -228,6 +228,14 @@ gui_forms::Control
          The pointer shape over the control, or none to use the parent's.
          :cpp:func:`effective_cursor <gui_forms::Control::effective_cursor>` resolves it; the default at the root is the arrow.
 
+      **classes** : ``std::span<const std::string>``
+         The style classes a theme's class rules select (T2 cascade), in the order
+         they were added, each once. A name is 1 to 64 lowercase ASCII letters,
+         digits, '-' and '_', starting with a letter. :cpp:func:`set_classes <gui_forms::Control::set_classes>` replaces them
+         and throws ``std::invalid_argument``, changing nothing, for an invalid
+         name; :cpp:func:`add_class <gui_forms::Control::add_class>` and :cpp:func:`remove_class <gui_forms::Control::remove_class>` change one. A change repaints
+         the control.
+
       **effective_cursor_images** : ``CursorImagesPtr``, read-only
 
       **accessible_name** : ``std::string``
@@ -404,6 +412,12 @@ gui_forms::Control
         - Marks the control for layout and, unless layout is suspended, runs the window's pending layout now.
       * - :cpp:func:`has_style <gui_forms::Control::has_style>`
         - Whether every flag of a :cpp:enum:`ControlStyles <gui_forms::ControlStyles>` mask is set.
+      * - :cpp:func:`add_class <gui_forms::Control::add_class>`
+        - Adds or removes one class; false when the class was already there (or absent).
+      * - :cpp:func:`remove_class <gui_forms::Control::remove_class>`
+        -  
+      * - :cpp:func:`has_class <gui_forms::Control::has_class>`
+        - Whether the control has the style class.
       * - :cpp:func:`invalidate <gui_forms::Control::invalidate>`
         - ``invalidate(Dirty)`` records what a change invalidated, for this control and the path to the root; the window acts on it at its next flush or paint.
       * - :cpp:func:`invalidate_subtree <gui_forms::Control::invalidate_subtree>`
@@ -903,6 +917,19 @@ gui_forms::Control
 
       Sets :cpp:func:`cursor <gui_forms::Control::cursor>`; see the property's description above.
 
+   .. cpp:function:: std::span<const std::string> classes() const noexcept
+
+      The style classes a theme's class rules select (T2 cascade), in the order
+      they were added, each once. A name is 1 to 64 lowercase ASCII letters,
+      digits, '-' and '_', starting with a letter. :cpp:func:`set_classes <gui_forms::Control::set_classes>` replaces them
+      and throws ``std::invalid_argument``, changing nothing, for an invalid
+      name; :cpp:func:`add_class <gui_forms::Control::add_class>` and :cpp:func:`remove_class <gui_forms::Control::remove_class>` change one. A change repaints
+      the control.
+
+   .. cpp:function:: void set_classes(std::vector<std::string> classes)
+
+      Sets :cpp:func:`classes <gui_forms::Control::classes>`; see the property's description above.
+
    .. cpp:function:: CursorImagesPtr effective_cursor_images() const noexcept
 
    .. cpp:function:: const std::string& accessible_name() const noexcept
@@ -1180,6 +1207,16 @@ gui_forms::Control
    .. cpp:function:: bool has_style(ControlStyles style) const noexcept
 
       Whether every flag of a :cpp:enum:`ControlStyles <gui_forms::ControlStyles>` mask is set.
+
+   .. cpp:function:: bool add_class(std::string_view name)
+
+      Adds or removes one class; false when the class was already there (or absent). An invalid name throws std::invalid_argument.
+
+   .. cpp:function:: bool remove_class(std::string_view name)
+
+   .. cpp:function:: bool has_class(std::string_view name) const noexcept
+
+      Whether the control has the style class.
 
    .. cpp:function:: void invalidate(Dirty dirty)
 

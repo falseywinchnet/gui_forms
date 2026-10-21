@@ -23,10 +23,20 @@ DispatchOperation post_dispatch(const std::shared_ptr<DispatcherState>& state,
             "GUI.Forms BeginInvoke requires an attached live dispatcher");
     }
 
-    std::function<void()> wake;
     std::shared_ptr<DispatchWork> work;
     {
         std::scoped_lock lock((*state).mutex);
+        if (!(*state).accepting && (*state).closing) {
+            // The teardown refusal: an operation that is already cancelled
+            // and holds no callback. The callback is released with this
+            // call's argument.
+            std::shared_ptr<DispatchWork> refused = std::make_shared<DispatchWork>();
+            (*refused).state.store(DispatchOperationState::cancelled, std::memory_order_release);
+            (*refused).dispatcher = state;
+            ++(*state).cancelled;
+            ++(*state).teardown_refusals;
+            return DispatchOperation(std::move(refused));
+        }
         if (!(*state).accepting) {
             throw std::logic_error("GUI.Forms dispatcher is shut down");
         }
@@ -57,13 +67,18 @@ DispatchOperation post_dispatch(const std::shared_ptr<DispatcherState>& state,
             if (!(*state).wake_pending) {
                 (*state).wake_pending = true;
                 ++(*state).wake_requests;
-                wake = (*state).wake;
+                // The host's wake runs under the lock, so that a host removing
+                // its handler (set_dispatch_wake_handler, shutdown_dispatcher)
+                // waits for a wake already under way and is never called
+                // after it returns. Every host's wake only signals (a flag, a
+                // posted message, a pipe byte, a queued block) and never
+                // re-enters the dispatcher.
+                (*state).wake();
             } else {
                 ++(*state).coalesced_wakes;
             }
         }
     }
-    if (wake) wake();
     return DispatchOperation(std::move(work));
 }
 

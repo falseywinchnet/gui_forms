@@ -243,6 +243,11 @@ void Painter::draw_live_surface(std::shared_ptr<LiveSurface>, Rect, double) {
     // the retained surface resource directly.
 }
 
+void Painter::draw_part_raster(const std::shared_ptr<const PartRaster>&, Point, double) {
+    // Deliberately inert: only painters that own device pixels composite
+    // part rasters, through the shared blend.
+}
+
 void Painter::draw_image_region_sampled(
     ImageId image, Rect source, Rect destination, ImageSampling,
     double opacity) {

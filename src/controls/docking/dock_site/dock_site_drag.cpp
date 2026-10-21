@@ -19,13 +19,10 @@
 namespace gui_forms {
 namespace {
 
-// The stamp's longer side in logical units, and the motions (about 100
-// units and 220 ms, D1 as corrected; tiles fade in over about 100 ms,
-// T2-4). Plain interpolation until the engine (T2) owns motion.
+// The stamp's longer side in logical units (about 100 units, D1 as
+// corrected). Its motion and the tiles' fade are the site's motion values
+// (dock_site.cpp), run by the window's motion clock.
 constexpr double stamp_side = 100.0;
-constexpr FrameInterval stamp_motion = std::chrono::milliseconds(220);
-constexpr FrameInterval tile_fade = std::chrono::milliseconds(100);
-constexpr FrameInterval drag_frame_interval = std::chrono::milliseconds(16);
 // A document tab sliding on its strip tears off this far outside the
 // strip's band.
 constexpr double tear_off_distance = 16.0;
@@ -33,16 +30,6 @@ constexpr double tear_off_distance = 16.0;
 constexpr double cue_side = 14.0;
 constexpr double cue_offset_x = 14.0;
 constexpr double cue_offset_y = 16.0;
-
-// Progress through a motion, eased (smoothstep), from 0 to 1.
-double eased_progress(FrameTime from, FrameTime now, FrameInterval length) noexcept {
-    if (length.count() <= 0) return 1.0;
-    const double elapsed = std::chrono::duration<double>(now - from).count();
-    const double total = std::chrono::duration<double>(length).count();
-    const double linear = std::clamp(elapsed / total, 0.0, 1.0);
-    const double eased = linear * linear * (3.0 - 2.0 * linear);
-    return eased;
-}
 
 double interpolate(double from, double to, double progress) noexcept {
     const double value = from + (to - from) * progress;
@@ -173,6 +160,9 @@ void DockSite::reset_drag() noexcept {
         }
     }
     drag_ = DragSession{};
+    // The session's motion ends with it.
+    stamp_motion_.finish();
+    tile_fade_.finish();
 }
 
 // The stamp's image area: the stamp below its label.
@@ -295,7 +285,6 @@ bool DockSite::begin_drag(const DockSubject& subject, DockNodeId source_stack, b
     const DockPanelId shown = subject.kind == DockSubjectKind::panel ? subject.panel : (*node).panels[(*node).selected];
     session.title = (*workspace_).panel_title(shown);
     session.generation = (*workspace_).tree_generation();
-    session.started = FrameClock::now();
     session.stamp = session.source;
     // A release where nothing accepts floats the subject (D4-1); a keyboard
     // move has no pointer to float at.
@@ -318,7 +307,10 @@ bool DockSite::begin_drag(const DockSubject& subject, DockNodeId source_stack, b
     invalidate(Dirty::arrange | Dirty::paint | Dirty::hit_test | Dirty::semantics);
     (*drag_layer_).invalidate(Dirty::paint);
     announce_drag();
-    request_drag_frames();
+    // The stamp shrinks from the source's rectangle (at once under reduced
+    // motion or in an occluded window).
+    stamp_motion_.jump_to(0.0);
+    static_cast<void>(stamp_motion_.animate_to(1.0));
     return true;
 }
 
@@ -411,7 +403,7 @@ void DockSite::update_drag_pointer(Point local, Modifier modifiers) {
     const Rect before = drag_paint_extent();
     drag_.pointer = local;
     drag_.suppressed = has_modifier(modifiers, Modifier::control);
-    drag_.stamp = stamp_at(FrameClock::now());
+    drag_.stamp = stamp_at();
     const DockDropEdges edges = floating() ? DockDropEdges::none : DockDropEdges::global;
     const DockDropHit hit = hit_dock_drop(local, site_surface(*this), drag_.panes, effective_text_scale(), edges);
     drag_.over_site = hit.over_site;
@@ -446,9 +438,14 @@ void DockSite::select_drag_target(std::optional<std::size_t> target, std::option
     drag_.target = target;
     if (pane_changed) {
         drag_.hovered_pane = hovered_pane;
-        drag_.hovered_since = FrameClock::now();
-        drag_.tiles_fading = hovered_pane.has_value() && !motion_reduced();
-        if (drag_.tiles_fading) request_drag_frames();
+        // A newly hovered pane's cross fades in (at once under reduced
+        // motion or in an occluded window).
+        if (hovered_pane) {
+            tile_fade_.jump_to(0.0);
+            static_cast<void>(tile_fade_.animate_to(1.0));
+        } else {
+            tile_fade_.finish();
+        }
     }
     if (drag_.keyboard) {
         // The keyboard's stamp stands over the target's area.
@@ -456,7 +453,7 @@ void DockSite::select_drag_target(std::optional<std::size_t> target, std::option
         const Rect area = chosen ? (*chosen).highlight : site_surface(*this);
         drag_.pointer = {area.x + area.width * 0.5, area.y + area.height * 0.5};
         drag_.over_site = true;
-        drag_.stamp = stamp_at(FrameClock::now());
+        drag_.stamp = stamp_at();
     }
     if (pane_changed || target_changed) {
         announce_drag();
@@ -467,15 +464,16 @@ void DockSite::select_drag_target(std::optional<std::size_t> target, std::option
 
 // The stamp: the source's rectangle at the start, shrinking over 220 ms to a
 // miniature whose longer side is about 100 units, held where the pointer
-// grabbed the source.
-Rect DockSite::stamp_at(FrameTime now) const {
+// grabbed the source. stamp_motion_ holds the shrink's progress (1 at once
+// under reduced motion, where it jumps to its end).
+Rect DockSite::stamp_at() const {
     const Rect from = drag_.source;
     const double longer = std::max(1.0, std::max(from.width, from.height));
     const double ratio = std::min(1.0, stamp_side * effective_text_scale() / longer);
     const double width = from.width * ratio;
     const double height = from.height * ratio;
     const Rect small{drag_.pointer.x - drag_.grab.x * width, drag_.pointer.y - drag_.grab.y * height, width, height};
-    const double progress = motion_reduced() ? 1.0 : eased_progress(drag_.started, now, stamp_motion);
+    const double progress = stamp_motion_.current();
     const Rect stamp = interpolate_rect(from, small, progress);
     return stamp;
 }
@@ -551,7 +549,7 @@ void DockSite::end_drag(DockDragEnd end) {
     drag_.settle_found = false;
     drag_.settle_from = drag_.stamp;
     drag_.hovered_pane.reset();
-    drag_.tiles_fading = false;
+    tile_fade_.finish();
     Window* const host = attached_window();
     if (host != nullptr && !keyboard && (*host).captured_control().get() == this) (*host).release_pointer();
     if (outcome.end == DockDragEnd::dropped) {
@@ -601,13 +599,14 @@ void DockSite::place_settle_target() {
     }
     drag_.settle_found = true;
     drag_.settle_to = (*slot).bounds;
-    drag_.settle_started = FrameClock::now();
     drag_.stamp = drag_.settle_from;
-    request_drag_frames();
+    stamp_motion_.jump_to(0.0);
+    // An occluded window (or a window that just turned reduced motion on)
+    // shows no settling: the stamp is gone at once.
+    if (stamp_motion_.animate_to(1.0) != MotionStart::started) finish_settling();
 }
 
 void DockSite::finish_settling() noexcept {
-    drag_frames_.disconnect();
     reset_drag();
     try {
         if (drag_layer_) (*drag_layer_).set_visible(false);
@@ -640,6 +639,12 @@ void DockSite::on_capture_changed(const PointerCaptureChange& change) {
     Window* const host = attached_window();
     if (host == nullptr) return;
     static_cast<void>(capture_check_.cancel());
+    // The check waits a turn, in case the capture comes back at once. A
+    // window whose dispatcher no longer runs has no next turn: decide now.
+    if (!(*host).dispatcher_snapshot().accepting) {
+        check_capture_after_release();
+        return;
+    }
     capture_check_ = (*host).begin_invoke(shared_from_this(), CaptureCheck{weak_from_this()});
 }
 
@@ -663,43 +668,32 @@ void DockSite::on_window_active(bool active) {
     if (drag_.phase == DockDragPhase::dragging) end_drag(DockDragEnd::deactivated);
 }
 
-// -- frames --------------------------------------------------------------------
+// -- motion --------------------------------------------------------------------
 
-void DockSite::request_drag_frames() {
-    Window* const host = attached_window();
-    if (host == nullptr || !drag_layer_ || drag_frames_.connected()) return;
-    const FrameTime first = FrameClock::now() + drag_frame_interval;
-    drag_frames_ = (*host).activate_surface(drag_layer_, drag_frame_interval, first);
-}
-
-void DockSite::advance_drag(FrameTime now) {
+// A step of the stamp's shrink or settling, or of the tiles' fade, on the
+// window's motion clock. While dragging, the stamp follows its progress and
+// the tiles stop publishing `expanding` when their fade settles; while
+// settling, the stamp grows into its place and the session ends when it
+// gets there. The layer repaints where the stamp was and is.
+void DockSite::on_drag_motion(const MotionStep& step) {
     if (drag_.phase == DockDragPhase::dragging) {
         const Rect before = drag_paint_extent();
-        drag_.stamp = stamp_at(now);
-        const bool shrinking = !motion_reduced() && eased_progress(drag_.started, now, stamp_motion) < 1.0;
-        if (drag_.tiles_fading && now - drag_.hovered_since >= tile_fade) {
-            drag_.tiles_fading = false;
-            invalidate(Dirty::paint);
-        }
+        drag_.stamp = stamp_at();
+        if (step.value == &tile_fade_ && step.settled) invalidate(Dirty::paint);
         if (drag_layer_) {
             (*drag_layer_).invalidate(before);
             (*drag_layer_).invalidate(drag_paint_extent());
         }
-        if (!shrinking && !drag_.tiles_fading) drag_frames_.disconnect();
         return;
     }
-    if (drag_.phase == DockDragPhase::settling && drag_.settle_found) {
-        const double progress = eased_progress(drag_.settle_started, now, stamp_motion);
-        const Rect before = drag_.stamp;
-        drag_.stamp = interpolate_rect(drag_.settle_from, drag_.settle_to, progress);
-        if (drag_layer_) {
-            (*drag_layer_).invalidate(before);
-            (*drag_layer_).invalidate(drag_.stamp);
-        }
-        if (progress >= 1.0) finish_settling();
-        return;
+    if (drag_.phase != DockDragPhase::settling || !drag_.settle_found || step.value != &stamp_motion_) return;
+    const Rect before = drag_.stamp;
+    drag_.stamp = interpolate_rect(drag_.settle_from, drag_.settle_to, step.current);
+    if (drag_layer_) {
+        (*drag_layer_).invalidate(before);
+        (*drag_layer_).invalidate(drag_.stamp);
     }
-    drag_frames_.disconnect();
+    if (step.settled) finish_settling();
 }
 
 // -- tiles ---------------------------------------------------------------------
@@ -753,7 +747,7 @@ AnatomyStateSet DockSite::tile_states(const TileSlot& tile) const {
     AnatomyStateSet states{};
     if (tile.lit) states.insert(AnatomyState::selected);
     if (tile.refused) states.insert(AnatomyState::disabled);
-    if (tile.kind == DockDropTargetKind::pane && drag_.tiles_fading) states.insert(AnatomyState::expanding);
+    if (tile.kind == DockDropTargetKind::pane && tiles_fading()) states.insert(AnatomyState::expanding);
     return states;
 }
 
@@ -835,9 +829,9 @@ void DockSite::paint_drag_layer(Painter& painter) {
         part.text = {};
         part.bounds = drag_image_bounds();
         if (drag_.picture) {
-            // The panel's picture, scaled with the stamp. An image part has
-            // no role of its own; icon (an image) is the nearest atom.
-            part.role = PartRole::icon;
+            // The panel's picture, scaled with the stamp: content, drawn as
+            // given (the image role, T2 GIVEN H1-1).
+            part.role = PartRole::image;
             part.image = (*drag_.picture).image;
             paint_part(painter, *this, part);
             part.image = {};
@@ -1068,7 +1062,8 @@ DockSite* DockSite::remote_guest() const noexcept {
 
 // Starts showing a drag of another site, the pointer at `local` here, or
 // follows it. A site busy with a drag of its own shows nothing.
-void DockSite::show_guest_drag(const DragSession& source, Point local, Modifier modifiers) {
+void DockSite::show_guest_drag(const DragSession& source, const MotionValue* source_motion, Point local,
+                               Modifier modifiers) {
     if (workspace_ == nullptr || !drag_layer_ || !is_alive()) return;
     if (drag_.guest && drag_.phase == DockDragPhase::dragging) {
         update_drag_pointer(local, modifiers);
@@ -1090,23 +1085,28 @@ void DockSite::show_guest_drag(const DragSession& source, Point local, Modifier 
     session.source = {local.x - source.grab.x * width, local.y - source.grab.y * height, width, height};
     session.title = source.title;
     session.generation = (*workspace_).tree_generation();
-    session.started = source.started;
     session.picture = source.picture;
     session.stamp_hidden = source.stamp_hidden;
     session.may_float = source.may_float;
     session.suppressed = has_modifier(modifiers, Modifier::control);
     drag_ = std::move(session);
-    drag_.stamp = stamp_at(FrameClock::now());
+    // The guest's stamp shrinks in step with the source's (from where that
+    // stands now), or from the start when the source has no stamp motion.
+    if (source_motion != nullptr) {
+        static_cast<void>(stamp_motion_.adopt(*source_motion));
+    } else {
+        stamp_motion_.jump_to(0.0);
+        static_cast<void>(stamp_motion_.animate_to(1.0));
+    }
+    drag_.stamp = stamp_at();
     (*drag_layer_).set_visible(true);
     plan_drag_targets();
     invalidate(Dirty::paint | Dirty::semantics);
     (*drag_layer_).invalidate(Dirty::paint);
-    request_drag_frames();
 }
 
 void DockSite::leave_guest_drag() noexcept {
     if (!drag_.guest) return;
-    drag_frames_.disconnect();
     reset_drag();
     try {
         if (drag_layer_) (*drag_layer_).set_visible(false);
@@ -1132,7 +1132,7 @@ void DockSite::route_drag(Point desktop, Modifier modifiers, const DockSite* exc
     }
     drag_.remote = (*under).weak_from_this();
     const Point local{desktop.x - (*origin).x, desktop.y - (*origin).y};
-    (*under).show_guest_drag(drag_, local, modifiers);
+    (*under).show_guest_drag(drag_, &stamp_motion_, local, modifiers);
 }
 
 std::optional<Rect> DockSite::float_frame_at(Point local) const {
@@ -1195,11 +1195,10 @@ void DockSite::continue_window_move(Modifier modifiers) {
     source.title = stacks_[0].title;
     source.source = stacks_[0].bounds;
     source.grab = {0.5, 0.0};
-    source.started = FrameClock::now();
     source.stamp_hidden = true;
     window_move_.remote = (*under).weak_from_this();
     const Point local{pointer.position.x - (*origin).x, pointer.position.y - (*origin).y};
-    (*under).show_guest_drag(source, local, modifiers);
+    (*under).show_guest_drag(source, nullptr, local, modifiers);
 }
 
 void DockSite::leave_window_move_guest() noexcept {
