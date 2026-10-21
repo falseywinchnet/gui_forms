@@ -205,6 +205,8 @@ struct Dump final {
     // Control type by stable id: (stable id, manifest id).
     std::vector<std::pair<std::string, std::string>> types;
     SemanticSnapshot snapshot;
+    // The dump file's bytes, as read.
+    std::string text;
 };
 
 std::string ns_text(id value) {
@@ -261,6 +263,7 @@ Dump read_dump(const std::string& path) {
     Dump dump;
     NSData* data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path.c_str()]];
     if (data == nil) return dump;
+    dump.text.assign(static_cast<const char*>(data.bytes), static_cast<std::size_t>(data.length));
     NSError* error = nil;
     NSDictionary* object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
     if (![object isKindOfClass:[NSDictionary class]]) return dump;
@@ -303,17 +306,14 @@ Dump wait_for_new_dump(const std::string& path, const Dump& previous, int timeou
 }
 
 // The current dump once the app is quiet: two reads at least three writer
-// ticks apart that agree, or the latest after two seconds.
+// ticks apart whose bytes are the same (so no value changed either, such as
+// a paint counter), or the latest after two seconds.
 Dump settled_dump(const std::string& path) {
     Dump previous = read_dump(path);
     for (int waited = 0; waited < 2000; waited += 160) {
         sleep_milliseconds(160);
         const Dump current = read_dump(path);
-        if (current.valid && previous.valid && current.generation == previous.generation &&
-            current.effects == previous.effects &&
-            current.snapshot.roots.size() == previous.snapshot.roots.size()) {
-            return current;
-        }
+        if (current.valid && previous.valid && current.text == previous.text) return current;
         previous = current;
     }
     return previous;
@@ -404,45 +404,10 @@ void note_instance(TypeTally& tally, const std::string& stable_id) {
     tally.instances.push_back(stable_id);
 }
 
-// A value that moves without changing the tree (an animated preview) is
-// read by the host when the walk fetches the surface's children, just after
-// the page's dump was written, and keeps moving while the walk goes on. Such
-// a value matches when the AX value equals the node's value in the page dump
-// or in one of a few fresh dumps, or for a number lies within the values
-// they span.
-bool live_value_matches(const Dump& page_dump, const std::string& path, const std::string& stable_id,
-                        const std::string& published) {
-    const SemanticNode* page_node = find_semantic_node(page_dump.snapshot.roots, stable_id);
-    if (page_node == nullptr) return false;
-    std::vector<SemanticNode> samples{*page_node};
-    for (int sample = 0; sample < 4; ++sample) {
-        sleep_milliseconds(40);
-        const Dump fresh = read_dump(path);
-        const SemanticNode* node = find_semantic_node(fresh.snapshot.roots, stable_id);
-        if (node != nullptr) samples.push_back(*node);
-    }
-    bool numeric = !published.empty();
-    double low = 0.0;
-    double high = 0.0;
-    for (std::size_t index = 0U; index < samples.size(); ++index) {
-        const SemanticNode& node = samples[index];
-        if (gui_forms::test_support::expected_ax_value(node) == published) return true;
-        if (!node.numeric_value) {
-            numeric = false;
-            continue;
-        }
-        low = index == 0U ? *node.numeric_value : std::min(low, *node.numeric_value);
-        high = index == 0U ? *node.numeric_value : std::max(high, *node.numeric_value);
-    }
-    if (!numeric) return false;
-    const double value = std::strtod(published.c_str(), nullptr);
-    return value >= low && value <= high;
-}
-
 class TreeComparison final {
 public:
-    TreeComparison(const Dump& dump, const std::string& path, Report& report, std::string phase)
-        : dump_(dump), path_(path), report_(report), phase_(std::move(phase)) {}
+    TreeComparison(const Dump& dump, Report& report, std::string phase)
+        : dump_(dump), report_(report), phase_(std::move(phase)) {}
 
     // `owner` is the nearest control at or above the node: its manifest id
     // and stable id.
@@ -459,14 +424,8 @@ public:
             add(owner_type, node.stable_id, "element", "present", "missing");
             matches = false;
         } else {
-            AccessibilityProjection expected = expected_ax_projection(node);
+            const AccessibilityProjection expected = expected_ax_projection(node);
             const AccessibilityProjection published = published_projection(element);
-            if (expected.value != published.value &&
-                live_value_matches(dump_, path_, node.stable_id, published.value)) {
-                report_.notes.push_back("live value " + node.stable_id + ": the AX value lies within the "
-                                        "values the node took around the read");
-                expected.value = published.value;
-            }
             matches = compare_projection(owner_type, node.stable_id, expected, published);
             children = children_of(element);
         }
@@ -532,20 +491,18 @@ private:
     }
 
     const Dump& dump_;
-    const std::string& path_;
     Report& report_;
     std::string phase_;
 };
 
-void compare_surface(const Dump& dump, const std::string& path, AXUIElementRef surface, Report& report,
-                     const std::string& phase) {
+void compare_surface(const Dump& dump, AXUIElementRef surface, Report& report, const std::string& phase) {
     const std::vector<AxElement> roots = children_of(surface);
     if (roots.size() != dump.snapshot.roots.size()) {
         report.mismatches.push_back(Mismatch{phase, "", "(window)", "roots",
                                              std::to_string(dump.snapshot.roots.size()),
                                              std::to_string(roots.size())});
     }
-    TreeComparison comparison(dump, path, report, phase);
+    TreeComparison comparison(dump, report, phase);
     for (std::size_t index = 0U; index < dump.snapshot.roots.size(); ++index) {
         AXUIElementRef root = index < roots.size() ? roots[index].get() : nullptr;
         comparison.compare(dump.snapshot.roots[index], root, "", "");
@@ -743,7 +700,7 @@ Dump compare_gallery_pages(const std::string& path, AXUIElementRef application, 
             report.failures.push_back("gallery: pressing " + row + " through AX did not show its page");
         }
         AxElement page_surface = find_surface(application);
-        compare_surface(dump, path, page_surface.get(), report, row);
+        compare_surface(dump, page_surface.get(), report, row);
     }
     return dump;
 }
@@ -858,14 +815,14 @@ int run(const Options& options) {
     if (surface.get() == nullptr) {
         report.failures.push_back("the app's retained surface is not published through AX");
     } else if (options.gallery) {
-        compare_surface(dump, options.dump, surface.get(), report, "initial");
+        compare_surface(dump, surface.get(), report, "initial");
         dump = compare_gallery_pages(options.dump, application.get(), dump, report);
     } else {
-        compare_surface(dump, options.dump, surface.get(), report, "initial");
+        compare_surface(dump, surface.get(), report, "initial");
         dump = perform_default_actions(options.dump, application.get(), dump, report);
         dump = settled_dump(options.dump);
         AxElement after_surface = find_surface(application.get());
-        compare_surface(dump, options.dump, after_surface.get(), report, "after-actions");
+        compare_surface(dump, after_surface.get(), report, "after-actions");
         dump = check_stale_element(options.dump, application.get(), dump, report);
     }
     close_app(application.get(), dump.pid);

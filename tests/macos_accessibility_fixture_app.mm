@@ -31,6 +31,15 @@
 // dump. The fixture variant adds two controls: "ax.disposable" and the
 // button "ax.dispose", whose click removes and destroys "ax.disposable", so
 // the client can hold an element of a disposed control (interview GF017).
+//
+// The Gallery variant freezes each page it shows, as the UIA Gallery client
+// does: when the selected page changes (and for the first page), it cancels
+// the window's frame requests before it writes that page's dump, so the
+// timers and animations a page starts (the timing page's tick and progress,
+// the easing preview, the motion target) cannot change the tree between the
+// dump and the client's AX reads. The writer's own timer is started again
+// after each freeze. The freeze runs as main-queue work after the writer's
+// tick, outside the window's frame dispatch.
 
 namespace {
 
@@ -66,15 +75,52 @@ void append_types(const gui_forms::Window& window, const SemanticNode& node, std
     for (const SemanticNode& child : node.children) append_types(window, child, out, first);
 }
 
+class SemanticDumpWriter;
+void freeze_page_on_main(void* context);
+
 class SemanticDumpWriter final {
 public:
     SemanticDumpWriter(gui_forms::Window& window, const StockEffectCounter* effects, std::string path)
         : window_(window), effects_(effects), path_(std::move(path)) {}
 
+    // The timer whose ticks call tick(); observed, owned by AppState, which
+    // keeps it no longer than this writer. Started again after a freeze.
+    void set_timer(gui_forms::Timer* timer) noexcept { timer_ = timer; }
+
     // Rewrites the dump when its content changed: a new generation, a new
     // effect count, or a value that changed without a new generation (a
-    // diagnostics control's live counters).
+    // diagnostics control's live counters). In the Gallery variant, a newly
+    // selected page is frozen first (freeze_page), and its dump is written
+    // only then.
     void tick() {
+#if defined(GUI_FORMS_AX_GALLERY)
+        const std::string_view page = gui_forms::gallery::selected_gallery_page(window_);
+        if (page != frozen_page_) {
+            if (!freeze_pending_) {
+                freeze_pending_ = true;
+                dispatch_async_f(dispatch_get_main_queue(), this, &freeze_page_on_main);
+            }
+            return;
+        }
+#endif
+        write_if_changed();
+    }
+
+    // Cancels the window's frame requests (every motion jumps to its end),
+    // records the page as frozen, starts this writer's timer again and
+    // writes the frozen page's dump.
+    void freeze_page() {
+        freeze_pending_ = false;
+#if defined(GUI_FORMS_AX_GALLERY)
+        window_.cancel_frame_requests();
+        frozen_page_ = std::string(gui_forms::gallery::selected_gallery_page(window_));
+#endif
+        if (timer_ != nullptr) (*timer_).start();
+        write_if_changed();
+    }
+
+private:
+    void write_if_changed() {
         const std::uint64_t effects = effects_ == nullptr ? 0U : (*effects_).total();
         const std::string text = dump_text(effects);
         if (text == written_text_) return;
@@ -82,7 +128,6 @@ public:
         written_text_ = text;
     }
 
-private:
     std::string dump_text(std::uint64_t effects) const {
         const SemanticSnapshot snapshot = window_.semantic_snapshot();
         std::string text = "{\"pid\":" + std::to_string(static_cast<long long>(getpid())) +
@@ -109,7 +154,19 @@ private:
     const StockEffectCounter* effects_;
     std::string path_;
     std::string written_text_;
+    gui_forms::Timer* timer_{};
+    // The page whose frame requests were last cancelled; empty before the
+    // first freeze.
+    std::string frozen_page_;
+    bool freeze_pending_{};
 };
+
+// Main-queue work posted by SemanticDumpWriter::tick; the context is the
+// writer, which AppState keeps for the whole run.
+void freeze_page_on_main(void* context) {
+    SemanticDumpWriter& writer = *static_cast<SemanticDumpWriter*>(context);
+    writer.freeze_page();
+}
 
 // Removes and destroys the disposable sample when "ax.dispose" is clicked.
 class DisposeSample final {
@@ -159,6 +216,7 @@ public:
         state_.timer = std::make_unique<gui_forms::Timer>(window, std::chrono::milliseconds(50));
         state_.tick_subscription = (*state_.timer).tick().subscribe(
             gui_forms::Delegate<>::bind<SemanticDumpWriter, &SemanticDumpWriter::tick>(*state_.writer));
+        (*state_.writer).set_timer(state_.timer.get());
         (*state_.timer).start();
         (*state_.writer).tick();
     }
