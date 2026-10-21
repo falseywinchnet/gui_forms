@@ -6,8 +6,14 @@ whole Gallery and performs every control's default action (A-W1,
 `results/2026-10-19-a-w1-msaa-gallery`); the UI Automation provider is in
 place (A-W2) and its client test does the same through IUIAutomation, each
 default action through its pattern (A-W3,
-`results/2026-10-20-a-w3-uia-gallery`). TextPattern (item 5) is next on
-Windows. macOS and Linux not started. Authority: `planning/FORWARD_PROGRAMME.md`
+`results/2026-10-20-a-w3-uia-gallery`). Linux: AT-SPI client tests of a
+fixture (A-L1) and of the whole Gallery (A-L2,
+`results/2026-10-20-a-l2-linux-gallery`). macOS:
+`gui_forms_macos_accessibility_tests` (in process, runs on CI) and
+`gui_forms_macos_accessibility_client_tests` (AXUIElement client; skipped as
+unsupported without the Accessibility permission) registered; gate run
+recorded in `results/2026-10-20-a-macos`. Editable text ranges (item 5) are
+next. Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -44,7 +50,11 @@ is never turned off (accessibility round A3).
   (interview GF012–GF013).
 - **macOS.** NSAccessibility publication inside
   `src/host/macos/application/macos_host.mm` (`native_accessibility_role` and
-  the element classes near it). No registered test.
+  the element classes near it). Tested in process by
+  `gui_forms_macos_accessibility_tests` and through AXUIElement by
+  `gui_forms_macos_accessibility_client_tests` (and its Gallery variant),
+  against the contract in `tests/support/macos_accessibility_contract.cpp`;
+  the stock-control fixture is `tests/support/stock_control_fixture.cpp`.
 - **Windows.** MSAA (`IAccessible`) in
   `src/host/windows/accessibility/windows_accessibility.cpp`. Test
   `tests/windows_accessibility_tests.cpp`, registered in `CMakeLists.txt` as
