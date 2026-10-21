@@ -50,11 +50,22 @@ class ManifestTests(unittest.TestCase):
 
     def test_notice_list_is_well_formed(self) -> None:
         data = json.loads(pp.LICENSES_PATH.read_text(encoding="utf-8"))
-        names = [notice["name"] for notice in data["notices"]]
-        self.assertEqual(len(names), len(set(names)))
+        # Names are package paths, so they are unique among the notices one platform ships.
+        for platform in pp.PLATFORMS:
+            names = [notice["name"] for notice in data["notices"]
+                     if not notice.get("platforms") or platform in notice["platforms"]]
+            self.assertEqual(len(names), len(set(names)), platform)
         for notice in data["notices"]:
-            if not notice.get("optional"):
+            # A $PREFIX source comes from a toolchain prefix given at packaging time.
+            if not notice.get("optional") and not notice["source"].startswith("$"):
                 self.assertTrue((pp.ROOT / notice["source"]).is_file(), notice["source"])
+
+    def test_windows_runtime_imports_are_recognised(self) -> None:
+        for name in ("libgcc_s_seh-1.dll", "libstdc++-6.dll", "LIBSTDC++-6.DLL", "libc++.dll", "libunwind.dll",
+                     "libwinpthread-1.dll", "libgomp-1.dll"):
+            self.assertIsNotNone(pp.WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name), name)
+        for name in ("libgui_forms_threading.dll", "gui_forms_abi0.dll", "kernel32.dll"):
+            self.assertIsNone(pp.WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name), name)
 
     def assert_rejected(self, mutate, pattern: str) -> None:
         data = manifest_data()

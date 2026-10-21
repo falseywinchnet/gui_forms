@@ -52,6 +52,13 @@ WINDOWS_SYSTEM_DLLS: frozenset[str] = frozenset({
     "shcore.dll", "dbghelp.dll", "psapi.dll", "userenv.dll", "iphlpapi.dll",
     "uiautomationcore.dll",
 })
+# Compiler runtime DLLs no Windows package may import: every Windows binary
+# links the LLVM runtimes and winpthreads statically (CMakeLists.txt), and a
+# GCC runtime (libgcc_s, libstdc++, libgomp, libatomic, libssp, libquadmath)
+# is never part of a GUI.Forms package.
+WINDOWS_FORBIDDEN_RUNTIME_DLL: re.Pattern[str] = re.compile(
+    r"(libgcc_s_[a-z0-9_]+-\d+|libstdc\+\+-\d+|libgomp-\d+|libatomic-\d+|libssp-\d+|libquadmath-\d+"
+    r"|libc\+\+|libc\+\+abi|libunwind|libwinpthread-\d+)\.dll", re.IGNORECASE)
 LINUX_FALLBACK_DEPENDS: str = "libc6, libx11-6, libxcursor1, libatk1.0-0t64 | libatk1.0-0, libatk-bridge2.0-0t64 | libatk-bridge2.0-0"
 
 
@@ -549,12 +556,16 @@ class Packager:
         return shutil.which("makensis") or "makensis"
 
     def windows_closure(self, bundle: Path, executable: Path) -> None:
+        """Copy the program's non-system DLL imports from the build into the bundle.
+
+        Every binary is inspected with objdump; a compiler runtime import
+        (WINDOWS_FORBIDDEN_RUNTIME_DLL) fails the package.
+        """
         objdump = self.tool("objdump") or self.tool("llvm-objdump")
         if objdump is None:
-            self.log("  import closure not checked: objdump is not on PATH (the gallery links -static)")
-            return
+            raise RuntimeError("objdump (or llvm-objdump) is needed to check a Windows package's imports")
         candidates: dict[str, Path] = {}
-        for directory in [self.build_dir, self.build_dir / "toolkit"] + ([self.runtime_dir] if self.runtime_dir else []):
+        for directory in [self.build_dir, self.build_dir / "toolkit"]:
             if directory.is_dir():
                 for path in directory.glob("*.dll"):
                     candidates.setdefault(path.name.lower(), path)
@@ -566,10 +577,18 @@ class Packager:
                 continue
             inspected.add(binary.name.lower())
             imports = self.run([objdump, "-p", str(binary)])
-            for name in re.findall(r"DLL Name:\s*(\S+)", imports):
+            names = re.findall(r"DLL Name:\s*(\S+)", imports)
+            own = [name for name in names
+                   if name.lower() not in WINDOWS_SYSTEM_DLLS and not name.lower().startswith(("api-ms-win-", "ext-ms-win-"))]
+            self.log(f"  imports of {binary.name}: {len(names) - len(own)} system DLLs"
+                     + (", and " + ", ".join(own) if own else "; no other DLL"))
+            for name in names:
                 key = name.lower()
                 if key in WINDOWS_SYSTEM_DLLS or key.startswith(("api-ms-win-", "ext-ms-win-")):
                     continue
+                if WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name):
+                    raise RuntimeError(f"{binary.name} imports the compiler runtime {name}; Windows binaries link "
+                                       "the LLVM runtimes and winpthreads statically and never a GCC runtime")
                 if key not in candidates:
                     raise RuntimeError(f"missing runtime import {name} for {binary.name}")
                 target = bundle / name
@@ -617,7 +636,8 @@ class Packager:
         bundle = stage / program.display_name
         self.log(f"  stage {plan.built} -> {bundle}")
         if self.dry_run:
-            for step in ("copy executable; copy non-system DLL imports (objdump) from the build dir and --runtime-dir",
+            for step in ("copy executable; copy non-system DLL imports (objdump) from the build dir; "
+                         "a compiler runtime import (GCC, libc++, libunwind, winpthreads) fails",
                          "strip --strip-unneeded when available",
                          "fonts/ from the build's post-build copy or assets/fonts; licenses/, README.txt, package-manifest.json",
                          f"zip with top-level folder {program.display_name!r} -> {names['archive']}",
@@ -827,7 +847,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--revision", default=None, help="source sha recorded in package manifests (default: GITHUB_SHA or git HEAD)")
     parser.add_argument("--runtime", type=Path, default=None,
                         help="macOS: LLVM 22 runtime prefix whose lib/ supplies libc++ (default $GUI_FORMS_LLVM_RUNTIME)")
-    parser.add_argument("--runtime-dir", type=Path, default=None, help="Windows: directory holding runtime DLLs (for example /clang64/bin)")
+    parser.add_argument("--runtime-dir", type=Path, default=None,
+                        help="Windows: the CLANG64 bin directory (for example /clang64/bin); its prefix supplies the "
+                             "licences of the statically linked runtimes ($MSYS_PREFIX in packaging/licenses.json). "
+                             "No DLL is copied from it.")
     parser.add_argument("--no-installer", action="store_true", help="archives only; skip pkg/setup.exe/deb")
     parser.add_argument("--dry-run", action="store_true", help="print the plan; run no external tool and write nothing")
     args = parser.parse_args(argv)
