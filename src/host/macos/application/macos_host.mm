@@ -854,8 +854,12 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     double _lastCGClipBoundsArea;
     std::size_t _lastCGSourceBytes;
     NSArray* _semanticAccessibilityChildren;
+    // The published elements by accessibility_element_key, and the first
+    // element for each stable identity (the tab-to-panel relation).
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
         _semanticAccessibilityElements;
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>*
+        _semanticAccessibilityElementsByStableId;
     BOOL _transparentFullSizeContent;
     std::vector<std::string> _windowDragRegionIds;
     // Portable frame capture (capture_path host option). Completed once,
@@ -909,8 +913,15 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 - (std::array<std::uint64_t, 13>)cpuAttributionSnapshot;
 - (MacCausalSnapshot)cpuCausalTraceSnapshot;
 - (NSRect)accessibilityFrameForSemanticBounds:(GFRect)bounds;
+// Performs `action` on a published node named as the shared routing API
+// names it: the runtime identity of its control and, for a virtual child,
+// the child's stable identity (empty for the control's own node). A virtual
+// child with no exposed control above it (control 0) is named by its stable
+// identity alone.
 - (BOOL)performSemanticAction:(SemanticAction)action
-                     stableId:(NSString*)stableId
+                      control:(std::uint64_t)control
+                 virtualChild:(const std::string&)virtualChild
+                     stableId:(const std::string&)stableId
                         value:(NSString*)value;
 - (id)semanticAccessibilityElementForStableId:(NSString*)stableId;
 @end
@@ -931,40 +942,51 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 }
 @end
 
+// One published semantic node. Its identity is the runtime identity of the
+// control that publishes it and, for a virtual child, the child's stable
+// identity (accessibility_element_key). Runtime identities are never reused,
+// so an element a client keeps after its control is disposed or replaced
+// names a control the window no longer has, and its actions are refused
+// (interview GF017).
 @interface GUIFormsAccessibilityElement : NSAccessibilityElement {
     __weak GUIFormsView* _owner;
     SemanticNode _node;
+    // The runtime identity of the control that publishes this node: the
+    // node's own, or, for a virtual child, the nearest control node's above
+    // it (0 when there is none).
+    std::uint64_t _control;
+    // The virtual child's stable identity; empty for a control's own node.
+    std::string _virtualChild;
     NSArray* _semanticChildren;
 }
 - (instancetype)initWithNode:(const SemanticNode&)node
                        owner:(GUIFormsView*)owner
-                      parent:(id)parent;
+                      parent:(id)parent
+                     control:(std::uint64_t)control
+                virtualChild:(const std::string&)virtualChild;
 - (void)updateWithNode:(const SemanticNode&)node
                  owner:(GUIFormsView*)owner
                 parent:(id)parent;
 - (void)setSemanticChildren:(NSArray*)children;
+- (BOOL)performNodeAction:(SemanticAction)action value:(NSString*)value;
 @end
 
 @implementation GUIFormsAccessibilityElement
 
+// The children are set by reconcile_accessibility_element, which keys them.
 - (instancetype)initWithNode:(const SemanticNode&)node
                        owner:(GUIFormsView*)owner
-                      parent:(id)parent {
+                      parent:(id)parent
+                     control:(std::uint64_t)control
+                virtualChild:(const std::string&)virtualChild {
     self = [super init];
     if (self != nil) {
         _owner = owner;
         _node = node;
+        _control = control;
+        _virtualChild = virtualChild;
         self.accessibilityParent = parent;
-        NSMutableArray* children = [[NSMutableArray alloc]
-            initWithCapacity:_node.children.size()];
-        for (const SemanticNode& childNode : _node.children) {
-            GUIFormsAccessibilityElement* child =
-                [[GUIFormsAccessibilityElement alloc] initWithNode:childNode
-                                                              owner:owner
-                                                             parent:self];
-            [children addObject:child];
-        }
-        _semanticChildren = children;
+        _semanticChildren = @[];
     }
     return self;
 }
@@ -979,6 +1001,15 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 
 - (void)setSemanticChildren:(NSArray*)children {
     _semanticChildren = [children copy];
+}
+
+- (BOOL)performNodeAction:(SemanticAction)action value:(NSString*)value {
+    if (_owner == nil) return NO;
+    return [_owner performSemanticAction:action
+                                 control:_control
+                            virtualChild:_virtualChild
+                                stableId:_node.stable_id
+                                   value:value];
 }
 
 - (BOOL)isAccessibilityElement { return YES; }
@@ -1040,9 +1071,7 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 // "Close".
 - (BOOL)performSemanticClose {
     if (_owner == nil || !semantic_has_action(_node, SemanticAction::close)) return NO;
-    return [_owner performSemanticAction:SemanticAction::close
-                                 stableId:native_string(_node.stable_id)
-                                    value:nil];
+    return [self performNodeAction:SemanticAction::close value:nil];
 }
 - (NSArray<NSAccessibilityCustomAction*>*)accessibilityCustomActions {
     if (!semantic_has_action(_node, SemanticAction::close)) return nil;
@@ -1089,16 +1118,12 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
             return NO;
         }
     }
-    return [_owner performSemanticAction:action
-                                 stableId:native_string(_node.stable_id)
-                                    value:nil];
+    return [self performNodeAction:action value:nil];
 }
 - (void)setAccessibilitySelected:(BOOL)selected {
     if (selected && _owner != nil &&
         semantic_has_action(_node, SemanticAction::select)) {
-        [_owner performSemanticAction:SemanticAction::select
-                              stableId:native_string(_node.stable_id)
-                                 value:nil];
+        static_cast<void>([self performNodeAction:SemanticAction::select value:nil]);
     }
 }
 - (BOOL)accessibilityPerformShowMenu {
@@ -1106,37 +1131,27 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
     const SemanticAction action = semantic_has_action(_node, SemanticAction::show_menu)
         ? SemanticAction::show_menu : SemanticAction::expand;
     if (!semantic_has_action(_node, action)) return NO;
-    return [_owner performSemanticAction:action
-                                 stableId:native_string(_node.stable_id)
-                                    value:nil];
+    return [self performNodeAction:action value:nil];
 }
 - (BOOL)accessibilityPerformIncrement {
     if (_owner == nil || !semantic_has_action(_node, SemanticAction::increment)) return NO;
-    return [_owner performSemanticAction:SemanticAction::increment
-                                 stableId:native_string(_node.stable_id)
-                                    value:nil];
+    return [self performNodeAction:SemanticAction::increment value:nil];
 }
 - (BOOL)accessibilityPerformDecrement {
     if (_owner == nil || !semantic_has_action(_node, SemanticAction::decrement)) return NO;
-    return [_owner performSemanticAction:SemanticAction::decrement
-                                 stableId:native_string(_node.stable_id)
-                                    value:nil];
+    return [self performNodeAction:SemanticAction::decrement value:nil];
 }
 - (void)setAccessibilityFocused:(BOOL)focused {
     if (focused && _owner != nil &&
         semantic_has_action(_node, SemanticAction::focus)) {
-        [_owner performSemanticAction:SemanticAction::focus
-                              stableId:native_string(_node.stable_id)
-                                 value:nil];
+        static_cast<void>([self performNodeAction:SemanticAction::focus value:nil]);
     }
 }
 - (void)setAccessibilityValue:(id)value {
     if (_owner == nil || !semantic_has_action(_node, SemanticAction::set_value)) return;
     NSString* text = [value isKindOfClass:[NSString class]]
         ? (NSString*)value : [value stringValue];
-    [_owner performSemanticAction:SemanticAction::set_value
-                          stableId:native_string(_node.stable_id)
-                             value:text];
+    static_cast<void>([self performNodeAction:SemanticAction::set_value value:text]);
 }
 
 - (BOOL)isAccessibilitySelectorAllowed:(SEL)selector {
@@ -1184,27 +1199,55 @@ bool semantic_has_action(const SemanticNode& node, SemanticAction action) {
 @end
 
 
+// The key of an element in the view's element table: the publishing
+// control's runtime identity, then the virtual child's stable identity
+// (empty for a control's own node). Unique within one window's tree; a
+// stable identity alone is not, since controls that show one model repeat
+// their virtual children's identities.
+static NSString* accessibility_element_key(std::uint64_t control, std::string_view virtual_child) {
+    std::string key = std::to_string(control);
+    key += '/';
+    key += virtual_child;
+    NSString* result = native_string(key);
+    return result;
+}
+
+// Publishes `node` under `parent`, reusing the element `previous` holds for
+// its key and recording it in `next`; `by_stable_id` records the first
+// element in tree order for each stable identity (the tab-to-panel
+// relation). `owner_control` is the runtime identity of the nearest control
+// node at or above `parent`, which publishes `node` when it is a virtual
+// child.
 static GUIFormsAccessibilityElement* reconcile_accessibility_element(
     const SemanticNode& node,
     GUIFormsView* owner,
     id parent,
+    std::uint64_t owner_control,
     NSDictionary<NSString*, GUIFormsAccessibilityElement*>* previous,
-    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next) {
-    NSString* identifier = native_string(node.stable_id);
-    GUIFormsAccessibilityElement* element = previous[identifier];
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next,
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* by_stable_id) {
+    const bool virtual_child = gui_forms::is_virtual_semantic_runtime_id(node.runtime_id);
+    const std::uint64_t control = virtual_child ? owner_control : node.runtime_id;
+    const std::string child_identity = virtual_child ? node.stable_id : std::string{};
+    NSString* key = accessibility_element_key(control, child_identity);
+    GUIFormsAccessibilityElement* element = previous[key];
     if (element == nil) {
         element = [[GUIFormsAccessibilityElement alloc] initWithNode:node
                                                                owner:owner
-                                                              parent:parent];
+                                                              parent:parent
+                                                             control:control
+                                                        virtualChild:child_identity];
     } else {
         [element updateWithNode:node owner:owner parent:parent];
     }
-    next[identifier] = element;
+    next[key] = element;
+    NSString* stable_identity = native_string(node.stable_id);
+    if (by_stable_id[stable_identity] == nil) by_stable_id[stable_identity] = element;
     NSMutableArray* children = [[NSMutableArray alloc]
         initWithCapacity:node.children.size()];
     for (const SemanticNode& childNode : node.children) {
         [children addObject:reconcile_accessibility_element(
-            childNode, owner, element, previous, next)];
+            childNode, owner, element, control, previous, next, by_stable_id)];
     }
     [element setSemanticChildren:children];
     return element;
@@ -1341,6 +1384,7 @@ void post_perform_close(NSWindow* window) {
         _windowDragRegionIds = std::move(windowDragRegionIds);
         _semanticAccessibilityChildren = nil;
         _semanticAccessibilityElements = [[NSMutableDictionary alloc] init];
+        _semanticAccessibilityElementsByStableId = [[NSMutableDictionary alloc] init];
         _markedText = [[NSMutableAttributedString alloc] init];
         _selectedRange = NSMakeRange(NSNotFound, 0);
         _displayLink = nil;
@@ -1579,12 +1623,15 @@ void post_perform_close(NSWindow* window) {
         initWithCapacity:snapshot.roots.size()];
     NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* next =
         [[NSMutableDictionary alloc] initWithCapacity:snapshot.node_count];
+    NSMutableDictionary<NSString*, GUIFormsAccessibilityElement*>* byStableId =
+        [[NSMutableDictionary alloc] initWithCapacity:snapshot.node_count];
     for (const SemanticNode& node : snapshot.roots) {
         GUIFormsAccessibilityElement* element = reconcile_accessibility_element(
-            node, self, self, _semanticAccessibilityElements, next);
+            node, self, self, 0U, _semanticAccessibilityElements, next, byStableId);
         [result addObject:element];
     }
     _semanticAccessibilityElements = next;
+    _semanticAccessibilityElementsByStableId = byStableId;
     _semanticAccessibilityChildren = [result copy];
     _accessibilityCacheGeneration = snapshot.generation;
     return _semanticAccessibilityChildren;
@@ -1608,20 +1655,27 @@ void post_perform_close(NSWindow* window) {
 // The element of the current semantic tree with this stable identity, or
 // nil; read by the tab-to-panel relation.
 - (id)semanticAccessibilityElementForStableId:(NSString*)stableId {
-    if (stableId == nil || _semanticAccessibilityElements == nil) return nil;
-    return _semanticAccessibilityElements[stableId];
+    if (stableId == nil || _semanticAccessibilityElementsByStableId == nil) return nil;
+    return _semanticAccessibilityElementsByStableId[stableId];
 }
 
 - (BOOL)performSemanticAction:(SemanticAction)action
-                     stableId:(NSString*)stableId
+                      control:(std::uint64_t)control
+                 virtualChild:(const std::string&)virtualChild
+                     stableId:(const std::string&)stableId
                         value:(NSString*)value {
-    if (!_model || stableId == nil) return NO;
-    const std::string identifier = utf8_string(stableId);
+    if (!_model) return NO;
     const std::string actionValue = value == nil ? std::string{} : utf8_string(value);
     if (action == SemanticAction::focus) {
         [self.window makeFirstResponder:self];
     }
-    const bool handled = (*_model).perform_semantic_action(identifier, action, actionValue);
+    bool handled = false;
+    if (control == 0U) {
+        handled = (*_model).perform_semantic_action(stableId, action, actionValue);
+    } else {
+        const gui_forms::RuntimeId identity{control};
+        handled = (*_model).perform_semantic_action(identity, virtualChild, action, actionValue);
+    }
     if (handled) {
         [self collectDamage];
         NSAccessibilityPostNotification(self, NSAccessibilityValueChangedNotification);
