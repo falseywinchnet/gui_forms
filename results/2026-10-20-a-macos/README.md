@@ -1,6 +1,7 @@
 # Stage A, macOS: accessibility verified through AX
 
-Date: 2026-10-20 (final runs 05:26 UTC). Stage: A, accessibility verified
+Date: 2026-10-21 (gate runs 02:00 to 02:02 UTC; first recorded
+2026-10-20). Stage: A, accessibility verified
 on every host (`planning/stages/A-accessibility/README.md`), macOS part.
 Windows and Linux are recorded separately.
 
@@ -26,18 +27,20 @@ output: [in-process.txt](in-process.txt), [ax-client-fixture.txt](ax-client-fixt
 
 ## Environment
 
-- Machine: the owner's Mac mini, Apple M4, 1920 × 1080 display, macOS 26.5
-  (25F71), Xcode 26.5 (17F42), MacOSX SDK 26.5.
-- Compiler: Homebrew clang 22.1.8 (`/opt/homebrew/opt/llvm@22`), the pinned
-  libc++ 22.1.8 runtime for macOS 14, `cmake/llvm22.cmake`.
+- Machine: the owner's Mac mini, Apple M4, 1920 × 1080 display.
+- Versions: macOS 26.5 (build 25F71); Xcode 26.5 (build 17F42) with the
+  MacOSX 26.5 SDK (`xcrun --show-sdk-version`); Homebrew clang 22.1.8
+  (`/opt/homebrew/opt/llvm@22/bin/clang`, target arm64-apple-darwin25.5.0),
+  with the pinned libc++ 22.1.8 runtime for macOS 14 and
+  `cmake/llvm22.cmake`.
 - Layout: the CI layout of `docs/building/fast-builds.md`, workspace
   `~/Developer/CodexBuilds/gui_forms-escape` (`gui_forms/`, `.build/`,
   `.ccache/`), with ccache.
 - Permission: `AXIsProcessTrusted()` was already true for processes started
-  over ssh on the M4 (checked with `osascript` and again inside the client).
-  No system setting was changed.
-- Source: `claude/a-macos-ax-client`, stacked on `claude/a-macos-in-process`,
-  on `main` at 13d1c7e0.
+  over ssh on the M4 (checked with `osascript` before the run and again
+  inside the client). No system setting was changed.
+- Source: `main` at addcf238 (#194 and #195 merged, with the Gallery app's
+  page freeze and the client's byte-identical settling).
 
 ## Commands
 
@@ -45,24 +48,28 @@ From the workspace, with the environment of `docs/building/fast-builds.md`:
 
 ```text
 python3 -B gui_forms/tools/ci_build.py --gallery --jobs 8
-#   186/186 tests passed (the three accessibility tests among them), installed-SDK examples 11/11
+#   196/196 tests passed (the three accessibility tests Passed, none Skipped), installed-SDK examples 11/11
 
-B=.build/native-macos-arm64/gui-forms
-$B/gui_forms_macos_accessibility_tests.app/Contents/MacOS/gui_forms_macos_accessibility_tests
-$B/gui_forms_macos_accessibility_client_tests --app $B/gui_forms_macos_accessibility_fixture_app.app --dump /tmp/ax-fixture.json
-$B/gui_forms_macos_accessibility_client_tests --gallery --app $B/gui_forms_macos_accessibility_gallery_app.app --dump /tmp/ax-gallery.json
+ctest --test-dir .build/native-macos-arm64/gui-forms -R 'gui_forms_macos_accessibility' -V    # three times
 
-python3 -B gui_forms/tools/ci_build.py --jobs 8 --sanitize --tests accessib
+python3 -B gui_forms/tools/ci_build.py --sanitize --tests accessib
 #   2/2 passed under ASan, UBSan and LSan (the in-process test and the AX client)
-
-python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis    # 0 findings
-python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis # 0 findings
 ```
 
-The sanitized client launches its app through LaunchServices, which does not
-pass the sanitizer options on, so the app runs with AddressSanitizer
-instrumented but without leak checking. Each AX run was repeated three times
-with the same result.
+The three verbose runs (02:00:58, 02:01:30 and 02:02:02 UTC) ended alike,
+each with 3/3 tests passed and no `note live value` line:
+
+| Test | Final line, runs 1, 2 and 3 |
+|---|---|
+| `gui_forms_macos_accessibility_tests` | `controls=80 nodes=580 matched=580 mismatches=0 failures=0` |
+| `gui_forms_macos_accessibility_client_tests` | `types=83 instances=162 nodes=585 matched=585 mismatches=0 failures=0` |
+| `gui_forms_macos_accessibility_client_gallery_tests` | `types=81 instances=956 nodes=2795 matched=2795 mismatches=0 failures=0` |
+
+The raw output files are the third run's, without ctest's line prefixes.
+The sanitized build is configured without the Gallery, so it runs the
+in-process test and the fixture client; the client launches its app through
+LaunchServices, which does not pass the sanitizer options on, so the app
+runs with AddressSanitizer instrumented but without leak checking.
 
 ## The contract
 
@@ -84,7 +91,7 @@ host, and checked by both tests:
 | Found | Resolution |
 |---|---|
 | Tabs published no subrole and an empty value, so a client could not tell a tab from a radio button or read which tab is selected. | Fixed in the host: a tab has AppKit's tab-button subrole (`NSAccessibilityTabButtonSubrole`) and AXValue 1 when selected, as NSTabView's tabs do. |
-| `metrics_view` and `visual_inspector_view` values (live paint counters) and the Gallery's animated `easing_preview` value change without a new semantic generation, so a dump and the AX read that follows it could differ. On CI (2026-10-20, before the fix below) the timing page's tick label changed between its dump and the AX read: expected "Idle · enter this page to start", published "Running · tick 1 · 250 ms · UI thread". | Not a publication error. This run accepted a moving value when it lay within the values the node took around the read (a note, `live value gallery.animation.easing`). That allowance is removed (2026-10-21): the Gallery app now freezes each page it shows, cancelling the window's frame requests before it writes the page's dump, as the UIA Gallery client does, and the client takes a dump as settled only when two reads 160 ms apart are byte for byte the same. The M4 runs above predate this change and are to be repeated. |
+| `metrics_view` and `visual_inspector_view` values (live paint counters) and the Gallery's animated `easing_preview` value change without a new semantic generation, so a dump and the AX read that follows it could differ. On CI (2026-10-20, before the fix below) the timing page's tick label changed between its dump and the AX read: expected "Idle · enter this page to start", published "Running · tick 1 · 250 ms · UI thread". | Not a publication error. This run accepted a moving value when it lay within the values the node took around the read (a note, `live value gallery.animation.easing`). That allowance is removed (2026-10-21): the Gallery app now freezes each page it shows, cancelling the window's frame requests before it writes the page's dump, as the UIA Gallery client does, and the client takes a dump as settled only when two reads 160 ms apart are byte for byte the same. The M4 gate runs of 2026-10-21 were made with this change in place and show no live-value note. |
 | Test errors during development (an open popup replacing the window's roots; a stale "before" dump; unsorted rows needed to see a sort; values a field rejects). | Corrected in the tests; no product change. |
 
 ## Vocabulary gaps (owner decisions, design language §12.7)

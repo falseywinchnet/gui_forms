@@ -80,5 +80,4 @@ control metrics_view instances=1 nodes=1 matched=1
 control typography_specimen instances=4 nodes=4 matched=4
 control visual_inspector_view instances=1 nodes=1 matched=1
 note gallery pages: 29
-note live value gallery.animation.easing: the AX value lies within the values the node took around the read
 types=81 instances=956 nodes=2795 matched=2795 mismatches=0 failures=0
