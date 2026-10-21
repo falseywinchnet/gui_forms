@@ -171,6 +171,7 @@ add_library(gui_forms_core STATIC
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
     src/core/image/png_decoder.cpp
+    src/core/image/png_pixels.cpp
     src/core/image/png_writer.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
@@ -2255,6 +2256,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_png_decoder_tests tests/image/png_decoder_tests.cpp)
     target_link_libraries(gui_forms_png_decoder_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_decoder_tests COMMAND gui_forms_png_decoder_tests)
+
+    add_executable(gui_forms_png_pixels_tests tests/image/png_pixels_tests.cpp)
+    target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
 
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
