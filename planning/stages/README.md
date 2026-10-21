@@ -31,7 +31,7 @@ Releases are the public roadmap's chevrons (`docs/dev/roadmap.md`,
 
 | Stage | Brief | Release | Depends on (gates recorded) | Status 2026-10-13 |
 |---|---|---|---|---|
-| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | started 2026-10-20: macOS in-process and out-of-process AX tests registered, macOS gate run recorded (`results/2026-10-20-a-macos`); Windows and Linux in progress |
+| A | [Accessibility verified on every host](A-accessibility/README.md) | 0.2 Verified | none | started 2026-10-19: Windows: MSAA client test over the whole Gallery (A-W1, `results/2026-10-19-a-w1-msaa-gallery`), UI Automation provider (A-W2) and its Gallery client test (A-W3, `results/2026-10-20-a-w3-uia-gallery`); Linux: AT-SPI client tests A-L1 (#192) and the whole Gallery A-L2 (#197, `results/2026-10-20-a-l2-linux-gallery`); macOS: in-process and out-of-process AX tests registered (#194, #195), gate run recorded (`results/2026-10-20-a-macos`); editable text ranges next; capability not yet advertised |
 | F | [Font substitution](F-font-substitution/README.md) | 0.2 Verified | none | not started |
 | T1 | [Anatomy: articulated controls and one schema](T1-anatomy/README.md) | 0.2 Verified | none | complete 2026-10-13 (`results/2026-10-13-t1-anatomy-gate`): 60 of 60 controls; item systems, per-part states, interactions, schema export and one-name-three-spellings merged; owner signed off, and declared T1 sealed once the follow-on DP and host work (#80, #81) was in |
 | T2 | [Engine core](T2-engine-core/README.md) | 0.3 Themeable | T1 | interview answered 2026-10-19; plan E1–E11 accepted (`T2-engine-core/PLAN.md`); E1 revision then E2 next |

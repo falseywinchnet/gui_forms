@@ -374,9 +374,8 @@ void content_colors(const Control& control) {
     fill.states.insert(AnatomyState::disabled);
     RecordingPainter disabled;
     paint_part(disabled, control, fill);
-    require(disabled.operations.size() == 1U && disabled.operations[0].color.red == 192 &&
-                disabled.operations[0].color.alpha == 115,
-            "a disabled part's content colour is drawn at 45 % of its opacity");
+    require(disabled.operations.size() == 1U && disabled.operations[0].color == sample,
+            "a disabled part's content colour is drawn exactly as given (GIVEN E2-1)");
     fill.states = {};
     const Theme& theme = control.effective_theme();
     ControlVisualContext contrast = part_visual_context(control, fill.states);

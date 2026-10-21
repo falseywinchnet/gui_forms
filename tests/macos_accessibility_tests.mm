@@ -22,7 +22,8 @@
 // through the NSAccessibility protocol, compares every element with the
 // semantic node it projects, performs each control's default action through
 // its element and observes the change, and checks that an element held past
-// its control's removal refuses actions. It runs in process, so it needs no
+// its control's removal refuses actions, and that items whose stable ids two
+// trees repeat each reach their own tree. It runs in process, so it needs no
 // Accessibility permission (CI); the out-of-process AXUIElement client is
 // macos_accessibility_client_tests.
 
@@ -422,6 +423,64 @@ void check_stale_element(StockControlFixture& fixture, NSView* view, Report& rep
 }
 
 // ---------------------------------------------------------------------------
+// Repeated item identities: two trees that show one model publish the same
+// item stable ids. Each item's element must reach its own tree (the shared
+// routing API names the publishing control by runtime identity), never the
+// first tree that claims the id.
+
+// The child of `element` whose identifier is `identifier`, or nil.
+id direct_child(id element, NSString* identifier) {
+    for (id child in [element accessibilityChildren]) {
+        if ([[child accessibilityIdentifier] isEqualToString:identifier]) return child;
+    }
+    return nil;
+}
+
+void check_repeated_item_identities(StockControlFixture& fixture, gui_forms::Window& window, NSView* view,
+                                    Report& report) {
+    std::shared_ptr<gui_forms::TreeView> left =
+        gui_forms::make_control<gui_forms::TreeView>(gui_forms::StableId("twins.left"));
+    std::shared_ptr<gui_forms::TreeView> right =
+        gui_forms::make_control<gui_forms::TreeView>(gui_forms::StableId("twins.right"));
+    std::vector<gui_forms::TreeViewItem> items;
+    items.push_back(gui_forms::TreeViewItem{"src", "src", 0U, false, false, true, {}});
+    items.push_back(gui_forms::TreeViewItem{"docs", "docs", 0U, false, false, true, {}});
+    (*left).set_items(items);
+    (*right).set_items(items);
+    (*left).set_requested_bounds({10.0, 10.0, 180.0, 120.0});
+    (*right).set_requested_bounds({210.0, 10.0, 180.0, 120.0});
+    (*fixture.root).add_child(left);
+    (*fixture.root).add_child(right);
+    window.perform_layout();
+    id left_tree = find_element([view accessibilityChildren], @"twins.left");
+    id right_tree = find_element([view accessibilityChildren], @"twins.right");
+    id left_docs = left_tree == nil ? nil : direct_child(left_tree, @"docs");
+    id right_docs = right_tree == nil ? nil : direct_child(right_tree, @"docs");
+    if (left_docs == nil || right_docs == nil) {
+        report.failures.push_back("repeated identities: both trees must publish an item docs");
+    } else if (left_docs == right_docs) {
+        report.failures.push_back("repeated identities: the two trees' docs items share one element");
+    } else if ([right_docs accessibilityParent] != right_tree) {
+        report.failures.push_back("repeated identities: the right tree's docs element has another parent");
+    } else {
+        [right_docs setAccessibilitySelected:YES];
+        if ((*right).selected_id() != "docs" || (*left).selected_id() == "docs") {
+            report.failures.push_back("repeated identities: selecting the right tree's docs element did not "
+                                      "select the right tree's item alone");
+        }
+        [left_docs setAccessibilitySelected:YES];
+        if ((*left).selected_id() != "docs") {
+            report.failures.push_back("repeated identities: selecting the left tree's docs element did not "
+                                      "select the left tree's item");
+        }
+        std::cout << "repeated identities: each tree's docs element selected its own tree's item\n";
+    }
+    static_cast<void>((*fixture.root).remove_child((*left).runtime_id()));
+    static_cast<void>((*fixture.root).remove_child((*right).runtime_id()));
+    window.perform_layout();
+}
+
+// ---------------------------------------------------------------------------
 
 void print_report(const StockControlFixture& fixture, const Report& report) {
     for (const StockControlEntry& entry : fixture.controls) {
@@ -498,6 +557,7 @@ void walk_and_close(void* context) {
         window.perform_layout();
         compare_window(*state.fixture, window, view, state.report, "after-actions");
         check_stale_element(*state.fixture, view, state.report);
+        check_repeated_item_identities(*state.fixture, window, view, state.report);
     }
     state.ran = true;
     state.request_close();

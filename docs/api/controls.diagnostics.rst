@@ -195,6 +195,18 @@ Related types
 
       Adds one or more disposed controls.
 
+   .. cpp:function:: void record_engine_part_created(bool index_fallback, std::uint64_t live) noexcept
+
+      A theme engine part record was made; ``live`` records remain.
+
+   .. cpp:function:: void record_engine_parts_released(std::uint64_t released, std::uint64_t live) noexcept
+
+      ``released`` part records were released; ``live`` records remain.
+
+   .. cpp:function:: void record_engine_parts_evicted(std::uint64_t evicted, std::uint64_t live) noexcept
+
+      ``evicted`` item-part records were evicted; ``live`` records remain.
+
    .. cpp:function:: void record_wrong_thread_rejection() noexcept
 
       Atomically counts a rejected cross-thread operation.
@@ -255,9 +267,17 @@ Related types
 
       Counts a scheduled frame request.
 
-   .. cpp:function:: void record_frame_poll(std::uint64_t deadlines_fired, std::uint64_t active_surface_ticks, std::uint64_t coalesced_requests) noexcept
+   .. cpp:function:: void record_frame_poll(std::uint64_t deadlines_fired, std::uint64_t active_surface_ticks, std::uint64_t motion_clock_ticks, std::uint64_t coalesced_requests) noexcept
 
       Accumulates deadlines, active ticks, coalescing, and nonempty scheduler wakes.
+
+   .. cpp:function:: void record_motion_started() noexcept
+
+      The motion clock: a move started, a value settled on a frame, a value jumped to its end at once, and the values moving now.
+
+   .. cpp:function:: void record_motion_settled() noexcept
+
+   .. cpp:function:: void record_motion_finished() noexcept
 
    .. cpp:function:: void record_frame_callback_fault() noexcept
 
@@ -298,6 +318,8 @@ Related types
    .. cpp:function:: void set_display_cache(std::uint64_t entries, std::uint64_t generation) noexcept
 
       Sets current cache entries and generation.
+
+   .. cpp:function:: void set_motion_values_moving(std::uint64_t moving) noexcept
 
    .. cpp:function:: void set_active_surface_count(std::size_t count) noexcept
 
@@ -440,6 +462,10 @@ Related types
 
    .. cpp:member:: std::uint64_t active_surface_ticks
 
+   .. cpp:member:: std::uint64_t motion_clock_ticks
+
+      Frames of the window's motion clock (T2 plan, phase E3): at most one per frame poll, however many motion values move.
+
    .. cpp:member:: std::uint64_t frame_requests_coalesced
 
    .. cpp:member:: std::uint64_t frame_callback_faults
@@ -479,6 +505,28 @@ Related types
    .. cpp:member:: std::uint64_t screen_copy_nanoseconds
 
       The time hosts spent only copying pixels to the screen (conversion and the native copy), retained and live together. The present durations above also cover painting and composing; this one compares the copy itself across hosts.
+
+   .. cpp:member:: std::uint64_t engine_part_records
+
+      The theme engine's part records (T2 plan, EnginePartTable): those live now, those made with the index fallback (an item part without a stable ID, whose record follows its position rather than the item; GIVEN H3-1), and those released because their control left the window. Records made, released and evicted are activity; the live count is population and survives reset_activity.
+
+   .. cpp:member:: std::uint64_t engine_part_index_fallbacks
+
+   .. cpp:member:: std::uint64_t engine_part_records_released
+
+   .. cpp:member:: std::uint64_t engine_part_records_evicted
+
+      Item-part records evicted, least recently painted first, to keep within the window's cap (maximum_item_part_records).
+
+   .. cpp:member:: std::uint64_t motion_values_moving
+
+      The motion clock's values (T2 plan, phase E3): those moving now, moves started (a retarget is a start), those that reached their settled condition on a frame, and those that jumped to their end at once (reduced motion, an occluded or minimized window, a zero duration, or an end by finish_all). The moving count is population and survives reset_activity; zero means the window schedules no motion frames.
+
+   .. cpp:member:: std::uint64_t motion_values_started
+
+   .. cpp:member:: std::uint64_t motion_values_settled
+
+   .. cpp:member:: std::uint64_t motion_values_finished
 
    .. cpp:member:: std::string renderer_name
 
@@ -948,6 +996,8 @@ Enumerations
    .. cpp:enumerator:: fill_image_pattern
 
    .. cpp:enumerator:: draw_live_surface
+
+   .. cpp:enumerator:: draw_part_raster
 
 Functions, constants and aliases
 --------------------------------

@@ -20,7 +20,7 @@ Every control also raises these interactions: `name_changed`, `visible_changed`,
 
 The atoms controls declare and themes address (design language §8.5 and §12.7).
 
-Part roles: `region`, `shadow`, `face`, `edge`, `keyline`, `perimeter`, `sheen`, `seam`, `divider`, `caption`, `cap`, `well`, `track`, `fill`, `thumb`, `actuator`, `indicator`, `activity`, `glyph`, `icon`, `label`, `content`, `caret`, `disclosure`, `grip`, `chip`, `focus`, `preselect`, `selection`, `validation`, `drop`.
+Part roles: `region`, `shadow`, `face`, `edge`, `keyline`, `perimeter`, `sheen`, `seam`, `divider`, `caption`, `cap`, `well`, `track`, `fill`, `thumb`, `actuator`, `indicator`, `activity`, `glyph`, `icon`, `label`, `content`, `caret`, `disclosure`, `grip`, `chip`, `focus`, `preselect`, `selection`, `validation`, `drop`, `image`.
 
 States: `normal`, `hot`, `pressed`, `captured`, `focused`, `focus_visible`, `preselect`, `selected`, `checked`, `indeterminate`, `current`, `active_tool`, `enabled`, `disabled`, `unavailable`, `read_only`, `invalid`, `pending`, `open`, `closed`, `expanding`, `collapsing`, `interrupted`, `drop_accepted`, `drop_rejected`, `key`, `secondary_participating`, `drag_proximate`, `deactivated`, `high_contrast`, `reduced_motion`.
 
@@ -37,6 +37,15 @@ Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio
 Semantic actions: `focus`, `press`, `select`, `increment`, `decrement`, `expand`, `collapse`, `show_menu`, `set_value`, `close`.
 
 Semantic node fields: `position_in_set`, `set_size`, `has_popup`, `controlled_panel`, `orientation`.
+
+## Engine
+
+Theme engine 0.1 (T2): the primitives a theme's rules may select, the atoms each declares against, and its cost. Cascade levels, lowest first: `built_in`, `theme_sheet`, `class_rule`, `stable_id_rule`, `inline_style`, `forced_high_contrast`.
+
+| Primitive | Since | Paints | Reads | Cost per device pixel | Parameters |
+|---|---|---|---|---|---|
+| `bulge` | 0.1 | `face` | `pressed`, `active_tool` | 320 | `amplitude`, `exponent`, `light_colour`, `light_peak`, `shade_colour`, `shade_peak`, `crown_colour`, `crown_peak`, `gold_light_colour`, `gold_light_peak`, `gold_shade_colour`, `gold_shade_peak`, `gold_crown_colour`, `gold_crown_peak` |
+| `dithered_bulge` | 0.1 | `face` | `pressed`, `active_tool` | 280 | `amplitude`, `exponent`, `lit_1`, `lit_2`, `lit_3`, `shaded_1`, `shaded_2`, `shaded_3`, `lit_gain`, `shade_gain`, `crown_gain`, `gold_lit_1`, `gold_lit_2`, `gold_lit_3`, `gold_body_1`, `gold_body_2`, `gold_body_3`, `gold_shaded_1`, `gold_shaded_2`, `gold_shaded_3` |
 
 ## `button_base` (ButtonBase, control)
 
@@ -1689,7 +1698,7 @@ Properties beyond every control's: none.
 | `focus` | focus |  |  |
 | `drag_stamp` | face |  |  |
 | `drag_stamp_label` | label |  |  |
-| `drag_stamp_image` | icon |  |  |
+| `drag_stamp_image` | image |  |  |
 | `drop_area` | drop |  | drop_accepted |
 | `drop_cue` | indicator |  | drop_rejected |
 | `flyout_shadow` | shadow |  |  |

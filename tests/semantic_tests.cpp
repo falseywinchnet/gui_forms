@@ -1,4 +1,6 @@
 #include "gui_forms/basic_controls.hpp"
+#include "gui_forms/collection_controls.hpp"
+#include "gui_forms/container_controls.hpp"
 #include "gui_forms/input_controls.hpp"
 #include "gui_forms/range_controls.hpp"
 #include "gui_forms/window.hpp"
@@ -265,6 +267,274 @@ void test_modal_semantic_scope() {
     require(find_node(outside_snapshot.roots, "outside"), "closing modal restores semantic tree");
 }
 
+// A control that publishes one virtual child, "shared", whose stable identity
+// every instance repeats (as tree and object views repeat their model's item
+// identities), and counts the presses that child receives. An unexposed one
+// has no node of its own, so its child is published at its nearest exposed
+// ancestor.
+class SharedVirtualChild final : public Control {
+public:
+    SharedVirtualChild(StableId stable_id, bool exposed) : Control(std::move(stable_id)), exposed_(exposed) {}
+    [[nodiscard]] int presses() const noexcept { return presses_; }
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.exposed = exposed_;
+        return descriptor;
+    }
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        SemanticNode node;
+        node.stable_id = "shared";
+        node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
+        node.role = SemanticRole::button;
+        node.name = "Shared";
+        node.actions = {SemanticAction::press};
+        std::vector<SemanticNode> nodes{node};
+        return nodes;
+    }
+    bool on_semantic_child_action(std::string_view stable_id, SemanticAction action,
+                                  std::string_view) override {
+        if (stable_id != "shared" || action != SemanticAction::press) return false;
+        ++presses_;
+        return true;
+    }
+
+private:
+    bool exposed_{};
+    int presses_{};
+};
+
+// Hosts name a published node by its control's runtime identity (interview
+// GF017): a disposed or replaced control's identity is refused, and a virtual
+// child reaches its own owner even when another control repeats its stable
+// identity.
+void test_runtime_identity_semantic_actions() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("identity.root"));
+    std::shared_ptr<SharedVirtualChild> first = make_control<SharedVirtualChild>(StableId("identity.first"), true);
+    std::shared_ptr<SharedVirtualChild> second = make_control<SharedVirtualChild>(StableId("identity.second"), true);
+    std::shared_ptr<GroupBox> holder = make_control<GroupBox>(StableId("identity.holder"), "Holder");
+    std::shared_ptr<SharedVirtualChild> inner = make_control<SharedVirtualChild>(StableId("identity.inner"), false);
+    std::shared_ptr<Button> button = make_control<Button>(StableId("identity.button"), "Press");
+    (*first).set_requested_bounds({0, 0, 50, 20});
+    (*second).set_requested_bounds({0, 30, 50, 20});
+    (*holder).set_requested_bounds({60, 0, 80, 60});
+    (*inner).set_requested_bounds({0, 0, 40, 20});
+    (*button).set_requested_bounds({0, 60, 50, 20});
+    (*root).add_child(first);
+    (*root).add_child(second);
+    (*root).add_child(holder);
+    (*holder).add_child(inner);
+    (*root).add_child(button);
+    Window window(root, {200, 120});
+    int clicks = 0;
+    SubscriptionToken clicked =
+        (*button).clicked().subscribe(test_support::IncrementCounter<int, ButtonBase&>(clicks));
+
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* holder_node = find_node(snapshot.roots, "identity.holder");
+    require(holder_node && find_node((*holder_node).children, "shared") && !find_node(snapshot.roots, "identity.inner"),
+            "an unexposed control's virtual child is published at its nearest exposed ancestor");
+    require(window.perform_semantic_action((*holder).runtime_id(), "shared", SemanticAction::press) &&
+                (*inner).presses() == 1 && (*first).presses() == 0 && (*second).presses() == 0,
+            "a virtual child named by its nearest exposed ancestor reaches the unexposed control inside it");
+    require(window.perform_semantic_action((*second).runtime_id(), "shared", SemanticAction::press) &&
+                (*second).presses() == 1 && (*first).presses() == 0,
+            "a virtual child named by its owner's runtime identity reaches that owner only");
+    require(window.perform_semantic_action("shared", SemanticAction::press) && (*first).presses() == 1,
+            "a stable identity alone reaches the first control that claims it");
+    require(!window.perform_semantic_action((*first).runtime_id(), "missing", SemanticAction::press),
+            "a virtual child its owner does not claim is refused");
+    require(window.perform_semantic_action((*button).runtime_id(), "", SemanticAction::press) && clicks == 1,
+            "a control's own node is reached by its runtime identity");
+
+    const RuntimeId stale = (*button).runtime_id();
+    const Control::Ptr removed = (*root).remove_child(stale);
+    require(removed != nullptr, "the button leaves the tree");
+    require(!window.perform_semantic_action(stale, "", SemanticAction::press) && clicks == 1,
+            "a removed control's runtime identity is refused");
+    std::shared_ptr<Button> replacement = make_control<Button>(StableId("identity.button"), "Press");
+    (*replacement).set_requested_bounds({0, 60, 50, 20});
+    (*root).add_child(replacement);
+    int replacement_clicks = 0;
+    SubscriptionToken replacement_clicked = (*replacement).clicked().subscribe(
+        test_support::IncrementCounter<int, ButtonBase&>(replacement_clicks));
+    require(!window.perform_semantic_action(stale, "", SemanticAction::press) && replacement_clicks == 0,
+            "a replaced control's old runtime identity never reaches its successor");
+    require(window.perform_semantic_action((*replacement).runtime_id(), "", SemanticAction::press) &&
+                replacement_clicks == 1,
+            "the successor answers to its own runtime identity");
+    require(!window.perform_semantic_action(RuntimeId{}, "", SemanticAction::press),
+            "the zero runtime identity names no control");
+}
+
+// A control that is not focusable and answers the focus action as handled
+// without moving focus anywhere.
+class ClaimsFocus final : public Control {
+public:
+    explicit ClaimsFocus(StableId stable_id) : Control(std::move(stable_id)) {}
+    [[nodiscard]] int focus_requests() const noexcept { return focus_requests_; }
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.actions = {SemanticAction::focus};
+        descriptor.exposed = true;
+        return descriptor;
+    }
+    bool on_semantic_action(SemanticAction action, std::string_view) override {
+        if (action != SemanticAction::focus) return false;
+        ++focus_requests_;
+        return true;
+    }
+
+private:
+    int focus_requests_{};
+};
+
+// Whether the window's focused control is `control` or lies inside it.
+bool focus_inside(const Window& window, const Control::Ptr& control) {
+    const Control::Ptr focused = window.focused_control();
+    const bool inside = focused && (focused == control || (*control).contains(*focused));
+    return inside;
+}
+
+// The semantic focus action on a composite that is not focusable itself
+// (focus belongs to its inner editor or part) is left to the composite's own
+// on_semantic_action. The window performs it only when focus then lies
+// inside the composite, and still refuses it where nothing can take focus.
+void test_semantic_focus_reaches_composites() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("focus.root"));
+    std::shared_ptr<NumericUpDown> numeric = make_control<NumericUpDown>(StableId("focus.numeric"));
+    std::shared_ptr<DomainUpDown> domain = make_control<DomainUpDown>(StableId("focus.domain"));
+    std::shared_ptr<MaskedTextBox> masked = make_control<MaskedTextBox>(StableId("focus.masked"), "(000) 000-0000");
+    std::shared_ptr<TokenBox> tokens = make_control<TokenBox>(StableId("focus.tokens"));
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("focus.split"));
+    std::shared_ptr<Panel> plain = make_control<Panel>(StableId("focus.plain"));
+    std::shared_ptr<ClaimsFocus> claims = make_control<ClaimsFocus>(StableId("focus.claims"));
+    std::shared_ptr<Button> button = make_control<Button>(StableId("focus.button"), "Press");
+    (*numeric).set_requested_bounds({0, 0, 120, 24});
+    (*domain).set_requested_bounds({0, 30, 120, 24});
+    (*masked).set_requested_bounds({0, 60, 160, 24});
+    (*tokens).set_requested_bounds({0, 90, 200, 28});
+    (*split).set_requested_bounds({0, 130, 240, 80});
+    (*plain).set_requested_bounds({250, 0, 60, 40});
+    (*claims).set_requested_bounds({250, 50, 60, 40});
+    (*button).set_requested_bounds({250, 100, 60, 24});
+    (*root).add_child(numeric);
+    (*root).add_child(domain);
+    (*root).add_child(masked);
+    (*root).add_child(tokens);
+    (*root).add_child(split);
+    (*root).add_child(plain);
+    (*root).add_child(claims);
+    (*root).add_child(button);
+    Window window(root, {320, 220});
+    window.perform_layout();
+
+    const std::array<Control::Ptr, 5> composites{numeric, domain, masked, tokens, split};
+    for (std::size_t index = 0; index < composites.size(); ++index) {
+        const Control::Ptr& composite = composites[index];
+        require(!(*composite).focusable(), "the composite is not focusable itself");
+        require(window.request_focus(button) && window.focused_control() == button,
+                "focus starts on the button");
+        require(window.perform_semantic_action((*composite).stable_id().value(), SemanticAction::focus),
+                "semantic focus on a composite named by stable identity is performed");
+        require(focus_inside(window, composite) && window.focused_control() != composite,
+                "the composite moves focus to its inner editor or part");
+        require(window.request_focus(button), "focus returns to the button");
+        require(window.perform_semantic_action((*composite).runtime_id(), "", SemanticAction::focus) &&
+                    focus_inside(window, composite),
+                "semantic focus on a composite named by runtime identity is performed");
+    }
+
+    require(window.request_focus(button), "focus returns to the button");
+    require(!window.perform_semantic_action("focus.plain", SemanticAction::focus) &&
+                window.focused_control() == button,
+            "a control that is not focusable and has nothing to take focus is refused");
+    require(!window.perform_semantic_action("focus.claims", SemanticAction::focus) &&
+                (*claims).focus_requests() == 1 && window.focused_control() == button,
+            "a control that answers focus without moving it into itself is refused");
+    require(window.perform_semantic_action("focus.button", SemanticAction::focus) &&
+                window.focused_control() == button,
+            "a focusable control still takes focus directly");
+
+    (*numeric).set_enabled(false);
+    require(!window.perform_semantic_action("focus.numeric", SemanticAction::focus) &&
+                window.focused_control() == button,
+            "a disabled composite is refused");
+}
+
+// A node publishes the focusable state when a control it hides (one that
+// publishes no node of its own) can take focus, and the focused state while
+// focus is on such a control, so a client sees focus on the composite.
+void test_hidden_focus_is_published_on_the_composite() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("hidden.root"));
+    std::shared_ptr<NumericUpDown> numeric = make_control<NumericUpDown>(StableId("hidden.numeric"));
+    std::shared_ptr<SplitContainer> split = make_control<SplitContainer>(StableId("hidden.split"));
+    std::shared_ptr<TokenBox> tokens = make_control<TokenBox>(StableId("hidden.tokens"));
+    std::shared_ptr<Panel> plain = make_control<Panel>(StableId("hidden.plain"));
+    std::shared_ptr<Button> button = make_control<Button>(StableId("hidden.button"), "Press");
+    (*numeric).set_requested_bounds({0, 0, 120, 24});
+    (*split).set_requested_bounds({0, 30, 240, 80});
+    (*tokens).set_requested_bounds({0, 120, 200, 28});
+    (*plain).set_requested_bounds({250, 0, 60, 40});
+    (*button).set_requested_bounds({250, 50, 60, 24});
+    (*root).add_child(numeric);
+    (*root).add_child(split);
+    (*root).add_child(tokens);
+    (*root).add_child(plain);
+    (*root).add_child(button);
+    Window window(root, {320, 160});
+    window.perform_layout();
+    require(window.request_focus(button), "focus starts on the button");
+
+    const SemanticSnapshot resting = window.semantic_snapshot();
+    const SemanticNode* numeric_node = find_node(resting.roots, "hidden.numeric");
+    const SemanticNode* split_node = find_node(resting.roots, "hidden.split");
+    const SemanticNode* tokens_node = find_node(resting.roots, "hidden.tokens");
+    const SemanticNode* editor_node = find_node(resting.roots, "hidden.tokens.editor");
+    const SemanticNode* plain_node = find_node(resting.roots, "hidden.plain");
+    require(numeric_node && has_semantic_state((*numeric_node).states, SemanticState::focusable) &&
+                !has_semantic_state((*numeric_node).states, SemanticState::focused),
+            "NumericUpDown's node is focusable through its hidden editor, and not focused");
+    require(split_node && has_semantic_state((*split_node).states, SemanticState::focusable),
+            "SplitContainer's node is focusable through its splitter, which publishes no node");
+    require(tokens_node && !has_semantic_state((*tokens_node).states, SemanticState::focusable) && editor_node &&
+                has_semantic_state((*editor_node).states, SemanticState::focusable),
+            "TokenBox publishes its editor as a node, which is focusable; the list itself is not");
+    require(plain_node == nullptr, "a plain panel publishes no node");
+
+    require(window.perform_semantic_action("hidden.numeric", SemanticAction::focus),
+            "focus on NumericUpDown is performed");
+    const SemanticSnapshot focused = window.semantic_snapshot();
+    numeric_node = find_node(focused.roots, "hidden.numeric");
+    const SemanticNode* button_node = find_node(focused.roots, "hidden.button");
+    require(numeric_node && has_semantic_state((*numeric_node).states, SemanticState::focused) && button_node &&
+                !has_semantic_state((*button_node).states, SemanticState::focused),
+            "while its hidden editor has focus, NumericUpDown's node is the focused one");
+
+    require(window.perform_semantic_action("hidden.split", SemanticAction::focus), "focus on SplitContainer is performed");
+    const SemanticSnapshot split_focused = window.semantic_snapshot();
+    split_node = find_node(split_focused.roots, "hidden.split");
+    numeric_node = find_node(split_focused.roots, "hidden.numeric");
+    require(split_node && has_semantic_state((*split_node).states, SemanticState::focused) && numeric_node &&
+                !has_semantic_state((*numeric_node).states, SemanticState::focused),
+            "focus on the splitter shows on SplitContainer's node and leaves NumericUpDown's");
+
+    require(window.perform_semantic_action("hidden.tokens", SemanticAction::focus), "focus on TokenBox is performed");
+    const SemanticSnapshot tokens_focused = window.semantic_snapshot();
+    tokens_node = find_node(tokens_focused.roots, "hidden.tokens");
+    editor_node = find_node(tokens_focused.roots, "hidden.tokens.editor");
+    require(tokens_node && !has_semantic_state((*tokens_node).states, SemanticState::focused) && editor_node &&
+                has_semantic_state((*editor_node).states, SemanticState::focused),
+            "TokenBox's published editor is the focused node, not the list");
+
+    (*numeric).set_enabled(false);
+    const SemanticSnapshot disabled = window.semantic_snapshot();
+    numeric_node = find_node(disabled.roots, "hidden.numeric");
+    require(numeric_node && !has_semantic_state((*numeric_node).states, SemanticState::focusable),
+            "a disabled composite's hidden editor cannot take focus, so its node is not focusable");
+}
+
 // The helper every control's virtual semantic children used to copy, kept
 // verbatim as the reference the shared helper must match byte for byte.
 std::uint64_t former_copy(std::string_view id) noexcept {
@@ -292,6 +562,118 @@ void test_virtual_runtime_ids_are_unchanged() {
                 virtual_semantic_runtime_id("site.stack.3") == 0xe9a74df8c42ada75ULL &&
                 virtual_semantic_runtime_id("café") == 0x8385b6459d53dff7ULL,
             "the virtual runtime IDs keep their recorded values");
+    require(is_virtual_semantic_runtime_id(virtual_semantic_runtime_id("a")) &&
+                !is_virtual_semantic_runtime_id(1U) && !is_virtual_semantic_runtime_id(0U),
+            "a virtual runtime ID is told from a control's and from zero");
+}
+
+// Two trees showing one model publish items with the same stable IDs, as the
+// Gallery's tree and tree list do. An action named by a tree's runtime
+// identity reaches that tree's item; one named by stable identity alone
+// reaches the first tree in tree order.
+void test_trees_sharing_item_identities_route_by_owner() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("trees.root"));
+    std::shared_ptr<TreeView> left = make_control<TreeView>(StableId("trees.left"));
+    std::shared_ptr<TreeView> right = make_control<TreeView>(StableId("trees.right"));
+    std::vector<TreeViewItem> items;
+    items.push_back(TreeViewItem{"src", "src", 0U, false, false, true, {}});
+    items.push_back(TreeViewItem{"docs", "docs", 0U, false, false, true, {}});
+    (*left).set_items(items);
+    (*right).set_items(items);
+    (*left).set_requested_bounds({10.0, 10.0, 180.0, 120.0});
+    (*right).set_requested_bounds({210.0, 10.0, 180.0, 120.0});
+    (*root).add_child(left);
+    (*root).add_child(right);
+    Window window(root, {420.0, 160.0});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* left_node = find_node(snapshot.roots, "trees.left");
+    const SemanticNode* right_node = find_node(snapshot.roots, "trees.right");
+    require(left_node != nullptr && right_node != nullptr &&
+                find_node((*left_node).children, "docs") != nullptr &&
+                find_node((*right_node).children, "docs") != nullptr,
+            "both trees publish an item docs");
+    require(window.perform_semantic_action((*right).runtime_id(), "docs", SemanticAction::select) &&
+                (*right).selected_id() == "docs" && (*left).selected_id() != "docs",
+            "an action named by the right tree's runtime identity reaches its item");
+    require(window.perform_semantic_action("docs", SemanticAction::select) &&
+                (*left).selected_id() == "docs",
+            "an action named by stable identity alone reaches the first tree's item");
+}
+
+// A control that publishes virtual children without runtime IDs, as the
+// Ribbon and BackstageView do: a group with a nested item, and one item that
+// carries its own runtime ID.
+class UnnumberedVirtualChildren final : public Control {
+public:
+    explicit UnnumberedVirtualChildren(StableId stable_id) : Control(std::move(stable_id)) {}
+    [[nodiscard]] SemanticDescriptor semantic_descriptor() const override {
+        SemanticDescriptor descriptor;
+        descriptor.role = SemanticRole::group;
+        descriptor.exposed = true;
+        return descriptor;
+    }
+    [[nodiscard]] std::vector<SemanticNode> semantic_virtual_children() const override {
+        SemanticNode item;
+        item.stable_id = "unnumbered.group.item";
+        item.role = SemanticRole::button;
+        item.actions = {SemanticAction::press};
+        SemanticNode group;
+        group.stable_id = "unnumbered.group";
+        group.role = SemanticRole::group;
+        group.children.push_back(item);
+        SemanticNode numbered;
+        numbered.stable_id = "unnumbered.numbered";
+        numbered.runtime_id = numbered_runtime_id;
+        numbered.role = SemanticRole::button;
+        std::vector<SemanticNode> nodes;
+        nodes.push_back(group);
+        nodes.push_back(numbered);
+        return nodes;
+    }
+    bool on_semantic_child_action(std::string_view stable_id, SemanticAction action,
+                                  std::string_view) override {
+        if (stable_id != "unnumbered.group.item" || action != SemanticAction::press) return false;
+        ++presses_;
+        return true;
+    }
+    [[nodiscard]] int presses() const noexcept { return presses_; }
+
+    // Deliberately not a value virtual_semantic_runtime_id gives, so the test
+    // sees that a published runtime ID is kept as it is.
+    static constexpr std::uint64_t numbered_runtime_id = 0x8000000000000005ULL;
+
+private:
+    int presses_{};
+};
+
+// The window gives a virtual child published with runtime ID zero, at any
+// depth, the runtime ID its stable ID gives, so hosts never confuse it with
+// the window's own object (zero), and keeps a runtime ID a control set.
+void test_unnumbered_virtual_children_get_runtime_ids() {
+    std::shared_ptr<Panel> root = make_control<Panel>(StableId("unnumbered.root"));
+    std::shared_ptr<UnnumberedVirtualChildren> owner =
+        make_control<UnnumberedVirtualChildren>(StableId("unnumbered.owner"));
+    (*owner).set_requested_bounds({0.0, 0.0, 80.0, 40.0});
+    (*root).add_child(owner);
+    Window window(root, {100.0, 60.0});
+    const SemanticSnapshot snapshot = window.semantic_snapshot();
+    const SemanticNode* group = find_node(snapshot.roots, "unnumbered.group");
+    const SemanticNode* item = find_node(snapshot.roots, "unnumbered.group.item");
+    const SemanticNode* numbered = find_node(snapshot.roots, "unnumbered.numbered");
+    require(group != nullptr && item != nullptr && numbered != nullptr,
+            "the virtual children are published");
+    require((*group).runtime_id == virtual_semantic_runtime_id("unnumbered.group") &&
+                (*item).runtime_id == virtual_semantic_runtime_id("unnumbered.group.item"),
+            "a virtual child published with runtime ID zero gets the one its stable ID gives");
+    require(is_virtual_semantic_runtime_id((*group).runtime_id) &&
+                is_virtual_semantic_runtime_id((*item).runtime_id),
+            "an assigned runtime ID is told from a control's");
+    require((*numbered).runtime_id == UnnumberedVirtualChildren::numbered_runtime_id,
+            "a runtime ID the control published is kept");
+    require(window.perform_semantic_action((*owner).runtime_id(), "unnumbered.group.item",
+                                           SemanticAction::press) &&
+                (*owner).presses() == 1,
+            "a nested virtual child is reached through its owner's runtime identity");
 }
 
 } // namespace
@@ -304,6 +686,11 @@ int main() {
         test_snapshot_roles_states_hierarchy_and_json();
         test_semantic_actions_use_control_behavior();
         test_virtual_list_items_are_selectable();
+        test_runtime_identity_semantic_actions();
+        test_trees_sharing_item_identities_route_by_owner();
+        test_unnumbered_virtual_children_get_runtime_ids();
+        test_semantic_focus_reaches_composites();
+        test_hidden_focus_is_published_on_the_composite();
         test_semantics_enforce_ui_thread();
         std::cout << "gui_forms_semantic_tests: all tests passed\n";
         return EXIT_SUCCESS;

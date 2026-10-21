@@ -27,6 +27,12 @@ std::optional<FrameTime> Window::next_wake() const noexcept {
         if (occluded_) {
             continue;
         }
+        if ((*request).kind == detail::FrameRequestKind::motion_clock) {
+            if (!result || (*request).deadline < *result) {
+                result = (*request).deadline;
+            }
+            continue;
+        }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
         if (!target || !(*target).is_alive() || (*target).window_ != this ||
             !(*target).effectively_visible()) {
@@ -77,6 +83,20 @@ FrameRequestToken Window::activate_surface(const Control::Ptr& control,
         detail::FrameRequestKind::active_surface, control, first_deadline, interval);
     frame_requests_.push_back(request);
     (*control).own_revocable(request);
+    metrics_.record_frame_request();
+    update_frame_schedule_metrics();
+    return FrameRequestToken(request);
+}
+
+FrameRequestToken Window::request_motion_frames(FrameTime first_deadline) {
+    require_ui_thread("motion clock scheduling");
+    compact_frame_requests();
+    if (frame_requests_.size() >= maximum_scheduled_frame_requests) {
+        throw std::length_error("GUI.Forms scheduled frame request limit reached");
+    }
+    std::shared_ptr<gui_forms::detail::ScheduledFrameRequest> request = std::make_shared<detail::ScheduledFrameRequest>(
+        detail::FrameRequestKind::motion_clock, Control::WeakPtr{}, first_deadline, motion_frame_interval);
+    frame_requests_.push_back(request);
     metrics_.record_frame_request();
     update_frame_schedule_metrics();
     return FrameRequestToken(request);
@@ -161,6 +181,18 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             result.suppressed_by_occlusion = true;
             continue;
         }
+        if ((*request).kind == detail::FrameRequestKind::motion_clock) {
+            // The motion clock's one request: one frame advances every value
+            // it holds. Like an active surface, a late frame is one frame.
+            ++result.motion_clock_ticks;
+            const FrameInterval lateness = now - (*request).deadline;
+            const FrameInterval::rep skipped = lateness / (*request).interval;
+            result.coalesced_requests += static_cast<std::uint64_t>(skipped);
+            (*request).deadline = now + (*request).interval;
+            metrics_.record_callback_emitted();
+            motion_clock_.advance(now);
+            continue;
+        }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();
         if (!target || !(*target).is_alive() || (*target).window_ != this) {
             (*request).disconnect();
@@ -218,7 +250,7 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
 
     compact_frame_requests();
     metrics_.record_frame_poll(result.deadlines_fired, result.active_surface_ticks,
-                               result.coalesced_requests);
+                               result.motion_clock_ticks, result.coalesced_requests);
     update_frame_schedule_metrics();
     result.damage_pending = needs_frame();
     result.next_wake = next_wake();
@@ -227,6 +259,8 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
 
 void Window::cancel_frame_requests() {
     require_ui_thread("frame schedule cancellation");
+    // Motion ends with the requests: every value jumps to its end.
+    motion_clock_.cancel();
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
         (*request).disconnect();
     }
@@ -241,6 +275,9 @@ void Window::set_occluded(bool occluded, FrameTime transition_time) {
     }
     occluded_ = occluded;
     metrics_.record_occlusion_transition(occluded);
+    // An occluded or minimized window shows no motion (GIVEN D4-1): every
+    // value jumps to its end now, and none is scheduled while it stays so.
+    if (occluded) motion_clock_.finish_all(MotionStepCause::occluded);
     if (!occluded) {
         for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
             if ((*request).connected() &&

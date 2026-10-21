@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
+#include "gui_forms/engine/theme_engine/theme_engine.hpp"
 #include "gui_forms/theme/types/theme_types.hpp"
 
 #include <cstddef>
@@ -40,11 +41,17 @@ public:
         if (high_contrast) return definition_.high_contrast_overlay_shadow;
         return definition_.overlay_shadow;
     }
+    // The theme's engine, which paint_part calls for every part. The theme
+    // owns it, so every window showing the theme shares it (T2 plan).
+    [[nodiscard]] const ThemeEngine& engine() const noexcept { return engine_; }
 
 private:
+    // The engine compiles the definition's rules: a theme is made whole or
+    // not at all, so the theme it replaces stays in force until it exists.
     explicit Theme(ThemeDefinition definition)
-        : definition_(std::move(definition)) {}
+        : definition_(std::move(definition)), engine_(definition_.rules) {}
     ThemeDefinition definition_;
+    ThemeEngine engine_;
 };
 
 [[nodiscard]] ThemeDefinition windows_professional_theme_definition();

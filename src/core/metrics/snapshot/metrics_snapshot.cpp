@@ -87,6 +87,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"scheduler_wakes\":" << scheduler_wakes << ','
            << "\"frame_deadlines_fired\":" << frame_deadlines_fired << ','
            << "\"active_surface_ticks\":" << active_surface_ticks << ','
+           << "\"motion_clock_ticks\":" << motion_clock_ticks << ','
            << "\"frame_requests_coalesced\":" << frame_requests_coalesced << ','
            << "\"frame_callback_faults\":" << frame_callback_faults << ','
            << "\"reentrant_frame_polls_deferred\":"
@@ -106,6 +107,14 @@ std::string MetricsSnapshot::to_json() const {
            << "\"live_rectangles_presented\":" << live_rectangles_presented << ','
            << "\"live_present_duration_nanoseconds\":" << live_present_duration_nanoseconds << ','
            << "\"screen_copy_nanoseconds\":" << screen_copy_nanoseconds << ','
+           << "\"engine_part_records\":" << engine_part_records << ','
+           << "\"engine_part_index_fallbacks\":" << engine_part_index_fallbacks << ','
+           << "\"engine_part_records_released\":" << engine_part_records_released << ','
+           << "\"engine_part_records_evicted\":" << engine_part_records_evicted << ','
+           << "\"motion_values_moving\":" << motion_values_moving << ','
+           << "\"motion_values_started\":" << motion_values_started << ','
+           << "\"motion_values_settled\":" << motion_values_settled << ','
+           << "\"motion_values_finished\":" << motion_values_finished << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';

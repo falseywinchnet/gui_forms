@@ -7,6 +7,8 @@
 #include "gui_forms/control.hpp"
 #include "gui_forms/display.hpp"
 #include "gui_forms/dispatcher.hpp"
+#include "gui_forms/engine/motion_clock/motion_clock.hpp"
+#include "gui_forms/engine/part_table/engine_part_table.hpp"
 #include "gui_forms/live_surface/wake_connection/live_surface_wake_connection.hpp"
 #include "gui_forms/event.hpp"
 #include "gui_forms/metrics.hpp"
@@ -475,7 +477,12 @@ public:
         std::size_t maximum_callbacks = maximum_callbacks_per_dispatch_turn);
     [[nodiscard]] DispatcherSnapshot dispatcher_snapshot() const noexcept;
     // Host adapters install a thread-safe wake primitive. Installing a handler
-    // after work was queued immediately publishes one coalesced wake.
+    // after work was queued immediately publishes one coalesced wake. The
+    // handler runs under the dispatcher's lock, on whichever thread posted:
+    // it may only signal (set a flag, post a message, write a pipe) and must
+    // never call back into the window. In return, once this call replaces or
+    // removes a handler, no wake through the old one is under way or to come,
+    // so its target may be destroyed.
     void set_dispatch_wake_handler(std::function<void()> wake);
     // Host adapters also install a paint wake seam. Retained invalidation may
     // originate from another Window's callback, so relying only on the host
@@ -483,6 +490,9 @@ public:
     // Wakes coalesce until the host consumes damage and remain suppressed while
     // the model is explicitly occluded.
     void set_paint_wake_handler(std::function<void()> wake);
+    // Stops accepting posted work and cancels everything pending. A host
+    // releases pointer capture first (see HostSession), so that controls
+    // that post about the release meet an accepting dispatcher.
     void shutdown_dispatcher() noexcept;
 
     [[nodiscard]] ImageLoadResult load_png(std::span<const std::byte> encoded);
@@ -655,6 +665,14 @@ public:
     void cancel_drag() noexcept;
 
     [[nodiscard]] MetricsSnapshot metrics_snapshot() const { return metrics_.snapshot(); }
+    // The theme engine's records of this window's keyed parts (T2 plan,
+    // EnginePartTable), for inspection. The engine alone changes them.
+    [[nodiscard]] const EnginePartTable& engine_parts() const noexcept { return engine_parts_; }
+    // The window's motion clock (T2 plan, phase E3): it advances the motion
+    // values of this window's controls on one frame request. A control's
+    // MotionValue finds it here; tests install a time source on it.
+    [[nodiscard]] MotionClock& motion_clock() noexcept { return motion_clock_; }
+    [[nodiscard]] const MotionClock& motion_clock() const noexcept { return motion_clock_; }
     Metrics& metrics() noexcept { return metrics_; }
     void reset_activity_metrics() noexcept { metrics_.reset_activity(); }
     // Captures the committed retained visual state without exposing a renderer
@@ -667,16 +685,45 @@ public:
     [[nodiscard]] std::uint64_t semantic_generation() const noexcept {
         return semantic_generation_;
     }
+    // Focus goes to a focusable control directly. For a control that is not
+    // focusable (a composite whose focus belongs to an inner editor or part)
+    // the control's own on_semantic_action decides, and the action counts as
+    // performed only when focus then lies in the control's subtree.
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
+    // Performs `action` on a semantic node a host published, named by the
+    // runtime identity of a control: that control's own node when
+    // `virtual_child` is empty, otherwise the virtual child with that stable
+    // identity published by the control or by a control inside it (the
+    // semantic tree publishes an unexposed control's virtual children at its
+    // nearest exposed ancestor, so hosts name that ancestor). Runtime
+    // identities are never reused, so a host still holding the node of a
+    // disposed or replaced control is refused (false) instead of reaching
+    // another control (interview GF017), and a virtual child whose stable
+    // identity another control's virtual child repeats is searched for only
+    // under the named control. Otherwise the same rules as the overload
+    // above: UI thread only, deferred while painting, and refused outside the
+    // active focus scope.
+    bool perform_semantic_action(RuntimeId control, std::string_view virtual_child,
+                                 SemanticAction action, std::string_view value = {});
 
 private:
     friend class HostSession;
+    friend class MotionClock;
+    // Called by the motion clock: its single frame request, first due at
+    // `first_deadline` and then every motion_frame_interval. Each frame
+    // calls the clock's advance; the clock disconnects the request when
+    // nothing moves. Throws std::length_error at the request limit.
+    [[nodiscard]] FrameRequestToken request_motion_frames(FrameTime first_deadline);
     // Called by HostSession: seeds the window's bindings with the host's
     // defaults unless they are seeded already.
     void install_host_key_map(const KeyMap& defaults);
     void initialize_cursor_identity() noexcept;
+    // The destructor's first dispatcher step: stops host wakes and marks the
+    // dispatcher closing, so that a post reaching it after shutdown is
+    // refused by name instead of throwing (DispatcherState::closing).
+    void begin_dispatcher_teardown() noexcept;
     void invalidate_cursor_interaction(CursorError cause) noexcept;
     friend class Control;
     friend class UpdateScope;
@@ -696,6 +743,15 @@ private:
     friend class NotifyIcon;
     friend class BindingContext;
     friend class detail::PopupAttachment;
+    friend class ThemeEngine;
+    // Called by ThemeEngine::paint for a part painted with a key: makes or
+    // updates its record and counts a new record's index fallback. Returns
+    // the record's handle, or none when the table has no record for it.
+    std::optional<PartRecordHandle> note_engine_part(const Control& control, const PartKey& key,
+                                                     AnatomyStateSet states);
+    // Called by ThemeEngine::paint: the part's raster from its record's
+    // cache (EnginePartTable::raster_for), on the paint in progress.
+    [[nodiscard]] PartRasterResult engine_part_raster(PartRecordHandle handle, const PartRasterRequest& request);
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;
@@ -800,11 +856,24 @@ private:
     void acknowledge_paint_wake_if_damage_drained() noexcept;
     void touch_paint() noexcept;
     void update_paint_lease_state() noexcept;
+    // A semantic action that arrived during paint. `owner` is zero for one
+    // named by stable identity alone; otherwise it is the publishing
+    // control's runtime identity and `stable_id` the virtual child (empty for
+    // the control's own node).
     struct DeferredSemanticInput final {
         std::string stable_id;
         SemanticAction action{SemanticAction::focus};
         std::string value;
+        RuntimeId owner{};
     };
+    // The attached control, in the root tree or a popup, with runtime
+    // identity `control`, or empty.
+    [[nodiscard]] Control::Ptr find_runtime_control(RuntimeId control) const;
+    // Whether a semantic action may reach `control` under the active focus
+    // scope: no scope contains focus, `control` lies inside the scope, or it
+    // lies in a popup whose owner does (the reach of the stable-identity
+    // overload's virtual-child search).
+    [[nodiscard]] bool semantic_scope_reaches(const Control::Ptr& control) const;
     using DeferredInput = std::variant<
         PointerEvent, KeyEvent, TextInputEvent, DragEvent,
         DeferredSemanticInput>;
@@ -997,6 +1066,11 @@ private:
     LiveSurfaceRegistrationMap live_surface_registrations_;
     std::shared_ptr<detail::LiveSurfaceIdleWake> live_surface_idle_wake_{};
     Metrics metrics_;
+    // The theme engine's records of this window's keyed parts. A control's
+    // records are released when it leaves the window.
+    EnginePartTable engine_parts_;
+    // After metrics_, which it reports into, so that it is destroyed first.
+    MotionClock motion_clock_{*this};
     // Shared with every window constructed with the same resources; this
     // window is registered with them from construction to destruction.
     std::shared_ptr<ApplicationResources> resources_;

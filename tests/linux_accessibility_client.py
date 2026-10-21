@@ -1,31 +1,324 @@
-"""Real AT-SPI client of the standalone host bridge fixture, on a session bus."""
-import subprocess,sys,time
-import pyatspi
-process=subprocess.Popen([sys.argv[1]],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
-def descendants(node):
-    yield node
-    for child in node:
-        yield from descendants(child)
-try:
-    limit=time.monotonic()+15
-    app=None
-    while time.monotonic()<limit and process.poll() is None:
-        for candidate in pyatspi.Registry.getDesktop(0):
-            if candidate.name=='Plan accessibility fixture':app=candidate;break
-        if app:break
-        time.sleep(.1)
-    assert app,'application registered on accessibility bus'
-    nodes={node.name:node for node in descendants(app)}
-    action=nodes['Draw mark'].queryAction()
-    presses=[i for i in range(action.nActions) if action.getName(i)=='press']
-    assert presses and action.doAction(presses[0]),'button action succeeds'
-    value=nodes['Canvas X'].queryValue()
-    assert value.minimumValue==0 and value.maximumValue==200,'numeric range exported'
-    value.currentValue=37
-    assert nodes['Artwork text'].queryEditableText().setTextContents('مرحبا ABC'),'Unicode text edit succeeds'
-    stdout,stderr=process.communicate(timeout=10)
-    print(stdout,end='')
-    assert process.returncode==0,stderr
-    assert 'CRITICAL' not in stderr and 'WARNING' not in stderr,stderr
-finally:
-    if process.poll() is None:process.terminate();process.wait(timeout=5)
+"""A real AT-SPI client of the Linux accessibility fixture, over D-Bus.
+
+Registered with ctest as ``gui_forms_linux_accessibility_tests`` (stage A,
+A-L1). Run by the system Python, which has PyGObject and the Atspi 2.0
+typelib (Ubuntu: python3-gi, gir1.2-atspi-2.0):
+
+    linux_accessibility_client.py FIXTURE
+    linux_accessibility_client.py --unsupported REASON
+
+The first form re-executes itself inside a private session bus
+(``dbus-run-session``), starts the AT-SPI bus launcher there, waits until the
+launcher owns ``org.a11y.Bus``, then starts FIXTURE and drives it as an
+assistive client would: it finds the fixture's application under the AT-SPI
+registry's desktop and uses the Action, Value and EditableText interfaces.
+The second form is registered when the build found no ATK or X11.
+
+Results. Exit 0 when every check passes; 1 on a mismatch or a failure.
+A missing prerequisite (no display, no ``dbus-run-session``, no AT-SPI bus
+launcher, no PyGObject or Atspi typelib, no ATK at build time) fails the
+test on CI (the ``CI`` environment variable is ``true``, as GitHub sets it,
+or ``GUI_FORMS_REQUIRE_ACCESSIBILITY`` is 1); elsewhere it prints
+``unsupported`` and exits 77, which ctest reports as skipped.
+
+Standard library and PyGObject only; Python 3.10+.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import traceback
+from types import ModuleType
+from typing import IO
+
+SKIP_EXIT: int = 77
+APPLICATION_NAME: str = 'Plan accessibility fixture'
+SESSION_MARKER: str = 'GUI_FORMS_ATSPI_SESSION'
+# Seconds. The launcher and the fixture each get this long to appear.
+STARTUP_SECONDS: float = 15.0
+POLL_SECONDS: float = 0.1
+LAUNCHER_NAME: str = 'at-spi-bus-launcher'
+# Where distributions install the launcher outside PATH: Debian and Ubuntu
+# (/usr/libexec), older Debian (/usr/lib/at-spi2-core) and multiarch layouts.
+LAUNCHER_DIRECTORIES: tuple[str, ...] = (
+    '/usr/libexec',
+    '/usr/lib/at-spi2-core',
+    '/usr/lib/x86_64-linux-gnu/at-spi2-core',
+    '/usr/lib/aarch64-linux-gnu/at-spi2-core',
+)
+
+
+class Mismatch(Exception):
+    """What the AT-SPI client saw differs from what the fixture published."""
+
+
+def check(condition: bool, message: str) -> None:
+    if not condition:
+        raise Mismatch(message)
+
+
+def accessibility_required() -> bool:
+    ci: str = os.environ.get('CI', '').strip().lower()
+    required: str = os.environ.get('GUI_FORMS_REQUIRE_ACCESSIBILITY', '').strip()
+    result: bool = ci == 'true' or required == '1'
+    return result
+
+
+def unsupported(reason: str) -> int:
+    """Fails on CI; elsewhere reports the platform as unsupported."""
+    if accessibility_required():
+        print('linux accessibility: prerequisite missing on CI: ' + reason, file=sys.stderr)
+        return 1
+    print('linux accessibility: unsupported: ' + reason)
+    return SKIP_EXIT
+
+
+def find_launcher() -> str | None:
+    found: str | None = shutil.which(LAUNCHER_NAME)
+    if found is not None:
+        return found
+    directory: str
+    for directory in LAUNCHER_DIRECTORIES:
+        candidate: Path = Path(directory) / LAUNCHER_NAME
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return None
+
+
+def missing_prerequisite() -> str | None:
+    """The first missing prerequisite, or None when all are present."""
+    if not os.environ.get('DISPLAY'):
+        return 'no X display (DISPLAY is unset); run under Xvfb'
+    if shutil.which('dbus-run-session') is None:
+        return 'dbus-run-session is not installed (Ubuntu: dbus)'
+    if find_launcher() is None:
+        return 'the AT-SPI bus launcher is not installed (Ubuntu: at-spi2-core)'
+    try:
+        import gi
+        gi.require_version('Atspi', '2.0')
+        gi.require_version('Gio', '2.0')
+    except (ImportError, ValueError) as error:
+        return ('PyGObject or the Atspi 2.0 typelib is missing '
+                '(Ubuntu: python3-gi, gir1.2-atspi-2.0): ' + str(error))
+    return None
+
+
+def run_in_session(arguments: list[str], script: str | None = None) -> int:
+    """Re-executes `script` (by default this one) inside a private session bus.
+
+    Returns its exit status.
+    """
+    if script is None:
+        script = str(Path(__file__).resolve())
+    environment: dict[str, str] = dict(os.environ)
+    environment[SESSION_MARKER] = '1'
+    # The fixture and the client must find the bus this script starts, not
+    # an address inherited from a desktop session or a previous launcher.
+    environment.pop('AT_SPI_BUS_ADDRESS', None)
+    command: list[str] = ['dbus-run-session', '--', sys.executable, script]
+    command.extend(arguments)
+    completed: subprocess.CompletedProcess[bytes] = subprocess.run(command, env=environment, check=False)
+    return completed.returncode
+
+
+class Session:
+    """The AT-SPI bus launcher this script owns inside its session bus.
+
+    start() launches it and waits until it owns org.a11y.Bus; stop()
+    terminates it. The accessibility bus address it reports is exported as
+    AT_SPI_BUS_ADDRESS, so the fixture and this client use that bus.
+    """
+
+    def __init__(self) -> None:
+        self.launcher: subprocess.Popen[bytes] | None = None
+        self.log: IO[bytes] = tempfile.TemporaryFile()
+        self.address: str = ''
+
+    def start(self, gio: ModuleType, glib: ModuleType) -> None:
+        launcher: str | None = find_launcher()
+        check(launcher is not None, 'AT-SPI bus launcher present')
+        self.launcher = subprocess.Popen([str(launcher), '--launch-immediately'],
+                                         stdout=self.log, stderr=subprocess.STDOUT)
+        connection: object = gio.bus_get_sync(gio.BusType.SESSION, None)
+        deadline: float = time.monotonic() + STARTUP_SECONDS
+        while time.monotonic() < deadline and self.launcher.poll() is None:
+            try:
+                # NO_AUTO_START: only the launcher started here may answer.
+                reply: object = connection.call_sync(
+                    'org.a11y.Bus', '/org/a11y/bus', 'org.a11y.Bus', 'GetAddress', None,
+                    glib.VariantType.new('(s)'), gio.DBusCallFlags.NO_AUTO_START, 1000, None)
+                self.address = reply.unpack()[0]
+            except glib.Error:
+                self.address = ''
+            if self.address != '':
+                break
+            time.sleep(POLL_SECONDS)
+        check(self.address != '',
+              'the AT-SPI bus launcher owns org.a11y.Bus and reports an address\n' + self.launcher_output())
+        os.environ['AT_SPI_BUS_ADDRESS'] = self.address
+
+    def launcher_output(self) -> str:
+        self.log.seek(0)
+        text: str = self.log.read().decode('utf-8', 'replace')
+        return text
+
+    def stop(self) -> None:
+        if self.launcher is not None and self.launcher.poll() is None:
+            self.launcher.terminate()
+            try:
+                self.launcher.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.launcher.kill()
+                self.launcher.wait(timeout=5)
+        self.log.close()
+
+
+def require_registry(gio: ModuleType, glib: ModuleType, address: str) -> None:
+    """The AT-SPI registry daemon owns its name on the accessibility bus."""
+    flags: int = gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION
+    bus: object = gio.DBusConnection.new_for_address_sync(address, flags, None, None)
+    reply: object = bus.call_sync(
+        'org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'NameHasOwner',
+        glib.Variant('(s)', ('org.a11y.atspi.Registry',)), glib.VariantType.new('(b)'),
+        gio.DBusCallFlags.NONE, 1000, None)
+    owned: bool = reply.unpack()[0]
+    bus.close_sync(None)
+    check(owned, 'the AT-SPI registry (at-spi2-registryd) owns org.a11y.atspi.Registry on the accessibility bus')
+
+
+def find_application(atspi: ModuleType, fixture: subprocess.Popen[str]) -> object:
+    deadline: float = time.monotonic() + STARTUP_SECONDS
+    while time.monotonic() < deadline and fixture.poll() is None:
+        desktop: object = atspi.get_desktop(0)
+        count: int = desktop.get_child_count()
+        index: int
+        for index in range(count):
+            candidate: object | None = desktop.get_child_at_index(index)
+            if candidate is not None and candidate.get_name() == APPLICATION_NAME:
+                return candidate
+        time.sleep(POLL_SECONDS)
+    raise Mismatch('application "' + APPLICATION_NAME + '" registered on the AT-SPI desktop')
+
+
+def collect_named(node: object, named: dict[str, object]) -> None:
+    """Records every descendant of node, node included, by accessible name."""
+    pending: list[object] = [node]
+    while pending:
+        current: object = pending.pop()
+        named[current.get_name()] = current
+        count: int = current.get_child_count()
+        index: int
+        for index in range(count):
+            child: object | None = current.get_child_at_index(index)
+            if child is not None:
+                pending.append(child)
+
+
+def action_index(atspi: ModuleType, node: object, name: str) -> int:
+    """The index of the action called name, or -1."""
+    count: int = atspi.Action.get_n_actions(node)
+    index: int
+    for index in range(count):
+        if atspi.Action.get_action_name(node, index) == name:
+            return index
+    return -1
+
+
+def exercise_fixture(atspi: ModuleType, fixture: subprocess.Popen[str]) -> None:
+    application: object = find_application(atspi, fixture)
+    named: dict[str, object] = {}
+    collect_named(application, named)
+    check('Draw mark' in named, 'button "Draw mark" published')
+    check('Canvas X' in named, 'numeric field "Canvas X" published')
+    check('Artwork text' in named, 'text box "Artwork text" published')
+
+    button: object = named['Draw mark']
+    check(button.get_role() == atspi.Role.PUSH_BUTTON, 'button role is push button, got ' + button.get_role_name())
+    press: int = action_index(atspi, button, 'press')
+    check(press >= 0, 'button publishes the press action')
+    check(atspi.Action.do_action(button, press), 'button press action succeeds')
+
+    number: object = named['Canvas X']
+    check(number.get_role() == atspi.Role.SPIN_BUTTON,
+          'numeric field role is spin button, got ' + number.get_role_name())
+    minimum: float = atspi.Value.get_minimum_value(number)
+    maximum: float = atspi.Value.get_maximum_value(number)
+    check(minimum == 0.0 and maximum == 200.0,
+          'numeric range exported as 0..200, got ' + str(minimum) + '..' + str(maximum))
+    check(atspi.Value.set_current_value(number, 37.0), 'numeric value set succeeds')
+
+    text: object = named['Artwork text']
+    check(text.get_role() == atspi.Role.ENTRY, 'text box role is entry, got ' + text.get_role_name())
+    check(atspi.EditableText.set_text_contents(text, 'مرحبا ABC'), 'Unicode text edit succeeds')
+
+
+def stop_fixture(fixture: subprocess.Popen[str]) -> None:
+    if fixture.poll() is None:
+        fixture.terminate()
+        try:
+            fixture.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            fixture.kill()
+            fixture.communicate(timeout=10)
+
+
+def run_client(fixture_path: str) -> int:
+    import gi
+    gi.require_version('Atspi', '2.0')
+    gi.require_version('Gio', '2.0')
+    from gi.repository import Gio, GLib
+    session: Session = Session()
+    fixture: subprocess.Popen[str] | None = None
+    try:
+        session.start(Gio, GLib)
+        # Atspi reads AT_SPI_BUS_ADDRESS when it first connects, so it is
+        # imported only after the session exported it.
+        from gi.repository import Atspi
+        fixture = subprocess.Popen([fixture_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        exercise_fixture(Atspi, fixture)
+        require_registry(Gio, GLib, session.address)
+        stdout: str
+        stderr: str
+        stdout, stderr = fixture.communicate(timeout=30)
+        print(stdout, end='')
+        check(fixture.returncode == 0,
+              'fixture observed every client action (exit ' + str(fixture.returncode) + ')\n' + stderr)
+        check('CRITICAL' not in stderr and 'WARNING' not in stderr, 'fixture printed no GLib warnings\n' + stderr)
+        print('linux accessibility: AT-SPI client checks passed')
+        return 0
+    except Mismatch as error:
+        print('linux accessibility: FAILED: ' + str(error), file=sys.stderr)
+        return 1
+    except Exception:
+        # A D-Bus error (GLib.Error) or a client defect: a failure, with its trace.
+        print('linux accessibility: FAILED with an exception', file=sys.stderr)
+        traceback.print_exc()
+        return 1
+    finally:
+        if fixture is not None:
+            stop_fixture(fixture)
+        session.stop()
+
+
+def main(arguments: list[str]) -> int:
+    if len(arguments) == 2 and arguments[0] == '--unsupported':
+        return unsupported(arguments[1])
+    if len(arguments) != 1:
+        print('usage: linux_accessibility_client.py FIXTURE | --unsupported REASON', file=sys.stderr)
+        return 2
+    if os.environ.get(SESSION_MARKER) == '1':
+        return run_client(arguments[0])
+    missing: str | None = missing_prerequisite()
+    if missing is not None:
+        return unsupported(missing)
+    return run_in_session(arguments)
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

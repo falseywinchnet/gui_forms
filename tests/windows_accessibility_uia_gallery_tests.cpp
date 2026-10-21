@@ -1,0 +1,1695 @@
+// The UI Automation client test over the whole Gallery (stage A, step A-W3).
+//
+// Runs the Gallery in a real Win32 window and reads it through
+// IUIAutomation, as a separate client does, from a thread of its own in the
+// multithreaded apartment. On every page it compares each element with the
+// semantic node it publishes: control type, name, AutomationId (the stable
+// ID), help text, enabled, focusable and focused, bounding rectangle,
+// position in set, the patterns it offers and their states (toggle,
+// expand-collapse, selected, value, range), the tab-to-panel relation, its
+// child order and its parent, and that runtime IDs are unique. A second
+// window holds the registry controls the Gallery does not attach to its
+// tree. Then it performs one default action for every control type and
+// semantic role pair through the pattern that action belongs to (Invoke,
+// Toggle, SelectionItem, ExpandCollapse, or SetFocus when focus is the only
+// action) and observes the change in the semantic tree, in a fresh window
+// per page. It checks that every visual registry control published a node
+// of its own, or is listed as presentational, and that an element of a page
+// that was replaced answers UIA_E_ELEMENTNOTAVAILABLE. TextPattern is not
+// covered (stage A item 5).
+//
+// The expected UI Automation vocabulary (control types, the pattern each
+// node offers, pattern states) is written out here, independently of the
+// provider, as a client expects it. Every mismatch is printed; the test
+// fails on any mismatch, refused action or unobserved change.
+//
+// Execution context: the window's UI thread runs the host's message loop
+// and owns the semantic tree. UI Automation marshals every provider call to
+// it (the providers ask for COM threading). The client thread reads and
+// changes the model only through Window::invoke, whose work runs on the UI
+// thread in posting order, after any work an Invoke posted before it.
+
+#include "gallery.hpp"
+#include "gallery_catalog.hpp"
+#include "gallery_page_specs.hpp"
+#include "gui_forms/gui_forms.hpp"
+#include "gui_forms/platform/windows_host.hpp"
+
+#include <windows.h>
+#include <ole2.h>
+#include <uiautomation.h>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <exception>
+#include <functional>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <span>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <utility>
+#include <vector>
+
+namespace {
+
+using namespace gui_forms;
+
+constexpr const wchar_t* fixture_title = L"GUI.Forms UI Automation Gallery client";
+constexpr std::string_view fixture_title_utf8 = "GUI.Forms UI Automation Gallery client";
+constexpr const wchar_t* framework_id = L"GUI.Forms";
+
+// The page whose buttons open the host's modal dialogs, write the system
+// clipboard and play sounds: compared like every page, but no action is
+// performed there (a modal dialog would hold the UI thread; the clipboard is
+// the machine's).
+constexpr std::string_view host_services_page = "dialogs-and-host-services";
+
+// The fixture window holding the registry controls the Gallery does not
+// attach to its root tree, compared and acted on like a Gallery page.
+constexpr std::string_view off_tree_page = "off-tree-controls";
+
+// Registry entries that are not controls, as the anatomy coverage test
+// lists them.
+constexpr std::array<std::string_view, 19> nonvisual_entries{
+    "command", "gallery_command", "font_command", "color_command", "context_menu",
+    "tool_tip", "ribbon_tool_tip", "timer", "background_worker", "notify_icon",
+    "image_list", "error_provider", "help_provider", "semantic_feedback", "binding",
+    "binding_source", "binding_context", "live_surface", "dock_workspace",
+};
+
+// Registry controls that publish no node of their own (A-W1 lists the
+// same ones and why).
+constexpr std::array<std::string_view, 8> unexposed_entries{
+    "scaled_panel", "splitter_panel", "tool_strip_panel", "property_grid",
+    "scrollable_control", "anchored_popup_layer", "visual_inspector_overlay",
+    "range_control",
+};
+
+// The most popups the client closes with Escape after an action.
+constexpr int maximum_popup_closes = 4;
+
+// -- COM ownership -----------------------------------------------------------
+
+// One owned COM interface reference. Move-only; releases on destruction.
+template <typename Interface>
+class ComReference final {
+public:
+    ComReference() noexcept = default;
+    ~ComReference() { reset(); }
+    ComReference(ComReference&& other) noexcept : value_(other.value_) { other.value_ = nullptr; }
+    ComReference& operator=(ComReference&& other) noexcept {
+        if (this != &other) {
+            reset();
+            value_ = other.value_;
+            other.value_ = nullptr;
+        }
+        return *this;
+    }
+    ComReference(const ComReference&) = delete;
+    ComReference& operator=(const ComReference&) = delete;
+
+    [[nodiscard]] Interface* get() const noexcept { return value_; }
+    // The address an out-parameter call fills; any held reference is
+    // released first.
+    [[nodiscard]] Interface** receive() noexcept {
+        reset();
+        return &value_;
+    }
+    void reset() noexcept {
+        if (value_ != nullptr) {
+            (*value_).Release();
+            value_ = nullptr;
+        }
+    }
+
+private:
+    Interface* value_{};
+};
+
+using ElementReference = ComReference<IUIAutomationElement>;
+
+// One owned BSTR.
+class BstrOwner final {
+public:
+    BstrOwner() noexcept = default;
+    ~BstrOwner() { SysFreeString(value_); }
+    BstrOwner(const BstrOwner&) = delete;
+    BstrOwner& operator=(const BstrOwner&) = delete;
+
+    [[nodiscard]] BSTR* receive() noexcept {
+        SysFreeString(value_);
+        value_ = nullptr;
+        return &value_;
+    }
+    [[nodiscard]] std::wstring wide() const {
+        if (value_ == nullptr) return {};
+        const std::wstring text(value_, SysStringLen(value_));
+        return text;
+    }
+    [[nodiscard]] std::string utf8() const;
+
+private:
+    BSTR value_{};
+};
+
+std::string BstrOwner::utf8() const {
+    if (value_ == nullptr) return {};
+    const UINT length = SysStringLen(value_);
+    if (length == 0U) return {};
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, value_, static_cast<int>(length), nullptr, 0,
+                                          nullptr, nullptr);
+    if (bytes <= 0) throw std::runtime_error("a UI Automation string does not convert to UTF-8");
+    std::string text(static_cast<std::size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value_, static_cast<int>(length), text.data(), bytes, nullptr,
+                        nullptr);
+    return text;
+}
+
+std::string hresult_text(HRESULT status) {
+    const unsigned long bits = static_cast<unsigned long>(status);
+    char text[16]{};
+    std::snprintf(text, sizeof(text), "0x%08lX", bits);
+    return std::string(text);
+}
+
+// -- the expected vocabulary -------------------------------------------------
+
+bool has_action(const SemanticNode& node, SemanticAction action) noexcept {
+    for (const SemanticAction published : node.actions) {
+        if (published == action) return true;
+    }
+    return false;
+}
+
+bool is_check_role(SemanticRole role) noexcept {
+    const bool check = role == SemanticRole::check_box || role == SemanticRole::check_list_item;
+    return check;
+}
+
+// The control type a client expects for each semantic role.
+CONTROLTYPEID expected_control_type(SemanticRole role) noexcept {
+    switch (role) {
+    case SemanticRole::generic: return UIA_GroupControlTypeId;
+    case SemanticRole::group: return UIA_GroupControlTypeId;
+    case SemanticRole::static_text: return UIA_TextControlTypeId;
+    case SemanticRole::button: return UIA_ButtonControlTypeId;
+    case SemanticRole::check_box: return UIA_CheckBoxControlTypeId;
+    case SemanticRole::radio_button: return UIA_RadioButtonControlTypeId;
+    case SemanticRole::link: return UIA_HyperlinkControlTypeId;
+    case SemanticRole::text_box: return UIA_EditControlTypeId;
+    case SemanticRole::list: return UIA_ListControlTypeId;
+    case SemanticRole::list_item: return UIA_ListItemControlTypeId;
+    case SemanticRole::check_list_item: return UIA_ListItemControlTypeId;
+    case SemanticRole::combo_box: return UIA_ComboBoxControlTypeId;
+    case SemanticRole::slider: return UIA_SliderControlTypeId;
+    case SemanticRole::scroll_bar: return UIA_ScrollBarControlTypeId;
+    case SemanticRole::progress_bar: return UIA_ProgressBarControlTypeId;
+    case SemanticRole::image: return UIA_ImageControlTypeId;
+    case SemanticRole::tab_group: return UIA_TabControlTypeId;
+    case SemanticRole::tab: return UIA_TabItemControlTypeId;
+    case SemanticRole::split_pane: return UIA_PaneControlTypeId;
+    case SemanticRole::numeric_field: return UIA_SpinnerControlTypeId;
+    case SemanticRole::tool_tip: return UIA_ToolTipControlTypeId;
+    case SemanticRole::date_picker: return UIA_ComboBoxControlTypeId;
+    case SemanticRole::calendar: return UIA_CalendarControlTypeId;
+    case SemanticRole::date_cell: return UIA_DataItemControlTypeId;
+    case SemanticRole::property_grid: return UIA_TableControlTypeId;
+    case SemanticRole::property_group: return UIA_GroupControlTypeId;
+    case SemanticRole::property_row: return UIA_DataItemControlTypeId;
+    case SemanticRole::menu_bar: return UIA_MenuBarControlTypeId;
+    case SemanticRole::menu_bar_item: return UIA_MenuItemControlTypeId;
+    case SemanticRole::menu: return UIA_MenuControlTypeId;
+    case SemanticRole::menu_item: return UIA_MenuItemControlTypeId;
+    case SemanticRole::separator: return UIA_SeparatorControlTypeId;
+    case SemanticRole::toolbar: return UIA_ToolBarControlTypeId;
+    case SemanticRole::radio_group: return UIA_GroupControlTypeId;
+    case SemanticRole::split_button: return UIA_SplitButtonControlTypeId;
+    case SemanticRole::menu_button: return UIA_ButtonControlTypeId;
+    case SemanticRole::pane: return UIA_PaneControlTypeId;
+    case SemanticRole::tab_panel: return UIA_PaneControlTypeId;
+    case SemanticRole::count: return UIA_GroupControlTypeId;
+    }
+    return UIA_GroupControlTypeId;
+}
+
+// The patterns a client expects a node to offer.
+struct ExpectedPatterns final {
+    bool invoke{};
+    bool toggle{};
+    bool selection_item{};
+    bool selection{};
+    bool range_value{};
+    bool value{};
+    bool expand_collapse{};
+};
+
+bool expects_toggle(const SemanticNode& node) noexcept {
+    if (is_check_role(node.role)) return true;
+    if (node.role == SemanticRole::radio_button) return false;
+    // A toggle button publishes checked (or mixed) only while it is on.
+    const bool on = has_semantic_state(node.states, SemanticState::checked) ||
+                    has_semantic_state(node.states, SemanticState::mixed);
+    const bool toggles = on && has_action(node, SemanticAction::press);
+    return toggles;
+}
+
+bool expects_selection_item(const SemanticNode& node) noexcept {
+    const bool item = node.role == SemanticRole::radio_button || has_action(node, SemanticAction::select);
+    return item;
+}
+
+ExpectedPatterns expected_patterns(const SemanticNode& node) noexcept {
+    ExpectedPatterns patterns;
+    patterns.toggle = expects_toggle(node);
+    patterns.invoke = has_action(node, SemanticAction::press) && !patterns.toggle &&
+                      node.role != SemanticRole::radio_button;
+    patterns.selection_item = expects_selection_item(node);
+    for (const SemanticNode& child : node.children) {
+        if (expects_selection_item(child)) patterns.selection = true;
+    }
+    patterns.range_value = node.numeric_value.has_value();
+    patterns.value = !node.numeric_value.has_value() &&
+                     (has_action(node, SemanticAction::set_value) || node.role == SemanticRole::text_box);
+    patterns.expand_collapse = has_action(node, SemanticAction::expand) ||
+                               has_action(node, SemanticAction::collapse) ||
+                               has_action(node, SemanticAction::show_menu);
+    return patterns;
+}
+
+bool expected_selected(const SemanticNode& node) noexcept {
+    if (node.role == SemanticRole::radio_button) {
+        return has_semantic_state(node.states, SemanticState::checked);
+    }
+    return has_semantic_state(node.states, SemanticState::selected);
+}
+
+ToggleState expected_toggle_state(const SemanticNode& node) noexcept {
+    if (has_semantic_state(node.states, SemanticState::mixed)) return ToggleState_Indeterminate;
+    if (has_semantic_state(node.states, SemanticState::checked)) return ToggleState_On;
+    return ToggleState_Off;
+}
+
+ExpandCollapseState expected_expand_state(const SemanticNode& node) noexcept {
+    if (has_semantic_state(node.states, SemanticState::expanded)) return ExpandCollapseState_Expanded;
+    return ExpandCollapseState_Collapsed;
+}
+
+// What one default action is, as this client performs it.
+enum class DefaultKind : std::uint8_t { none, press, show_menu, select, expand, collapse };
+
+// The first of press, show menu, select, then expand or collapse by the
+// node's expanded state (the order A-W1's client uses).
+DefaultKind expected_default(const SemanticNode& node) noexcept {
+    if (has_action(node, SemanticAction::press)) return DefaultKind::press;
+    if (has_action(node, SemanticAction::show_menu)) return DefaultKind::show_menu;
+    if (has_action(node, SemanticAction::select)) return DefaultKind::select;
+    const bool expanded = has_semantic_state(node.states, SemanticState::expanded);
+    if (expanded && has_action(node, SemanticAction::collapse)) return DefaultKind::collapse;
+    if (!expanded && has_action(node, SemanticAction::expand)) return DefaultKind::expand;
+    return DefaultKind::none;
+}
+
+// The pattern method the client calls for a node's default action.
+enum class PatternCall : std::uint8_t { set_focus, invoke, toggle, select, expand, collapse };
+
+PatternCall pattern_call(const SemanticNode& node, DefaultKind kind) noexcept {
+    switch (kind) {
+    case DefaultKind::none: return PatternCall::set_focus;
+    case DefaultKind::press:
+        if (expects_toggle(node)) return PatternCall::toggle;
+        if (node.role == SemanticRole::radio_button) return PatternCall::select;
+        return PatternCall::invoke;
+    case DefaultKind::show_menu: return PatternCall::expand;
+    case DefaultKind::select: return PatternCall::select;
+    case DefaultKind::expand: return PatternCall::expand;
+    case DefaultKind::collapse: return PatternCall::collapse;
+    }
+    return PatternCall::set_focus;
+}
+
+const char* pattern_call_name(PatternCall call) noexcept {
+    switch (call) {
+    case PatternCall::set_focus: return "SetFocus";
+    case PatternCall::invoke: return "Invoke.Invoke";
+    case PatternCall::toggle: return "Toggle.Toggle";
+    case PatternCall::select: return "SelectionItem.Select";
+    case PatternCall::expand: return "ExpandCollapse.Expand";
+    case PatternCall::collapse: return "ExpandCollapse.Collapse";
+    }
+    return "unknown";
+}
+
+// -- what the UI thread prepares ---------------------------------------------
+
+// A published node with what the client needs to judge it: the node (its
+// children cleared), the registry control type it belongs to, whether it is
+// an item (a virtual child), the stable ID of its scope (the nearest
+// control-backed node at or above it) and its children.
+struct ExpectedNode final {
+    SemanticNode node;
+    std::string control_type;
+    bool is_item{};
+    std::string scope_id;
+    ExpectedPatterns patterns;
+    std::vector<ExpectedNode> children;
+};
+
+// One page as the UI thread saw it: the expected tree under the window's
+// client node and the geometry that converts its bounds to the screen.
+struct PageExpectation final {
+    ExpectedNode client;
+    double scale{1.0};
+    POINT origin{};
+    bool shown{};
+};
+
+// A control that publishes virtual children, with the stable IDs of all of
+// them and their descendants.
+struct VirtualOwner final {
+    Control::Ptr control;
+    std::string control_type;
+    std::vector<std::string> stable_ids;
+};
+
+bool control_backed(const SemanticNode& node) noexcept {
+    const bool backed = node.runtime_id != 0U && !is_virtual_semantic_runtime_id(node.runtime_id);
+    return backed;
+}
+
+void collect_virtual_ids(const std::vector<SemanticNode>& nodes, std::vector<std::string>& ids) {
+    for (const SemanticNode& node : nodes) {
+        ids.push_back(node.stable_id);
+        collect_virtual_ids(node.children, ids);
+    }
+}
+
+void collect_virtual_owners(const Control::Ptr& control, std::vector<VirtualOwner>& owners) {
+    if (!(*control).effectively_visible()) return;
+    const std::vector<SemanticNode> published = (*control).semantic_virtual_children();
+    if (!published.empty()) {
+        VirtualOwner owner;
+        owner.control = control;
+        owner.control_type = std::string((*control).anatomy().control_id);
+        collect_virtual_ids(published, owner.stable_ids);
+        owners.push_back(std::move(owner));
+    }
+    const std::span<const Control::Ptr> children = (*control).children();
+    for (std::size_t index = 0; index < children.size(); ++index) {
+        collect_virtual_owners(children[index], owners);
+    }
+}
+
+bool contains_text(const std::vector<std::string>& texts, std::string_view wanted) noexcept {
+    for (const std::string& text : texts) {
+        if (text == wanted) return true;
+    }
+    return false;
+}
+
+// The registry type a node belongs to: its control's anatomy id, or, for a
+// virtual child, the id of the control at or below its scope publishing it.
+std::string node_control_type(Window& window, const std::vector<VirtualOwner>& owners,
+                              const SemanticNode& node, std::string_view scope_id, bool& is_item) {
+    if (control_backed(node)) {
+        is_item = false;
+        const Control::Ptr control = window.find(node.stable_id);
+        if (!control) return std::string("(control not found)");
+        const std::string type((*control).anatomy().control_id);
+        return type;
+    }
+    is_item = true;
+    Control::Ptr scope;
+    if (!scope_id.empty()) scope = window.find(scope_id);
+    for (const VirtualOwner& owner : owners) {
+        const bool within = !scope || owner.control == scope || (*scope).contains(*owner.control);
+        if (within && contains_text(owner.stable_ids, node.stable_id)) return owner.control_type;
+    }
+    return std::string("(owner not found)");
+}
+
+void build_expected(Window& window, const std::vector<VirtualOwner>& owners,
+                    const SemanticNode& node, std::string_view scope_id, ExpectedNode& expected) {
+    expected.node = node;
+    expected.node.children.clear();
+    expected.patterns = expected_patterns(node);
+    expected.control_type = node_control_type(window, owners, node, scope_id, expected.is_item);
+    std::string_view own_scope = scope_id;
+    if (control_backed(node)) own_scope = node.stable_id;
+    expected.scope_id = std::string(own_scope);
+    expected.children.resize(node.children.size());
+    for (std::size_t index = 0; index < node.children.size(); ++index) {
+        build_expected(window, owners, node.children[index], own_scope, expected.children[index]);
+    }
+}
+
+bool show_page(Window& window, std::string_view page) {
+    if (page == off_tree_page) return true;
+    const bool selected = gallery::select_gallery_page(window, page);
+    return selected;
+}
+
+// Shows a page and builds its expectation, on the UI thread. With
+// `freeze`, it first cancels the window's frame requests: the client reads
+// the tree through many UI-thread calls while the message loop runs, and
+// the timers and animations some pages start (the timing page's tick and
+// progress, the easing preview, the motion target) would change it between
+// the expectation and the reads. A-W1's client sees one instant because it
+// runs on the UI thread; a frozen window gives this client the same. Only
+// the comparison windows are frozen; actions run in windows of their own.
+struct PreparePage final {
+    Window* window{};
+    HWND hwnd{};
+    std::string_view page;
+    PageExpectation* expectation{};
+    bool freeze{};
+    void operator()() const {
+        PageExpectation& out = *expectation;
+        out.shown = show_page(*window, page);
+        if (!out.shown) return;
+        (*window).perform_layout();
+        if (freeze) (*window).cancel_frame_requests();
+        const UINT dpi = GetDpiForWindow(hwnd);
+        out.scale = dpi == 0U ? 1.0 : std::max(1.0, dpi / 96.0);
+        out.origin = POINT{};
+        ClientToScreen(hwnd, &out.origin);
+        const SemanticSnapshot snapshot = (*window).semantic_snapshot();
+        std::vector<VirtualOwner> owners;
+        collect_virtual_owners((*window).root(), owners);
+        out.client = ExpectedNode{};
+        out.client.node.name = std::string(fixture_title_utf8);
+        out.client.control_type = "(window client)";
+        out.client.children.resize(snapshot.roots.size());
+        for (std::size_t index = 0; index < snapshot.roots.size(); ++index) {
+            build_expected(*window, owners, snapshot.roots[index], std::string_view(),
+                           out.client.children[index]);
+        }
+    }
+};
+
+// -- the comparison ------------------------------------------------------------
+
+struct Mismatch final {
+    std::string page;
+    std::string stable_id;
+    std::string control_type;
+    std::string field;
+    std::string expected;
+    std::string observed;
+};
+
+struct ControlTally final {
+    std::size_t own_nodes{};
+    std::size_t item_nodes{};
+    std::size_t matched{};
+    std::size_t mismatched{};
+};
+
+enum class ActionOutcome : std::uint8_t { changed, refused, unobserved, lost };
+
+const char* outcome_name(ActionOutcome outcome) noexcept {
+    switch (outcome) {
+    case ActionOutcome::changed: return "changed";
+    case ActionOutcome::refused: return "refused";
+    case ActionOutcome::unobserved: return "no observable change";
+    case ActionOutcome::lost: return "node lost";
+    }
+    return "unknown";
+}
+
+// One node chosen to have its default action performed (A-W1's choice: the
+// first enabled node of its type and role, preferring one whose change can
+// be seen).
+struct ActionCandidate final {
+    std::string page;
+    std::string scope_id;
+    std::string stable_id;
+    std::string control_type;
+    SemanticRole role{SemanticRole::generic};
+    bool observable{};
+};
+
+struct ActionResult final {
+    std::string key;
+    std::string page;
+    std::string stable_id;
+    std::string call;
+    std::string evidence;
+    ActionOutcome outcome{ActionOutcome::unobserved};
+};
+
+struct Report final {
+    std::map<std::string, ControlTally> tallies;
+    std::vector<Mismatch> mismatches;
+    std::map<std::string, ActionCandidate> candidates;
+    std::vector<ActionResult> actions;
+    std::size_t pages{};
+    std::size_t elements{};
+    std::size_t controller_relations{};
+    std::string stale_check;
+    std::string failure;
+    bool completed{};
+};
+
+// The fixed parts of one page's comparison, on the client thread.
+struct PageWalk final {
+    IUIAutomation& automation;
+    IUIAutomationTreeWalker& walker;
+    Report& report;
+    std::string_view page;
+    const PageExpectation& expectation;
+    std::set<std::vector<int>> runtime_ids;
+};
+
+void add_mismatch(PageWalk& walk, const ExpectedNode& expected, std::string_view field,
+                  std::string wanted, std::string observed, bool& matched) {
+    Mismatch mismatch;
+    mismatch.page = std::string(walk.page);
+    mismatch.stable_id = expected.node.stable_id;
+    mismatch.control_type = expected.control_type;
+    mismatch.field = std::string(field);
+    mismatch.expected = std::move(wanted);
+    mismatch.observed = std::move(observed);
+    walk.report.mismatches.push_back(std::move(mismatch));
+    matched = false;
+}
+
+std::string bool_text(bool value) { return value ? "true" : "false"; }
+
+std::vector<int> runtime_id(IUIAutomationElement& element) {
+    std::vector<int> parts;
+    SAFEARRAY* array = nullptr;
+    if (FAILED(element.GetRuntimeId(&array)) || array == nullptr) return parts;
+    LONG lower = 0;
+    LONG upper = -1;
+    SafeArrayGetLBound(array, 1, &lower);
+    SafeArrayGetUBound(array, 1, &upper);
+    for (LONG index = lower; index <= upper; ++index) {
+        int part = 0;
+        SafeArrayGetElement(array, &index, &part);
+        parts.push_back(part);
+    }
+    SafeArrayDestroy(array);
+    return parts;
+}
+
+// The element's children, in order: on the window element only the
+// GUI.Forms ones (the host's non-client parts are the system's).
+std::vector<ElementReference> element_children(PageWalk& walk, IUIAutomationElement& element,
+                                               bool window_level) {
+    std::vector<ElementReference> children;
+    ElementReference child;
+    HRESULT status = walk.walker.GetFirstChildElement(&element, child.receive());
+    while (SUCCEEDED(status) && child.get() != nullptr) {
+        bool keep = true;
+        if (window_level) {
+            BstrOwner framework;
+            const HRESULT read = (*child.get()).get_CurrentFrameworkId(framework.receive());
+            keep = SUCCEEDED(read) && framework.wide() == framework_id;
+        }
+        ElementReference next;
+        status = walk.walker.GetNextSiblingElement(child.get(), next.receive());
+        if (keep) children.push_back(std::move(child));
+        child = std::move(next);
+    }
+    return children;
+}
+
+template <typename Pattern>
+bool element_pattern(IUIAutomationElement& element, PATTERNID id, ComReference<Pattern>& found) {
+    const HRESULT status = element.GetCurrentPatternAs(id, __uuidof(Pattern),
+                                                       reinterpret_cast<void**>(found.receive()));
+    const bool offered = SUCCEEDED(status) && found.get() != nullptr;
+    return offered;
+}
+
+bool offers(IUIAutomationElement& element, PATTERNID id) {
+    ComReference<IUnknown> pattern;
+    const HRESULT status = element.GetCurrentPattern(id, pattern.receive());
+    const bool offered = SUCCEEDED(status) && pattern.get() != nullptr;
+    return offered;
+}
+
+// An integer property, or zero when the element reports none.
+int integer_property(IUIAutomationElement& element, PROPERTYID property) {
+    VARIANT value;
+    VariantInit(&value);
+    const HRESULT status = element.GetCurrentPropertyValue(property, &value);
+    int result = 0;
+    if (SUCCEEDED(status) && value.vt == VT_I4) result = value.lVal;
+    VariantClear(&value);
+    return result;
+}
+
+LONG device_coordinate(double logical, double scale) noexcept {
+    const LONG device = static_cast<LONG>(std::lround(logical * scale));
+    return device;
+}
+
+std::string rect_text(double left, double top, double width, double height) {
+    const std::string text = std::to_string(std::lround(left)) + "," + std::to_string(std::lround(top)) +
+                             " " + std::to_string(std::lround(width)) + "x" +
+                             std::to_string(std::lround(height));
+    return text;
+}
+
+void compare_patterns(PageWalk& walk, IUIAutomationElement& element, const ExpectedNode& expected,
+                      bool& matched) {
+    const ExpectedPatterns& patterns = expected.patterns;
+    const SemanticNode& node = expected.node;
+    struct Offer final {
+        PATTERNID id;
+        bool wanted;
+        const char* name;
+    };
+    const std::array<Offer, 7> table{{
+        {UIA_InvokePatternId, patterns.invoke, "Invoke pattern"},
+        {UIA_TogglePatternId, patterns.toggle, "Toggle pattern"},
+        {UIA_SelectionItemPatternId, patterns.selection_item, "SelectionItem pattern"},
+        {UIA_SelectionPatternId, patterns.selection, "Selection pattern"},
+        {UIA_RangeValuePatternId, patterns.range_value, "RangeValue pattern"},
+        {UIA_ValuePatternId, patterns.value, "Value pattern"},
+        {UIA_ExpandCollapsePatternId, patterns.expand_collapse, "ExpandCollapse pattern"},
+    }};
+    for (const Offer& offer : table) {
+        const bool offered = offers(element, offer.id);
+        if (offered != offer.wanted) {
+            add_mismatch(walk, expected, offer.name, bool_text(offer.wanted), bool_text(offered), matched);
+        }
+    }
+    ComReference<IUIAutomationTogglePattern> toggle;
+    if (patterns.toggle && element_pattern(element, UIA_TogglePatternId, toggle)) {
+        ToggleState state = ToggleState_Indeterminate;
+        static_cast<void>((*toggle.get()).get_CurrentToggleState(&state));
+        if (state != expected_toggle_state(node)) {
+            add_mismatch(walk, expected, "ToggleState",
+                         std::to_string(static_cast<int>(expected_toggle_state(node))),
+                         std::to_string(static_cast<int>(state)), matched);
+        }
+    }
+    ComReference<IUIAutomationExpandCollapsePattern> expand;
+    if (patterns.expand_collapse && element_pattern(element, UIA_ExpandCollapsePatternId, expand)) {
+        ExpandCollapseState state = ExpandCollapseState_LeafNode;
+        static_cast<void>((*expand.get()).get_CurrentExpandCollapseState(&state));
+        if (state != expected_expand_state(node)) {
+            add_mismatch(walk, expected, "ExpandCollapseState",
+                         std::to_string(static_cast<int>(expected_expand_state(node))),
+                         std::to_string(static_cast<int>(state)), matched);
+        }
+    }
+    ComReference<IUIAutomationSelectionItemPattern> item;
+    if (patterns.selection_item && element_pattern(element, UIA_SelectionItemPatternId, item)) {
+        BOOL selected = FALSE;
+        static_cast<void>((*item.get()).get_CurrentIsSelected(&selected));
+        if ((selected == TRUE) != expected_selected(node)) {
+            add_mismatch(walk, expected, "IsSelected", bool_text(expected_selected(node)),
+                         bool_text(selected == TRUE), matched);
+        }
+    }
+    ComReference<IUIAutomationValuePattern> value;
+    if (patterns.value && element_pattern(element, UIA_ValuePatternId, value)) {
+        BstrOwner text;
+        static_cast<void>((*value.get()).get_CurrentValue(text.receive()));
+        if (text.utf8() != node.value) {
+            add_mismatch(walk, expected, "Value", node.value, text.utf8(), matched);
+        }
+    }
+    ComReference<IUIAutomationRangeValuePattern> range;
+    if (patterns.range_value && element_pattern(element, UIA_RangeValuePatternId, range)) {
+        double current = 0.0;
+        double minimum = 0.0;
+        double maximum = 0.0;
+        static_cast<void>((*range.get()).get_CurrentValue(&current));
+        static_cast<void>((*range.get()).get_CurrentMinimum(&minimum));
+        static_cast<void>((*range.get()).get_CurrentMaximum(&maximum));
+        const double wanted = *node.numeric_value;
+        const double wanted_minimum = node.minimum_value ? *node.minimum_value : wanted;
+        const double wanted_maximum = node.maximum_value ? *node.maximum_value : wanted;
+        if (current != wanted || minimum != wanted_minimum || maximum != wanted_maximum) {
+            add_mismatch(walk, expected, "RangeValue",
+                         std::to_string(wanted) + " in [" + std::to_string(wanted_minimum) + ", " +
+                             std::to_string(wanted_maximum) + "]",
+                         std::to_string(current) + " in [" + std::to_string(minimum) + ", " +
+                             std::to_string(maximum) + "]",
+                         matched);
+        }
+    }
+}
+
+// Whether the expectation holds a control-backed node with `stable_id`.
+bool holds_control(const ExpectedNode& at, std::string_view stable_id) noexcept {
+    for (const ExpectedNode& child : at.children) {
+        if (!control_backed(child.node)) continue;
+        if (child.node.stable_id == stable_id) return true;
+        if (holds_control(child, stable_id)) return true;
+    }
+    return false;
+}
+
+void compare_controller(PageWalk& walk, IUIAutomationElement& element, const ExpectedNode& expected,
+                        bool& matched) {
+    const std::string& panel = expected.node.controlled_panel;
+    // A hidden page's panel is not in the tree, and no relation is published.
+    const bool present = !panel.empty() && holds_control(walk.expectation.client, panel);
+    ComReference<IUIAutomationElementArray> controlled;
+    const HRESULT status = element.get_CurrentControllerFor(controlled.receive());
+    int count = 0;
+    if (SUCCEEDED(status) && controlled.get() != nullptr) {
+        static_cast<void>((*controlled.get()).get_Length(&count));
+    }
+    const int wanted = present ? 1 : 0;
+    if (count != wanted) {
+        add_mismatch(walk, expected, "ControllerFor count", std::to_string(wanted),
+                     std::to_string(count), matched);
+        return;
+    }
+    if (!present) return;
+    ElementReference target;
+    static_cast<void>((*controlled.get()).GetElement(0, target.receive()));
+    BstrOwner target_id;
+    if (target.get() != nullptr) static_cast<void>((*target.get()).get_CurrentAutomationId(target_id.receive()));
+    if (target_id.utf8() != panel) {
+        add_mismatch(walk, expected, "ControllerFor", panel, target_id.utf8(), matched);
+        return;
+    }
+    ++walk.report.controller_relations;
+}
+
+void consider_candidate(PageWalk& walk, const ExpectedNode& expected) {
+    const SemanticNode& node = expected.node;
+    if (walk.page == host_services_page) return;
+    if (!has_semantic_state(node.states, SemanticState::enabled)) return;
+    const DefaultKind kind = expected_default(node);
+    const bool focus_only = kind == DefaultKind::none &&
+                            has_semantic_state(node.states, SemanticState::focusable);
+    if (kind == DefaultKind::none && !focus_only) return;
+    const std::string key = expected.control_type + " / " + semantic_role_name(node.role);
+    bool observable = true;
+    if (kind == DefaultKind::select) observable = !has_semantic_state(node.states, SemanticState::selected);
+    if (kind == DefaultKind::press && node.role == SemanticRole::radio_button) {
+        observable = !has_semantic_state(node.states, SemanticState::checked);
+    }
+    if (kind == DefaultKind::none) observable = !has_semantic_state(node.states, SemanticState::focused);
+    std::map<std::string, ActionCandidate>::iterator existing = walk.report.candidates.find(key);
+    if (existing != walk.report.candidates.end()) {
+        if ((*existing).second.observable || !observable) return;
+    }
+    ActionCandidate candidate;
+    candidate.page = std::string(walk.page);
+    candidate.scope_id = expected.scope_id;
+    candidate.stable_id = node.stable_id;
+    candidate.control_type = expected.control_type;
+    candidate.role = node.role;
+    candidate.observable = observable;
+    walk.report.candidates[key] = std::move(candidate);
+}
+
+// Compares one element with its expected node, then descends. `window`
+// says that `element` is the window element, whose node is the client.
+void compare_element(PageWalk& walk, IUIAutomationElement& element, const ExpectedNode& expected,
+                     bool window) {
+    ++walk.report.elements;
+    bool matched = true;
+    const SemanticNode& node = expected.node;
+    if (!window) {
+        CONTROLTYPEID type = 0;
+        static_cast<void>(element.get_CurrentControlType(&type));
+        const CONTROLTYPEID wanted = expected_control_type(node.role);
+        if (type != wanted) {
+            add_mismatch(walk, expected, "ControlType", std::to_string(static_cast<int>(wanted)),
+                         std::to_string(static_cast<int>(type)), matched);
+        }
+        BstrOwner name;
+        static_cast<void>(element.get_CurrentName(name.receive()));
+        if (name.utf8() != node.name) add_mismatch(walk, expected, "Name", node.name, name.utf8(), matched);
+        BstrOwner id;
+        static_cast<void>(element.get_CurrentAutomationId(id.receive()));
+        if (id.utf8() != node.stable_id) {
+            add_mismatch(walk, expected, "AutomationId", node.stable_id, id.utf8(), matched);
+        }
+        BstrOwner help;
+        static_cast<void>(element.get_CurrentHelpText(help.receive()));
+        if (help.utf8() != node.description) {
+            add_mismatch(walk, expected, "HelpText", node.description, help.utf8(), matched);
+        }
+        BstrOwner framework;
+        static_cast<void>(element.get_CurrentFrameworkId(framework.receive()));
+        if (framework.wide() != framework_id) {
+            add_mismatch(walk, expected, "FrameworkId", "GUI.Forms", framework.utf8(), matched);
+        }
+        BOOL enabled = FALSE;
+        BOOL focusable = FALSE;
+        BOOL focused = FALSE;
+        BOOL offscreen = TRUE;
+        static_cast<void>(element.get_CurrentIsEnabled(&enabled));
+        static_cast<void>(element.get_CurrentIsKeyboardFocusable(&focusable));
+        static_cast<void>(element.get_CurrentHasKeyboardFocus(&focused));
+        static_cast<void>(element.get_CurrentIsOffscreen(&offscreen));
+        const bool wanted_enabled = has_semantic_state(node.states, SemanticState::enabled);
+        const bool wanted_focusable = has_semantic_state(node.states, SemanticState::focusable);
+        const bool wanted_focused = has_semantic_state(node.states, SemanticState::focused);
+        const bool wanted_offscreen = !has_semantic_state(node.states, SemanticState::visible);
+        if ((enabled == TRUE) != wanted_enabled) {
+            add_mismatch(walk, expected, "IsEnabled", bool_text(wanted_enabled), bool_text(enabled == TRUE), matched);
+        }
+        if ((focusable == TRUE) != wanted_focusable) {
+            add_mismatch(walk, expected, "IsKeyboardFocusable", bool_text(wanted_focusable),
+                         bool_text(focusable == TRUE), matched);
+        }
+        if ((focused == TRUE) != wanted_focused) {
+            add_mismatch(walk, expected, "HasKeyboardFocus", bool_text(wanted_focused), bool_text(focused == TRUE),
+                         matched);
+        }
+        if ((offscreen == TRUE) != wanted_offscreen) {
+            add_mismatch(walk, expected, "IsOffscreen", bool_text(wanted_offscreen), bool_text(offscreen == TRUE),
+                         matched);
+        }
+        RECT bounds{};
+        static_cast<void>(element.get_CurrentBoundingRectangle(&bounds));
+        const double scale = walk.expectation.scale;
+        LONG left = walk.expectation.origin.x + device_coordinate(node.bounds.x, scale);
+        LONG top = walk.expectation.origin.y + device_coordinate(node.bounds.y, scale);
+        LONG width = device_coordinate(node.bounds.width, scale);
+        LONG height = device_coordinate(node.bounds.height, scale);
+        // A node with no area (an overflowed tab, a gallery item scrolled
+        // out, a label squeezed to no width) reads as the empty rectangle.
+        if (width == 0 || height == 0) {
+            left = 0;
+            top = 0;
+            width = 0;
+            height = 0;
+        }
+        const bool located = bounds.left == left && bounds.top == top &&
+                             bounds.right - bounds.left == width && bounds.bottom - bounds.top == height;
+        if (!located) {
+            add_mismatch(walk, expected, "BoundingRectangle", rect_text(left, top, width, height),
+                         rect_text(bounds.left, bounds.top, bounds.right - bounds.left,
+                                   bounds.bottom - bounds.top),
+                         matched);
+        }
+        const int position = integer_property(element, UIA_PositionInSetPropertyId);
+        const int size = integer_property(element, UIA_SizeOfSetPropertyId);
+        const bool positioned = node.position_in_set.has_value() && node.set_size.has_value();
+        const int wanted_position = positioned ? static_cast<int>(*node.position_in_set) : 0;
+        const int wanted_size = positioned ? static_cast<int>(*node.set_size) : 0;
+        // UI Automation reports a missing position as zero or -1.
+        const bool position_matches = positioned ? position == wanted_position && size == wanted_size
+                                                 : position <= 0 && size <= 0;
+        if (!position_matches) {
+            add_mismatch(walk, expected, "PositionInSet/SizeOfSet",
+                         std::to_string(wanted_position) + "/" + std::to_string(wanted_size),
+                         std::to_string(position) + "/" + std::to_string(size), matched);
+        }
+        compare_patterns(walk, element, expected, matched);
+        if (node.role == SemanticRole::tab) compare_controller(walk, element, expected, matched);
+        const std::vector<int> identity = runtime_id(element);
+        if (identity.empty() || !walk.runtime_ids.insert(identity).second) {
+            add_mismatch(walk, expected, "RuntimeId", "unique", identity.empty() ? "none" : "repeated",
+                         matched);
+        }
+        ControlTally& tally = walk.report.tallies[expected.control_type];
+        if (expected.is_item) {
+            ++tally.item_nodes;
+        } else {
+            ++tally.own_nodes;
+        }
+        if (matched) {
+            ++tally.matched;
+        } else {
+            ++tally.mismatched;
+        }
+        consider_candidate(walk, expected);
+    }
+    const std::vector<ElementReference> children = element_children(walk, element, window);
+    if (children.size() != expected.children.size()) {
+        bool counted = true;
+        add_mismatch(walk, expected, "child count", std::to_string(expected.children.size()),
+                     std::to_string(children.size()), counted);
+    }
+    const std::size_t walked = std::min(children.size(), expected.children.size());
+    for (std::size_t index = 0; index < walked; ++index) {
+        IUIAutomationElement& child = *children[index].get();
+        // The parent link leads back to this element.
+        ElementReference parent;
+        BOOL same = FALSE;
+        const HRESULT read = walk.walker.GetParentElement(&child, parent.receive());
+        if (SUCCEEDED(read) && parent.get() != nullptr) {
+            static_cast<void>(walk.automation.CompareElements(parent.get(), &element, &same));
+        }
+        if (same != TRUE) {
+            bool linked = true;
+            add_mismatch(walk, expected.children[index], "parent", "this element's parent",
+                         "another element", linked);
+        }
+        compare_element(walk, child, expected.children[index], false);
+    }
+}
+
+// -- actions ----------------------------------------------------------------------
+
+void press_escape(Window& window) {
+    KeyEvent down;
+    down.action = KeyAction::down;
+    down.physical_key = PhysicalKey::escape;
+    static_cast<void>(window.dispatch_key(down));
+    KeyEvent up;
+    up.action = KeyAction::up;
+    up.physical_key = PhysicalKey::escape;
+    static_cast<void>(window.dispatch_key(up));
+}
+
+struct ClickCounter final {
+    int count{};
+    void clicked(ButtonBase&) { ++count; }
+};
+
+struct InvocationCounter final {
+    int count{};
+    void invoked(const CommandInvocation&) { ++count; }
+};
+
+// The node a candidate names (its scope and stable ID) in `nodes`, or null.
+const SemanticNode* find_named(const std::vector<SemanticNode>& nodes, std::string_view scope_id,
+                               std::string_view stable_id, std::string_view current_scope) {
+    for (const SemanticNode& node : nodes) {
+        std::string_view node_scope = current_scope;
+        if (control_backed(node)) node_scope = node.stable_id;
+        if (node.stable_id == stable_id && node_scope == scope_id) return &node;
+        const SemanticNode* found = find_named(node.children, scope_id, stable_id, node_scope);
+        if (found != nullptr) return found;
+    }
+    return nullptr;
+}
+const SemanticNode* find_named(std::vector<SemanticNode>&&, std::string_view, std::string_view,
+                               std::string_view) = delete;
+
+// The state one action starts from, captured on the UI thread, and the
+// counters that observe its effects.
+struct ActionState final {
+    SemanticSnapshot before;
+    std::optional<SemanticNode> node;
+    std::uint64_t generation_before{};
+    std::size_t scopes_before{};
+    ClickCounter clicks;
+    InvocationCounter invocations;
+    SubscriptionToken click_subscription;
+    SubscriptionToken invocation_subscription;
+};
+
+// Ends an action's observation subscriptions on the UI thread, which owns
+// the events they connect to.
+struct ReleaseSubscriptions final {
+    ActionState* state{};
+    void operator()() const {
+        (*state).click_subscription = SubscriptionToken{};
+        (*state).invocation_subscription = SubscriptionToken{};
+    }
+};
+
+struct BeginAction final {
+    Window* window{};
+    const ActionCandidate* candidate{};
+    ActionState* state{};
+    void operator()() const {
+        ActionState& out = *state;
+        out.before = (*window).semantic_snapshot();
+        const SemanticNode* found = find_named(out.before.roots, (*candidate).scope_id,
+                                               (*candidate).stable_id, std::string_view());
+        out.node.reset();
+        if (found == nullptr) return;
+        out.node = *found;
+        out.generation_before = (*window).semantic_generation();
+        out.scopes_before = (*window).focus_scope_depth();
+        const Control::Ptr control = (*window).find((*found).stable_id);
+        const std::shared_ptr<ButtonBase> button = std::dynamic_pointer_cast<ButtonBase>(control);
+        if (button) {
+            out.click_subscription = (*button).clicked().subscribe(
+                Delegate<ButtonBase&>::bind<ClickCounter, &ClickCounter::clicked>(out.clicks));
+        }
+        const std::shared_ptr<RibbonColorPicker> picker = std::dynamic_pointer_cast<RibbonColorPicker>(control);
+        if (picker && (*picker).command()) {
+            const std::shared_ptr<Command>& command = (*(*picker).command()).command();
+            out.invocation_subscription = (*command).invoked().subscribe(
+                Delegate<const CommandInvocation&>::bind<InvocationCounter, &InvocationCounter::invoked>(
+                    out.invocations));
+        }
+    }
+};
+
+bool popup_opened(const SemanticSnapshot& before, const SemanticSnapshot& after, std::size_t scopes_before,
+                  std::size_t scopes_after) noexcept {
+    const bool opened = after.roots.size() > before.roots.size() || after.node_count > before.node_count ||
+                        scopes_after > scopes_before;
+    return opened;
+}
+
+// Judges an action's effect from the state it started from, on the UI
+// thread (A-W1's rules).
+struct EndAction final {
+    Window* window{};
+    const ActionCandidate* candidate{};
+    ActionState* state{};
+    ActionResult* result{};
+    // Filled for a reversible action: whether it changed and which states
+    // the undo must restore.
+    bool* reversible{};
+    void operator()() const {
+        ActionState& from = *state;
+        ActionResult& out = *result;
+        const SemanticNode& node = *from.node;
+        const DefaultKind kind = expected_default(node);
+        const SemanticSnapshot after = (*window).semantic_snapshot();
+        const std::size_t scopes_after = (*window).focus_scope_depth();
+        const SemanticNode* changed = find_named(after.roots, (*candidate).scope_id, (*candidate).stable_id,
+                                                 std::string_view());
+        const bool checked_before = has_semantic_state(node.states, SemanticState::checked);
+        const bool mixed_before = has_semantic_state(node.states, SemanticState::mixed);
+        const bool expanded_before = has_semantic_state(node.states, SemanticState::expanded);
+        const bool opened = popup_opened(from.before, after, from.scopes_before, scopes_after);
+        out.outcome = ActionOutcome::unobserved;
+        if (kind == DefaultKind::none) {
+            if (changed != nullptr && has_semantic_state((*changed).states, SemanticState::focused)) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = "focused";
+            }
+        } else if (kind == DefaultKind::select ||
+                   (kind == DefaultKind::press && node.role == SemanticRole::radio_button)) {
+            if (changed != nullptr && expected_selected(*changed)) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = node.role == SemanticRole::radio_button ? "checked" : "selected";
+            }
+        } else if (kind == DefaultKind::expand || kind == DefaultKind::collapse) {
+            if (changed != nullptr &&
+                has_semantic_state((*changed).states, SemanticState::expanded) != expanded_before) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = expanded_before ? "collapsed" : "expanded";
+            } else if (kind == DefaultKind::expand && opened) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = "a popup opened";
+            }
+        } else if (kind == DefaultKind::show_menu) {
+            if (opened) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = "a popup opened";
+            } else if (changed != nullptr && has_semantic_state((*changed).states, SemanticState::expanded)) {
+                out.outcome = ActionOutcome::changed;
+                out.evidence = "expanded";
+            }
+        } else if (changed != nullptr &&
+                   (has_semantic_state((*changed).states, SemanticState::checked) != checked_before ||
+                    has_semantic_state((*changed).states, SemanticState::mixed) != mixed_before)) {
+            out.outcome = ActionOutcome::changed;
+            out.evidence = has_semantic_state((*changed).states, SemanticState::checked) ? "checked" : "unchecked";
+        } else if (from.clicks.count == 1) {
+            out.outcome = ActionOutcome::changed;
+            out.evidence = "clicked raised once";
+        } else if (from.invocations.count == 1) {
+            out.outcome = ActionOutcome::changed;
+            out.evidence = "its command invoked once";
+        } else if (opened) {
+            out.outcome = ActionOutcome::changed;
+            out.evidence = "a popup opened";
+        } else if ((*window).semantic_generation() != from.generation_before) {
+            out.outcome = ActionOutcome::changed;
+            out.evidence = "the semantic tree changed";
+        }
+        if (from.clicks.count > 1) {
+            out.outcome = ActionOutcome::unobserved;
+            out.evidence = "clicked raised " + std::to_string(from.clicks.count) + " times";
+        }
+        // An expansion or a toggle is undone through the same pattern,
+        // which proves the reverse too; before any popup closes.
+        *reversible = out.outcome == ActionOutcome::changed &&
+                      (kind == DefaultKind::expand || kind == DefaultKind::collapse ||
+                       (kind == DefaultKind::press && expects_toggle(node))) &&
+                      changed != nullptr && out.evidence != "a popup opened";
+        ReleaseSubscriptions{state}();
+    }
+};
+
+// Whether the candidate's expanded and checked states are back to the ones
+// the action started from, on the UI thread.
+struct CheckRestored final {
+    Window* window{};
+    const ActionCandidate* candidate{};
+    const SemanticNode* before{};
+    bool* restored{};
+    void operator()() const {
+        const SemanticSnapshot now = (*window).semantic_snapshot();
+        const SemanticNode* node = find_named(now.roots, (*candidate).scope_id, (*candidate).stable_id,
+                                              std::string_view());
+        *restored = false;
+        if (node == nullptr) return;
+        const bool expanded = has_semantic_state((*node).states, SemanticState::expanded) ==
+                              has_semantic_state((*before).states, SemanticState::expanded);
+        const bool checked = has_semantic_state((*node).states, SemanticState::checked) ==
+                             has_semantic_state((*before).states, SemanticState::checked);
+        *restored = expanded && checked;
+    }
+};
+
+// Closes popups an action opened, so the page's root set is restored, on
+// the UI thread.
+struct ClosePopups final {
+    Window* window{};
+    std::size_t baseline_roots{};
+    void operator()() const {
+        for (int attempt = 0; attempt < maximum_popup_closes; ++attempt) {
+            const SemanticSnapshot snapshot = (*window).semantic_snapshot();
+            const bool open = snapshot.roots.size() > baseline_roots || (*window).focus_scope_depth() != 0U;
+            if (!open) return;
+            press_escape(*window);
+        }
+    }
+};
+
+struct DoNothing final {
+    void operator()() const {}
+};
+
+
+// The element a candidate names: the path of child positions to its node
+// in the window's tree, then the same path through UI Automation.
+bool find_path(const std::vector<SemanticNode>& nodes, std::string_view scope_id, std::string_view stable_id,
+               std::string_view current_scope, std::vector<std::size_t>& path) {
+    for (std::size_t index = 0; index < nodes.size(); ++index) {
+        const SemanticNode& node = nodes[index];
+        std::string_view node_scope = current_scope;
+        if (control_backed(node)) node_scope = node.stable_id;
+        path.push_back(index);
+        if (node.stable_id == stable_id && node_scope == scope_id) return true;
+        if (find_path(node.children, scope_id, stable_id, node_scope, path)) return true;
+        path.pop_back();
+    }
+    return false;
+}
+
+struct FindCandidatePath final {
+    Window* window{};
+    const ActionCandidate* candidate{};
+    std::vector<std::size_t>* path{};
+    bool* found{};
+    void operator()() const {
+        const SemanticSnapshot snapshot = (*window).semantic_snapshot();
+        (*path).clear();
+        *found = find_path(snapshot.roots, (*candidate).scope_id, (*candidate).stable_id, std::string_view(),
+                           *path);
+    }
+};
+
+// Calls one pattern method on `element`. Returns its HRESULT, or
+// E_NOINTERFACE when the element does not offer the pattern.
+HRESULT call_pattern(IUIAutomationElement& element, PatternCall call) {
+    switch (call) {
+    case PatternCall::set_focus: return element.SetFocus();
+    case PatternCall::invoke: {
+        ComReference<IUIAutomationInvokePattern> invoke;
+        if (!element_pattern(element, UIA_InvokePatternId, invoke)) return E_NOINTERFACE;
+        return (*invoke.get()).Invoke();
+    }
+    case PatternCall::toggle: {
+        ComReference<IUIAutomationTogglePattern> toggle;
+        if (!element_pattern(element, UIA_TogglePatternId, toggle)) return E_NOINTERFACE;
+        return (*toggle.get()).Toggle();
+    }
+    case PatternCall::select: {
+        ComReference<IUIAutomationSelectionItemPattern> item;
+        if (!element_pattern(element, UIA_SelectionItemPatternId, item)) return E_NOINTERFACE;
+        return (*item.get()).Select();
+    }
+    case PatternCall::expand: {
+        ComReference<IUIAutomationExpandCollapsePattern> expand;
+        if (!element_pattern(element, UIA_ExpandCollapsePatternId, expand)) return E_NOINTERFACE;
+        return (*expand.get()).Expand();
+    }
+    case PatternCall::collapse: {
+        ComReference<IUIAutomationExpandCollapsePattern> expand;
+        if (!element_pattern(element, UIA_ExpandCollapsePatternId, expand)) return E_NOINTERFACE;
+        return (*expand.get()).Collapse();
+    }
+    }
+    return E_NOTIMPL;
+}
+
+// The reverse of a reversible call: Toggle again, or the opposite of an
+// expansion.
+PatternCall undo_call(PatternCall call) noexcept {
+    if (call == PatternCall::expand) return PatternCall::collapse;
+    if (call == PatternCall::collapse) return PatternCall::expand;
+    return call;
+}
+
+// -- the client thread ------------------------------------------------------------
+
+// One action to perform: a candidate and its key in Report::candidates.
+struct ActionJob final {
+    const std::string* key;
+    const ActionCandidate* candidate;
+};
+
+struct ClientRun final {
+    Report* report{};
+    Window* window{};
+    HWND hwnd{};
+    // The Gallery, or off_tree_page for the off-tree fixture.
+    std::string_view window_kind;
+    const std::vector<ActionJob>* jobs{};
+    std::function<void()> request_close;
+};
+
+// The element at a path of child positions below the window element (only
+// GUI.Forms children at the window level).
+ElementReference element_at(IUIAutomationTreeWalker& walker, IUIAutomationElement& window,
+                            const std::vector<std::size_t>& path) {
+    ElementReference current;
+    IUIAutomationElement* parent = &window;
+    for (std::size_t depth = 0; depth < path.size(); ++depth) {
+        ElementReference child;
+        HRESULT status = walker.GetFirstChildElement(parent, child.receive());
+        std::size_t position = 0;
+        bool reached = false;
+        while (SUCCEEDED(status) && child.get() != nullptr) {
+            bool ours = true;
+            if (depth == 0U) {
+                BstrOwner framework;
+                const HRESULT read = (*child.get()).get_CurrentFrameworkId(framework.receive());
+                ours = SUCCEEDED(read) && framework.wide() == framework_id;
+            }
+            if (ours) {
+                if (position == path[depth]) {
+                    reached = true;
+                    break;
+                }
+                ++position;
+            }
+            ElementReference next;
+            status = walker.GetNextSiblingElement(child.get(), next.receive());
+            child = std::move(next);
+        }
+        if (!reached) return ElementReference{};
+        current = std::move(child);
+        parent = current.get();
+    }
+    return current;
+}
+
+void perform_job(ClientRun& run, IUIAutomationTreeWalker& walker, IUIAutomationElement& window_element,
+                 const ActionJob& job) {
+    const ActionCandidate& candidate = *job.candidate;
+    ActionResult result;
+    result.key = *job.key;
+    result.page = candidate.page;
+    result.stable_id = candidate.stable_id;
+    PageExpectation shown;
+    (*run.window).invoke(std::function<void()>(PreparePage{run.window, run.hwnd, candidate.page, &shown}));
+    if (!shown.shown) throw std::runtime_error("a Gallery page cannot be selected: " + candidate.page);
+    ActionState state;
+    (*run.window).invoke(std::function<void()>(BeginAction{run.window, &candidate, &state}));
+    if (!state.node) {
+        result.outcome = ActionOutcome::lost;
+        result.evidence = "the node is not in the tree when its page is shown again";
+        (*run.report).actions.push_back(std::move(result));
+        return;
+    }
+    const std::size_t baseline_roots = state.before.roots.size();
+    std::vector<std::size_t> path;
+    bool found = false;
+    (*run.window).invoke(std::function<void()>(FindCandidatePath{run.window, &candidate, &path, &found}));
+    ElementReference element;
+    if (found) element = element_at(walker, window_element, path);
+    if (element.get() == nullptr) {
+        result.outcome = ActionOutcome::lost;
+        result.evidence = "the UI Automation path to the node ends early";
+        (*run.report).actions.push_back(std::move(result));
+        return;
+    }
+    const DefaultKind kind = expected_default(*state.node);
+    const PatternCall call = pattern_call(*state.node, kind);
+    result.call = pattern_call_name(call);
+    const HRESULT status = call_pattern(*element.get(), call);
+    // Work an Invoke posted runs on the UI thread before this.
+    (*run.window).invoke(std::function<void()>(DoNothing{}));
+    if (status != S_OK) {
+        result.outcome = ActionOutcome::refused;
+        result.evidence = "HRESULT " + hresult_text(status);
+        (*run.window).invoke(std::function<void()>(ReleaseSubscriptions{&state}));
+        (*run.window).invoke(std::function<void()>(ClosePopups{run.window, baseline_roots}));
+        (*run.report).actions.push_back(std::move(result));
+        return;
+    }
+    bool reversible = false;
+    (*run.window).invoke(std::function<void()>(EndAction{run.window, &candidate, &state, &result, &reversible}));
+    if (reversible) {
+        // The element is found again: the action may have rebuilt the tree.
+        std::vector<std::size_t> again_path;
+        bool again_found = false;
+        (*run.window).invoke(
+            std::function<void()>(FindCandidatePath{run.window, &candidate, &again_path, &again_found}));
+        ElementReference again;
+        if (again_found) again = element_at(walker, window_element, again_path);
+        bool restored = false;
+        if (again.get() != nullptr && call_pattern(*again.get(), undo_call(call)) == S_OK) {
+            const SemanticNode before = *state.node;
+            (*run.window).invoke(std::function<void()>(CheckRestored{run.window, &candidate, &before, &restored}));
+        }
+        result.evidence += restored ? ", then restored" : ", but not restored";
+        if (!restored) result.outcome = ActionOutcome::unobserved;
+    }
+    (*run.window).invoke(std::function<void()>(ClosePopups{run.window, baseline_roots}));
+    (*run.report).actions.push_back(std::move(result));
+}
+
+// Compares one page: the UI thread shows it and builds the expectation,
+// then the client walks the window element.
+void compare_page(ClientRun& run, IUIAutomation& automation, IUIAutomationTreeWalker& walker,
+                  IUIAutomationElement& window_element, std::string_view page) {
+    PageExpectation expectation;
+    (*run.window).invoke(std::function<void()>(PreparePage{run.window, run.hwnd, page, &expectation, true}));
+    if (!expectation.shown) throw std::runtime_error("a Gallery page cannot be selected: " + std::string(page));
+    PageWalk walk{automation, walker, *run.report, page, expectation, {}};
+    compare_element(walk, window_element, expectation.client, true);
+    ++(*run.report).pages;
+}
+
+// The child positions to the first control-backed node at or below `at`
+// that `other` does not hold. Returns false when there is none.
+bool path_to_unshared_control(const ExpectedNode& at, const ExpectedNode& other,
+                              std::vector<std::size_t>& path, std::string& stable_id) {
+    for (std::size_t index = 0; index < at.children.size(); ++index) {
+        const ExpectedNode& child = at.children[index];
+        path.push_back(index);
+        const bool candidate = control_backed(child.node) && !holds_control(other, child.node.stable_id);
+        if (candidate) {
+            stable_id = child.node.stable_id;
+            return true;
+        }
+        if (path_to_unshared_control(child, other, path, stable_id)) return true;
+        path.pop_back();
+    }
+    return false;
+}
+
+// An element of a control on the first page, and not on the second,
+// answers UIA_E_ELEMENTNOTAVAILABLE once the second page replaced the
+// first.
+void check_stale_element(ClientRun& run, IUIAutomationTreeWalker& walker,
+                         IUIAutomationElement& window_element) {
+    const std::string_view first = gallery::gallery_pages[0].id;
+    const std::string_view second = gallery::gallery_pages[1].id;
+    PageExpectation later;
+    (*run.window).invoke(std::function<void()>(PreparePage{run.window, run.hwnd, second, &later}));
+    PageExpectation shown;
+    (*run.window).invoke(std::function<void()>(PreparePage{run.window, run.hwnd, first, &shown}));
+    std::vector<std::size_t> path;
+    std::string stable_id;
+    if (!path_to_unshared_control(shown.client, later.client, path, stable_id)) {
+        (*run.report).stale_check = "page " + std::string(first) + " has no control page " +
+                                    std::string(second) + " lacks";
+        return;
+    }
+    ElementReference kept = element_at(walker, window_element, path);
+    if (kept.get() == nullptr) {
+        (*run.report).stale_check = "no element was found for " + stable_id;
+        return;
+    }
+    BstrOwner before;
+    const HRESULT live = (*kept.get()).get_CurrentName(before.receive());
+    PageExpectation replaced;
+    (*run.window).invoke(std::function<void()>(PreparePage{run.window, run.hwnd, second, &replaced}));
+    BstrOwner after;
+    const HRESULT stale = (*kept.get()).get_CurrentName(after.receive());
+    if (FAILED(live) || stale != static_cast<HRESULT>(UIA_E_ELEMENTNOTAVAILABLE)) {
+        (*run.report).stale_check = "the element of " + stable_id + " answered " + hresult_text(stale) +
+                                    " after its page was replaced (before: " + hresult_text(live) + ")";
+    }
+}
+
+void run_client(ClientRun& run) {
+    ComReference<IUIAutomation> automation;
+    const HRESULT created = CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
+                                             __uuidof(IUIAutomation),
+                                             reinterpret_cast<void**>(automation.receive()));
+    if (FAILED(created) || automation.get() == nullptr) throw std::runtime_error("IUIAutomation is not created");
+    ComReference<IUIAutomationTreeWalker> walker;
+    if (FAILED((*automation.get()).get_RawViewWalker(walker.receive())) || walker.get() == nullptr) {
+        throw std::runtime_error("the raw view walker is not available");
+    }
+    ElementReference window_element;
+    const HRESULT found = (*automation.get()).ElementFromHandle(run.hwnd, window_element.receive());
+    if (FAILED(found) || window_element.get() == nullptr) {
+        throw std::runtime_error("the window has no UI Automation element");
+    }
+    if (run.jobs != nullptr) {
+        for (const ActionJob& job : *run.jobs) perform_job(run, *walker.get(), *window_element.get(), job);
+        return;
+    }
+    if (run.window_kind == off_tree_page) {
+        compare_page(run, *automation.get(), *walker.get(), *window_element.get(), off_tree_page);
+        return;
+    }
+    for (const gallery::GalleryPageSpec& page : gallery::gallery_pages) {
+        compare_page(run, *automation.get(), *walker.get(), *window_element.get(), page.id);
+    }
+    check_stale_element(run, *walker.get(), *window_element.get());
+}
+
+struct CloseWindow final {
+    std::function<void()>* request_close{};
+    void operator()() const { (*request_close)(); }
+};
+
+// The client thread: the multithreaded apartment, the run, then the window
+// closes through the UI thread whatever happened.
+struct ClientThread final {
+    ClientRun* run{};
+    void operator()() const {
+        ClientRun& state = *run;
+        const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        try {
+            if (FAILED(initialized)) throw std::runtime_error("the client thread has no COM apartment");
+            run_client(state);
+            (*state.report).completed = true;
+        } catch (const std::exception& error) {
+            (*state.report).failure = error.what();
+        }
+        if (SUCCEEDED(initialized)) CoUninitialize();
+        try {
+            (*state.window).invoke(std::function<void()>(CloseWindow{&state.request_close}));
+        } catch (const std::exception& error) {
+            (*state.report).failure += std::string(" closing the window: ") + error.what();
+        }
+    }
+};
+
+// Starts the client once the host has attached the window and its
+// publishers, and returns so the UI thread's message loop serves it.
+struct HostReady final {
+    ClientRun* run{};
+    std::thread* client{};
+    void operator()(std::function<void()>, std::function<void()> request_close,
+                    std::function<HostDialogResult(const HostDialogRequest&)>,
+                    std::function<HostServiceStatus(const HostTooltipRequest&)>,
+                    std::function<void()>, std::function<HostClipboardTextResult()>,
+                    std::function<HostServiceStatus(std::string_view)>) const {
+        (*run).request_close = std::move(request_close);
+        (*run).hwnd = FindWindowW(L"GUIForms.Window.v1", fixture_title);
+        if ((*run).hwnd == nullptr) {
+            (*(*run).report).failure = "the window's native handle does not exist";
+            (*run).request_close();
+            return;
+        }
+        *client = std::thread(ClientThread{run});
+    }
+};
+
+void place(Panel& root, const Control::Ptr& control, Rect bounds) {
+    (*control).set_requested_bounds(bounds);
+    root.add_child(control);
+}
+
+// The off-tree fixture, as A-W1 builds it.
+std::unique_ptr<Window> make_off_tree_fixture() {
+    const std::shared_ptr<Panel> root = make_control<Panel>(StableId("off-tree"));
+    const std::shared_ptr<ButtonBase> button_base =
+        make_control<ButtonBase>(StableId("off-tree.button-base"), "Base command");
+    place(*root, button_base, Rect{10.0, 10.0, 160.0, 30.0});
+    place(*root, make_control<RangeControl>(StableId("off-tree.range-control")), Rect{10.0, 50.0, 160.0, 30.0});
+    place(*root, make_control<ScrollBar>(StableId("off-tree.scroll-bar")), Rect{10.0, 90.0, 160.0, 18.0});
+    const std::shared_ptr<ScaledPanel> scaled =
+        make_control<ScaledPanel>(StableId("off-tree.scaled-panel"), Size{200.0, 100.0});
+    place(*root, scaled, Rect{200.0, 10.0, 200.0, 100.0});
+    const std::shared_ptr<Label> scaled_label =
+        make_control<Label>(StableId("off-tree.scaled-panel.label"), "Scaled content");
+    (*scaled_label).set_requested_bounds(Rect{4.0, 4.0, 150.0, 24.0});
+    (*scaled).add_child(scaled_label);
+    place(*root, make_control<SplitterPanel>(StableId("off-tree.splitter-panel")), Rect{420.0, 10.0, 160.0, 100.0});
+    place(*root, make_control<ToolStripPanel>(StableId("off-tree.tool-strip-panel")),
+          Rect{600.0, 10.0, 300.0, 40.0});
+    place(*root, make_control<PropertyGrid>(StableId("off-tree.property-grid")), Rect{10.0, 130.0, 300.0, 240.0});
+    place(*root, make_control<TaskDialog>(StableId("off-tree.task-dialog")), Rect{330.0, 130.0, 420.0, 240.0});
+    place(*root, make_control<FontDialog>(StableId("off-tree.font-dialog")), Rect{10.0, 390.0, 640.0, 400.0});
+    const Size size{1280.0, 820.0};
+    std::unique_ptr<Window> window = std::make_unique<Window>(root, size);
+    return window;
+}
+
+// Runs one window with the client in it. Throws when the window does not
+// run or the client fails.
+void run_window(Report& report, std::string_view window_kind, const std::vector<ActionJob>* jobs) {
+    report.completed = false;
+    std::unique_ptr<Window> model;
+    if (window_kind == off_tree_page) {
+        model = make_off_tree_fixture();
+    } else {
+        model = gallery::make_gallery();
+    }
+    ClientRun run;
+    run.report = &report;
+    run.window = model.get();
+    run.window_kind = window_kind;
+    run.jobs = jobs;
+    std::thread client;
+    host::WindowsHostOptions options;
+    options.title = std::string(fixture_title_utf8);
+    options.initial_size = gallery::gallery_default_size;
+    options.minimum_size = gallery::gallery_minimum_size;
+    options.print_metrics_on_close = false;
+    options.host_ready = HostReady{&run, &client};
+    const int exit_code = host::run_windows(std::move(model), std::move(options));
+    if (client.joinable()) client.join();
+    if (exit_code != 0) throw std::runtime_error("the Gallery window did not run");
+    if (!report.failure.empty()) throw std::runtime_error(report.failure);
+    if (!report.completed) throw std::runtime_error("the client did not complete");
+}
+
+// Performs every candidate of `page` in one fresh window; one whose change
+// was not seen runs again alone in a fresh window, and that result stands
+// (A-W1's rule: an earlier action's effects can hide a later one's).
+void perform_page_actions(Report& report, std::string_view page) {
+    std::vector<ActionJob> jobs;
+    for (const std::pair<const std::string, ActionCandidate>& entry : report.candidates) {
+        if (entry.second.page != page) continue;
+        jobs.push_back(ActionJob{&entry.first, &entry.second});
+    }
+    if (jobs.empty()) return;
+    std::string_view window_kind;
+    if (page == off_tree_page) window_kind = off_tree_page;
+    const std::size_t first = report.actions.size();
+    run_window(report, window_kind, &jobs);
+    for (std::size_t index = 0; index < jobs.size(); ++index) {
+        if (report.actions[first + index].outcome == ActionOutcome::changed) continue;
+        const ActionResult& batched = report.actions[first + index];
+        std::string first_try = std::string(outcome_name(batched.outcome));
+        if (!batched.evidence.empty()) first_try += ", " + batched.evidence;
+        const std::vector<ActionJob> alone{jobs[index]};
+        run_window(report, window_kind, &alone);
+        ActionResult isolated = std::move(report.actions.back());
+        report.actions.pop_back();
+        if (!isolated.evidence.empty()) isolated.evidence += "; ";
+        isolated.evidence += "alone in a fresh window, after \"" + first_try + "\" in the page's window";
+        report.actions[first + index] = std::move(isolated);
+    }
+}
+
+bool listed(std::span<const std::string_view> list, std::string_view id) noexcept {
+    for (const std::string_view entry : list) {
+        if (entry == id) return true;
+    }
+    return false;
+}
+
+std::string registry_coverage(const Report& report) {
+    std::size_t controls = 0;
+    std::size_t exposed = 0;
+    std::string missing;
+    std::string stale;
+    for (const gallery::CatalogEntry& entry : gallery::control_catalog) {
+        if (listed(nonvisual_entries, entry.id)) continue;
+        ++controls;
+        const std::map<std::string, ControlTally>::const_iterator found = report.tallies.find(std::string(entry.id));
+        const bool own_node = found != report.tallies.end() && (*found).second.own_nodes != 0U;
+        if (own_node) ++exposed;
+        const bool unexposed = listed(unexposed_entries, entry.id);
+        if (!own_node && !unexposed) missing += " " + std::string(entry.id);
+        if (own_node && unexposed) stale += " " + std::string(entry.id);
+    }
+    std::cout << "registry coverage: " << exposed << " of " << controls
+              << " visual registry controls publish their own node; " << unexposed_entries.size()
+              << " are presentational (" << nonvisual_entries.size() << " nonvisual entries excluded)\n";
+    std::string disagreement;
+    if (!missing.empty()) disagreement += "registry controls the client never found:" + missing;
+    if (!stale.empty()) disagreement += " unexposed_entries lists exposed controls:" + stale;
+    return disagreement;
+}
+
+void print_report(const Report& report) {
+    std::cout << "UI Automation Gallery client: " << report.pages << " pages, " << report.elements
+              << " elements compared, " << report.controller_relations << " tab-to-panel relations\n";
+    std::cout << "| control type | own nodes | item nodes | matched | mismatched |\n";
+    for (const std::pair<const std::string, ControlTally>& entry : report.tallies) {
+        const ControlTally& tally = entry.second;
+        std::cout << "| " << entry.first << " | " << tally.own_nodes << " | " << tally.item_nodes << " | "
+                  << tally.matched << " | " << tally.mismatched << " |\n";
+    }
+    std::cout << "default actions (" << report.actions.size() << "):\n";
+    for (const ActionResult& action : report.actions) {
+        std::cout << "  " << action.key << " [" << action.page << " " << action.stable_id << "] " << action.call
+                  << ": " << outcome_name(action.outcome);
+        if (!action.evidence.empty()) std::cout << " (" << action.evidence << ")";
+        std::cout << '\n';
+    }
+    std::cout << "mismatches (" << report.mismatches.size() << "):\n";
+    for (const Mismatch& mismatch : report.mismatches) {
+        std::cout << "  " << mismatch.page << " " << mismatch.stable_id << " [" << mismatch.control_type << "] "
+                  << mismatch.field << ": expected \"" << mismatch.expected << "\", observed \""
+                  << mismatch.observed << "\"\n";
+    }
+}
+
+} // namespace
+
+int main() {
+    try {
+        Report report;
+        run_window(report, std::string_view(), nullptr);
+        run_window(report, off_tree_page, nullptr);
+        for (const gallery::GalleryPageSpec& page : gallery::gallery_pages) {
+            perform_page_actions(report, page.id);
+        }
+        perform_page_actions(report, off_tree_page);
+        print_report(report);
+        const std::string coverage = registry_coverage(report);
+        std::size_t failed_actions = 0;
+        for (const ActionResult& action : report.actions) {
+            if (action.outcome != ActionOutcome::changed) ++failed_actions;
+        }
+        if (!report.stale_check.empty()) {
+            std::cerr << report.stale_check << '\n';
+            return 1;
+        }
+        std::cout << "stale element: UIA_E_ELEMENTNOTAVAILABLE after its page was replaced\n";
+        if (!coverage.empty()) {
+            std::cerr << coverage << '\n';
+            return 1;
+        }
+        if (!report.mismatches.empty() || failed_actions != 0U) {
+            std::cerr << report.mismatches.size() << " mismatches, " << failed_actions
+                      << " actions without an observed change\n";
+            return 1;
+        }
+        std::cout << "UI Automation Gallery client passed\n";
+        return 0;
+    } catch (const std::exception& error) {
+        std::cerr << error.what() << '\n';
+        return 1;
+    }
+}

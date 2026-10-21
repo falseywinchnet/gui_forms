@@ -16,8 +16,16 @@ Types
 
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
      - BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
+   * - :cpp:class:`CachedPartRaster <gui_forms::CachedPartRaster>`
+     - A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent.
    * - :cpp:class:`Color <gui_forms::Color>`
      - gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default.
+   * - :cpp:class:`CompiledThemeRules <gui_forms::CompiledThemeRules>`
+     - A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them.
+   * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
+     - What a part is: the facts its selectors are matched against.
+   * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
+     -  
    * - :cpp:class:`ConnectedControlSeam <gui_forms::ConnectedControlSeam>`
      -  
    * - :cpp:class:`ConnectedControlTopology <gui_forms::ConnectedControlTopology>`
@@ -42,8 +50,14 @@ Types
      - A raster's size in device pixels.
    * - :cpp:class:`DeviceScale <gui_forms::DeviceScale>`
      - Device pixels per logical unit.
+   * - :cpp:class:`EnginePartRecord <gui_forms::EnginePartRecord>`
+     - One painted part's record.
+   * - :cpp:class:`EnginePartTable <gui_forms::EnginePartTable>`
+     - The table.
    * - :cpp:class:`EnginePrimitive <gui_forms::EnginePrimitive>`
      - One kind of effect.
+   * - :cpp:class:`EngineSineCosine <gui_forms::EngineSineCosine>`
+     - The sine and cosine of ``x`` radians, computed together (E3's springs).
    * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
      - The engine version a primitive was introduced in, and the version a theme declares it needs.
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
@@ -64,14 +78,38 @@ Types
      - One ordered physical keyline.
    * - :cpp:class:`MaterialShadow <gui_forms::MaterialShadow>`
      - MaterialShadow specifies offset, blur, spread, and color for one bounded surface shadow.
+   * - :cpp:class:`MotionClock <gui_forms::MotionClock>`
+     - One window's motion clock (T2 plan, MotionClock; GIVEN D1-1).
+   * - :cpp:class:`MotionCurve <gui_forms::MotionCurve>`
+     - How a value moves.
+   * - :cpp:class:`MotionRecordHandle <gui_forms::MotionRecordHandle>`
+     - Which record of a clock a value holds while it moves: a slot and the slot's generation when the record was made.
+   * - :cpp:class:`MotionStep <gui_forms::MotionStep>`
+     - One step of a value, as its listener sees it.
+   * - :cpp:class:`MotionTimeSource <gui_forms::MotionTimeSource>`
+     - Where a clock reads the time a motion starts.
+   * - :cpp:class:`MotionValue <gui_forms::MotionValue>`
+     - One value.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
+   * - :cpp:class:`PartKey <gui_forms::PartKey>`
+     - A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster.
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
+   * - :cpp:class:`PartRaster <gui_forms::PartRaster>`
+     - One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale.
+   * - :cpp:class:`PartRasterRequest <gui_forms::PartRasterRequest>`
+     - What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size times the scale, rounded up).
+   * - :cpp:class:`PartRasterResult <gui_forms::PartRasterResult>`
+     -  
    * - :cpp:class:`PartRasterView <gui_forms::PartRasterView>`
      - A borrowed destination for one part's pixels.
+   * - :cpp:class:`PartRecordAcquisition <gui_forms::PartRecordAcquisition>`
+     - What acquire() did.
+   * - :cpp:class:`PartRecordHandle <gui_forms::PartRecordHandle>`
+     - Which record a handle names: a slot of the table and the slot's generation when the record was made.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
    * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
@@ -90,12 +128,22 @@ Types
      - A fixed table of primitives, in registration order.
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
      - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states.
+   * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
+     - The raster cache's counters, for instrumentation.
    * - :cpp:class:`Rect <gui_forms::Rect>`
      - Rect is a half-open logical rectangle with finite/empty checks, containment, exact intersection, and bounding union operations.
    * - :cpp:class:`RetainedDrawCache <gui_forms::RetainedDrawCache>`
      -  
    * - :cpp:class:`RetainedDrawMemo <gui_forms::RetainedDrawMemo>`
      - Renderer-derived data for one retained draw command, such as shaped text.
+   * - :cpp:class:`RuleDeclaration <gui_forms::RuleDeclaration>`
+     - One declaration: a property and its value.
+   * - :cpp:class:`RuleDiagnostic <gui_forms::RuleDiagnostic>`
+     -  
+   * - :cpp:class:`RuleSelector <gui_forms::RuleSelector>`
+     - What a rule applies to.
+   * - :cpp:class:`RuleSpecificity <gui_forms::RuleSpecificity>`
+     - A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
    * - :cpp:class:`Size <gui_forms::Size>`
      - Size is a renderer-neutral logical width and height.
    * - :cpp:class:`SurfaceMaterial <gui_forms::SurfaceMaterial>`
@@ -104,10 +152,18 @@ Types
      - Theme is an immutable validated role/state recipe table plus structural spacing, geometry, typography, and motion tokens; it resolves logical visual context without exposing renderer or platform objects.
    * - :cpp:class:`ThemeDefinition <gui_forms::ThemeDefinition>`
      - ThemeDefinition is one named, complete compatibility palette, role/state material matrix, and structural-token set.
+   * - :cpp:class:`ThemeEngine <gui_forms::ThemeEngine>`
+     - The theme engine's entry point (T2 plan, ThemeEngine).
+   * - :cpp:class:`ThemeEngine::PartPlan <gui_forms::ThemeEngine::PartPlan>`
+     -  
    * - :cpp:class:`ThemeGeometryTokens <gui_forms::ThemeGeometryTokens>`
      - ThemeGeometryTokens centralizes control heights, touch targets, splitter geometry, navigation extents, and compact breakpoint.
    * - :cpp:class:`ThemeMotionTokens <gui_forms::ThemeMotionTokens>`
      - ThemeMotionTokens defines quick, standard, emphasized, and busy-cycle durations without prescribing an animation engine.
+   * - :cpp:class:`ThemeRule <gui_forms::ThemeRule>`
+     - One rule.
+   * - :cpp:class:`ThemeRuleSheet <gui_forms::ThemeRuleSheet>`
+     - A theme's rules, as authored, with the engine version the theme declares it needs.
    * - :cpp:class:`ThemeSpacingTokens <gui_forms::ThemeSpacingTokens>`
      - ThemeSpacingTokens names the shared micro-through-section logical spacing scale.
    * - :cpp:class:`ThemeStructureTokens <gui_forms::ThemeStructureTokens>`
@@ -173,6 +229,30 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: CachedPartRaster final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   A part's cached raster and what drew it: the primitive, every parameter (animated ones included, since they change the pixels), the target with its states restricted to those the primitive reads, and the extent. The record owns it; ``raster`` is the cache's reference, and recorded commands that composite the raster hold others.
+
+   .. cpp:member:: std::shared_ptr<PartRaster> raster
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: PrimitiveTarget target
+
+   .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: std::uint64_t raster_generation
+
+      The record's and the table's raster generations when ``raster`` was drawn; invalidation advances the current ones.
+
+   .. cpp:member:: std::uint64_t raster_table_generation
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Color
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -193,6 +273,81 @@ Types
    .. cpp:member:: std::uint8_t alpha
 
       Default: ``{255}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: CompiledThemeRules final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them. Immutable once made; a ThemeEngine owns one. Compiling never fails as a whole: an invalid declaration or rule is dropped with a diagnostic and the rest stands, so a broken rule cannot take the theme's other rules down with it.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: CompiledThemeRules() = default
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool empty() const noexcept
+
+   .. cpp:function:: std::size_t rule_count() const noexcept
+
+   .. cpp:function:: const std::vector<RuleDiagnostic>& diagnostics() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static CompiledThemeRules compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
+
+      Compiles ``sheet`` against ``registry``, which must outlive the result.
+
+   .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
+
+      The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::PartFacts final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   What a part is: the facts its selectors are matched against. The views are borrowed for the call.
+
+   .. cpp:member:: std::string_view control_type
+
+   .. cpp:member:: std::string_view stable_id
+
+   .. cpp:member:: std::span<const std::string> classes
+
+   .. cpp:member:: std::string_view part
+
+      Empty for an unkeyed part.
+
+   .. cpp:member:: PartRole role
+
+      Default: ``{PartRole::region}``.
+
+   .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::Resolution final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: Outcome outcome
+
+      Default: ``{Outcome::no_rule}``.
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: CascadeLevel level
+
+      The level of the declaration that chose the primitive (or built_in); built_in when no rule did. Default: ``{CascadeLevel::built_in}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -449,6 +604,111 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: EnginePartRecord final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   One painted part's record. The identity strings are owned copies of the key the part was first painted with.
+
+   .. cpp:member:: std::string control
+
+   .. cpp:member:: std::string part
+
+   .. cpp:member:: std::string item
+
+   .. cpp:member:: std::optional<std::size_t> item_index
+
+      Set only for the index fallback (PartKey::index_fallback).
+
+   .. cpp:member:: AnatomyStateSet states
+
+      The states the part was last painted in.
+
+   .. cpp:member:: PrimitivePreparation preparation
+
+      What the part's primitive derived for its geometry; empty until a primitive draws the part (never, before themes select one in T3).
+
+   .. cpp:member:: std::uint64_t last_painted
+
+      When the part was last painted: the number of window paints completed before the one that drew it. The cache evicts the smallest first.
+
+   .. cpp:member:: bool motion_unsettled
+
+      True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
+
+   .. cpp:member:: std::unique_ptr<CachedPartRaster> cached
+
+      The cached raster and what drew it, made the first time a primitive draws the part, so that a record no primitive draws stays small.
+
+   .. cpp:member:: std::uint64_t generation
+
+      The record's current raster generation; invalidate_raster advances it. Default: ``{1U}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: EnginePartTable final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   The table. It owns its records. Every member runs on the window's UI thread; the table is not shared between windows.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit EnginePartTable(std::size_t item_record_cap = maximum_item_part_records) noexcept
+
+      The table keeps at most ``item_record_cap`` item-part records (at least 1); the window's table uses maximum_item_part_records.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::size_t record_count() const noexcept
+
+      Live records, and those of item parts among them.
+
+   .. cpp:function:: std::size_t item_record_count() const noexcept
+
+   .. cpp:function:: std::size_t slot_count() const noexcept
+
+      Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
+
+   .. cpp:function:: RasterCacheStatistics cache_statistics() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: PartRecordAcquisition acquire(std::string_view control_id, const PartKey& key)
+
+      The record for ``control_id`` and ``key``, made if there is none, and marked the most recently painted item record when it is an item's. A new record reuses a released slot before the table grows; a new item record beyond the cap evicts the least recently painted settled item record (O(1) unless records with unsettled motion are passed over). If an allocation fails, std::bad_alloc propagates and the table is unchanged.
+
+   .. cpp:function:: std::optional<PartRecordHandle> find(std::string_view control_id, const PartKey& key) const
+
+      The live record for ``control_id`` and ``key``, if there is one. For inspection: it builds its lookup text in a string of its own.
+
+   .. cpp:function:: EnginePartRecord* record(PartRecordHandle handle) noexcept
+
+      The record a handle names, or null when the handle is stale (its record was released) or names no slot. The pointer is valid until the next acquire() or release on this table.
+
+   .. cpp:function:: const EnginePartRecord* record(PartRecordHandle handle) const noexcept
+
+   .. cpp:function:: std::size_t release_control(std::string_view control_id) noexcept
+
+      Releases every record of the control with this stable ID, as when it leaves the window, and returns how many. Their handles become stale and their cached rasters are released. The cost is one pass over the table's slots.
+
+   .. cpp:function:: PartRasterResult raster_for(PartRecordHandle handle, const PartRasterRequest& request, std::uint64_t paint_sequence)
+
+      The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
+
+   .. cpp:function:: void invalidate_raster(PartRecordHandle handle) noexcept
+
+      Makes one part's cached raster stale; the next raster_for draws it again. A stale handle does nothing.
+
+   .. cpp:function:: void invalidate_rasters() noexcept
+
+      Makes every cached raster stale, as when the theme changes.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: EnginePrimitive
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -470,6 +730,18 @@ Types
    .. rubric:: Extension points
 
    .. cpp:function:: virtual const PrimitiveDescriptor& descriptor() const noexcept = 0
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: EngineSineCosine final
+
+   ``#include <gui_forms/engine/engine_math/engine_math.hpp>``
+
+   The sine and cosine of ``x`` radians, computed together (E3's springs). For x of magnitude at most 2^20 the absolute error of each is at most 2^-50; beyond that, and for infinities and NaN, both are NaN. Exact case: x = 0 gives sine 0 and cosine 1. The argument is reduced by the nearest multiple of π/2, with π/2 split in three parts (Cody and Waite) so that the reduction is exact to about 2^-100 relative.
+
+   .. cpp:member:: double sine
+
+   .. cpp:member:: double cosine
 
 .. cpp:namespace:: gui_forms
 
@@ -748,6 +1020,204 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: MotionClock final
+
+   ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+   One window's motion clock (T2 plan, MotionClock; GIVEN D1-1). The window owns it; it observes the window. It holds at most one frame request, armed only while some value it holds has not settled, however many values move; the request is disconnected once the last one settles, so a window at rest schedules no frames. Execution: every member runs on the window's UI thread. Frames, settling and the listeners' damage all happen inside the window's frame poll. Event order on a frame: each value enlisted before the frame starts is advanced to the frame's time, in the order of its record's slot (the same for the same sequence of starts and releases); a value that settles is released before its listener runs; then the owner is invalidated as the value declared, then its listener runs. Values started by a listener are first advanced on the next frame. A listener that throws is counted as a frame callback fault; its value jumps to its end. Ending motion (all by name): - finish_all: reduced motion turned on (GIVEN D2-1) or the window occluded or minimized (GIVEN D4-1). Every value jumps to its end and its listener runs once, with the cause. While either holds, a new move jumps to its end at once and nothing is scheduled. - release_owner: a control left the window. Its values jump to their ends without listeners. - cancel: the window closes (or cancels its frame requests). Every value jumps to its end without listeners, and the request is disconnected. A record is named by its handle; a stale handle (its record released) is rejected, so a value whose owner has gone is never advanced.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: explicit MotionClock(Window& window) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: FrameTime now() const noexcept
+
+      The time a move starting now starts at.
+
+   .. cpp:function:: bool armed() const noexcept
+
+      Whether the clock holds its frame request.
+
+   .. cpp:function:: std::size_t moving_count() const noexcept
+
+      Values moving on the clock now.
+
+   .. cpp:function:: bool suppressed() const noexcept
+
+      Whether a move would jump to its end at once: reduced motion, or an occluded or minimized window.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void set_time_source(const MotionTimeSource* source) noexcept
+
+      Borrows ``source`` (it must outlive its installation); null restores the steady clock.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionCurve final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   How a value moves. Make it with the named factories, which keep the fields that belong together consistent.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static MotionCurve timed(FrameInterval duration, MotionEasing easing) noexcept
+
+   .. cpp:function:: static MotionCurve follow(FrameInterval time_constant = follow_time_constant) noexcept
+
+   .. cpp:function:: static MotionCurve spring(FrameInterval response, double overshoot = 0.0) noexcept
+
+   .. cpp:function:: static MotionCurve decay(FrameInterval time_constant) noexcept
+
+   .. cpp:member:: MotionKind kind
+
+      Default: ``{MotionKind::timed}``.
+
+   .. cpp:member:: FrameInterval duration
+
+      timed: the duration. follow and decay: the time constant. spring: the response time, 1/ω for the natural angular frequency ω. Clamped to [0, motion_duration_ceiling]; zero means the value jumps to its end. Default: ``{std::chrono::milliseconds(180)}``.
+
+   .. cpp:member:: MotionEasing easing
+
+      timed only. Default: ``{MotionEasing::smoothstep}``.
+
+   .. cpp:member:: double overshoot
+
+      spring only: the overshoot of a move from rest, as a fraction of the distance, from 0 (critically damped) to maximum_motion_overshoot.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionRecordHandle final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   Which record of a clock a value holds while it moves: a slot and the slot's generation when the record was made. A released record's handle is stale and names nothing, even after its slot is reused.
+
+   .. cpp:member:: std::uint32_t slot
+
+   .. cpp:member:: std::uint32_t generation
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: MotionStep final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   One step of a value, as its listener sees it. ``value`` is the value that moved; it is valid for the call.
+
+   .. cpp:member:: MotionValue* value
+
+   .. cpp:member:: double previous
+
+   .. cpp:member:: double current
+
+   .. cpp:member:: bool settled
+
+      The value reached its settled condition (or jumped to its end) and stands exactly at its target; the clock no longer advances it.
+
+   .. cpp:member:: MotionStepCause cause
+
+      Default: ``{MotionStepCause::advanced}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MotionTimeSource
+
+   ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+   Where a clock reads the time a motion starts. Steady-clock time unless a source is installed: tests install one so that motion is sampled from a time they choose, never from the wall clock. Its times must be in the same domain as the times the window is polled with.
+
+
+   .. rubric:: Extension points
+
+   .. cpp:function:: virtual FrameTime now() const noexcept = 0
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: MotionValue final
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   One value. Ownership: a control owns it as a member (or through something the control owns), and names itself as the owner, so the owner outlives it. It neither copies nor moves, so the clock's record of it stays valid; it releases that record when it is destroyed. All of it runs on the UI thread of the owner's window. The settled conditions, in device pixels at the window's scale (extent times scale converts value units): - timed: the duration has elapsed; - follow and decay: the remaining gap is within motion_settle_tolerance; - spring: the gap is within it, and so is the movement over one 60 Hz frame at the current velocity. On settling the value snaps exactly to its target, so the last frame is the static rendering. Every move starts from where the value stands at that moment, with its velocity: a retarget mid-flight never jumps (design language §9.1).
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: MotionValue(Control& owner, MotionCurve curve, double initial = 0.0) noexcept
+
+      A settled value at ``initial``, owned by :cpp:func:`owner <gui_forms::MotionValue::owner>`.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: double current() const noexcept
+
+      The value at the last frame, start or jump.
+
+   .. cpp:function:: double target() const noexcept
+
+      Where the value is going (a decay: where it comes to rest).
+
+   .. cpp:function:: double velocity() const noexcept
+
+   .. cpp:function:: bool settled() const noexcept
+
+   .. cpp:function:: const MotionCurve& curve() const noexcept
+
+   .. cpp:function:: void set_curve(MotionCurve curve) noexcept
+
+      The curve of the next move; a move under way keeps its own. Durations and overshoot are clamped (see MotionCurve).
+
+   .. cpp:function:: double extent() const noexcept
+
+   .. cpp:function:: bool set_extent(double logical_units) noexcept
+
+      The logical length one unit of the value spans, for the settled conditions (default 1: the value is a logical length). A progress across a 150-unit slide has extent 150. Refused (returns false, the extent unchanged) outside [minimum_motion_extent, maximum_motion_extent] or when not finite.
+
+   .. cpp:function:: Control& owner() const noexcept
+
+   .. cpp:function:: bool enlisted() const noexcept
+
+      Whether a clock holds this value's record (it is moving on it).
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: MotionStart animate_to(double target)
+
+      Moves toward :cpp:func:`target <gui_forms::MotionValue::target>` from where the value stands now. A decay comes to rest at the target. If the clock's record or its frame request cannot be made, the exception propagates and the value is unchanged.
+
+   .. cpp:function:: MotionStart fling(double velocity)
+
+      decay only: launches the value at :cpp:func:`velocity <gui_forms::MotionValue::velocity>` (value units per second); it comes to rest where friction stops it.
+
+   .. cpp:function:: MotionStart adopt(const MotionValue& source)
+
+      Moves as ``source`` moves: its curve, its current move and its time, on this value's own clock (a docking guest showing another window's stamp). A settled source makes this value jump to its value.
+
+   .. cpp:function:: void finish() noexcept
+
+      Ends the move: the value stands at its target, settled. No listener runs.
+
+   .. cpp:function:: void jump_to(double value) noexcept
+
+      Stands the value at ``value``, settled (a non-finite value is ignored). No listener runs.
+
+   .. cpp:function:: void set_listener(MotionListener listener) noexcept
+
+   .. cpp:function:: void set_invalidation(Dirty dirty) noexcept
+
+      What the clock invalidates on the owner after each step; none by default (the listener invalidates what it moved).
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:class:: Painter : public TextMetricsProvider
 
    ``#include <gui_forms/types/painter/painter.hpp>``
@@ -827,6 +1297,10 @@ Types
 
       A live raster is a retained renderer-neutral resource whose producer may publish independently of the UI dispatcher. Display lists retain the resource and terminal renderers sample only its newest complete frame.
 
+   .. cpp:function:: virtual void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin, double opacity = 1.0)
+
+      Composites one of the theme engine's part rasters (T2 plan, E2; GIVEN A2-2 and C1-1). ``origin`` is the raster's top-left corner in logical units; the painter places the raster's first pixel on the device pixel nearest to it, one raster pixel per device pixel, so the part is device-aligned and never resampled. ``opacity`` in [0, 1] is the part's opacity, one multiplier on its whole composite. The blend is the shared premultiplied source-over (detail::composite_part_raster) under the current clip, so every host writes the same bytes. A raster made for another display scale than the painter's is not drawn: the engine rasterizes a part for the scale it is shown at. The base implementation draws nothing; the recording, Skia and Windows DIB painters override it. A null raster draws nothing.
+
    .. cpp:function:: virtual void draw_image_region(ImageId image, Rect source, Rect destination, double opacity = 1.0)
 
       Source-region replay is the renderer-neutral primitive behind image strips, texture fills, and nine-patch materials. ``source`` is expressed in source-image pixels. Minimal painters may preserve coherence by falling back to whole-image scaling; production painters override it.
@@ -853,11 +1327,32 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartKey final
+
+   ``#include <gui_forms/engine/types/engine_types.hpp>``
+
+   A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster. The full identity is the control's stable ID, the declared part, and for an item part the item's stable ID. The engine takes the control's stable ID from the control painting the part, so a key cannot name another control; the key carries the rest: - ``part``: the part's declared name, as in the control's anatomy; - ``item``: the item's stable ID, empty for a part that is not an item's or for an item without one; - ``item_index``: the item's index. It is part of the identity only when ``item`` is empty: the index fallback, which the window counts in its metrics, because the record then follows the position, not the item. Every view is borrowed for the call that paints the part.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: constexpr bool index_fallback() const noexcept
+
+      Whether the key falls back to an item index.
+
+   .. cpp:member:: std::string_view part
+
+   .. cpp:member:: std::string_view item
+
+   .. cpp:member:: std::optional<std::size_t> item_index
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PartPaint final
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
 
-   One part to paint, in the control's local coordinates. ``text``, ``image`` and ``mark`` are read only by roles that show them (label, caption and content; icon; glyph and indicator). ``text`` is borrowed for the call. ``font`` is an effective font (Control::effective_font). ``corner_radius``, when set, gives a surface part its shape; the theme (T4) will own shapes, so a control sets it only where today's recipe has no shape for the part. ``orientation`` and ``alignment`` are read with ``text``; ``dock_region`` only by the dock_shape mark.
+   One part to paint, in the control's local coordinates. ``text``, ``image`` and ``mark`` are read only by roles that show them (label, caption and content; icon and image; glyph and indicator). ``text`` is borrowed for the call. ``font`` is an effective font (Control::effective_font). ``corner_radius``, when set, gives a surface part its shape; the theme (T4) will own shapes, so a control sets it only where today's recipe has no shape for the part. ``orientation`` and ``alignment`` are read with ``text``; ``dock_region`` only by the dock_shape mark.
 
    .. cpp:member:: PartRole role
 
@@ -901,7 +1396,71 @@ Types
 
    .. cpp:member:: std::optional<Color> content_color
 
-      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and at 45 % opacity when the part is disabled, as a disabled icon is.
+      The colour the part shows as its content (design language 8.5; owner decision W-7), such as a colour picker's sample, or none. Only the fill role honours it: a fill with a content colour is painted that colour, flat, in the part's shape (corner_radius, else square), in place of the recipe's material; every other role ignores it. A swatch is therefore a fill inside a well part that frames it. The colour is data, as an image is: it is drawn as given in ordinary and high-contrast presentation alike (the framing well follows the high-contrast recipe, so the sample stays outlined), and when the part is disabled (T2 GIVEN E2-1: a theme styles only what surrounds it, so a disabled swatch shows through its well, edge and label).
+
+   .. cpp:member:: std::optional<PartKey> key
+
+      The part's identity across frames (T2 GIVEN H3-1), or none. A part with a key has a record in its window's engine part table; one without is drawn statically, with no transitions and no cached raster. It is identity, not vocabulary: it changes nothing a part looks like today. Its views are borrowed for the call.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: PartRaster final
+
+   ``#include <gui_forms/engine/part_raster/part_raster.hpp>``
+
+   One part's pixels as the engine keeps them (T2 plan, PartRaster): premultiplied RGBA8 in device pixels, in PartRasterView's layout, made for one display scale. Rows are tight: row_bytes is width * 4. Lifetime: create() makes a raster with every pixel transparent; its maker fills it through view() and then shares it read-only, as std::shared_ptr<const PartRaster>, with every recorded command that composites it (Painter::draw_part_raster). Recorded commands keep it alive until their display chunk is rebuilt or retired.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const std::uint8_t> pixels() const noexcept
+
+   .. cpp:function:: DeviceExtent extent() const noexcept
+
+   .. cpp:function:: std::size_t row_bytes() const noexcept
+
+   .. cpp:function:: DeviceScale scale() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static std::shared_ptr<PartRaster> create(DeviceExtent extent, DeviceScale scale)
+
+      A transparent raster of :cpp:func:`extent <gui_forms::PartRaster::extent>` for display scale :cpp:func:`scale <gui_forms::PartRaster::scale>`, or null when either side exceeds maximum_part_raster_side or the scale is not a finite value in [minimum_device_scale, maximum_device_scale]. An empty extent is allowed and has no pixels.
+
+   .. cpp:function:: PartRasterView view() noexcept
+
+      The raster as a destination for a primitive: valid while the raster lives and is not shared read-only.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRasterRequest final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size times the scale, rounded up).
+
+   .. cpp:member:: const EnginePrimitive* primitive
+
+   .. cpp:member:: PrimitiveParameterBlock parameters
+
+   .. cpp:member:: PrimitiveTarget target
+
+   .. cpp:member:: DeviceExtent extent
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRasterResult final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   .. cpp:member:: std::shared_ptr<const PartRaster> raster
+
+      The part's raster, or null when status is stale_record or refused.
+
+   .. cpp:member:: PartRasterStatus status
+
+      Default: ``{PartRasterStatus::refused}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -916,6 +1475,36 @@ Types
    .. cpp:member:: DeviceExtent extent
 
    .. cpp:member:: std::size_t row_bytes
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRecordAcquisition final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   What acquire() did.
+
+   .. cpp:member:: PartRecordHandle handle
+
+   .. cpp:member:: bool created
+
+      A new record was made for the key.
+
+   .. cpp:member:: std::size_t evicted
+
+      Item records evicted to keep within the cap; their handles are stale.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartRecordHandle final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   Which record a handle names: a slot of the table and the slot's generation when the record was made. Releasing a record advances its slot's generation, so a handle kept past the release is stale and finds nothing, even after the slot is reused.
+
+   .. cpp:member:: std::uint32_t slot
+
+   .. cpp:member:: std::uint32_t generation
 
 .. cpp:namespace:: gui_forms
 
@@ -1101,6 +1690,34 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: RasterCacheStatistics final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   The raster cache's counters, for instrumentation.
+
+   .. cpp:member:: std::size_t rasters
+
+      Rasters held and their bytes now.
+
+   .. cpp:member:: std::size_t bytes
+
+   .. cpp:member:: std::uint64_t hits
+
+      Requests answered from the cache, drawn into reused storage, drawn into new storage, and drawn without caching.
+
+   .. cpp:member:: std::uint64_t storage_reuses
+
+   .. cpp:member:: std::uint64_t storage_allocations
+
+   .. cpp:member:: std::uint64_t uncached
+
+   .. cpp:member:: std::uint64_t evictions
+
+      Rasters evicted to keep within the budget.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Rect
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -1158,6 +1775,93 @@ Types
    ``#include <gui_forms/types/painter/painter.hpp>``
 
    Renderer-derived data for one retained draw command, such as shaped text. The command's recording owns it: a Window creates it when a control records the command and releases it when that control's display chunk is rebuilt or retired. A renderer fills, validates and replaces the memo.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleDeclaration final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static RuleDeclaration primitive(std::string_view primitive_name)
+
+   .. cpp:function:: static RuleDeclaration number_value(std::string_view parameter, double value)
+
+   .. cpp:function:: static RuleDeclaration colour_value(std::string_view parameter, Color value)
+
+   .. cpp:member:: std::string property
+
+   .. cpp:member:: RuleValueKind kind
+
+      Default: ``{RuleValueKind::number}``.
+
+   .. cpp:member:: std::string name
+
+   .. cpp:member:: double number
+
+   .. cpp:member:: Color colour
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleDiagnostic final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:member:: RuleDiagnosticKind kind
+
+      Default: ``{RuleDiagnosticKind::rule_empty}``.
+
+   .. cpp:member:: std::size_t rule
+
+      The rule's position in the sheet and its label.
+
+   .. cpp:member:: std::string label
+
+   .. cpp:member:: std::string property
+
+      The declaration's property, empty for a whole-rule diagnostic.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleSelector final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   What a rule applies to. Every field it sets must match; an empty field matches anything. No combinators: a selector names one part of one control. - ``control_type``: the control's anatomy id (ControlAnatomy::control_id, its id in manifests/controls.json). - ``stable_id``: the control's stable ID. - ``classes``: classes the control must all have (Control::classes). - ``part``: the part's declared name. A part is known by name only when it is painted with a key (PartPaint::key); an unkeyed part never matches a selector that names one. - ``role``: the part's role. - ``states``: states the part must all be in.
+
+   .. cpp:member:: std::string control_type
+
+   .. cpp:member:: std::string stable_id
+
+   .. cpp:member:: std::vector<std::string> classes
+
+   .. cpp:member:: std::string part
+
+   .. cpp:member:: std::optional<PartRole> role
+
+   .. cpp:member:: std::vector<AnatomyState> states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: RuleSpecificity final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
+
+   .. cpp:member:: std::uint32_t ids
+
+   .. cpp:member:: std::uint32_t classes
+
+   .. cpp:member:: std::uint32_t types
+
+   .. cpp:member:: std::uint32_t parts
+
+   .. cpp:member:: std::uint32_t states
 
 .. cpp:namespace:: gui_forms
 
@@ -1239,6 +1943,10 @@ Types
 
       Returns the complete immutable definition for inspection or derivation.
 
+   .. cpp:function:: const ThemeEngine& engine() const noexcept
+
+      The theme's engine, which paint_part calls for every part. The theme owns it, so every window showing the theme shares it (T2 plan).
+
 
    .. rubric:: Methods
 
@@ -1287,6 +1995,67 @@ Types
    .. cpp:member:: std::vector<MaterialShadow> high_contrast_overlay_shadow
 
       The overlay shadow in high contrast, under the same rules. Empty by default: high contrast draws no cast shadow, and the overlay's high-contrast edge separates it from the content below.
+
+   .. cpp:member:: ThemeRuleSheet rules
+
+      The theme's rules (the cascade, T2 E4): which primitive draws which part. Empty by default: every part keeps the built-in recipe. They are compiled when the theme is made; an invalid rule or declaration is dropped with a diagnostic (Theme::engine().rules().diagnostics()).
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: ThemeEngine final
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4) and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules draws every part with the built-in recipe, as before E4.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: ThemeEngine()
+
+      An engine with no rules.
+
+   .. cpp:function:: explicit ThemeEngine(const ThemeRuleSheet& sheet)
+
+      An engine with ``sheet`` compiled against the built-in registry. Invalid rules and declarations are dropped with diagnostics; nothing throws for them.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: const PrimitiveRegistry& registry() const noexcept
+
+      The primitives the engine's rules may select.
+
+   .. cpp:function:: const CompiledThemeRules& rules() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: PartPlan plan(const Control& control, const PartPaint& part) const noexcept
+
+      The cascade's decision for one part of ``control``, without painting.
+
+   .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
+
+      Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeEngine::PartPlan final
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   .. cpp:member:: PartDrawing drawing
+
+      Default: ``{PartDrawing::built_in_recipe}``.
+
+   .. cpp:member:: CompiledThemeRules::Resolution resolution
+
+   .. cpp:member:: DeviceExtent extent
+
+      The raster's size for a primitive, in device pixels.
+
+   .. cpp:member:: DeviceScale scale
 
 .. cpp:namespace:: gui_forms
 
@@ -1359,6 +2128,40 @@ Types
    .. cpp:member:: std::chrono::milliseconds busy_cycle
 
       Default: ``{1400}``.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeRule final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's.
+
+   .. cpp:member:: std::string label
+
+   .. cpp:member:: CascadeLevel level
+
+      Default: ``{CascadeLevel::theme_sheet}``.
+
+   .. cpp:member:: RuleSelector selector
+
+   .. cpp:member:: std::vector<RuleDeclaration> declarations
+
+   .. cpp:member:: std::optional<EngineVersion> requires_engine
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ThemeRuleSheet final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A theme's rules, as authored, with the engine version the theme declares it needs.
+
+   .. cpp:member:: EngineVersion requires_engine
+
+      Default: ``{current_engine_version}``.
+
+   .. cpp:member:: std::vector<ThemeRule> rules
 
 .. cpp:namespace:: gui_forms
 
@@ -1446,6 +2249,40 @@ Types
 
 Enumerations
 ------------
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CascadeLevel
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: built_in
+
+   .. cpp:enumerator:: theme_sheet
+
+   .. cpp:enumerator:: class_rule
+
+   .. cpp:enumerator:: stable_id_rule
+
+   .. cpp:enumerator:: inline_style
+
+   .. cpp:enumerator:: forced_high_contrast
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: CompiledThemeRules::Outcome
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: primitive
+
+   .. cpp:enumerator:: no_rule
+
+   .. cpp:enumerator:: built_in_selected
+
+   .. cpp:enumerator:: role_mismatch
 
 .. cpp:namespace:: gui_forms
 
@@ -1683,6 +2520,64 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: MotionEasing
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: smoothstep
+
+   .. cpp:enumerator:: exponential_approach
+
+   .. cpp:enumerator:: linear
+
+   .. cpp:enumerator:: ease
+
+   .. cpp:enumerator:: overshoot
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionKind
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: follow
+
+   .. cpp:enumerator:: spring
+
+   .. cpp:enumerator:: decay
+
+   .. cpp:enumerator:: timed
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionStart
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: started
+
+   .. cpp:enumerator:: unchanged
+
+   .. cpp:enumerator:: finished
+
+   .. cpp:enumerator:: detached
+
+   .. cpp:enumerator:: refused
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: MotionStepCause
+
+   ``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+   .. cpp:enumerator:: advanced
+
+   .. cpp:enumerator:: reduced_motion
+
+   .. cpp:enumerator:: occluded
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ParameterAssignment
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -1758,6 +2653,24 @@ Enumerations
    .. cpp:enumerator:: dock_shape
 
    .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PartRasterStatus
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   .. cpp:enumerator:: cached
+
+   .. cpp:enumerator:: reused_storage
+
+   .. cpp:enumerator:: new_storage
+
+   .. cpp:enumerator:: uncached
+
+   .. cpp:enumerator:: stale_record
+
+   .. cpp:enumerator:: refused
 
 .. cpp:namespace:: gui_forms
 
@@ -1863,6 +2776,56 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: RuleDiagnosticKind
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: needs_newer_engine
+
+   .. cpp:enumerator:: level_not_authored
+
+   .. cpp:enumerator:: selector_missing_level_field
+
+   .. cpp:enumerator:: selector_invalid
+
+   .. cpp:enumerator:: unknown_primitive
+
+   .. cpp:enumerator:: primitive_role_mismatch
+
+   .. cpp:enumerator:: primitive_over_budget
+
+   .. cpp:enumerator:: primitive_cost_unbounded
+
+   .. cpp:enumerator:: primitive_value_not_a_name
+
+   .. cpp:enumerator:: parameter_without_primitive
+
+   .. cpp:enumerator:: unknown_parameter
+
+   .. cpp:enumerator:: parameter_wrong_kind
+
+   .. cpp:enumerator:: parameter_not_finite
+
+   .. cpp:enumerator:: parameter_out_of_range
+
+   .. cpp:enumerator:: duplicate_declaration
+
+   .. cpp:enumerator:: rule_empty
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: RuleValueKind
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   .. cpp:enumerator:: name
+
+   .. cpp:enumerator:: number
+
+   .. cpp:enumerator:: colour
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: TextOrientation
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -1872,6 +2835,24 @@ Enumerations
    .. cpp:enumerator:: bottom_to_top
 
    .. cpp:enumerator:: top_to_bottom
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ThemeEngine::PartDrawing
+
+   ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
+
+   .. cpp:enumerator:: primitive
+
+   .. cpp:enumerator:: built_in_recipe
+
+   .. cpp:enumerator:: forced_high_contrast
+
+   .. cpp:enumerator:: role_mismatch
+
+   .. cpp:enumerator:: over_frame_budget
+
+   .. cpp:enumerator:: not_paintable
 
 Functions, constants and aliases
 --------------------------------
@@ -1918,6 +2899,68 @@ Functions, constants and aliases
 
    ``base`` raised to ``exponent``, for base ≥ 0. Exact cases: base^0 is 1, 1^exponent is 1, and 0^exponent is 0 for exponent > 0. Returns NaN for a negative or NaN base and for a NaN exponent.
 
+.. cpp:function:: EngineSineCosine engine_sine_cosine(double x) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
+
+.. cpp:var:: constexpr FrameInterval motion_frame_interval
+
+   The clock's frame cadence while something moves. Value: ``std::chrono::milliseconds(16)``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/motion_value/motion_value.hpp>``
+
+.. cpp:function:: double motion_easing(MotionEasing easing, double progress) noexcept
+
+   The eased progress for ``progress`` in [0, 1] (clamped), for tests and for later engine transitions.
+
+.. cpp:var:: constexpr FrameInterval motion_duration_ceiling
+
+   The ceiling on every duration (design language §9.2; the 400 ms starting token). A longer duration or time constant is clamped to it. Value: ``std::chrono::milliseconds(400)``.
+
+.. cpp:var:: constexpr FrameInterval follow_time_constant
+
+   The exponential approach's time constant (GIVEN D3-1, "a fixed fraction of the remaining gap per about 75 ms"): each 75 ms the gap shrinks by a factor of e, so 63 % of what remains is covered. Value: ``std::chrono::milliseconds(75)``.
+
+.. cpp:var:: constexpr double maximum_motion_overshoot
+
+   The largest overshoot a spring or the overshoot easing shows, as a fraction of the distance travelled (the 8 % starting token). A larger request is clamped to it. Value: ``0.08``.
+
+.. cpp:var:: constexpr double motion_settle_tolerance
+
+   The settled conditions' tolerance: half a device pixel at the window's scale. A settling value whose remaining gap (and, for a spring, whose movement over one 60 Hz frame) is within it snaps to its target. Value: ``0.5``.
+
+.. cpp:var:: constexpr double motion_settle_frame_seconds
+
+   Value: ``1.0 / 60.0``.
+
+.. cpp:var:: constexpr double minimum_motion_extent
+
+   The bounds of a value's extent (MotionValue::set_extent). Value: ``1e-6``.
+
+.. cpp:var:: constexpr double maximum_motion_extent
+
+   Value: ``1e6``.
+
+.. cpp:type:: MotionListener = Delegate<const MotionStep&>
+
+   A value's listener: a named member or function of the owner, bound with Delegate::bind. It runs on the UI thread, from the clock's frame or from the window event that ended the motion, after the value moved and after the owner was invalidated as declared. It may retarget, finish or jump any value, its own included; a value it starts is first advanced on the next frame.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_item_part_records
+
+   The most item-part records one window keeps before it evicts the least recently painted (see EnginePartTable). A record is about 800 bytes on 64-bit hosts (its preparation is about half of that); with its slot, its lookup text and its index entry it takes about 1 KB, so the cap costs at most about 4 MB per window. A part a primitive draws also has its CachedPartRaster (about 450 bytes) and its raster, which the raster cache's budget bounds. The cap covers far more item parts than a window shows at once: a record evicted while its part is still on screen is only made again on the next paint. Each eviction is O(1). Value: ``4096``.
+
+.. cpp:var:: constexpr std::size_t raster_cache_budget_bytes
+
+   The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB). Value: ``8U * 1024U * 1024U``.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -1955,6 +2998,36 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_registered_primitives
 
    Value: ``64``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+.. cpp:function:: std::string_view cascade_level_name(CascadeLevel level) noexcept
+
+.. cpp:function:: bool valid_style_class_name(std::string_view name) noexcept
+
+   Whether ``name`` is a valid style class name: 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter.
+
+.. cpp:function:: RuleSpecificity rule_specificity(const RuleSelector& selector) noexcept
+
+.. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
+
+.. cpp:var:: constexpr std::string_view primitive_property
+
+   The name of the declaration that selects a part's primitive. Its value is a registered primitive's name, or ``built_in`` for the built-in recipe. Value: ``"primitive"``.
+
+.. cpp:var:: constexpr std::string_view built_in_primitive_name
+
+   Value: ``"built_in"``.
+
+.. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
+
+   Budgets (GIVEN F1-1): a part's primitive costs at most 512 declared operations per device pixel, and an animated part (one whose primitive has an animated parameter) at most 4 million per frame. A part beyond either keeps the built-in recipe; a primitive declaring no per-pixel cost cannot be bounded and is refused too. Value: ``512U``.
+
+.. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
+
+   Value: ``4'000'000U``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2016,7 +3089,7 @@ Functions, constants and aliases
 
 .. cpp:function:: void paint_part(Painter& painter, const Control& control, const PartPaint& part)
 
-   Paints one part of ``control`` by its role (see PartPaint). Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
+   Paints one part of ``control`` by its role (see PartPaint), through the engine of the control's effective theme. Roles that draw nothing of their own (region, edge, perimeter, sheen) are no-ops: the material of the surface they belong to draws them. An empty or non-finite ``bounds`` paints nothing. What disabled means (owner, 2026-10-20: "a change in font color or control highlighting. greyed out"): a disabled part greys the control's chrome, through the recipes' disabled states: the text colour of labels and captions, and the highlighting (edge, well, hot and selected plates). Content never changes: - the image role (T2 GIVEN H1-1) is a content picture, such as the docking stamp's snapshot, drawn exactly as given into ``bounds``, never tinted, dimmed or resized by a theme, disabled or not; - a content colour (GIVEN E2-1) is drawn exactly as given, disabled or not. An icon is chrome, the theme's or the command's symbol, and keeps its disabled treatment: 45 % opacity. The shadow role paints the theme's overlay shadow (owner decision RB-37): ``bounds`` is the rect of the surface that casts it (a tooltip's face, a menu's panel), with the corner radius of ``corner_radius`` or else of the ``family`` recipe, and the shadow falls outside it, down and right. Paint it before the surface. Only surfaces that really overlap content cast it; a control's own contact shadow stays in its material. Nothing is painted where the theme casts no overlay shadow (high contrast, by default). A control that paints a shadow part reports overlay_shadow_outsets from its visual_outsets, so that damage and replay cover the blur.
 
 .. cpp:function:: Insets overlay_shadow_outsets(const Control& control) noexcept
 
@@ -2049,6 +3122,10 @@ Functions, constants and aliases
 .. cpp:function:: bool valid_control_visual_recipe(const ControlVisualRecipe& value) noexcept
 
 .. cpp:function:: bool valid_control_state_recipes(const ControlStateRecipes& value) noexcept
+
+.. cpp:function:: ControlRoleRecipes derive_high_contrast_recipes(ControlRoleRecipes recipes)
+
+   The forced high-contrast pass (T2 plan, E4; design language 5.8): ``recipes`` with its high_contrast and high_contrast_selected records derived from its ordinary ones. GUI.Forms' own high-contrast mode keeps each state's geometry and cues (corner radius, edge width, focus and default rings, offsets) and rebuilds the material as one solid plate inside one solid edge from a near-colourless palette by state, dropping gradients, images, keylines, per-edge borders and shadows. Selected parts take a white plate and black text inside their state's edge. Theme::create applies it to every family, so authored high-contrast records are replaced.
 
 .. cpp:function:: inline std::vector<Color> provisional_accent_ramp()
 
