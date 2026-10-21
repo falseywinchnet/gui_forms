@@ -67,6 +67,7 @@ option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+add_subdirectory(stx_zlib)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -169,6 +170,7 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/image/png_decoder.cpp
     src/core/image/png_writer.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
@@ -209,7 +211,7 @@ add_library(gui_forms_core STATIC
     src/core/window/command_route/window_command_route.cpp
     src/core/commands/command_route/command_route.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -2241,6 +2243,19 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_host_image_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_host_image_tests COMMAND gui_forms_host_image_tests)
 
+    add_executable(gui_forms_inflate_tests tests/compression/inflate_tests.cpp)
+    target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
+
+    add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
+    target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_inflate_protocol_tests COMMAND gui_forms_inflate_protocol_tests)
+
+    add_executable(gui_forms_png_decoder_tests tests/image/png_decoder_tests.cpp)
+    target_link_libraries(gui_forms_png_decoder_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_decoder_tests COMMAND gui_forms_png_decoder_tests)
+
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
@@ -3448,6 +3463,46 @@ if(GUI_FORMS_BUILD_FUZZERS)
         GUI_FORMS_HAS_LIBFUZZER_RUNTIME
     )
     unset(CMAKE_REQUIRED_FLAGS)
+    add_executable(gui_forms_inflate_fuzz
+        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_inflate_protocol_fuzz
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_png_decode_fuzz
+        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_png_decode_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_png_decode_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
         src/core/resources/image_registry/image_registry.cpp
@@ -3529,6 +3584,7 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
+install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)

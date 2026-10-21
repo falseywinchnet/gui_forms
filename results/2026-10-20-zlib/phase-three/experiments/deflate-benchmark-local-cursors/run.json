@@ -1,0 +1,170 @@
+{
+  "host": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "compiler": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n",
+  "oracle_revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+  "source_sha256": {
+    "stx_zlib/src/deflate.cpp": "8d5f0e299fd3dc092d338ec27c1b14e853334991e71c576b33b557ceb4273b93",
+    "stx_zlib/include/stx_zlib/deflate.hpp": "831222b01eebaec3856d44d5e65d7cdb2deec3249b71935b79111124c4b7b993",
+    "stx_zlib/include/stx_zlib/inflate.hpp": "d6fcd9b09de987547ec3c73a8088841511c7a1e8ec8776ebc5bc993b1d1f437a",
+    "stx_zlib/bench/deflate.cpp": "d51961d54994448b0714d84e0e50670982b1c244fd110340c4f0d3c006a38e40",
+    "tools/benchmark_deflate.py": "3764787b22cdf67b0858acff613d8bf67b15993b64dbb8666f196c82d03d06c6"
+  },
+  "flags": [
+    "-O3",
+    "-DNDEBUG"
+  ],
+  "cxx_flags": [
+    "-std=c++20",
+    "-stdlib=libc++",
+    "-nostdinc++",
+    "-isystem",
+    "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1"
+  ],
+  "link_flags": [
+    "-L/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+    "-Wl,-rpath,/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+    "-lunwind"
+  ],
+  "no_vector": false,
+  "profile": false,
+  "lto": false,
+  "commands": [
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/adler32.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/adler32.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/crc32.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/crc32.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/deflate.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/deflate.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inflate.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inflate.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inffast.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inffast.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/inftrees.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inftrees.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/trees.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/trees.o"
+    ],
+    [
+      "clang",
+      "-O3",
+      "-DNDEBUG",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-c",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib/zutil.c",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/zutil.o"
+    ],
+    [
+      "clang++",
+      "-std=c++20",
+      "-stdlib=libc++",
+      "-nostdinc++",
+      "-isystem",
+      "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/deflate.cpp",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/adler32.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/crc32.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/deflate.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inflate.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inffast.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/inftrees.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/trees.o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/zutil.o",
+      "-L/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-Wl,-rpath,/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-lunwind",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/benchmark"
+    ],
+    [
+      "clang++",
+      "-std=c++20",
+      "-stdlib=libc++",
+      "-nostdinc++",
+      "-isystem",
+      "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/include",
+      "-I/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build-zlib-study-sources/upstream-zlib",
+      "-S",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/src/deflate.cpp",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/candidate.s"
+    ],
+    [
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/deflate-benchmark-local-cursors/benchmark"
+    ]
+  ],
+  "sampling": "calibrate >=10ms, two warmup pairs, nine timed pairs with alternating order; reset included; allocation excluded",
+  "hardware": "machdep.cpu.brand_string: Apple M4\nhw.memsize: 17179869184\n"
+}

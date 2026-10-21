@@ -1,0 +1,2 @@
+chain_index_bytes=393228 tree_index_bytes=524300
+boundary_fixtures=1052 exact_answers=PASS
