@@ -2,10 +2,12 @@
 """Build and test the standalone toolkit in the consumer-compatible CI layout."""
 from __future__ import annotations
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 
 ROOT: Path = Path(__file__).resolve().parents[2]
@@ -159,6 +161,86 @@ def sanitizer_options(host: str, lsan_suppressions: Path) -> tuple[list[str], di
     return options, environment
 
 
+# fetch_text_stack.sh pins each checkout as <directory>_revision=<commit>.
+PIN_PATTERN: re.Pattern[str] = re.compile(r'^(\w+)_revision=([0-9a-f]{40})$', re.MULTILINE)
+
+
+def pinned_checkouts_current(script: Path) -> bool:
+    """Whether every checkout the fetch script pins is already at its pinned commit.
+
+    The script would then only re-run `git checkout --detach` of the commit
+    HEAD already names, which changes nothing (it keeps local edits either
+    way) but rescans thousands of files. A script without readable pins, a
+    missing checkout or a failing git counts as not current.
+    """
+    pins: list[tuple[str, str]] = PIN_PATTERN.findall(script.read_text(encoding='utf-8'))
+    if not pins:
+        return False
+    pin: tuple[str, str]
+    for pin in pins:
+        checkout: Path = script.parent / pin[0]
+        if not (checkout / '.git').exists():
+            return False
+        completed: subprocess.CompletedProcess[str] = subprocess.run(
+            ['git', '-C', str(checkout), 'rev-parse', 'HEAD'], capture_output=True, text=True)
+        if completed.returncode != 0 or completed.stdout.strip() != pin[1]:
+            return False
+    return True
+
+
+def fetch_text_stack(script: Path) -> None:
+    if pinned_checkouts_current(script):
+        print(f'{script.name}: every checkout is at its pinned commit', flush=True)
+        return
+    run('sh', script)
+
+
+# Environment that changes what a first configure records (compilers,
+# launchers, and the macOS sanitizer and runtime flags).
+CONFIGURE_ENVIRONMENT: tuple[str, ...] = (
+    'CC', 'CXX', 'OBJCXX', 'CFLAGS', 'CXXFLAGS', 'OBJCXXFLAGS', 'LDFLAGS',
+    'CMAKE_C_COMPILER_LAUNCHER', 'CMAKE_CXX_COMPILER_LAUNCHER', 'CMAKE_OBJCXX_COMPILER_LAUNCHER',
+    'GUI_FORMS_LLVM_RUNTIME', 'GUI_FORMS_SYSTEM_BUILD_TOOLS')
+
+
+CONFIGURE_RECORD_NAME: str = 'ci_build-configure.json'
+
+
+def configure_record(configure: list[str], environ: dict[str, str], cache_text: bytes) -> str:
+    """What one configure of a tree depended on: its command, environment and resulting cache."""
+    environment: dict[str, str] = {}
+    name: str
+    for name in CONFIGURE_ENVIRONMENT:
+        environment[name] = environ.get(name, '')
+    record: dict = {'command': configure, 'environment': environment,
+                    'cmake_cache_sha256': hashlib.sha256(cache_text).hexdigest()}
+    return json.dumps(record, indent=1, sort_keys=True)
+
+
+def configure_tree(toolkit: Path, configure: list[str]) -> None:
+    """Configure toolkit, unless the same configure already produced its current cache.
+
+    After a configure the record of its command, environment and
+    CMakeCache.txt digest is kept in the tree. When all three still match,
+    configuring again would change nothing, so only ninja's own regeneration
+    step runs, which re-runs CMake if a CMake input changed since. Any other
+    change to the cache (a manual cmake -D, a different profile) or a missing
+    record configures again.
+    """
+    cache: Path = toolkit / 'CMakeCache.txt'
+    record_path: Path = toolkit / CONFIGURE_RECORD_NAME
+    if (toolkit / 'build.ninja').is_file() and cache.is_file() and record_path.is_file():
+        expected: str = configure_record(configure, dict(os.environ), cache.read_bytes())
+        if record_path.read_text(encoding='utf-8') == expected:
+            print(f'{toolkit.name}: configured by this command already; regenerating only if CMake inputs changed',
+                  flush=True)
+            run('cmake', '--build', toolkit, '--target', 'build.ninja')
+            return
+    record_path.unlink(missing_ok=True)
+    run(*configure)
+    record_path.write_text(configure_record(configure, dict(os.environ), cache.read_bytes()), encoding='utf-8')
+
+
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
                   sanitize: bool = False, tests: str = '') -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
@@ -187,13 +269,13 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         options.append(f'-DGUI_FORMS_ENABLE_{name}_HOST={enabled}')
     if host == 'windows':
         # ADR-004: the Win32 host draws text with the shared HarfBuzz/FreeType engine.
-        run('sh', ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
         options.extend(['-DGUI_FORMS_ENABLE_SKIA=OFF', '-DGUI_FORMS_ENABLE_HARFBUZZ_TEXT=ON'])
     else:
         if host == 'linux':
             os.environ['GUI_FORMS_SYSTEM_BUILD_TOOLS'] = '1'
         run('sh', ROOT / 'gui_forms/third_party/fetch_skia_cpu.sh')
-        run('sh', ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
+        fetch_text_stack(ROOT / 'gui_forms/third_party/fetch_text_stack.sh')
         skia_out: Path = build / 'skia'
         if host == 'linux':
             run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu_linux.sh', skia_out)
@@ -209,12 +291,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         options.extend(sanitizer_cmake)
         os.environ.update(sanitizer_environment)
         timeout = '900'
-    run('cmake', '-S', ROOT / 'gui_forms', '-B', toolkit, '-G', 'Ninja',
+    configure: list[str] = [
+        'cmake', '-S', str(ROOT / 'gui_forms'), '-B', str(toolkit), '-G', 'Ninja',
         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_LIBDIR=lib',
         '-DCMAKE_TOOLCHAIN_FILE=' + str(ROOT / 'gui_forms/cmake/llvm22.cmake'),
         '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', f'-DGUI_FORMS_BUILD_GALLERY={gallery_option}',
         '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON',
-        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
+        '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options]
+    configure_tree(toolkit, configure)
     # A narrowed run builds only what its tests read, not every program in the tree.
     targets: list[str] | None = None
     if tests:
