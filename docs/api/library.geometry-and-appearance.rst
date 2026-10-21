@@ -2394,7 +2394,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value). The `n`th name is read at published_value_position(n). Each is 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter, and is listed once; at most maximum_published_values.
+   A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value). The name at position n of the list is read at published_value_position(n). Each is 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter, and is listed once; at most maximum_published_values.
 
    .. cpp:member:: EngineVersion requires_engine
 
@@ -3238,7 +3238,7 @@ Functions, constants and aliases
 
 .. cpp:function:: constexpr ExpressionInputIndex published_value_position(std::size_t value) noexcept
 
-   The position of the theme's `value`th published value (counting from 0).
+   The position of the theme's published value at ``value`` in its list, counting from 0.
 
 .. cpp:function:: constexpr std::uint64_t expression_input_bit(ExpressionInputIndex input) noexcept
 

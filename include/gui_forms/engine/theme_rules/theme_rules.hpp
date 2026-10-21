@@ -160,8 +160,8 @@ struct ThemeRule final {
 
 // A theme's rules, as authored, with the engine version the theme declares
 // it needs and the values an application publishes that its expressions
-// read (E6; Window::publish_value). The `n`th name is read at
-// published_value_position(n). Each is 1 to 64 characters of lowercase
+// read (E6; Window::publish_value). The name at position n of the list is
+// read at published_value_position(n). Each is 1 to 64 characters of lowercase
 // ASCII letters, digits, '-' and '_', the first a letter, and is listed
 // once; at most maximum_published_values.
 struct ThemeRuleSheet final {

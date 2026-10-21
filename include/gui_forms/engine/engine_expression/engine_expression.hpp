@@ -69,7 +69,8 @@ static_assert(engine_input_count + maximum_published_values <= maximum_expressio
     return position;
 }
 
-// The position of the theme's `value`th published value (counting from 0).
+// The position of the theme's published value at `value` in its list,
+// counting from 0.
 [[nodiscard]] constexpr ExpressionInputIndex published_value_position(std::size_t value) noexcept {
     const ExpressionInputIndex position{static_cast<std::uint8_t>(engine_input_count + value)};
     return position;
