@@ -53,7 +53,10 @@ def main() -> None:
         else:
             subprocess.run(command, cwd=output, check=True)
 
-    source_hashes = {name: digest(ROOT / name) for name in ('include/gui_forms/compression/inflate.hpp', 'src/core/compression/inflate.cpp', 'tests/compression/inflate_benchmark.cpp', 'tools/benchmark_inflate.py')}
+    source_hashes = {name: digest(ROOT / name) for name in
+                     ('include/gui_forms/compression/inflate.hpp',
+                      'stx_zlib/include/stx_zlib/inflate.hpp', 'stx_zlib/src/inflate.cpp',
+                      'tests/compression/inflate_benchmark.cpp', 'tools/benchmark_inflate.py')}
     hardware = ''
     if platform.system() == 'Darwin':
         hardware = subprocess.check_output(['/usr/sbin/sysctl', 'machdep.cpu.brand_string', 'hw.memsize'], text=True)
@@ -92,8 +95,10 @@ def main() -> None:
         source_root = baseline if variant == 'baseline' else ROOT
         extra = ['-fno-vectorize', '-fno-slp-vectorize'] if variant == 'no-vector' else []
         common = ['clang++', '-std=c++20', *flags, *extra, '-Wall', '-Wextra', '-Wpedantic',
-                  '-I' + str(source_root / 'include'), '-I' + str(oracle)]
-        source = str(source_root / 'src/core/compression/inflate.cpp')
+                  '-I' + str(source_root / 'include'),
+                  '-I' + str(source_root / 'stx_zlib/include'), '-I' + str(oracle)]
+        source = str(source_root / ('src/core/compression/inflate.cpp' if variant == 'baseline'
+                                    else 'stx_zlib/src/inflate.cpp'))
         run([*common, '-Rpass=loop-vectorize', '-Rpass-missed=loop-vectorize', source,
              str(ROOT / 'tests/compression/inflate_benchmark.cpp'), *objects, '-o', variant], variant + '-compiler.log')
         run([*common, '-S', source, '-o', variant + '.s'])
@@ -103,7 +108,8 @@ def main() -> None:
         sdk = subprocess.check_output(['/usr/bin/xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip()
         run(['clang++', '--target=x86_64-apple-macos14', '-std=c++20', *flags,
              '-isysroot', sdk, '-march=x86-64', '-mtune=generic', '-msse2', '-mno-avx', '-Rpass=loop-vectorize', '-Rpass-missed=loop-vectorize',
-             '-I' + str(ROOT / 'include'), '-S', str(ROOT / 'src/core/compression/inflate.cpp'),
+             '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'),
+             '-S', str(ROOT / 'stx_zlib/src/inflate.cpp'),
              '-o', 'candidate-sse2.s'], 'candidate-sse2-compiler.log')
 
 

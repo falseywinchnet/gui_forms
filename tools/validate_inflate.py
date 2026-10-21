@@ -57,7 +57,8 @@ def main() -> None:
             raise RuntimeError('LLVM 22.1.8 required: ' + compiler)
         versions[compiler] = version
     source_hashes: dict[str, str] = {}
-    for name in ('src/core/compression/inflate.cpp', 'include/gui_forms/compression/inflate.hpp',
+    for name in ('stx_zlib/src/inflate.cpp', 'stx_zlib/include/stx_zlib/inflate.hpp',
+                 'include/gui_forms/compression/inflate.hpp',
                  'tests/compression/inflate_tests.cpp', 'tests/compression/inflate_fixture.hpp',
                  'fuzz/inflate_fuzz.cpp'):
         source_hashes[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
@@ -74,9 +75,10 @@ def main() -> None:
     suffix = '.exe' if os.name == 'nt' else ''
     test = output / ('inflate-tests' + suffix)
     fuzz = output / ('inflate-fuzz' + suffix)
-    candidate = str(ROOT / 'src/core/compression/inflate.cpp')
+    candidate = str(ROOT / 'stx_zlib/src/inflate.cpp')
     arguments = [cxx, '-std=c++20', *common, '-DGUI_FORMS_INFLATE_ORACLE=1',
-                 '-I' + str(ROOT / 'include'), '-I' + str(oracle), candidate]
+                 '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'),
+                 '-I' + str(oracle), candidate]
     run([*arguments, '-Wall', '-Wextra', '-Wpedantic', '-fstack-usage',
          str(ROOT / 'tests/compression/inflate_tests.cpp'), *objects, '-o', str(test)], output, environment)
     with (output / 'tests.log').open('w') as log:

@@ -1,13 +1,13 @@
 // Altered C++ implementation: canonical Huffman construction/decoding derived
 // from Mark Adler's puff (zlib pin in PROVENANCE.md). Original notice is retained
 // in LICENSE-puff.txt. Streaming, ownership, quotas and wrapper are rewritten.
-#include "gui_forms/compression/inflate.hpp"
+#include "stx_zlib/inflate.hpp"
 
 #include <limits>
 #include <algorithm>
 #include <cstring>
 
-namespace gui_forms::compression {
+namespace stx_zlib {
 namespace {
 
 // Integer-address ordering is confined to this buffer-boundary overlap check.
@@ -750,4 +750,4 @@ InflateResult InflateStream::process(std::span<const std::byte> input,
     return result;
 }
 
-} // namespace gui_forms::compression
+} // namespace stx_zlib
