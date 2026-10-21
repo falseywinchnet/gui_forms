@@ -225,8 +225,10 @@ jobs:
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose
+      # Only main saves (pull requests restore main's): per-PR entries evicted
+      # the dependency caches from the repository's 10 GB.
       - uses: actions/cache/save@v4
-        if: always() && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
+        if: always() && github.event_name != 'pull_request' && steps.compile.outcome == 'success' && steps.objects.outputs.cache-hit != 'true'
         with:
           path: .ccache
           key: ${{ steps.objects.outputs.cache-primary-key }}
