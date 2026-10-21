@@ -4,6 +4,9 @@
 #include "opacity_painter.hpp"
 
 #include "gui_forms/paint_framebuffer.hpp"
+#if defined(GUI_FORMS_PREPARED_TEXT)
+#include "gui_forms/prepared_text/types/prepared_text_types.hpp"
+#endif
 
 #include <cmath>
 #include <utility>
