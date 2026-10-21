@@ -2,6 +2,7 @@
 """Build and test the standalone toolkit in the consumer-compatible CI layout."""
 from __future__ import annotations
 import argparse
+import json
 import os
 from pathlib import Path
 import platform
@@ -17,6 +18,76 @@ def run(*arguments: str | Path | int) -> None:
         command.append(str(argument))
     print(' '.join(command), flush=True)
     subprocess.run(command, check=True)
+
+
+def captured(*arguments: str | Path) -> str:
+    """Run a query command and return its standard output (it must succeed)."""
+    command: list[str] = []
+    argument: str | Path
+    for argument in arguments:
+        command.append(str(argument))
+    completed: subprocess.CompletedProcess[str] = subprocess.run(
+        command, check=True, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    return completed.stdout
+
+
+def tree_relative(argument: str, tree: Path) -> str | None:
+    """The build-tree-relative path an argument names, or None if it names none.
+
+    A -DNAME=value argument is read by its value. The result uses forward
+    slashes, as ninja spells its outputs.
+    """
+    value: str = argument
+    if argument.startswith('-') and '=' in argument:
+        value = argument.partition('=')[2]
+    if not value:
+        return None
+    root: str = os.path.normcase(os.path.normpath(str(tree)))
+    path: str = os.path.normcase(os.path.normpath(value))
+    if not path.startswith(root + os.sep):
+        return None
+    return os.path.relpath(os.path.normpath(value), os.path.normpath(str(tree))).replace(os.sep, '/')
+
+
+def targets_for_tests(listing: dict, known_outputs: set[str], tree: Path) -> list[str] | None:
+    """The ninja outputs the listed tests read, or None to build everything.
+
+    listing is `ctest --show-only=json-v1` output for the selected tests and
+    known_outputs every output ninja can build in tree. A test reads the
+    build-tree files its command names (its executable, or the libraries and
+    programs an audit script inspects). The whole tree is built instead when
+    a test names a build-tree file ninja does not produce, or depends on other
+    tests (fixtures, DEPENDS), whose products this reading cannot see. A test
+    naming no build-tree file needs nothing built.
+    """
+    targets: set[str] = set()
+    test: dict
+    for test in listing.get('tests', []):
+        property_record: dict
+        for property_record in test.get('properties', []):
+            if property_record.get('name') in ('FIXTURES_REQUIRED', 'DEPENDS', 'REQUIRED_FILES'):
+                return None
+        argument: str
+        for argument in test.get('command', []):
+            relative: str | None = tree_relative(argument, tree)
+            if relative is None:
+                continue
+            if relative not in known_outputs:
+                return None
+            targets.add(relative)
+    return sorted(targets)
+
+
+def selected_test_targets(toolkit: Path, tests: str) -> list[str] | None:
+    """Ask ctest and ninja which outputs the tests matching tests need (see targets_for_tests)."""
+    listing: dict = json.loads(captured('ctest', '--test-dir', toolkit, '--show-only=json-v1', '-R', tests))
+    known_outputs: set[str] = set()
+    line: str
+    for line in captured('ninja', '-C', toolkit, '-t', 'targets', 'all').splitlines():
+        output: str = line.rpartition(': ')[0]
+        if output:
+            known_outputs.add(output)
+    return targets_for_tests(listing, known_outputs, toolkit)
 
 
 def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
@@ -94,8 +165,9 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 
     With sanitize, the toolkit is built in its own directory with the
     sanitizers and only tested: nothing is installed and the installed-SDK
-    examples are not built. tests, a ctest -R pattern, narrows that run; empty
-    runs the whole suite.
+    examples are not built. tests, a ctest -R pattern, narrows that run to
+    the matching tests and the build to the outputs they read (fails when it
+    matches none); empty builds everything and runs the whole suite.
     """
     toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
@@ -143,11 +215,22 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
         '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', f'-DGUI_FORMS_BUILD_GALLERY={gallery_option}',
         '-DGUI_FORMS_BUILD_TESTS=ON', '-DGUI_FORMS_BUILD_AUDIO=ON',
         '-DGUI_FORMS_AUDIO_VORBIS_BACKEND=stx', f'-DCMAKE_INSTALL_PREFIX={sdk}', *options)
-    run('cmake', '--build', toolkit, '--parallel', jobs)
+    # A narrowed run builds only what its tests read, not every program in the tree.
+    targets: list[str] | None = None
+    if tests:
+        targets = selected_test_targets(toolkit, tests)
+    if targets is None:
+        run('cmake', '--build', toolkit, '--parallel', jobs)
+    elif targets:
+        print(f'{len(targets)} build outputs serve the tests matching {tests}', flush=True)
+        run('cmake', '--build', toolkit, '--parallel', jobs, '--target', *targets)
+    else:
+        print(f'the tests matching {tests} read no build output; nothing to build', flush=True)
     os.environ['GUI_FORMS_FONT_DIR'] = str(ROOT / 'gui_forms/assets/fonts')
     selection: list[str] = []
     if tests:
-        selection = ['-R', tests]
+        # A pattern that matches no test is a mistake, not a pass.
+        selection = ['-R', tests, '--no-tests=error']
     run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout, *selection)
     if sanitize:
         return
@@ -167,7 +250,7 @@ def main() -> None:
                         help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
                              'and macOS) and only test')
     parser.add_argument('--tests', default='',
-                        help='with --sanitize, run only the tests matching this ctest -R pattern')
+                        help='with --sanitize, build and run only what the tests matching this ctest -R pattern need')
     parser.add_argument('--gallery', action='store_true',
                         help='also configure GUI_FORMS_BUILD_GALLERY=ON '
                              '(or set GUI_FORMS_CI_BUILD_GALLERY=1); default OFF')

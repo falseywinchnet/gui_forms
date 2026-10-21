@@ -1,5 +1,6 @@
 """Unit tests for the option resolution in ci_build.py (no build is run)."""
 from __future__ import annotations
+import os
 from pathlib import Path
 import re
 import unittest
@@ -73,6 +74,46 @@ class SanitizerOptionTests(unittest.TestCase):
             self.assertIn('-DCMAKE_SHARED_LINKER_FLAGS=' + ci_build.SANITIZER_LINK_FLAGS, options, host)
             self.assertNotIn('CXXFLAGS', environment, host)
             self.assertNotIn('LDFLAGS', environment, host)
+
+
+TREE: Path = Path(os.path.abspath('example-build-tree'))
+
+
+def test_record(command: list[str], properties: list[dict] | None = None) -> dict:
+    return {'name': 'example', 'command': command, 'properties': properties or []}
+
+
+class TestTargetTests(unittest.TestCase):
+    KNOWN: set[str] = {'gui_forms_example_tests.exe', 'libgui_forms_core.a', 'sub/tool.exe'}
+
+    def test_a_test_executable_is_its_own_target(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE / 'gui_forms_example_tests.exe')])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), ['gui_forms_example_tests.exe'])
+
+    def test_definition_values_and_nested_outputs_are_read(self) -> None:
+        listing: dict = {'tests': [test_record(['cmake', '-DCORE=' + str(TREE / 'libgui_forms_core.a'),
+                                                str(TREE / 'sub' / 'tool.exe'), '-P', 'check.cmake'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE),
+                         ['libgui_forms_core.a', 'sub/tool.exe'])
+
+    def test_a_test_reading_only_sources_needs_nothing_built(self) -> None:
+        listing: dict = {'tests': [test_record(['python', os.path.abspath('tools/check.py'), '--check'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
+
+    def test_an_unknown_tree_file_builds_everything(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE / 'generated' / 'table.txt')])]}
+        self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE))
+
+    def test_tests_depending_on_other_tests_build_everything(self) -> None:
+        name: str
+        for name in ('FIXTURES_REQUIRED', 'DEPENDS', 'REQUIRED_FILES'):
+            listing: dict = {'tests': [test_record([str(TREE / 'gui_forms_example_tests.exe')],
+                                                   [{'name': name, 'value': ['setup']}])]}
+            self.assertIsNone(ci_build.targets_for_tests(listing, self.KNOWN, TREE), name)
+
+    def test_a_sibling_directory_with_the_same_prefix_is_outside_the_tree(self) -> None:
+        listing: dict = {'tests': [test_record([str(TREE) + '-other' + os.sep + 'gui_forms_example_tests.exe'])]}
+        self.assertEqual(ci_build.targets_for_tests(listing, self.KNOWN, TREE), [])
 
 
 CHECKOUT: Path = Path(__file__).resolve().parents[1]
