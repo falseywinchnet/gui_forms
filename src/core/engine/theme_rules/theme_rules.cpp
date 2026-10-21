@@ -231,13 +231,17 @@ std::optional<ExpressionInputIndex> CompiledThemeRules::published_value_input(st
 
 namespace {
 
-// Precedence, lowest first; std::stable_sort keeps authored order among
-// equals, so the later rule stays later.
+// Precedence, lowest first, with authored order breaking ties so that the
+// later rule stays later. The order is total: the rules of one level come
+// from one sheet (the engine's own table is all built_in), whose positions
+// are distinct, so std::sort gives what a stable sort would, without the
+// temporary buffer a stable sort allocates.
 struct LowerPrecedence final {
     template <typename Rule>
     bool operator()(const Rule& left, const Rule& right) const noexcept {
         if (left.level != right.level) return left.level < right.level;
-        return left.specificity < right.specificity;
+        if (!(left.specificity == right.specificity)) return left.specificity < right.specificity;
+        return left.order < right.order;
     }
 };
 
@@ -499,7 +503,7 @@ CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, cons
         result.published_values_.push_back(usable ? name : std::string{});
     }
     add_rules(result, sheet, registry, false);
-    std::stable_sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
+    std::sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
     return result;
 }
 
@@ -511,7 +515,7 @@ CompiledThemeRules CompiledThemeRules::compile_with_built_in(const ThemeRuleShee
     const std::size_t authored_rules = result.rules_.size();
     add_rules(result, built_in_theme_rules(), registry, true);
     result.built_in_rules_ = result.rules_.size() - authored_rules;
-    std::stable_sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
+    std::sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
     return result;
 }
 
