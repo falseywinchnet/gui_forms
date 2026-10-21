@@ -1694,6 +1694,28 @@ if(GUI_FORMS_BUILD_GALLERY)
         set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
         )
+        # The nine programs share one directory and so one fonts/ beside them.
+        # Each of them used to copy every face there after linking, so on a
+        # cold parallel build several post-build steps wrote the same files
+        # at once and one could fail ("Error copying file"). One target now
+        # stages each file through its own build rule (one writer per file,
+        # recopied when the source changes), and the programs depend on it.
+        set(gui_forms_windows_program_directory "${CMAKE_CURRENT_BINARY_DIR}")
+        if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+            set(gui_forms_windows_program_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        endif()
+        set(gui_forms_windows_staged_fonts)
+        foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS GUI_FORMS_GALLERY_FONT_NOTICES)
+            get_filename_component(font_name "${font_file}" NAME)
+            set(staged_font "${gui_forms_windows_program_directory}/fonts/${font_name}")
+            add_custom_command(OUTPUT "${staged_font}"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${gui_forms_windows_program_directory}/fonts"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}" "${staged_font}"
+                DEPENDS "${font_file}"
+                VERBATIM)
+            list(APPEND gui_forms_windows_staged_fonts "${staged_font}")
+        endforeach()
+        add_custom_target(gui_forms_windows_gallery_fonts DEPENDS ${gui_forms_windows_staged_fonts})
         foreach(font_target IN ITEMS
                 gui_forms_gallery_windows
                 gui_forms_vsync_lab_windows
@@ -1704,23 +1726,11 @@ if(GUI_FORMS_BUILD_GALLERY)
                 gui_forms_responsive_tracks_lab_windows
                 gui_forms_connected_controls_lab_windows
                 gui_forms_seam_proximity_lab_windows)
-            add_custom_command(TARGET ${font_target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
-            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-                get_filename_component(font_name "${font_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${font_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-            endforeach()
-            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-                get_filename_component(notice_name "${notice_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${notice_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-            endforeach()
+            get_target_property(font_target_directory ${font_target} RUNTIME_OUTPUT_DIRECTORY)
+            if(font_target_directory AND NOT font_target_directory STREQUAL gui_forms_windows_program_directory)
+                message(FATAL_ERROR "${font_target} is built outside ${gui_forms_windows_program_directory}, where its fonts are staged")
+            endif()
+            add_dependencies(${font_target} gui_forms_windows_gallery_fonts)
         endforeach()
         find_program(GUI_FORMS_WINDOWS_OBJDUMP
             NAMES x86_64-w64-mingw32-objdump
