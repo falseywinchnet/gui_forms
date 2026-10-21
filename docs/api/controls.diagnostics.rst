@@ -285,6 +285,12 @@ Related types
 
    .. cpp:function:: void record_engine_input_damage(std::uint64_t parts, double area) noexcept
 
+   .. cpp:function:: void record_engine_ambient_frame() noexcept
+
+      An ambient part repainted for its effect, or an effect refused.
+
+   .. cpp:function:: void record_engine_ambient_refusal() noexcept
+
    .. cpp:function:: void record_frame_callback_fault() noexcept
 
       Counts a contained frame callback exception.
@@ -541,6 +547,12 @@ Related types
    .. cpp:member:: std::uint64_t engine_input_damaged_parts
 
    .. cpp:member:: double engine_input_damage_area
+
+   .. cpp:member:: std::uint64_t engine_ambient_frames
+
+      The theme engine's ambient effects (E7): frames that repainted an ambient part, and effects refused for covering more than 10 % of the window on an everyday surface (counted when the refusal begins).
+
+   .. cpp:member:: std::uint64_t engine_ambient_refusals
 
    .. cpp:member:: std::string renderer_name
 

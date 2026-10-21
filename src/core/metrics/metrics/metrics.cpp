@@ -205,6 +205,12 @@ void Metrics::record_engine_input_damage(std::uint64_t parts, double area) noexc
     values_.engine_input_damaged_parts = values_.engine_input_damaged_parts + parts;
     values_.engine_input_damage_area = values_.engine_input_damage_area + area;
 }
+void Metrics::record_engine_ambient_frame() noexcept {
+    values_.engine_ambient_frames = values_.engine_ambient_frames + 1U;
+}
+void Metrics::record_engine_ambient_refusal() noexcept {
+    values_.engine_ambient_refusals = values_.engine_ambient_refusals + 1U;
+}
 void Metrics::record_frame_callback_fault() noexcept {
     ++values_.frame_callback_faults;
 }

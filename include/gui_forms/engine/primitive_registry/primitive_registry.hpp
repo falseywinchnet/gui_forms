@@ -228,6 +228,12 @@ public:
 
     [[nodiscard]] virtual const PrimitiveDescriptor& descriptor() const noexcept = 0;
 
+    // Whether the primitive draws nothing at all with `parameters`, such as
+    // a bulge at amplitude 0 (the flat plane): the engine then composites
+    // nothing and keeps no raster for the part (E7). False unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual bool blank(const PrimitiveParameterBlock& parameters) const noexcept;
+
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`
     // unchanged. Its cost is the descriptor's preparation_per_device_pixel

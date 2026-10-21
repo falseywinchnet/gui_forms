@@ -388,9 +388,11 @@ void paint_path() {
     std::shared_ptr<Control> control = make_control<Control>(StableId("painted"));
     Window window(control, Size{400.0, 300.0});
     std::shared_ptr<const Theme> plain = Theme::create(windows_professional_theme_definition());
-    require((*plain).engine().rules().empty(), "the professional theme has no rules");
+    require((*plain).engine().rules().rule_count() == (*plain).engine().rules().built_in_rule_count(),
+            "the professional theme has no rules of its own, only the engine's built-in ones (E7)");
     std::shared_ptr<const Theme> theme = Theme::create(bulge_theme());
-    require((*theme).engine().rules().rule_count() == 1U && (*theme).engine().rules().diagnostics().empty(),
+    require((*theme).engine().rules().rule_count() == (*theme).engine().rules().built_in_rule_count() + 1U &&
+                (*theme).engine().rules().diagnostics().empty(),
             "a theme's rules compile when it is made");
     window.set_theme(theme);
 

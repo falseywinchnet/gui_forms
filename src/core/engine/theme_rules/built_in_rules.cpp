@@ -1,0 +1,103 @@
+// The engine's built-in rules (T2 plan, phase E7): the motion the default
+// draws before T4, compiled below every theme's rules
+// (CompiledThemeRules::compile_with_built_in), so that any theme rule for
+// the same parts takes precedence.
+
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
+
+#include <chrono>
+
+namespace gui_forms {
+namespace {
+
+// The docking tiles' fade (GIVEN C1-1, C2-1): DK D3 publishes `expanding`
+// on the hovered pane's tiles while their 100 ms fade runs; entering it
+// stands the tile at opacity 0 and fades it to 1, linearly over the theme's
+// quick token, as D3's own motion value runs. A tile out of it is opaque.
+constexpr std::chrono::milliseconds tile_fade_duration{100};
+
+PropertyTransition tile_fade() {
+    PropertyTransition fade{};
+    fade.property = std::string(opacity_property);
+    PresentationState appearing{};
+    appearing.when.push_back(AnatomyState::expanding);
+    appearing.target = 1.0;
+    appearing.enter_from = 0.0;
+    PresentationState shown{};
+    shown.target = 1.0;
+    fade.states.push_back(appearing);
+    fade.states.push_back(shown);
+    fade.curve = MotionCurve::timed(tile_fade_duration, MotionEasing::linear);
+    return fade;
+}
+
+// The ribbon's rise (GIVEN D3-1, G4-1; rendering reference §2 and §3): a
+// ribbon button is flat at rest, and while it is hot its dithered bulge's
+// amplitude rises from 0 to 1 by the exponential approach (the follow
+// curve, 75 ms), falling back when it is no longer hot. Hover is the rise:
+// there is no brightness lift.
+PropertyTransition ribbon_rise() {
+    PropertyTransition rise{};
+    rise.property = "amplitude";
+    PresentationState hot{};
+    hot.when.push_back(AnatomyState::hot);
+    hot.target = 1.0;
+    PresentationState rest{};
+    rest.target = 0.0;
+    rise.states.push_back(hot);
+    rise.states.push_back(rest);
+    rise.curve = MotionCurve::follow();
+    return rise;
+}
+
+ThemeRule built_in_rule(std::string label, std::string_view control_type, std::string_view part) {
+    ThemeRule rule{};
+    rule.label = std::move(label);
+    rule.level = CascadeLevel::built_in;
+    rule.selector.control_type = std::string(control_type);
+    rule.selector.part = std::string(part);
+    return rule;
+}
+
+// A ribbon part that takes the dithered button (RB decision 23: the large
+// elements that conventionally show a hover square), and the states in
+// which it keeps today's plate: a checked toggle and an open menu are told
+// apart by the plate, which the bulge alone would not show.
+void add_ribbon_button(ThemeRuleSheet& sheet, std::string_view part, bool checkable) {
+    ThemeRule rise = built_in_rule("ribbon_rise:" + std::string(part), "ribbon", part);
+    rise.declarations.push_back(RuleDeclaration::primitive("dithered_bulge"));
+    rise.transitions.push_back(ribbon_rise());
+    sheet.rules.push_back(std::move(rise));
+    if (checkable) {
+        ThemeRule checked = built_in_rule("ribbon_checked:" + std::string(part), "ribbon", part);
+        checked.selector.states.push_back(AnatomyState::checked);
+        checked.declarations.push_back(RuleDeclaration::primitive(built_in_primitive_name));
+        sheet.rules.push_back(std::move(checked));
+    }
+    ThemeRule open = built_in_rule("ribbon_open:" + std::string(part), "ribbon", part);
+    open.selector.states.push_back(AnatomyState::open);
+    open.declarations.push_back(RuleDeclaration::primitive(built_in_primitive_name));
+    sheet.rules.push_back(std::move(open));
+}
+
+ThemeRuleSheet make_built_in_rules() {
+    ThemeRuleSheet sheet{};
+    add_ribbon_button(sheet, "command_face", true);
+    add_ribbon_button(sheet, "group_button", false);
+    ThemeRule tile = built_in_rule("dock_tile_fade:tile", "dock_site", "tile");
+    tile.transitions.push_back(tile_fade());
+    sheet.rules.push_back(std::move(tile));
+    ThemeRule glyph = built_in_rule("dock_tile_fade:tile_glyph", "dock_site", "tile_glyph");
+    glyph.transitions.push_back(tile_fade());
+    sheet.rules.push_back(std::move(glyph));
+    return sheet;
+}
+
+} // namespace
+
+const ThemeRuleSheet& built_in_theme_rules() {
+    static const ThemeRuleSheet rules = make_built_in_rules();
+    return rules;
+}
+
+} // namespace gui_forms

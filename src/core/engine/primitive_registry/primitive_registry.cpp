@@ -168,6 +168,10 @@ ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const P
     return ParameterAssignment::assigned;
 }
 
+bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
+    return false;
+}
+
 PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
                                             PrimitivePreparation& preparation) const noexcept {
     const PrimitiveDescriptor& described = descriptor();

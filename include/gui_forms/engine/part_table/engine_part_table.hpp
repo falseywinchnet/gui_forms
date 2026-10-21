@@ -2,8 +2,10 @@
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
 #include "gui_forms/engine/engine_expression/engine_expression.hpp"
+#include "gui_forms/engine/motion_value/motion_value.hpp"
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
+#include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/scheduler/types/scheduler_types.hpp"
 #include "gui_forms/types/geometry/geometry.hpp"
@@ -79,6 +81,45 @@ struct CachedPartRaster final {
     std::uint64_t raster_table_generation{};
 };
 
+class Window;
+
+// One property's transition on a part (E7): opacity or the parameter at
+// `parameter`, the state of its machine the part was last painted in (none
+// when the part's states matched none), and the property's motion value,
+// made the first time the part is painted with the transition.
+struct PartTransitionChannel final {
+    bool opacity{};
+    std::size_t parameter{};
+    std::optional<std::size_t> state{};
+    std::optional<MotionValue> value{};
+};
+
+// A part's running transitions (E7; T2 plan, "How motion is driven"). The
+// part's record owns it through a pointer, so that its motion values, which
+// never move, keep their addresses however the table's storage grows. Each
+// value is owned by the part's control (MotionValue's owner), runs on the
+// window's MotionClock, and reports each step to on_step, which repaints
+// the part's extent on the control that recorded it. The record is released
+// with its control, which releases the values from the clock.
+class PartMotion final {
+public:
+    PartMotion(Window& window, PartRecordHandle record) noexcept;
+    PartMotion(const PartMotion&) = delete;
+    PartMotion& operator=(const PartMotion&) = delete;
+
+    // Whether any of the part's values has not settled.
+    [[nodiscard]] bool moving() const noexcept;
+    // A value's step, from the clock: the part's extent repaints.
+    void on_step(const MotionStep& step);
+
+    std::array<PartTransitionChannel, maximum_part_transitions> channels{};
+
+private:
+    // Observed: the window owns the table that owns this record.
+    Window* window_;
+    PartRecordHandle record_;
+};
+
 // One painted part's record. The identity strings are owned copies of the
 // key the part was first painted with.
 struct EnginePartRecord final {
@@ -116,6 +157,15 @@ struct EnginePartRecord final {
     // When the part entered the states it was last painted in, on the
     // window's motion clock; time_in_state counts from it.
     FrameTime state_entered{};
+
+    // The part's transitions (E7), made the first time it is painted with
+    // one; null for a part without any.
+    std::unique_ptr<PartMotion> motion{};
+    // Whether the part's last paint had an ambient effect, and whether that
+    // effect was refused for its area (E7). An ambient part repaints when
+    // ambient motion resumes; a refusal is counted once, when it begins.
+    bool ambient{};
+    bool ambient_refused{};
 
     // The cached raster and what drew it, made the first time a primitive
     // draws the part, so that a record no primitive draws stays small.

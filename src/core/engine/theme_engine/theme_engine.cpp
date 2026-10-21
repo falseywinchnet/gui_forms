@@ -5,6 +5,7 @@
 #include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window/window.hpp"
 #include "../../theme/part_painting/built_in_recipe.hpp"
+#include "opacity_painter.hpp"
 
 #include <algorithm>
 #include <array>
@@ -13,6 +14,12 @@
 #include <limits>
 #include <memory>
 #include <span>
+
+// The values a part is drawn with (expressions, transitions, inputs) must
+// have the same bits on every host: no fused multiply-add here either.
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
 
 namespace gui_forms {
 namespace {
@@ -57,6 +64,9 @@ struct PartInputSources final {
     // The part's top-left corner in window coordinates.
     Point part_origin{};
     AnatomyStateSet states{};
+    // time_in_state as an ambient effect gives it (E7), in place of the
+    // time since the record's state entry.
+    std::optional<double> time_in_state{};
 };
 
 std::size_t input_slot(EngineInput input) noexcept {
@@ -77,7 +87,7 @@ void gather_inputs(const CompiledThemeRules& rules, std::uint64_t read, const Pa
     const EnginePartRecord& record = *sources.record;
     const FrameTime now = window.motion_clock().now();
     const double in_state = std::chrono::duration<double>(now - record.state_entered).count();
-    inputs[input_slot(EngineInput::time_in_state)] = in_state;
+    inputs[input_slot(EngineInput::time_in_state)] = sources.time_in_state.value_or(in_state);
     // The pointer only while the part is hot (GIVEN B1-1), in part-local
     // logical units (B2-1).
     if (sources.states.contains(AnatomyState::hot) && sources.pointer) {
@@ -121,12 +131,177 @@ void evaluate_expressions(const CompiledThemeRules::Resolution& resolution, std:
     }
 }
 
+// -- transitions (E7) ------------------------------------------------------------
+
+// Where a part's transitions run: its window, its record and the record's
+// handle (none for a part painted without a key, which is drawn
+// statically), the part's control as the owner of its motion values, and
+// its published states.
+struct PartTransitionSources final {
+    Window* window{};
+    EnginePartRecord* record{};
+    PartRecordHandle handle{};
+    std::shared_ptr<Control> owner{};
+    AnatomyStateSet states{};
+};
+
+using CompiledTransition = CompiledThemeRules::CompiledTransition;
+
+// The machine state the part's states select: the first whose `when`
+// states they all include, or none.
+std::optional<std::size_t> machine_state(const CompiledTransition& transition, AnatomyStateSet states) noexcept {
+    for (std::size_t index = 0; index < transition.states.size(); ++index) {
+        const std::uint64_t needed = transition.states[index].when.standard_bits();
+        if ((states.standard_bits() & needed) == needed) return index;
+    }
+    return std::nullopt;
+}
+
+// A property's range: [0, 1] for opacity, the parameter's declared range
+// otherwise.
+struct PropertyRange final {
+    double minimum{};
+    double maximum{1.0};
+};
+
+PropertyRange property_range(const CompiledTransition& transition, const PrimitiveDescriptor* descriptor) noexcept {
+    PropertyRange range{};
+    if (transition.opacity || descriptor == nullptr) return range;
+    const PrimitiveParameterDeclaration& declared = (*descriptor).parameters[transition.parameter];
+    range.minimum = declared.minimum;
+    range.maximum = declared.maximum;
+    return range;
+}
+
+// The value a property rests at when the part's states match no machine
+// state: its cascade value, or 1 for opacity.
+double rest_value(const CompiledTransition& transition, const PrimitiveParameterBlock& parameters) noexcept {
+    if (transition.opacity) return 1.0;
+    const double value = parameters.values[transition.parameter].number;
+    return value;
+}
+
+// Shows a transition's value: the part's opacity, or its parameter,
+// clamped to the property's range.
+void show_value(const CompiledTransition& transition, double value, PropertyRange range,
+                PrimitiveParameterBlock& parameters, double& opacity) noexcept {
+    const double raised = std::max(value, range.minimum);
+    const double shown = std::min(raised, range.maximum);
+    if (transition.opacity) {
+        opacity = shown;
+        return;
+    }
+    parameters.values[transition.parameter].number = shown;
+}
+
+// The logical extent the settled condition measures a property's value
+// against (MotionValue::set_extent): one unit of the value spans 255
+// device pixels over the property's range, so that a value settles within
+// half an 8-bit step of its range.
+double settle_extent(PropertyRange range, double scale) noexcept {
+    const double span = range.maximum - range.minimum;
+    const double extent = 255.0 / (span * scale);
+    return extent;
+}
+
+// Runs the part's presentational state machines for one paint and shows
+// their values: a parameter's in `parameters`, the opacity returned. A
+// part with a record moves each property on its motion value, retargeting
+// from the value shown; one without stands each property at its target.
+// Parameter transitions run only while a primitive draws the part
+// (`descriptor` set). A record's values for properties no longer
+// transitioned are released.
+double run_transitions(const CompiledThemeRules::Resolution& resolution, const PartTransitionSources& sources,
+                       const PrimitiveDescriptor* descriptor, PrimitiveParameterBlock& parameters) {
+    double opacity = 1.0;
+    EnginePartRecord* const record = sources.owner ? sources.record : nullptr;
+    PartMotion* motion = nullptr;
+    if (record != nullptr && resolution.transition_count > 0U) {
+        if (!(*record).motion) (*record).motion = std::make_unique<PartMotion>(*sources.window, sources.handle);
+        motion = (*record).motion.get();
+    }
+    std::array<bool, maximum_part_transitions> used{};
+    for (std::size_t index = 0; index < resolution.transition_count; ++index) {
+        const CompiledTransition& transition = *resolution.transitions[index];
+        if (!transition.opacity && descriptor == nullptr) continue;
+        const PropertyRange range = property_range(transition, descriptor);
+        const std::optional<std::size_t> state = machine_state(transition, sources.states);
+        const double target = state ? transition.states[*state].target : rest_value(transition, parameters);
+        if (motion == nullptr) {
+            show_value(transition, target, range, parameters, opacity);
+            continue;
+        }
+        // The channel already running this property, else the first free one.
+        std::size_t chosen = maximum_part_transitions;
+        for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
+            const PartTransitionChannel& running = (*motion).channels[channel];
+            if (!running.value || used[channel]) continue;
+            if (running.opacity == transition.opacity && running.parameter == transition.parameter) chosen = channel;
+        }
+        for (std::size_t channel = 0; chosen == maximum_part_transitions && channel < maximum_part_transitions;
+             ++channel) {
+            if (!(*motion).channels[channel].value && !used[channel]) chosen = channel;
+        }
+        if (chosen == maximum_part_transitions) continue;
+        used[chosen] = true;
+        PartTransitionChannel& channel = (*motion).channels[chosen];
+        std::optional<double> entry{};
+        if (state) entry = transition.states[*state].enter_from;
+        if (!channel.value) {
+            // The part appears in its state: at the state's entry value if
+            // it has one, else at its target.
+            channel.opacity = transition.opacity;
+            channel.parameter = transition.parameter;
+            channel.state = state;
+            const double initial = entry ? *entry : target;
+            channel.value.emplace(*sources.owner, transition.curve, initial);
+            MotionValue& made = *channel.value;
+            static_cast<void>(made.set_extent(settle_extent(range, (*sources.window).scale())));
+            made.set_listener(MotionListener::bind<PartMotion, &PartMotion::on_step>(*motion));
+        } else {
+            (*channel.value).set_curve(transition.curve);
+            if (channel.state != state) {
+                channel.state = state;
+                if (entry) (*channel.value).jump_to(*entry);
+            }
+        }
+        MotionValue& value = *channel.value;
+        static_cast<void>(value.animate_to(target));
+        show_value(transition, value.current(), range, parameters, opacity);
+    }
+    if (motion != nullptr) {
+        for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
+            if (used[channel]) continue;
+            (*motion).channels[channel].value.reset();
+            (*motion).channels[channel].state.reset();
+        }
+        (*record).motion_unsettled = (*motion).moving();
+    } else if (record != nullptr && (*record).motion) {
+        (*record).motion.reset();
+        (*record).motion_unsettled = false;
+    }
+    return opacity;
+}
+
+// Paints a part with the built-in recipe at `opacity`: not at all at 0,
+// through an OpacityPainter between 0 and 1.
+void paint_built_in(Painter& painter, const Control& control, const PartPaint& part, double opacity) {
+    if (opacity <= 0.0) return;
+    if (opacity >= 1.0) {
+        paint_part_with_built_in_recipe(painter, control, part);
+        return;
+    }
+    detail::OpacityPainter faded(painter, opacity);
+    paint_part_with_built_in_recipe(faded, control, part);
+}
+
 } // namespace
 
-ThemeEngine::ThemeEngine() : registry_(&builtin_primitive_registry()) {}
+ThemeEngine::ThemeEngine() : ThemeEngine(ThemeRuleSheet{}) {}
 
 ThemeEngine::ThemeEngine(const ThemeRuleSheet& sheet)
-    : registry_(&builtin_primitive_registry()), rules_(CompiledThemeRules::compile(sheet, *registry_)) {}
+    : registry_(&builtin_primitive_registry()),
+      rules_(CompiledThemeRules::compile_with_built_in(sheet, *registry_)) {}
 
 ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint& part) const noexcept {
     PartPlan result{};
@@ -184,43 +359,72 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         record = (*window).note_engine_part(control, *part.key, part.states);
     }
     const PartPlan decided = plan(control, part);
+    const CompiledThemeRules::Resolution& resolution = decided.resolution;
     const bool primitive_draws = decided.drawing == PartDrawing::primitive && window != nullptr;
     // Where the part lands, and what it reads: the inputs are delivered and
     // damaged only for a part with a record (E6).
     Window::EnginePaintPlace place{};
     if (record || primitive_draws) place = (*window).engine_paint_place(control, painter);
+    Rect extent{};
     if (record) {
         Insets outsets{};
         std::uint64_t inputs_read = 0U;
         if (primitive_draws) {
-            outsets = (*decided.resolution.primitive).descriptor().outsets;
-            inputs_read = decided.resolution.inputs_read;
+            outsets = (*resolution.primitive).descriptor().outsets;
+            inputs_read = resolution.inputs_read;
         }
-        const Rect extent = part_extent(part.bounds, place.origin, outsets);
+        extent = part_extent(part.bounds, place.origin, outsets);
         (*window).note_engine_paint(*record, inputs_read, *place.painted_by, extent);
     }
+    // The part's record, for its transitions and its ambient effect (E7).
+    EnginePartRecord* const kept = record ? (*window).engine_part_record(*record) : nullptr;
+    PartTransitionSources transitions{};
+    transitions.window = window;
+    transitions.record = kept;
+    if (record) transitions.handle = *record;
+    if (kept != nullptr) transitions.owner = (*window).find(control.stable_id().value());
+    transitions.states = part.states;
     if (!primitive_draws) {
-        paint_part_with_built_in_recipe(painter, control, part);
+        if (kept != nullptr) stop_ambient(*window, *kept, *record);
+        PrimitiveParameterBlock unused{};
+        const double opacity = run_transitions(resolution, transitions, nullptr, unused);
+        paint_built_in(painter, control, part, opacity);
         return;
     }
     PartRasterRequest request{};
-    request.primitive = decided.resolution.primitive;
-    request.parameters = decided.resolution.parameters;
+    request.primitive = resolution.primitive;
+    request.parameters = resolution.parameters;
     request.target.logical_size = Size{part.bounds.width, part.bounds.height};
     request.target.scale = decided.scale;
     request.target.states = part.states;
     request.extent = decided.extent;
-    // The inputs, then the expressions that read them.
+    // The ambient effect's time, then the inputs, the expressions that read
+    // them, and the transitions over both.
+    std::optional<double> ambient_time{};
+    if (resolution.ambient != nullptr) {
+        const double window_area = (*window).client_size().width * (*window).client_size().height;
+        const bool everyday = !control.on_ceremonial_surface();
+        const bool area_ok = !everyday || extent.area() <= maximum_ambient_window_fraction * window_area;
+        ambient_time = ambient_seconds(*window, kept, record, *resolution.ambient, area_ok);
+    } else if (kept != nullptr) {
+        stop_ambient(*window, *kept, *record);
+    }
     std::array<double, maximum_expression_inputs> inputs{};
     PartInputSources sources{};
     sources.window = window;
     sources.part_origin = Point{place.window_origin.x + part.bounds.x, place.window_origin.y + part.bounds.y};
     sources.states = part.states;
     sources.pointer = (*window).engine_pointer();
-    if (record) sources.record = (*window).engine_parts().record(*record);
-    gather_inputs(rules_, decided.resolution.inputs_read, sources, inputs);
+    sources.record = kept;
+    sources.time_in_state = ambient_time;
+    gather_inputs(rules_, resolution.inputs_read, sources, inputs);
     for (std::size_t index = 0; index < engine_input_count; ++index) request.target.inputs[index] = inputs[index];
-    evaluate_expressions(decided.resolution, inputs, part.states, request.parameters);
+    evaluate_expressions(resolution, inputs, part.states, request.parameters);
+    const PrimitiveDescriptor& descriptor = (*request.primitive).descriptor();
+    const double opacity = run_transitions(resolution, transitions, &descriptor, request.parameters);
+    // A part at opacity 0, or one its primitive draws as nothing (a flat
+    // bulge), composites nothing and needs no raster.
+    if (opacity <= 0.0 || (*request.primitive).blank(request.parameters)) return;
     std::shared_ptr<const PartRaster> raster{};
     if (record) {
         const PartRasterResult drawn = (*window).engine_part_raster(*record, request);
@@ -240,10 +444,43 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         if (painted) raster = std::move(own);
     }
     if (!raster) {
-        paint_part_with_built_in_recipe(painter, control, part);
+        paint_built_in(painter, control, part, opacity);
         return;
     }
-    painter.draw_part_raster(raster, Point{part.bounds.x, part.bounds.y}, 1.0);
+    painter.draw_part_raster(raster, Point{part.bounds.x, part.bounds.y}, opacity);
+}
+
+double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
+                                    const std::optional<PartRecordHandle>& handle, const AmbientEffect& ambient,
+                                    bool area_ok) {
+    const double pose = std::chrono::duration<double>(ambient.pose).count();
+    // A part without a record is drawn statically, at its pose.
+    if (record == nullptr || !handle) return pose;
+    EnginePartRecord& part = *record;
+    part.ambient = true;
+    if (!area_ok && !part.ambient_refused) window.metrics().record_engine_ambient_refusal();
+    part.ambient_refused = !area_ok;
+    if (!area_ok || window.motion_clock().ambient_suppressed()) {
+        window.stop_engine_ambient(*handle);
+        return pose;
+    }
+    const std::chrono::duration<double> frame(1.0 / ambient.frames_per_second);
+    const FrameInterval interval = std::chrono::ceil<FrameInterval>(frame);
+    window.run_engine_ambient(*handle, interval);
+    // The time in the part's states, wrapped to the period, so the effect
+    // cycles; exact in the clock's ticks.
+    const FrameInterval elapsed = window.motion_clock().now() - part.state_entered;
+    const FrameInterval forward = elapsed < FrameInterval::zero() ? FrameInterval::zero() : elapsed;
+    const FrameInterval within = forward % ambient.period;
+    const double seconds = std::chrono::duration<double>(within).count();
+    return seconds;
+}
+
+void ThemeEngine::stop_ambient(Window& window, EnginePartRecord& record, PartRecordHandle handle) noexcept {
+    if (!record.ambient) return;
+    record.ambient = false;
+    record.ambient_refused = false;
+    window.stop_engine_ambient(handle);
 }
 
 } // namespace gui_forms
