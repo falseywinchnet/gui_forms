@@ -18,6 +18,14 @@
 #include <span>
 #include <vector>
 
+// The identity tables' inputs are computed here as row × step − offset. Clang
+// contracts that into a fused multiply-add on arm64 and not on baseline
+// x86-64, which would give the expressions different inputs on different
+// hosts, so contraction is off for this file as it is for the engine.
+#if defined(__clang__)
+#pragma clang fp contract(off)
+#endif
+
 namespace {
 using namespace gui_forms;
 
