@@ -504,6 +504,13 @@ void run_client_checks(ClientContext& context) {
     ComReference<IUIAutomationElement> window;
     const HRESULT found = (*automation.get()).ElementFromHandle(context.hwnd, window.receive());
     require(SUCCEEDED(found) && window.get() != nullptr, "the window has a UI Automation element");
+    // The window's provider answers FrameworkId GUI.Forms; an element UI
+    // Automation built from the system proxies (it does so for a window
+    // Windows reports hung) answers none.
+    BstrText root_framework;
+    const HRESULT framework_read = (*window.get()).get_CurrentFrameworkId(root_framework.receive());
+    require(SUCCEEDED(framework_read) && root_framework.text() == L"GUI.Forms",
+            "UI Automation uses the window's provider");
     // The decoy process shows a window with the same class and title, so a
     // desktop-wide lookup could have chosen either; the client must be
     // reading this process's window.

@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -605,23 +606,33 @@ std::vector<int> runtime_id(IUIAutomationElement& element) {
 
 // The element's children, in order: on the window element only the
 // GUI.Forms ones (the host's non-client parts are the system's).
+// With `trace`, which a mismatch report asks for by walking again, each raw
+// child's AutomationId and framework (or the failing HRESULT) and how the
+// walk ended are appended to it.
 std::vector<ElementReference> element_children(PageWalk& walk, IUIAutomationElement& element,
-                                               bool window_level) {
+                                               bool window_level, std::string* trace) {
     std::vector<ElementReference> children;
     ElementReference child;
     HRESULT status = walk.walker.GetFirstChildElement(&element, child.receive());
     while (SUCCEEDED(status) && child.get() != nullptr) {
         bool keep = true;
-        if (window_level) {
+        if (window_level || trace != nullptr) {
             BstrOwner framework;
             const HRESULT read = (*child.get()).get_CurrentFrameworkId(framework.receive());
-            keep = SUCCEEDED(read) && framework.wide() == framework_id;
+            if (window_level) keep = SUCCEEDED(read) && framework.wide() == framework_id;
+            if (trace != nullptr) {
+                BstrOwner id;
+                static_cast<void>((*child.get()).get_CurrentAutomationId(id.receive()));
+                const std::string seen = SUCCEEDED(read) ? framework.utf8() : hresult_text(read);
+                *trace += " [" + id.utf8() + " " + seen + "]";
+            }
         }
         ElementReference next;
         status = walk.walker.GetNextSiblingElement(child.get(), next.receive());
         if (keep) children.push_back(std::move(child));
         child = std::move(next);
     }
+    if (trace != nullptr) *trace += " end " + hresult_text(status);
     return children;
 }
 
@@ -930,11 +941,15 @@ void compare_element(PageWalk& walk, IUIAutomationElement& element, const Expect
         }
         consider_candidate(walk, expected);
     }
-    const std::vector<ElementReference> children = element_children(walk, element, window);
+    const std::vector<ElementReference> children = element_children(walk, element, window, nullptr);
     if (children.size() != expected.children.size()) {
+        std::string trace;
+        static_cast<void>(element_children(walk, element, window, &trace));
+        std::string wanted = std::to_string(expected.children.size()) + ":";
+        for (const ExpectedNode& child : expected.children) wanted += " " + child.node.stable_id;
         bool counted = true;
-        add_mismatch(walk, expected, "child count", std::to_string(expected.children.size()),
-                     std::to_string(children.size()), counted);
+        add_mismatch(walk, expected, "child count", wanted,
+                     std::to_string(children.size()) + ":" + trace, counted);
     }
     const std::size_t walked = std::min(children.size(), expected.children.size());
     for (std::size_t index = 0; index < walked; ++index) {
@@ -1434,20 +1449,70 @@ void check_stale_element(ClientRun& run, IUIAutomationTreeWalker& walker,
     }
 }
 
+// How many frames the window has painted, read on the UI thread.
+struct ReadPaintPasses final {
+    Window* window{};
+    std::uint64_t* passes{};
+    void operator()() const { *passes = (*window).metrics().snapshot().paint_passes; }
+};
+
+// Waits until the window has painted its first frame and its UI thread is
+// taking messages again. UI Automation does not send WM_GETOBJECT to a
+// window Windows reports hung (one whose thread has not taken a message
+// for about five seconds); it then builds the window's element from the
+// system proxies, without this window's provider, and keeps that element.
+// A new Gallery window's first layout and paint can hold the UI thread that
+// long on a loaded machine or under a sanitizer, so the client asks for the
+// element only after it. Throws when the first frame takes more than two
+// minutes.
+void wait_until_responsive(ClientRun& run) {
+    const std::chrono::steady_clock::time_point deadline =
+        std::chrono::steady_clock::now() + std::chrono::minutes(2);
+    std::uint64_t passes = 0U;
+    while (true) {
+        (*run.window).invoke(std::function<void()>(ReadPaintPasses{run.window, &passes}));
+        const bool painted = passes != 0U;
+        if (painted && IsHungAppWindow(run.hwnd) == FALSE) return;
+        if (std::chrono::steady_clock::now() > deadline) {
+            throw std::runtime_error("the window did not paint and respond within two minutes");
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+}
+
 void run_client(ClientRun& run) {
-    ComReference<IUIAutomation> automation;
-    const HRESULT created = CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
-                                             __uuidof(IUIAutomation),
+    ComReference<IUIAutomation2> automation;
+    const HRESULT created = CoCreateInstance(CLSID_CUIAutomation8, nullptr, CLSCTX_INPROC_SERVER,
+                                             __uuidof(IUIAutomation2),
                                              reinterpret_cast<void**>(automation.receive()));
-    if (FAILED(created) || automation.get() == nullptr) throw std::runtime_error("IUIAutomation is not created");
+    if (FAILED(created) || automation.get() == nullptr) throw std::runtime_error("IUIAutomation2 is not created");
+    // UI Automation waits 2 s for a window to answer WM_GETOBJECT and then
+    // builds its element from the system proxies, without the window's
+    // provider; it waits 20 s for a provider call. On a loaded machine or
+    // under a sanitizer the UI thread can be busier than that (a page's
+    // layout and paint), so this client waits as long as the test's limit
+    // allows. A provider that never answers still fails the test.
+    if (FAILED((*automation.get()).put_ConnectionTimeout(120000U)) ||
+        FAILED((*automation.get()).put_TransactionTimeout(300000U))) {
+        throw std::runtime_error("the client's UI Automation timeouts cannot be set");
+    }
     ComReference<IUIAutomationTreeWalker> walker;
     if (FAILED((*automation.get()).get_RawViewWalker(walker.receive())) || walker.get() == nullptr) {
         throw std::runtime_error("the raw view walker is not available");
     }
+    wait_until_responsive(run);
     ElementReference window_element;
     const HRESULT found = (*automation.get()).ElementFromHandle(run.hwnd, window_element.receive());
     if (FAILED(found) || window_element.get() == nullptr) {
         throw std::runtime_error("the window has no UI Automation element");
+    }
+    // The window's provider answers FrameworkId GUI.Forms; an element built
+    // from the system proxies answers none.
+    BstrOwner framework;
+    const HRESULT read = (*window_element.get()).get_CurrentFrameworkId(framework.receive());
+    if (FAILED(read) || framework.wide() != framework_id) {
+        throw std::runtime_error("UI Automation did not use the window's provider (FrameworkId \"" +
+                                 framework.utf8() + "\", " + hresult_text(read) + ")");
     }
     if (run.jobs != nullptr) {
         for (const ActionJob& job : *run.jobs) perform_job(run, *walker.get(), *window_element.get(), job);
