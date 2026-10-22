@@ -1,4 +1,4 @@
-#include "png_writer.hpp"
+#include "stx_png/encoder.hpp"
 
 #include "stx_zlib/checksum.hpp"
 #include "stx_zlib/deflate.hpp"
@@ -11,7 +11,7 @@
 #include <new>
 #include <stdexcept>
 
-namespace gui_forms::image {
+namespace stx_png {
 namespace {
 
 constexpr std::array<std::uint8_t, 8> png_signature{
@@ -273,4 +273,4 @@ bool encode_png(const PngEncodeInput& input, std::vector<std::byte>& output) {
     return true;
 }
 
-} // namespace gui_forms::image
+} // namespace stx_png

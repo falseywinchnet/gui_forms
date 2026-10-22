@@ -220,7 +220,7 @@ void precedence_and_degenerate_values() {
     const image::PngColorResolution resolution = image::resolve_png_color(file, records, false);
     require(resolution.error == image::PngColorError::none &&
             resolution.encoding.ignored_gamma && resolution.encoding.ignored_chromaticities &&
-            resolution.encoding.source == image::PngColorSource::srgb_default, "ignored chunks not reported");
+            resolution.encoding.source == image::ColorSource::srgb_default, "ignored chunks not reported");
 }
 
 // Mismatched records (not from a decode of this file) are refused without

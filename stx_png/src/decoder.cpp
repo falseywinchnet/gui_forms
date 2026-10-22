@@ -1,4 +1,4 @@
-#include "png_decoder.hpp"
+#include "stx_png/decoder.hpp"
 #include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
@@ -6,13 +6,13 @@
 #include <cstring>
 #include <limits>
 
-namespace gui_forms::image {
+namespace stx_png {
 namespace {
-using compression::InflateError;
-using compression::InflateOptions;
-using compression::InflateResult;
-using compression::InflateStatus;
-using compression::InflateStream;
+using stx_zlib::InflateError;
+using stx_zlib::InflateOptions;
+using stx_zlib::InflateResult;
+using stx_zlib::InflateStatus;
+using stx_zlib::InflateStream;
 
 constexpr std::uint32_t ihdr = 0x49484452U;
 constexpr std::uint32_t plte = 0x504c5445U;
@@ -962,4 +962,4 @@ PngDecodeResult decode_png_samples_discarding_metadata(std::span<const std::byte
     list_metadata(encoded, records);
     return result;
 }
-} // namespace gui_forms::image
+} // namespace stx_png

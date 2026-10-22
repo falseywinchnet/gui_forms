@@ -83,6 +83,7 @@ if(WIN32 AND NOT MSVC)
 endif()
 include(CMakePackageConfigHelpers)
 add_subdirectory(stx_zlib)
+add_subdirectory(stx_png)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -186,10 +187,9 @@ add_library(gui_forms_core STATIC
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
     src/core/host/image/clipboard_png.cpp
-    src/core/image/png_decoder.cpp
     src/core/image/png_pixels.cpp
     src/core/image/png_color.cpp
-    src/core/image/png_writer.cpp
+    src/core/image/color_conversion.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
@@ -229,7 +229,7 @@ add_library(gui_forms_core STATIC
     src/core/window/command_route/window_command_route.cpp
     src/core/commands/command_route/command_route.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -3506,10 +3506,10 @@ if(GUI_FORMS_BUILD_FUZZERS)
     endif()
 
     add_executable(gui_forms_png_decode_fuzz
-        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
-        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp
+        fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp
+        stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp
         stx_zlib/src/checksum.cpp)
-    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE stx_png/include stx_zlib/include)
     target_compile_options(gui_forms_png_decode_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
     target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
@@ -3603,7 +3603,14 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
+# stx_zlib and stx_png install their own licences and provenance under
+# share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
+install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
+install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
+install(FILES stx_zlib/LICENSE-zlib.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-zlib.txt)
+install(FILES stx_zlib/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-PROVENANCE.md)
+install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-LICENSE.txt)
+install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 # Every third-party component the SDK and the programs ship, with its licence
 # and the FreeType credit (THIRD_PARTY_NOTICES.md).
