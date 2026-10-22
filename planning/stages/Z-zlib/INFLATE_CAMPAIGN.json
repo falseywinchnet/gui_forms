@@ -1,0 +1,37 @@
+{
+  "campaign": "inflate-2026-10-20-v1",
+  "architectures": [
+    "x64",
+    "arm64"
+  ],
+  "oracle_modes": [
+    "ordinary",
+    "strict"
+  ],
+  "shards_per_configuration": 6,
+  "seconds_per_shard": 14400,
+  "rss_limit_bytes": 1610612736,
+  "seed_base": 20261020,
+  "source_sha256": {
+    "src/core/compression/inflate.cpp": "09d188197c8911803e7f70d024eb727a044d7809f87065d3ae4011665972b08f",
+    "include/gui_forms/compression/inflate.hpp": "6f136007584e278c0ef20a9e8e74f0f445c4375aa127bcda2402faf1feb28ea0",
+    "tests/compression/inflate_tests.cpp": "e71f5d52a327c1d3600a0f953ca7db1db6b5e5688e17e18aa6d7873c5575194f",
+    "tests/compression/inflate_fixture.hpp": "81771089e399b01c9b7ad313ca5f2546d8e29faefeaf43fed3fdf7a2a8085117",
+    "tests/compression/oracle_sha256.json": "82dd09c3dfd9095b42fe26ff12f592bce6a3c06c39eb0ca6b8d2b0b03e69a994",
+    "fuzz/inflate_fuzz.cpp": "60fd0d0f87d7b47ef7990c47438fb8eeb7157bb79379dbdc1d6389c5a8c81a4d",
+    "tools/run_inflate_campaign.py": "0c021d21e37e2439aab7fa64e2e0ec52164efa61a7fac8a61a2a7725850e86b8",
+    "tools/check_inflate_campaign.py": "3911c201af3bb66af5b08bb85a31f54cfbb14fc2cbde48b2c3a2ad6756576010",
+    "tools/test_inflate_campaign.py": "d0d911f42c1f7c9da8fae1fe491f91dd2a0391ebebd8851d3e608d8b64ff79d3",
+    ".github/workflows/inflate-campaign.yml": "59541cd627bf3783f04cdd70d2703c46411d413c6da8a22028f2b3d102c93890",
+    "fuzz/corpus/inflate/png-red-idat": "1da1c3a0fddeb43e6c70bb9e524cce10e5b1dd86be33cd75b1463f635c56d0e0",
+    "fuzz/corpus/inflate/raw-dynamic": "159e5d49cc058f61bd16211f920d6703e5ffe6e852332b19296de4857a36e027",
+    "fuzz/corpus/inflate/raw-dynamic-bounded": "506acae406d95ffd5e59312f1447723be3559240b3a7aa0e6e7992fbd3d903a0",
+    "fuzz/corpus/inflate/raw-empty": "5787fe825530f21ff116ce01966a36410b00f4b319bf3d3d757297b93797f921",
+    "fuzz/corpus/inflate/raw-reserved": "2ecd8a6b7d2845546659ad4cf443533cf921b19dc81fa83934e83821b4dfdcb7",
+    "fuzz/corpus/inflate/raw-stored": "fa69df0547de8716c20f697c52d870fa954e21f366ec8cbd7b9c9bfdbb7d8962",
+    "fuzz/corpus/inflate/zlib-dictionary": "9218fbde4da2d3a849cc44351e3b1e500a4ecdf2cba13dee81fea99ae7d3f3e3",
+    "fuzz/corpus/inflate/zlib-dynamic-bounded": "e7305d995a271454717a46ea263a774916b5b0dbc305818738e60fd5621e764f",
+    "fuzz/corpus/inflate/zlib-empty": "c340139356bfcb79b3d9eacfcd2eb963362317f76017704197a83c71fcc16059",
+    "fuzz/corpus/inflate/zlib-text": "818479238171f568d348b267d14df1ae56c3023c071cc53642decc7ca57c4297"
+  }
+}

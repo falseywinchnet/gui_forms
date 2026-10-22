@@ -1,0 +1,3 @@
+chain_index_bytes=393228 tree_index_bytes=622604
+boundary_fixtures=1052 exact_answers=PASS
+radix_work workload=entropy schedule=greedy root_insertions=130833 branch_insertions=711 duplicates=0 root_expirations=97714 branch_expirations=588 predictor_rejections=237 directory_probes=0

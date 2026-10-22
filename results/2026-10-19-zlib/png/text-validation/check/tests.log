@@ -1,0 +1,3 @@
+Format/filter/Adam7 matrix: 15300 cases, plus byte-split IDAT
+PNG text: 256 methods, malformed UTF-8/NUL, and all nonzero Unicode scalars passed
+Owned PNG sample decoder checks passed

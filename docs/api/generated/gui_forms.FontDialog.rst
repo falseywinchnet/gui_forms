@@ -286,6 +286,10 @@ gui_forms::FontDialog
 
    .. cpp:function:: SemanticDescriptor semantic_descriptor() const override
 
+   .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
+
+      The focus action moves focus to the font list, the dialog's first field; the dialog itself is not focusable.
+
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
    .. cpp:function:: void append_interactions(std::vector<InteractionDeclaration>& interactions) const override

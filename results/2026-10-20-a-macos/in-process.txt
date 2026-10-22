@@ -1,0 +1,106 @@
+repeated identities: each tree's docs element selected its own tree's item
+control review_card nodes=0 (publishes no semantic node)
+control range_control nodes=0 (publishes no semantic node)
+control scrollable_control nodes=0 (publishes no semantic node)
+control visual_inspector_overlay nodes=0 (publishes no semantic node)
+omitted button_base: base type; placed as Button, DropDownButton, LinkLabel, CheckBox and RadioButton
+omitted context_menu: component; a popup that exists only while open
+omitted command: component; published through the menus, strips and ribbon that present it
+omitted font_command: component; published through RibbonFontControl
+omitted color_command: component; published through RibbonColorPicker
+omitted gallery_command: component; published through RibbonGallery
+omitted dock_workspace: component; its layout is published through the placed DockSite
+omitted tool_tip: component; a popup shown on hover
+omitted ribbon_tool_tip: component; a popup shown on hover
+omitted live_surface: service type, not a control; it presents through a control's surface
+omitted timer: component without a place in the control tree
+omitted background_worker: component without a place in the control tree
+omitted notify_icon: component without a place in the control tree
+omitted image_list: component without a place in the control tree
+omitted error_provider: component without a place in the control tree
+omitted help_provider: component without a place in the control tree
+omitted semantic_feedback: component without a place in the control tree
+omitted binding: component without a place in the control tree
+omitted binding_source: component without a place in the control tree
+omitted binding_context: component without a place in the control tree
+control button nodes=2 matched=2 default_action=press observed=yes
+control drop_down_button nodes=2 matched=2 default_action=press observed=yes
+control link_label nodes=2 matched=2 default_action=press observed=yes
+control command_bar nodes=6 matched=6 default_action=press observed=yes
+control label nodes=2 matched=2 default_action=none observed=no
+control text_box nodes=2 matched=2 default_action=set_value observed=yes
+control token_box nodes=8 matched=8 default_action=set_value observed=yes
+control masked_text_box nodes=2 matched=2 default_action=set_value observed=yes
+control picture_box nodes=2 matched=2 default_action=none observed=no
+control progress_bar nodes=2 matched=2 default_action=none observed=no
+control card nodes=2 matched=2 default_action=none observed=no
+control check_box nodes=2 matched=2 default_action=press observed=yes
+control radio_button nodes=2 matched=2 default_action=press observed=yes
+control track_bar nodes=2 matched=2 default_action=increment observed=yes
+control numeric_up_down nodes=2 matched=2 default_action=increment observed=yes
+control domain_up_down nodes=2 matched=2 default_action=increment observed=yes
+control color_value_editor nodes=4 matched=4 default_action=set_value observed=yes
+control flags_value_editor nodes=2 matched=2 default_action=expand observed=yes
+control property_list nodes=5 matched=5 default_action=collapse observed=yes
+control date_time_picker nodes=2 matched=2 default_action=increment observed=yes
+control month_calendar nodes=68 matched=68 default_action=set_value observed=yes
+control instrument_rack nodes=2 matched=2 default_action=none observed=no
+control list_box nodes=8 matched=8 default_action=press observed=yes
+control checked_list_box nodes=6 matched=6 default_action=press observed=yes
+control combo_box nodes=2 matched=2 default_action=expand observed=yes
+control tree_view nodes=7 matched=7 default_action=press observed=yes
+control object_view nodes=6 matched=6 default_action=press observed=yes
+control list_view nodes=10 matched=10 default_action=press observed=yes
+control tree_list_view nodes=10 matched=10 default_action=press observed=yes
+control correspondence_view nodes=10 matched=10 default_action=press observed=yes
+control data_grid_view nodes=12 matched=12 default_action=press observed=yes
+control choice_group nodes=6 matched=6 default_action=press observed=yes
+control breadcrumb_trail nodes=8 matched=8 default_action=press observed=yes
+control panel nodes=2 matched=2 default_action=none observed=no
+control group_box nodes=2 matched=2 default_action=none observed=no
+control scaled_group_box nodes=2 matched=2 default_action=none observed=no
+control material_panel nodes=2 matched=2 default_action=none observed=no
+control expandable_sections nodes=4 matched=4 default_action=press observed=yes
+control container_control nodes=2 matched=2 default_action=none observed=no
+control user_control nodes=2 matched=2 default_action=none observed=no
+control tab_control nodes=6 matched=6 default_action=select observed=yes
+control tab_page nodes=2 matched=2 default_action=select observed=yes
+control page_view nodes=12 matched=12 default_action=select observed=yes
+control page_strip nodes=6 matched=6 default_action=select observed=yes
+control navigation_pane nodes=14 matched=14 default_action=press observed=yes
+control flow_layout_panel nodes=2 matched=2 default_action=none observed=no
+control table_layout_panel nodes=2 matched=2 default_action=none observed=no
+control responsive_track_panel nodes=2 matched=2 default_action=none observed=no
+control scaled_panel nodes=2 matched=2 default_action=none observed=no
+control split_container nodes=2 matched=2 default_action=increment observed=yes
+control splitter_panel nodes=2 matched=2 default_action=none observed=no
+control command_overflow_panel nodes=4 matched=4 default_action=press observed=yes
+control master_detail_view nodes=4 matched=4 default_action=none observed=no
+control scroll_bar nodes=2 matched=2 default_action=increment observed=yes
+control h_scroll_bar nodes=2 matched=2 default_action=increment observed=yes
+control v_scroll_bar nodes=2 matched=2 default_action=increment observed=yes
+control menu_strip nodes=4 matched=4 default_action=press observed=yes
+control tool_strip nodes=4 matched=4 default_action=press observed=yes
+control status_strip nodes=4 matched=4 default_action=press observed=yes
+control quick_access_toolbar nodes=6 matched=6 default_action=press observed=yes
+control tool_strip_panel nodes=4 matched=4 default_action=press observed=yes
+control tool_strip_container nodes=2 matched=2 default_action=none observed=no
+control binding_navigator nodes=22 matched=22 default_action=none observed=no
+control ribbon nodes=14 matched=14 default_action=press observed=yes
+control backstage_view nodes=8 matched=8 default_action=press observed=yes
+control ribbon_gallery nodes=14 matched=14 default_action=press observed=yes
+control ribbon_font_control nodes=6 matched=6 default_action=expand observed=yes
+control ribbon_color_picker nodes=2 matched=2 default_action=press observed=yes
+control dock_site nodes=26 matched=26 default_action=set_value observed=yes
+control dock_navigator nodes=10 matched=10 default_action=press observed=yes
+control property_grid nodes=106 matched=106 default_action=set_value observed=yes
+control anchored_popup_layer nodes=4 matched=4 default_action=none observed=no
+control font_dialog nodes=32 matched=32 default_action=press observed=yes
+control task_dialog nodes=8 matched=8 default_action=press observed=yes
+control drawing_surface nodes=2 matched=2 default_action=none observed=no
+control raster_canvas nodes=2 matched=2 default_action=none observed=no
+control easing_preview nodes=2 matched=2 default_action=none observed=no
+control metrics_view nodes=2 matched=2 default_action=none observed=no
+control typography_specimen nodes=2 matched=2 default_action=none observed=no
+control visual_inspector_view nodes=2 matched=2 default_action=none observed=no
+controls=80 nodes=580 matched=580 mismatches=0 failures=0

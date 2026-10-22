@@ -16,16 +16,25 @@ constexpr std::size_t stored_block_limit = 65535U;
 // what the toolkit's own PNG validator will accept.
 constexpr std::uint32_t dimension_limit = 16384U;
 
-std::array<std::uint32_t, 256> make_crc_table() noexcept {
-    std::array<std::uint32_t, 256> table{};
+// Eight byte positions, 256 values each. Tables encode successive applications
+// of the same reflected IEEE polynomial; they are not CRC32C instruction tables.
+using CrcTables = std::array<std::array<std::uint32_t, 256>, 8>;
+constexpr CrcTables make_crc_tables() noexcept {
+    CrcTables tables{};
     for (std::uint32_t index = 0; index < 256U; ++index) {
         std::uint32_t value = index;
-        for (int bit = 0; bit < 8; ++bit) {
+        for (unsigned bit = 0; bit < 8; ++bit) {
             value = (value & 1U) != 0U ? 0xedb88320U ^ (value >> 1U) : value >> 1U;
         }
-        table[index] = value;
+        tables[0][index] = value;
     }
-    return table;
+    for (std::size_t position = 1; position < tables.size(); ++position) {
+        for (std::size_t index = 0; index < 256; ++index) {
+            const std::uint32_t previous = tables[position - 1][index];
+            tables[position][index] = tables[0][previous & 255U] ^ (previous >> 8U);
+        }
+    }
+    return tables;
 }
 
 void append_u32_big_endian(std::vector<std::byte>& output, std::uint32_t value) {
@@ -51,12 +60,30 @@ void append_chunk(std::vector<std::byte>& output, const char (&type)[5],
 } // namespace
 
 std::uint32_t png_crc32(std::span<const std::byte> bytes) noexcept {
-    static const std::array<std::uint32_t, 256> table = make_crc_table();
+    static constexpr CrcTables tables = make_crc_tables();
     std::uint32_t crc = 0xffffffffU;
-    for (const std::byte value : bytes) {
-        crc = table[(crc ^ std::to_integer<std::uint32_t>(value)) & 0xffU] ^ (crc >> 8U);
+    const std::size_t interior = bytes.size() - bytes.size() % 8;
+    std::size_t offset = 0;
+    for (; offset < interior; offset += 8) {
+        // Explicit byte order, unaligned input, and no read beyond the live span.
+        const std::uint32_t first = std::to_integer<std::uint32_t>(bytes[offset]) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 1]) << 8U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 2]) << 16U) |
+            (std::to_integer<std::uint32_t>(bytes[offset + 3]) << 24U);
+        const std::uint32_t combined = crc ^ first;
+        crc = tables[7][combined & 255U] ^ tables[6][(combined >> 8U) & 255U] ^
+              tables[5][(combined >> 16U) & 255U] ^ tables[4][combined >> 24U] ^
+              tables[3][std::to_integer<unsigned>(bytes[offset + 4])] ^
+              tables[2][std::to_integer<unsigned>(bytes[offset + 5])] ^
+              tables[1][std::to_integer<unsigned>(bytes[offset + 6])] ^
+              tables[0][std::to_integer<unsigned>(bytes[offset + 7])];
     }
-    return crc ^ 0xffffffffU;
+    for (; offset < bytes.size(); ++offset) {
+        const unsigned value = std::to_integer<unsigned>(bytes[offset]);
+        crc = tables[0][(crc ^ value) & 255U] ^ (crc >> 8U);
+    }
+    const std::uint32_t result = crc ^ 0xffffffffU;
+    return result;
 }
 
 std::uint32_t png_adler32(std::span<const std::byte> bytes) noexcept {
@@ -78,16 +105,30 @@ std::uint32_t png_adler32(std::span<const std::byte> bytes) noexcept {
 }
 
 bool encode_png(const PngEncodeInput& input, std::vector<std::byte>& output) {
+    // Check the borrow before clearing its possible owner. Address differences
+    // avoid overflowing an end-address calculation for either live range.
+    bool aliased = false;
+    if (!input.pixels.empty() && !output.empty()) {
+        const std::uintptr_t source = reinterpret_cast<std::uintptr_t>(input.pixels.data());
+        const std::uintptr_t destination = reinterpret_cast<std::uintptr_t>(output.data());
+        aliased = source <= destination ? destination - source < input.pixels.size()
+            : source - destination < output.size();
+    }
     output.clear();
+    if (aliased) return false;
+    if (input.order != PngChannelOrder::rgba && input.order != PngChannelOrder::bgra) return false;
     if (input.width == 0U || input.height == 0U || input.width > dimension_limit ||
         input.height > dimension_limit) {
         return false;
     }
     const std::uint64_t tight_row = static_cast<std::uint64_t>(input.width) * 4U;
     if (input.row_bytes < tight_row) return false;
-    // The final row only needs its pixel bytes, not trailing stride padding.
-    const std::uint64_t required = input.row_bytes * (input.height - 1U) + tight_row;
-    if (required > input.pixels.size()) return false;
+    // Validate by division before multiplying an untrusted stride. The final
+    // row needs pixel bytes only; a one-row image never uses its row stride.
+    if (tight_row > input.pixels.size()) return false;
+    const std::uint64_t preceding_rows = input.height - 1U;
+    const std::uint64_t available = input.pixels.size() - tight_row;
+    if (preceding_rows != 0 && input.row_bytes > available / preceding_rows) return false;
 
     const std::size_t channels = input.opaque ? 3U : 4U;
     const std::size_t scanline = 1U + static_cast<std::size_t>(input.width) * channels;

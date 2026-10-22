@@ -607,8 +607,12 @@ void consider_candidate(PageWalk& walk, const SemanticNode& node, std::string_vi
     if (walk.page == host_services_page) return;
     if (!has_semantic_state(node.states, SemanticState::enabled)) return;
     const DefaultKind kind = expected_default(node);
+    // Focus is the default for a focusable node, and for one that publishes
+    // the focus action although it is not focusable itself: a composite whose
+    // own handler moves focus to an inner editor or part.
     const bool focus_only = kind == DefaultKind::none &&
-                            has_semantic_state(node.states, SemanticState::focusable);
+                            (has_semantic_state(node.states, SemanticState::focusable) ||
+                             has_action(node, SemanticAction::focus));
     if (kind == DefaultKind::none && !focus_only) return;
     const std::string key = std::string(type) + " / " + semantic_role_name(node.role);
     const bool observable = candidate_observable(node, kind);
@@ -935,9 +939,15 @@ ActionResult perform_candidate(Window& window, HWND hwnd, const std::string& key
     const bool expanded_before = has_semantic_state(node.states, SemanticState::expanded);
     result.outcome = ActionOutcome::unobserved;
     if (kind == DefaultKind::none) {
+        const Control::Ptr focused = window.focused_control();
         if (changed != nullptr && has_semantic_state((*changed).states, SemanticState::focused)) {
             result.outcome = ActionOutcome::changed;
             result.evidence = "focused";
+        } else if (control && focused && focused != control && (*control).contains(*focused)) {
+            // A composite that is not focusable moved focus to an inner
+            // control the semantic tree does not publish.
+            result.outcome = ActionOutcome::changed;
+            result.evidence = "focus moved inside, to " + std::string((*focused).stable_id().value());
         }
     } else if (kind == DefaultKind::select) {
         if (changed != nullptr && has_semantic_state((*changed).states, SemanticState::selected)) {

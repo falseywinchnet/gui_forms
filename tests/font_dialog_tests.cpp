@@ -1,6 +1,7 @@
 // FontDialog (stage W): the bundled faces it offers, styles per face, size
 // range, preview, Apply, OK and Cancel, the owned popup with its focus scope
-// and revocation, Escape, semantics and the published anatomy.
+// and revocation, Escape, semantics (focus goes to the font list) and the
+// published anatomy.
 
 #include "gui_forms/gui_forms.hpp"
 
@@ -147,6 +148,10 @@ void embedded_semantics_and_anatomy() {
     require((*dialog.ok_button()).perform_click() && closed.size() == 1U && closed[0].result == DialogResult::ok &&
                 dialog.font().weight == 700U,
             "placed in a layout, OK reports and takes the selection");
+    require((*fixture.window).request_focus(fixture.owner), "focus starts on the owner button");
+    require((*fixture.window).perform_semantic_action("font", SemanticAction::focus) &&
+                (*fixture.window).focused_control() == dialog.face_list(),
+            "semantic focus on the dialog moves focus to its font list");
 
     const ControlAnatomy& anatomy = dialog.anatomy();
     require(validate_control_anatomy(anatomy).defect == AnatomyDefect::none && anatomy.control_id == "font_dialog",

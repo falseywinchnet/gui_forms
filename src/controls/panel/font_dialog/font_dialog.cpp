@@ -440,6 +440,16 @@ SemanticDescriptor FontDialog::semantic_descriptor() const {
     return descriptor;
 }
 
+bool FontDialog::on_semantic_action(SemanticAction action, std::string_view value) {
+    Window* const host = window();
+    if (action == SemanticAction::focus && face_list_ && host != nullptr) {
+        const bool focused = (*host).request_focus(face_list_);
+        return focused;
+    }
+    const bool handled = Panel::on_semantic_action(action, value);
+    return handled;
+}
+
 // -- anatomy ---------------------------------------------------------------------
 
 namespace {
