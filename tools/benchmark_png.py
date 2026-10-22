@@ -81,7 +81,8 @@ def main() -> None:
             binary = output / ('benchmark-' + mode)
             command = ['clang++', '-std=c++20', '-O3', *includes, *flags,
                        str(ROOT / 'src/core/image/png_decoder.cpp'), str(ROOT / 'src/core/image/png_writer.cpp'),
-                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'tests/image/png_benchmark.cpp'),
+                       str(ROOT / 'stx_zlib/src/inflate.cpp'), str(ROOT / 'stx_zlib/src/deflate.cpp'),
+                       str(ROOT / 'tests/image/png_benchmark.cpp'),
                        str(baseline_object), str(oracle), *objects, '-o', str(binary)]
             record['commands'].append(command)
             subprocess.run(command, check=True)

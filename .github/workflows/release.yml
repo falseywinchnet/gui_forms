@@ -4,12 +4,22 @@ name: GUI.Forms programs and release
 # and smoke-launches the packages on the runner, and publishes a tested `v*`
 # release from main. Pull requests stop after the smoke. Toolchain and cache
 # restoration mirror native.yml so the published compiler cache can match.
+#
+# Pushes to main and pull requests run this workflow from native.yml, after
+# the native jobs (from_native): each programs job then adds the objects its
+# platform's native job just compiled for the same tree (the native cache
+# archive), so the toolkit and tests are compiled once per platform and run,
+# rather than twice. Tags, manual dispatch and the weekly prune still start
+# it directly, with only the Actions caches.
 on:
+  workflow_call:
+    inputs:
+      from_native:
+        description: Add the calling run's native cache archive to the restored objects
+        type: boolean
+        default: false
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
-    paths-ignore: ['docs/**', '*.md', 'planning/**', 'decisions/**', 'results/**']
   workflow_dispatch:
     inputs:
       publish:
@@ -89,8 +99,11 @@ jobs:
     steps:
       # The same layout as native.yml (sources at gui_forms/, build three levels
       # down) so the compiler cache native.yml publishes matches these objects.
+      # The tree native.yml built and tested (a pull request's head, not the
+      # merge commit), so its objects match and packages name that revision.
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
       - uses: actions/setup-python@v5
         with:
@@ -190,6 +203,22 @@ jobs:
             .build/native-${{ matrix.platform }}/gui-forms/_deps/gui_forms_miniaudio-src
             .build/native-${{ matrix.platform }}/skia
           key: gui-deps-v3-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn', 'gui_forms/cmake/Audio.cmake') }}
+      # Called from native.yml: this run's native job for the platform compiled
+      # the toolkit and tests of this very tree and archived its .ccache (or,
+      # on a promoted main run, the archive of the run that tested this tree).
+      # Its entries are added to the restored cache: ccache entries are
+      # content-addressed files, so the union is a valid cache. Every test
+      # below still runs.
+      - uses: actions/download-artifact@v4
+        if: inputs.from_native
+        with:
+          name: gui-forms-cache-${{ matrix.platform }}
+          path: .ci/native-cache
+      - name: Add the native job's objects to the compiler cache
+        if: inputs.from_native
+        run: |
+          tar -xzf .ci/native-cache/gui-forms-cache-${{ matrix.platform }}.tar.gz .ccache
+          rm -rf .ci/native-cache
       # --- build, as tools/ci_build.py configures it, plus the programs ------------
       - name: Fetch pinned text sources and build the CPU renderer
         run: |

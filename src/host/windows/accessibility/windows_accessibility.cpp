@@ -670,6 +670,30 @@ LRESULT WindowsAccessibility::object(WPARAM parameter) noexcept {
     return result;
 }
 
+namespace {
+
+// Whether this thread's COM apartment is pinned for UI Automation.
+thread_local bool automation_apartment_pinned = false;
+
+} // namespace
+
+// UI Automation does not accept a thread's providers after that thread's COM
+// apartment ended and began again while a client still held an element:
+// when a run ended the UI thread's apartment (the host's last
+// CoUninitialize) and the next run began a new one on the same thread, the
+// new window's UiaReturnRawElementProvider answered E_INVALIDARG and UI
+// Automation served that window from the system proxies (measured: every
+// time with an element kept across the runs, about half the time under
+// load without). Releasing every provider (UiaDisconnectAllProviders)
+// before the apartment ended did not help. So the first provider a thread
+// serves takes one more reference on the thread's apartment and never
+// releases it: the apartment ends when the thread does.
+void WindowsAccessibility::pin_automation_apartment() noexcept {
+    if (automation_apartment_pinned) return;
+    const HRESULT pinned = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    automation_apartment_pinned = SUCCEEDED(pinned);
+}
+
 bool WindowsAccessibility::automation_request(LPARAM lparam) noexcept {
     // WM_GETOBJECT carries the object ID in the low 32 bits of lparam.
     const bool requested = static_cast<LONG>(lparam) == static_cast<LONG>(UiaRootObjectId);
@@ -679,6 +703,7 @@ bool WindowsAccessibility::automation_request(LPARAM lparam) noexcept {
 LRESULT WindowsAccessibility::automation_object(WPARAM wparam, LPARAM lparam) noexcept {
     SemanticSource& source = *source_;
     if (source.model == nullptr || source.hwnd == nullptr) return 0;
+    pin_automation_apartment();
     if (!source.automation_observed) {
         // The tree the first client sees is the one later changes are
         // compared against.

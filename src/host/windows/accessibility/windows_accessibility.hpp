@@ -44,6 +44,24 @@ public:
     void notify(double scale) noexcept;
 
 private:
+    // Takes one reference on the calling thread's COM apartment
+    // (CoInitializeEx) the first time the thread serves a UI Automation
+    // provider, and never releases it.
+    // - Owner: the thread, not this object. A thread_local flag records that
+    //   the thread holds it; WindowsAccessibility objects come and go with
+    //   their windows and never release it.
+    // - Lifetime: from that first provider until the thread exits; the
+    //   apartment then ends with the thread, after every run on it. A run's
+    //   own CoInitializeEx/CoUninitialize pair no longer ends the apartment.
+    // - Why: UI Automation refuses a thread's providers
+    //   (UiaReturnRawElementProvider answers E_INVALIDARG) once that thread's
+    //   apartment has ended and begun again while a client still held an
+    //   element. UiaDisconnectAllProviders before the apartment ended was
+    //   not enough: it releases the providers UI Automation holds, but the
+    //   refusal persisted in the next apartment (measured; see
+    //   windows_accessibility.cpp).
+    static void pin_automation_apartment() noexcept;
+
     std::shared_ptr<SemanticSource> source_;
 };
 
