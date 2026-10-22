@@ -312,6 +312,79 @@ the plan left a number or a form open, E3 chose:
 7. **Ceremonial is a `Control` property** (`set_ceremonial`), inherited by
    descendants: accepted.
 
+## Decisions for E8c, the material primitive (owner direction, 2026-10-22)
+
+1. **A refused material falls back.** The `material` primitive refuses a part
+   whose material is missing or invalid, whose image fill is unavailable, or
+   whose estimated bake exceeds the bound. The part is then drawn by the
+   built-in recipe, and each refusal is counted once per part
+   (`engine_primitive_refusals` in the metrics snapshot). The bound and the
+   costs are set in one place, `material_bake_policy.hpp`.
+2. **Image fills are supported, never refused for being images.** No stock
+   theme uses them. Resampling is Mitchell–Netravali (B = C = 1/3),
+   separable and done in premultiplied colour. When an image is shrunk, its
+   kernel is widened by the shrink factor and the weights are normalized.
+   The filter is deterministic, has no ringing worth seeing at UI scales and
+   needs no mip chain. It is a proposal: the owner may name another.
+3. **CSS inline images** are a design question for the owner, recorded in
+   the track file; they are not built.
+4. **Bake cost and live cost are separate.** A material is baked once per
+   invalidation (state, size, scale or theme) and cached. Compositing it
+   afterwards is a blit, plus a group blend where one applies. The bake is
+   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame
+   (a proposed default).
+5. **Nothing rasterizes per frame.** The material reads no inputs. The
+   retained forms of E7's animated parameters, and slicing, are phase E7r
+   (after E8c, before E9).
+
+### E8c bake costs
+
+Measured with `gui_forms_engine_material_tests --measure`. Each figure is
+the median of nine bakes of a 240-unit square part at scale 1 (a 256 × 256
+destination including the outsets), minus the base material's bake, divided
+by the destination's pixels. The per-tap figure comes from a 64 × 64 image
+magnified and a 1024 × 1024 image shrunk over the same box. The decode
+figure comes from a 64 × 64 PNG.
+
+The build was Release (clang 22, -O2) on Windows 11, on an AMD EPYC 9354
+virtual machine with 8 logical CPUs. The runs were on 2026-10-22, while
+other builds held the CPUs at 88–97 % load. There were seven runs, and the
+table gives the minimum, median and maximum per pixel (per tap for
+`image_tap`, per source pixel for `image_decode`), in nanoseconds:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| base (the square box) | 23.4 | 24.6 | 24.9 | 26 |
+| base, rounded box | 24.3 | 26.0 | 27.6 | (in base) |
+| solid fill | 7.5 | 9.2 | 22.8 | 10 |
+| linear fill | 12.0 | 14.7 | 18.1 | 15 |
+| radial fill | 17.3 | 21.1 | 29.0 | 22 |
+| each gradient stop past two | 0.22 | 0.24 | 0.37 | 0.5 |
+| outer shadow | 61.6 | 68.1 | 89.7 | 69 |
+| inset shadow | 55.7 | 59.1 | 82.4 | 60 |
+| border (rounded) | 22.4 | 25.4 | 39.1 | 26 |
+| border edge | 9.9 | 10.7 | 18.5 | 11 |
+| keyline | 7.4 | 12.3 | 17.2 | 13 |
+| image composite | −2.5 | 5.1 | 15.9 | 6 |
+| image tap | 3.4 | 3.9 | 4.3 | 4 |
+| image decode | −96 | −3.9 | 81 | 10 |
+
+The "used" column rounds each median up. The two image figures are below
+the noise at this workload: single runs measured below zero. They therefore
+carry conservative figures rather than measurements. The machine's load
+makes every figure pessimistic.
+
+What the bound admits:
+
+- A material with a shadow, a gradient, a border and a keyline costs about
+  150 ns per device pixel, so 4 ms admits about 26 000 pixels. That is a
+  100 × 24 button at scale 2, with its outsets.
+- A plain solid region costs about 36 ns per pixel, so 4 ms admits about
+  110 000 pixels, a region of roughly 320 × 320 at scale 1.
+- Larger parts are refused and drawn by the built-in recipe until E7r's
+  slice cache bakes a reference box once and composes larger parts from
+  its corners, edges and centre.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,
