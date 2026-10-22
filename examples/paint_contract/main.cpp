@@ -50,6 +50,7 @@ class PointerObserver final : public gui_forms::Component {
 public:
     explicit PointerObserver(gui_forms::RasterCanvas& canvas) : canvas_(canvas) {}
     void observe(const gui_forms::PointerEvent& event) {
+        // Only presses and releases are counted; other actions pass unobserved.
         if (event.action == gui_forms::PointerAction::down) {
             canvas_.set_pointer_capture(true);
             ++presses;

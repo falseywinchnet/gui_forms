@@ -57,31 +57,7 @@ RectF Region::bounds() const {
     }
     for (const PathSnapshot& path : value_.paths) {
         for (const PathElement& element : path.elements) {
-            switch (element.verb) {
-            case PathVerb::line:
-                accumulator.include(element.first);
-                accumulator.include(element.second);
-                break;
-            case PathVerb::quadratic:
-                accumulator.include(element.first);
-                accumulator.include(element.second);
-                accumulator.include(element.third);
-                break;
-            case PathVerb::bezier:
-                accumulator.include(element.first);
-                accumulator.include(element.second);
-                accumulator.include(element.third);
-                accumulator.include(element.fourth);
-                break;
-            case PathVerb::rectangle:
-            case PathVerb::ellipse:
-            case PathVerb::arc:
-                accumulator.include(element.rect);
-                break;
-            case PathVerb::start_figure:
-            case PathVerb::close_figure:
-                break;
-            }
+            include_path_element(element, accumulator);
         }
     }
     return accumulator.bounds();

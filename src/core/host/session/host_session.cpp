@@ -149,6 +149,33 @@ bool valid_drag_event(const DragEvent& event) noexcept {
     }
     return true;
 }
+
+// What a host event is refused with in lifecycle `phase` (none when it is
+// admitted): before attach only an attach or shutdown, once attached no
+// second attach, after close authorization only the close, shutdown or a
+// passive deactivation or occlusion, once closed only shutdown, and nothing
+// after shutdown.
+HostDispatchError lifecycle_refusal(HostLifecyclePhase phase, bool attach, bool shutdown,
+                                    bool closed, bool passive_terminal) noexcept {
+    switch (phase) {
+    case HostLifecyclePhase::constructed:
+        if (!attach && !shutdown) return HostDispatchError::invalid_lifecycle;
+        return HostDispatchError::none;
+    case HostLifecyclePhase::attached:
+        if (attach) return HostDispatchError::invalid_lifecycle;
+        return HostDispatchError::none;
+    case HostLifecyclePhase::close_authorized:
+        if (!closed && !shutdown && !passive_terminal) return HostDispatchError::invalid_lifecycle;
+        return HostDispatchError::none;
+    case HostLifecyclePhase::closed:
+        if (!shutdown) return HostDispatchError::invalid_lifecycle;
+        return HostDispatchError::none;
+    case HostLifecyclePhase::shutdown:
+        return HostDispatchError::after_shutdown;
+    }
+    // A phase outside the enumeration admits nothing.
+    return HostDispatchError::invalid_lifecycle;
+}
 } // namespace
 HostSession::HostSession(Window& window,
                          HostCapabilities capabilities,
@@ -316,25 +343,8 @@ HostDispatchResult HostSession::dispatch(HostEvent event) {
                        std::get_if<HostOcclusionEvent>(&event.payload)) {
             passive_terminal = (*occlusion).occluded;
         }
-        switch (snapshot_.phase) {
-        case HostLifecyclePhase::constructed:
-            if (!attach && !shutdown) result.error = HostDispatchError::invalid_lifecycle;
-            break;
-        case HostLifecyclePhase::attached:
-            if (attach) result.error = HostDispatchError::invalid_lifecycle;
-            break;
-        case HostLifecyclePhase::close_authorized:
-            if (!closed && !shutdown && !passive_terminal) {
-                result.error = HostDispatchError::invalid_lifecycle;
-            }
-            break;
-        case HostLifecyclePhase::closed:
-            if (!shutdown) result.error = HostDispatchError::invalid_lifecycle;
-            break;
-        case HostLifecyclePhase::shutdown:
-            result.error = HostDispatchError::after_shutdown;
-            break;
-        }
+        result.error = lifecycle_refusal(snapshot_.phase, attach, shutdown, closed,
+                                         passive_terminal);
     }
     if (!result.accepted()) {
         ++snapshot_.events_rejected;

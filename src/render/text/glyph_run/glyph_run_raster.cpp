@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 
 namespace gui_forms::render::text {
@@ -100,8 +101,9 @@ struct RunPlacement final {
     GlyphRunTransform linear{};
     FT_F26Dot6 size{};
     FT_Int32 flags{light_flags};
-    bool has_matrix{};
-    FT_Matrix matrix{};
+    // FreeType's outline transform; none when the run is only scaled
+    // uniformly (no oblique, no transform).
+    std::optional<FT_Matrix> matrix{};
     // Total outline thickening in 26.6 device units; 0 for none.
     FT_Pos embolden{};
 };
@@ -158,8 +160,8 @@ public:
                 const std::int64_t pixel_x = floor_div_64(device_x);
                 const std::int64_t pixel_y = floor_div_64(device_y);
                 FT_Vector delta{static_cast<FT_Pos>(device_x - pixel_x * 64), -static_cast<FT_Pos>(device_y - pixel_y * 64)};
-                if (placement.has_matrix) {
-                    FT_Matrix matrix = placement.matrix;
+                if (placement.matrix.has_value()) {
+                    FT_Matrix matrix = *placement.matrix;
                     FT_Set_Transform(face, &matrix, &delta);
                 } else {
                     FT_Set_Transform(face, nullptr, &delta);
@@ -230,7 +232,6 @@ GlyphRunCoverage GlyphRunRasterizer::rasterize(const ShapedText& shaped, const F
     placement.size = static_cast<FT_F26Dot6>(std::llround(device_size * 64.0));
     placement.flags = light_flags;
     if (synthesis.oblique) {
-        placement.has_matrix = true;
         placement.matrix = oblique_matrix();
     }
     if (synthesis.embolden) placement.embolden = embolden_strength(device_size);
@@ -273,7 +274,6 @@ GlyphRunCoverage GlyphRunRasterizer::rasterize_transformed(const ShapedText& sha
         FT_Matrix_Multiply(&matrix, &shear);
         matrix = shear;
     }
-    placement.has_matrix = true;
     placement.matrix = matrix;
     if (synthesis.embolden) placement.embolden = embolden_strength(logical_size * std::sqrt(std::abs(determinant)));
     GlyphRunCoverage result = Impl::Runner::run(*impl_, shaped, placement);
