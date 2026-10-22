@@ -1,0 +1,522 @@
+<meta charset="utf-8">
+<title>Accessibility Vocabulary Interview</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/*FONTS*/
+/* Layout: one reading column of question cards under a sticky section rail; visuals break wider inside their own scroll boxes. */
+:root {
+  --paper: #F4F5F7;
+  --card: #FFFFFF;
+  --ink: #16263A;
+  --ink-2: #4B5B70;
+  --rule: #D3DCE8;
+  --accent: #173F79;
+  --accent-soft: #E3EDFB;
+  --rec: #A9720F;
+  --rec-soft: #FBF1DC;
+  --done: #2F7A4B;
+  --chip: #E8EEF6;
+  --series-1: #2F68C7;
+  --series-2: #B8860B;
+  --series-3: #B5476F;
+  --face-display: "Portsmouth Rapids", "Segoe UI", Tahoma, Arial, sans-serif;
+  --face-body: "Portsmouth Rapids", "Segoe UI", Tahoma, Arial, sans-serif;
+  --face-mono: "Portsmouth Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #050706; --card: #0E1310; --ink: #E2EADF; --ink-2: #A3B39D; --rule: #26322A;
+    --accent: #82B361; --accent-soft: #17241A; --rec: #D98AAB; --rec-soft: #2A1620;
+    --done: #82B361; --chip: #18211B; --series-1: #82B361; --series-2: #E0B860; --series-3: #D98AAB;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #050706; --card: #0E1310; --ink: #E2EADF; --ink-2: #A3B39D; --rule: #26322A;
+  --accent: #82B361; --accent-soft: #17241A; --rec: #D98AAB; --rec-soft: #2A1620;
+  --done: #82B361; --chip: #18211B; --series-1: #82B361; --series-2: #E0B860; --series-3: #D98AAB;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: var(--face-body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 860px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--face-display); font-weight: 700; text-wrap: balance; line-height: 1.2; }
+h1 { font-size: 2.1rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; margin: 0; }
+h3 { font-size: 1.08rem; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--ink-2); max-width: 65ch; }
+.mono { font-family: var(--face-mono); }
+header.top { padding-block: 32px 18px; display: grid; gap: 14px; }
+.eyebrow { font-family: var(--face-mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.status-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 0.9rem; color: var(--ink-2); }
+.meter { flex: 1 1 220px; height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; min-width: 160px; }
+.meter > i { display: block; height: 100%; width: 0; background: var(--done); transition: width 200ms ease; }
+.store-note { font-size: 0.85rem; }
+nav.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--paper); border-bottom: 1px solid var(--rule);
+  padding-block: 10px; margin-bottom: 18px;
+}
+nav.rail .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; }
+nav.rail a {
+  flex: 0 0 auto; text-decoration: none; color: var(--ink); background: var(--chip);
+  font-size: 0.84rem; padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+}
+nav.rail a:focus-visible, button:focus-visible, textarea:focus-visible, .opt input:focus-visible + .opt-body { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav.rail a .count { font-family: var(--face-mono); color: var(--ink-2); margin-left: 4px; }
+nav.rail a.complete { background: var(--accent-soft); }
+.context { display: grid; gap: 14px; margin-bottom: 28px; }
+.panel { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 10px; min-width: 0; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--face-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); font-weight: 400; }
+section.group { display: grid; gap: 16px; margin-bottom: 36px; scroll-margin-top: 64px; }
+section.group > header { display: grid; gap: 4px; padding-top: 6px; border-top: 2px solid var(--accent); }
+section.group > header .eyebrow { margin-top: 10px; }
+article.q { background: var(--card); border: 1px solid var(--rule); border-radius: 6px; padding: 18px; display: grid; gap: 12px; scroll-margin-top: 64px; min-width: 0; }
+article.q.answered { border-left: 4px solid var(--done); }
+.q-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.q-id { font-family: var(--face-mono); font-size: 0.82rem; color: var(--accent); }
+.q-context { color: var(--ink-2); font-size: 0.95rem; max-width: 70ch; }
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; cursor: pointer; }
+.opt input { margin-top: 5px; accent-color: var(--accent); width: 17px; height: 17px; }
+.opt-body { border: 1px solid var(--rule); border-radius: 5px; padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.opt input:checked + .opt-body { border-color: var(--accent); background: var(--accent-soft); }
+.opt-title { font-weight: 700; }
+.opt-why { color: var(--ink-2); font-size: 0.92rem; }
+.rec { display: inline-block; font-family: var(--face-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rec); background: var(--rec-soft); border-radius: 3px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+.note-row { display: grid; gap: 4px; }
+.note-row label { font-size: 0.84rem; color: var(--ink-2); }
+textarea { width: 100%; min-height: 56px; resize: vertical; font: inherit; font-size: 0.95rem; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px; }
+.saved { font-size: 0.8rem; color: var(--ink-2); min-height: 1.2em; }
+.visual { border: 1px dashed var(--rule); border-radius: 6px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.visual .cap { font-size: 0.85rem; color: var(--ink-2); max-width: 70ch; }
+.vis-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-start; }
+.vis-cell { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.vis-cell .lbl { font-size: 0.82rem; font-family: var(--face-mono); color: var(--ink-2); }
+.vis-cell .lbl b { color: var(--ink); font-weight: 700; }
+canvas.px { image-rendering: pixelated; image-rendering: crisp-edges; max-width: 100%; height: auto; background: #fff; }
+.vis-scroll { overflow-x: auto; }
+button.act { font: inherit; font-size: 0.88rem; color: var(--card); background: var(--accent); border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+button.ghost { font: inherit; font-size: 0.88rem; color: var(--accent); background: transparent; border: 1px solid var(--accent); border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+.motion-note { font-size: 0.82rem; color: var(--rec); }
+.tiles { position: relative; width: 168px; height: 168px; background: #22262B; border-radius: 4px; }
+.tiles .tile { position: absolute; width: 40px; height: 40px; border: 2px solid #0B0E12; background: #3F7FE0; border-radius: 3px; box-shadow: inset 0 0 0 2px #9CC2FF; }
+.tiles .tile.off { opacity: 0; }
+.tiles.fade .tile { transition: opacity 100ms linear; }
+.diagram { display: grid; gap: 8px; }
+.layer { border: 1px solid var(--rule); border-radius: 5px; padding: 8px 10px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.layer .who { font-family: var(--face-mono); font-size: 0.78rem; color: var(--ink-2); }
+.layer.covered { background: var(--accent-soft); border-color: var(--accent); }
+.press-zone { display: grid; gap: 6px; justify-items: center; }
+.press-frame { outline: 1px dashed var(--ink-2); outline-offset: 0; display: inline-block; line-height: 0; }
+.press-frame canvas { transition: transform 60ms ease-out; touch-action: none; cursor: pointer; }
+#summary pre { white-space: pre-wrap; font-family: var(--face-mono); font-size: 0.82rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 5px; padding: 12px; margin: 0; max-height: 420px; overflow: auto; }
+.sum-table td:first-child { font-family: var(--face-mono); white-space: nowrap; }
+.pending { color: var(--rec); }
+footer.next { display: grid; gap: 10px; }
+@media (max-width: 520px) {
+  h1 { font-size: 1.7rem; }
+  article.q, .panel { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter > i, .press-frame canvas { transition: none; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">GUI.Forms · stage A · accessibility · vocabulary round 1</div>
+    <h1>Accessibility Vocabulary Interview</h1>
+    <p class="lede">Stage A (release 0.2) now verifies every stock control through MSAA, UI Automation and AT-SPI on CI, with zero mismatches. What remains needs vocabulary, which is yours to admit: the roles, fields and text support the workers found missing on every host. Each question explains its options and my recommendation. Your answers are kept in this browser; save them to a file or copy the record and give it to the coordinating session, which records them in the stage A brief and hands them to the workers.</p>
+    <div class="status-row">
+      <span id="progress-text">0 of 0 answered</span>
+      <span class="meter" aria-hidden="true"><i id="progress-bar"></i></span>
+      <span id="store-note" class="store-note">Answers are kept in this browser. Save them to a file to keep them anywhere else.</span>
+    </div>
+  </header>
+
+  <nav class="rail" aria-label="Sections"><div class="chips" id="rail"></div></nav>
+
+  <div class="context">
+    <div class="panel">
+      <h2>Where stage A stands</h2>
+      <p>Merged: one routing core for every host (by runtime ID, so a disposed control is refused); the MSAA and UI Automation clients over the whole Gallery on Windows (2,792 elements, 0 mismatches, 96 of 96 default actions through their patterns); the AT-SPI client over the whole Gallery on Linux (2,743 nodes, 0 mismatches); focus for composite controls on every host. Found on the way and fixed: eight memory-safety defects of the same kind in controls.</p>
+      <p>Already decided (DK-51): a live-region role for the docking move mode's announcements, built in this stage. Not asked here.</p>
+    </div>
+  </div>
+
+  <main id="groups"></main>
+
+  <section class="group" id="summary">
+    <header><div class="eyebrow">Record</div><h2>Your answers</h2></header>
+    <div class="panel">
+      <p class="lede" id="summary-lede">Answered questions appear here as you go. Save the answers to a file (you can load it back here later, in any browser), or copy the record and paste it into the conversation.</p>
+      <div class="table-scroll"><table class="sum-table"><thead><tr><th>Question</th><th>Choice</th><th>Note</th></tr></thead><tbody id="summary-rows"></tbody></table></div>
+      <div class="vis-row"><button class="act" id="save-btn" type="button">Save answers to a file</button><button class="ghost" id="load-btn" type="button">Load answers from a file</button><button class="ghost" id="copy-btn" type="button">Copy the record</button><input type="file" id="load-file" accept=".json,application/json" hidden><span class="saved" id="copy-state"></span></div>
+      <pre id="summary-text" hidden></pre>
+    </div>
+  </section>
+
+  <footer class="next panel">
+    <h2>What happens with your answers</h2>
+    <p>They become GIVEN decisions in <span class="mono">planning/stages/A-accessibility/README.md</span> and the design language's §12, and the vocabulary joins the schema. Then the workers build them on every host: the roles and fields through MSAA, UI Automation, AT-SPI and macOS AX, and editable text through AT-SPI Text, UI Automation TextPattern and macOS text attributes, each proven by the Gallery-wide client tests on CI.</p>
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------- questions
+const GROUPS = [
+  { key: "A", title: "Roles", blurb: "What a screen reader is told a thing is. Today every tree, list, grid and table publishes as list and list item, header cells as buttons, and dialogs and the status strip as plain groups. Adding a role is your decision (design language §12.7). Each new role maps to every host: MSAA, UI Automation, AT-SPI and macOS AX all have these.", questions: [
+    { id: "A-R1", q: "Admit tree roles?",
+      ctx: "TreeView, the object view and BreadcrumbTrail publish their items as list items with the depth written into the description. A screen reader then cannot announce “level 3, expanded, 4 of 7” the way it does in Explorer.",
+      opts: [
+        { t: "Admit tree and tree_item", w: "Items gain a level field beside the existing position-in-set and set-size, and keep their expanded state. Every host has a native tree role, so readers announce level and expansion properly.", rec: true },
+        { t: "Keep list and list item", w: "No new atoms; depth stays in the description text, which readers speak as words rather than as structure." } ] },
+    { id: "A-R2", q: "Admit table and grid roles?",
+      ctx: "DataGridView and ListView in details mode publish rows as list items and column headers as buttons. A reader cannot move by column or announce “row 12, column Size”.",
+      opts: [
+        { t: "Admit table, row, cell, column_header and row_header, with row and column index and count fields", w: "Readers navigate by row and column and announce the header for each cell. This is what UIA's Grid and Table patterns, AT-SPI's Table and AX tables expect.", rec: true },
+        { t: "Admit table and cell only", w: "Fewer atoms, but headers and row grouping stay invisible, so a reader cannot say which column a cell is in." },
+        { t: "Keep list and list item", w: "No new atoms; tables read as long flat lists." } ] },
+    { id: "A-R3", q: "Tree-grids (TreeListView)?",
+      ctx: "TreeListView is a tree whose rows have columns.",
+      opts: [
+        { t: "A tree_grid role: table semantics with tree_item rows", w: "Maps to UIA's DataGrid with tree items, AT-SPI's tree table and AX's outline. Needs A-R1 and A-R2.", rec: true },
+        { t: "Publish it as a tree", w: "Columns are lost to the reader." },
+        { t: "Publish it as a table", w: "Levels and expansion are lost to the reader." } ] },
+    { id: "A-R4", q: "A dialog role?",
+      ctx: "FontDialog, TaskDialog and owned dialogs publish as panes or groups, so a reader does not announce “dialog” when one opens.",
+      opts: [
+        { t: "Admit dialog, with a modal flag", w: "Readers announce the dialog and its title on opening, and keep the reading inside a modal one.", rec: true },
+        { t: "Keep pane and group", w: "No new atom; the opening is announced only as a focus change." } ] },
+    { id: "A-R5", q: "A status bar role?",
+      ctx: "StatusStrip publishes as a group.",
+      opts: [
+        { t: "Admit status_bar", w: "Readers have a key to read the status bar on demand (NVDA+End, for example); that needs the role.", rec: true },
+        { t: "Keep group", w: "No new atom; the status text is found only by moving through the window." } ] },
+    { id: "A-R6", q: "The docking navigator and the token field?",
+      ctx: "The T1 recheck handed both to this stage. DockNavigator publishes as a group of two lists; TokenBox's tokens as list items beside its text box. No host has a navigator role or a token role.",
+      opts: [
+        { t: "No new roles: keep the compositions, with clear names", w: "Every host already reads groups of lists and lists of items well; a new role would map to nothing on most hosts.", rec: true },
+        { t: "Admit navigator and token roles anyway", w: "Exact in our own tree, but each host would fall back to a generic role." } ] } ] },
+  { key: "B", title: "Fields and states", blurb: "Smaller atoms the workers found missing while checking every control on Windows, Linux and macOS.", questions: [
+    { id: "A-F1", q: "Checkable controls?",
+      ctx: "A toggle button that is off looks like a plain button: nothing says it can be checked. UI Automation can therefore offer its Toggle pattern only while the button is on, and readers don't announce “not pressed”.",
+      opts: [
+        { t: "Admit a checkable state", w: "Any control that can be checked says so, on or off. Every host's toggle and check semantics follow from it.", rec: true },
+        { t: "Admit a toggle_button role instead", w: "Covers toggle buttons only; other checkable things (menu items, tool buttons) still need their own handling." },
+        { t: "Neither", w: "An off toggle stays indistinguishable from a button." } ] },
+    { id: "A-F2", q: "Access keys?",
+      ctx: "Labels and menus carry mnemonics (the underlined letter of “&File”), but nodes don't publish them, so MSAA's keyboard shortcut and UIA's AccessKey are always empty.",
+      opts: [
+        { t: "Admit an access_key field", w: "Readers announce “Alt+F” with the control. Filled from the mnemonic the control already has.", rec: true },
+        { t: "No", w: "Readers never announce access keys." } ] },
+    { id: "A-F3", q: "Step sizes on ranges?",
+      ctx: "Sliders, scroll bars and numeric fields publish value, minimum and maximum, but not their small and large steps, which UIA's RangeValue and readers use for arrow and page keys.",
+      opts: [
+        { t: "Admit small_step and large_step fields on range nodes", w: "Filled from the controls' own increments.", rec: true },
+        { t: "No", w: "Hosts report a default step that may not match the control." } ] },
+    { id: "A-F4", q: "Multiple selection?",
+      ctx: "Nothing says whether a list, tree or grid allows several selected items, which UIA's Selection pattern and readers report.",
+      opts: [
+        { t: "Admit a multiselectable state", w: "On lists, trees and grids that allow it.", rec: true },
+        { t: "No", w: "Readers assume single selection." } ] },
+    { id: "A-F5", q: "The docking pin?",
+      ctx: "A pin publishes as a checked check box named “Pinned”. The T1 recheck asked whether it needs its own action.",
+      opts: [
+        { t: "Keep the check box", w: "Every host reads a named check box correctly; with A-F1's checkable state it is announced exactly.", rec: true },
+        { t: "A pin action", w: "A new atom that maps to nothing native on any host." } ] } ] },
+  { key: "C", title: "Editable text", blurb: "Stage A's text deliverable: reading a text box by character, word and line, following the caret, and changing the selection, through AT-SPI Text, UIA TextPattern and macOS text attributes. Today a text box publishes only its whole text, as its value, with no caret or selection. The Linux worker stopped here because it needs vocabulary.", questions: [
+    { id: "A-T1", q: "How does text selection and layout reach the hosts?",
+      ctx: "The text library already has typed offsets and grapheme segmentation, and TextBox already keeps its selection on grapheme boundaries.",
+      opts: [
+        { t: "Two node fields plus two on-demand window queries", w: "Fields: text_selection (anchor and caret as byte offsets into the value; absent for password boxes) and multiline. Queries: the visual lines, character positions and word starts, built only when a host asks; and setting the selection, refused when stale, off a character boundary, or outside the focus scope. Two new field atoms, no new action. Every host converts to its own units.", rec: true },
+        { t: "The same, but setting the selection is a semantic action", w: "It reuses the existing action path, but the two offsets have to be packed into a string value. Adds one action atom as well." },
+        { t: "No node fields: everything through window queries", w: "Avoids touching the field list, but hosts must poll every text node on each update to notice changes; the same capability under another name." } ] },
+    { id: "A-T2", q: "Accept the text defaults?",
+      ctx: "Offsets are kept in UTF-8 in the core and converted per host. Words follow the text box's own Ctrl+Arrow rule, so a reader's words match the keyboard's. Lines are visual (wrapped) lines. Sentences are reported unsupported, since nothing segments them yet. A caret placed inside a combining sequence is refused rather than moved. Password boxes publish no text or layout. This pass covers TextBox (single and multiline), MaskedTextBox and TokenBox's editor; the hidden editors of ComboBox, DomainUpDown and NumericUpDown come later.",
+      opts: [
+        { t: "Accept all of them", w: "The Linux worker builds AT-SPI Text on them; UIA TextPattern and macOS follow on the same core.", rec: true },
+        { t: "Accept, with changes in the note", w: "Name which default changes, for example snapping a caret inside a combining sequence instead of refusing it." } ] } ] },
+  { key: "M", title: "macOS", blurb: "Your M4 session wrote the macOS stage A drafts: #194 (green) and #195 (one mismatch: a timer label read at two moments). Both also need the shared runtime-ID routing.", questions: [
+    { id: "A-M1", q: "Who finishes #194 and #195?",
+      ctx: "Only the M4 can run the permission-granted outside client test, which is the gate evidence on macOS.",
+      opts: [
+        { t: "A worker here, through CI; the M4 runs only the final gate", w: "Keeps all three hosts under one review and one routing core; the M4 is needed once, at the end.", rec: true },
+        { t: "The M4 session continues them", w: "You relay a short handoff covering the routing change and the #195 fix." } ] } ] }
+];
+
+const VISUALS = {};
+
+// ---------------------------------------------------------------- answers
+const answers = {};
+
+function allQuestions() {
+  const list = [];
+  for (const g of GROUPS) for (const q of g.questions) list.push({ g: g, q: q });
+  return list;
+}
+function localKey() { return "a-vocabulary-round-1"; }
+function loadLocal() {
+  try { const raw = localStorage.getItem(localKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+function saveLocal() {
+  try { localStorage.setItem(localKey(), JSON.stringify(answers)); } catch (e) { /* storage unavailable */ }
+}
+function setSaved(id, text) {
+  const el = document.getElementById("saved-" + id);
+  if (el) el.textContent = text;
+}
+function persist(id) {
+  saveLocal();
+  setSaved(id, "Saved in this browser");
+}
+function record(id, choice, note) {
+  const now = new Date().toISOString();
+  const prev = answers[id] || { choice: 0, note: "", history: [] };
+  const history = (prev.history || []).slice(-19);
+  if (choice !== prev.choice) history.push({ choice: choice, at: now });
+  answers[id] = { choice: choice, note: note, at: now, history: history };
+  refreshQuestion(id);
+  refreshProgress();
+  persist(id);
+}
+function applyRemote(id, data) {
+  answers[id] = { choice: Number(data.choice) || 0, note: String(data.note || ""), at: String(data.at || ""), history: Array.isArray(data.history) ? data.history.slice(-20) : [] };
+  const radios = document.querySelectorAll("input[name='opt-" + id + "']");
+  for (const r of radios) r.checked = Number(r.value) === answers[id].choice;
+  const ta = document.getElementById("note-" + id);
+  if (ta && document.activeElement !== ta) ta.value = answers[id].note;
+  refreshQuestion(id);
+}
+
+// ---------------------------------------------------------------- page
+function buildPage() {
+  const rail = document.getElementById("rail");
+  const main = document.getElementById("groups");
+  for (const g of GROUPS) {
+    const a = document.createElement("a");
+    a.href = "#group-" + g.key;
+    a.id = "rail-" + g.key;
+    a.innerHTML = g.key + " · " + g.title + "<span class=\"count\"></span>";
+    rail.appendChild(a);
+    const sec = document.createElement("section");
+    sec.className = "group";
+    sec.id = "group-" + g.key;
+    const head = document.createElement("header");
+    head.innerHTML = "<div class=\"eyebrow\">Section " + g.key + "</div><h2>" + g.title + "</h2><p class=\"lede\">" + g.blurb + "</p>";
+    sec.appendChild(head);
+    for (const q of g.questions) sec.appendChild(buildQuestion(q));
+    main.appendChild(sec);
+  }
+  const s = document.createElement("a");
+  s.href = "#summary"; s.textContent = "Record";
+  rail.appendChild(s);
+}
+function buildQuestion(q) {
+  const art = document.createElement("article");
+  art.className = "q";
+  art.id = q.id;
+  const head = document.createElement("div");
+  head.className = "q-head";
+  head.innerHTML = "<span class=\"q-id\">" + q.id + "</span><h3>" + q.q + "</h3>";
+  art.appendChild(head);
+  const ctx = document.createElement("p");
+  ctx.className = "q-context";
+  ctx.textContent = q.ctx;
+  art.appendChild(ctx);
+  let visualBox = null;
+  if (q.visual) {
+    visualBox = document.createElement("div");
+    visualBox.className = "visual";
+    art.appendChild(visualBox);
+    VISUALS[q.visual](visualBox);
+  }
+  const opts = document.createElement("div");
+  opts.className = "opts";
+  opts.setAttribute("role", "radiogroup");
+  opts.setAttribute("aria-label", q.q);
+  q.opts.forEach(function (o, index) {
+    const n = index + 1;
+    const label = document.createElement("label");
+    label.className = "opt";
+    const input = document.createElement("input");
+    input.type = "radio"; input.name = "opt-" + q.id; input.value = String(n); input.id = "opt-" + q.id + "-" + n;
+    input.addEventListener("change", function () {
+      const note = (answers[q.id] && answers[q.id].note) || "";
+      record(q.id, n, note);
+      if (visualBox && visualBox.highlight) visualBox.highlight(n);
+    });
+    const body = document.createElement("div");
+    body.className = "opt-body";
+    const title = document.createElement("div");
+    title.className = "opt-title";
+    title.textContent = n + ". " + o.t;
+    if (o.rec) { const r = document.createElement("span"); r.className = "rec"; r.textContent = "Recommended"; title.appendChild(r); }
+    const why = document.createElement("div");
+    why.className = "opt-why";
+    why.textContent = o.w;
+    body.appendChild(title); body.appendChild(why);
+    label.appendChild(input); label.appendChild(body);
+    opts.appendChild(label);
+  });
+  art.appendChild(opts);
+  const noteRow = document.createElement("div");
+  noteRow.className = "note-row";
+  const nl = document.createElement("label");
+  nl.setAttribute("for", "note-" + q.id);
+  nl.textContent = "Note (optional): a qualification, or your own answer";
+  const ta = document.createElement("textarea");
+  ta.id = "note-" + q.id;
+  let timer = 0;
+  function commitNote() {
+    clearTimeout(timer);
+    const cur = answers[q.id] || { choice: 0, note: "" };
+    if (cur.note === ta.value) return;
+    record(q.id, cur.choice || 0, ta.value);
+  }
+  ta.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(commitNote, 900); });
+  ta.addEventListener("blur", commitNote);
+  noteRow.appendChild(nl); noteRow.appendChild(ta);
+  art.appendChild(noteRow);
+  const saved = document.createElement("div");
+  saved.className = "saved";
+  saved.id = "saved-" + q.id;
+  art.appendChild(saved);
+  art.visualBox = visualBox;
+  return art;
+}
+function refreshQuestion(id) {
+  const art = document.getElementById(id);
+  if (!art) return;
+  const a = answers[id];
+  const isAnswered = !!(a && (a.choice > 0 || (a.note && a.note.trim())));
+  art.classList.toggle("answered", isAnswered);
+  if (art.visualBox && art.visualBox.highlight) art.visualBox.highlight(a ? a.choice : 0);
+}
+function refreshProgress() {
+  const list = allQuestions();
+  let done = 0;
+  const perGroup = {};
+  for (const item of list) {
+    const a = answers[item.q.id];
+    const isDone = !!(a && a.choice > 0);
+    if (isDone) done++;
+    perGroup[item.g.key] = perGroup[item.g.key] || [0, 0];
+    perGroup[item.g.key][1]++;
+    if (isDone) perGroup[item.g.key][0]++;
+  }
+  document.getElementById("progress-text").textContent = done + " of " + list.length + " answered";
+  document.getElementById("progress-bar").style.width = (100 * done / list.length) + "%";
+  for (const g of GROUPS) {
+    const chip = document.getElementById("rail-" + g.key);
+    const c = perGroup[g.key];
+    chip.querySelector(".count").textContent = c[0] + "/" + c[1];
+    chip.classList.toggle("complete", c[0] === c[1]);
+  }
+  refreshSummary(list);
+}
+function refreshSummary(list) {
+  const rows = document.getElementById("summary-rows");
+  rows.textContent = "";
+  const lines = ["Stage A accessibility vocabulary, round 1"];
+  for (const item of list) {
+    const a = answers[item.q.id];
+    const tr = document.createElement("tr");
+    const tdId = document.createElement("td"); tdId.textContent = item.q.id;
+    const tdC = document.createElement("td");
+    const tdN = document.createElement("td");
+    if (a && a.choice > 0) {
+      const o = item.q.opts[a.choice - 1];
+      tdC.textContent = a.choice + ". " + o.t;
+      lines.push(item.q.id + ": " + a.choice + " (" + o.t + ")" + (a.note ? " — note: " + a.note : ""));
+    } else {
+      tdC.textContent = "Not answered"; tdC.className = "pending";
+      lines.push(item.q.id + ": not answered" + (a && a.note ? " — note: " + a.note : ""));
+    }
+    tdN.textContent = (a && a.note) || "";
+    tr.appendChild(tdId); tr.appendChild(tdC); tr.appendChild(tdN);
+    rows.appendChild(tr);
+  }
+  document.getElementById("summary-text").textContent = lines.join("\n");
+}
+function setStoreNote(text) { document.getElementById("store-note").textContent = text; }
+
+document.getElementById("copy-btn").addEventListener("click", function () {
+  const pre = document.getElementById("summary-text");
+  const text = pre.textContent;
+  const state = document.getElementById("copy-state");
+  function fallback() {
+    pre.hidden = false;
+    const range = document.createRange();
+    range.selectNodeContents(pre);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    state.textContent = "Selected below; copy it with your keyboard.";
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { state.textContent = "Copied."; }, fallback);
+  } else { fallback(); }
+});
+
+buildPage();
+const local = loadLocal();
+for (const id in local) { answers[id] = local[id]; }
+for (const id in answers) applyRemote(id, answers[id]);
+refreshProgress();
+
+// Saving to and loading from a file: the answers travel as JSON beside the readable record.
+function saveToFile() {
+  const payload = { interview: "Stage A accessibility vocabulary, round 1", saved: new Date().toISOString(), answers: answers, record: document.getElementById("summary-text").textContent };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "a-vocabulary-answers.json";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(function () { URL.revokeObjectURL(link.href); }, 1000);
+  document.getElementById("copy-state").textContent = "Saved a-vocabulary-answers.json to your downloads.";
+}
+function loadFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    const state = document.getElementById("copy-state");
+    let payload = null;
+    try { payload = JSON.parse(String(reader.result)); } catch (e) { payload = null; }
+    if (!payload || typeof payload.answers !== "object" || payload.answers === null) {
+      state.textContent = "That file is not a saved stage A interview; nothing was loaded.";
+      return;
+    }
+    let loaded = 0;
+    for (const id in payload.answers) {
+      if (!document.getElementById(id)) continue;
+      applyRemote(id, payload.answers[id]);
+      loaded++;
+    }
+    saveLocal();
+    refreshProgress();
+    state.textContent = "Loaded " + loaded + " answers from " + file.name + ".";
+  };
+  reader.readAsText(file);
+}
+document.getElementById("save-btn").addEventListener("click", saveToFile);
+document.getElementById("load-btn").addEventListener("click", function () { document.getElementById("load-file").click(); });
+document.getElementById("load-file").addEventListener("change", function (ev) {
+  const files = ev.target.files;
+  if (files && files.length > 0) loadFromFile(files[0]);
+  ev.target.value = "";
+});
+</script>

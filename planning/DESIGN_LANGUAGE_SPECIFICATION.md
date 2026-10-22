@@ -1521,6 +1521,32 @@ in the T2 brief. Those that touch this document:
     own tone range, and is drawn at the nearest integer display scale. The
     rules are in `T4-default-theme/RENDERING_REFERENCE.md` §3.
 
+### 12.13 Owner decisions, stage A vocabulary, 2026-10-21
+
+Recorded in `planning/interview/A_VOCABULARY_ROUND_001.md`. The GIVEN list
+is in the stage A brief. Atoms admitted (§12.7):
+
+- **Semantic roles:**
+  - `tree`, `tree_item`;
+  - `table`, `row`, `cell`, `column_header`, `row_header`;
+  - `tree_grid`;
+  - `dialog`;
+  - `status_bar`;
+  - and DK-51's live region.
+- **Semantic fields:**
+  - `level`;
+  - row and column index and count;
+  - `modal`;
+  - `access_key`;
+  - `small_step` and `large_step`;
+  - `text_selection` and `multiline`.
+- **Semantic states:** `checkable`, `multiselectable`.
+- **Not admitted:** navigator and token roles. DockNavigator and TokenBox
+  keep their compositions.
+
+Text selection and layout reach the hosts through on-demand window queries,
+not the snapshot.
+
 ## Appendix A. Anti-models
 
 Rejected for the default and, unless a row says otherwise, every shipped house
