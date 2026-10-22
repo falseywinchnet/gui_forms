@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import subprocess
 
 ROOT: Path = Path(__file__).resolve().parents[2]
@@ -90,6 +91,55 @@ def selected_test_targets(toolkit: Path, tests: str) -> list[str] | None:
         if output:
             known_outputs.add(output)
     return targets_for_tests(listing, known_outputs, toolkit)
+
+
+def check_windows_sdk_imports(sdk: Path) -> None:
+    """Fail when an installed SDK DLL imports a compiler runtime DLL.
+
+    Every Windows binary links the LLVM runtimes and winpthreads statically
+    (CMakeLists.txt), so an installed DLL imports Windows system DLLs and
+    GUI.Forms' own DLLs only; the forbidden names are package_programs.py's.
+    Prints each DLL's non-system imports.
+    """
+    from package_programs import WINDOWS_FORBIDDEN_RUNTIME_DLL, WINDOWS_SYSTEM_DLLS
+    objdump: str | None = shutil.which('objdump') or shutil.which('llvm-objdump')
+    if objdump is None:
+        raise RuntimeError('objdump (or llvm-objdump) is needed to check the installed DLLs')
+    dlls: list[Path] = sorted(sdk.rglob('*.dll'))
+    if not dlls:
+        raise RuntimeError('the installed SDK has no DLL under ' + str(sdk))
+    dll: Path
+    for dll in dlls:
+        listing: str = subprocess.run([objdump, '-p', str(dll)], check=True, capture_output=True,
+                                      text=True).stdout
+        names: list[str] = re.findall(r'DLL Name:\s*(\S+)', listing)
+        own: list[str] = []
+        name: str
+        for name in names:
+            key: str = name.lower()
+            if key in WINDOWS_SYSTEM_DLLS or key.startswith(('api-ms-win-', 'ext-ms-win-')):
+                continue
+            if WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name):
+                raise RuntimeError(f'installed {dll.name} imports the compiler runtime {name}')
+            own.append(name)
+        print(f'installed {dll.relative_to(sdk)}: imports {", ".join(own) if own else "system DLLs only"}', flush=True)
+
+
+def check_installed_notices(sdk: Path) -> None:
+    """Fail unless the installed SDK carries THIRD_PARTY_NOTICES.md with the
+    FreeType credit and no GPL text (the rules of package_programs.py)."""
+    from package_programs import FREETYPE_CREDIT, GPL_TITLE, NOTICES_NAME
+    licences: Path = sdk / 'share' / 'licenses' / 'GUIForms'
+    notices: Path = licences / NOTICES_NAME
+    if not notices.is_file() or FREETYPE_CREDIT not in notices.read_text(encoding='utf-8'):
+        raise RuntimeError(f'the installed SDK lacks {notices} or its FreeType credit')
+    path: Path
+    for path in sorted(licences.rglob('*')):
+        if 'gpl' in path.name.lower():
+            raise RuntimeError(f'the installed SDK ships {path.name}')
+        if path.is_file() and GPL_TITLE.search(path.read_text(encoding='utf-8', errors='replace')):
+            raise RuntimeError(f'the installed {path.name} carries a GNU General Public License text')
+    print(f'installed notices checked: {notices.relative_to(sdk)}', flush=True)
 
 
 def gallery_enabled(flag: bool, environ: dict[str, str]) -> bool:
@@ -242,7 +292,7 @@ def configure_tree(toolkit: Path, configure: list[str]) -> None:
 
 
 def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = False,
-                  sanitize: bool = False, tests: str = '') -> None:
+                  sanitize: bool = False, tests: str = '', test_jobs: int = 1) -> None:
     """Build, test, then install only into the explicitly supplied build SDK.
 
     With sanitize, the toolkit is built in its own directory with the
@@ -250,6 +300,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     examples are not built. tests, a ctest -R pattern, narrows that run to
     the matching tests and the build to the outputs they read (fails when it
     matches none); empty builds everything and runs the whole suite.
+    test_jobs is how many tests ctest runs at once (1, the default, runs
+    them one after another).
     """
     toolkit: Path = build / ('gui-forms-sanitize' if sanitize else 'gui-forms')
     options: list[str] = []
@@ -315,10 +367,14 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
     if tests:
         # A pattern that matches no test is a mistake, not a pass.
         selection = ['-R', tests, '--no-tests=error']
-    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout, *selection)
+    run('ctest', '--test-dir', toolkit, '--output-on-failure', '--timeout', timeout,
+        '--parallel', test_jobs, *selection)
     if sanitize:
         return
     run('cmake', '--install', toolkit)
+    check_installed_notices(sdk)
+    if host == 'windows':
+        check_windows_sdk_imports(sdk)
     examples: Path = build / 'installed-reference-examples'
     run('cmake', '-S', ROOT / 'gui_forms/examples/reference', '-B', examples,
         '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', f'-DCMAKE_PREFIX_PATH={sdk}',
@@ -330,6 +386,8 @@ def build_toolkit(host: str, build: Path, sdk: Path, jobs: int, gallery: bool = 
 def main() -> None:
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--jobs', type=int, default=4)
+    parser.add_argument('--test-jobs', type=int, default=1,
+                        help='tests ctest runs at once (default 1: one after another)')
     parser.add_argument('--sanitize', action='store_true',
                         help='build in gui-forms-sanitize with ASan and UBSan (and LSan on Linux '
                              'and macOS) and only test')
@@ -341,6 +399,8 @@ def main() -> None:
     args: argparse.Namespace = parser.parse_args()
     if args.jobs < 1:
         parser.error('--jobs must be positive')
+    if args.test_jobs < 1:
+        parser.error('--test-jobs must be positive')
     if args.tests and not args.sanitize:
         parser.error('--tests narrows the sanitized run only')
     hosts: dict[str, str] = {'Darwin': 'macos', 'Linux': 'linux', 'Windows': 'windows'}
@@ -352,7 +412,8 @@ def main() -> None:
     build.mkdir(parents=True, exist_ok=True)
     os.environ['BUILD_JOBS'] = str(args.jobs)
     build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
-                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests)
+                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests,
+                  args.test_jobs)
 
 
 if __name__ == '__main__':
