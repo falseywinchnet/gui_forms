@@ -77,6 +77,11 @@ struct PrimitiveDescriptor final {
     // How many values the primitive's preparation derives, at most
     // maximum_prepared_values; zero for a primitive that derives none.
     std::size_t prepared_values{};
+    // The engine inputs the primitive's output depends on (E6), read from
+    // PrimitiveTarget::inputs. A change to any other input never repaints
+    // it. Like animated parameters, inputs are never read by the
+    // preparation.
+    std::span<const EngineInput> inputs_read{};
 };
 
 inline constexpr std::size_t maximum_primitive_parameters = 24;
@@ -144,13 +149,16 @@ enum class ParameterAssignment : std::uint8_t {
                                                        std::string_view name, Color value) noexcept;
 
 // The part a primitive draws: its size in logical units (the box the
-// primitive's geometry is measured in), the display scale, and its
-// published states. The destination's extent is the caller's choice,
-// normally the logical size times the scale, rounded up.
+// primitive's geometry is measured in), the display scale, its published
+// states, and the engine inputs' values for it, by EngineInput (NaN for an
+// input that is not published, such as the pointer of a part that is not
+// hot). The destination's extent is the caller's choice, normally the
+// logical size times the scale, rounded up.
 struct PrimitiveTarget final {
     Size logical_size{};
     DeviceScale scale{};
     AnatomyStateSet states{};
+    std::array<double, engine_input_count> inputs{};
 };
 
 class EnginePrimitive;
@@ -220,6 +228,12 @@ public:
 
     [[nodiscard]] virtual const PrimitiveDescriptor& descriptor() const noexcept = 0;
 
+    // Whether the primitive draws nothing at all with `parameters`, such as
+    // a bulge at amplitude 0 (the flat plane): the engine then composites
+    // nothing and keeps no raster for the part (E7). False unless the
+    // primitive says otherwise. `parameters` match the declarations.
+    [[nodiscard]] virtual bool blank(const PrimitiveParameterBlock& parameters) const noexcept;
+
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`
     // unchanged. Its cost is the descriptor's preparation_per_device_pixel
@@ -265,6 +279,7 @@ enum class RegistrationOutcome : std::uint8_t {
     default_out_of_range,
     introduced_after_engine,
     too_many_prepared_values,
+    input_out_of_range,
 };
 
 [[nodiscard]] const char* registration_outcome_name(RegistrationOutcome outcome) noexcept;

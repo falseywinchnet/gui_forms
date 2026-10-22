@@ -145,12 +145,14 @@ add_library(gui_forms_core STATIC
     src/core/theme/part_painting/part_painting.cpp
     src/core/engine/types/engine_types.cpp
     src/core/engine/engine_math/engine_math.cpp
+    src/core/engine/engine_expression/engine_expression.cpp
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
     src/core/engine/part_table/engine_part_table.cpp
     src/core/engine/part_raster/part_raster.cpp
     src/core/engine/theme_engine/theme_engine.cpp
     src/core/engine/theme_rules/theme_rules.cpp
+    src/core/engine/theme_rules/built_in_rules.cpp
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
@@ -223,6 +225,8 @@ add_library(gui_forms_core STATIC
     src/core/window/update_scope/update_scope.cpp
     src/core/window/presentation/window_presentation.cpp
     src/core/window/scheduler/window_scheduler.cpp
+    src/core/window/engine_inputs/window_engine_inputs.cpp
+    src/core/window/engine_motion/window_engine_motion.cpp
     src/core/window/popup/popup_token.cpp
     src/core/window/accelerator/accelerator_token.cpp
     src/core/control/dispatcher/control_dispatcher.cpp
@@ -2285,6 +2289,15 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_math_tests tests/engine_math_tests.cpp)
     target_link_libraries(gui_forms_engine_math_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_math_tests COMMAND gui_forms_engine_math_tests)
+    add_executable(gui_forms_engine_expression_tests tests/engine_expression_tests.cpp)
+    target_link_libraries(gui_forms_engine_expression_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_engine_expression_tests COMMAND gui_forms_engine_expression_tests)
+    add_executable(gui_forms_engine_input_tests tests/engine_input_tests.cpp)
+    target_link_libraries(gui_forms_engine_input_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_input_tests COMMAND gui_forms_engine_input_tests)
+    add_executable(gui_forms_engine_motion_tests tests/engine_motion_tests.cpp)
+    target_link_libraries(gui_forms_engine_motion_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_motion_tests COMMAND gui_forms_engine_motion_tests)
     add_executable(gui_forms_engine_primitive_tests tests/engine_primitive_tests.cpp)
     target_link_libraries(gui_forms_engine_primitive_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_primitive_tests COMMAND gui_forms_engine_primitive_tests)
@@ -2357,6 +2370,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_composite_tests tests/part_composite_tests.cpp)
     target_link_libraries(gui_forms_part_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_composite_tests COMMAND gui_forms_part_composite_tests)
+    add_executable(gui_forms_paint_group_tests tests/paint_group_tests.cpp)
+    target_link_libraries(gui_forms_paint_group_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_paint_group_tests COMMAND gui_forms_paint_group_tests)
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)

@@ -305,6 +305,10 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
     const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
                                                         source.top + static_cast<std::int64_t>(source.height)});
     const ChannelShifts shifts = channel_shifts(target.order);
+    // The source's red and blue bytes within a pixel; green and alpha are
+    // the same in both orders.
+    const std::size_t red_byte = source.order == TextPixelOrder::rgba ? 0U : 2U;
+    const std::size_t blue_byte = source.order == TextPixelOrder::rgba ? 2U : 0U;
     const std::uint64_t opacity_weight = opacity;
     for (std::int64_t y = top; y < bottom; ++y) {
         const std::size_t source_row = static_cast<std::size_t>(y - source.top) * source.row_bytes;
@@ -320,9 +324,9 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
             const std::uint64_t weight = opacity_weight * clipped;
             const unsigned alpha = weighted_channel(source_alpha, weight);
             if (alpha == 0) continue;
-            const unsigned red = weighted_channel(source.pixels[offset], weight);
+            const unsigned red = weighted_channel(source.pixels[offset + red_byte], weight);
             const unsigned green = weighted_channel(source.pixels[offset + 1U], weight);
-            const unsigned blue = weighted_channel(source.pixels[offset + 2U], weight);
+            const unsigned blue = weighted_channel(source.pixels[offset + blue_byte], weight);
             std::uint32_t& pixel = target.pixels[target_row + static_cast<std::size_t>(x)];
             const std::uint32_t previous = pixel;
             const unsigned remaining = 255U - alpha;

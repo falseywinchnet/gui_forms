@@ -212,9 +212,11 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         per_pixel_budget = int(budgets["operations_per_device_pixel"])
     roles: set[str] = set()
     states: set[str] = set()
+    inputs: set[str] = set()
     if isinstance(vocabulary, dict):
         roles = {str(name) for name in vocabulary.get("part_roles", [])}
         states = {str(name) for name in vocabulary.get("states", [])}
+        inputs = {str(name) for name in vocabulary.get("engine_inputs", [])}
     primitives: object = engine.get("primitives")
     if not isinstance(primitives, list) or not primitives:
         findings.append("engine: no primitives are registered")
@@ -236,6 +238,9 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         for state in primitive.get("states_read", []):
             if states and str(state) not in states:
                 findings.append(f"engine: {name} reads {state!r}, which is not a vocabulary state")
+        for read in primitive.get("inputs_read", []):
+            if inputs and str(read) not in inputs:
+                findings.append(f"engine: {name} reads {read!r}, which is not a vocabulary engine input")
         cost: Mapping[str, object] = primitive.get("cost", {})
         per_pixel: object = cost.get("per_device_pixel")
         if not isinstance(per_pixel, int) or per_pixel <= 0 or (per_pixel_budget and per_pixel > per_pixel_budget):
@@ -246,6 +251,52 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
         for parameter in parameter_names:
             if not _SNAKE.fullmatch(parameter):
                 findings.append(f"engine: {name}: parameter {parameter!r} is not snake_case")
+    findings.extend(_expression_findings(engine.get("expressions")))
+    findings.extend(_motion_findings(engine.get("transitions"), engine.get("ambient")))
+    return findings
+
+
+def _motion_findings(transitions: object, ambient: object) -> list[str]:
+    """Presentational state machines and ambient effects (T2 E7): opacity is the
+    engine property, the machine bounds are positive, and the ambient caps are
+    the accepted starting tokens (at most 30 frames per second over at most 10 %
+    of the window)."""
+    findings: list[str] = []
+    if not isinstance(transitions, dict) or "opacity" not in transitions.get("engine_properties", []):
+        findings.append("engine: transitions do not list opacity as the engine property")
+    elif not all(isinstance(transitions.get(key), int) and int(transitions[key]) > 0
+                 for key in ("maximum_states", "maximum_per_part")):
+        findings.append("engine: transitions: the machine bounds are not positive")
+    if not isinstance(ambient, dict):
+        findings.append("engine: no ambient section (frame and area caps)")
+        return findings
+    rate: object = ambient.get("maximum_frames_per_second")
+    fraction: object = ambient.get("maximum_window_fraction")
+    if not isinstance(rate, (int, float)) or not 0 < float(rate) <= 30:
+        findings.append(f"engine: ambient: maximum_frames_per_second {rate!r} is not within 30")
+    if not isinstance(fraction, (int, float)) or not 0 < float(fraction) <= 0.1:
+        findings.append(f"engine: ambient: maximum_window_fraction {fraction!r} is not within 10 %")
+    return findings
+
+
+def _expression_findings(expressions: object) -> list[str]:
+    """The bounded expressions (T2 E5): a positive operation budget and stack
+    bound, and the operations by snake_case name, each once."""
+    if not isinstance(expressions, dict):
+        return ["engine: no expressions section (budget and operations)"]
+    findings: list[str] = []
+    for key in ("maximum_operations", "maximum_stack"):
+        bound: object = expressions.get(key)
+        if not isinstance(bound, int) or bound <= 0:
+            findings.append(f"engine: expressions: {key} {bound!r} is not a positive bound")
+    operations: list[str] = [str(name) for name in expressions.get("operations", [])]
+    if not operations:
+        findings.append("engine: expressions list no operations")
+    if len(set(operations)) != len(operations):
+        findings.append("engine: expressions repeat an operation")
+    for operation in operations:
+        if not _SNAKE.fullmatch(operation):
+            findings.append(f"engine: expressions: operation {operation!r} is not snake_case")
     return findings
 
 
@@ -267,7 +318,7 @@ def validate(schema: Mapping[str, object], registry: control_registry.Registry,
         findings.append("the schema has no vocabulary (part roles, states, custom states, marks, values, "
                         "families, semantic roles, actions and fields)")
     else:
-        for key in ("part_roles", "states", "custom_states", "marks", "values", "families",
+        for key in ("part_roles", "states", "custom_states", "marks", "engine_inputs", "values", "families",
                     "semantic_roles", "semantic_actions", "semantic_fields"):
             names: object = vocabulary.get(key)
             if not isinstance(names, list) or not names:
@@ -374,7 +425,8 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("")
         titles: list[tuple[str, str]] = [("part_roles", "Part roles"), ("states", "States"),
                                          ("custom_states", "Admitted custom states"),
-                                         ("marks", "Marks"), ("values", "Values"),
+                                         ("marks", "Marks"), ("engine_inputs", "Engine inputs"),
+                                         ("values", "Values"),
                                          ("families", "Recipe families"),
                                          ("semantic_roles", "Semantic roles"),
                                          ("semantic_actions", "Semantic actions"),
@@ -395,12 +447,30 @@ def render_page(schema: Mapping[str, object]) -> str:
         lines.append("|---|---|---|---|---|---|")
         for primitive in engine.get("primitives", []):  # type: ignore[union-attr]
             painted: str = ", ".join(_code(str(role)) for role in primitive.get("roles", []))
-            read: str = ", ".join(_code(str(state)) for state in primitive.get("states_read", [])) or "none"
+            read_atoms: list[str] = [str(state) for state in primitive.get("states_read", [])]
+            read_atoms.extend(str(item) for item in primitive.get("inputs_read", []))
+            read: str = ", ".join(_code(atom) for atom in read_atoms) or "none"
             parameters: str = ", ".join(_code(str(item["name"])) for item in primitive.get("parameters", []))
             cost: Mapping[str, object] = primitive.get("cost", {})
             lines.append(f"| {_code(str(primitive['name']))} | {primitive['introduced']} | {painted} | {read} | "
                          f"{cost.get('per_device_pixel')} | {parameters or 'none'} |")
         lines.append("")
+        expressions: Mapping[str, object] = engine.get("expressions", {})  # type: ignore[assignment]
+        if expressions:
+            operations: str = ", ".join(_code(str(name)) for name in expressions.get("operations", []))
+            lines.append(f"Bounded expressions: at most {expressions.get('maximum_operations')} operations and a "
+                         f"stack of {expressions.get('maximum_stack')}, from {operations}.")
+            lines.append("")
+        transitions: Mapping[str, object] = engine.get("transitions", {})  # type: ignore[assignment]
+        ambient: Mapping[str, object] = engine.get("ambient", {})  # type: ignore[assignment]
+        if transitions and ambient:
+            properties: str = ", ".join(_code(str(name)) for name in transitions.get("engine_properties", []))
+            lines.append(f"Transitions run on {properties} and on the primitives' animated parameters: at most "
+                         f"{transitions.get('maximum_states')} states a machine and {transitions.get('maximum_per_part')} "
+                         f"transitions a part. Ambient effects: at most {ambient.get('maximum_frames_per_second')} "
+                         f"frames per second over at most {ambient.get('maximum_window_fraction')} of the window on "
+                         "everyday surfaces.")
+            lines.append("")
     for record in types:
         identity: str = str(record["id"])
         lines.append(f"## {_code(identity)} ({record['type']}, {record['kind']})")

@@ -258,6 +258,18 @@ std::string_view anatomy_state_name(AnatomyState state) noexcept {
     return anatomy_state_names[index];
 }
 
+std::string_view engine_input_name(EngineInput input) noexcept {
+    switch (input) {
+    case EngineInput::pointer_x: return "pointer_x";
+    case EngineInput::pointer_y: return "pointer_y";
+    case EngineInput::time_in_state: return "time_in_state";
+    case EngineInput::display_scale: return "display_scale";
+    case EngineInput::text_scale: return "text_scale";
+    case EngineInput::count: return {};
+    }
+    return {};
+}
+
 std::optional<PartRole> part_role_from_name(std::string_view name) noexcept {
     for (std::size_t index = 0; index < part_role_names.size(); ++index) {
         if (part_role_names[index] == name) {

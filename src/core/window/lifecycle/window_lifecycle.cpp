@@ -146,6 +146,8 @@ void Window::set_presentation_settings(PresentationSettings settings) {
         presentation_settings_.text_scale != settings.text_scale;
     const bool motion_reduced_now =
         settings.reduced_motion && !presentation_settings_.reduced_motion;
+    const bool ambient_switched_off =
+        !settings.ambient_motion && presentation_settings_.ambient_motion;
     presentation_settings_ = settings;
     // Transient overlays own geometry resolved for the opening text metrics.
     // A text-scale transition dismisses them deterministically; reopening
@@ -165,6 +167,10 @@ void Window::set_presentation_settings(PresentationSettings settings) {
     // Reduced motion (GIVEN D2-1, design language §9.5): every value jumps
     // to its end in this call, and later moves jump at once.
     if (motion_reduced_now) motion_clock_.finish_all(MotionStepCause::reduced_motion);
+    // The application's motion switch (E7): ambient effects stop. Every
+    // part repaints above, at its pose; one resuming is repainted too, and
+    // its paint starts its effect again.
+    if (ambient_switched_off) motion_clock_.stop_ambient(false);
     presentation_changed_.emit(presentation_settings_);
 }
 

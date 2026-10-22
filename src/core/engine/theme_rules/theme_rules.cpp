@@ -86,7 +86,9 @@ std::optional<RuleDiagnosticKind> parameter_defect(const PrimitiveDescriptor& de
     if (!found) return RuleDiagnosticKind::unknown_parameter;
     const PrimitiveParameterDeclaration& parameter = descriptor.parameters[*found];
     if (declaration.kind == RuleValueKind::name) return RuleDiagnosticKind::parameter_wrong_kind;
-    const bool number = declaration.kind == RuleValueKind::number;
+    // An expression gives a number; its fallback, in `number`, is checked
+    // as a number value is.
+    const bool number = declaration.kind == RuleValueKind::number || declaration.kind == RuleValueKind::expression;
     if (number != (parameter.kind == PrimitiveParameterKind::number)) return RuleDiagnosticKind::parameter_wrong_kind;
     if (number) {
         if (!std::isfinite(declaration.number)) return RuleDiagnosticKind::parameter_not_finite;
@@ -96,6 +98,25 @@ std::optional<RuleDiagnosticKind> parameter_defect(const PrimitiveDescriptor& de
     }
     index = *found;
     return std::nullopt;
+}
+
+// Whether an expression reads a parameter that is a colour.
+bool reads_colour_parameter(const PrimitiveDescriptor& descriptor, const EngineExpression& expression) noexcept {
+    for (std::size_t index = 0; index < descriptor.parameters.size(); ++index) {
+        const ExpressionParameterIndex position{static_cast<std::uint8_t>(index)};
+        if (!expression.dependencies().reads_parameter(position)) continue;
+        if (descriptor.parameters[index].kind == PrimitiveParameterKind::colour) return true;
+    }
+    return false;
+}
+
+// The primitive's declared inputs as expression input bits.
+std::uint64_t declared_input_bits(const PrimitiveDescriptor& descriptor) noexcept {
+    std::uint64_t bits = 0U;
+    for (const EngineInput input : descriptor.inputs_read) {
+        bits = bits | expression_input_bit(engine_input_position(input));
+    }
+    return bits;
 }
 
 } // namespace
@@ -151,7 +172,15 @@ std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept {
     case RuleDiagnosticKind::parameter_not_finite: return "parameter_not_finite";
     case RuleDiagnosticKind::parameter_out_of_range: return "parameter_out_of_range";
     case RuleDiagnosticKind::duplicate_declaration: return "duplicate_declaration";
+    case RuleDiagnosticKind::expression_invalid: return "expression_invalid";
+    case RuleDiagnosticKind::expression_reads_colour: return "expression_reads_colour";
     case RuleDiagnosticKind::rule_empty: return "rule_empty";
+    case RuleDiagnosticKind::transition_property_unknown: return "transition_property_unknown";
+    case RuleDiagnosticKind::transition_property_not_animated: return "transition_property_not_animated";
+    case RuleDiagnosticKind::transition_invalid: return "transition_invalid";
+    case RuleDiagnosticKind::ambient_over_frame_cap: return "ambient_over_frame_cap";
+    case RuleDiagnosticKind::ambient_invalid: return "ambient_invalid";
+    case RuleDiagnosticKind::published_value_invalid: return "published_value_invalid";
     }
     return {};
 }
@@ -180,25 +209,48 @@ RuleDeclaration RuleDeclaration::colour_value(std::string_view parameter, Color 
     return result;
 }
 
+RuleDeclaration RuleDeclaration::expression_value(std::string_view parameter,
+                                                  std::span<const ExpressionInstruction> program, double fallback) {
+    RuleDeclaration result{};
+    result.property = std::string(parameter);
+    result.kind = RuleValueKind::expression;
+    result.number = fallback;
+    result.program.assign(program.begin(), program.end());
+    return result;
+}
+
+std::optional<ExpressionInputIndex> CompiledThemeRules::published_value_input(std::string_view name) const noexcept {
+    if (name.empty()) return std::nullopt;
+    for (std::size_t index = 0; index < published_values_.size(); ++index) {
+        if (published_values_[index] == name) return published_value_position(index);
+    }
+    return std::nullopt;
+}
+
 // -- compiling -----------------------------------------------------------------
 
 namespace {
 
-// Precedence, lowest first; std::stable_sort keeps authored order among
-// equals, so the later rule stays later.
+// Precedence, lowest first, with authored order breaking ties so that the
+// later rule stays later. The order is total: the rules of one level come
+// from one sheet (the engine's own table is all built_in), whose positions
+// are distinct, so std::sort gives what a stable sort would, without the
+// temporary buffer a stable sort allocates.
 struct LowerPrecedence final {
     template <typename Rule>
     bool operator()(const Rule& left, const Rule& right) const noexcept {
         if (left.level != right.level) return left.level < right.level;
-        return left.specificity < right.specificity;
+        if (!(left.specificity == right.specificity)) return left.specificity < right.specificity;
+        return left.order < right.order;
     }
 };
 
 } // namespace
 
-CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry) {
-    CompiledThemeRules result{};
-    result.rules_.reserve(sheet.rules.size());
+void CompiledThemeRules::add_rules(CompiledThemeRules& result, const ThemeRuleSheet& sheet,
+                                   const PrimitiveRegistry& registry, bool engine_table) {
+    const std::size_t input_count = result.input_count();
+    result.rules_.reserve(result.rules_.size() + sheet.rules.size());
     for (std::size_t index = 0; index < sheet.rules.size(); ++index) {
         const ThemeRule& rule = sheet.rules[index];
         const EngineVersion needed = rule.requires_engine.value_or(sheet.requires_engine);
@@ -206,7 +258,10 @@ CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, cons
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::needs_newer_engine, index, rule, {}));
             continue;
         }
-        if (!authored(rule.level)) {
+        // The engine's own table is all built_in; a theme authors only the
+        // four authored levels.
+        const bool level_allowed = engine_table ? rule.level == CascadeLevel::built_in : authored(rule.level);
+        if (!level_allowed) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::level_not_authored, index, rule, {}));
             continue;
         }
@@ -279,7 +334,29 @@ CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, cons
             }
             CompiledDeclaration value{};
             value.parameter = parameter;
-            if (declaration.kind == RuleValueKind::number) {
+            if (declaration.kind == RuleValueKind::expression) {
+                const PrimitiveDescriptor& descriptor = (*compiled.primitive).descriptor();
+                ExpressionLimits limits{};
+                limits.inputs = input_count;
+                limits.parameters = descriptor.parameters.size();
+                const ExpressionCompilation built =
+                    value.program.compile(declaration.program, declaration.number, limits);
+                if (built.defect != ExpressionDefect::none) {
+                    RuleDiagnostic invalid =
+                        diagnostic(RuleDiagnosticKind::expression_invalid, index, rule, declaration.property);
+                    invalid.expression = built.defect;
+                    result.diagnostics_.push_back(std::move(invalid));
+                    continue;
+                }
+                if (reads_colour_parameter(descriptor, value.program)) {
+                    result.diagnostics_.push_back(
+                        diagnostic(RuleDiagnosticKind::expression_reads_colour, index, rule, declaration.property));
+                    continue;
+                }
+                value.expression = true;
+                value.value.kind = PrimitiveParameterKind::number;
+                value.value.number = declaration.number;
+            } else if (declaration.kind == RuleValueKind::number) {
                 value.value.kind = PrimitiveParameterKind::number;
                 value.value.number = declaration.number;
             } else {
@@ -288,13 +365,157 @@ CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, cons
             }
             compiled.parameters.push_back(value);
         }
-        if (!compiled.selects && compiled.parameters.empty()) {
+        add_transitions(result.diagnostics_, index, rule, compiled);
+        add_ambient(result.diagnostics_, index, rule, compiled);
+        const bool declares = compiled.selects || !compiled.parameters.empty() || !compiled.transitions.empty() ||
+                              compiled.ambient.has_value();
+        if (!declares) {
             result.diagnostics_.push_back(diagnostic(RuleDiagnosticKind::rule_empty, index, rule, {}));
             continue;
         }
         result.rules_.push_back(std::move(compiled));
     }
-    std::stable_sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
+}
+
+// -- transitions and ambient effects (E7) ------------------------------------------
+
+namespace {
+
+bool in_range(double value, double minimum, double maximum) noexcept {
+    const bool inside = std::isfinite(value) && value >= minimum && value <= maximum;
+    return inside;
+}
+
+// Whether a machine's states are usable for a property ranging over
+// [minimum, maximum].
+bool usable_states(const PropertyTransition& transition, double minimum, double maximum) noexcept {
+    if (transition.states.empty() || transition.states.size() > maximum_presentation_states) return false;
+    for (const PresentationState& state : transition.states) {
+        for (const AnatomyState when : state.when) {
+            if (static_cast<std::size_t>(when) >= anatomy_state_count) return false;
+        }
+        if (!in_range(state.target, minimum, maximum)) return false;
+        if (state.enter_from && !in_range(*state.enter_from, minimum, maximum)) return false;
+    }
+    return true;
+}
+
+} // namespace
+
+void CompiledThemeRules::add_transitions(std::vector<RuleDiagnostic>& diagnostics, std::size_t index,
+                                         const ThemeRule& rule, CompiledRule& compiled) {
+    for (const PropertyTransition& transition : rule.transitions) {
+        CompiledTransition made{};
+        double minimum = 0.0;
+        double maximum = 1.0;
+        if (transition.property == opacity_property) {
+            made.opacity = true;
+        } else {
+            if (compiled.primitive == nullptr) {
+                diagnostics.push_back(
+                    diagnostic(RuleDiagnosticKind::parameter_without_primitive, index, rule, transition.property));
+                continue;
+            }
+            const PrimitiveDescriptor& descriptor = (*compiled.primitive).descriptor();
+            const std::optional<std::size_t> found = find_parameter(descriptor, transition.property);
+            if (!found) {
+                diagnostics.push_back(
+                    diagnostic(RuleDiagnosticKind::transition_property_unknown, index, rule, transition.property));
+                continue;
+            }
+            const PrimitiveParameterDeclaration& declared = descriptor.parameters[*found];
+            if (declared.kind != PrimitiveParameterKind::number || !declared.animated) {
+                diagnostics.push_back(diagnostic(RuleDiagnosticKind::transition_property_not_animated, index, rule,
+                                                 transition.property));
+                continue;
+            }
+            made.parameter = *found;
+            minimum = declared.minimum;
+            maximum = declared.maximum;
+        }
+        bool repeated = false;
+        for (const CompiledTransition& earlier : compiled.transitions) {
+            if (earlier.opacity == made.opacity && earlier.parameter == made.parameter) repeated = true;
+        }
+        if (repeated) {
+            diagnostics.push_back(
+                diagnostic(RuleDiagnosticKind::duplicate_declaration, index, rule, transition.property));
+            continue;
+        }
+        if (compiled.transitions.size() >= maximum_part_transitions ||
+            !usable_states(transition, minimum, maximum)) {
+            diagnostics.push_back(diagnostic(RuleDiagnosticKind::transition_invalid, index, rule, transition.property));
+            continue;
+        }
+        made.states.reserve(transition.states.size());
+        for (const PresentationState& state : transition.states) {
+            CompiledPresentationState compiled_state{};
+            for (const AnatomyState when : state.when) compiled_state.when.insert(when);
+            compiled_state.target = state.target;
+            compiled_state.enter_from = state.enter_from;
+            made.states.push_back(compiled_state);
+        }
+        made.curve = transition.curve;
+        compiled.transitions.push_back(std::move(made));
+    }
+}
+
+void CompiledThemeRules::add_ambient(std::vector<RuleDiagnostic>& diagnostics, std::size_t index,
+                                     const ThemeRule& rule, CompiledRule& compiled) {
+    if (!rule.ambient) return;
+    const AmbientEffect& ambient = *rule.ambient;
+    const double rate = ambient.frames_per_second;
+    // Refused at load (design language §9.4): no frame cap, or one above 30.
+    if (!(rate > 0.0) || !(rate <= maximum_ambient_frames_per_second)) {
+        diagnostics.push_back(diagnostic(RuleDiagnosticKind::ambient_over_frame_cap, index, rule, "ambient"));
+        return;
+    }
+    const bool timed = ambient.period > FrameInterval::zero() && ambient.pose >= FrameInterval::zero() &&
+                       ambient.pose < ambient.period;
+    if (!timed) {
+        diagnostics.push_back(diagnostic(RuleDiagnosticKind::ambient_invalid, index, rule, "ambient"));
+        return;
+    }
+    compiled.ambient = ambient;
+}
+
+CompiledThemeRules CompiledThemeRules::compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry) {
+    CompiledThemeRules result{};
+    // The published values first: expressions are checked against their
+    // count. An unusable name keeps its position, empty, so that the
+    // positions after it stay where the sheet's expressions expect them.
+    const std::size_t published = std::min(sheet.published_values.size(), maximum_published_values);
+    result.published_values_.reserve(published);
+    for (std::size_t index = 0; index < sheet.published_values.size(); ++index) {
+        const std::string& name = sheet.published_values[index];
+        bool usable = index < maximum_published_values && valid_style_class_name(name);
+        for (std::size_t earlier = 0; usable && earlier < index; ++earlier) {
+            if (sheet.published_values[earlier] == name) usable = false;
+        }
+        if (!usable) {
+            RuleDiagnostic invalid{};
+            invalid.kind = RuleDiagnosticKind::published_value_invalid;
+            invalid.rule = sheet_diagnostic;
+            invalid.property = name;
+            result.diagnostics_.push_back(std::move(invalid));
+        }
+        if (index >= maximum_published_values) continue;
+        result.published_values_.push_back(usable ? name : std::string{});
+    }
+    add_rules(result, sheet, registry, false);
+    std::sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
+    return result;
+}
+
+CompiledThemeRules CompiledThemeRules::compile_with_built_in(const ThemeRuleSheet& sheet,
+                                                            const PrimitiveRegistry& registry) {
+    CompiledThemeRules result = compile(sheet, registry);
+    // The engine's rules after the sheet's, so that the sheet's diagnostics
+    // keep their positions; precedence puts them first.
+    const std::size_t authored_rules = result.rules_.size();
+    add_rules(result, built_in_theme_rules(), registry, true);
+    result.built_in_rules_ = result.rules_.size() - authored_rules;
+    std::sort(result.rules_.begin(), result.rules_.end(), LowerPrecedence{});
     return result;
 }
 
@@ -331,30 +552,72 @@ CompiledThemeRules::Resolution CompiledThemeRules::resolve(const PartFacts& fact
             break;
         }
     }
-    if (winner == rules_.size()) return result;
-    const CompiledRule& chosen = rules_[winner];
+    if (winner != rules_.size()) resolve_primitive(facts, rules_[winner], result);
+    resolve_transitions(facts, result);
+    return result;
+}
+
+void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const CompiledRule& chosen,
+                                           Resolution& result) const noexcept {
     result.level = chosen.level;
     if (chosen.primitive == nullptr) {
         result.outcome = Outcome::built_in_selected;
-        return result;
+        return;
     }
     const PrimitiveDescriptor& descriptor = (*chosen.primitive).descriptor();
     if (!paints_role(descriptor, facts.role)) {
         result.outcome = Outcome::role_mismatch;
-        return result;
+        return;
     }
     result.parameters = default_parameters(descriptor);
     // Every matching rule for the same primitive contributes, in ascending
-    // precedence, so the last write of each parameter is its winner.
+    // precedence, so the last write of each parameter is its winner. A
+    // winning expression keeps its fallback as the parameter's value until
+    // the engine evaluates it.
     for (const CompiledRule& rule : rules_) {
         if (rule.primitive != chosen.primitive || !matches(rule, facts)) continue;
         for (const CompiledDeclaration& declaration : rule.parameters) {
             result.parameters.values[declaration.parameter] = declaration.value;
+            result.expressions[declaration.parameter] = declaration.expression ? &declaration.program : nullptr;
         }
+    }
+    result.inputs_read = declared_input_bits(descriptor);
+    for (std::size_t index = 0; index < result.parameters.count; ++index) {
+        const EngineExpression* const expression = result.expressions[index];
+        if (expression != nullptr) result.inputs_read = result.inputs_read | (*expression).dependencies().inputs;
     }
     result.outcome = Outcome::primitive;
     result.primitive = chosen.primitive;
-    return result;
+}
+
+void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution& result) const noexcept {
+    // The last matching declaration of each property wins: opacity from any
+    // rule, a parameter only from the rules selecting the part's primitive.
+    const CompiledTransition* opacity = nullptr;
+    std::array<const CompiledTransition*, maximum_primitive_parameters> parameters{};
+    const bool primitive = result.outcome == Outcome::primitive;
+    for (const CompiledRule& rule : rules_) {
+        if ((rule.transitions.empty() && !rule.ambient) || !matches(rule, facts)) continue;
+        if (rule.ambient) result.ambient = &*rule.ambient;
+        const bool same_primitive = primitive && rule.primitive == result.primitive;
+        for (const CompiledTransition& transition : rule.transitions) {
+            if (transition.opacity) {
+                opacity = &transition;
+            } else if (same_primitive) {
+                parameters[transition.parameter] = &transition;
+            }
+        }
+    }
+    result.transition_count = 0U;
+    if (opacity != nullptr) {
+        result.transitions[result.transition_count] = opacity;
+        result.transition_count = result.transition_count + 1U;
+    }
+    for (std::size_t index = 0; index < result.parameters.count; ++index) {
+        if (parameters[index] == nullptr || result.transition_count >= maximum_part_transitions) continue;
+        result.transitions[result.transition_count] = parameters[index];
+        result.transition_count = result.transition_count + 1U;
+    }
 }
 
 } // namespace gui_forms
