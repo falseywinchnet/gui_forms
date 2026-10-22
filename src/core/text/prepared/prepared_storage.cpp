@@ -140,12 +140,12 @@ PreparedReservation& PreparedReservation::operator=(PreparedReservation&& other)
     }
     return *this;
 }
-PreparedTextStatus PreparedReservation::acquire(std::shared_ptr<PreparedLedger> ledger,
-    const PreparedResource resource, const std::size_t bytes) {
-    if (ledger_ || !ledger) return PreparedTextStatus::invalid_input;
-    std::lock_guard<std::mutex> lock((*ledger).mutex);
-    if ((*ledger).closing) return PreparedTextStatus::closing;
-    PreparedTextBudgetSnapshot& usage = (*ledger).usage;
+namespace {
+
+// Charges `bytes` of `resource` to `usage`, or refuses with the reason and
+// leaves `usage` unchanged. The caller holds the ledger's lock.
+PreparedTextStatus charge_reservation(PreparedTextBudgetSnapshot& usage, PreparedResource resource,
+                                      std::size_t bytes) noexcept {
     switch (resource) {
     case PreparedResource::font_bank:
         if (bytes > PreparedTextLimits::font_bytes) return PreparedTextStatus::budget_exceeded;
@@ -153,19 +153,19 @@ PreparedTextStatus PreparedReservation::acquire(std::shared_ptr<PreparedLedger> 
             bytes > PreparedTextLimits::font_bytes - usage.font_bytes) return PreparedTextStatus::busy;
         ++usage.font_banks;
         usage.font_bytes += bytes;
-        break;
+        return PreparedTextStatus::success;
     case PreparedResource::input:
         if (bytes > PreparedTextLimits::display_bytes + PreparedTextLimits::metadata_bytes) return PreparedTextStatus::budget_exceeded;
         if (usage.input_owners != 0) return PreparedTextStatus::busy;
         ++usage.input_owners;
         usage.input_bytes += bytes;
-        break;
+        return PreparedTextStatus::success;
     case PreparedResource::payload:
         if (bytes != PreparedTextLimits::payload_bytes) return PreparedTextStatus::invalid_input;
         if (usage.payload_generations == PreparedTextLimits::payload_generations) return PreparedTextStatus::busy;
         ++usage.payload_generations;
         usage.payload_reserved_bytes += bytes;
-        break;
+        return PreparedTextStatus::success;
     case PreparedResource::mask:
         if (bytes > PreparedTextLimits::mask_bytes) return PreparedTextStatus::budget_exceeded;
         if (usage.mask_owners == PreparedTextLimits::mask_owners ||
@@ -174,8 +174,37 @@ PreparedTextStatus PreparedReservation::acquire(std::shared_ptr<PreparedLedger> 
         }
         ++usage.mask_owners;
         usage.mask_bytes += bytes;
-        break;
+        return PreparedTextStatus::success;
     }
+    // A resource outside the enumeration has no budget to charge.
+    return PreparedTextStatus::invalid_input;
+}
+
+// Returns a reservation's `bytes` of `resource` to `usage`. The caller holds
+// the ledger's lock.
+void refund_reservation(PreparedTextBudgetSnapshot& usage, PreparedResource resource,
+                        std::size_t bytes) noexcept {
+    switch (resource) {
+    case PreparedResource::font_bank: --usage.font_banks; usage.font_bytes -= bytes; return;
+    case PreparedResource::input: --usage.input_owners; usage.input_bytes -= bytes; return;
+    case PreparedResource::payload: --usage.payload_generations; usage.payload_reserved_bytes -= bytes; return;
+    case PreparedResource::mask: --usage.mask_owners; usage.mask_bytes -= bytes; return;
+    }
+    // No reservation is charged to a resource outside the enumeration
+    // (charge_reservation refuses it), so there is nothing to return.
+    return;
+}
+
+} // namespace
+
+PreparedTextStatus PreparedReservation::acquire(std::shared_ptr<PreparedLedger> ledger,
+    const PreparedResource resource, const std::size_t bytes) {
+    if (ledger_ || !ledger) return PreparedTextStatus::invalid_input;
+    std::lock_guard<std::mutex> lock((*ledger).mutex);
+    if ((*ledger).closing) return PreparedTextStatus::closing;
+    PreparedTextBudgetSnapshot& usage = (*ledger).usage;
+    const PreparedTextStatus charged = charge_reservation(usage, resource, bytes);
+    if (charged != PreparedTextStatus::success) return charged;
     ledger_ = std::move(ledger);
     resource_ = resource;
     bytes_ = bytes;
@@ -186,12 +215,7 @@ void PreparedReservation::release() noexcept {
     {
         std::lock_guard<std::mutex> lock((*ledger_).mutex);
         PreparedTextBudgetSnapshot& usage = (*ledger_).usage;
-        switch (resource_) {
-        case PreparedResource::font_bank: --usage.font_banks; usage.font_bytes -= bytes_; break;
-        case PreparedResource::input: --usage.input_owners; usage.input_bytes -= bytes_; break;
-        case PreparedResource::payload: --usage.payload_generations; usage.payload_reserved_bytes -= bytes_; break;
-        case PreparedResource::mask: --usage.mask_owners; usage.mask_bytes -= bytes_; break;
-        }
+        refund_reservation(usage, resource_, bytes_);
     }
     ledger_.reset();
     bytes_ = 0;

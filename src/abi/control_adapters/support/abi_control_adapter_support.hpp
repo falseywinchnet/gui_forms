@@ -63,6 +63,20 @@ struct RasterPointerSample final {
     std::uint32_t button{};
 };
 
+// The C ABI event kind for a pointer action.
+[[nodiscard]] inline std::uint32_t pointer_event_kind(gui_forms::PointerAction action) noexcept {
+    switch (action) {
+    case gui_forms::PointerAction::down: return GF_EVENT_MOUSE_DOWN;
+    case gui_forms::PointerAction::up: return GF_EVENT_MOUSE_UP;
+    case gui_forms::PointerAction::wheel: return GF_EVENT_MOUSE_WHEEL;
+    case gui_forms::PointerAction::enter: return GF_EVENT_MOUSE_ENTER;
+    case gui_forms::PointerAction::leave: return GF_EVENT_MOUSE_LEAVE;
+    case gui_forms::PointerAction::move: return GF_EVENT_MOUSE_MOVE;
+    }
+    // An action outside the enumeration is reported as a move.
+    return GF_EVENT_MOUSE_MOVE;
+}
+
 struct RasterKeySample final {
     std::uint32_t event_kind{};
     std::uint32_t physical_key{};

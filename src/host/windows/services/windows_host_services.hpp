@@ -295,20 +295,26 @@ protected:
 
     HostServiceStatus play_sound_cue_impl(
         const HostSoundCueRequest& request) override {
-        UINT type = MB_OK;
-        switch (request.cue) {
-        case HostSoundCue::notification: type = MB_ICONASTERISK; break;
-        case HostSoundCue::success: type = MB_OK; break;
-        case HostSoundCue::warning: type = MB_ICONEXCLAMATION; break;
-        case HostSoundCue::error: type = MB_ICONHAND; break;
-        case HostSoundCue::operation_complete: type = MB_OK; break;
-        }
+        const UINT type = sound_cue_beep(request.cue);
         return MessageBeep(type) ? HostServiceStatus{}
                                  : HostServiceStatus{HostServiceError::backend_failure};
     }
 
 
 private:
+    // The MessageBeep sound for a cue.
+    static UINT sound_cue_beep(HostSoundCue cue) noexcept {
+        switch (cue) {
+        case HostSoundCue::notification: return MB_ICONASTERISK;
+        case HostSoundCue::success: return MB_OK;
+        case HostSoundCue::warning: return MB_ICONEXCLAMATION;
+        case HostSoundCue::error: return MB_ICONHAND;
+        case HostSoundCue::operation_complete: return MB_OK;
+        }
+        // A cue outside the enumeration plays the default beep.
+        return MB_OK;
+    }
+
     void forward_tray_event(const HostTrayIconEvent& event) { publish_tray_icon_event(event); }
 
     struct CursorEntry final {

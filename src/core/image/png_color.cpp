@@ -89,12 +89,12 @@ PngColorResolution resolve_png_color(std::span<const std::byte> encoded,
             saw_srgb = true;
         } else if (record.type == gama) {
             colour.gamma = read32(data, 0);
-            colour.has_gamma = true;
         } else if (record.type == chrm) {
-            for (std::size_t index = 0; index < colour.chromaticities.size(); ++index) {
-                colour.chromaticities[index] = read32(data, index * 4U);
+            std::array<std::uint32_t, 8> stored{};
+            for (std::size_t index = 0; index < stored.size(); ++index) {
+                stored[index] = read32(data, index * 4U);
             }
-            colour.has_chromaticities = true;
+            colour.chromaticities = stored;
         }
     }
     if (saw_cicp) {

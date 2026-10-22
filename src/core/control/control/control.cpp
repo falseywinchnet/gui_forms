@@ -203,6 +203,51 @@ BindingValue current_enum_property_value_impl(
     return value >= U'A' && value <= U'Z' ? value + (U'a' - U'A') : value;
 }
 
+// The slot a child docked at `dock` takes from `remaining`, which loses it:
+// an edge takes the child's `width` or `height` (clamped to what remains)
+// along that edge, fill takes everything, and none takes nothing.
+Rect take_dock_slot(DockStyle dock, double width, double height, Rect& remaining) noexcept {
+    Rect slot = remaining;
+    switch (dock) {
+    case DockStyle::top: {
+        const double extent = std::clamp(height, 0.0, remaining.height);
+        slot.height = extent;
+        remaining.y += extent;
+        remaining.height -= extent;
+        return slot;
+    }
+    case DockStyle::bottom: {
+        const double extent = std::clamp(height, 0.0, remaining.height);
+        slot.y = remaining.y + remaining.height - extent;
+        slot.height = extent;
+        remaining.height -= extent;
+        return slot;
+    }
+    case DockStyle::left: {
+        const double extent = std::clamp(width, 0.0, remaining.width);
+        slot.width = extent;
+        remaining.x += extent;
+        remaining.width -= extent;
+        return slot;
+    }
+    case DockStyle::right: {
+        const double extent = std::clamp(width, 0.0, remaining.width);
+        slot.x = remaining.x + remaining.width - extent;
+        slot.width = extent;
+        remaining.width -= extent;
+        return slot;
+    }
+    case DockStyle::fill:
+        remaining = {remaining.x, remaining.y, 0.0, 0.0};
+        return slot;
+    case DockStyle::none:
+        // Undocked children are placed by their anchors, not here.
+        return slot;
+    }
+    // A style outside the enumeration docks nowhere and takes nothing.
+    return slot;
+}
+
 } // namespace
 
 std::shared_ptr<const PropertyEnumDescriptor>
@@ -2261,42 +2306,7 @@ void Control::arrange(Rect final_bounds) {
                    : desired.height)
             : ((*child).requested_bounds_.height > 0.0
                    ? (*child).requested_bounds_.height : desired.height);
-        Rect slot = remaining;
-        switch ((*child).dock_) {
-        case DockStyle::top: {
-            const double extent = std::clamp(height, 0.0, remaining.height);
-            slot.height = extent;
-            remaining.y += extent;
-            remaining.height -= extent;
-            break;
-        }
-        case DockStyle::bottom: {
-            const double extent = std::clamp(height, 0.0, remaining.height);
-            slot.y = remaining.y + remaining.height - extent;
-            slot.height = extent;
-            remaining.height -= extent;
-            break;
-        }
-        case DockStyle::left: {
-            const double extent = std::clamp(width, 0.0, remaining.width);
-            slot.width = extent;
-            remaining.x += extent;
-            remaining.width -= extent;
-            break;
-        }
-        case DockStyle::right: {
-            const double extent = std::clamp(width, 0.0, remaining.width);
-            slot.x = remaining.x + remaining.width - extent;
-            slot.width = extent;
-            remaining.width -= extent;
-            break;
-        }
-        case DockStyle::fill:
-            remaining = {remaining.x, remaining.y, 0.0, 0.0};
-            break;
-        case DockStyle::none:
-            break;
-        }
+        const Rect slot = take_dock_slot((*child).dock_, width, height, remaining);
         (*child).anchor_reference_.reset();
         set_child_layout(child, slot);
     }
