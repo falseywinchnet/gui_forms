@@ -202,6 +202,10 @@ struct Dump final {
     pid_t pid{};
     std::uint64_t generation{};
     std::uint64_t effects{};
+    // The client's request number the app had read when it wrote this dump,
+    // and whether the app was settled then (see the fixture app).
+    std::uint64_t request{};
+    bool settled{};
     // Control type by stable id: (stable id, manifest id).
     std::vector<std::pair<std::string, std::string>> types;
     SemanticSnapshot snapshot;
@@ -270,6 +274,8 @@ Dump read_dump(const std::string& path) {
     dump.pid = static_cast<pid_t>(ns_number(object[@"pid"]).value_or(0.0));
     dump.generation = static_cast<std::uint64_t>(ns_number(object[@"generation"]).value_or(0.0));
     dump.effects = static_cast<std::uint64_t>(ns_number(object[@"effects"]).value_or(0.0));
+    dump.request = static_cast<std::uint64_t>(ns_number(object[@"request"]).value_or(0.0));
+    dump.settled = ns_number(object[@"settled"]).value_or(0.0) != 0.0;
     NSDictionary* types = object[@"types"];
     for (NSString* key in types) dump.types.emplace_back(ns_text(key), ns_text(types[key]));
     NSDictionary* snapshot = object[@"snapshot"];
@@ -303,20 +309,6 @@ Dump wait_for_new_dump(const std::string& path, const Dump& previous, int timeou
         sleep_milliseconds(20);
     }
     return latest;
-}
-
-// The current dump once the app is quiet: two reads at least three writer
-// ticks apart whose bytes are the same (so no value changed either, such as
-// a paint counter), or the latest after two seconds.
-Dump settled_dump(const std::string& path) {
-    Dump previous = read_dump(path);
-    for (int waited = 0; waited < 2000; waited += 160) {
-        sleep_milliseconds(160);
-        const Dump current = read_dump(path);
-        if (current.valid && previous.valid && current.text == previous.text) return current;
-        previous = current;
-    }
-    return previous;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,6 +387,73 @@ TypeTally& tally_for(Report& report, const std::string& control_type) {
     }
     report.types.push_back(TypeTally{control_type});
     return report.types.back();
+}
+
+// ---------------------------------------------------------------------------
+// Settling. The client asks the app for a settled dump by writing a new
+// request number beside the dump; the app's writer echoes the number it
+// read and says whether it was settled (painted, nothing invalidated, no
+// motion armed). Quiet is never inferred from timing.
+
+constexpr int settle_timeout_ms = 10000;
+
+std::string request_path(const std::string& dump_path) {
+    const std::string path = dump_path + ".request";
+    return path;
+}
+
+// The number the client last wrote, or 0 before the first request. Only
+// this client writes the file.
+std::uint64_t last_request(const std::string& dump_path) {
+    const std::string path = request_path(dump_path);
+    std::FILE* file = std::fopen(path.c_str(), "r");
+    if (file == nullptr) return 0U;
+    unsigned long long value = 0U;
+    const int fields = std::fscanf(file, "%llu", &value);
+    static_cast<void>(std::fclose(file));
+    if (fields != 1) return 0U;
+    const std::uint64_t request = static_cast<std::uint64_t>(value);
+    return request;
+}
+
+// Replaces the request file by rename, so the app reads a whole number.
+bool write_request(const std::string& dump_path, std::uint64_t request) {
+    const std::string path = request_path(dump_path);
+    const std::string temporary = path + ".tmp";
+    std::FILE* file = std::fopen(temporary.c_str(), "w");
+    if (file == nullptr) return false;
+    const int printed = std::fprintf(file, "%llu
+", static_cast<unsigned long long>(request));
+    const int closed = std::fclose(file);
+    if (printed <= 0 || closed != 0) return false;
+    const int renamed = std::rename(temporary.c_str(), path.c_str());
+    return renamed == 0;
+}
+
+// The first dump that answers a new request and is settled. A request the
+// app has not answered settled within settle_timeout_ms is a failure named
+// for `where`; the latest dump is returned then.
+Dump settled_dump(const std::string& path, Report& report, const std::string& where) {
+    const std::uint64_t request = last_request(path) + 1U;
+    if (!write_request(path, request)) {
+        report.failures.push_back("settle (" + where + "): could not write the request file");
+        const Dump current = read_dump(path);
+        return current;
+    }
+    Dump latest = read_dump(path);
+    for (int waited = 0; waited < settle_timeout_ms; waited += 20) {
+        const Dump current = read_dump(path);
+        if (current.valid) {
+            latest = current;
+            if (current.request >= request && current.settled) return current;
+        }
+        sleep_milliseconds(20);
+    }
+    report.failures.push_back("settle (" + where + "): the app answered request " + std::to_string(request) +
+                              " with no settled dump within " + std::to_string(settle_timeout_ms) +
+                              " ms (last dump: request " + std::to_string(latest.request) + ", settled " +
+                              (latest.settled ? "true" : "false") + ")");
+    return latest;
 }
 
 void note_instance(TypeTally& tally, const std::string& stable_id) {
@@ -583,7 +642,7 @@ Dump perform_default_actions(const std::string& path, AXUIElementRef application
     std::vector<std::string> entries;
     for (const SemanticNode& root : dump.snapshot.roots) collect_entries(dump, root, entries);
     for (const std::string& entry : entries) {
-        dump = settled_dump(path);
+        dump = settled_dump(path, report, "before " + entry);
         AxElement surface = find_surface(application);
         const SemanticNode* control = find_semantic_node(dump.snapshot.roots, entry);
         const std::string type = control_type(dump, entry);
@@ -624,7 +683,7 @@ Dump perform_default_actions(const std::string& path, AXUIElementRef application
 // "ax.dispose" through AX, and then reads and presses the held element.
 
 Dump check_stale_element(const std::string& path, AXUIElementRef application, Dump dump, Report& report) {
-    dump = settled_dump(path);
+    dump = settled_dump(path, report, "stale element");
     AxElement surface = find_surface(application);
     AxElement stale = find_identified(surface.get(), "ax.disposable");
     AxElement dispose = find_identified(surface.get(), "ax.dispose");
@@ -684,7 +743,7 @@ Dump compare_gallery_pages(const std::string& path, AXUIElementRef application, 
     report.notes.push_back("gallery pages: " + std::to_string(rows.size()));
     for (std::size_t index = 0U; index < rows.size(); ++index) {
         const std::string& row = rows[index];
-        dump = settled_dump(path);
+        dump = settled_dump(path, report, "before pressing " + row);
         AxElement surface = find_surface(application);
         AxElement element = find_identified(surface.get(), row);
         if (element.get() == nullptr) {
@@ -694,7 +753,7 @@ Dump compare_gallery_pages(const std::string& path, AXUIElementRef application, 
         const std::string ids_before = snapshot_ids(dump.snapshot);
         const AXError pressed = AXUIElementPerformAction(element.get(), kAXPressAction);
         static_cast<void>(wait_for_new_dump(path, dump, 2000));
-        dump = settled_dump(path);
+        dump = settled_dump(path, report, "after pressing " + row);
         const bool shown = index == 0U || snapshot_ids(dump.snapshot) != ids_before;
         if (pressed != kAXErrorSuccess || !shown) {
             report.failures.push_back("gallery: pressing " + row + " through AX did not show its page");
@@ -810,8 +869,8 @@ int run(const Options& options) {
         surface = find_surface(application.get());
         if (surface.get() == nullptr) sleep_milliseconds(100);
     }
-    dump = settled_dump(options.dump);
     Report report;
+    dump = settled_dump(options.dump, report, "initial");
     if (surface.get() == nullptr) {
         report.failures.push_back("the app's retained surface is not published through AX");
     } else if (options.gallery) {
@@ -820,7 +879,7 @@ int run(const Options& options) {
     } else {
         compare_surface(dump, surface.get(), report, "initial");
         dump = perform_default_actions(options.dump, application.get(), dump, report);
-        dump = settled_dump(options.dump);
+        dump = settled_dump(options.dump, report, "after-actions");
         AxElement after_surface = find_surface(application.get());
         compare_surface(dump, after_surface.get(), report, "after-actions");
         dump = check_stale_element(options.dump, application.get(), dump, report);

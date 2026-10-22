@@ -23,12 +23,23 @@
 // built as the Gallery variant (GUI_FORMS_AX_GALLERY), the GUI.Forms
 // Gallery. While it runs it writes a dump the client compares against:
 //
-//   {"pid":N,"generation":G,"effects":E,"types":{stable id: manifest id},
-//    "snapshot":<SemanticSnapshot::to_json()>}
+//   {"pid":N,"generation":G,"effects":E,"request":R,"settled":S,
+//    "types":{stable id: manifest id},"snapshot":<SemanticSnapshot::to_json()>}
 //
 // to the path after --semantic-dump, whenever its content changes (checked
 // every 50 ms), by writing a temporary file and renaming it over the
-// dump. The fixture variant adds two controls: "ax.disposable" and the
+// dump.
+//
+// "settled" is true when the window has painted at least once, no
+// invalidation is pending (Window::needs_frame) and the motion clock is not
+// armed: nothing the app knows of will change the tree or a value (such as
+// a paint counter a diagnostics control publishes) before the next input.
+// "request" is the number the client last wrote to the file at the dump's
+// path plus ".request", as read by the writer's latest tick. A client that
+// writes a new number after its last action and then waits for a dump with
+// that number and "settled" true reads a tree that reflects the action and
+// is quiet; it never infers quiet from timing. The writer's ticks run on the
+// main thread, after any AX action the client already completed there. The fixture variant adds two controls: "ax.disposable" and the
 // button "ax.dispose", whose click removes and destroys "ax.disposable", so
 // the client can hold an element of a disposed control (interview GF017).
 //
@@ -81,7 +92,7 @@ void freeze_page_on_main(void* context);
 class SemanticDumpWriter final {
 public:
     SemanticDumpWriter(gui_forms::Window& window, const StockEffectCounter* effects, std::string path)
-        : window_(window), effects_(effects), path_(std::move(path)) {}
+        : window_(window), effects_(effects), path_(std::move(path)), request_path_(path_ + ".request") {}
 
     // The timer whose ticks call tick(); observed, owned by AppState, which
     // keeps it no longer than this writer. Started again after a freeze.
@@ -122,17 +133,47 @@ public:
 private:
     void write_if_changed() {
         const std::uint64_t effects = effects_ == nullptr ? 0U : (*effects_).total();
-        const std::string text = dump_text(effects);
+        const std::uint64_t request = read_request();
+        const bool settled = is_settled();
+        const std::string text = dump_text(effects, request, settled);
         if (text == written_text_) return;
         write(text);
         written_text_ = text;
     }
 
-    std::string dump_text(std::uint64_t effects) const {
+    // Painted at least once, no invalidation pending, no motion armed, and
+    // (Gallery) the shown page frozen. Its inputs are read on the main
+    // thread, which also paints, so they cannot change while it runs.
+    bool is_settled() const {
+        const gui_forms::MetricsSnapshot metrics = window_.metrics_snapshot();
+        if (metrics.paint_passes == 0U) return false;
+        if (window_.needs_frame()) return false;
+        if (window_.motion_clock().armed()) return false;
+        if (freeze_pending_) return false;
+        return true;
+    }
+
+    // The client's latest request number, or 0 when it wrote none or the
+    // file does not hold a number. The client replaces the file by rename,
+    // so a read sees a whole number or the previous one.
+    std::uint64_t read_request() const {
+        std::FILE* file = std::fopen(request_path_.c_str(), "r");
+        if (file == nullptr) return 0U;
+        unsigned long long value = 0U;
+        const int fields = std::fscanf(file, "%llu", &value);
+        static_cast<void>(std::fclose(file));
+        if (fields != 1) return 0U;
+        const std::uint64_t request = static_cast<std::uint64_t>(value);
+        return request;
+    }
+
+    std::string dump_text(std::uint64_t effects, std::uint64_t request, bool settled) const {
         const SemanticSnapshot snapshot = window_.semantic_snapshot();
         std::string text = "{\"pid\":" + std::to_string(static_cast<long long>(getpid())) +
                            ",\"generation\":" + std::to_string(snapshot.generation) +
-                           ",\"effects\":" + std::to_string(effects) + ",\"types\":{";
+                           ",\"effects\":" + std::to_string(effects) +
+                           ",\"request\":" + std::to_string(request) +
+                           ",\"settled\":" + (settled ? "true" : "false") + ",\"types\":{";
         bool first = true;
         for (const SemanticNode& root : snapshot.roots) append_types(window_, root, text, first);
         text += "},\"snapshot\":";
@@ -153,6 +194,8 @@ private:
     gui_forms::Window& window_;
     const StockEffectCounter* effects_;
     std::string path_;
+    // The file the client writes its request number to: path_ + ".request".
+    std::string request_path_;
     std::string written_text_;
     gui_forms::Timer* timer_{};
     // The page whose frame requests were last cancelled; empty before the
