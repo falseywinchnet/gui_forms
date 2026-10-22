@@ -39,10 +39,10 @@ jobs:
           python3 tools/control_schema.py render --check
           python3 -B -m unittest discover -s tools -p test_generate_library_docs.py
           python3 tools/generate_library_docs.py --check
-          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib fuzz
+          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
-          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib fuzz
+          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
   docs:
     runs-on: ubuntu-24.04
     steps:
@@ -365,6 +365,17 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
+      - name: Prove one compression and PNG implementation in the link map
+        if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
+        run: |
+          # Every static archive the toolkit links, plus Skia's: no C zlib,
+          # FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
+          build=.build/native-${{ matrix.platform }}
+          archives=$(find "$build/gui-forms" -name '*.a' -not -path '*/_deps/*' -not -name '*.dll.a')
+          skia=$(find "$build/skia" -maxdepth 1 -name '*.a' 2>/dev/null || true)
+          python gui_forms/tools/audit_link_map.py --forbid-foreign $archives $skia
+          # Archive sizes for third_party/SKIA_BUILD_EVIDENCE.md.
+          if [ -n "$skia" ]; then ls -l $skia; fi
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}

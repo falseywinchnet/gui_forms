@@ -47,8 +47,8 @@ def main() -> None:
         versions[compiler] = subprocess.check_output([compiler, '--version'], text=True)
         if 'clang version 22.1.8' not in versions[compiler]:
             raise RuntimeError('LLVM 22.1.8 required')
-    sources = ['src/core/image/png_decoder.hpp', 'src/core/image/png_decoder.cpp',
-               'src/core/image/png_writer.cpp', 'include/gui_forms/compression/inflate.hpp',
+    sources = ['stx_png/include/stx_png/decoder.hpp', 'stx_png/src/decoder.cpp',
+               'stx_png/src/encoder.cpp', 'include/gui_forms/compression/inflate.hpp',
                'stx_zlib/src/inflate.cpp', 'tests/image/png_decoder_tests.cpp',
                'tests/image/png_oracle.c', 'tests/image/png_dynamic_fixture.hpp', 'fuzz/png_decode_fuzz.cpp', 'tools/validate_png.py']
     record = {'host': platform.platform(), 'machine': platform.machine(), 'compilers': versions,
@@ -57,7 +57,7 @@ def main() -> None:
               'commands': [], 'status': 'incomplete'}
     flags = ['-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=undefined',
              '-fno-omit-frame-pointer']
-    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include')]
+    includes = ['-I' + str(output), '-I' + str(png), '-I' + str(zlib), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(ROOT / 'stx_png/include')]
     shutil.copyfile(png / 'scripts/pnglibconf.h.prebuilt', output / 'pnglibconf.h')
     start = time.monotonic()
     try:
@@ -75,8 +75,8 @@ def main() -> None:
         command = ['clang', *flags, *includes, '-c', str(ROOT / 'tests/image/png_oracle.c'), '-o', str(oracle)]
         record['commands'].append(command)
         subprocess.run(command, cwd=output, env=env, check=True)
-        candidate = [str(ROOT / name) for name in ('src/core/image/png_decoder.cpp',
-                     'src/core/image/png_writer.cpp', 'stx_zlib/src/inflate.cpp',
+        candidate = [str(ROOT / name) for name in ('stx_png/src/decoder.cpp',
+                     'stx_png/src/encoder.cpp', 'stx_zlib/src/inflate.cpp',
                      'stx_zlib/src/deflate.cpp', 'stx_zlib/src/checksum.cpp')]
         test = output / 'png-tests'
         command = ['clang++', '-std=c++20', *flags, *includes, '-Wall', '-Wextra', '-Wpedantic',

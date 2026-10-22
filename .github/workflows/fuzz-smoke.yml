@@ -8,8 +8,8 @@ on:
   pull_request:
     paths:
       - 'stx_zlib/**'
+      - 'stx_png/**'
       - 'src/core/image/**'
-      - 'src/core/compression/**'
       - 'include/gui_forms/compression/**'
       - 'fuzz/**'
       - 'tests/compression/oracle_sha256.json'
@@ -81,7 +81,7 @@ jobs:
               clang++ $flags -Ioracle -DGUI_FORMS_INFLATE_ORACLE=1 fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp $objects -o smoke ;;
             inflate_protocol) clang++ $flags fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp -o smoke ;;
             deflate) clang++ $flags fuzz/deflate_fuzz.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
-            png_decode) clang++ $flags fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
+            png_decode) clang++ $flags -Istx_png/include fuzz/png_decode_fuzz.cpp stx_png/src/decoder.cpp stx_png/src/encoder.cpp stx_zlib/src/inflate.cpp stx_zlib/src/checksum.cpp stx_zlib/src/deflate.cpp -o smoke ;;
           esac
       - name: Run the smoke
         env:
