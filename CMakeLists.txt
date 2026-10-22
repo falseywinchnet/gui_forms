@@ -92,6 +92,7 @@ endif()
 include(CMakePackageConfigHelpers)
 add_subdirectory(stx_zlib)
 add_subdirectory(stx_png)
+add_subdirectory(stx_conv)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -207,6 +208,7 @@ add_library(gui_forms_core STATIC
     src/core/image/png_pixels.cpp
     src/core/image/png_color.cpp
     src/core/image/color_conversion.cpp
+    src/core/interpolation/interpolation.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
     src/core/host/types/host_capabilities/host_capabilities.cpp
@@ -249,6 +251,8 @@ add_library(gui_forms_core STATIC
     src/core/commands/command_route/command_route.cpp
 )
 target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib stx_png::stx_png)
+# The interpolation seam's private engine; no stx_conv type is public.
+target_link_libraries(gui_forms_core PRIVATE stx_conv::stx_conv)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -2199,6 +2203,11 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_color_tests COMMAND gui_forms_png_color_tests)
 
+    # The internal interpolation seam over stx_conv (binary64, clamped).
+    add_executable(gui_forms_interpolation_tests tests/interpolation/interpolation_tests.cpp)
+    target_link_libraries(gui_forms_interpolation_tests PRIVATE gui_forms_core stx_conv::stx_conv)
+    add_test(NAME gui_forms_interpolation_tests COMMAND gui_forms_interpolation_tests)
+
     # By-hand measurement of encoder size and time per level; not a test.
     add_executable(gui_forms_png_encode_benchmark tests/image/png_encode_benchmark.cpp)
     target_link_libraries(gui_forms_png_encode_benchmark PRIVATE gui_forms_core)
@@ -3582,7 +3591,7 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
-# stx_zlib and stx_png install their own licences and provenance under
+# stx_zlib, stx_png and stx_conv install their own licences and provenance under
 # share/licenses/<package>; the SDK also carries them beside GUI.Forms' others.
 install(FILES stx_zlib/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE.txt)
 install(FILES stx_zlib/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-LICENSE-puff.txt)
@@ -3590,6 +3599,8 @@ install(FILES stx_zlib/LICENSE-zlib.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/lic
 install(FILES stx_zlib/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_zlib-PROVENANCE.md)
 install(FILES stx_png/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-LICENSE.txt)
 install(FILES stx_png/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_png-PROVENANCE.md)
+install(FILES stx_conv/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-LICENSE.txt)
+install(FILES stx_conv/PROVENANCE.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_conv-PROVENANCE.md)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 # Every third-party component the SDK and the programs ship, with its licence
 # and the FreeType credit (THIRD_PARTY_NOTICES.md).
@@ -3823,5 +3834,5 @@ endif()
 # Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
 if(GUI_FORMS_BUILD_TESTS)
     include(cmake/TestAreas.cmake)
-    gui_forms_label_test_areas(stx_zlib stx_png)
+    gui_forms_label_test_areas(stx_zlib stx_png stx_conv)
 endif()

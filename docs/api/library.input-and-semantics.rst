@@ -46,6 +46,8 @@ Types
      - SemanticNode is the immutable snapshot form of one exposed control, with exact runtime/stable identity, bounds, values, states, actions, and children.
    * - :cpp:class:`SemanticSnapshot <gui_forms::SemanticSnapshot>`
      - SemanticSnapshot is an immutable generation-tagged forest of exact retained accessibility nodes with counted topology.
+   * - :cpp:class:`SemanticTextSelection <gui_forms::SemanticTextSelection>`
+     - The selection and caret of a node's text (owner decision A-T1, 12.13), as UTF-8 byte offsets into the node's value, on grapheme boundaries; with nothing selected the anchor and the caret are the same offset.
    * - :cpp:class:`TextInputEvent <gui_forms::TextInputEvent>`
      - TextInputEvent owns UTF-8 text or composition payload plus replacement range and mutable handled state.
 
@@ -617,6 +619,28 @@ Types
 
    .. cpp:member:: std::optional<SemanticOrientation> orientation
 
+   .. cpp:member:: std::optional<std::size_t> level
+
+   .. cpp:member:: bool modal
+
+   .. cpp:member:: std::optional<std::size_t> row_index
+
+   .. cpp:member:: std::optional<std::size_t> column_index
+
+   .. cpp:member:: std::optional<std::size_t> row_count
+
+   .. cpp:member:: std::optional<std::size_t> column_count
+
+   .. cpp:member:: std::string access_key
+
+   .. cpp:member:: std::optional<double> small_step
+
+   .. cpp:member:: std::optional<double> large_step
+
+   .. cpp:member:: std::optional<SemanticTextSelection> text_selection
+
+   .. cpp:member:: bool multiline
+
    .. cpp:member:: SemanticState states
 
       Default: ``{SemanticState::none}``.
@@ -667,6 +691,28 @@ Types
 
    .. cpp:member:: std::optional<SemanticOrientation> orientation
 
+   .. cpp:member:: std::optional<std::size_t> level
+
+   .. cpp:member:: bool modal
+
+   .. cpp:member:: std::optional<std::size_t> row_index
+
+   .. cpp:member:: std::optional<std::size_t> column_index
+
+   .. cpp:member:: std::optional<std::size_t> row_count
+
+   .. cpp:member:: std::optional<std::size_t> column_count
+
+   .. cpp:member:: std::string access_key
+
+   .. cpp:member:: std::optional<double> small_step
+
+   .. cpp:member:: std::optional<double> large_step
+
+   .. cpp:member:: std::optional<SemanticTextSelection> text_selection
+
+   .. cpp:member:: bool multiline
+
    .. cpp:member:: Rect bounds
 
    .. cpp:member:: SemanticState states
@@ -697,6 +743,18 @@ Types
    .. cpp:member:: std::size_t node_count
 
    .. cpp:member:: std::vector<SemanticNode> roots
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SemanticTextSelection final
+
+   ``#include <gui_forms/semantics/types/semantic_types.hpp>``
+
+   The selection and caret of a node's text (owner decision A-T1, 12.13), as UTF-8 byte offsets into the node's value, on grapheme boundaries; with nothing selected the anchor and the caret are the same offset.
+
+   .. cpp:member:: Utf8Offset anchor
+
+   .. cpp:member:: Utf8Offset caret
 
 .. cpp:namespace:: gui_forms
 
@@ -981,6 +1039,28 @@ Enumerations
 
    .. cpp:enumerator:: tab_panel
 
+   .. cpp:enumerator:: tree
+
+   .. cpp:enumerator:: tree_item
+
+   .. cpp:enumerator:: table
+
+   .. cpp:enumerator:: row
+
+   .. cpp:enumerator:: cell
+
+   .. cpp:enumerator:: column_header
+
+   .. cpp:enumerator:: row_header
+
+   .. cpp:enumerator:: tree_grid
+
+   .. cpp:enumerator:: dialog
+
+   .. cpp:enumerator:: status_bar
+
+   .. cpp:enumerator:: live_region
+
    .. cpp:enumerator:: count
 
 .. cpp:namespace:: gui_forms
@@ -1014,6 +1094,10 @@ Enumerations
    .. cpp:enumerator:: protected_content
 
    .. cpp:enumerator:: invalid
+
+   .. cpp:enumerator:: checkable
+
+   .. cpp:enumerator:: multiselectable
 
 Functions, constants and aliases
 --------------------------------
@@ -1056,6 +1140,14 @@ Functions, constants and aliases
 
 .. cpp:function:: const char* semantic_orientation_name(SemanticOrientation orientation) noexcept
 
+.. cpp:function:: const char* semantic_state_name(SemanticState state) noexcept
+
+   The name of one state bit (``state`` holds exactly one of semantic_states).
+
+.. cpp:function:: std::span<const char* const> semantic_field_names() noexcept
+
+   The node fields the vocabulary admits, by name, for the schema export.
+
 .. cpp:function:: std::uint64_t virtual_semantic_runtime_id(std::string_view stable_id) noexcept
 
    The runtime ID of a virtual semantic child (a tab, an item, a caption button: a SemanticNode with no control of its own), from its stable ID: a 64-bit FNV-1a-style hash of the ID's bytes with the top bit set, so it never meets a control's own runtime ID (those count up from 1). The same stable ID always gives the same runtime ID, on every host. A virtual child the control publishes with runtime ID zero is given this one when the window assembles its snapshot, so no node below the window has runtime ID zero.
@@ -1067,6 +1159,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t semantic_role_count
 
    Value: ``static_cast<std::size_t>(SemanticRole::count)``.
+
+.. cpp:var:: constexpr SemanticState semantic_states[]
+
+   Every semantic state, in bit order, for tables and the schema export.
 
 .. cpp:var:: constexpr std::size_t semantic_action_count
 

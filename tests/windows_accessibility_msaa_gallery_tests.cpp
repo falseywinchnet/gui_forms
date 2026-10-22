@@ -241,6 +241,20 @@ LONG expected_role(SemanticRole role) noexcept {
     case SemanticRole::menu_button: return ROLE_SYSTEM_BUTTONMENU;
     case SemanticRole::pane: return ROLE_SYSTEM_PANE;
     case SemanticRole::tab_panel: return ROLE_SYSTEM_PROPERTYPAGE;
+    // The stage A vocabulary (12.13). MSAA has no tree-grid or live-region
+    // role: a tree grid is an outline, as Chromium publishes one, and a live
+    // region a grouping (UI Automation carries its live setting).
+    case SemanticRole::tree: return ROLE_SYSTEM_OUTLINE;
+    case SemanticRole::tree_item: return ROLE_SYSTEM_OUTLINEITEM;
+    case SemanticRole::table: return ROLE_SYSTEM_TABLE;
+    case SemanticRole::row: return ROLE_SYSTEM_ROW;
+    case SemanticRole::cell: return ROLE_SYSTEM_CELL;
+    case SemanticRole::column_header: return ROLE_SYSTEM_COLUMNHEADER;
+    case SemanticRole::row_header: return ROLE_SYSTEM_ROWHEADER;
+    case SemanticRole::tree_grid: return ROLE_SYSTEM_OUTLINE;
+    case SemanticRole::dialog: return ROLE_SYSTEM_DIALOG;
+    case SemanticRole::status_bar: return ROLE_SYSTEM_STATUSBAR;
+    case SemanticRole::live_region: return ROLE_SYSTEM_GROUPING;
     case SemanticRole::count: return ROLE_SYSTEM_GROUPING;
     }
     return ROLE_SYSTEM_GROUPING;
@@ -271,6 +285,7 @@ LONG expected_state(const SemanticNode& node) noexcept {
     if (has_semantic_state(states, SemanticState::protected_content)) bits |= STATE_SYSTEM_PROTECTED;
     if (has_semantic_state(states, SemanticState::busy)) bits |= STATE_SYSTEM_BUSY;
     if (node.has_popup) bits |= STATE_SYSTEM_HASPOPUP;
+    if (has_semantic_state(states, SemanticState::multiselectable)) bits |= STATE_SYSTEM_MULTISELECTABLE;
     if (node.role == SemanticRole::link) bits |= STATE_SYSTEM_LINKED;
     return bits;
 }
