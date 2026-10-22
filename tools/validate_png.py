@@ -76,7 +76,8 @@ def main() -> None:
         record['commands'].append(command)
         subprocess.run(command, cwd=output, env=env, check=True)
         candidate = [str(ROOT / name) for name in ('src/core/image/png_decoder.cpp',
-                     'src/core/image/png_writer.cpp', 'stx_zlib/src/inflate.cpp')]
+                     'src/core/image/png_writer.cpp', 'stx_zlib/src/inflate.cpp',
+                     'stx_zlib/src/deflate.cpp')]
         test = output / 'png-tests'
         command = ['clang++', '-std=c++20', *flags, *includes, '-Wall', '-Wextra', '-Wpedantic',
                    '-DGUI_FORMS_PNG_ORACLE=1', *candidate, str(ROOT / 'tests/image/png_decoder_tests.cpp'),

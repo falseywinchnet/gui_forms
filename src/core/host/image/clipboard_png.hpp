@@ -14,4 +14,10 @@ namespace gui_forms::detail {
 // an image over the bound is too_large, exhausted storage is backend_failure;
 // the result then holds no image. Every host's clipboard calls this one path.
 [[nodiscard]] HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes);
+
+// Encodes a valid host image (straight RGBA8) as the PNG every host offers on
+// the clipboard, with the shared owned encoder at its default level. Returns
+// an empty vector for an invalid image, an image wider or taller than the
+// encoder's 16384-pixel limit, or an encoder failure.
+[[nodiscard]] std::vector<std::byte> encode_clipboard_png(HostImageView source);
 } // namespace gui_forms::detail

@@ -1,6 +1,7 @@
 #include "clipboard_png.hpp"
 
 #include "../../image/png_pixels.hpp"
+#include "../../image/png_writer.hpp"
 
 #include <new>
 #include <stdexcept>
@@ -49,6 +50,20 @@ HostClipboardImageResult decode_clipboard_png(std::span<const std::byte> bytes) 
     result.has_image = true;
     result.status = {};
     return result;
+}
+
+std::vector<std::byte> encode_clipboard_png(HostImageView source) {
+    std::vector<std::byte> png;
+    if (validate_host_image(source) != HostImageError::none) return png;
+    image::PngEncodeInput input{};
+    input.width = source.width;
+    input.height = source.height;
+    input.row_bytes = source.row_bytes;
+    input.pixels = source.pixels;
+    input.order = image::PngChannelOrder::rgba;
+    input.alpha = image::PngSourceAlpha::straight;
+    if (!image::encode_png(input, png)) png.clear();
+    return png;
 }
 
 } // namespace gui_forms::detail

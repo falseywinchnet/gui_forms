@@ -1026,7 +1026,7 @@ public:
             reinterpret_cast<const std::byte*>(saved_pixels),
             static_cast<std::size_t>(saved_width) * static_cast<std::size_t>(saved_height) * 4U);
         input.order = gui_forms::image::PngChannelOrder::bgra;
-        input.opaque = true;
+        input.alpha = gui_forms::image::PngSourceAlpha::opaque;
         return gui_forms::image::encode_png(input, output);
     }
 

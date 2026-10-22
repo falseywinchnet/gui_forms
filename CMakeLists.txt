@@ -834,7 +834,6 @@ if(GUI_FORMS_ENABLE_SKIA)
 
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
-        src/render/skia/raster/clipboard_png.cpp
     )
     add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
@@ -2264,6 +2263,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_color_tests COMMAND gui_forms_png_color_tests)
 
+    # By-hand measurement of encoder size and time per level; not a test.
+    add_executable(gui_forms_png_encode_benchmark tests/image/png_encode_benchmark.cpp)
+    target_link_libraries(gui_forms_png_encode_benchmark PRIVATE gui_forms_core)
+
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
@@ -3500,7 +3503,7 @@ if(GUI_FORMS_BUILD_FUZZERS)
 
     add_executable(gui_forms_png_decode_fuzz
         fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
-        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp)
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
     target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
     target_compile_options(gui_forms_png_decode_fuzz PRIVATE
         -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)

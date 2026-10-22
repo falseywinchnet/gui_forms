@@ -2,9 +2,7 @@
 #include "../../../core/host/image/clipboard_image_wire.hpp"
 #include "../../../core/host/image/clipboard_png.hpp"
 
-#include <algorithm>
-#include <cstring>
-#include <limits>
+#include <vector>
 
 namespace gui_forms::host::detail {
 namespace {
@@ -43,19 +41,11 @@ HostClipboardImageResult read_appkit_clipboard_image(NSPasteboard* pasteboard) {
 HostServiceStatus write_appkit_clipboard_image(NSPasteboard* pasteboard, HostImageView image) {
     if (pasteboard == nil) return {HostServiceError::backend_failure};
     const std::vector<std::byte> raw = gui_forms::detail::encode_clipboard_image(image);
-    const std::size_t row_bytes = static_cast<std::size_t>(image.width) * 4U;
-    NSBitmapImageRep* bitmap = [[NSBitmapImageRep alloc]
-        initWithBitmapDataPlanes:nullptr pixelsWide:image.width pixelsHigh:image.height
-        bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
-        colorSpaceName:NSDeviceRGBColorSpace bitmapFormat:NSBitmapFormatAlphaNonpremultiplied
-        bytesPerRow:row_bytes bitsPerPixel:32];
-    if (bitmap == nil || bitmap.bitmapData == nullptr) return {HostServiceError::backend_failure};
-    for (std::uint32_t row = 0; row < image.height; ++row) {
-        std::memcpy(bitmap.bitmapData + static_cast<std::size_t>(bitmap.bytesPerRow) * row,
-                    image.pixels.data() + static_cast<std::size_t>(image.row_bytes) * row, row_bytes);
-    }
-    NSBitmapImageRep* tagged = [bitmap bitmapImageRepByRetaggingWithColorSpace:[NSColorSpace sRGBColorSpace]];
-    NSData* png = [tagged representationUsingType:NSBitmapImageFileTypePNG properties:@{}];
+    // PNG through the shared owned encoder, as on every host (it writes an
+    // sRGB chunk); no NSBitmapImageRep encoding.
+    const std::vector<std::byte> encoded = gui_forms::detail::encode_clipboard_png(image);
+    if (raw.empty() || encoded.empty()) return {HostServiceError::backend_failure};
+    NSData* png = [NSData dataWithBytes:encoded.data() length:encoded.size()];
     NSData* exact = [NSData dataWithBytes:raw.data() length:raw.size()];
     if (png == nil || exact == nil) return {HostServiceError::backend_failure};
     NSPasteboardItem* item = [[NSPasteboardItem alloc] init];

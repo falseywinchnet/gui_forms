@@ -202,3 +202,23 @@ They also cover precedence, cICP, an ignored iCCP, degenerate values, and
 identity hashes over three conversion cases × four formats × Adam7 (checked
 on all four CI platforms): `0x44de97c1f2726691`, `0xf284508a59809f75`,
 `0x66e109f833f56831`.
+
+### I3: one owned encoder on every host (2026-10-21)
+
+Every PNG encode now goes through `encode_png` in `src/core/image/png_writer`:
+the Windows frame capture, the Skia raster capture, GUI.Drawing's
+`encode_png`, and the clipboard writes on Linux and macOS (through
+`detail::encode_clipboard_png`). `SkPngEncoder` and `NSBitmapImageRep` PNG
+encoding are no longer called. The stored-block writer is replaced:
+- each row's filter is the one with the minimum sum of |signed byte|, with a
+  tie taking the lower filter type; level 0 writes filter 0;
+- the IDAT is compressed by stx_zlib at the requested level, default 6
+  (measured in [results/2026-10-21-png-encoder](../../../results/2026-10-21-png-encoder/README.md));
+- premultiplied sources are unpremultiplied with a stated nearest rule;
+- an sRGB chunk is written.
+
+The output is deterministic. `png_writer_tests` checks an identity hash over
+six cases (RGBA and BGRA; straight, premultiplied and opaque; levels 0, 1, 6
+and 9) on all four CI platforms. It also checks round trips through the owned
+decoder at every level, and that a premultiplied image survives encoding and
+decoding exactly.
