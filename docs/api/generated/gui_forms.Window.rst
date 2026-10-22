@@ -395,6 +395,8 @@ gui_forms::Window
         - Builds the semantic tree that assistive technology and automation see: roles, names, values, states and bounds, keyed by stable ID.
       * - :cpp:func:`perform_semantic_action <gui_forms::Window::perform_semantic_action>`
         - Performs an automation action, such as focus or press, and returns whether it was performed.
+      * - :cpp:func:`semantic_text_layout <gui_forms::Window::semantic_text_layout>`
+        - Fills ``layout`` (caller-owned storage, emptied first and reused) with the text layout of the control with runtime identity ``control``: its visual lines, graphemes and word starts, built only now (owner decision A-T1, 12.13).
       * - :cpp:func:`set_text_scale <gui_forms::Window::set_text_scale>`
         -  
       * - :cpp:func:`set_framebuffer_painter <gui_forms::Window::set_framebuffer_painter>`
@@ -409,6 +411,8 @@ gui_forms::Window
         - Host adapters also install a paint wake seam.
       * - :cpp:func:`set_command_target <gui_forms::Window::set_command_target>`
         - Names the :cpp:class:`CommandTarget <gui_forms::CommandTarget>` of one stage of the command routing chain: the active panel, the active document or the main window, or clears it with null.
+      * - :cpp:func:`set_semantic_text_selection <gui_forms::Window::set_semantic_text_selection>`
+        - Moves the text selection of the control with runtime identity ``control`` (A-T1); focus does not move.
 
    .. seealso::
 
@@ -1215,6 +1219,10 @@ gui_forms::Window
       its control's runtime ID and, for a virtual child, the child's stable
       ID; a disposed or replaced control's runtime ID is refused.
 
+   .. cpp:function:: SemanticTextResult semantic_text_layout(RuntimeId control, SemanticTextLayout& layout)
+
+      Fills ``layout`` (caller-owned storage, emptied first and reused) with the text layout of the control with runtime identity ``control``: its visual lines, graphemes and word starts, built only now (owner decision A-T1, 12.13). Text is published on a control's own node, never on a virtual child. UI thread only, and not deferred: during paint it answers during_paint and the host asks again. A runtime identity no attached control holds answers stale_identity (interview GF017). Reading changes no text, selection or scroll position.
+
    .. cpp:function:: void set_text_scale(double text_scale)
 
    .. cpp:function:: void set_framebuffer_painter(Painter* painter)
@@ -1245,3 +1253,7 @@ gui_forms::Window
       (``Control::set_command_target``), and naming it throws
       ``std::invalid_argument``. ``command_target(stage)`` returns the named
       target while it lives.
+
+   .. cpp:function:: SemanticTextResult set_semantic_text_selection(RuntimeId control, SemanticTextSelection selection)
+
+      Moves the text selection of the control with runtime identity ``control`` (A-T1); focus does not move. Refused as semantic_text_layout refuses, and also for a control outside the active focus scope (outside_focus_scope) or an offset off a grapheme boundary (off_boundary); a refusal changes nothing. A done change reaches hosts through the next snapshot's text_selection field.

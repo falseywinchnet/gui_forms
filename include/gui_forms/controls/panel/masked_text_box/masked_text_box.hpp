@@ -128,6 +128,10 @@ public:
     void on_key_preview(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
     bool on_semantic_action(SemanticAction action, std::string_view value) override;
+    // Forwarded to the editor while it shows the published value (prompts
+    // and literals in place), so offsets index that value; no_text otherwise.
+    [[nodiscard]] SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override;
+    [[nodiscard]] SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
     [[nodiscard]] AnatomyStateSet anatomy_states() const override;
     // Stage T1 anatomy, as dot members.
@@ -186,6 +190,8 @@ private:
     // Rebuilds the provider from the editor's display text (after undo or
     // redo, which the filter does not see).
     void adopt_display_text(std::string_view display);
+    // Whether the editor's text is the value the descriptor publishes.
+    [[nodiscard]] bool editor_shows_published_value() const;
     void publish_text_if_changed();
     // A provider with the given mask and culture and this box's settings.
     [[nodiscard]] MaskedTextProvider configured_provider(std::string mask, MaskCulture culture) const;

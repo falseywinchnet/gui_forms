@@ -410,6 +410,12 @@ gui_forms::MaskedTextBox
 
    .. cpp:function:: bool on_semantic_action(SemanticAction action, std::string_view value) override
 
+   .. cpp:function:: SemanticTextResult on_semantic_text_layout(SemanticTextLayout& layout) override
+
+      Forwarded to the editor while it shows the published value (prompts and literals in place), so offsets index that value; no_text otherwise.
+
+   .. cpp:function:: SemanticTextResult on_set_semantic_text_selection(SemanticTextSelection selection) override
+
    .. cpp:function:: const ControlAnatomy& anatomy() const noexcept override
 
    .. cpp:function:: AnatomyStateSet anatomy_states() const override

@@ -427,9 +427,117 @@ gunichar character(AtkText* object, gint offset) {
     const std::string& value = data(object).node.value;
     return offset >= 0 && offset < text_count(object) ? g_utf8_get_char(g_utf8_offset_to_pointer(value.c_str(), offset)) : 0;
 }
+
+// Editable text on the A-T1 core (A-L3). AT-SPI counts characters (Unicode
+// scalar values); the core counts UTF-8 bytes on grapheme boundaries. Every
+// offset is converted against the published value, which is valid UTF-8.
+
+// The character offset of byte offset `byte` (at most the value's size).
+gint character_offset(const std::string& value, std::size_t byte) {
+    const glong offset = g_utf8_pointer_to_offset(value.c_str(), value.c_str() + byte);
+    return static_cast<gint>(offset);
+}
+// The byte offset of character offset `offset`, or none when it lies
+// outside 0..character count.
+std::optional<std::size_t> byte_offset(const std::string& value, gint offset) {
+    const glong count = g_utf8_strlen(value.c_str(), static_cast<gssize>(value.size()));
+    if (offset < 0 || offset > count) return std::nullopt;
+    const gchar* at = g_utf8_offset_to_pointer(value.c_str(), offset);
+    const std::size_t byte = static_cast<std::size_t>(at - value.c_str());
+    return byte;
+}
+// The published caret, or 0 without a published selection.
+gint caret_offset(AtkText* object) {
+    const NodeData& node = data(object);
+    if (!node.live || !node.node.text_selection) return 0;
+    return character_offset(node.node.value, (*node.node.text_selection).caret.value());
+}
+// One selection while the anchor and the caret differ, else none.
+gint selection_count(AtkText* object) {
+    const NodeData& node = data(object);
+    if (!node.live || !node.node.text_selection) return 0;
+    const SemanticTextSelection selection = *node.node.text_selection;
+    return selection.anchor == selection.caret ? 0 : 1;
+}
+gchar* selection_text(AtkText* object, gint number, gint* start, gint* end) {
+    if (start) { *start = 0; }
+    if (end) { *end = 0; }
+    if (number != 0 || selection_count(object) == 0) return nullptr;
+    const NodeData& node = data(object);
+    const SemanticTextSelection selection = *node.node.text_selection;
+    const std::size_t low = std::min(selection.anchor.value(), selection.caret.value());
+    const std::size_t high = std::max(selection.anchor.value(), selection.caret.value());
+    const gint first = character_offset(node.node.value, low);
+    const gint last = character_offset(node.node.value, high);
+    if (start) { *start = first; }
+    if (end) { *end = last; }
+    return g_utf8_substring(node.node.value.c_str(), first, last);
+}
+// Defined after LinuxAccessibility::Impl: these reach the window.
+gboolean set_caret(AtkText* object, gint offset);
+gboolean add_selection(AtkText* object, gint start, gint end);
+gboolean remove_selection(AtkText* object, gint number);
+gboolean set_selection(AtkText* object, gint number, gint start, gint end);
+gchar* string_at(AtkText* object, gint offset, AtkTextGranularity granularity, gint* start, gint* end);
+void character_extents(AtkText* object, gint offset, gint* x, gint* y, gint* width, gint* height, AtkCoordType coordinates);
+gint offset_at_point(AtkText* object, gint x, gint y, AtkCoordType coordinates);
 void text_init(gpointer raw, gpointer) {
     AtkTextIface& face = *static_cast<AtkTextIface*>(raw);
     face.get_text = text; face.get_character_count = text_count; face.get_character_at_offset = character;
+    face.get_caret_offset = caret_offset; face.set_caret_offset = set_caret;
+    face.get_n_selections = selection_count; face.get_selection = selection_text;
+    face.add_selection = add_selection; face.remove_selection = remove_selection; face.set_selection = set_selection;
+    face.get_string_at_offset = string_at;
+    face.get_character_extents = character_extents; face.get_offset_at_point = offset_at_point;
+}
+
+// Announces a text node's change from `before` to `after` (A-L3): the
+// replaced span as text-remove then text-insert (the common prefix and
+// suffix, cut at character boundaries, are kept), then text-caret-moved when
+// the caret moved and text-selection-changed when the selected span changed.
+// Whether byte `index` of `text` continues a character (a UTF-8
+// continuation byte) rather than starting one or lying at the end.
+bool continues_character(const std::string& text, std::size_t index) {
+    if (index >= text.size()) return false;
+    const bool continuation = (static_cast<unsigned char>(text[index]) & 0xC0U) == 0x80U;
+    return continuation;
+}
+void announce_text(AtkObject* object, const std::string& before, const std::optional<SemanticTextSelection>& was,
+                   const std::string& after, const std::optional<SemanticTextSelection>& now) {
+    if (before != after) {
+        const std::size_t shorter = std::min(before.size(), after.size());
+        std::size_t prefix = 0U;
+        while (prefix < shorter && before[prefix] == after[prefix]) ++prefix;
+        // The prefix ends where a character starts in both texts.
+        while (prefix > 0U && (continues_character(before, prefix) || continues_character(after, prefix))) --prefix;
+        // The suffix does not overlap the prefix in the shorter text.
+        std::size_t suffix = 0U;
+        while (suffix < shorter - prefix && before[before.size() - 1U - suffix] == after[after.size() - 1U - suffix]) {
+            ++suffix;
+        }
+        // The suffix starts where a character starts; its bytes are the same
+        // in both texts.
+        while (suffix > 0U && continues_character(after, after.size() - suffix)) --suffix;
+        const gint position = character_offset(after, prefix);
+        const std::string removed = before.substr(prefix, before.size() - suffix - prefix);
+        const std::string inserted = after.substr(prefix, after.size() - suffix - prefix);
+        if (!removed.empty()) {
+            const gint length = static_cast<gint>(g_utf8_strlen(removed.c_str(), static_cast<gssize>(removed.size())));
+            g_signal_emit_by_name(object, "text-remove", position, length, removed.c_str());
+        }
+        if (!inserted.empty()) {
+            const gint length = static_cast<gint>(g_utf8_strlen(inserted.c_str(), static_cast<gssize>(inserted.size())));
+            g_signal_emit_by_name(object, "text-insert", position, length, inserted.c_str());
+        }
+    }
+    if (now) {
+        const gint caret = character_offset(after, (*now).caret.value());
+        const gint previous = was ? character_offset(before, (*was).caret.value()) : -1;
+        if (caret != previous) { g_signal_emit_by_name(object, "text-caret-moved", caret); }
+    }
+    const bool selected_before = was && (*was).anchor != (*was).caret;
+    const bool selected_now = now && (*now).anchor != (*now).caret;
+    if ((selected_before || selected_now) && was != now) { g_signal_emit_by_name(object, "text-selection-changed"); }
 }
 void set_contents(AtkEditableText* object, const gchar* value) {
     if (value && g_utf8_validate(value, -1, nullptr)) { static_cast<void>(perform(object, SemanticAction::set_value, value)); }
@@ -484,6 +592,8 @@ struct LinuxAccessibility::Impl {
     std::vector<AtkObject*> retired;
     std::uint64_t generation = 0;
     bool published = false;
+    // Reused by every text query (A-L3); filled and read within one query.
+    SemanticTextLayout text_layout;
 
     // Marks `object` dead: it answers as defunct and no longer reaches the
     // model. The caller still holds its reference.
@@ -514,6 +624,7 @@ struct LinuxAccessibility::Impl {
         NodeData& value = data(object);
         const StateBits old_states = created ? StateBits{0} : state_bits(value.node);
         const std::string old_value = value.node.value, old_name = value.node.name;
+        const std::optional<SemanticTextSelection> old_selection = value.node.text_selection;
         std::vector<AtkObject*> previous = std::move(value.children);
         value.children.clear();
         value.flags = flags; value.owner = this; value.key = key; value.node = node; value.node.children.clear(); value.live = true;
@@ -539,6 +650,9 @@ struct LinuxAccessibility::Impl {
                 const bool is = (new_states & state_bit(type)) != 0U;
                 if (was != is) atk_object_notify_state_change(object, type, is);
             }
+        }
+        if (!created && (flags & text_interface) != 0U) {
+            announce_text(object, old_value, old_selection, node.value, node.text_selection);
         }
         const std::uint64_t child_owner = key.control;
         for (std::size_t i = 0; i < node.children.size(); ++i) { sync(node.children[i], object, static_cast<int>(i), child_owner); }
@@ -627,19 +741,235 @@ gboolean perform(gpointer object, SemanticAction action, const std::string& valu
     g_object_unref(accessible);
     return result;
 }
-void extents(AtkComponent* object, gint* x, gint* y, gint* width, gint* height, AtkCoordType coordinates) {
-    const NodeData& node = data(object);
-    int left = 0, top = 0;
+// Where window client coordinates (the coordinates of node bounds and text
+// layout boxes) put their origin in `coordinates`: the window's place on the
+// screen, the client origin itself, or minus the place of `node`'s parent.
+void coordinate_origin(const NodeData& node, AtkCoordType coordinates, int& left, int& top) {
+    left = 0; top = 0;
     if (node.owner && coordinates == ATK_XY_SCREEN) {
         ::Window child{};
         XTranslateCoordinates((*node.owner).display, (*node.owner).native, DefaultRootWindow((*node.owner).display), 0, 0, &left, &top, &child);
     } else if (node.parent && coordinates == ATK_XY_PARENT) {
         left = -static_cast<int>(data(node.parent).node.bounds.x); top = -static_cast<int>(data(node.parent).node.bounds.y);
     }
+}
+void extents(AtkComponent* object, gint* x, gint* y, gint* width, gint* height, AtkCoordType coordinates) {
+    const NodeData& node = data(object);
+    int left = 0, top = 0;
+    coordinate_origin(node, coordinates, left, top);
     if (x) { *x = left + static_cast<int>(node.node.bounds.x); }
     if (y) { *y = top + static_cast<int>(node.node.bounds.y); }
     if (width) { *width = node.live ? static_cast<int>(node.node.bounds.width) : 0; }
     if (height) { *height = node.live ? static_cast<int>(node.node.bounds.height) : 0; }
+}
+
+// -- editable text through the window (A-L3) ---------------------------------
+// Each function holds a reference to its object throughout, since bringing
+// the published tree up to date may retire it, and catches every exception:
+// none may cross into the AT-SPI bridge.
+
+// Whether every offset of `layout` lies within a value of `size` bytes: the
+// layout comes from the control, the value from the published snapshot.
+bool layout_fits(const SemanticTextLayout& layout, std::size_t size) {
+    for (const SemanticTextLine& line : layout.lines) {
+        if (line.range.end.value() > size) return false;
+    }
+    for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+        if (grapheme.range.end.value() > size) return false;
+    }
+    for (const Utf8Offset start : layout.word_starts) {
+        if (start.value() > size) return false;
+    }
+    return true;
+}
+// Brings the published tree up to the window's generation, then fills the
+// owner's text layout for `accessible`. False when the object is defunct,
+// the window answers anything but done, or the layout does not fit the
+// published value.
+bool fetch_text_layout(AtkObject* accessible) {
+    NodeData& node = data(accessible);
+    if (!node.live || node.owner == nullptr || (*node.owner).model == nullptr) return false;
+    LinuxAccessibility::Impl& owner = *node.owner;
+    owner.update();
+    if (!node.live || node.owner == nullptr) return false;
+    const RuntimeId control{node.key.control};
+    const SemanticTextResult result = (*owner.model).semantic_text_layout(control, owner.text_layout);
+    if (result != SemanticTextResult::done) return false;
+    const bool fits = layout_fits(owner.text_layout, node.node.value.size());
+    return fits;
+}
+// Moves the selection to characters anchor..caret through the window, then
+// publishes it, which announces the caret move and the selection change.
+gboolean select_text(AtkText* object, gint anchor, gint caret) {
+    AtkObject* const accessible = ATK_OBJECT(object);
+    g_object_ref(accessible);
+    gboolean result = FALSE;
+    try {
+        NodeData& node = data(accessible);
+        if (node.live && node.owner != nullptr && (*node.owner).model != nullptr) {
+            LinuxAccessibility::Impl& owner = *node.owner;
+            owner.update();
+            const std::optional<std::size_t> anchor_byte = byte_offset(node.node.value, anchor);
+            const std::optional<std::size_t> caret_byte = byte_offset(node.node.value, caret);
+            if (node.live && node.owner != nullptr && anchor_byte && caret_byte) {
+                const RuntimeId control{node.key.control};
+                const SemanticTextSelection selection{.anchor = Utf8Offset(*anchor_byte), .caret = Utf8Offset(*caret_byte)};
+                const SemanticTextResult moved = (*owner.model).set_semantic_text_selection(control, selection);
+                result = moved == SemanticTextResult::done ? TRUE : FALSE;
+                owner.update();
+            }
+        }
+    } catch (...) { result = FALSE; }
+    g_object_unref(accessible);
+    return result;
+}
+gboolean set_caret(AtkText* object, gint offset) {
+    const gboolean result = select_text(object, offset, offset);
+    return result;
+}
+// A second selection is not supported; the one selection is added only
+// while there is none.
+gboolean add_selection(AtkText* object, gint start, gint end) {
+    if (selection_count(object) != 0) return FALSE;
+    const gboolean result = select_text(object, start, end);
+    return result;
+}
+// Removing the selection leaves the caret where it was.
+gboolean remove_selection(AtkText* object, gint number) {
+    if (number != 0 || selection_count(object) == 0) return FALSE;
+    const gint caret = caret_offset(object);
+    const gboolean result = select_text(object, caret, caret);
+    return result;
+}
+gboolean set_selection(AtkText* object, gint number, gint start, gint end) {
+    if (number != 0) return FALSE;
+    const gboolean result = select_text(object, start, end);
+    return result;
+}
+// The span of `granularity` around byte `byte` of `value`, from the owner's
+// layout: a grapheme, a word (between consecutive word starts), a visual
+// line (with the break that ends it), or a paragraph (a logical line with
+// its break). False for a sentence (unsupported, A-T2) or a granularity ATK
+// adds later, and at the end of the text for the layout-based spans.
+bool granularity_span(const SemanticTextLayout& layout, const std::string& value, std::size_t byte,
+                      AtkTextGranularity granularity, std::size_t& low, std::size_t& high) {
+    switch (granularity) {
+    case ATK_TEXT_GRANULARITY_CHAR:
+        for (const SemanticTextGrapheme& grapheme : layout.graphemes) {
+            if (grapheme.range.start.value() <= byte && byte < grapheme.range.end.value()) {
+                low = grapheme.range.start.value(); high = grapheme.range.end.value();
+                return true;
+            }
+        }
+        return false;
+    case ATK_TEXT_GRANULARITY_WORD:
+        for (std::size_t index = 0U; index + 1U < layout.word_starts.size(); ++index) {
+            if (layout.word_starts[index].value() <= byte && byte < layout.word_starts[index + 1U].value()) {
+                low = layout.word_starts[index].value(); high = layout.word_starts[index + 1U].value();
+                return true;
+            }
+        }
+        return false;
+    case ATK_TEXT_GRANULARITY_LINE:
+        for (std::size_t index = 0U; index < layout.lines.size(); ++index) {
+            const std::size_t start = layout.lines[index].range.start.value();
+            const bool last = index + 1U == layout.lines.size();
+            const std::size_t next = last ? value.size() : layout.lines[index + 1U].range.start.value();
+            if (start <= byte && (byte < next || (last && byte == next))) {
+                low = start; high = next;
+                return true;
+            }
+        }
+        return false;
+    case ATK_TEXT_GRANULARITY_PARAGRAPH: {
+        const std::size_t before = byte == 0U ? std::string::npos : value.rfind('\n', byte - 1U);
+        low = before == std::string::npos ? 0U : before + 1U;
+        const std::size_t after = value.find('\n', byte);
+        high = after == std::string::npos ? value.size() : after + 1U;
+        return true;
+    }
+    case ATK_TEXT_GRANULARITY_SENTENCE:
+        return false;
+    }
+    return false;
+}
+gchar* string_at(AtkText* object, gint offset, AtkTextGranularity granularity, gint* start, gint* end) {
+    if (start) { *start = -1; }
+    if (end) { *end = -1; }
+    AtkObject* const accessible = ATK_OBJECT(object);
+    g_object_ref(accessible);
+    gchar* result = nullptr;
+    try {
+        if (fetch_text_layout(accessible)) {
+            const NodeData& node = data(accessible);
+            const std::string& value = node.node.value;
+            const std::optional<std::size_t> byte = byte_offset(value, offset);
+            std::size_t low = 0U, high = 0U;
+            if (byte && granularity_span((*node.owner).text_layout, value, *byte, granularity, low, high)) {
+                const gint first = character_offset(value, low);
+                const gint last = character_offset(value, high);
+                if (start) { *start = first; }
+                if (end) { *end = last; }
+                result = g_utf8_substring(value.c_str(), first, last);
+            }
+        }
+    } catch (...) { result = nullptr; }
+    g_object_unref(accessible);
+    return result;
+}
+// A character's box: the box of the grapheme it belongs to. All four are -1
+// at the end of the text or when the layout cannot be read.
+void character_extents(AtkText* object, gint offset, gint* x, gint* y, gint* width, gint* height, AtkCoordType coordinates) {
+    if (x) { *x = -1; }
+    if (y) { *y = -1; }
+    if (width) { *width = -1; }
+    if (height) { *height = -1; }
+    AtkObject* const accessible = ATK_OBJECT(object);
+    g_object_ref(accessible);
+    try {
+        if (fetch_text_layout(accessible)) {
+            const NodeData& node = data(accessible);
+            const std::optional<std::size_t> byte = byte_offset(node.node.value, offset);
+            std::size_t low = 0U, high = 0U;
+            if (byte && granularity_span((*node.owner).text_layout, node.node.value, *byte, ATK_TEXT_GRANULARITY_CHAR, low, high)) {
+                for (const SemanticTextGrapheme& grapheme : (*node.owner).text_layout.graphemes) {
+                    if (grapheme.range.start.value() != low) continue;
+                    int left = 0, top = 0;
+                    coordinate_origin(node, coordinates, left, top);
+                    if (x) { *x = left + static_cast<int>(std::lround(grapheme.bounds.x)); }
+                    if (y) { *y = top + static_cast<int>(std::lround(grapheme.bounds.y)); }
+                    if (width) { *width = static_cast<int>(std::lround(grapheme.bounds.width)); }
+                    if (height) { *height = static_cast<int>(std::lround(grapheme.bounds.height)); }
+                    break;
+                }
+            }
+        }
+    } catch (...) {}
+    g_object_unref(accessible);
+}
+// The first character of the grapheme whose box holds the point, or -1.
+gint offset_at_point(AtkText* object, gint x, gint y, AtkCoordType coordinates) {
+    AtkObject* const accessible = ATK_OBJECT(object);
+    g_object_ref(accessible);
+    gint result = -1;
+    try {
+        if (fetch_text_layout(accessible)) {
+            const NodeData& node = data(accessible);
+            int left = 0, top = 0;
+            coordinate_origin(node, coordinates, left, top);
+            const double client_x = static_cast<double>(x - left);
+            const double client_y = static_cast<double>(y - top);
+            for (const SemanticTextGrapheme& grapheme : (*node.owner).text_layout.graphemes) {
+                const Rect box = grapheme.bounds;
+                if (client_x >= box.x && client_x < box.x + box.width && client_y >= box.y && client_y < box.y + box.height) {
+                    result = character_offset(node.node.value, grapheme.range.start.value());
+                    break;
+                }
+            }
+        }
+    } catch (...) { result = -1; }
+    g_object_unref(accessible);
+    return result;
 }
 }
 LinuxAccessibility::LinuxAccessibility(Display* display, ::Window native, Window& model, const std::string& title)

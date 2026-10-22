@@ -183,6 +183,18 @@ const char* semantic_orientation_name(SemanticOrientation orientation) noexcept 
     return "horizontal";
 }
 
+const char* semantic_text_result_name(SemanticTextResult result) noexcept {
+    switch (result) {
+    case SemanticTextResult::done: return "done";
+    case SemanticTextResult::stale_identity: return "stale_identity";
+    case SemanticTextResult::during_paint: return "during_paint";
+    case SemanticTextResult::outside_focus_scope: return "outside_focus_scope";
+    case SemanticTextResult::no_text: return "no_text";
+    case SemanticTextResult::off_boundary: return "off_boundary";
+    }
+    return "unknown";
+}
+
 const char* semantic_state_name(SemanticState state) noexcept {
     switch (state) {
     case SemanticState::none: return "none";
