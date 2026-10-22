@@ -86,6 +86,17 @@ public:
         self.assertEqual(len(findings), 1)
         self.assertIn("vocabulary", findings[0])
 
+    def test_the_vocabulary_lists_the_stage_a_atoms(self) -> None:
+        vocabulary = cs.load_schema()["vocabulary"]
+        for role in ("tree", "tree_item", "table", "row", "cell", "column_header", "row_header", "tree_grid",
+                     "dialog", "status_bar", "live_region"):
+            self.assertIn(role, vocabulary["semantic_roles"])
+        for state in ("checkable", "multiselectable"):
+            self.assertIn(state, vocabulary["semantic_states"])
+        for field in ("level", "modal", "row_index", "column_index", "row_count", "column_count", "access_key",
+                      "small_step", "large_step", "text_selection", "multiline"):
+            self.assertIn(field, vocabulary["semantic_fields"])
+
     def test_the_vocabulary_lists_the_docking_atoms(self) -> None:
         schema = cs.load_schema()
         vocabulary = schema["vocabulary"]

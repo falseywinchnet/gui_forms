@@ -191,6 +191,21 @@ CONTROLTYPEID control_type(SemanticRole role) noexcept {
     case SemanticRole::pane: return UIA_PaneControlTypeId;
     // The content a tab shows is a pane, as a tab item's content is.
     case SemanticRole::tab_panel: return UIA_PaneControlTypeId;
+    // The stage A vocabulary (12.13). A tree grid is a data grid whose rows
+    // are tree items; a cell is a data item, as a grid's cells are; a dialog
+    // inside the window is a pane with IsDialog; a live region is a group
+    // with a polite LiveSetting.
+    case SemanticRole::tree: return UIA_TreeControlTypeId;
+    case SemanticRole::tree_item: return UIA_TreeItemControlTypeId;
+    case SemanticRole::table: return UIA_TableControlTypeId;
+    case SemanticRole::row: return UIA_DataItemControlTypeId;
+    case SemanticRole::cell: return UIA_DataItemControlTypeId;
+    case SemanticRole::column_header: return UIA_HeaderItemControlTypeId;
+    case SemanticRole::row_header: return UIA_HeaderItemControlTypeId;
+    case SemanticRole::tree_grid: return UIA_DataGridControlTypeId;
+    case SemanticRole::dialog: return UIA_PaneControlTypeId;
+    case SemanticRole::status_bar: return UIA_StatusBarControlTypeId;
+    case SemanticRole::live_region: return UIA_GroupControlTypeId;
     case SemanticRole::count: return UIA_GroupControlTypeId;
     }
     return UIA_GroupControlTypeId;
@@ -560,6 +575,23 @@ HRESULT UiaElement::property_value(const SemanticNode& client, const SemanticLoc
     case UIA_ControllerForPropertyId:
         if (node.controlled_panel.empty()) return S_OK;
         return controller_for(client, node, out);
+    case UIA_AccessKeyPropertyId: {
+        // A mnemonic is reached with Alt, as Win32 publishes it.
+        if (node.access_key.empty()) return S_OK;
+        const std::string key = "Alt+" + node.access_key;
+        return set_text(out, key);
+    }
+    case UIA_LevelPropertyId:
+        if (!node.level) return S_OK;
+        set_int(out, static_cast<int>(*node.level));
+        return S_OK;
+    case UIA_IsDialogPropertyId:
+        set_bool(out, node.role == SemanticRole::dialog);
+        return S_OK;
+    case UIA_LiveSettingPropertyId:
+        if (node.role != SemanticRole::live_region) return S_OK;
+        set_int(out, Polite);
+        return S_OK;
     default: return S_OK;
     }
 }
@@ -862,14 +894,17 @@ HRESULT STDMETHODCALLTYPE UiaElement::get_Minimum(double* out) {
     return S_OK;
 }
 
-// The tree carries no step sizes (stage A gap list); zero tells a client
-// none is known.
+// A node's large_step and small_step; zero, for a node that publishes none,
+// tells a client no step is known.
 HRESULT STDMETHODCALLTYPE UiaElement::get_LargeChange(double* out) {
     if (out == nullptr) return E_INVALIDARG;
     *out = 0.0;
     SemanticNode client;
     SemanticLocation self;
-    return resolve_pattern(UIA_RangeValuePatternId, client, self);
+    const HRESULT status = resolve_pattern(UIA_RangeValuePatternId, client, self);
+    if (FAILED(status)) return status;
+    if ((*self.node).large_step) *out = *(*self.node).large_step;
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE UiaElement::get_SmallChange(double* out) {
@@ -877,7 +912,10 @@ HRESULT STDMETHODCALLTYPE UiaElement::get_SmallChange(double* out) {
     *out = 0.0;
     SemanticNode client;
     SemanticLocation self;
-    return resolve_pattern(UIA_RangeValuePatternId, client, self);
+    const HRESULT status = resolve_pattern(UIA_RangeValuePatternId, client, self);
+    if (FAILED(status)) return status;
+    if ((*self.node).small_step) *out = *(*self.node).small_step;
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE UiaElement::Expand() {
@@ -1005,11 +1043,13 @@ HRESULT STDMETHODCALLTYPE UiaElement::GetSelection(SAFEARRAY** out) {
 
 HRESULT STDMETHODCALLTYPE UiaElement::get_CanSelectMultiple(BOOL* out) {
     if (out == nullptr) return E_INVALIDARG;
-    // The tree has no multiple-selection flag (stage A gap list).
     *out = FALSE;
     SemanticNode client;
     SemanticLocation self;
-    return resolve_pattern(UIA_SelectionPatternId, client, self);
+    const HRESULT status = resolve_pattern(UIA_SelectionPatternId, client, self);
+    if (FAILED(status)) return status;
+    if (has_semantic_state((*self.node).states, SemanticState::multiselectable)) *out = TRUE;
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE UiaElement::get_IsSelectionRequired(BOOL* out) {

@@ -988,6 +988,43 @@ a tab panel as a scroll pane (as GTK does), the relation as
 controller-for, the orientation as the horizontal or vertical state, and
 close as an action named "close".
 
+From 2026-10-21 (§12.13) the stage A vocabulary is admitted. Roles:
+`tree` and `tree_item`; `table`, `row`, `cell`, `column_header` and
+`row_header`; `tree_grid` (a table whose rows are tree items); `dialog`;
+`status_bar`; and `live_region` (a region whose changes are announced,
+DK-51). States: `checkable` and `multiselectable`. Node fields: `level` (a
+tree item's depth, from one); `modal` (a dialog that blocks its window);
+`row_index`, `column_index`, `row_count` and `column_count` (a cell's or
+row's place in its table and the table's size, indices from one);
+`access_key` (the mnemonic's character, without its modifier);
+`small_step` and `large_step` (a range's arrow-key and page-key changes);
+`text_selection` (a text node's anchor and caret as UTF-8 offsets into its
+value, absent for protected content) and `multiline`. The hosts map them
+as far as their APIs allow:
+
+- MSAA: outline, outline item, table, row, cell, column and row header,
+  dialog and status bar roles (a tree grid is an outline and a live region
+  a grouping); the multiple-selection state; the access key as the
+  keyboard shortcut "Alt+key".
+- UI Automation: tree, tree item, table, data item (rows and cells),
+  header item, data grid (a tree grid), pane with IsDialog (a dialog),
+  status bar and group with a polite LiveSetting (a live region); Level,
+  AccessKey ("Alt+key"), CanSelectMultiple, SmallChange and LargeChange.
+- ATK: tree, tree item, table, table row, table cell, column and row
+  header, tree table, dialog and status bar roles (a live region is a
+  panel with the "live" and "container-live" attributes); the checkable,
+  multiselectable, modal and single- or multi-line states; the "level",
+  "rowindex", "colindex", "rowcount" and "colcount" attributes; the access
+  key as the default action's key binding "<Alt>key"; the small step as
+  the value's increment.
+- AppKit: outline (a tree and a tree grid), row (a tree item, with the
+  outline-row subrole, and a table row), table and cell roles; a dialog, a
+  status bar and a live region are groups with WebKit's subroles
+  (AXApplicationDialog, AXApplicationStatus, AXApplicationLog); the
+  disclosure level, row and column index ranges and counts, modal, and a
+  multi-line text box as a text area. AppKit has no access-key or step
+  attribute.
+
 ## 9. Motion, effects and sound
 
 ### 9.1 Character
