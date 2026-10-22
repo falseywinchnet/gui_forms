@@ -460,7 +460,8 @@ bool show_page(Window& window, std::string_view page) {
 }
 
 // Shows a page and builds its expectation, on the UI thread. With
-// `freeze`, it first cancels the window's frame requests: the client reads
+// `freeze`, it first takes the native window's input away and ends any
+// pointer hover (below), then cancels the window's frame requests: the client reads
 // the tree through many UI-thread calls while the message loop runs, and
 // the timers and animations some pages start (the timing page's tick and
 // progress, the easing preview, the motion target) would change it between
@@ -478,7 +479,20 @@ struct PreparePage final {
         out.shown = show_page(*window, page);
         if (!out.shown) return;
         (*window).perform_layout();
-        if (freeze) (*window).cancel_frame_requests();
+        if (freeze) {
+            // The physical pointer may rest over the window: hovering shows
+            // a tooltip, and a later move hides it while the client reads.
+            // A disabled native window takes no pointer or key input (UI
+            // Automation still reaches the providers), and a leave ends any
+            // hover the pointer began before.
+            EnableWindow(hwnd, FALSE);
+            PointerEvent leave;
+            leave.action = PointerAction::leave;
+            leave.position = Point{-1.0, -1.0};
+            static_cast<void>((*window).dispatch_pointer(leave));
+            (*window).perform_layout();
+            (*window).cancel_frame_requests();
+        }
         const UINT dpi = GetDpiForWindow(hwnd);
         out.scale = dpi == 0U ? 1.0 : std::max(1.0, dpi / 96.0);
         out.origin = POINT{};
