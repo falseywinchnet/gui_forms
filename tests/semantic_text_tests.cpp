@@ -201,10 +201,11 @@ void refusals() {
             "runtime identity zero names no control");
 
     const FocusScopeId scope_id = window.begin_focus_scope(scope, inside);
-    require(window.set_semantic_text_selection((*outside).runtime_id(), {Utf8Offset(0U), Utf8Offset(3U)}) ==
+    const TextSelection outside_before = (*outside).selection();
+    require(window.set_semantic_text_selection((*outside).runtime_id(), {Utf8Offset(0U), Utf8Offset(1U)}) ==
                 SemanticTextResult::outside_focus_scope &&
-                (*outside).selection().caret != Utf8Offset(3U),
-            "a selection outside the active focus scope is refused");
+                (*outside).selection() == outside_before,
+            "a selection outside the active focus scope is refused and changes nothing");
     require(window.semantic_text_layout((*outside).runtime_id(), layout) == SemanticTextResult::done,
             "a layout may be read outside the focus scope");
     require(window.set_semantic_text_selection((*inside).runtime_id(), {Utf8Offset(0U), Utf8Offset(2U)}) ==
@@ -252,13 +253,14 @@ void during_paint() {
     window.perform_layout();
     (*field).set_text("abc");
     (*probe).target = (*field).runtime_id();
+    const TextSelection before = (*field).selection();
     test_support::TypographyPainter painter{};
     const DamageRegion damage = window.take_damage();
     const std::optional<PaintReceipt> receipt = window.paint(painter, damage.bounds());
     require(receipt.has_value() && (*probe).painted, "the probe paints");
     require((*probe).layout_result == SemanticTextResult::during_paint &&
                 (*probe).selection_result == SemanticTextResult::during_paint &&
-                (*field).selection().caret == Utf8Offset(0U),
+                (*field).selection() == before,
             "both queries are refused during paint, not deferred");
 }
 
