@@ -176,8 +176,8 @@ const PrimitiveParameterDeclaration twice[] = {{"strength", PrimitiveParameterKi
 
 void test_builtin_registry() {
     const PrimitiveRegistry& registry = builtin_primitive_registry();
-    require(registry.primitives().size() == 9U,
-            "the built-in registry holds the bulge pair, the relief set and the material");
+    require(registry.primitives().size() == 10U,
+            "the built-in registry holds the bulge pair, the relief set, the material and the overlay shadow");
     require(registry.find("not_a_primitive") == nullptr, "an unknown name finds nothing");
     const char* const names[] = {"bulge", "dithered_bulge"};
     for (const char* const name : names) {

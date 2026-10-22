@@ -460,6 +460,77 @@ assembles any size of a sliceable material from one reference bake.
   `gui_forms_engine_motion_tests` bake nothing after the idle frames, and at
   most one keyframe per frame before them.
 
+## E9, light (in progress)
+
+### Decisions for E9 (owner, 2026-10-22)
+
+- **E9-A, option 1: an overlay seam for sheen only.** The face is baked
+  once, and the sheen band once per (size, state, scale). The band is
+  composited at the pointer offset, clipped to the part's shape. Damage is
+  limited to the part's extent.
+- **E9-B, option 1: a cached backplane image.** The window keeps one per
+  requested region: the backplane plane alone, keyed to its damage
+  generation, read through a target borrow. Glass blurs within the 8 px
+  cap, and the cache follows E7r's rules.
+- **E9-C, option 1: no new primitives.** Gloss is a material preset. Glow is
+  one new material layer kind, soft and additive, bounded by the grant. Pop
+  is rule data only.
+
+### E9.1, the overlay shadow
+
+- **The primitive.** `overlay_shadow` (GIVEN E1-1) draws a `shadow` part
+  with the material kernel. The engine lends the theme's overlay shadow
+  layers, or the high-contrast ones, as a material of one transparent fill
+  and those outer shadows, at the part's corner radius (its own, else its
+  family recipe's). A theme that casts none draws nothing. A built-in rule
+  selects it for every shadow part, replacing `Painter::draw_box_shadow`, so
+  the shadow has the same bytes on every host. Its outsets are 32 logical
+  units. The damage outsets controls report are unchanged.
+- **Refusals.** It refuses an inset shadow, a shadow that reaches past 32
+  units (spread, offset and 3.5σ', plus two device pixels), and a bake over
+  the bound. A refused shadow is drawn by `draw_box_shadow` and counted.
+- **The kernel.** An outer shadow's rectangle integral is separable. The
+  kernel evaluates it once per column and once per row. The rounded edge's
+  integral is taken only within the shape's corner squares and outward
+  from them. Elsewhere the rounded shape is its rectangle, and a blurred
+  rectangle never exceeds the integral across its nearest edge. The bytes
+  are unchanged: every material reference hash still matches, and so does
+  the overlay shadow's. A solid fill of alpha 0 is not drawn, and the box's
+  coverage is not computed when no layer reads it.
+- **Proof.** `gui_forms_engine_light_tests` checks scales 1, 1.5 and 2. The
+  engine composites one raster and no box shadow, and the raster equals a
+  whole bake byte for byte, sliced or not. Its scale-1 hash is checked on
+  every CI platform. High contrast casts nothing. A shadow too wide falls
+  back, counted. `gui_forms_overlay_shadow_tests` sees the raster first in
+  each tooltip's and context menu's operations.
+
+### E9 shadow costs
+
+The outer shadow was measured again after the separable kernel, with
+`gui_forms_engine_material_tests --measure`. A new workload, `outer_corner`,
+measures the cost per pixel within a rounded shadow's corners. It uses a box
+rounded to a circle, where every pixel is a corner pixel. The figure is net
+of the separable cost.
+
+These two figures are **provisional** until the quiet-machine re-measure,
+which records the CPU load. The machine was the same, on 2026-10-22. The
+load was not sampled. It was lighter than in the E8c runs: the inset
+shadow, unchanged, measured 47.5–48.7 ns against 59.1 earlier. So each
+median is scaled by 1.25 and rounded up. There were seven runs, in
+nanoseconds per pixel:
+
+| Cost | Min | Median | Max | Used |
+|---|---|---|---|---|
+| outer shadow (separable) | 4.53 | 4.83 | 5.24 | 7 |
+| outer shadow, corner pixel | 20.98 | 21.71 | 22.02 | 28 |
+
+The estimate counts every pixel at `outer_shadow`. It adds `outer_corner`
+for each pixel within a rounded shadow's corner span on both axes: its
+radius plus its reach (3.5σ'), and one pixel, on each side.
+
+The overlay tooltip of 120 × 40 at scale 2 now bakes within the bound. It
+was refused at 1.5 and 2 under the old per-pixel cost of 69 ns.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

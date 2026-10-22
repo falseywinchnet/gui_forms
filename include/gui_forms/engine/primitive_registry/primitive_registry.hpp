@@ -337,6 +337,13 @@ public:
     [[nodiscard]] virtual std::optional<ControlVisualRole> theme_material(
         const PrimitiveParameterBlock& parameters) const noexcept;
 
+    // Whether the primitive draws the theme's overlay shadow (E9, GIVEN
+    // E1-1): the engine then lends the theme's overlay shadow layers for the
+    // part's presentation as a material of one transparent fill and those
+    // shadows, at the part's corner radius, and draws nothing when the theme
+    // casts none. False unless the primitive says otherwise.
+    [[nodiscard]] virtual bool lends_overlay_shadow() const noexcept;
+
     // Whether the primitive will draw this target with `parameters`, such as
     // a material whose bake would exceed its bound. A primitive that refuses
     // is drawn by the built-in recipe instead, and the engine counts the

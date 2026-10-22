@@ -3,6 +3,7 @@
 #include "gui_forms/schema/types/schema_types.hpp"
 #include "../primitives/bulge/bulge_primitives.hpp"
 #include "../primitives/material/material_primitive.hpp"
+#include "../primitives/material/overlay_shadow_primitive.hpp"
 #include "../primitives/relief/relief_primitives.hpp"
 
 #include <algorithm>
@@ -100,12 +101,13 @@ const engine_primitives::EtchedDividerPrimitive etched_divider_primitive{};
 const engine_primitives::SeamPrimitive seam_primitive{};
 const engine_primitives::GripPrimitive grip_primitive{};
 const engine_primitives::MaterialPrimitive material_primitive{};
+const engine_primitives::OverlayShadowPrimitive overlay_shadow_primitive{};
 
 PrimitiveRegistry make_builtin_registry() {
     const EnginePrimitive* const first_party[] = {
         &bulge_primitive,       &dithered_bulge_primitive, &pill_plate_primitive, &gold_plate_primitive,
         &inset_well_primitive,  &etched_divider_primitive, &seam_primitive,       &grip_primitive,
-        &material_primitive,
+        &material_primitive,    &overlay_shadow_primitive,
     };
     PrimitiveRegistry registry{};
     for (const EnginePrimitive* const primitive : first_party) {
@@ -245,6 +247,10 @@ bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
 
 std::optional<ControlVisualRole> EnginePrimitive::theme_material(const PrimitiveParameterBlock&) const noexcept {
     return std::nullopt;
+}
+
+bool EnginePrimitive::lends_overlay_shadow() const noexcept {
+    return false;
 }
 
 bool EnginePrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveTarget&) const noexcept {

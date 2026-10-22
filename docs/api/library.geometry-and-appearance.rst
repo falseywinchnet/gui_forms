@@ -982,6 +982,10 @@ Types
 
       The recipe role (ControlVisualRole) whose theme material the primitive draws with ``parameters`` (E8-1): the engine then resolves the role's recipe for the part's state and lends its material in the target. None unless the primitive says otherwise. ``parameters`` match the declarations.
 
+   .. cpp:function:: virtual bool lends_overlay_shadow() const noexcept
+
+      Whether the primitive draws the theme's overlay shadow (E9, GIVEN E1-1): the engine then lends the theme's overlay shadow layers for the part's presentation as a material of one transparent fill and those shadows, at the part's corner radius, and draws nothing when the theme casts none. False unless the primitive says otherwise.
+
    .. cpp:function:: virtual bool accepts(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target) const noexcept
 
       Whether the primitive will draw this target with ``parameters``, such as a material whose bake would exceed its bound. A primitive that refuses is drawn by the built-in recipe instead, and the engine counts the refusal. True unless the primitive says otherwise. Called only with a target in range and parameters that match the declarations.

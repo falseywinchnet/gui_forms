@@ -199,6 +199,16 @@
         "parameters": [
           {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false}
         ]
+      },
+      {
+        "name": "overlay_shadow",
+        "introduced": "0.2",
+        "roles": ["shadow"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [32, 32, 32, 32],
+        "parameters": []
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
