@@ -14,6 +14,8 @@ Types
    :class: autosummary longtable
    :widths: 35 65
 
+   * - :cpp:class:`AmbientEffect <gui_forms::AmbientEffect>`
+     - An ambient effect (E7): its part repaints as time passes, at most ``frames_per_second``, and reads time_in_state within one ``period`` (it wraps), so that the effect cycles.
    * - :cpp:class:`BasicControlStyle <gui_forms::BasicControlStyle>`
      - BasicControlStyle retains the compact compatibility palette used by callers that do not select full role recipes.
    * - :cpp:class:`CachedPartRaster <gui_forms::CachedPartRaster>`
@@ -22,6 +24,10 @@ Types
      - gui_forms::Color is an explicit unpremultiplied RGBA value with opaque alpha default.
    * - :cpp:class:`CompiledThemeRules <gui_forms::CompiledThemeRules>`
      - A sheet compiled against a registry: the rules that survived, each declaration checked, in the order the cascade visits them.
+   * - :cpp:class:`CompiledThemeRules::CompiledPresentationState <gui_forms::CompiledThemeRules::CompiledPresentationState>`
+     - One state of a compiled machine (see PresentationState).
+   * - :cpp:class:`CompiledThemeRules::CompiledTransition <gui_forms::CompiledThemeRules::CompiledTransition>`
+     - A checked transition: opacity, or the parameter at ``parameter``.
    * - :cpp:class:`CompiledThemeRules::PartFacts <gui_forms::CompiledThemeRules::PartFacts>`
      - What a part is: the facts its selectors are matched against.
    * - :cpp:class:`CompiledThemeRules::Resolution <gui_forms::CompiledThemeRules::Resolution>`
@@ -50,6 +56,8 @@ Types
      - A raster's size in device pixels.
    * - :cpp:class:`DeviceScale <gui_forms::DeviceScale>`
      - Device pixels per logical unit.
+   * - :cpp:class:`EngineExpression <gui_forms::EngineExpression>`
+     - A compiled program: immutable, a fixed-size value with no allocation, so it can be copied into a rule table and evaluated from any number of parts on the UI thread.
    * - :cpp:class:`EnginePartRecord <gui_forms::EnginePartRecord>`
      - One painted part's record.
    * - :cpp:class:`EnginePartTable <gui_forms::EnginePartTable>`
@@ -60,6 +68,22 @@ Types
      - The sine and cosine of ``x`` radians, computed together (E3's springs).
    * - :cpp:class:`EngineVersion <gui_forms::EngineVersion>`
      - The engine version a primitive was introduced in, and the version a theme declares it needs.
+   * - :cpp:class:`ExpressionCompilation <gui_forms::ExpressionCompilation>`
+     - A compilation's outcome: the program when ``defect`` is none, otherwise the defect and the position of the instruction it concerns (0 for a defect of the whole program).
+   * - :cpp:class:`ExpressionDependencies <gui_forms::ExpressionDependencies>`
+     - What a program reads, found when it is compiled: bit i of ``inputs`` for the input at position i, bit i of ``parameters`` for the parameter at position i, and the standard states in ``states``.
+   * - :cpp:class:`ExpressionEnvironment <gui_forms::ExpressionEnvironment>`
+     - What one evaluation reads.
+   * - :cpp:class:`ExpressionInputIndex <gui_forms::ExpressionInputIndex>`
+     - The position of an input in the inputs an expression is evaluated with.
+   * - :cpp:class:`ExpressionInstruction <gui_forms::ExpressionInstruction>`
+     - One instruction.
+   * - :cpp:class:`ExpressionLimits <gui_forms::ExpressionLimits>`
+     - How many inputs and parameters the program may address: an index at or beyond either count is refused when the program is compiled.
+   * - :cpp:class:`ExpressionParameterIndex <gui_forms::ExpressionParameterIndex>`
+     - The position of a number parameter among a primitive's declared parameters (PrimitiveDescriptor::parameters).
+   * - :cpp:class:`ExpressionResult <gui_forms::ExpressionResult>`
+     -  
    * - :cpp:class:`FontSpec <gui_forms::FontSpec>`
      - FontSpec carries logical role, size, weight, italic, and bounded letter-spacing inputs shared by measurement and painting.
    * - :cpp:class:`GradientStop <gui_forms::GradientStop>`
@@ -92,10 +116,16 @@ Types
      - One value.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
+   * - :cpp:class:`PaintGroup <gui_forms::PaintGroup>`
+     - A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
+   * - :cpp:class:`PartHitRegion <gui_forms::PartHitRegion>`
+     - A part's hit region (T1's hand-off): its shape in its bounds, never less than the minimum target.
    * - :cpp:class:`PartKey <gui_forms::PartKey>`
      - A painted part's identity from frame to frame (T2 GIVEN H3-1), which lets the engine keep a record for it: its states and when it entered them, its transitions, its preparation and its cached raster.
+   * - :cpp:class:`PartMotion <gui_forms::PartMotion>`
+     - A part's running transitions (E7; T2 plan, "How motion is driven").
    * - :cpp:class:`PartPaint <gui_forms::PartPaint>`
      - One part to paint, in the control's local coordinates.
    * - :cpp:class:`PartRaster <gui_forms::PartRaster>`
@@ -110,8 +140,14 @@ Types
      - What acquire() did.
    * - :cpp:class:`PartRecordHandle <gui_forms::PartRecordHandle>`
      - Which record a handle names: a slot of the table and the slot's generation when the record was made.
+   * - :cpp:class:`PartShape <gui_forms::PartShape>`
+     -  
+   * - :cpp:class:`PartTransitionChannel <gui_forms::PartTransitionChannel>`
+     - One property's transition on a part (E7): opacity or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
    * - :cpp:class:`Point <gui_forms::Point>`
      - Point is a renderer-neutral logical-coordinate pair.
+   * - :cpp:class:`PresentationState <gui_forms::PresentationState>`
+     - One state of a part's presentational state machine (E7; design language §9.6).
    * - :cpp:class:`PrimitiveCost <gui_forms::PrimitiveCost>`
      - A declared upper bound on a primitive's work.
    * - :cpp:class:`PrimitiveDescriptor <gui_forms::PrimitiveDescriptor>`
@@ -127,7 +163,9 @@ Types
    * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
      - A fixed table of primitives, in registration order.
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
-     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states.
+     - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot).
+   * - :cpp:class:`PropertyTransition <gui_forms::PropertyTransition>`
+     - A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation.
    * - :cpp:class:`RasterCacheStatistics <gui_forms::RasterCacheStatistics>`
      - The raster cache's counters, for instrumentation.
    * - :cpp:class:`Rect <gui_forms::Rect>`
@@ -163,13 +201,27 @@ Types
    * - :cpp:class:`ThemeRule <gui_forms::ThemeRule>`
      - One rule.
    * - :cpp:class:`ThemeRuleSheet <gui_forms::ThemeRuleSheet>`
-     - A theme's rules, as authored, with the engine version the theme declares it needs.
+     - A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value).
    * - :cpp:class:`ThemeSpacingTokens <gui_forms::ThemeSpacingTokens>`
      - ThemeSpacingTokens names the shared micro-through-section logical spacing scale.
    * - :cpp:class:`ThemeStructureTokens <gui_forms::ThemeStructureTokens>`
      - ThemeStructureTokens groups spacing, geometry, typography, and motion vocabularies into one coherent structural contract.
    * - :cpp:class:`ThemeTypographyTokens <gui_forms::ThemeTypographyTokens>`
      - ThemeTypographyTokens defines role-aware control, field, caption, heading, title, and monospace font recipes.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: AmbientEffect final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   An ambient effect (E7): its part repaints as time passes, at most ``frames_per_second``, and reads time_in_state within one ``period`` (it wraps), so that the effect cycles. Its region is the part's extent. It runs only while a primitive draws the part and the part has a record, and stops in an occluded or minimized window, under reduced motion and while the application's motion switch is off (PresentationSettings::ambient_motion); the part then rests at ``pose``, the time within the period it shows when still, such as an activity object's static pose.
+
+   .. cpp:member:: FrameInterval period
+
+   .. cpp:member:: double frames_per_second
+
+   .. cpp:member:: FrameInterval pose
 
 .. cpp:namespace:: gui_forms
 
@@ -290,11 +342,23 @@ Types
 
    .. rubric:: Properties
 
+   .. cpp:function:: std::size_t built_in_rule_count() const noexcept
+
+      How many of the rules are the engine's built-in rules.
+
    .. cpp:function:: bool empty() const noexcept
 
    .. cpp:function:: std::size_t rule_count() const noexcept
 
    .. cpp:function:: const std::vector<RuleDiagnostic>& diagnostics() const noexcept
+
+   .. cpp:function:: const std::vector<std::string>& published_values() const noexcept
+
+      The published values the sheet's expressions read, in position order (an invalid name is kept empty, so later positions stay).
+
+   .. cpp:function:: std::size_t input_count() const noexcept
+
+      How many inputs the sheet's expressions are evaluated with: the engine inputs and the sheet's published values.
 
 
    .. rubric:: Methods
@@ -303,9 +367,47 @@ Types
 
       Compiles ``sheet`` against ``registry``, which must outlive the result.
 
+   .. cpp:function:: static CompiledThemeRules compile_with_built_in(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry)
+
+      Compiles the engine's built-in rules (built_in_theme_rules, at CascadeLevel::built_in, below every authored rule) and then ``sheet``. The theme engine's rules are made this way. Diagnostics name the sheet's rules by their positions in ``sheet``.
+
+   .. cpp:function:: std::optional<ExpressionInputIndex> published_value_input(std::string_view name) const noexcept
+
+      The position of the published value ``name``, or none when the sheet does not read it.
+
    .. cpp:function:: Resolution resolve(const PartFacts& facts) const noexcept
 
       The cascade for one part: the winning primitive declaration, then each of that primitive's parameters from the winning declaration of it among the matching rules that select the same primitive, else its declared default. Linear in the number of rules; tables are small, and a theme with no rules returns at once.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::CompiledPresentationState final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One state of a compiled machine (see PresentationState).
+
+   .. cpp:member:: AnatomyStateSet when
+
+   .. cpp:member:: double target
+
+   .. cpp:member:: std::optional<double> enter_from
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: CompiledThemeRules::CompiledTransition final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A checked transition: opacity, or the parameter at ``parameter``.
+
+   .. cpp:member:: bool opacity
+
+   .. cpp:member:: std::size_t parameter
+
+   .. cpp:member:: std::vector<CompiledPresentationState> states
+
+   .. cpp:member:: MotionCurve curve
 
 .. cpp:namespace:: gui_forms
 
@@ -348,6 +450,24 @@ Types
    .. cpp:member:: CascadeLevel level
 
       The level of the declaration that chose the primitive (or built_in); built_in when no rule did. Default: ``{CascadeLevel::built_in}``.
+
+   .. cpp:member:: std::array<const EngineExpression*, maximum_primitive_parameters> expressions
+
+      The expression whose value a parameter takes, by the parameter's position, where the winning declaration of the parameter is one; null elsewhere. The expressions belong to the compiled rules.
+
+   .. cpp:member:: std::uint64_t inputs_read
+
+      The inputs the part reads (E6): the primitive's declared inputs and every input its expressions read, as expression input bits.
+
+   .. cpp:member:: std::array<const CompiledTransition*, maximum_part_transitions> transitions
+
+      The part's transitions (E7): its opacity's, whatever draws it, and its primitive's parameters', when a primitive does. They belong to the compiled rules. ``transition_count`` are live.
+
+   .. cpp:member:: std::size_t transition_count
+
+   .. cpp:member:: const AmbientEffect* ambient
+
+      The part's ambient effect, or null; it belongs to the rules.
 
 .. cpp:namespace:: gui_forms
 
@@ -604,6 +724,45 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:class:: EngineExpression final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   A compiled program: immutable, a fixed-size value with no allocation, so it can be copied into a rule table and evaluated from any number of parts on the UI thread.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: EngineExpression() noexcept
+
+      The program ``1`` with fallback 0, which reads nothing.
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: std::span<const ExpressionInstruction> instructions() const noexcept
+
+   .. cpp:function:: std::size_t operation_count() const noexcept
+
+   .. cpp:function:: double fallback() const noexcept
+
+   .. cpp:function:: const ExpressionDependencies& dependencies() const noexcept
+
+   .. cpp:function:: const ExpressionLimits& limits() const noexcept
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: ExpressionCompilation compile(std::span<const ExpressionInstruction> program, double fallback, ExpressionLimits limits) noexcept
+
+      Checks ``program`` against :cpp:func:`limits <gui_forms::EngineExpression::limits>` and the budget, then replaces this expression with it. Anything but ``none`` leaves the expression unchanged. :cpp:func:`fallback <gui_forms::EngineExpression::fallback>` is the value an evaluation gives on a division by zero or a value that is not finite.
+
+   .. cpp:function:: ExpressionResult evaluate(const ExpressionEnvironment& environment) const noexcept
+
+      Evaluates the program. Its cost is one operation per instruction (operation_count). Never fails: a defect of the inputs gives the fallback, with the reason.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: EnginePartRecord final
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
@@ -635,6 +794,28 @@ Types
    .. cpp:member:: bool motion_unsettled
 
       True while a transition or motion value of the part has not settled (E3, E7): such a record is never evicted. Nothing sets it before E3.
+
+   .. cpp:member:: std::uint64_t inputs_read
+
+      What the part's last paint read, and where it was drawn (E6). An input change damages exactly this extent of this control. - ``inputs_read``: the inputs its primitive and its expressions read, as expression input bits (expression_input_bit); zero for a part the built-in recipe draws. Set only through EnginePartTable::note_paint, which keeps the table's reader counts. - ``painted_by``: the stable ID of the control whose display chunk recorded the part. It is the control painting the part, or one that paints on its behalf, such as a docking site's drag layer. - ``extent``: the part's bounds and its primitive's outsets, in that control's local coordinates.
+
+   .. cpp:member:: std::string painted_by
+
+   .. cpp:member:: Rect extent
+
+   .. cpp:member:: FrameTime state_entered
+
+      When the part entered the states it was last painted in, on the window's motion clock; time_in_state counts from it.
+
+   .. cpp:member:: std::unique_ptr<PartMotion> motion
+
+      The part's transitions (E7), made the first time it is painted with one; null for a part without any.
+
+   .. cpp:member:: bool ambient
+
+      Whether the part's last paint had an ambient effect, and whether that effect was refused for its area (E7). An ambient part repaints when ambient motion resumes; a refusal is counted once, when it begins.
+
+   .. cpp:member:: bool ambient_refused
 
    .. cpp:member:: std::unique_ptr<CachedPartRaster> cached
 
@@ -707,6 +888,18 @@ Types
 
       Makes every cached raster stale, as when the theme changes.
 
+   .. cpp:function:: void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent)
+
+      Records what a part's paint read and where it was drawn (E6; see EnginePartRecord::inputs_read). A stale handle does nothing. If the control's ID cannot be copied, std::bad_alloc propagates and the record is unchanged.
+
+   .. cpp:function:: bool reads_any(std::uint64_t inputs) const noexcept
+
+      Whether any live record reads any input of ``inputs``, from the table's reader counts, without a scan.
+
+   .. cpp:function:: const EnginePartRecord* record_in_slot(std::size_t slot) const noexcept
+
+      The live record in ``slot`` (below slot_count()), or null for a free slot: for scans over the table. Valid until the next acquire() or release.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:class:: EnginePrimitive
@@ -731,6 +924,14 @@ Types
 
    .. cpp:function:: virtual const PrimitiveDescriptor& descriptor() const noexcept = 0
 
+   .. cpp:function:: virtual bool blank(const PrimitiveParameterBlock& parameters) const noexcept
+
+      Whether the primitive draws nothing at all with ``parameters``, such as a bulge at amplitude 0 (the flat plane): the engine then composites nothing and keeps no raster for the part (E7). False unless the primitive says otherwise. ``parameters`` match the declarations.
+
+   .. cpp:function:: virtual PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept
+
+      The shape the primitive draws with ``parameters``, its radius in logical units (E8): what the part's hit region derives from (design language §7.4 rule 1). A rectangle filling the box unless the primitive says otherwise. ``parameters`` match the declarations.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: EngineSineCosine final
@@ -754,6 +955,130 @@ Types
    .. cpp:member:: std::uint16_t major
 
    .. cpp:member:: std::uint16_t minor
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionCompilation final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   A compilation's outcome: the program when ``defect`` is none, otherwise the defect and the position of the instruction it concerns (0 for a defect of the whole program).
+
+   .. cpp:member:: ExpressionDefect defect
+
+      Default: ``{ExpressionDefect::none}``.
+
+   .. cpp:member:: std::size_t instruction
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionDependencies final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   What a program reads, found when it is compiled: bit i of ``inputs`` for the input at position i, bit i of ``parameters`` for the parameter at position i, and the standard states in ``states``.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: constexpr bool reads_input(ExpressionInputIndex input) const noexcept
+
+   .. cpp:function:: constexpr bool reads_parameter(ExpressionParameterIndex parameter) const noexcept
+
+   .. cpp:member:: std::uint64_t inputs
+
+   .. cpp:member:: std::uint32_t parameters
+
+   .. cpp:member:: AnatomyStateSet states
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionEnvironment final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   What one evaluation reads. Every view is borrowed for the call. ``inputs`` and ``parameters`` must hold at least the program's limits.
+
+   .. cpp:member:: std::span<const double> inputs
+
+   .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: std::span<const double> parameters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionInputIndex final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   The position of an input in the inputs an expression is evaluated with. Distinct from a parameter's position and from a state.
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionInstruction final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   One instruction. Make it with the named factories, which keep the operation and its operand together: ``index`` is read by input, state and parameter, ``constant`` by constant.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: static constexpr ExpressionInstruction number(double value) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction input(ExpressionInputIndex input) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction state(AnatomyState state) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction parameter(ExpressionParameterIndex parameter) noexcept
+
+   .. cpp:function:: static constexpr ExpressionInstruction apply(ExpressionOperation operation) noexcept
+
+      An operation that takes its operands from the stack.
+
+   .. cpp:member:: ExpressionOperation operation
+
+      Default: ``{ExpressionOperation::constant}``.
+
+   .. cpp:member:: std::uint8_t index
+
+   .. cpp:member:: double constant
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionLimits final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   How many inputs and parameters the program may address: an index at or beyond either count is refused when the program is compiled. Each is at most its maximum_expression_* bound.
+
+   .. cpp:member:: std::size_t inputs
+
+   .. cpp:member:: std::size_t parameters
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionParameterIndex final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   The position of a number parameter among a primitive's declared parameters (PrimitiveDescriptor::parameters).
+
+   .. cpp:member:: std::uint8_t value
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: ExpressionResult final
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:member:: double value
+
+   .. cpp:member:: ExpressionFallback fallback
+
+      Default: ``{ExpressionFallback::none}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1024,7 +1349,7 @@ Types
 
    ``#include <gui_forms/engine/motion_clock/motion_clock.hpp>``
 
-   One window's motion clock (T2 plan, MotionClock; GIVEN D1-1). The window owns it; it observes the window. It holds at most one frame request, armed only while some value it holds has not settled, however many values move; the request is disconnected once the last one settles, so a window at rest schedules no frames. Execution: every member runs on the window's UI thread. Frames, settling and the listeners' damage all happen inside the window's frame poll. Event order on a frame: each value enlisted before the frame starts is advanced to the frame's time, in the order of its record's slot (the same for the same sequence of starts and releases); a value that settles is released before its listener runs; then the owner is invalidated as the value declared, then its listener runs. Values started by a listener are first advanced on the next frame. A listener that throws is counted as a frame callback fault; its value jumps to its end. Ending motion (all by name): - finish_all: reduced motion turned on (GIVEN D2-1) or the window occluded or minimized (GIVEN D4-1). Every value jumps to its end and its listener runs once, with the cause. While either holds, a new move jumps to its end at once and nothing is scheduled. - release_owner: a control left the window. Its values jump to their ends without listeners. - cancel: the window closes (or cancels its frame requests). Every value jumps to its end without listeners, and the request is disconnected. A record is named by its handle; a stale handle (its record released) is rejected, so a value whose owner has gone is never advanced.
+   One window's motion clock (T2 plan, MotionClock; GIVEN D1-1). The window owns it; it observes the window. It holds at most one frame request, armed only while some value it holds has not settled, however many values move; the request is disconnected once the last one settles, so a window at rest schedules no frames. Execution: every member runs on the window's UI thread. Frames, settling and the listeners' damage all happen inside the window's frame poll. Event order on a frame: each value enlisted before the frame starts is advanced to the frame's time, in the order of its record's slot (the same for the same sequence of starts and releases); a value that settles is released before its listener runs; then the owner is invalidated as the value declared, then its listener runs. Values started by a listener are first advanced on the next frame. A listener that throws is counted as a frame callback fault; its value jumps to its end. Ending motion (all by name): - finish_all: reduced motion turned on (GIVEN D2-1) or the window occluded or minimized (GIVEN D4-1). Every value jumps to its end and its listener runs once, with the cause. While either holds, a new move jumps to its end at once and nothing is scheduled. - release_owner: a control left the window. Its values jump to their ends without listeners. - cancel: the window closes (or cancels its frame requests). Every value jumps to its end without listeners, and the request is disconnected. A record is named by its handle; a stale handle (its record released) is rejected, so a value whose owner has gone is never advanced. Ambient effects (T2 plan, phase E7; design language §9.4) share the same request. The engine enlists a part with an ambient effect while it draws it; on each frame at least the effect's frame interval after its last, the part's extent repaints. An effect whose part was not repainted since its last frame (the part is no longer shown) is dropped, so an effect can never keep a window painting by itself. finish_all and cancel drop every effect too; finish_all repaints each part once, at its static pose.
 
 
    .. rubric:: Construction
@@ -1049,6 +1374,14 @@ Types
    .. cpp:function:: bool suppressed() const noexcept
 
       Whether a move would jump to its end at once: reduced motion, or an occluded or minimized window.
+
+   .. cpp:function:: bool ambient_suppressed() const noexcept
+
+      Whether ambient effects are stopped: as suppressed(), or the application's motion switch off (PresentationSettings::ambient_motion).
+
+   .. cpp:function:: std::size_t ambient_count() const noexcept
+
+      Ambient effects running on the clock now.
 
 
    .. rubric:: Methods
@@ -1227,6 +1560,12 @@ Types
 
    .. rubric:: Extension points
 
+   .. cpp:function:: virtual void begin_group(const PaintGroup& group)
+
+      Paint groups (see PaintGroup). begin_group and end_group pair like save and restore and nest like them, up to maximum_paint_group_depth: the state in force at end_group (transform, clips, saves) must be the one at its begin_group. Within a retained display chunk every group ends in the chunk that begins it; the recorder refuses a chunk left unbalanced. The recording, Skia and Windows DIB painters isolate; each keeps one reusable scratch image per nesting level, grown to the largest clipped bounds it has met and released with the painter. The base implementation is a minimal painter's fallback without isolation: save() and clip_rect(bounds), then restore().
+
+   .. cpp:function:: virtual void end_group()
+
    .. cpp:function:: virtual std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
 
       Native renderers preserve their fonts and drawing semantics offscreen. Recording/headless painters explicitly report this facility unavailable.
@@ -1313,6 +1652,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PaintGroup final
+
+   ``#include <gui_forms/types/painter/painter.hpp>``
+
+   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: double opacity
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: PaintGroupComposite composite
+
+      Default: ``{PaintGroupComposite::source_over}``.
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: ParameterValidation final
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -1324,6 +1681,18 @@ Types
       Default: ``{ParameterDefect::none}``.
 
    .. cpp:member:: std::size_t parameter
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartHitRegion final
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   A part's hit region (T1's hand-off): its shape in its bounds, never less than the minimum target. A point hits when it lies in the bounds and either inside the shape or inside the minimum target centred in the bounds (clipped to them), so a hit region may exceed what is drawn but never falls below the minimum.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: PartShape shape
 
 .. cpp:namespace:: gui_forms
 
@@ -1345,6 +1714,35 @@ Types
    .. cpp:member:: std::string_view item
 
    .. cpp:member:: std::optional<std::size_t> item_index
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:class:: PartMotion final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   A part's running transitions (E7; T2 plan, "How motion is driven"). The part's record owns it through a pointer, so that its motion values, which never move, keep their addresses however the table's storage grows. Each value is owned by the part's control (MotionValue's owner), runs on the window's MotionClock, and reports each step to on_step, which repaints the part's extent on the control that recorded it. The record is released with its control, which releases the values from the clock.
+
+
+   .. rubric:: Construction
+
+   .. cpp:function:: PartMotion(Window& window, PartRecordHandle record) noexcept
+
+
+   .. rubric:: Properties
+
+   .. cpp:function:: bool moving() const noexcept
+
+      Whether any of the part's values has not settled.
+
+
+   .. rubric:: Methods
+
+   .. cpp:function:: void on_step(const MotionStep& step)
+
+      A value's step, from the clock: the part's extent repaints.
+
+   .. cpp:member:: std::array<PartTransitionChannel, maximum_part_transitions> channels
 
 .. cpp:namespace:: gui_forms
 
@@ -1508,6 +1906,36 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PartShape final
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   .. cpp:member:: PartShapeKind kind
+
+      Default: ``{PartShapeKind::rounded_rectangle}``.
+
+   .. cpp:member:: double corner_radius
+
+      The corner radius of a rounded rectangle, in logical units.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PartTransitionChannel final
+
+   ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
+
+   One property's transition on a part (E7): opacity or the parameter at ``parameter``, the state of its machine the part was last painted in (none when the part's states matched none), and the property's motion value, made the first time the part is painted with the transition.
+
+   .. cpp:member:: bool opacity
+
+   .. cpp:member:: std::size_t parameter
+
+   .. cpp:member:: std::optional<std::size_t> state
+
+   .. cpp:member:: std::optional<MotionValue> value
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: Point
 
    ``#include <gui_forms/types/geometry/geometry.hpp>``
@@ -1517,6 +1945,20 @@ Types
    .. cpp:member:: double x
 
    .. cpp:member:: double y
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PresentationState final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   One state of a part's presentational state machine (E7; design language §9.6). The machine is in the first of its states whose ``when`` states the part's published states all include (an empty ``when`` always matches), and moves its property to ``target``. A part whose states match none rests at the property's own value: its cascade value, or 1 for opacity. When the machine enters this state from another, or the part first appears in it, ``enter_from``, if set, stands the property at that value first; this is how a part fades in when it appears (the docking tiles, T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a transition retargets and never restarts. The machine is presentational only: it reads the published states and writes nothing back, so it can neither create an observable state nor delay behaviour.
+
+   .. cpp:member:: std::vector<AnatomyState> when
+
+   .. cpp:member:: double target
+
+   .. cpp:member:: std::optional<double> enter_from
 
 .. cpp:namespace:: gui_forms
 
@@ -1568,6 +2010,10 @@ Types
 
       How many values the primitive's preparation derives, at most maximum_prepared_values; zero for a primitive that derives none.
 
+   .. cpp:member:: std::span<const EngineInput> inputs_read
+
+      The engine inputs the primitive's output depends on (E6), read from PrimitiveTarget::inputs. A change to any other input never repaints it. Like animated parameters, inputs are never read by the preparation.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PrimitiveParameterBlock final
@@ -1586,7 +2032,7 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for. An ``animated`` parameter is one a transition drives from frame to frame, such as the bulge's amplitude during the ribbon's rise. A primitive's preparation never reads it, so changing it never makes a preparation stale (see PrimitivePreparation).
+   One declared parameter. A number must lie in [minimum, maximum]. A colour's alpha scales whatever the primitive uses the colour for. A choice is one of ``choices`` (snake_case, each once), by position; ``default_number`` is the default choice's position. An ``animated`` parameter is one a transition drives from frame to frame, such as the bulge's amplitude during the ribbon's rise. A primitive's preparation never reads it, so changing it never makes a preparation stale (see PrimitivePreparation).
 
    .. cpp:member:: std::string_view name
 
@@ -1603,6 +2049,8 @@ Types
    .. cpp:member:: Color default_colour
 
    .. cpp:member:: bool animated
+
+   .. cpp:member:: std::span<const std::string_view> choices
 
 .. cpp:namespace:: gui_forms
 
@@ -1680,13 +2128,29 @@ Types
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
 
-   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, and its published states. The destination's extent is the caller's choice, normally the logical size times the scale, rounded up.
+   The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot). The destination's extent is the caller's choice, normally the logical size times the scale, rounded up.
 
    .. cpp:member:: Size logical_size
 
    .. cpp:member:: DeviceScale scale
 
    .. cpp:member:: AnatomyStateSet states
+
+   .. cpp:member:: std::array<double, engine_input_count> inputs
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PropertyTransition final
+
+   ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
+
+   A transition on one resolved property: ``opacity``, or a number parameter of the rule's primitive that the primitive declares animated (such as the bulge's amplitude), so that its frames never remake the part's preparation. It runs on the window's MotionClock with ``curve``; every duration is clamped to the 400 ms ceiling. Under reduced motion and in an occluded or minimized window it jumps to its end (GIVEN D2-1, D4-1).
+
+   .. cpp:member:: std::string property
+
+   .. cpp:member:: std::vector<PresentationState> states
+
+   .. cpp:member:: MotionCurve curve
 
 .. cpp:namespace:: gui_forms
 
@@ -1782,7 +2246,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too.
+   One declaration: a property and its value. Every property but :cpp:func:`primitive <gui_forms::RuleDeclaration::primitive>` is a parameter of the primitive the same rule selects, so a rule that sets parameters names its primitive too. An expression's program reads inputs by position (engine_input_position, published_value_position), states, and the primitive's number parameters by their declaration position. A parameter it reads has the value the cascade gives it before any expression, so expressions never read one another. ``number`` is the expression's fallback. Its value is clamped to the parameter's range.
 
 
    .. rubric:: Methods
@@ -1792,6 +2256,12 @@ Types
    .. cpp:function:: static RuleDeclaration number_value(std::string_view parameter, double value)
 
    .. cpp:function:: static RuleDeclaration colour_value(std::string_view parameter, Color value)
+
+   .. cpp:function:: static RuleDeclaration choice_value(std::string_view parameter, std::string_view choice)
+
+      A choice parameter's value by the choice's name, such as a shape.
+
+   .. cpp:function:: static RuleDeclaration expression_value(std::string_view parameter, std::span<const ExpressionInstruction> program, double fallback)
 
    .. cpp:member:: std::string property
 
@@ -1805,6 +2275,8 @@ Types
 
    .. cpp:member:: Color colour
 
+   .. cpp:member:: std::vector<ExpressionInstruction> program
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: RuleDiagnostic final
@@ -1817,13 +2289,17 @@ Types
 
    .. cpp:member:: std::size_t rule
 
-      The rule's position in the sheet and its label.
+      The rule's position in the sheet and its label (sheet_diagnostic and empty for the sheet).
 
    .. cpp:member:: std::string label
 
    .. cpp:member:: std::string property
 
       The declaration's property, empty for a whole-rule diagnostic.
+
+   .. cpp:member:: ExpressionDefect expression
+
+      For expression_invalid, why the expression does not compile. Default: ``{ExpressionDefect::none}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2006,14 +2482,14 @@ Types
 
    ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
 
-   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4) and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules draws every part with the built-in recipe, as before E4.
+   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4), below them the engine's own built-in rules (built_in_theme_rules, E7), and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable and MotionClock. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules of its own draws every part with the built-in recipe except those the built-in rules address: the ribbon's command faces and group buttons, which take the dithered bulge and its rise, and the docking tiles, which fade in. A keyed part's transitions run on its window's motion clock (E7): the part's states select each machine's state, the property moves toward it, and the part repaints within its extent as it moves. Its opacity multiplies a primitive's composite in the shared blend; a part the built-in recipe draws is drawn as one paint group (Painter::begin_group) composited once at that opacity. A part painted without a key stands at its machines' targets and its ambient effect's pose.
 
 
    .. rubric:: Construction
 
    .. cpp:function:: ThemeEngine()
 
-      An engine with no rules.
+      An engine with only the built-in rules.
 
    .. cpp:function:: explicit ThemeEngine(const ThemeRuleSheet& sheet)
 
@@ -2038,6 +2514,10 @@ Types
    .. cpp:function:: void paint(Painter& painter, const Control& control, const PartPaint& part) const
 
       Paints one part of ``control`` (see paint_part). A part with a key (PartPaint::key) and paintable bounds, painted by a control attached to a window, has its record in that window's part table made or updated first; a primitive then draws into the record's cached raster. A part without a key leaves no record; a primitive draws it into a raster of its own for this paint. If the primitive refuses the part, the built-in recipe draws it.
+
+   .. cpp:function:: PartHitRegion hit_region(const Control& control, const PartPaint& part) const noexcept
+
+      The hit region of one part of ``control`` (E8, T1's hand-off): the part's bounds and the shape its primitive draws there, as plan() decides it. A part the built-in recipe draws, for any reason, has a rectangle. Themes choose a primitive's shape; they never set a hit region (design language §7.4 rule 1). Test a point with part_hit.
 
 .. cpp:namespace:: gui_forms
 
@@ -2135,7 +2615,7 @@ Types
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's.
+   One rule. ``label`` names it in diagnostics (T3: its source position). ``requires_engine``, when set, is the engine version the rule needs, in place of its sheet's. Its transitions and its ambient effect cascade as declarations do: for each property, the transition of the last matching rule that declares one (for a parameter, among the rules selecting the part's primitive), and the ambient effect of the last matching rule that declares one.
 
    .. cpp:member:: std::string label
 
@@ -2149,19 +2629,25 @@ Types
 
    .. cpp:member:: std::optional<EngineVersion> requires_engine
 
+   .. cpp:member:: std::vector<PropertyTransition> transitions
+
+   .. cpp:member:: std::optional<AmbientEffect> ambient
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: ThemeRuleSheet final
 
    ``#include <gui_forms/engine/theme_rules/theme_rules.hpp>``
 
-   A theme's rules, as authored, with the engine version the theme declares it needs.
+   A theme's rules, as authored, with the engine version the theme declares it needs and the values an application publishes that its expressions read (E6; Window::publish_value). The name at position n of the list is read at published_value_position(n). Each is 1 to 64 characters of lowercase ASCII letters, digits, '-' and '_', the first a letter, and is listed once; at most maximum_published_values.
 
    .. cpp:member:: EngineVersion requires_engine
 
       Default: ``{current_engine_version}``.
 
    .. cpp:member:: std::vector<ThemeRule> rules
+
+   .. cpp:member:: std::vector<std::string> published_values
 
 .. cpp:namespace:: gui_forms
 
@@ -2418,6 +2904,102 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: ExpressionDefect
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: empty_program
+
+   .. cpp:enumerator:: over_budget
+
+   .. cpp:enumerator:: unknown_operation
+
+   .. cpp:enumerator:: constant_not_finite
+
+   .. cpp:enumerator:: fallback_not_finite
+
+   .. cpp:enumerator:: limits_out_of_range
+
+   .. cpp:enumerator:: input_out_of_range
+
+   .. cpp:enumerator:: state_out_of_range
+
+   .. cpp:enumerator:: parameter_out_of_range
+
+   .. cpp:enumerator:: missing_operand
+
+   .. cpp:enumerator:: stack_too_deep
+
+   .. cpp:enumerator:: unbalanced
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ExpressionFallback
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: none
+
+   .. cpp:enumerator:: division_by_zero
+
+   .. cpp:enumerator:: not_finite
+
+   .. cpp:enumerator:: environment_too_short
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: ExpressionOperation
+
+   ``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+   .. cpp:enumerator:: constant
+
+   .. cpp:enumerator:: input
+
+   .. cpp:enumerator:: state
+
+   .. cpp:enumerator:: parameter
+
+   .. cpp:enumerator:: negate
+
+   .. cpp:enumerator:: add
+
+   .. cpp:enumerator:: subtract
+
+   .. cpp:enumerator:: multiply
+
+   .. cpp:enumerator:: divide
+
+   .. cpp:enumerator:: minimum
+
+   .. cpp:enumerator:: maximum
+
+   .. cpp:enumerator:: less
+
+   .. cpp:enumerator:: less_equal
+
+   .. cpp:enumerator:: greater
+
+   .. cpp:enumerator:: greater_equal
+
+   .. cpp:enumerator:: equal
+
+   .. cpp:enumerator:: not_equal
+
+   .. cpp:enumerator:: clamp
+
+   .. cpp:enumerator:: mix
+
+   .. cpp:enumerator:: smoothstep
+
+   .. cpp:enumerator:: choose
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: FontRole
 
    ``#include <gui_forms/types/paint_types/paint_types.hpp>``
@@ -2578,6 +3160,14 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PaintGroupComposite
+
+   ``#include <gui_forms/types/painter/painter.hpp>``
+
+   .. cpp:enumerator:: source_over
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: ParameterAssignment
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -2674,6 +3264,24 @@ Enumerations
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:enum-class:: PartShapeKind
+
+   ``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+   .. cpp:enumerator:: rounded_rectangle
+
+   .. cpp:enumerator:: pill
+
+   .. cpp:enumerator:: circle
+
+   .. cpp:enumerator:: cap_start
+
+   .. cpp:enumerator:: cap_end
+
+   .. cpp:enumerator:: count
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:enum-class:: PartTextAlignment
 
    ``#include <gui_forms/theme/part_painting/part_painting.hpp>``
@@ -2705,6 +3313,8 @@ Enumerations
    .. cpp:enumerator:: number
 
    .. cpp:enumerator:: colour
+
+   .. cpp:enumerator:: choice
 
 .. cpp:namespace:: gui_forms
 
@@ -2774,6 +3384,10 @@ Enumerations
 
    .. cpp:enumerator:: too_many_prepared_values
 
+   .. cpp:enumerator:: input_out_of_range
+
+   .. cpp:enumerator:: choices_invalid
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: RuleDiagnosticKind
@@ -2810,7 +3424,23 @@ Enumerations
 
    .. cpp:enumerator:: duplicate_declaration
 
+   .. cpp:enumerator:: expression_invalid
+
+   .. cpp:enumerator:: expression_reads_colour
+
    .. cpp:enumerator:: rule_empty
+
+   .. cpp:enumerator:: transition_property_unknown
+
+   .. cpp:enumerator:: transition_property_not_animated
+
+   .. cpp:enumerator:: transition_invalid
+
+   .. cpp:enumerator:: ambient_over_frame_cap
+
+   .. cpp:enumerator:: ambient_invalid
+
+   .. cpp:enumerator:: published_value_invalid
 
 .. cpp:namespace:: gui_forms
 
@@ -2823,6 +3453,8 @@ Enumerations
    .. cpp:enumerator:: number
 
    .. cpp:enumerator:: colour
+
+   .. cpp:enumerator:: expression
 
 .. cpp:namespace:: gui_forms
 
@@ -2882,6 +3514,56 @@ Functions, constants and aliases
    Renderer-neutral material composition used by ButtonBase and available to custom controls which need the same explicit connected physical grammar.
 
 .. cpp:function:: Insets connected_surface_visual_outsets(const SurfaceMaterial& material, std::optional<ConnectedControlTopology> topology) noexcept
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/engine/engine_expression/engine_expression.hpp>``
+
+.. cpp:function:: constexpr ExpressionInputIndex engine_input_position(EngineInput input) noexcept
+
+.. cpp:function:: constexpr ExpressionInputIndex published_value_position(std::size_t value) noexcept
+
+   The position of the theme's published value at ``value`` in its list, counting from 0.
+
+.. cpp:function:: constexpr std::uint64_t expression_input_bit(ExpressionInputIndex input) noexcept
+
+   One input's bit in a set of inputs read (ExpressionDependencies::inputs).
+
+.. cpp:function:: const char* expression_operation_name(ExpressionOperation operation) noexcept
+
+   Registered (snake_case) name of an operation, for diagnostics and the schema.
+
+.. cpp:function:: std::size_t expression_operand_count(ExpressionOperation operation) noexcept
+
+   How many operands an operation pops.
+
+.. cpp:function:: const char* expression_defect_name(ExpressionDefect defect) noexcept
+
+.. cpp:function:: const char* expression_fallback_name(ExpressionFallback fallback) noexcept
+
+.. cpp:var:: constexpr std::size_t maximum_expression_operations
+
+   The most instructions a program may have: its fixed operation budget. Value: ``64``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_stack
+
+   The deepest the evaluation stack may grow. Value: ``16``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_inputs
+
+   The most inputs and parameters an expression can address, so that what it reads fits a 64-bit and a 32-bit set. Value: ``64``.
+
+.. cpp:var:: constexpr std::size_t maximum_expression_parameters
+
+   Value: ``32``.
+
+.. cpp:var:: constexpr std::size_t maximum_published_values
+
+   Where the engine puts its inputs (E6): first the engine inputs, in EngineInput order, then the values an application publishes that the theme names (ThemeRuleSheet::published_values), in the order the theme lists them. An input that is not published, such as the pointer of a part that is not hot, reads as NaN, so an expression reading it gives its fallback. Value: ``32``.
+
+.. cpp:var:: constexpr std::size_t expression_operation_count
+
+   Value: ``static_cast<std::size_t>(ExpressionOperation::count)``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2951,6 +3633,36 @@ Functions, constants and aliases
 
 .. cpp:namespace:: gui_forms
 
+``#include <gui_forms/engine/part_shape/part_shape.hpp>``
+
+.. cpp:function:: double shape_signed_distance(PartShape shape, Rect box, Point point) noexcept
+
+   The signed distance from ``point`` to the edge of ``shape`` drawn in ``box``, in the box's units: negative inside, positive outside.
+
+.. cpp:function:: bool shape_contains(PartShape shape, Rect box, Point point) noexcept
+
+   Whether ``point`` lies inside ``shape`` drawn in ``box``, all in the same units. The box's left and top edges are inside, its right and bottom edges outside.
+
+.. cpp:function:: double shape_coverage(PartShape shape, Rect box, double scale, std::int64_t x, std::int64_t y) noexcept
+
+   How much of the device pixel (x, y) ``shape`` covers when drawn in ``box`` (logical units) at ``scale`` device pixels per unit, from 0 to 1: one half minus the signed distance of the pixel's centre in device pixels, clamped. The same inputs give the same coverage on every host.
+
+.. cpp:function:: bool part_hit(const PartHitRegion& region, Point point) noexcept
+
+.. cpp:var:: constexpr std::size_t part_shape_kind_count
+
+   Value: ``static_cast<std::size_t>(PartShapeKind::count)``.
+
+.. cpp:var:: constexpr std::array<std::string_view, part_shape_kind_count> part_shape_names
+
+   The shapes' registered names, in PartShapeKind order: the choices of a primitive's ``shape`` parameter.
+
+.. cpp:var:: constexpr double minimum_hit_target
+
+   The pointer target minimum of dense chrome (design language §7.4, 20 × 20 logical units, proposed). Value: ``20.0``.
+
+.. cpp:namespace:: gui_forms
+
 ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
 .. cpp:var:: constexpr std::size_t maximum_item_part_records
@@ -2980,6 +3692,14 @@ Functions, constants and aliases
    Set one parameter of ``block`` by name. Anything but ``assigned`` leaves the block unchanged.
 
 .. cpp:function:: ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, Color value) noexcept
+
+.. cpp:function:: ParameterAssignment set_choice_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor, std::string_view name, std::string_view choice) noexcept
+
+   A choice by its name; an unknown choice is out_of_range.
+
+.. cpp:function:: std::optional<std::size_t> find_choice(const PrimitiveParameterDeclaration& declaration, std::string_view choice) noexcept
+
+   The position of ``choice`` among a choice parameter's choices, or none.
 
 .. cpp:function:: const char* registration_outcome_name(RegistrationOutcome outcome) noexcept
 
@@ -3013,6 +3733,10 @@ Functions, constants and aliases
 
 .. cpp:function:: std::string_view rule_diagnostic_name(RuleDiagnosticKind kind) noexcept
 
+.. cpp:function:: const ThemeRuleSheet& built_in_theme_rules()
+
+   The engine's built-in rules (E7), compiled below every theme's: the docking drop tiles' fade (T2 GIVEN C2-1) and the ribbon's dithered rise (D3-1, G4-1). Static storage, made once on first use.
+
 .. cpp:var:: constexpr std::string_view primitive_property
 
    The name of the declaration that selects a part's primitive. Its value is a registered primitive's name, or ``built_in`` for the built-in recipe. Value: ``"primitive"``.
@@ -3021,6 +3745,26 @@ Functions, constants and aliases
 
    Value: ``"built_in"``.
 
+.. cpp:var:: constexpr std::string_view opacity_property
+
+   The engine's presentational property (T2 GIVEN C1-1): one multiplier, from 0 to 1, on the part's whole composite. It is no vocabulary atom and no primitive parameter; only a transition sets it, and a part without one is opaque. Value: ``"opacity"``.
+
+.. cpp:var:: constexpr std::size_t maximum_presentation_states
+
+   The most states one presentational state machine has, and the most transitions one part runs. Value: ``8``.
+
+.. cpp:var:: constexpr std::size_t maximum_part_transitions
+
+   Value: ``4``.
+
+.. cpp:var:: constexpr double maximum_ambient_frames_per_second
+
+   The ambient budget (design language §9.4, the accepted starting tokens): at most 30 frames per second, over a region of at most 10 % of the window on everyday surfaces. A surface the application marks ceremonial (Control::set_ceremonial, GIVEN B3-1) lifts the area cap for the parts on it. Value: ``30.0``.
+
+.. cpp:var:: constexpr double maximum_ambient_window_fraction
+
+   Value: ``0.10``.
+
 .. cpp:var:: constexpr std::uint32_t maximum_operations_per_device_pixel
 
    Budgets (GIVEN F1-1): a part's primitive costs at most 512 declared operations per device pixel, and an animated part (one whose primitive has an animated parameter) at most 4 million per frame. A part beyond either keeps the built-in recipe; a primitive declaring no per-pixel cost cannot be bounded and is refused too. Value: ``512U``.
@@ -3028,6 +3772,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
 
    Value: ``4'000'000U``.
+
+.. cpp:var:: constexpr std::size_t sheet_diagnostic
+
+   The rule position of a diagnostic about the sheet itself rather than one of its rules. Value: ``static_cast<std::size_t>(-1)``.
 
 .. cpp:namespace:: gui_forms
 
@@ -3043,7 +3791,7 @@ Functions, constants and aliases
 
 .. cpp:var:: constexpr EngineVersion current_engine_version
 
-   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1. Value: ``{0, 1}``.
+   The version this build of the engine implements. E1 (the kernels, the registry and the bulge pair) is 0.1; E8 (the relief primitives, shapes and choice parameters) is 0.2. Value: ``{0, 2}``.
 
 .. cpp:var:: constexpr double minimum_device_scale
 
@@ -3160,3 +3908,11 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_gradient_stops
 
    Value: ``32U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/types/painter/painter.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_paint_group_depth
+
+   The deepest groups nest (T2, coordinator decision Q2/Q3). A group begun deeper is refused by name: it draws without isolation (as clip_rect(bounds) under a save), and the refusal is counted. Value: ``4``.

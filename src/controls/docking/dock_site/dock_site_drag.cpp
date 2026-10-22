@@ -846,18 +846,25 @@ void DockSite::paint_drag_layer(Painter& painter) {
     for (std::size_t index = 0; index < tiles; ++index) {
         const TileSlot tile = tile_at(index);
         // The quiet tiles' look (dark plates, the shape in blue, reduced
-        // strength and the fade) is the theme's (T2-4); today's button
-        // recipe draws the plate, lit while selected.
+        // strength) is the theme's (T2-4); the engine's built-in rules draw
+        // the pill plate, the gold plate while lit (E8). The fade is the
+        // engine's (T2 GIVEN
+        // C2-1): keyed by the tile's identity, a tile entering `expanding`
+        // fades in by the built-in rules.
+        const std::string identity = tile_identity(tile);
         part.family = ControlVisualRole::button;
         part.states = tile_states(tile);
         part.role = PartRole::actuator;
         part.bounds = tile.bounds;
+        part.key = PartKey{"tile", identity, {}};
         paint_part(painter, *this, part);
         part.role = PartRole::glyph;
         part.mark = PartMark::dock_shape;
         part.dock_region = region_of(tile.zone);
         part.bounds = tile_glyph_bounds(tile.bounds);
+        part.key = PartKey{"tile_glyph", identity, {}};
         paint_part(painter, *this, part);
+        part.key.reset();
         part.mark = PartMark::none;
     }
     const Rect cue = drop_cue_bounds();

@@ -2,6 +2,7 @@
 
 #include "gui_forms/schema/types/schema_types.hpp"
 #include "../primitives/bulge/bulge_primitives.hpp"
+#include "../primitives/relief/relief_primitives.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,6 +13,13 @@ namespace {
 
 bool number_in_range(const PrimitiveParameterDeclaration& declaration, double value) noexcept {
     const bool inside = value >= declaration.minimum && value <= declaration.maximum;
+    return inside;
+}
+
+// Whether `value` is the position of one of the declaration's choices.
+bool choice_in_range(const PrimitiveParameterDeclaration& declaration, double value) noexcept {
+    if (!std::isfinite(value) || value < 0.0 || std::floor(value) != value) return false;
+    const bool inside = value < static_cast<double>(declaration.choices.size());
     return inside;
 }
 
@@ -41,6 +49,19 @@ RegistrationOutcome check_parameters(const PrimitiveDescriptor& descriptor) noex
         for (std::size_t earlier = 0U; earlier < index; ++earlier) {
             if (parameters[earlier].name == declaration.name) return RegistrationOutcome::duplicate_parameter_name;
         }
+        if (declaration.kind == PrimitiveParameterKind::choice) {
+            if (declaration.choices.empty()) return RegistrationOutcome::choices_invalid;
+            for (std::size_t choice = 0U; choice < declaration.choices.size(); ++choice) {
+                if (!is_registered_name(declaration.choices[choice])) return RegistrationOutcome::choices_invalid;
+                for (std::size_t earlier = 0U; earlier < choice; ++earlier) {
+                    if (declaration.choices[earlier] == declaration.choices[choice]) {
+                        return RegistrationOutcome::choices_invalid;
+                    }
+                }
+            }
+            if (!choice_in_range(declaration, declaration.default_number)) return RegistrationOutcome::default_out_of_range;
+            continue;
+        }
         if (declaration.kind != PrimitiveParameterKind::number) continue;
         const bool finite = std::isfinite(declaration.minimum) && std::isfinite(declaration.maximum);
         if (!finite || declaration.minimum > declaration.maximum) return RegistrationOutcome::parameter_range_invalid;
@@ -58,6 +79,9 @@ RegistrationOutcome check_descriptor(const PrimitiveDescriptor& descriptor) noex
     for (const AnatomyState state : descriptor.states_read) {
         if (static_cast<std::size_t>(state) >= anatomy_state_count) return RegistrationOutcome::state_out_of_range;
     }
+    for (const EngineInput input : descriptor.inputs_read) {
+        if (static_cast<std::size_t>(input) >= engine_input_count) return RegistrationOutcome::input_out_of_range;
+    }
     if (current_engine_version < descriptor.introduced) return RegistrationOutcome::introduced_after_engine;
     if (descriptor.prepared_values > maximum_prepared_values) return RegistrationOutcome::too_many_prepared_values;
     const RegistrationOutcome parameters = check_parameters(descriptor);
@@ -68,14 +92,25 @@ RegistrationOutcome check_descriptor(const PrimitiveDescriptor& descriptor) noex
 // that borrows them.
 const engine_primitives::BulgePrimitive bulge_primitive{};
 const engine_primitives::DitheredBulgePrimitive dithered_bulge_primitive{};
+const engine_primitives::PillPlatePrimitive pill_plate_primitive{};
+const engine_primitives::GoldPlatePrimitive gold_plate_primitive{};
+const engine_primitives::InsetWellPrimitive inset_well_primitive{};
+const engine_primitives::EtchedDividerPrimitive etched_divider_primitive{};
+const engine_primitives::SeamPrimitive seam_primitive{};
+const engine_primitives::GripPrimitive grip_primitive{};
 
 PrimitiveRegistry make_builtin_registry() {
+    const EnginePrimitive* const first_party[] = {
+        &bulge_primitive,       &dithered_bulge_primitive, &pill_plate_primitive, &gold_plate_primitive,
+        &inset_well_primitive,  &etched_divider_primitive, &seam_primitive,       &grip_primitive,
+    };
     PrimitiveRegistry registry{};
-    const RegistrationOutcome bulge = registry.register_primitive(bulge_primitive);
-    const RegistrationOutcome dithered = registry.register_primitive(dithered_bulge_primitive);
-    // A first-party descriptor that fails its own checks is a defect of this
-    // build, not a runtime condition.
-    if (bulge != RegistrationOutcome::registered || dithered != RegistrationOutcome::registered) std::abort();
+    for (const EnginePrimitive* const primitive : first_party) {
+        const RegistrationOutcome outcome = registry.register_primitive(*primitive);
+        // A first-party descriptor that fails its own checks is a defect of
+        // this build, not a runtime condition.
+        if (outcome != RegistrationOutcome::registered) std::abort();
+    }
     return registry;
 }
 
@@ -129,6 +164,12 @@ ParameterValidation validate_parameters(const PrimitiveDescriptor& descriptor,
         const PrimitiveParameterDeclaration& declaration = descriptor.parameters[index];
         const PrimitiveParameterValue& value = block.values[index];
         if (value.kind != declaration.kind) return ParameterValidation{ParameterDefect::wrong_kind, index};
+        if (declaration.kind == PrimitiveParameterKind::choice) {
+            if (!choice_in_range(declaration, value.number)) {
+                return ParameterValidation{ParameterDefect::out_of_range, index};
+            }
+            continue;
+        }
         if (declaration.kind != PrimitiveParameterKind::number) continue;
         if (!std::isfinite(value.number)) return ParameterValidation{ParameterDefect::not_finite, index};
         if (!number_in_range(declaration, value.number)) return ParameterValidation{ParameterDefect::out_of_range, index};
@@ -163,6 +204,35 @@ ParameterAssignment set_colour_parameter(PrimitiveParameterBlock& block, const P
     if (declaration.kind != PrimitiveParameterKind::colour) return ParameterAssignment::wrong_kind;
     block.values[*index].colour = value;
     return ParameterAssignment::assigned;
+}
+
+std::optional<std::size_t> find_choice(const PrimitiveParameterDeclaration& declaration,
+                                       std::string_view choice) noexcept {
+    for (std::size_t index = 0U; index < declaration.choices.size(); ++index) {
+        if (declaration.choices[index] == choice) return index;
+    }
+    return std::nullopt;
+}
+
+ParameterAssignment set_choice_parameter(PrimitiveParameterBlock& block, const PrimitiveDescriptor& descriptor,
+                                         std::string_view name, std::string_view choice) noexcept {
+    const std::optional<std::size_t> index = find_parameter(descriptor, name);
+    if (!index || *index >= block.count) return ParameterAssignment::unknown_name;
+    const PrimitiveParameterDeclaration& declaration = descriptor.parameters[*index];
+    if (declaration.kind != PrimitiveParameterKind::choice) return ParameterAssignment::wrong_kind;
+    const std::optional<std::size_t> position = find_choice(declaration, choice);
+    if (!position) return ParameterAssignment::out_of_range;
+    block.values[*index].number = static_cast<double>(*position);
+    return ParameterAssignment::assigned;
+}
+
+PartShape EnginePrimitive::shape(const PrimitiveParameterBlock&) const noexcept {
+    const PartShape rectangle{};
+    return rectangle;
+}
+
+bool EnginePrimitive::blank(const PrimitiveParameterBlock&) const noexcept {
+    return false;
 }
 
 PreparationOutcome EnginePrimitive::prepare(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -216,6 +286,8 @@ const char* registration_outcome_name(RegistrationOutcome outcome) noexcept {
     case RegistrationOutcome::default_out_of_range: return "default_out_of_range";
     case RegistrationOutcome::introduced_after_engine: return "introduced_after_engine";
     case RegistrationOutcome::too_many_prepared_values: return "too_many_prepared_values";
+    case RegistrationOutcome::input_out_of_range: return "input_out_of_range";
+    case RegistrationOutcome::choices_invalid: return "choices_invalid";
     }
     return "unknown";
 }

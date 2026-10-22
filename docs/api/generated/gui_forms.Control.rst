@@ -236,6 +236,16 @@ gui_forms::Control
          name; :cpp:func:`add_class <gui_forms::Control::add_class>` and :cpp:func:`remove_class <gui_forms::Control::remove_class>` change one. A change repaints
          the control.
 
+      **ceremonial** : ``bool``, default ``false``
+         Whether the application marks the control's surface ceremonial, as an
+         installer's or a first run's world (T2, decision B3-1). On it and its
+         descendants the theme engine's ambient effects may cover more than the
+         everyday 10 % of the window; nothing else changes. A theme never sets
+         it. A change repaints the control and its descendants.
+
+      **on_ceremonial_surface** : ``bool``, read-only
+         Whether this control or one of its ancestors is marked :cpp:func:`ceremonial <gui_forms::Control::ceremonial>`.
+
       **effective_cursor_images** : ``CursorImagesPtr``, read-only
 
       **accessible_name** : ``std::string``
@@ -929,6 +939,22 @@ gui_forms::Control
    .. cpp:function:: void set_classes(std::vector<std::string> classes)
 
       Sets :cpp:func:`classes <gui_forms::Control::classes>`; see the property's description above.
+
+   .. cpp:function:: bool ceremonial() const noexcept
+
+      Whether the application marks the control's surface ceremonial, as an
+      installer's or a first run's world (T2, decision B3-1). On it and its
+      descendants the theme engine's ambient effects may cover more than the
+      everyday 10 % of the window; nothing else changes. A theme never sets
+      it. A change repaints the control and its descendants.
+
+   .. cpp:function:: void set_ceremonial(bool ceremonial)
+
+      Sets :cpp:func:`ceremonial <gui_forms::Control::ceremonial>`; see the property's description above.
+
+   .. cpp:function:: bool on_ceremonial_surface() const noexcept
+
+      Whether this control or one of its ancestors is marked :cpp:func:`ceremonial <gui_forms::Control::ceremonial>`.
 
    .. cpp:function:: CursorImagesPtr effective_cursor_images() const noexcept
 

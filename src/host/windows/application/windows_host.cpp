@@ -742,6 +742,8 @@ public:
         width_ = static_cast<int>(columns);
         height_ = static_cast<int>(rows);
         surface_size_valid_ = true;
+        row_origin_ = 0;
+        row_end_ = height_;
         return true;
 #else
         const int width = std::max(1, static_cast<int>(std::ceil(logical_size.width * scale)));
@@ -768,6 +770,8 @@ public:
         width_ = width;
         height_ = height;
         std::memset(pixels_, 0, static_cast<std::size_t>(width_) * height_ * 4U);
+        row_origin_ = 0;
+        row_end_ = height_;
         return true;
 #endif
     }
@@ -792,6 +796,12 @@ public:
             0.0,
             {0.0, 0.0, logical_size_.width, logical_size_.height},
             std::nullopt});
+        // A frame starts on the DIB, with no paint group open.
+        row_origin_ = 0;
+        row_end_ = height_;
+        maintain_alpha_ = false;
+        group_depth_ = 0U;
+        refused_open_ = 0U;
         SetBkMode(memory_dc_, TRANSPARENT);
         return true;
     }
@@ -1070,7 +1080,7 @@ public:
         if (area.empty()) return;
         const unsigned alpha = color.alpha;
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             const PixelSpan span = clipped_row_span(area, y);
             fill_span(row, span, color, alpha);
         }
@@ -1084,7 +1094,7 @@ public:
         radius = std::clamp(radius, 0.0,
                             std::max(0.0, std::min(rect.width, rect.height) * 0.5));
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             const PixelSpan span = rounded_row_span(rect, radius, y, clipped_row_span(area, y));
             fill_span(row, span, color, color.alpha);
         }
@@ -1111,7 +1121,7 @@ public:
                          rect.width - line * 2.0, rect.height - line * 2.0};
         const double inner_radius = std::max(0.0, radius - line);
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             const PixelSpan outer = rounded_row_span(rect, radius, y, clipped_row_span(area, y));
             const PixelSpan inset = inner.empty() ? PixelSpan{} : rounded_row_span(inner, inner_radius, y, outer);
             if (inset.right > inset.left) {
@@ -1164,7 +1174,7 @@ public:
             }
         }
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             const PixelSpan span = clipped_row_span(area, y);
             if (dx == 0.0) {
                 const double amount = spread_gradient_coordinate(
@@ -1206,7 +1216,7 @@ public:
             stops, GradientSpreadMode::pad, true);
         if (raster != nullptr) { paint_gradient_raster(*raster); return; }
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const double sample_x = ((x + 0.5) / scale_ - center.x) /
@@ -1244,7 +1254,7 @@ public:
             return;
         }
         for (int y = area.top; y < area.bottom; ++y) {
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const Point sample{(x + 0.5) / scale_, (y + 0.5) / scale_};
@@ -1266,6 +1276,10 @@ public:
         const int x1 = logical_x(to.x);
         const int y1 = logical_y(to.y);
         const int thickness = std::max(1, static_cast<int>(std::lround(width * scale_)));
+        if (maintain_alpha_) {
+            draw_group_line(from, to, color, thickness);
+            return;
+        }
         HPEN pen = CreatePen(PS_SOLID, thickness, RGB(color.red, color.green, color.blue));
         if (pen == nullptr) return;
         const int saved = SaveDC(memory_dc_);
@@ -1285,6 +1299,10 @@ public:
         const std::shared_ptr<const gui_forms::detail::PreparedTextStorage>& storage = gui_forms::detail::PreparedTextAccess::layout(layout);
         if (!storage || pixels_ == nullptr || width_ <= 0 || height_ <= 0 || states_.empty()) {
             result.status = PreparedTextStatus::invalid_input;
+        } else if (maintain_alpha_) {
+            // The development prepared-text surface stages into the DIB
+            // only; it is not drawn inside a paint group.
+            result.status = PreparedTextStatus::unsupported_profile;
         } else if ((*(*storage).authority_state).executor != std::this_thread::get_id()) {
             result.status = PreparedTextStatus::wrong_executor;
         } else if ((*storage).metrics.device_scale != scale_) {
@@ -1518,10 +1536,30 @@ public:
                     const std::size_t source_x =
                         static_cast<std::size_t>(copy_left - destination_x) * 4U;
                     std::memcpy(
-                        reinterpret_cast<std::byte*>(pixels_) +
-                            (static_cast<std::size_t>(y) * width_ + copy_left) * 4U,
+                        reinterpret_cast<std::byte*>(row_at(y) + copy_left),
                         source + source_y * source_stride + source_x,
                         copy_bytes);
+                }
+            }
+            if (saved != 0) RestoreDC(memory_dc_, saved);
+            return;
+        }
+        if (maintain_alpha_) {
+            const std::size_t source_stride = static_cast<std::size_t>(frame.row_bytes());
+            for (int y = area.top; y < area.bottom; ++y) {
+                const int source_y = std::clamp(static_cast<int>(
+                    (static_cast<long long>(y - destination_y) * frame.height()) / destination_height),
+                    0, static_cast<int>(frame.height()) - 1);
+                std::uint32_t* const destination_row = row_at(y);
+                for (int x = area.left; x < area.right; ++x) {
+                    if (!pixel_allowed(x, y)) continue;
+                    const int source_x = std::clamp(static_cast<int>(
+                        (static_cast<long long>(x - destination_x) * frame.width()) / destination_width),
+                        0, static_cast<int>(frame.width()) - 1);
+                    std::uint32_t pixel{};
+                    std::memcpy(&pixel, source + static_cast<std::size_t>(source_y) * source_stride +
+                                            static_cast<std::size_t>(source_x) * 4U, sizeof pixel);
+                    destination_row[x] = pixel;
                 }
             }
             if (saved != 0) RestoreDC(memory_dc_, saved);
@@ -1584,7 +1622,7 @@ public:
             // Sample at destination pixel centers. Do not round a subpixel
             // tile to a whole-pixel width or overlap adjacent content clips.
             const double source_y = source_rect.y + (y + 0.5 - top) * source_rect.height / height;
-            std::uint32_t* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* destination_row = row_at(y);
             for (int x = area.left; x < area.right; ++x) {
                 const Point center{(x + 0.5) / scale_, (y + 0.5) / scale_};
                 if (!state().clip.contains(center) || !global_destination.contains(center) ||
@@ -1629,7 +1667,7 @@ public:
             const unsigned int source_y = std::min<std::uint32_t>(
                 source.height - 1U,
                 static_cast<std::uint32_t>(tile_y * source.height / tile_height));
-            std::uint32_t* destination_row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* destination_row = row_at(y);
             for (int x = area.left; x < area.right; ++x) {
                 if (!pixel_allowed(x, y)) continue;
                 const double tile_x = std::fmod(std::max(0.0, x - left), tile_width);
@@ -1809,9 +1847,9 @@ private:
         const std::size_t columns = static_cast<std::size_t>(area.right - area.left);
         for (int y = area.top; y < area.bottom; ++y) {
             const PixelSpan span = clipped_row_span(area, y);
+            if (span.right <= span.left) continue;
             const std::size_t source_row = static_cast<std::size_t>(y - area.top) * columns;
-            std::uint32_t* const destination = pixels_ + static_cast<std::size_t>(y) *
-                static_cast<std::size_t>(width_);
+            std::uint32_t* const destination = row_at(y);
             for (int x = span.left; x < span.right; ++x) {
                 const std::uint16_t alpha = raster.samples[source_row + static_cast<std::size_t>(x - area.left)];
                 if (alpha == 256U) continue;
@@ -1891,7 +1929,7 @@ private:
             if (span.right <= span.left) continue;
             const std::uint32_t* source = raster.pixels.data() +
                 static_cast<std::size_t>(y - area.top) * stride;
-            std::uint32_t* row = pixels_ + static_cast<std::size_t>(y) * width_;
+            std::uint32_t* row = row_at(y);
             if (raster.opaque) {
                 std::copy(source + span.left - area.left, source + span.right - area.left, row + span.left);
                 continue;
@@ -1920,7 +1958,7 @@ private:
         }
         return span;
     }
-    static void fill_span(std::uint32_t* row, PixelSpan span, Color color, unsigned alpha) noexcept {
+    void fill_span(std::uint32_t* row, PixelSpan span, Color color, unsigned alpha) const noexcept {
         if (span.right <= span.left) return;
         if (alpha == 255U) {
             const std::uint32_t pixel = color.blue | (static_cast<std::uint32_t>(color.green) << 8U) |
@@ -1932,6 +1970,43 @@ private:
     }
 
     const State& state() const noexcept { return states_.back(); }
+    // Row y of the current target: the DIB, or a paint group's rows, whose
+    // first row is row_origin_. y lies in [row_origin_, row_end_).
+    [[nodiscard]] std::uint32_t* row_at(int y) const noexcept {
+        std::uint32_t* const row = pixels_ + static_cast<std::size_t>(y - row_origin_) * static_cast<std::size_t>(width_);
+        return row;
+    }
+    // A line inside a paint group: every pixel whose centre lies within half
+    // of `thickness` device pixels of the segment, under the clip.
+    void draw_group_line(Point from, Point to, Color color, int thickness) {
+        const double x0 = (from.x + state().tx) * scale_;
+        const double y0 = (from.y + state().ty) * scale_;
+        const double x1 = (to.x + state().tx) * scale_;
+        const double y1 = (to.y + state().ty) * scale_;
+        const double half = static_cast<double>(thickness) * 0.5;
+        const Rect reach{std::min(x0, x1) / scale_ - state().tx - half / scale_,
+                         std::min(y0, y1) / scale_ - state().ty - half / scale_,
+                         (std::fabs(x1 - x0) + half * 2.0) / scale_, (std::fabs(y1 - y0) + half * 2.0) / scale_};
+        const PixelRect area = pixel_rect(reach);
+        if (area.empty()) return;
+        const double dx = x1 - x0;
+        const double dy = y1 - y0;
+        const double length_squared = dx * dx + dy * dy;
+        for (int y = area.top; y < area.bottom; ++y) {
+            std::uint32_t* const row = row_at(y);
+            for (int x = area.left; x < area.right; ++x) {
+                if (!pixel_allowed(x, y)) continue;
+                const double px = x + 0.5 - x0;
+                const double py = y + 0.5 - y0;
+                double along = length_squared > 0.0 ? (px * dx + py * dy) / length_squared : 0.0;
+                along = std::clamp(along, 0.0, 1.0);
+                const double ox = px - along * dx;
+                const double oy = py - along * dy;
+                if (ox * ox + oy * oy > half * half) continue;
+                blend_pixel(row[x], color, color.alpha);
+            }
+        }
+    }
     [[nodiscard]] static bool inside_rounded(Point point, Rect rect,
                                              double radius) noexcept {
         if (!rect.contains(point)) return false;
@@ -1967,8 +2042,11 @@ private:
         return inside_rounded(point, (*state().rounded_clip).rect,
                               (*state().rounded_clip).radius);
     }
-    static void blend_pixel(std::uint32_t& destination, Color color,
-                            unsigned alpha) noexcept {
+    // Source-over of a straight colour at `alpha`. On the DIB the result is
+    // written opaque; inside a paint group, whose image is premultiplied,
+    // the alpha channel is blended too.
+    void blend_pixel(std::uint32_t& destination, Color color,
+                     unsigned alpha) const noexcept {
         alpha = std::min(alpha, 255U);
         const unsigned db = destination & 0xffU;
         const unsigned dg = (destination >> 8U) & 0xffU;
@@ -1977,7 +2055,12 @@ private:
         const unsigned b = (color.blue * alpha + db * inverse + 127U) / 255U;
         const unsigned g = (color.green * alpha + dg * inverse + 127U) / 255U;
         const unsigned r = (color.red * alpha + dr * inverse + 127U) / 255U;
-        destination = b | (g << 8U) | (r << 16U) | 0xff000000U;
+        unsigned a = 255U;
+        if (maintain_alpha_) {
+            const unsigned da = (destination >> 24U) & 0xffU;
+            a = (255U * alpha + da * inverse + 127U) / 255U;
+        }
+        destination = b | (g << 8U) | (r << 16U) | (a << 24U);
     }
     [[nodiscard]] static unsigned composite_image_channel(
         std::uint32_t source, std::uint32_t destination,
@@ -1990,9 +2073,9 @@ private:
             premultiplied +
                 (destination_channel * inverse + 127U) / 255U);
     }
-    [[nodiscard]] static std::uint32_t blend_image_pixel(
+    [[nodiscard]] std::uint32_t blend_image_pixel(
         std::uint32_t source, std::uint32_t destination,
-        unsigned global_alpha, unsigned source_alpha) noexcept {
+        unsigned global_alpha, unsigned source_alpha) const noexcept {
         const unsigned inverse = 255U - source_alpha;
         const unsigned blue = composite_image_channel(
             source, destination, global_alpha, inverse, 0U);
@@ -2000,7 +2083,12 @@ private:
             source, destination, global_alpha, inverse, 8U);
         const unsigned red = composite_image_channel(
             source, destination, global_alpha, inverse, 16U);
-        return blue | (green << 8U) | (red << 16U) | 0xff000000U;
+        unsigned alpha = 255U;
+        if (maintain_alpha_) {
+            const unsigned destination_alpha = (destination >> 24U) & 0xffU;
+            alpha = std::min(255U, source_alpha + (destination_alpha * inverse + 127U) / 255U);
+        }
+        return blue | (green << 8U) | (red << 16U) | (alpha << 24U);
     }
     [[nodiscard]] static std::uint8_t interpolate_channel(
         std::uint8_t left, std::uint8_t right, double amount) noexcept {
@@ -2057,9 +2145,9 @@ private:
         rect.y += state().ty;
         rect = Rect::intersection(rect, state().clip);
         return {std::clamp(static_cast<int>(std::floor(rect.x * scale_)), 0, width_),
-                std::clamp(static_cast<int>(std::floor(rect.y * scale_)), 0, height_),
+                std::clamp(static_cast<int>(std::floor(rect.y * scale_)), row_origin_, row_end_),
                 std::clamp(static_cast<int>(std::ceil((rect.x + rect.width) * scale_)), 0, width_),
-                std::clamp(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), 0, height_)};
+                std::clamp(static_cast<int>(std::ceil((rect.y + rect.height) * scale_)), row_origin_, row_end_)};
     }
     // Rasterizes a shaped run at the device scale and blends it into the
     // DIB under the current clip. A memo keeps the coverage for its scale
@@ -2087,28 +2175,34 @@ private:
         }
         blend_run_coverage(*coverage, placement, color);
     }
-    // The DIB as the shared blends take it: BGRA, alpha not maintained.
+    // The current target as the shared blends take it: the DIB (BGRA,
+    // alpha not maintained), or a paint group's rows (premultiplied BGRA),
+    // whose first row is row_origin_.
     gui_forms::detail::TextCompositeTarget shared_composite_target() const noexcept {
-        const std::size_t pixel_count = static_cast<std::size_t>(width_) * static_cast<std::size_t>(height_);
+        const std::size_t rows = static_cast<std::size_t>(row_end_ - row_origin_);
+        const std::size_t pixel_count = static_cast<std::size_t>(width_) * rows;
         gui_forms::detail::TextCompositeTarget target{};
         target.pixels = std::span<std::uint32_t>(pixels_, pixel_count);
         target.width = static_cast<std::uint32_t>(width_);
-        target.height = static_cast<std::uint32_t>(height_);
+        target.height = static_cast<std::uint32_t>(rows);
         target.stride = static_cast<std::size_t>(width_);
         target.order = gui_forms::detail::TextPixelOrder::bgra;
-        target.opaque = true;
+        target.opaque = !maintain_alpha_;
         return target;
     }
     // The current clip in device pixels, as the shared blends take it.
     gui_forms::detail::TextCompositeClip shared_composite_clip() const noexcept {
         const State& current = state();
         gui_forms::detail::TextCompositeClip clip{};
-        clip.rect = {current.clip.x * scale_, current.clip.y * scale_, current.clip.width * scale_,
+        // In the target's own rows: a group's first row is row_origin_.
+        const double row_shift = static_cast<double>(row_origin_);
+        clip.rect = {current.clip.x * scale_, current.clip.y * scale_ - row_shift, current.clip.width * scale_,
                      current.clip.height * scale_};
         if (current.rounded_clip) {
             const Rect rounded = (*current.rounded_clip).rect;
             clip.rounded = true;
-            clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_, rounded.width * scale_, rounded.height * scale_};
+            clip.rounded_rect = {rounded.x * scale_, rounded.y * scale_ - row_shift, rounded.width * scale_,
+                                 rounded.height * scale_};
             clip.radius = (*current.rounded_clip).radius * scale_;
         }
         return clip;
@@ -2125,7 +2219,7 @@ private:
         const gui_forms::detail::TextCoverage source{.pixels = coverage.pixels, .width = coverage.width,
                                           .height = coverage.height,
                                           .left = placement.pixel_x + coverage.left,
-                                          .top = placement.pixel_y + coverage.top};
+                                          .top = placement.pixel_y + coverage.top - row_origin_};
         static_cast<void>(gui_forms::detail::composite_text_coverage(source, target, clip, color));
     }
     // Composites a part raster with the shared blend under the current
@@ -2142,10 +2236,107 @@ private:
         const gui_forms::detail::PartRasterSource source{.pixels = (*raster).pixels(), .width = extent.width,
                                                          .height = extent.height,
                                                          .row_bytes = (*raster).row_bytes(),
-                                                         .left = logical_x(origin.x), .top = logical_y(origin.y)};
+                                                         .left = logical_x(origin.x),
+                                                         .top = logical_y(origin.y) - row_origin_};
         const std::uint8_t byte = gui_forms::detail::part_composite_opacity(opacity);
         static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
     }
+public:
+    // Paint groups (Painter::begin_group). An isolated group draws into its
+    // level's scratch rows (the group's clipped rows across the target's full
+    // width), premultiplied and cleared to transparent, then composites them
+    // once into the parent through the shared blend at the group's opacity,
+    // under the clip in force when it began.
+    void begin_group(const PaintGroup& group) override {
+        if (group_depth_ >= maximum_paint_group_depth) {
+            // Refused by name: drawn without isolation, limited to its bounds.
+            save();
+            clip_rect(group.bounds);
+            refused_open_ = refused_open_ + 1U;
+            group_refusals_ = group_refusals_ + 1U;
+            return;
+        }
+        GroupLevel& level = groups_[group_depth_];
+        level.isolated = false;
+        level.opacity = group.opacity;
+        save();
+        clip_rect(group.bounds);
+        const bool visible = group.opacity > 0.0;
+        if (!visible) states_.back().clip = Rect{};
+        level.state_depth = states_.size();
+        group_depth_ = group_depth_ + 1U;
+        if (!visible || group.opacity >= 1.0 || pixels_ == nullptr || width_ <= 0) return;
+        const Rect clip = state().clip;
+        const PixelRect area{std::clamp(static_cast<int>(std::floor(clip.x * scale_)), 0, width_),
+                             std::clamp(static_cast<int>(std::floor(clip.y * scale_)), row_origin_, row_end_),
+                             std::clamp(static_cast<int>(std::ceil((clip.x + clip.width) * scale_)), 0, width_),
+                             std::clamp(static_cast<int>(std::ceil((clip.y + clip.height) * scale_)), row_origin_,
+                                        row_end_)};
+        if (area.empty()) return;
+        // Storage first: a refused allocation propagates with the group
+        // drawing directly, as at opacity 1.
+        const std::size_t rows = static_cast<std::size_t>(area.bottom - area.top);
+        const std::size_t count = rows * static_cast<std::size_t>(width_);
+        if (level.pixels.size() < count) level.pixels.resize(count);
+        std::fill(level.pixels.begin(), level.pixels.begin() + static_cast<std::ptrdiff_t>(count), 0U);
+        // Finish batched GDI writes into the DIB before drawing elsewhere.
+        GdiFlush();
+        level.isolated = true;
+        level.device = area;
+        level.parent_pixels = pixels_;
+        level.parent_row_origin = row_origin_;
+        level.parent_row_end = row_end_;
+        level.parent_maintain_alpha = maintain_alpha_;
+        pixels_ = level.pixels.data();
+        row_origin_ = area.top;
+        row_end_ = area.bottom;
+        maintain_alpha_ = true;
+        // Inside, the group's whole image: the clip in force at its start,
+        // fractional edges and rounded corners included, applies once, when
+        // the image is composited (as on every other host).
+        states_.back().clip = Rect{area.left / scale_, area.top / scale_, (area.right - area.left) / scale_,
+                                   (area.bottom - area.top) / scale_};
+        states_.back().rounded_clip.reset();
+    }
+
+    void end_group() override {
+        if (refused_open_ > 0U) {
+            refused_open_ = refused_open_ - 1U;
+            restore();
+            return;
+        }
+        if (group_depth_ == 0U) return;
+        group_depth_ = group_depth_ - 1U;
+        GroupLevel& level = groups_[group_depth_];
+        if (states_.size() > level.state_depth) states_.resize(level.state_depth);
+        restore();
+        if (!level.isolated) return;
+        level.isolated = false;
+        pixels_ = level.parent_pixels;
+        row_origin_ = level.parent_row_origin;
+        row_end_ = level.parent_row_end;
+        maintain_alpha_ = level.parent_maintain_alpha;
+        const PixelRect area = level.device;
+        const std::size_t columns = static_cast<std::size_t>(area.right - area.left);
+        const std::size_t rows = static_cast<std::size_t>(area.bottom - area.top);
+        const std::size_t first = static_cast<std::size_t>(area.left);
+        const std::size_t length = (rows - 1U) * static_cast<std::size_t>(width_) + columns;
+        const std::span<const std::uint8_t> bytes(
+            reinterpret_cast<const std::uint8_t*>(level.pixels.data() + first), length * 4U);
+        const gui_forms::detail::PartRasterSource source{.pixels = bytes,
+            .width = static_cast<std::uint32_t>(columns), .height = static_cast<std::uint32_t>(rows),
+            .row_bytes = static_cast<std::size_t>(width_) * 4U, .left = area.left,
+            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra};
+        const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
+        const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
+        const std::uint8_t byte = gui_forms::detail::part_composite_opacity(level.opacity);
+        static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
+    }
+
+    // Paint groups begun deeper than maximum_paint_group_depth.
+    [[nodiscard]] std::uint64_t group_refusals() const noexcept { return group_refusals_; }
+
+private:
     void apply_gdi_clip() const {
         const Rect clip = state().clip;
         IntersectClipRect(memory_dc_,
@@ -2167,6 +2358,7 @@ private:
 #endif
         memory_dc_ = nullptr; bitmap_ = nullptr; old_bitmap_ = nullptr; pixels_ = nullptr;
         width_ = 0; height_ = 0;
+        row_origin_ = 0; row_end_ = 0;
     }
     void reset() noexcept {
         reset_bitmap();
@@ -2214,6 +2406,29 @@ private:
 #endif
     int width_{};
     int height_{};
+    // The current target's rows: [0, height_) on the DIB, a paint group's
+    // rows inside one. maintain_alpha_ is true inside a group.
+    int row_origin_{};
+    int row_end_{};
+    bool maintain_alpha_{};
+    // One level per open paint group: its scratch rows (reused, never
+    // shrunk; released with the painter), what it covers, and the target it
+    // will composite into.
+    struct GroupLevel final {
+        std::vector<std::uint32_t> pixels{};
+        bool isolated{};
+        PixelRect device{};
+        double opacity{};
+        std::size_t state_depth{};
+        std::uint32_t* parent_pixels{};
+        int parent_row_origin{};
+        int parent_row_end{};
+        bool parent_maintain_alpha{};
+    };
+    std::array<GroupLevel, maximum_paint_group_depth> groups_{};
+    std::size_t group_depth_{};
+    std::size_t refused_open_{};
+    std::uint64_t group_refusals_{};
     Size logical_size_{};
     double scale_{1.0};
     std::vector<State> states_;

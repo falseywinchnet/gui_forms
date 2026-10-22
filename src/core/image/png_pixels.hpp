@@ -1,7 +1,9 @@
 #pragma once
 
+#include "gui_forms/compression/inflate.hpp"
 #include "png_color.hpp"
 #include "png_decoder.hpp"
+#include "stx_png/pixels.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -19,36 +21,14 @@ namespace gui_forms::image {
 // and cHRM follow png_color.hpp (stage I6), which converts gAMA/cHRM images
 // to sRGB before the 8-bit kernel.
 
-// Memory order of the four 8-bit channels of one destination pixel.
-enum class PixelOrder { rgba, bgra };
-// Straight alpha keeps colour independent of coverage (interchange, PNG
-// files); premultiplied scales every colour channel by alpha (compositing).
-enum class PixelAlpha { straight, premultiplied };
-
-struct PixelTarget final {
-    PixelOrder order = PixelOrder::rgba;
-    PixelAlpha alpha = PixelAlpha::premultiplied;
-};
-
-// Converts top-down straight-alpha RGBA16 samples to 8-bit pixels.
-//
-// Rounding rule: every output channel is the integer nearest the exact
-// rational value, computed in unsigned 64-bit integers with no floating point.
-//   straight colour and every alpha: (c * 255 + 32767) / 65535
-//   premultiplied colour:            (c * a * 255 + 2147418112) / 4294836225
-// where c and a are the 16-bit samples and 4294836225 = 65535 * 65535. Both
-// denominators are odd and every numerator is an integer, so an exact half
-// cannot occur and the rule needs no tie break. Eight-bit sources (stored as
-// v * 257) convert back to exactly v; premultiplied 8-bit results equal
-// round(v * alpha / 255).
-//
-// samples holds width * height * 4 live values. pixels holds at least
-// row_bytes * (height - 1) + width * 4 bytes, and row_bytes >= width * 4;
-// bytes between rows are left unchanged. The two spans must be disjoint.
-// Returns false, writing nothing, when the shape or target is invalid.
-[[nodiscard]] bool convert_rgba16_samples(std::span<const std::uint16_t> samples,
-    std::uint32_t width, std::uint32_t height, PixelTarget target,
-    std::span<std::byte> pixels, std::size_t row_bytes) noexcept;
+// The 8-bit conversion kernel and its target vocabulary are stx_png's
+// (stx_png/pixels.hpp): its rounding rule is stated there.
+using stx_png::PixelAlpha;
+using stx_png::PixelOrder;
+using stx_png::PixelTarget;
+using stx_png::convert_rgba16_samples;
+using stx_png::valid_pixel_destination;
+using stx_png::valid_pixel_target;
 
 // What an embedded ICC profile (iCCP) does to a pixel request. GUI.Forms has
 // no ICC transform: refuse fails the request; ignore treats the samples as
@@ -131,7 +111,7 @@ public:
     [[nodiscard]] PngPixelResult inspect(std::span<const std::byte> encoded,
                                          const PngPixelRequest& request) const noexcept;
 
-    // Decodes into caller pixels (layout as convert_rgba16_samples states).
+    // Decodes into caller pixels (layout as valid_pixel_destination states).
     // encoded and pixels must be disjoint. On failure the destination may
     // hold a partial, unverified prefix: discard it.
     [[nodiscard]] PngPixelResult decode(std::span<const std::byte> encoded,
@@ -147,7 +127,7 @@ private:
     std::vector<std::uint16_t> samples_;
     std::vector<std::byte> scratch_;
     std::vector<PngMetadataRecord> records_;
-    PngColorWorkspace color_work_;
+    ColorWorkspace color_work_;
 };
 
 } // namespace gui_forms::image

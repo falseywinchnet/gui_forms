@@ -176,7 +176,7 @@ const PrimitiveParameterDeclaration twice[] = {{"strength", PrimitiveParameterKi
 
 void test_builtin_registry() {
     const PrimitiveRegistry& registry = builtin_primitive_registry();
-    require(registry.primitives().size() == 2U, "the built-in registry holds the bulge pair");
+    require(registry.primitives().size() == 8U, "the built-in registry holds the bulge pair and the relief set");
     require(registry.find("not_a_primitive") == nullptr, "an unknown name finds nothing");
     const char* const names[] = {"bulge", "dithered_bulge"};
     for (const char* const name : names) {
@@ -187,7 +187,7 @@ void test_builtin_registry() {
         require(read.size() == 2U && read.count(AnatomyState::pressed) == 1U &&
                     read.count(AnatomyState::active_tool) == 1U,
                 "the bulge reads pressed and active_tool only");
-        require(descriptor.introduced == current_engine_version, "the bulge pair is engine 0.1");
+        require(descriptor.introduced == EngineVersion{0, 1}, "the bulge pair is engine 0.1");
         require(descriptor.cost.per_device_pixel > 0U, "the bulge declares its cost");
         const PrimitiveParameterBlock defaults = default_parameters(descriptor);
         require(validate_parameters(descriptor, defaults).defect == ParameterDefect::none, "defaults validate");

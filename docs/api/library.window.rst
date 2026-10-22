@@ -726,6 +726,10 @@ Related types
 
       Default: ``{true}``.
 
+   .. cpp:member:: bool ambient_motion
+
+      The application's motion switch (design language §9.4 item 3, T2 E7): off, the theme engine's ambient effects stop and their parts rest at their static poses. Transitions are not affected; reduced motion, the host's preference, ends them. Default: ``{true}``.
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:struct:: PresentedArea final

@@ -279,6 +279,20 @@ Related types
 
    .. cpp:function:: void record_motion_finished() noexcept
 
+   .. cpp:function:: void record_engine_input_change() noexcept
+
+      The engine's inputs: one change seen, and ``parts`` parts damaged over ``area`` because they read a changed input.
+
+   .. cpp:function:: void record_engine_input_damage(std::uint64_t parts, double area) noexcept
+
+   .. cpp:function:: void record_engine_ambient_frame() noexcept
+
+      An ambient part repainted for its effect, or an effect refused.
+
+   .. cpp:function:: void record_engine_ambient_refusal() noexcept
+
+   .. cpp:function:: void record_paint_group_refusals(std::uint64_t refusals) noexcept
+
    .. cpp:function:: void record_frame_callback_fault() noexcept
 
       Counts a contained frame callback exception.
@@ -527,6 +541,24 @@ Related types
    .. cpp:member:: std::uint64_t motion_values_settled
 
    .. cpp:member:: std::uint64_t motion_values_finished
+
+   .. cpp:member:: std::uint64_t engine_input_changes
+
+      The theme engine's inputs (T2 plan, phase E6): changes the engine saw to an input a part may read (a pointer move inside the window, a value published or withdrawn), the parts those changes damaged because they read the input, and the logical area of that damage. A change no part reads damages nothing.
+
+   .. cpp:member:: std::uint64_t engine_input_damaged_parts
+
+   .. cpp:member:: double engine_input_damage_area
+
+   .. cpp:member:: std::uint64_t engine_ambient_frames
+
+      The theme engine's ambient effects (E7): frames that repainted an ambient part, and effects refused for covering more than 10 % of the window on an everyday surface (counted when the refusal begins).
+
+   .. cpp:member:: std::uint64_t engine_ambient_refusals
+
+   .. cpp:member:: std::uint64_t paint_group_refusals
+
+      Paint groups begun deeper than maximum_paint_group_depth, drawn without isolation (Painter::begin_group).
 
    .. cpp:member:: std::string renderer_name
 
@@ -998,6 +1030,10 @@ Enumerations
    .. cpp:enumerator:: draw_live_surface
 
    .. cpp:enumerator:: draw_part_raster
+
+   .. cpp:enumerator:: begin_group
+
+   .. cpp:enumerator:: end_group
 
 Functions, constants and aliases
 --------------------------------
