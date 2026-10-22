@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <climits>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
@@ -144,7 +145,9 @@ std::string range_attribute(AXUIElementRef element, CFStringRef attribute) {
     if (CFGetTypeID(value.get()) != AXValueGetTypeID()) return {};
     CFRange range = CFRangeMake(kCFNotFound, 0);
     if (!AXValueGetValue(static_cast<AXValueRef>(value.get()), kAXValueTypeCFRange, &range)) return {};
-    if (range.location == kCFNotFound) return {};
+    // No range: kCFNotFound, or AppKit's NSNotFound (LONG_MAX), which an
+    // NSRange of {NSNotFound, 0} becomes on its way through AXValue.
+    if (range.location == kCFNotFound || range.location == LONG_MAX) return {};
     const std::string text = std::to_string(static_cast<long long>(range.location)) + "+" +
                              std::to_string(static_cast<long long>(range.length));
     return text;

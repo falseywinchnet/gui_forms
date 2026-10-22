@@ -1117,7 +1117,10 @@ static bool contains_live_region(const SemanticNode& node) {
     return static_cast<NSInteger>(*_node.level - 1);
 }
 // A row's, cell's or header's place in its table, counting from zero, and a
-// table's size.
+// table's size. A node without an index does not publish the attribute
+// (isAccessibilitySelectorAllowed:): AppKit would otherwise send the
+// no-range value, {NSNotFound, 0}, which reaches a client as a location of
+// LONG_MAX rather than kCFNotFound.
 - (NSRange)accessibilityRowIndexRange {
     if (!_node.row_index || *_node.row_index == 0) return NSMakeRange(NSNotFound, 0);
     return NSMakeRange(static_cast<NSUInteger>(*_node.row_index - 1), 1);
@@ -1262,6 +1265,12 @@ static bool contains_live_region(const SemanticNode& node) {
     }
     if (selector == @selector(accessibilityPerformDecrement)) {
         return semantic_has_action(_node, SemanticAction::decrement);
+    }
+    if (selector == @selector(accessibilityRowIndexRange)) {
+        return _node.row_index && *_node.row_index != 0 ? YES : NO;
+    }
+    if (selector == @selector(accessibilityColumnIndexRange)) {
+        return _node.column_index && *_node.column_index != 0 ? YES : NO;
     }
     return [super isAccessibilitySelectorAllowed:selector];
 }
