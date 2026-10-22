@@ -637,7 +637,7 @@ verification or licence/provenance requirements.
 Five A answers remain accepted; choice 2 is superseded by the owned-PNG
 rewrite direction. Phase 2 now contains a bounded streaming inflate derived
 from the pinned upstream puff canonical-Huffman algorithm, with new ownership,
-quota and streaming state. [Provenance](../../../src/core/compression/PROVENANCE.md)
+quota and streaming state. [Provenance](../../../stx_zlib/PROVENANCE.md)
 and [phase-2 evidence](../../../results/2026-10-19-zlib/phase-two/README.md)
 record the source decision and open gate. House style is mandatory; it is not
 a substitute for the accepted executable verification.

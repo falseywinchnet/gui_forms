@@ -1,5 +1,6 @@
 #include "../../src/core/image/png_decoder.hpp"
 #include "../../src/core/image/png_writer.hpp"
+#include "stx_zlib/checksum.hpp"
 #include "png_dynamic_fixture.hpp"
 
 #include <algorithm>
@@ -34,7 +35,7 @@ void chunk(Bytes& data, const char* name, const Bytes& payload) {
     for (unsigned index = 0; index < 4; ++index) data.push_back(static_cast<std::byte>(name[index]));
     data.insert(data.end(), payload.begin(), payload.end());
     const std::span<const std::byte> checked(data.data() + begin, payload.size() + 4);
-    put32(data, image::png_crc32(checked));
+    put32(data, stx_zlib::crc32(checked));
 }
 Bytes stored(const Bytes& raw) {
     Bytes data{std::byte{0x78}, std::byte{0x01}};
@@ -51,7 +52,7 @@ Bytes stored(const Bytes& raw) {
                     raw.begin() + static_cast<std::ptrdiff_t>(offset + count));
         offset += count;
     } while (offset < raw.size());
-    put32(data, image::png_adler32(raw));
+    put32(data, stx_zlib::adler32(raw));
     return data;
 }
 struct Format final { unsigned color = 0; unsigned depth = 0; unsigned channels = 0; };
@@ -292,14 +293,14 @@ void checksum_boundaries() {
     for (std::size_t offset = 0; offset < 16; ++offset) {
         for (std::size_t length = 0; length <= 257; ++length) {
             const std::span<const std::byte> bytes(storage.data() + offset, length);
-            require(image::png_crc32(bytes) == reference_crc(bytes), "bulk CRC alignment/tail mismatch");
+            require(stx_zlib::crc32(bytes) == reference_crc(bytes), "bulk CRC alignment/tail mismatch");
         }
         const std::span<const std::byte> long_input(storage.data() + offset, 65535);
-        require(image::png_crc32(long_input) == reference_crc(long_input), "bulk CRC long input mismatch");
+        require(stx_zlib::crc32(long_input) == reference_crc(long_input), "bulk CRC long input mismatch");
     }
     const Bytes check{std::byte{49},std::byte{50},std::byte{51},std::byte{52},std::byte{53},
                       std::byte{54},std::byte{55},std::byte{56},std::byte{57}};
-    require(image::png_crc32(check) == 0xcbf43926U, "IEEE CRC check vector mismatch");
+    require(stx_zlib::crc32(check) == 0xcbf43926U, "IEEE CRC check vector mismatch");
 }
 void malformed_and_limits() {
     const Bytes valid = fixture(3, 2, formats[13], false, 0, 1000);

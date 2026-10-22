@@ -1,18 +1,18 @@
-#include "png_decoder.hpp"
-#include "png_writer.hpp"
+#include "stx_png/decoder.hpp"
+#include "stx_zlib/checksum.hpp"
 
 #include <algorithm>
 #include <array>
 #include <cstring>
 #include <limits>
 
-namespace gui_forms::image {
+namespace stx_png {
 namespace {
-using compression::InflateError;
-using compression::InflateOptions;
-using compression::InflateResult;
-using compression::InflateStatus;
-using compression::InflateStream;
+using stx_zlib::InflateError;
+using stx_zlib::InflateOptions;
+using stx_zlib::InflateResult;
+using stx_zlib::InflateStatus;
+using stx_zlib::InflateStream;
 
 constexpr std::uint32_t ihdr = 0x49484452U;
 constexpr std::uint32_t plte = 0x504c5445U;
@@ -348,7 +348,7 @@ PngDecodeError parse(std::span<const std::byte> encoded,
         }
         if ((byte(encoded[offset + 6]) & 32U) != 0) return PngDecodeError::invalid_chunk_type;
         const std::span<const std::byte> checked = encoded.subspan(offset + 4, length + 4ULL);
-        if (png_crc32(checked) != read32(encoded, chunk.next - 4)) return PngDecodeError::crc_mismatch;
+        if (stx_zlib::crc32(checked) != read32(encoded, chunk.next - 4)) return PngDecodeError::crc_mismatch;
         const std::span<const std::byte> data = encoded.subspan(chunk.data_offset, chunk.length);
         if (!saw_header && chunk.type != ihdr) return PngDecodeError::invalid_order;
         if (saw_idat && chunk.type != idat) ended_idat = true;
@@ -962,4 +962,4 @@ PngDecodeResult decode_png_samples_discarding_metadata(std::span<const std::byte
     list_metadata(encoded, records);
     return result;
 }
-} // namespace gui_forms::image
+} // namespace stx_png

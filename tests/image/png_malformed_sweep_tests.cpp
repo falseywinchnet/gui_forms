@@ -67,7 +67,7 @@ std::vector<ChunkSpan> chunks_of(const Bytes& png) {
 
 void repair_crc(Bytes& png, const ChunkSpan& item) {
     const std::span<const std::byte> covered(png.data() + item.offset + 4U, item.length + 4U);
-    write32(png, item.offset + 8U + item.length, image::png_crc32(covered));
+    write32(png, item.offset + 8U + item.length, stx_zlib::crc32(covered));
 }
 
 constexpr std::uint32_t idat = 0x49444154U;

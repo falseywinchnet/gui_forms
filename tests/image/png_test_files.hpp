@@ -4,6 +4,7 @@
 // ancillary chunks before PLTE, and IDAT compressed by the owned encoder.
 // Decoded pixels depend only on the raw scanlines, never on the encoder.
 #include "../../src/core/image/png_writer.hpp"
+#include "stx_zlib/checksum.hpp"
 #include "stx_zlib/deflate.hpp"
 
 #include <algorithm>
@@ -34,7 +35,7 @@ inline void chunk(Bytes& data, const char* name, const Bytes& payload) {
     for (unsigned index = 0; index < 4; ++index) data.push_back(static_cast<std::byte>(name[index]));
     data.insert(data.end(), payload.begin(), payload.end());
     const std::span<const std::byte> checked(data.data() + begin, payload.size() + 4);
-    put32(data, gui_forms::image::png_crc32(checked));
+    put32(data, stx_zlib::crc32(checked));
 }
 
 // Compresses with the owned encoder; decoded pixels depend only on the raw

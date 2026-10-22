@@ -72,7 +72,7 @@ caller bytes it has copied.
 
 No finding beyond those listed for inflate.
 
-## PNG decoder (`src/core/image/png_decoder.cpp`)
+## PNG decoder (`stx_png/src/decoder.cpp`)
 
 | Function | R1 | R2 | R3 | R4 | R5 | R6 |
 |---|---|---|---|---|---|---|
@@ -107,7 +107,7 @@ No finding beyond those listed for inflate.
   PLTE/IDAT walk stops at an envelope that leaves the span.
   `png_color_tests` covers both cases.
 
-## PNG encoder (`src/core/image/png_writer.cpp`)
+## PNG encoder (`stx_png/src/encoder.cpp`)
 
 | Function | R1 | R2 | R3 | R4 | R5 | R6 |
 |---|---|---|---|---|---|---|
