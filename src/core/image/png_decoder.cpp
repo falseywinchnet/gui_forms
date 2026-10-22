@@ -825,11 +825,14 @@ PngDecodeResult measure_png_samples(std::span<const std::byte> encoded,
     return result;
 }
 
-PngDecodeResult decode_png_samples(std::span<const std::byte> encoded,
-    PngDecodeLimits limits, InflateStream& workspace, std::span<std::byte> rows,
-    std::span<std::uint16_t> rgba, std::span<std::byte> metadata,
-    std::span<PngMetadataRecord> records) noexcept {
-    PngDecodeResult result{};
+namespace {
+
+// Validation shared by both decode entries: mutually disjoint storage, the
+// structural parse, and row/sample/record capacity, all before any write.
+PngDecodeError prepare_decode(std::span<const std::byte> encoded, const PngDecodeLimits& limits,
+    const InflateStream& workspace, std::span<const std::byte> rows,
+    std::span<const std::uint16_t> rgba, std::span<const std::byte> metadata,
+    std::span<const PngMetadataRecord> records, Plan& plan) noexcept {
     const std::span<const InflateStream> workspace_objects(&workspace, 1);
     const std::span<const std::byte> workspace_bytes = std::as_bytes(workspace_objects);
     const std::span<const std::byte> sample_bytes = std::as_bytes(rgba);
@@ -838,30 +841,28 @@ PngDecodeResult decode_png_samples(std::span<const std::byte> encoded,
         encoded, workspace_bytes, rows, sample_bytes, metadata, record_bytes};
     for (std::size_t first = 0; first < buffers.size(); ++first) {
         for (std::size_t second = first + 1; second < buffers.size(); ++second) {
-            if (overlaps(buffers[first], buffers[second])) {
-                result.error = PngDecodeError::invalid_argument;
-                return result;
-            }
+            if (overlaps(buffers[first], buffers[second])) return PngDecodeError::invalid_argument;
         }
     }
-    Plan plan{};
-    result.error = parse(encoded, limits, plan);
-    if (result.error != PngDecodeError::none) return result;
-    result.layout = plan.layout;
+    const PngDecodeError parsed = parse(encoded, limits, plan);
+    if (parsed != PngDecodeError::none) return parsed;
     if (rows.size() < plan.layout.row_storage_bytes || rgba.size() < plan.layout.rgba_samples ||
         records.size() < plan.layout.metadata_records) {
-        result.error = PngDecodeError::insufficient_storage;
-        return result;
+        return PngDecodeError::insufficient_storage;
     }
+    return PngDecodeError::none;
+}
+
+// Reconstructs every pass into rgba, then drains the zlib trailer.
+PngDecodeError decode_image(std::span<const std::byte> encoded, const PngDecodeLimits& limits,
+    const Plan& plan, InflateStream& workspace, std::span<std::byte> rows,
+    std::span<std::uint16_t> rgba, PngDecodeResult& result) noexcept {
     InflateOptions options{};
     options.limits.input_bytes.value = plan.idat_bytes;
     options.limits.output_bytes.value = plan.layout.filtered_bytes;
     options.limits.work = limits.inflate_work;
     result.inflate_error = workspace.reset(options);
-    if (result.inflate_error != InflateError::none) {
-        result.error = PngDecodeError::inflate_failure;
-        return result;
-    }
+    if (result.inflate_error != InflateError::none) return PngDecodeError::inflate_failure;
     IdatReader reader{.chunk_offset = plan.idat_begin};
     const Scatter scatter_row = select_scatter(plan);
     for (unsigned index = 0; index < plan.pass_count; ++index) {
@@ -870,19 +871,89 @@ PngDecodeResult decode_png_samples(std::span<const std::byte> encoded,
         std::span<std::byte> previous = rows.subspan(pass.row_bytes + 1, pass.row_bytes + 1);
         std::fill(previous.begin(), previous.end(), std::byte{0});
         for (std::uint32_t y = 0; y < pass.height; ++y) {
-            result.error = read_image_bytes(encoded, plan, workspace, reader, current, false, result);
-            if (result.error != PngDecodeError::none) return result;
-            result.error = unfilter(byte(current[0]), current.subspan(1), previous.subspan(1), plan.filter_stride);
-            if (result.error != PngDecodeError::none) return result;
-            result.error = scatter_row(plan, pass, y, current.subspan(1), rgba);
-            if (result.error != PngDecodeError::none) return result;
+            PngDecodeError error = read_image_bytes(encoded, plan, workspace, reader, current, false, result);
+            if (error != PngDecodeError::none) return error;
+            error = unfilter(byte(current[0]), current.subspan(1), previous.subspan(1), plan.filter_stride);
+            if (error != PngDecodeError::none) return error;
+            error = scatter_row(plan, pass, y, current.subspan(1), rgba);
+            if (error != PngDecodeError::none) return error;
             std::swap(current, previous);
         }
     }
     // An empty output span permits trailer consumption but no extra image byte.
-    result.error = read_image_bytes(encoded, plan, workspace, reader, {}, true, result);
+    const PngDecodeError drained = read_image_bytes(encoded, plan, workspace, reader, {}, true, result);
+    return drained;
+}
+
+// Records for every ancillary chunk with no decoded storage: offsets and
+// lengths of decoded fields stay zero. The parse already proved each field.
+void list_metadata(std::span<const std::byte> encoded, std::span<PngMetadataRecord> records) noexcept {
+    std::size_t offset = 8;
+    std::size_t record_index = 0;
+    while (offset < encoded.size()) {
+        const Chunk chunk = chunk_at(encoded, offset);
+        offset = chunk.next;
+        if ((chunk.type & 0x20000000U) == 0) continue;
+        PngMetadataRecord record{};
+        record.type = chunk.type;
+        record.encoded_offset = chunk.data_offset;
+        record.encoded_length = chunk.length;
+        const std::span<const std::byte> data = encoded.subspan(chunk.data_offset, chunk.length);
+        std::size_t start = 0;
+        const PngDecodeError field_error = metadata_field<false>(chunk.type, data, record.compressed, start);
+        // Unreachable after a successful parse; the record stays uncompressed.
+        if (field_error != PngDecodeError::none) record.compressed = false;
+        records[record_index] = record;
+        ++record_index;
+    }
+}
+
+} // namespace
+
+PngDecodeResult decode_png_samples(std::span<const std::byte> encoded,
+    PngDecodeLimits limits, InflateStream& workspace, std::span<std::byte> rows,
+    std::span<std::uint16_t> rgba, std::span<std::byte> metadata,
+    std::span<PngMetadataRecord> records) noexcept {
+    PngDecodeResult result{};
+    Plan plan{};
+    result.error = prepare_decode(encoded, limits, workspace, rows, rgba, metadata, records, plan);
+    if (result.error != PngDecodeError::none) return result;
+    result.layout = plan.layout;
+    result.error = decode_image(encoded, limits, plan, workspace, rows, rgba, result);
     if (result.error != PngDecodeError::none) return result;
     result.error = decode_metadata(encoded, limits, workspace, metadata, records, result);
+    return result;
+}
+
+PngDecodeResult decode_png_samples_discarding_metadata(std::span<const std::byte> encoded,
+    PngDecodeLimits limits, InflateStream& workspace, std::span<std::byte> rows,
+    std::span<std::uint16_t> rgba, std::span<std::byte> scratch,
+    std::span<PngMetadataRecord> records) noexcept {
+    PngDecodeResult result{};
+    if (scratch.empty()) {
+        result.error = PngDecodeError::invalid_argument;
+        return result;
+    }
+    Plan plan{};
+    result.error = prepare_decode(encoded, limits, workspace, rows, rgba, scratch, records, plan);
+    if (result.error != PngDecodeError::none) return result;
+    result.layout = plan.layout;
+    result.error = decode_image(encoded, limits, plan, workspace, rows, rgba, result);
+    if (result.error != PngDecodeError::none) return result;
+    // Measurement validates each compressed field through the bounded scratch
+    // with the same quotas and text checks as storing it, then forgets it.
+    // Its work allowance is the whole quota, so the image's work is charged
+    // against the same quota by shrinking it first.
+    PngDecodeLimits remaining = limits;
+    remaining.inflate_work.value = limits.inflate_work.value - result.inflate_work.value;
+    PngDecodeResult measured{};
+    measured.error = measure_metadata(encoded, remaining, workspace, scratch, measured);
+    result.inflate_error = measured.inflate_error;
+    result.inflate_work.value += measured.inflate_work.value;
+    result.metadata_bytes = measured.metadata_bytes;
+    result.error = measured.error;
+    if (result.error != PngDecodeError::none) return result;
+    list_metadata(encoded, records);
     return result;
 }
 } // namespace gui_forms::image

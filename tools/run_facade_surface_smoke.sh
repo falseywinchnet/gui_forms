@@ -20,7 +20,14 @@ done
 }
 generated="$repo/generated/facade-v1"
 mac_build="$repo/build-abi-surface"
-windows_build="$repo/build-abi-windows-skia-smoke"
+# The Windows half runs Windows binaries under Wine. They are built natively
+# with MSYS2 CLANG64 (the GCC cross toolchain this script used is retired):
+# configure with -DGUI_FORMS_ENABLE_SKIA=ON -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON,
+# build gui_forms_c_api gui_drawing_c_api gui_drawing_raster_c_api
+# gui_forms_win32_compat gui_forms_windows_probe, copy the build directory
+# here and name it in GUI_FORMS_WINDOWS_BUILD. Every Windows binary links its
+# runtimes statically, so no runtime DLL is staged beside them.
+windows_build=${GUI_FORMS_WINDOWS_BUILD:-"$repo/build-abi-windows-skia-smoke"}
 smoke_output="$repo/tools/facade_smoke/bin/Release/net10.0"
 behavior_output="$repo/tools/facade_behavior_smoke/bin/Release/net10.0"
 
@@ -62,13 +69,12 @@ rg -q 'property-grid=native:true\|multi:true\|clone:true\|sort:true\|selection-e
 rg -q 'lifecycle-order=load>input>closing>closed' "$behavior_host_log"
 unlink "$behavior_host_log"
 
-cmake -S "$repo" -B "$windows_build" \
-  -DCMAKE_TOOLCHAIN_FILE="$repo/cmake/toolchains/x86_64-w64-mingw32.cmake" \
-  -DGUI_FORMS_BUILD_GALLERY=OFF -DGUI_FORMS_ENABLE_SKIA=ON \
-  -DGUI_FORMS_SKIA_PREBUILT=ON \
-  -DGUI_FORMS_SKIA_OUT="$repo/third_party/skia/out/gui_forms-cpu-windows-mingw" \
-  -DGUI_FORMS_ENABLE_WINDOWS_HOST=ON -DGUI_FORMS_BUILD_TESTS=OFF
-cmake --build "$windows_build" --target gui_forms_c_api gui_drawing_c_api gui_drawing_raster_c_api gui_forms_win32_compat gui_forms_windows_probe --parallel
+for windows_binary in gui_forms_abi0.dll gui_forms_win32_compat.dll gui_drawing_abi0.dll gui_drawing_raster0.dll gui_forms_windows_probe.exe; do
+  [ -f "$windows_build/$windows_binary" ] || {
+    echo "$windows_build/$windows_binary missing: build the Windows binaries with CLANG64 (see GUI_FORMS_WINDOWS_BUILD above)" >&2
+    exit 1
+  }
+done
 cp "$windows_build/gui_forms_abi0.dll" "$smoke_output/"
 cp "$windows_build/gui_forms_abi0.dll" "$behavior_output/"
 cp "$windows_build/gui_forms_win32_compat.dll" "$smoke_output/"
@@ -82,8 +88,6 @@ cp "$windows_build/fonts/PortsmouthRapids.ttf" "$smoke_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids-Bold.ttf" "$smoke_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids.ttf" "$behavior_output/fonts/"
 cp "$windows_build/fonts/PortsmouthRapids-Bold.ttf" "$behavior_output/fonts/"
-"$repo/tools/stage_mingw_runtime.sh" "$smoke_output"
-"$repo/tools/stage_mingw_runtime.sh" "$behavior_output"
 for dependency in Microsoft.Win32.SystemEvents.dll System.Formats.Nrbf.dll System.Private.Windows.Core.dll System.Private.Windows.GdiPlus.dll; do
   cp "$windows_runtime/$dependency" "$smoke_output/"
   cp "$windows_runtime/$dependency" "$behavior_output/"
