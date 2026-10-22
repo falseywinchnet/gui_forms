@@ -225,12 +225,12 @@ PngColorResolution resolve_png_color(std::span<const std::byte> encoded,
             saw_srgb = true;
         } else if (record.type == gama) {
             colour.gamma = read32(data, 0);
-            colour.has_gamma = true;
         } else if (record.type == chrm) {
-            for (std::size_t index = 0; index < colour.chromaticities.size(); ++index) {
-                colour.chromaticities[index] = read32(data, index * 4U);
+            std::array<std::uint32_t, 8> stored{};
+            for (std::size_t index = 0; index < stored.size(); ++index) {
+                stored[index] = read32(data, index * 4U);
             }
-            colour.has_chromaticities = true;
+            colour.chromaticities = stored;
         }
     }
     if (saw_cicp) {
@@ -249,19 +249,19 @@ PngColorResolution resolve_png_color(std::span<const std::byte> encoded,
         colour.source = PngColorSource::srgb_chunk;
         return result;
     }
-    if (colour.has_gamma && (colour.gamma < gamma_minimum || colour.gamma > gamma_maximum)) {
-        colour.has_gamma = false;
+    if (colour.gamma.has_value() && (*colour.gamma < gamma_minimum || *colour.gamma > gamma_maximum)) {
+        colour.gamma.reset();
         colour.ignored_gamma = true;
     }
-    if (colour.has_chromaticities) {
+    if (colour.chromaticities.has_value()) {
         Matrix3 unused{};
         Vector3 white{};
-        if (!primaries_to_xyz(colour.chromaticities, unused, white)) {
-            colour.has_chromaticities = false;
+        if (!primaries_to_xyz(*colour.chromaticities, unused, white)) {
+            colour.chromaticities.reset();
             colour.ignored_chromaticities = true;
         }
     }
-    colour.source = colour.has_gamma || colour.has_chromaticities
+    colour.source = colour.gamma.has_value() || colour.chromaticities.has_value()
         ? PngColorSource::gamma_chromaticity : PngColorSource::srgb_default;
     return result;
 }
@@ -276,21 +276,22 @@ bool convert_png_samples_to_srgb(const PngColorEncoding& encoding, unsigned dept
     const std::size_t entries = wide ? 65536U : 256U;
     const std::uint32_t step = wide ? 1U : 257U;
     work.linear.resize(entries);
-    const double exponent = encoding.has_gamma ? 100000.0 / static_cast<double>(encoding.gamma) : 0.0;
+    const bool stated_gamma = encoding.gamma.has_value();
+    const double exponent = stated_gamma ? 100000.0 / static_cast<double>(*encoding.gamma) : 0.0;
     for (std::size_t index = 0; index < entries; ++index) {
         const double encoded = static_cast<double>(index * step) / 65535.0;
-        work.linear[index] = encoding.has_gamma ? engine_power(encoded, exponent) : srgb_decode(encoded);
+        work.linear[index] = stated_gamma ? engine_power(encoded, exponent) : srgb_decode(encoded);
     }
 
     // 2. Gamut matrix, or none.
     bool matrix_step = false;
     Matrix3 to_srgb{};
-    if (encoding.has_chromaticities) {
+    if (encoding.chromaticities.has_value()) {
         Matrix3 image_primaries{};
         Vector3 image_white{};
         Matrix3 srgb_primaries{};
         Vector3 d65{};
-        const bool image_valid = primaries_to_xyz(encoding.chromaticities, image_primaries, image_white);
+        const bool image_valid = primaries_to_xyz(*encoding.chromaticities, image_primaries, image_white);
         const bool srgb_valid = primaries_to_xyz(srgb_chromaticities, srgb_primaries, d65);
         if (!image_valid || !srgb_valid) return false;
         const Matrix3 adapted = multiply(bradford(image_white, d65), image_primaries);

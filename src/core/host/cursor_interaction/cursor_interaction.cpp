@@ -31,8 +31,13 @@ HostServiceStatus CursorStatus::host_status() const noexcept {
     case CursorError::stale_window:
     case CursorError::stale_metrics: return {HostServiceError::invalid_argument};
     case CursorError::closing: return {HostServiceError::after_shutdown};
-    default: return {HostServiceError::backend_failure};
+    case CursorError::denied:
+    case CursorError::busy:
+    case CursorError::revoked:
+    case CursorError::native_failure: return {HostServiceError::backend_failure};
     }
+    // An error outside the enumeration is the backend's failure.
+    return {HostServiceError::backend_failure};
 }
 CursorHiddenLease::CursorHiddenLease(std::shared_ptr<CursorLeaseState> state) : state_(std::move(state)) {}
 CursorHiddenLease::~CursorHiddenLease() { static_cast<void>(release()); }

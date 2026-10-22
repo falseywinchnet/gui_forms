@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <vector>
 
@@ -54,12 +55,11 @@ enum class PngColorError { none, unsupported_color_profile, invalid_color_metada
 
 struct PngColorEncoding final {
     PngColorSource source = PngColorSource::srgb_default;
-    bool has_gamma = false;
-    // gAMA's stored value: image gamma times 100000.
-    std::uint32_t gamma = 0;
-    bool has_chromaticities = false;
-    // cHRM's stored values times 100000: white x, y; red x, y; green x, y; blue x, y.
-    std::array<std::uint32_t, 8> chromaticities{};
+    // gAMA's stored value: image gamma times 100000; none without a usable gAMA.
+    std::optional<std::uint32_t> gamma{};
+    // cHRM's stored values times 100000: white x, y; red x, y; green x, y;
+    // blue x, y; none without a usable cHRM.
+    std::optional<std::array<std::uint32_t, 8>> chromaticities{};
     bool ignored_gamma = false;
     bool ignored_chromaticities = false;
 
