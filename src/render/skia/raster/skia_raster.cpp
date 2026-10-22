@@ -11,6 +11,7 @@
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/png_writer.hpp"
 
 #include "include/core/SkCanvas.h"
 #include "include/core/SkBlurTypes.h"
@@ -27,7 +28,6 @@
 #include "include/core/SkRRect.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
-#include "include/encode/SkPngEncoder.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "include/effects/SkGradient.h"
 
@@ -643,14 +643,22 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
         pixmap.width() <= 0 || pixmap.height() <= 0) {
         return result;
     }
-    // The front surface is premultiplied RGBA8; the encoder unpremultiplies
-    // so the file carries straight alpha as every PNG consumer expects.
-    SkDynamicMemoryWStream stream;
-    if (!SkPngEncoder::Encode(&stream, pixmap, {})) return result;
-    const sk_sp<SkData> data = stream.detachAsData();
-    if (!data || (*data).size() == 0) return result;
-    result.resize((*data).size());
-    std::memcpy(result.data(), (*data).data(), result.size());
+    // The front surface is premultiplied 8-bit RGBA or BGRA; the shared owned
+    // encoder unpremultiplies so the file carries straight alpha, as on
+    // every host.
+    const bool rgba = pixmap.colorType() == kRGBA_8888_SkColorType;
+    const bool bgra = pixmap.colorType() == kBGRA_8888_SkColorType;
+    if ((!rgba && !bgra) || pixmap.alphaType() != kPremul_SkAlphaType) return result;
+    gui_forms::image::PngEncodeInput input{};
+    input.width = static_cast<std::uint32_t>(pixmap.width());
+    input.height = static_cast<std::uint32_t>(pixmap.height());
+    input.row_bytes = pixmap.rowBytes();
+    input.pixels = std::span<const std::byte>(static_cast<const std::byte*>(pixmap.addr()),
+                                              pixmap.computeByteSize());
+    input.order = rgba ? gui_forms::image::PngChannelOrder::rgba
+                       : gui_forms::image::PngChannelOrder::bgra;
+    input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
+    if (!gui_forms::image::encode_png(input, result)) result.clear();
     return result;
 }
 

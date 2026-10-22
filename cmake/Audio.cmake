@@ -114,4 +114,7 @@ if(GUI_FORMS_AUDIO_VORBIS_BACKEND STREQUAL "stb")
 else()
     install(FILES "${_gui_audio_root}/stx_vorbis/LICENSE"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME stx_vorbis-LICENSE.txt)
+    # stx_vorbis compiles BFFT's BODFT sources (stx_vorbis/third_party/bfft).
+    install(FILES "${_gui_audio_root}/stx_vorbis/third_party/bfft/LICENSE"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME bfft-LICENSE.txt)
 endif()

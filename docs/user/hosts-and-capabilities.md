@@ -169,8 +169,8 @@ The host presents pixels; it does not paint them. Painting goes through the
 
 - A CPU-only Skia build (no GPU backend, no font backend, PNG as the only
   codec) on macOS and Linux, confined to `src/render/skia/`. PNG decoding
-  on every host uses the shared owned decoder in `src/core/image/`; Skia
-  still encodes PNG until the owned encoder replaces it.
+  and encoding on every host use the shared owned codec in
+  `src/core/image/` (on stx_zlib), not Skia's or the platform's.
 - A DIB compositor on Windows that implements the same blending arithmetic
   byte for byte.
 
