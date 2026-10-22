@@ -3797,3 +3797,9 @@ if(gui_forms_font_programs)
         add_dependencies(${font_target} gui_forms_program_fonts)
     endforeach()
 endif()
+
+# Every test carries one area label (cmake/TestAreas.cmake, tools/test_areas.json).
+if(GUI_FORMS_BUILD_TESTS)
+    include(cmake/TestAreas.cmake)
+    gui_forms_label_test_areas(stx_zlib stx_png)
+endif()

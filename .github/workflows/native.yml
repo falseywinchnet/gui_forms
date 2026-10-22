@@ -48,6 +48,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
           python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
+          python3 -B -m unittest discover -s tools -p test_change_selection.py
           python3 -B -m unittest discover -s tools -p test_native_tests.py
           python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
   docs:
@@ -67,9 +68,10 @@ jobs:
           path: docs/_build/html
           retention-days: 30
   # House style section 5: memory errors and undefined behaviour are defects,
-  # tests included. The whole suite runs under AddressSanitizer,
-  # UndefinedBehaviorSanitizer and LeakSanitizer; any report stops its test
-  # and fails the job. Make it a required check on main (branch protection).
+  # tests included. The suite (on a pull request, the tests its changes can
+  # affect) runs under AddressSanitizer, UndefinedBehaviorSanitizer and
+  # LeakSanitizer; any report stops its test and fails the job. Make it a
+  # required check on main (branch protection).
   sanitizers:
     name: Sanitizers (Linux, ASan + UBSan + LSan)
     needs: house-style
@@ -81,10 +83,13 @@ jobs:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
+      # The whole history, so a pull request's changed paths are taken from its
+      # merge base (tools/change_selection.py).
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -156,10 +161,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
-      - name: Build and test the whole suite under the sanitizers
+      # A pull request builds and runs only the tests its changed paths can
+      # affect (the areas of tools/test_areas.json; every test when it touches
+      # CMake, the toolchain, the core headers or this workflow). A push to
+      # main runs the whole suite.
+      - name: Build and test under the sanitizers
+        env:
+          CHANGED_FROM: ${{ github.event.pull_request.base.sha }}
         run: |
           ccache --zero-stats
-          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize
+          selection=""
+          if [ -n "$CHANGED_FROM" ]; then
+            selection="--changed-from $CHANGED_FROM"
+          fi
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize $selection
       - name: Report cache statistics
         if: always()
         run: ccache --show-stats --verbose
