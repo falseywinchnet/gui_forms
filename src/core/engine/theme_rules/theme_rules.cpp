@@ -429,7 +429,11 @@ void CompiledThemeRules::add_transitions(std::vector<RuleDiagnostic>& diagnostic
         double minimum = 0.0;
         double maximum = 1.0;
         if (transition.property == opacity_property) {
-            made.opacity = true;
+            made.property = PresentationProperty::opacity;
+        } else if (transition.property == scale_property) {
+            made.property = PresentationProperty::scale;
+            minimum = minimum_presentational_scale;
+            maximum = maximum_presentational_scale;
         } else {
             if (compiled.primitive == nullptr) {
                 diagnostics.push_back(
@@ -455,7 +459,7 @@ void CompiledThemeRules::add_transitions(std::vector<RuleDiagnostic>& diagnostic
         }
         bool repeated = false;
         for (const CompiledTransition& earlier : compiled.transitions) {
-            if (earlier.opacity == made.opacity && earlier.parameter == made.parameter) repeated = true;
+            if (earlier.property == made.property && earlier.parameter == made.parameter) repeated = true;
         }
         if (repeated) {
             diagnostics.push_back(
@@ -611,9 +615,11 @@ void CompiledThemeRules::resolve_primitive(const PartFacts& facts, const Compile
 }
 
 void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution& result) const noexcept {
-    // The last matching declaration of each property wins: opacity from any
-    // rule, a parameter only from the rules selecting the part's primitive.
+    // The last matching declaration of each property wins: opacity and
+    // scale from any rule, a parameter only from the rules selecting the
+    // part's primitive.
     const CompiledTransition* opacity = nullptr;
+    const CompiledTransition* scale = nullptr;
     std::array<const CompiledTransition*, maximum_primitive_parameters> parameters{};
     const bool primitive = result.outcome == Outcome::primitive;
     for (const CompiledRule& rule : rules_) {
@@ -621,8 +627,10 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
         if (rule.ambient) result.ambient = &*rule.ambient;
         const bool same_primitive = primitive && rule.primitive == result.primitive;
         for (const CompiledTransition& transition : rule.transitions) {
-            if (transition.opacity) {
+            if (transition.property == PresentationProperty::opacity) {
                 opacity = &transition;
+            } else if (transition.property == PresentationProperty::scale) {
+                scale = &transition;
             } else if (same_primitive) {
                 parameters[transition.parameter] = &transition;
             }
@@ -631,6 +639,10 @@ void CompiledThemeRules::resolve_transitions(const PartFacts& facts, Resolution&
     result.transition_count = 0U;
     if (opacity != nullptr) {
         result.transitions[result.transition_count] = opacity;
+        result.transition_count = result.transition_count + 1U;
+    }
+    if (scale != nullptr) {
+        result.transitions[result.transition_count] = scale;
         result.transition_count = result.transition_count + 1U;
     }
     for (std::size_t index = 0; index < result.parameters.count; ++index) {

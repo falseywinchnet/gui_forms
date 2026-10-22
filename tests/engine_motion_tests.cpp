@@ -178,7 +178,7 @@ void machines_are_rule_data() {
         built_in.resolve(facts_of("ribbon", "command_face", PartRole::face));
     require(face.outcome == CompiledThemeRules::Outcome::primitive &&
                 (*face.primitive).descriptor().name == "dithered_bulge" && face.transition_count == 1U &&
-                !(*face.transitions[0]).opacity && (*face.transitions[0]).parameter == 0U &&
+                (*face.transitions[0]).property == PresentationProperty::parameter && (*face.transitions[0]).parameter == 0U &&
                 face.level == CascadeLevel::built_in,
             "a ribbon command face takes the dithered bulge with its amplitude's rise, at the built-in level");
     AnatomyStateSet checked{};
@@ -190,7 +190,7 @@ void machines_are_rule_data() {
     const CompiledThemeRules::Resolution tile = built_in.resolve(facts_of("dock_site", "tile", PartRole::actuator));
     require(tile.outcome == CompiledThemeRules::Outcome::primitive &&
                 (*tile.primitive).descriptor().name == "pill_plate" && tile.transition_count == 1U &&
-                (*tile.transitions[0]).opacity && (*tile.transitions[0]).states.size() == 2U,
+                (*tile.transitions[0]).property == PresentationProperty::opacity && (*tile.transitions[0]).states.size() == 2U,
             "a docking tile is the pill plate (E8) with its opacity's fade");
     AnatomyStateSet lit{};
     lit.insert(AnatomyState::selected);
@@ -198,7 +198,7 @@ void machines_are_rule_data() {
         built_in.resolve(facts_of("dock_site", "tile", PartRole::actuator, lit));
     require(gold.outcome == CompiledThemeRules::Outcome::primitive &&
                 (*gold.primitive).descriptor().name == "gold_plate" && gold.transition_count == 1U &&
-                (*gold.transitions[0]).opacity,
+                (*gold.transitions[0]).property == PresentationProperty::opacity,
             "a lit tile is the gold plate, and fades as any tile");
     const CompiledThemeRules::Resolution other = built_in.resolve(facts_of("button", "face", PartRole::face));
     require(other.outcome == CompiledThemeRules::Outcome::no_rule && other.transition_count == 0U,
@@ -273,7 +273,7 @@ void machines_are_rule_data() {
             "ten diagnostics; the rule left with nothing is dropped, the others stand");
     const CompiledThemeRules::Resolution label = checked_rules.resolve(facts_of("label", "text", PartRole::label));
     require(label.outcome == CompiledThemeRules::Outcome::no_rule && label.transition_count == 1U &&
-                (*label.transitions[0]).opacity,
+                (*label.transitions[0]).property == PresentationProperty::opacity,
             "a rule declaring only an opacity transition stands, without a primitive");
 }
 

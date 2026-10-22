@@ -254,6 +254,15 @@ public:
     // primitive says otherwise. `parameters` match the declarations.
     [[nodiscard]] virtual PartShape shape(const PrimitiveParameterBlock& parameters) const noexcept;
 
+    // How far inside a part of `logical` size, at display `scale` and the
+    // window's `text_scale`, its text may begin (E8, T1's hand-off: text is
+    // published as a layout slot, ThemeEngine::text_slot). In logical
+    // units; the slot inside them lies within the shape the primitive
+    // draws. None unless the primitive says otherwise. `parameters` match
+    // the declarations; `logical` and `scale` are positive and finite.
+    [[nodiscard]] virtual Insets content_insets(const PrimitiveParameterBlock& parameters, Size logical,
+                                                DeviceScale scale, double text_scale) const noexcept;
+
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`
     // unchanged. Its cost is the descriptor's preparation_per_device_pixel

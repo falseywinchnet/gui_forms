@@ -156,8 +156,8 @@ std::optional<std::size_t> machine_state(const CompiledTransition& transition, A
     return std::nullopt;
 }
 
-// A property's range: [0, 1] for opacity, the parameter's declared range
-// otherwise.
+// A property's range: [0, 1] for opacity, the presentational scale's for
+// scale, the parameter's declared range otherwise.
 struct PropertyRange final {
     double minimum{};
     double maximum{1.0};
@@ -165,7 +165,12 @@ struct PropertyRange final {
 
 PropertyRange property_range(const CompiledTransition& transition, const PrimitiveDescriptor* descriptor) noexcept {
     PropertyRange range{};
-    if (transition.opacity || descriptor == nullptr) return range;
+    if (transition.property == PresentationProperty::scale) {
+        range.minimum = minimum_presentational_scale;
+        range.maximum = maximum_presentational_scale;
+        return range;
+    }
+    if (transition.property == PresentationProperty::opacity || descriptor == nullptr) return range;
     const PrimitiveParameterDeclaration& declared = (*descriptor).parameters[transition.parameter];
     range.minimum = declared.minimum;
     range.maximum = declared.maximum;
@@ -173,21 +178,31 @@ PropertyRange property_range(const CompiledTransition& transition, const Primiti
 }
 
 // The value a property rests at when the part's states match no machine
-// state: its cascade value, or 1 for opacity.
+// state: its cascade value, or 1 for opacity and scale.
 double rest_value(const CompiledTransition& transition, const PrimitiveParameterBlock& parameters) noexcept {
-    if (transition.opacity) return 1.0;
+    if (transition.property != PresentationProperty::parameter) return 1.0;
     const double value = parameters.values[transition.parameter].number;
     return value;
 }
 
-// Shows a transition's value: the part's opacity, or its parameter,
-// clamped to the property's range.
+// The engine properties a part is shown with this paint.
+struct PresentedProperties final {
+    double opacity{1.0};
+    double scale{1.0};
+};
+
+// Shows a transition's value: the part's opacity or scale, or its
+// parameter, clamped to the property's range.
 void show_value(const CompiledTransition& transition, double value, PropertyRange range,
-                PrimitiveParameterBlock& parameters, double& opacity) noexcept {
+                PrimitiveParameterBlock& parameters, PresentedProperties& presented) noexcept {
     const double raised = std::max(value, range.minimum);
     const double shown = std::min(raised, range.maximum);
-    if (transition.opacity) {
-        opacity = shown;
+    if (transition.property == PresentationProperty::opacity) {
+        presented.opacity = shown;
+        return;
+    }
+    if (transition.property == PresentationProperty::scale) {
+        presented.scale = shown;
         return;
     }
     parameters.values[transition.parameter].number = shown;
@@ -204,15 +219,16 @@ double settle_extent(PropertyRange range, double scale) noexcept {
 }
 
 // Runs the part's presentational state machines for one paint and shows
-// their values: a parameter's in `parameters`, the opacity returned. A
+// their values: a parameter's in `parameters`, opacity and scale returned. A
 // part with a record moves each property on its motion value, retargeting
 // from the value shown; one without stands each property at its target.
 // Parameter transitions run only while a primitive draws the part
 // (`descriptor` set). A record's values for properties no longer
 // transitioned are released.
-double run_transitions(const CompiledThemeRules::Resolution& resolution, const PartTransitionSources& sources,
-                       const PrimitiveDescriptor* descriptor, PrimitiveParameterBlock& parameters) {
-    double opacity = 1.0;
+PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolution,
+                                    const PartTransitionSources& sources, const PrimitiveDescriptor* descriptor,
+                                    PrimitiveParameterBlock& parameters) {
+    PresentedProperties presented{};
     EnginePartRecord* const record = sources.owner ? sources.record : nullptr;
     PartMotion* motion = nullptr;
     if (record != nullptr && resolution.transition_count > 0U) {
@@ -222,12 +238,12 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
     std::array<bool, maximum_part_transitions> used{};
     for (std::size_t index = 0; index < resolution.transition_count; ++index) {
         const CompiledTransition& transition = *resolution.transitions[index];
-        if (!transition.opacity && descriptor == nullptr) continue;
+        if (transition.property == PresentationProperty::parameter && descriptor == nullptr) continue;
         const PropertyRange range = property_range(transition, descriptor);
         const std::optional<std::size_t> state = machine_state(transition, sources.states);
         const double target = state ? transition.states[*state].target : rest_value(transition, parameters);
         if (motion == nullptr) {
-            show_value(transition, target, range, parameters, opacity);
+            show_value(transition, target, range, parameters, presented);
             continue;
         }
         // The channel already running this property, else the first free one.
@@ -235,7 +251,9 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
         for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
             const PartTransitionChannel& running = (*motion).channels[channel];
             if (!running.value || used[channel]) continue;
-            if (running.opacity == transition.opacity && running.parameter == transition.parameter) chosen = channel;
+            if (running.property == transition.property && running.parameter == transition.parameter) {
+                chosen = channel;
+            }
         }
         for (std::size_t channel = 0; chosen == maximum_part_transitions && channel < maximum_part_transitions;
              ++channel) {
@@ -249,7 +267,7 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
         if (!channel.value) {
             // The part appears in its state: at the state's entry value if
             // it has one, else at its target.
-            channel.opacity = transition.opacity;
+            channel.property = transition.property;
             channel.parameter = transition.parameter;
             channel.state = state;
             const double initial = entry ? *entry : target;
@@ -266,7 +284,7 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
         }
         MotionValue& value = *channel.value;
         static_cast<void>(value.animate_to(target));
-        show_value(transition, value.current(), range, parameters, opacity);
+        show_value(transition, value.current(), range, parameters, presented);
     }
     if (motion != nullptr) {
         for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
@@ -279,7 +297,65 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
         (*record).motion.reset();
         (*record).motion_unsettled = false;
     }
-    return opacity;
+    return presented;
+}
+
+// Whether the part's transitions include its scale.
+bool scales(const CompiledThemeRules::Resolution& resolution) noexcept {
+    for (std::size_t index = 0; index < resolution.transition_count; ++index) {
+        if ((*resolution.transitions[index]).property == PresentationProperty::scale) return true;
+    }
+    return false;
+}
+
+// The largest scale at which `bounds`, grown about its centre, stays within
+// the overflow its control grants: no more than 1 when none is granted.
+double granted_scale(Rect bounds, Insets overflow) noexcept {
+    double limit = maximum_presentational_scale;
+    if (bounds.width > 0.0) {
+        const double across = 1.0 + 2.0 * std::min(overflow.left, overflow.right) / bounds.width;
+        limit = std::min(limit, across);
+    }
+    if (bounds.height > 0.0) {
+        const double down = 1.0 + 2.0 * std::min(overflow.top, overflow.bottom) / bounds.height;
+        limit = std::min(limit, down);
+    }
+    const double granted = std::max(1.0, limit);
+    return granted;
+}
+
+// `bounds` less `insets`, each axis shrinking to the centre line of
+// `bounds` where the insets leave no room on it.
+Rect slot_within(Rect bounds, Insets insets) noexcept {
+    Rect slot{bounds.x + insets.left, bounds.y + insets.top, bounds.width - insets.left - insets.right,
+              bounds.height - insets.top - insets.bottom};
+    if (!(slot.width > 0.0)) {
+        slot.x = bounds.x + bounds.width * 0.5;
+        slot.width = 0.0;
+    }
+    if (!(slot.height > 0.0)) {
+        slot.y = bounds.y + bounds.height * 0.5;
+        slot.height = 0.0;
+    }
+    return slot;
+}
+
+// `bounds` at `scale` about its centre.
+Rect scaled_about_centre(Rect bounds, double scale) noexcept {
+    const double width = bounds.width * scale;
+    const double height = bounds.height * scale;
+    const Rect scaled{bounds.x + (bounds.width - width) * 0.5, bounds.y + (bounds.height - height) * 0.5, width,
+                      height};
+    return scaled;
+}
+
+// The part as shown at its presentational scale: its bounds grown or
+// shrunk about their centre, the growth clamped to the granted overflow.
+PartPaint scaled_part(const PartPaint& part, double scale) noexcept {
+    PartPaint shown = part;
+    const double granted = std::min(scale, granted_scale(part.bounds, part.granted_overflow));
+    if (granted != 1.0) shown.bounds = scaled_about_centre(part.bounds, granted);
+    return shown;
 }
 
 // How far past its bounds the built-in recipe may draw a part that is not
@@ -375,6 +451,18 @@ PartHitRegion ThemeEngine::hit_region(const Control& control, const PartPaint& p
     return region;
 }
 
+Rect ThemeEngine::text_slot(const Control& control, const PartPaint& part) const noexcept {
+    const PartPlan decided = plan(control, part);
+    if (decided.drawing != PartDrawing::primitive) return part.bounds;
+    const Window* const window = control.attached_window();
+    const double text_scale = (*window).presentation_settings().text_scale;
+    const Size logical{part.bounds.width, part.bounds.height};
+    const Insets insets = (*decided.resolution.primitive)
+                              .content_insets(decided.resolution.parameters, logical, decided.scale, text_scale);
+    const Rect slot = slot_within(part.bounds, insets);
+    return slot;
+}
+
 void ThemeEngine::paint(Painter& painter, const Control& control, const PartPaint& part) const {
     Window* const window = control.attached_window();
     std::optional<PartRecordHandle> record{};
@@ -396,6 +484,13 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
             outsets = (*resolution.primitive).descriptor().outsets;
             inputs_read = resolution.inputs_read;
         }
+        // A part that scales may draw anywhere in its granted overflow.
+        if (scales(resolution)) {
+            outsets.left = outsets.left + part.granted_overflow.left;
+            outsets.top = outsets.top + part.granted_overflow.top;
+            outsets.right = outsets.right + part.granted_overflow.right;
+            outsets.bottom = outsets.bottom + part.granted_overflow.bottom;
+        }
         extent = part_extent(part.bounds, place.origin, outsets);
         (*window).note_engine_paint(*record, inputs_read, *place.painted_by, extent);
     }
@@ -410,8 +505,9 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     if (!primitive_draws) {
         if (kept != nullptr) stop_ambient(*window, *kept, *record);
         PrimitiveParameterBlock unused{};
-        const double opacity = run_transitions(resolution, transitions, nullptr, unused);
-        paint_built_in(painter, control, part, opacity);
+        const PresentedProperties presented = run_transitions(resolution, transitions, nullptr, unused);
+        const PartPaint shown = scaled_part(part, presented.scale);
+        paint_built_in(painter, control, shown, presented.opacity);
         return;
     }
     PartRasterRequest request{};
@@ -444,10 +540,31 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     for (std::size_t index = 0; index < engine_input_count; ++index) request.target.inputs[index] = inputs[index];
     evaluate_expressions(resolution, inputs, part.states, request.parameters);
     const PrimitiveDescriptor& descriptor = (*request.primitive).descriptor();
-    const double opacity = run_transitions(resolution, transitions, &descriptor, request.parameters);
+    const PresentedProperties presented = run_transitions(resolution, transitions, &descriptor, request.parameters);
+    const double opacity = presented.opacity;
     // A part at opacity 0, or one its primitive draws as nothing (a flat
     // bulge), composites nothing and needs no raster.
     if (opacity <= 0.0 || (*request.primitive).blank(request.parameters)) return;
+    // A scaled part is drawn at its scaled size (D5-1), so that its edges
+    // stay sharp; one whose scaled raster would not fit, or would break the
+    // animated frame budget, is drawn at its own size.
+    PartPaint shown = scaled_part(part, presented.scale);
+    if (shown.bounds != part.bounds) {
+        const double scale = decided.scale.value;
+        const DeviceExtent scaled{device_side(shown.bounds.width, scale), device_side(shown.bounds.height, scale)};
+        const std::uint64_t pixels =
+            static_cast<std::uint64_t>(scaled.width) * static_cast<std::uint64_t>(scaled.height);
+        const std::uint64_t operations =
+            pixels * static_cast<std::uint64_t>(descriptor.cost.per_device_pixel) + descriptor.cost.fixed;
+        const bool within = scaled.width > 0U && scaled.height > 0U &&
+                            (!animated(descriptor) || operations <= maximum_animated_operations_per_frame);
+        if (within) {
+            request.target.logical_size = Size{shown.bounds.width, shown.bounds.height};
+            request.extent = scaled;
+        } else {
+            shown = part;
+        }
+    }
     std::shared_ptr<const PartRaster> raster{};
     if (record) {
         const PartRasterResult drawn = (*window).engine_part_raster(*record, request);
@@ -467,10 +584,10 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         if (painted) raster = std::move(own);
     }
     if (!raster) {
-        paint_built_in(painter, control, part, opacity);
+        paint_built_in(painter, control, shown, opacity);
         return;
     }
-    painter.draw_part_raster(raster, Point{part.bounds.x, part.bounds.y}, opacity);
+    painter.draw_part_raster(raster, Point{shown.bounds.x, shown.bounds.y}, opacity);
 }
 
 double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
