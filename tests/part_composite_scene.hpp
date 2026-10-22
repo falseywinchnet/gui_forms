@@ -112,7 +112,7 @@ inline constexpr std::array<std::array<std::uint64_t, 3>, 9> expected_groups{{
     {0xbbdc19788bd13499ULL, 0x6c3059a7826c9bb9ULL, 0x776795552a69caadULL},
     {0xc183a2164b45b65bULL, 0xec6594a4e86abc22ULL, 0x25f850baee2383daULL},
     {0x71f66f11bdc74903ULL, 0xf3ace0f9d5950c23ULL, 0xf99dba7b260b4d83ULL},
-    {0xb7e1be8974d909b7ULL, 0xfbda12fc24dd18d1ULL, 0xd88aee9b15622aadULL},
+    {0x1dccba5d934eafaaULL, 0xb366485acb055227ULL, 0xae0d2722293c7987ULL},
     {0x71f66f11bdc74903ULL, 0xf3ace0f9d5950c23ULL, 0xf99dba7b260b4d83ULL},
     {0x76930cce6775bc50ULL, 0xf84b6b81bb71753bULL, 0x8909e0d61d0afca7ULL},
     {0x507848af44929242ULL, 0x8a75fbb0401ef37bULL, 0x94620dda471017e3ULL},

@@ -2284,6 +2284,12 @@ public:
         row_origin_ = area.top;
         row_end_ = area.bottom;
         maintain_alpha_ = true;
+        // Inside, the group's whole image: the clip in force at its start,
+        // fractional edges and rounded corners included, applies once, when
+        // the image is composited (as on every other host).
+        states_.back().clip = Rect{area.left / scale_, area.top / scale_, (area.right - area.left) / scale_,
+                                   (area.bottom - area.top) / scale_};
+        states_.back().rounded_clip.reset();
     }
 
     void end_group() override {
