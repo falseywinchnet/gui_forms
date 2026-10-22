@@ -1,0 +1,29 @@
+{
+  "source_sha256": {
+    "src/core/compression/inflate.cpp": "09d188197c8911803e7f70d024eb727a044d7809f87065d3ae4011665972b08f",
+    "include/gui_forms/compression/inflate.hpp": "6f136007584e278c0ef20a9e8e74f0f445c4375aa127bcda2402faf1feb28ea0",
+    "tests/compression/inflate_tests.cpp": "e71f5d52a327c1d3600a0f953ca7db1db6b5e5688e17e18aa6d7873c5575194f",
+    "tests/compression/inflate_fixture.hpp": "81771089e399b01c9b7ad313ca5f2546d8e29faefeaf43fed3fdf7a2a8085117",
+    "fuzz/inflate_fuzz.cpp": "60fd0d0f87d7b47ef7990c47438fb8eeb7157bb79379dbdc1d6389c5a8c81a4d"
+  },
+  "host": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "compilers": {
+    "clang": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n",
+    "clang++": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n"
+  },
+  "oracle_revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+  "strict": false,
+  "seconds": 61.40330712497234,
+  "exit_code": 0,
+  "fuzz_command": [
+    "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/inflate-release-ordinary/inflate-fuzz",
+    "-seed=20261019",
+    "-max_total_time=60",
+    "-max_len=4096",
+    "-print_final_stats=1",
+    "-rss_limit_mb=0",
+    "-malloc_limit_mb=0",
+    "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/inflate-release-ordinary/corpus"
+  ]
+}

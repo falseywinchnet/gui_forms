@@ -701,6 +701,10 @@ public:
     [[nodiscard]] std::uint64_t semantic_generation() const noexcept {
         return semantic_generation_;
     }
+    // Focus goes to a focusable control directly. For a control that is not
+    // focusable (a composite whose focus belongs to an inner editor or part)
+    // the control's own on_semantic_action decides, and the action counts as
+    // performed only when focus then lies in the control's subtree.
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});

@@ -1,0 +1,65 @@
+{
+  "host": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "compiler": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n",
+  "source_sha256": {
+    "stx_zlib/bench/match_index.cpp": "c5a8bde8b6017d4ddd8b49961ac0430c725c80544d107be49956bdb59ef0fb91",
+    "tools/benchmark_match_index.py": "7452dbb6238a2441adbe4d066bfa1b450cfef6fa75bb21c67995ce95dfe74647",
+    "tools/benchmark_deflate.py": "d6834407f7c9a1bb4786880cc669e7351ccb5422a891c0a0d14e9607e53eb7b1"
+  },
+  "workloads": [
+    {
+      "path": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/docs/library/captures/text_input_screen.png",
+      "png_sha256": "e65cbfb14e25c9d1ad728a8aa8b1f97d0f087ca781d88f1d5f77e691ef2f66e8",
+      "ihdr_hex": "000004eb000002f80802000000",
+      "filtered_bytes": 2871280,
+      "filtered_sha256": "78825a904ce31f3f11304486575a5552bd38b5b767f6a5088d239f06d4833ed2",
+      "extractor_zlib": "1.2.12",
+      "measured_prefix_bytes": 131072,
+      "measured_prefix_sha256": "5b00484e9b6dcc68caf109502f2951c1001ddb90d5383451a77643248dc0b171"
+    },
+    {
+      "path": "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/docs/library/captures/picture_box_screen.png",
+      "png_sha256": "753c5913339bfbf2de2318151fcf332d69fa5e14c4455bebbbe7792a647ab83b",
+      "ihdr_hex": "000004eb000002f80802000000",
+      "filtered_bytes": 2871280,
+      "filtered_sha256": "452e16d14d26aa87c2c2edcea097ecfda559bed9557ad9e0954420e257e039fb",
+      "extractor_zlib": "1.2.12",
+      "measured_prefix_bytes": 131072,
+      "measured_prefix_sha256": "5b00484e9b6dcc68caf109502f2951c1001ddb90d5383451a77643248dc0b171"
+    }
+  ],
+  "commands": [
+    [
+      "clang++",
+      "-std=c++20",
+      "-O3",
+      "-DNDEBUG",
+      "-Wall",
+      "-Wextra",
+      "-Wpedantic",
+      "-Wconversion",
+      "-Wshadow",
+      "-stdlib=libc++",
+      "-nostdinc++",
+      "-isystem",
+      "/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1",
+      "-L/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-Wl,-rpath,/Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/lib",
+      "-lunwind",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/stx_zlib/bench/match_index.cpp",
+      "-o",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/match-index-calibrated/match-index"
+    ],
+    [
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/match-index-calibrated/match-index",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/match-index-calibrated/png-0.prefix",
+      "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/match-index-calibrated/png-1.prefix"
+    ]
+  ],
+  "samples": 9,
+  "minimum_sample_seconds": 0.01,
+  "hardware_counters": "not measured",
+  "production_encoder": "unchanged",
+  "exit_code": 0
+}

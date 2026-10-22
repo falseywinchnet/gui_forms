@@ -1,0 +1,9 @@
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/lib/libstx_zlib.a
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/include/stx_zlib/deflate.hpp
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/include/stx_zlib/inflate.hpp
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/lib/cmake/stx_zlib/stx_zlibTargets.cmake
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/lib/cmake/stx_zlib/stx_zlibTargets-relwithdebinfo.cmake
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/lib/cmake/stx_zlib/stx_zlibConfig.cmake
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/lib/cmake/stx_zlib/stx_zlibConfigVersion.cmake
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/share/licenses/stx_zlib/LICENSE-puff.txt
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-9709c6a35d08/build/stx-zlib-sdk/share/licenses/stx_zlib/LICENSE-zlib.txt

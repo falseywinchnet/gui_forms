@@ -97,6 +97,9 @@ public:
     void on_paint(Painter& painter, Rect local_damage) override;
     void on_key_preview(KeyEvent& event) override;
     [[nodiscard]] SemanticDescriptor semantic_descriptor() const override;
+    // The focus action moves focus to the font list, the dialog's first
+    // field; the dialog itself is not focusable.
+    bool on_semantic_action(SemanticAction action, std::string_view value) override;
     [[nodiscard]] const ControlAnatomy& anatomy() const noexcept override;
     // Stage T1 anatomy, as dot members; its states are Control's.
     struct Parts final {

@@ -1197,6 +1197,9 @@ gui_forms::Window
 
       Performs an automation action, such as focus or press, and returns
       whether it was performed. One overload names the control by stable ID.
+      Focus on a control that is not focusable itself, such as a composite
+      over an inner editor, is left to the control, and is performed only if
+      focus then lies inside it.
       The overload native accessibility hosts use names a published node by
       its control's runtime ID and, for a virtual child, the child's stable
       ID; a disposed or replaced control's runtime ID is refused.
@@ -1205,6 +1208,9 @@ gui_forms::Window
 
       Performs an automation action, such as focus or press, and returns
       whether it was performed. One overload names the control by stable ID.
+      Focus on a control that is not focusable itself, such as a composite
+      over an inner editor, is left to the control, and is performed only if
+      focus then lies inside it.
       The overload native accessibility hosts use names a published node by
       its control's runtime ID and, for a virtual child, the child's stable
       ID; a disposed or replaced control's runtime ID is refused.

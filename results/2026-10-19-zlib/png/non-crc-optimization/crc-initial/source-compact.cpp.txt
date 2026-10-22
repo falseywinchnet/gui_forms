@@ -1,0 +1,279 @@
+#include "compact.hpp"
+#include <algorithm>
+
+namespace crc_suitability {
+namespace {
+using Word = std::array<std::uint32_t, 4>;
+using Reduction = std::array<std::array<std::uint32_t, 256>, 4>;
+constexpr Reduction make_reduction() {
+    Reduction table{};
+    for (unsigned position = 0; position < 4; ++position) {
+        for (unsigned value = 0; value < 256; ++value) {
+            std::uint32_t remainder = value << (position * 8);
+            for (unsigned bit = 0; bit < 32; ++bit) {
+                const bool high = (remainder >> 31) != 0;
+                remainder <<= 1;
+                if (high) remainder ^= 0xdb710641U;
+            }
+            table[position][value] = remainder;
+        }
+    }
+    return table;
+}
+constexpr Reduction reduction = make_reduction();
+std::uint32_t reduce(std::uint32_t state, std::uint32_t word) {
+    const std::uint32_t result = word ^ reduction[0][state & 255U]
+        ^ reduction[1][(state >> 8) & 255U] ^ reduction[2][(state >> 16) & 255U]
+        ^ reduction[3][state >> 24];
+    return result;
+}
+std::uint32_t load32(std::span<const std::byte> bytes, std::size_t offset) {
+    std::uint32_t value = 0;
+    for (unsigned byte = 0; byte < 4; ++byte) {
+        value |= std::to_integer<std::uint32_t>(bytes[offset + byte]) << (byte * 8);
+    }
+    return value;
+}
+std::uint32_t tail(std::span<const std::byte> bytes, std::size_t offset, std::uint32_t raw) {
+    for (; offset < bytes.size(); ++offset) {
+        raw ^= std::to_integer<unsigned>(bytes[offset]);
+        for (unsigned bit = 0; bit < 8; ++bit) {
+            raw = (raw >> 1) ^ ((0U - (raw & 1U)) & 0xedb88320U);
+        }
+    }
+    const std::uint32_t result = ~raw;
+    return result;
+}
+unsigned wrapped(unsigned cursor, unsigned delay, unsigned size) {
+    const unsigned position = cursor >= delay ? cursor - delay : cursor + size - delay;
+    return position;
+}
+template<unsigned Lanes>
+using ScaledWord = std::array<std::uint32_t, Lanes>;
+template<unsigned Lanes>
+struct Compact final {
+    std::array<ScaledWord<Lanes>, 209> q{};
+    std::array<ScaledWord<Lanes>, 52> s{};
+    unsigned q_cursor = 0;
+    unsigned s_cursor = 0;
+};
+template<unsigned Lanes>
+void step(Compact<Lanes>& state, const ScaledWord<Lanes>& input) {
+    const unsigned q12 = wrapped(state.q_cursor, 12, 209);
+    const unsigned q150 = wrapped(state.q_cursor, 150, 209);
+    for (unsigned lane = 0; lane < Lanes; ++lane) {
+        const std::uint32_t a = state.s[state.s_cursor][lane] ^ state.q[q12][lane];
+        const std::uint32_t b = input[lane] ^ state.q[state.q_cursor][lane];
+        state.q[state.q_cursor][lane] = a ^ state.q[q150][lane];
+        state.s[state.s_cursor][lane] = a ^ b;
+    }
+    ++state.q_cursor;
+    if (state.q_cursor == 209) state.q_cursor = 0;
+    ++state.s_cursor;
+    if (state.s_cursor == 52) state.s_cursor = 0;
+}
+// The reciprocal transfer has 52 words of delay. Call only after that zero
+// flush; extraction replaces auxiliary state with the older quotient history.
+template<unsigned Lanes>
+std::uint32_t finish(Compact<Lanes>& state) {
+    for (unsigned age = 1; age <= 52; ++age) {
+        const unsigned slot = wrapped(state.s_cursor, age, 52);
+        const unsigned recent = wrapped(state.q_cursor, age, 209);
+        const unsigned other = wrapped(state.q_cursor, age + 150, 209);
+        for (unsigned lane = 0; lane < Lanes; ++lane) {
+            state.s[slot][lane] ^= state.q[recent][lane] ^ state.q[other][lane];
+        }
+    }
+    std::uint32_t raw = 0;
+    constexpr std::array<unsigned, 5> delays{12,52,150,202,261};
+    for (unsigned remaining = 261; remaining != 0; --remaining) {
+        const unsigned offset = remaining - 1;
+        ScaledWord<Lanes> word{};
+        for (unsigned delay : delays) {
+            if (delay <= offset) continue;
+            const unsigned age = delay - offset;
+            const ScaledWord<Lanes>& history = age <= 209
+                ? state.q[wrapped(state.q_cursor, age, 209)]
+                : state.s[wrapped(state.s_cursor, age - 209, 52)];
+            for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] ^= history[lane];
+        }
+        for (unsigned lane = Lanes; lane != 0; --lane) raw = reduce(raw, word[lane - 1]);
+    }
+    return raw;
+}
+template<unsigned Lanes>
+std::uint32_t compact(std::span<const std::byte> bytes, std::uint32_t seed) {
+    constexpr unsigned width = Lanes * 4;
+    if (bytes.size() < width) {
+        const std::uint32_t result = tail(bytes, 0, ~seed);
+        return result;
+    }
+    Compact<Lanes> state{};
+    ScaledWord<Lanes> word{};
+    for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] = load32(bytes, lane * 4);
+    word[0] ^= ~seed;
+    step<Lanes>(state, word);
+    std::size_t offset = width;
+    for (; bytes.size() - offset >= width; offset += width) {
+        for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] = load32(bytes, offset + lane * 4);
+        step<Lanes>(state, word);
+    }
+    word.fill(0);
+    for (unsigned index = 0; index < 52; ++index) step<Lanes>(state, word);
+    const std::uint32_t raw = finish(state);
+    const std::uint32_t result = tail(bytes, offset, raw);
+    return result;
+}
+// Four consecutive 32-bit time steps have no intra-quartet dependency. The
+// 209-word ring is exact-sized: its three split starts use explicit wrapping.
+Word read_four(const std::array<std::uint32_t, 209>& q, unsigned position) {
+    Word word{};
+    if (position <= 205) {
+        for (unsigned lane = 0; lane < 4; ++lane) word[lane] = q[position + lane];
+    } else {
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            word[lane] = q[position];
+            ++position;
+            if (position == 209) position = 0;
+        }
+    }
+    return word;
+}
+void quartet(std::array<std::uint32_t, 209>& q, unsigned& cursor, Word& auxiliary, const Word& input) {
+    const Word q12 = read_four(q, wrapped(cursor, 12, 209));
+    const Word q150 = read_four(q, wrapped(cursor, 150, 209));
+    const Word q209 = read_four(q, cursor);
+    Word output{};
+    for (unsigned lane = 0; lane < 4; ++lane) {
+        const std::uint32_t a = auxiliary[lane] ^ q12[lane];
+        const std::uint32_t b = input[lane] ^ q209[lane];
+        output[lane] = a ^ q150[lane];
+        auxiliary[lane] = a ^ b;
+    }
+    if (cursor <= 205) {
+        for (unsigned lane = 0; lane < 4; ++lane) q[cursor + lane] = output[lane];
+        cursor += 4;
+        if (cursor == 209) cursor = 0;
+    } else {
+        for (unsigned lane = 0; lane < 4; ++lane) {
+            q[cursor] = output[lane];
+            ++cursor;
+            if (cursor == 209) cursor = 0;
+        }
+    }
+}
+template<unsigned Slot, bool Seed>
+void input_quartet(std::array<std::uint32_t, 209>& q, unsigned& cursor,
+                   std::array<Word, 13>& auxiliary, std::span<const std::byte> bytes,
+                   std::size_t offset, std::uint32_t seed) {
+    Word word{};
+    for (unsigned lane = 0; lane < 4; ++lane) word[lane] = load32(bytes, offset + Slot * 16 + lane * 4);
+    if constexpr (Seed && Slot == 0) word[0] ^= ~seed;
+    quartet(q, cursor, auxiliary[Slot], word);
+}
+template<bool Seed>
+void cycle(std::array<std::uint32_t, 209>& q, unsigned& cursor,
+           std::array<Word, 13>& auxiliary, std::span<const std::byte> bytes,
+           std::size_t offset, std::uint32_t seed) {
+    input_quartet<0, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<1, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<2, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<3, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<4, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<5, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<6, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<7, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<8, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<9, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<10, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<11, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+    input_quartet<12, Seed>(q, cursor, auxiliary, bytes, offset, seed);
+}
+std::uint32_t one_write(std::span<const std::byte> bytes, std::uint32_t seed) {
+    if (bytes.size() < 208) {
+        const std::uint32_t result = compact<1>(bytes, seed);
+        return result;
+    }
+    std::array<std::uint32_t, 209> q{};
+    std::array<Word, 13> auxiliary{};
+    unsigned cursor = 0;
+    cycle<true>(q, cursor, auxiliary, bytes, 0, seed);
+    std::size_t offset = 208;
+    for (; bytes.size() - offset >= 208; offset += 208) {
+        cycle<false>(q, cursor, auxiliary, bytes, offset, 0);
+    }
+    unsigned slot = 0;
+    for (; bytes.size() - offset >= 16; offset += 16) {
+        Word word{};
+        for (unsigned lane = 0; lane < 4; ++lane) word[lane] = load32(bytes, offset + lane * 4);
+        quartet(q, cursor, auxiliary[slot], word);
+        ++slot;
+    }
+    const Word zero{};
+    for (unsigned index = 0; index < 13; ++index) {
+        quartet(q, cursor, auxiliary[slot], zero);
+        ++slot;
+        if (slot == 13) slot = 0;
+    }
+    // Materialization and final reduction are included in every measured call.
+    Compact<1> terminal{};
+    for (unsigned index = 0; index < 209; ++index) terminal.q[index][0] = q[index];
+    for (unsigned index = 0; index < 52; ++index) terminal.s[index][0] = auxiliary[index / 4][index % 4];
+    terminal.q_cursor = cursor;
+    terminal.s_cursor = slot * 4;
+    const std::uint32_t raw = finish(terminal);
+    const std::uint32_t result = tail(bytes, offset, raw);
+    return result;
+}
+// Independent direct degree-300 control from the published sparse multiple.
+// This models the recurrence; it is not the deployed Chorba implementation.
+template<unsigned Lanes>
+std::uint32_t direct300(std::span<const std::byte> bytes, std::uint32_t seed) {
+    constexpr unsigned width = Lanes * 4;
+    if (bytes.size() < width) {
+        const std::uint32_t result = tail(bytes, 0, ~seed);
+        return result;
+    }
+    std::array<ScaledWord<Lanes>, 300> q{};
+    unsigned cursor = 0;
+    std::uint32_t initial = ~seed;
+    std::size_t offset = 0;
+    for (; bytes.size() - offset >= width; offset += width) {
+        const unsigned a = wrapped(cursor, 145, 300);
+        const unsigned b = wrapped(cursor, 183, 300);
+        const unsigned c = wrapped(cursor, 211, 300);
+        ScaledWord<Lanes> word{};
+        for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] = load32(bytes, offset + lane * 4);
+        word[0] ^= initial;
+        initial = 0;
+        for (unsigned lane = 0; lane < Lanes; ++lane) {
+            q[cursor][lane] = (word[lane] ^ q[cursor][lane]) ^ (q[a][lane] ^ q[b][lane]) ^ q[c][lane];
+        }
+        ++cursor;
+        if (cursor == 300) cursor = 0;
+    }
+    constexpr std::array<unsigned, 4> delays{145,183,211,300};
+    std::uint32_t raw = 0;
+    for (unsigned remaining = 300; remaining != 0; --remaining) {
+        const unsigned position = remaining - 1;
+        ScaledWord<Lanes> word{};
+        for (unsigned delay : delays) {
+            if (delay <= position) continue;
+            const unsigned age = delay - position;
+            for (unsigned lane = 0; lane < Lanes; ++lane) word[lane] ^= q[wrapped(cursor, age, 300)][lane];
+        }
+        for (unsigned lane = Lanes; lane != 0; --lane) raw = reduce(raw, word[lane - 1]);
+    }
+    const std::uint32_t result = tail(bytes, offset, raw);
+    return result;
+}
+} // namespace
+const std::array<crc_study::Candidate, 6> circuits{{
+    {"compact261-32", compact<1>, 4096, 1044, true},
+    {"compact261-64", compact<2>, 4096, 2088, true},
+    {"compact261-128", compact<4>, 4096, 4176, true},
+    {"quartet261", one_write, 4096, 2088, true},
+    {"direct300-32", direct300<1>, 4096, 1200, true},
+    {"direct300-128", direct300<4>, 4096, 4800, true},
+}};
+} // namespace crc_suitability

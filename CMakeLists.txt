@@ -67,6 +67,7 @@ option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
+add_subdirectory(stx_zlib)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -172,6 +173,7 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/image/png_decoder.cpp
     src/core/image/png_writer.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
@@ -214,7 +216,7 @@ add_library(gui_forms_core STATIC
     src/core/window/command_route/window_command_route.cpp
     src/core/commands/command_route/command_route.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -2246,6 +2248,19 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_host_image_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_host_image_tests COMMAND gui_forms_host_image_tests)
 
+    add_executable(gui_forms_inflate_tests tests/compression/inflate_tests.cpp)
+    target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
+
+    add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
+    target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_inflate_protocol_tests COMMAND gui_forms_inflate_protocol_tests)
+
+    add_executable(gui_forms_png_decoder_tests tests/image/png_decoder_tests.cpp)
+    target_link_libraries(gui_forms_png_decoder_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_decoder_tests COMMAND gui_forms_png_decoder_tests)
+
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
@@ -3251,6 +3266,74 @@ if(GUI_FORMS_BUILD_TESTS)
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_macos_activated_test.cmake)
         set_tests_properties(gui_forms_macos_message_dialog_key_tests PROPERTIES TIMEOUT 60)
 
+        # Stage A: the NSAccessibility tree of every stock control, read in
+        # process (no Accessibility permission needed).
+        add_executable(gui_forms_macos_accessibility_tests MACOSX_BUNDLE
+            tests/macos_accessibility_tests.mm
+            tests/support/accessibility_actions.cpp
+            tests/support/macos_accessibility_contract.cpp
+            tests/support/stock_control_fixture.cpp)
+        target_compile_options(gui_forms_macos_accessibility_tests PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_tests PRIVATE
+            gui_forms_host_macos gui_forms_controls)
+        add_test(NAME gui_forms_macos_accessibility_tests
+                 COMMAND gui_forms_macos_accessibility_tests)
+        set_tests_properties(gui_forms_macos_accessibility_tests PROPERTIES TIMEOUT 60)
+
+        # Stage A: the out-of-process AX client and the app it inspects. The
+        # client needs the Accessibility permission; without it it reports
+        # unsupported and exits 77, which ctest shows as skipped.
+        add_executable(gui_forms_macos_accessibility_fixture_app MACOSX_BUNDLE
+            tests/macos_accessibility_fixture_app.mm
+            tests/support/stock_control_fixture.cpp)
+        target_compile_options(gui_forms_macos_accessibility_fixture_app PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_fixture_app PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_fixture_app PRIVATE
+            gui_forms_host_macos gui_forms_controls)
+        set_target_properties(gui_forms_macos_accessibility_fixture_app PROPERTIES
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.ax-fixture")
+        find_library(GUI_FORMS_APPLICATION_SERVICES ApplicationServices REQUIRED)
+        add_executable(gui_forms_macos_accessibility_client_tests
+            tests/macos_accessibility_client_tests.mm
+            tests/support/accessibility_actions.cpp
+            tests/support/macos_accessibility_contract.cpp)
+        target_compile_options(gui_forms_macos_accessibility_client_tests PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_client_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_client_tests PRIVATE
+            gui_forms_controls ${GUI_FORMS_APPKIT} ${GUI_FORMS_APPLICATION_SERVICES})
+        add_dependencies(gui_forms_macos_accessibility_client_tests gui_forms_macos_accessibility_fixture_app)
+        add_test(NAME gui_forms_macos_accessibility_client_tests
+                 COMMAND gui_forms_macos_accessibility_client_tests
+                     --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_fixture_app>
+                     --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_fixture_semantics.json)
+        set_tests_properties(gui_forms_macos_accessibility_client_tests PROPERTIES
+            SKIP_RETURN_CODE 77 TIMEOUT 300)
+        if(TARGET gui_forms_gallery_model)
+            add_executable(gui_forms_macos_accessibility_gallery_app MACOSX_BUNDLE
+                tests/macos_accessibility_fixture_app.mm
+                tests/support/stock_control_fixture.cpp
+                ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+            target_compile_options(gui_forms_macos_accessibility_gallery_app PRIVATE -fobjc-arc)
+            target_compile_definitions(gui_forms_macos_accessibility_gallery_app PRIVATE GUI_FORMS_AX_GALLERY=1)
+            target_include_directories(gui_forms_macos_accessibility_gallery_app PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+            target_link_libraries(gui_forms_macos_accessibility_gallery_app PRIVATE
+                gui_forms_gallery_model gui_forms_host_macos)
+            set_target_properties(gui_forms_macos_accessibility_gallery_app PROPERTIES
+                MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.ax-gallery")
+            add_dependencies(gui_forms_macos_accessibility_client_tests gui_forms_macos_accessibility_gallery_app)
+            add_test(NAME gui_forms_macos_accessibility_client_gallery_tests
+                     COMMAND gui_forms_macos_accessibility_client_tests --gallery
+                         --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_gallery_app>
+                         --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_gallery_semantics.json)
+            set_tests_properties(gui_forms_macos_accessibility_client_gallery_tests PROPERTIES
+                SKIP_RETURN_CODE 77 TIMEOUT 600)
+        endif()
+
         add_executable(gui_forms_macos_multi_window_tests
             tests/macos_multi_window_tests.mm)
         target_compile_options(gui_forms_macos_multi_window_tests PRIVATE -fobjc-arc)
@@ -3269,7 +3352,9 @@ if(GUI_FORMS_BUILD_TESTS)
                 gui_forms_macos_exposure_tests
                 gui_forms_macos_idle_visibility_tests
                 gui_forms_macos_host_close_tests
-                gui_forms_macos_multi_window_tests)
+                gui_forms_macos_multi_window_tests
+                gui_forms_macos_accessibility_tests
+                gui_forms_macos_accessibility_fixture_app)
             set_target_properties(${native_fixture} PROPERTIES MACOSX_BUNDLE TRUE)
             target_sources(${native_fixture} PRIVATE
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
@@ -3392,6 +3477,46 @@ if(GUI_FORMS_BUILD_FUZZERS)
         GUI_FORMS_HAS_LIBFUZZER_RUNTIME
     )
     unset(CMAKE_REQUIRED_FLAGS)
+    add_executable(gui_forms_inflate_fuzz
+        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_inflate_protocol_fuzz
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_png_decode_fuzz
+        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_png_decode_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_png_decode_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
         src/core/resources/image_registry/image_registry.cpp
@@ -3473,6 +3598,7 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
+install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
