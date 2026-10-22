@@ -57,6 +57,14 @@ inline constexpr FrameInterval motion_frame_interval = std::chrono::milliseconds
 //
 // A record is named by its handle; a stale handle (its record released) is
 // rejected, so a value whose owner has gone is never advanced.
+//
+// Ambient effects (T2 plan, phase E7; design language §9.4) share the same
+// request. The engine enlists a part with an ambient effect while it draws
+// it; on each frame at least the effect's frame interval after its last,
+// the part's extent repaints. An effect whose part was not repainted since
+// its last frame (the part is no longer shown) is dropped, so an effect can
+// never keep a window painting by itself. finish_all and cancel drop every
+// effect too; finish_all repaints each part once, at its static pose.
 class MotionClock final {
 public:
     explicit MotionClock(Window& window) noexcept;
@@ -77,6 +85,11 @@ public:
     // Whether a move would jump to its end at once: reduced motion, or an
     // occluded or minimized window.
     [[nodiscard]] bool suppressed() const noexcept;
+    // Whether ambient effects are stopped: as suppressed(), or the
+    // application's motion switch off (PresentationSettings::ambient_motion).
+    [[nodiscard]] bool ambient_suppressed() const noexcept;
+    // Ambient effects running on the clock now.
+    [[nodiscard]] std::size_t ambient_count() const noexcept { return ambient_live_; }
 
 private:
     friend class MotionValue;
@@ -100,8 +113,18 @@ private:
     void enlist(MotionValue& value);
     void release(MotionValue& value) noexcept;
 
+    // For Window: an ambient effect on the part with record `part`, its
+    // frames at least `interval` apart. Enlisting again changes the
+    // interval only. If the record's place or the frame request cannot be
+    // made, the exception propagates and nothing changes.
+    void enlist_ambient(std::uint32_t part_slot, std::uint32_t part_generation, FrameInterval interval);
+    void withdraw_ambient(std::uint32_t part_slot, std::uint32_t part_generation) noexcept;
+    // Drops every ambient effect; with `repaint`, each part repaints once.
+    void stop_ambient(bool repaint);
+
     // For Window.
-    // The frame at `now`: advances every value (see the event order).
+    // The frame at `now`: advances every value (see the event order), then
+    // runs the ambient effects that are due.
     void advance(FrameTime now);
     void finish_all(MotionStepCause cause);
     void release_owner(const Control& owner) noexcept;
@@ -119,8 +142,28 @@ private:
     // if it is still enlisted (a default handle when it is not).
     void notify(Control& owner, MotionValue& value, const MotionStep& step, MotionRecordHandle handle);
 
+    // One ambient effect: its part's record, its frame interval, when its
+    // next frame is due, and the paint its last frame was answered by
+    // (none_seen before its first frame).
+    struct AmbientRecord final {
+        std::uint32_t part_slot{};
+        std::uint32_t part_generation{};
+        FrameInterval interval{};
+        FrameTime next{};
+        std::uint64_t seen{};
+        bool live{};
+    };
+    static constexpr std::uint64_t none_seen = ~std::uint64_t{0};
+
+    void advance_ambient(FrameTime now);
+    // While only ambient effects run, moves the request's next frame to the
+    // earliest effect's.
+    void align_to_ambient() noexcept;
+
     Window* window_;
     const MotionTimeSource* time_source_{};
+    std::vector<AmbientRecord> ambient_;
+    std::size_t ambient_live_{};
     std::vector<Record> slots_;
     std::vector<std::uint32_t> free_slots_;
     // Reused by every frame, so that a frame allocates nothing once it has

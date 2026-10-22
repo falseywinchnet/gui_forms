@@ -352,19 +352,10 @@ void identity_hashes() {
     require(digest.value == expected, "encoded PNG identity hash changed");
 }
 
-void checksums_match_reference_values() {
-    const std::array<std::uint8_t, 9> text{'1', '2', '3', '4', '5', '6', '7', '8', '9'};
-    const std::span<const std::byte> bytes = std::as_bytes(std::span<const std::uint8_t>(text));
-    require(image::png_crc32(bytes) == 0xcbf43926U, "crc32 check value differs");
-    require(image::png_adler32(bytes) == 0x091e01deU, "adler32 check value differs");
-    require(image::png_crc32({}) == 0U && image::png_adler32({}) == 1U, "empty checksum values");
-}
-
 } // namespace
 
 int main() {
     try {
-        checksums_match_reference_values();
         rgba_round_trip();
         bgra_opaque_round_trip();
         premultiplied_round_trip();

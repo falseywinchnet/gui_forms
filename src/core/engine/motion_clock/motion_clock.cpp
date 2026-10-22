@@ -8,6 +8,7 @@
 #include "gui_forms/window.hpp"
 
 #include <limits>
+#include <optional>
 #include <stdexcept>
 
 namespace gui_forms {
@@ -31,6 +32,89 @@ bool MotionClock::suppressed() const noexcept {
     const bool reduced = (*window_).presentation_settings().reduced_motion;
     const bool hidden = (*window_).occluded();
     return reduced || hidden;
+}
+
+bool MotionClock::ambient_suppressed() const noexcept {
+    const bool switched_off = !(*window_).presentation_settings().ambient_motion;
+    const bool stopped = suppressed() || switched_off;
+    return stopped;
+}
+
+void MotionClock::enlist_ambient(std::uint32_t part_slot, std::uint32_t part_generation, FrameInterval interval) {
+    for (AmbientRecord& existing : ambient_) {
+        if (existing.live && existing.part_slot == part_slot && existing.part_generation == part_generation) {
+            existing.interval = interval;
+            return;
+        }
+    }
+    // Room and the request first, so that nothing below fails.
+    std::size_t free = ambient_.size();
+    for (std::size_t index = 0; index < ambient_.size(); ++index) {
+        if (!ambient_[index].live) free = index;
+    }
+    if (free == ambient_.size()) ambient_.reserve(ambient_.size() + 1U);
+    if (!request_.connected()) request_ = (*window_).request_motion_frames(now() + motion_frame_interval);
+    if (free == ambient_.size()) ambient_.emplace_back();
+    AmbientRecord& made = ambient_[free];
+    made.part_slot = part_slot;
+    made.part_generation = part_generation;
+    made.interval = interval;
+    // The first frame one interval after the paint that started it.
+    made.next = now() + interval;
+    made.seen = none_seen;
+    made.live = true;
+    ambient_live_ = ambient_live_ + 1U;
+    align_to_ambient();
+}
+
+void MotionClock::withdraw_ambient(std::uint32_t part_slot, std::uint32_t part_generation) noexcept {
+    for (AmbientRecord& existing : ambient_) {
+        if (!existing.live || existing.part_slot != part_slot || existing.part_generation != part_generation) continue;
+        existing.live = false;
+        ambient_live_ = ambient_live_ - 1U;
+    }
+    disarm_when_idle();
+}
+
+void MotionClock::stop_ambient(bool repaint) {
+    for (AmbientRecord& existing : ambient_) {
+        if (!existing.live) continue;
+        existing.live = false;
+        ambient_live_ = ambient_live_ - 1U;
+        if (repaint) (*window_).repaint_engine_part(existing.part_slot, existing.part_generation);
+    }
+    disarm_when_idle();
+}
+
+void MotionClock::advance_ambient(FrameTime now) {
+    // By index: a repaint never enlists or withdraws an effect.
+    for (std::size_t index = 0; index < ambient_.size(); ++index) {
+        AmbientRecord& effect = ambient_[index];
+        if (!effect.live || effect.next > now) continue;
+        const bool shown = (*window_).engine_ambient_frame(effect.part_slot, effect.part_generation, effect.seen);
+        if (!shown) {
+            effect.live = false;
+            ambient_live_ = ambient_live_ - 1U;
+            continue;
+        }
+        // At least one interval from this frame: the cap holds however late
+        // the frame came.
+        effect.next = now + effect.interval;
+    }
+    disarm_when_idle();
+    align_to_ambient();
+}
+
+void MotionClock::align_to_ambient() noexcept {
+    if (moving_ != 0U || ambient_live_ == 0U || !request_.connected()) return;
+    // Nothing settles, so the request need not run at the motion cadence:
+    // its next frame is the earliest effect's.
+    std::optional<FrameTime> earliest{};
+    for (const AmbientRecord& effect : ambient_) {
+        if (!effect.live) continue;
+        if (!earliest || effect.next < *earliest) earliest = effect.next;
+    }
+    if (earliest) (*window_).set_motion_frame_deadline(*earliest);
 }
 
 MotionClock::Record* MotionClock::find(MotionRecordHandle handle) noexcept {
@@ -132,7 +216,7 @@ void MotionClock::collect_handles() {
 }
 
 void MotionClock::disarm_when_idle() noexcept {
-    if (moving_ == 0U) request_.disconnect();
+    if (moving_ == 0U && ambient_live_ == 0U) request_.disconnect();
 }
 
 void MotionClock::publish_moving() noexcept {
@@ -192,6 +276,7 @@ void MotionClock::advance(FrameTime now) {
         // them) stay alive through the listener.
         notify(*owner, value, step, handle);
     }
+    advance_ambient(now);
 }
 
 void MotionClock::finish_all(MotionStepCause cause) {
@@ -216,6 +301,8 @@ void MotionClock::finish_all(MotionStepCause cause) {
         step.cause = cause;
         notify(*owner, value, step, MotionRecordHandle{});
     }
+    // Ambient effects stop too; each part repaints at its static pose.
+    stop_ambient(true);
     request_.disconnect();
 }
 
@@ -231,6 +318,7 @@ void MotionClock::release_owner(const Control& owner) noexcept {
 }
 
 void MotionClock::cancel() noexcept {
+    stop_ambient(false);
     for (std::size_t index = 0; index < slots_.size(); ++index) {
         Record& record = slots_[index];
         if (!record.live) continue;

@@ -1,4 +1,10 @@
-# Sustained inflater campaign
+# Sustained inflater campaign (retired)
+
+**Retired 2026-10-20 by the owner's revision of decision 6A.** No sustained
+campaign runs. The plan file, supervisor, accounting tool, their unit test and
+the campaign workflow are removed; `.github/workflows/fuzz-smoke.yml` keeps a
+short libFuzzer smoke run per change on GitHub's runners. The text below is
+kept as the record of what was planned; its commands no longer exist.
 
 The campaign plan in `INFLATE_CAMPAIGN.json` locks the candidate, harness,
 comparison manifest, seed files, supervision tools and workflow by SHA-256.

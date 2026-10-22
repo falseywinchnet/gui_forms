@@ -58,10 +58,13 @@ for limitations. On an M4 mirror, provide `--baseline` pointing to the exported
 `123f13cd` header/source; the runner verifies their hashes. The normal checkout
 can omit that option to read the same revision from Git.
 
-## Sustained campaign
+## Fuzzing and sweeps
 
-The [source-locked campaign](../../planning/stages/Z-zlib/INFLATE_CAMPAIGN.md)
-runs bounded four-hour shards on x64 and arm64 against ordinary and strict pinned
-zlib. It records source coverage, preserves failing inputs and uses an external
-RSS/time supervisor. Short runner validation has zero qualifying hours; successful
-shard accounting does not by itself close the phase gate.
+The sustained campaign is retired (owner revision of decision 6A,
+2026-10-20). Evidence comes from the deterministic malformed-input sweeps in
+the normal suite (`gui_forms_malformed_sweep_tests`,
+`gui_forms_png_malformed_sweep_tests`), run under the sanitizers, and from the
+whole-suite sanitizer job. `.github/workflows/fuzz-smoke.yml` runs a few
+minutes of libFuzzer per target per change on GitHub's runners, including
+the pinned-zlib oracle in ordinary and strict modes. That run is a build
+check, not a certificate, and it never runs on the owner's machine.

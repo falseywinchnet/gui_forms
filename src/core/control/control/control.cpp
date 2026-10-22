@@ -1882,6 +1882,22 @@ void Control::set_classes(std::vector<std::string> classes) {
     invalidate(Dirty::style | Dirty::paint);
 }
 
+void Control::set_ceremonial(bool ceremonial) {
+    require_mutable();
+    if (ceremonial_ == ceremonial) return;
+    ceremonial_ = ceremonial;
+    invalidate_subtree(Dirty::paint);
+}
+
+bool Control::on_ceremonial_surface() const noexcept {
+    for (const Control* current = this; current != nullptr;) {
+        if ((*current).ceremonial_) return true;
+        const std::shared_ptr<Control> parent = (*current).parent_.lock();
+        current = parent.get();
+    }
+    return false;
+}
+
 bool Control::add_class(std::string_view name) {
     require_mutable();
     if (!valid_style_class_name(name)) {

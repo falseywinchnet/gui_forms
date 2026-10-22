@@ -567,6 +567,16 @@ public:
     bool add_class(std::string_view name);
     bool remove_class(std::string_view name);
     [[nodiscard]] bool has_class(std::string_view name) const noexcept;
+    // Whether the application marks this control's surface ceremonial (T2
+    // GIVEN B3-1; design language §10): an installer's or a first run's
+    // world. On it, and on its descendants, the theme engine's ambient
+    // effects may cover more than 10 % of the window; everywhere else the
+    // everyday cap holds. A theme never sets it. Changing it repaints the
+    // control and its descendants.
+    [[nodiscard]] bool ceremonial() const noexcept { return ceremonial_; }
+    void set_ceremonial(bool ceremonial);
+    // Whether this control or one of its ancestors is marked ceremonial.
+    [[nodiscard]] bool on_ceremonial_surface() const noexcept;
     // A stock assignment clears the image override. Null images select fallback.
     void set_custom_cursor(CursorImagesPtr images, CursorKind fallback = CursorKind::arrow);
     [[nodiscard]] CursorImagesPtr effective_cursor_images() const noexcept;
@@ -956,6 +966,7 @@ private:
                           ControlStyles::all_painting_in_one_pass};
     std::optional<CursorKind> cursor_;
     std::vector<std::string> classes_;
+    bool ceremonial_{};
     CursorImagesPtr cursor_images_;
     std::shared_ptr<const Theme> theme_override_;
     std::optional<SurfaceMaterial> authored_surface_material_;
