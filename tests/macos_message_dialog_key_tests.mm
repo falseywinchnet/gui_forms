@@ -98,6 +98,7 @@ NSEvent* key_down_event(ProbeKey key, NSInteger window_number) {
     unsigned short key_code = 53U;
     switch (key) {
     case ProbeKey::escape:
+        // The characters and key code above are escape's.
         break;
     case ProbeKey::return_key:
         characters = @"\r";
