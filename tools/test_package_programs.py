@@ -50,11 +50,22 @@ class ManifestTests(unittest.TestCase):
 
     def test_notice_list_is_well_formed(self) -> None:
         data = json.loads(pp.LICENSES_PATH.read_text(encoding="utf-8"))
-        names = [notice["name"] for notice in data["notices"]]
-        self.assertEqual(len(names), len(set(names)))
+        # Names are package paths, so they are unique among the notices one platform ships.
+        for platform in pp.PLATFORMS:
+            names = [notice["name"] for notice in data["notices"]
+                     if not notice.get("platforms") or platform in notice["platforms"]]
+            self.assertEqual(len(names), len(set(names)), platform)
         for notice in data["notices"]:
-            if not notice.get("optional"):
+            # A $PREFIX source comes from a toolchain prefix given at packaging time.
+            if not notice.get("optional") and not notice["source"].startswith("$"):
                 self.assertTrue((pp.ROOT / notice["source"]).is_file(), notice["source"])
+
+    def test_windows_runtime_imports_are_recognised(self) -> None:
+        for name in ("libgcc_s_seh-1.dll", "libstdc++-6.dll", "LIBSTDC++-6.DLL", "libc++.dll", "libunwind.dll",
+                     "libwinpthread-1.dll", "libgomp-1.dll"):
+            self.assertIsNotNone(pp.WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name), name)
+        for name in ("libgui_forms_threading.dll", "gui_forms_abi0.dll", "kernel32.dll"):
+            self.assertIsNone(pp.WINDOWS_FORBIDDEN_RUNTIME_DLL.fullmatch(name), name)
 
     def assert_rejected(self, mutate, pattern: str) -> None:
         data = manifest_data()
@@ -122,6 +133,64 @@ class PlanTests(unittest.TestCase):
             plans = pp.make_plan(manifest, "windows-x64", build)
             gallery = next(plan for plan in plans if plan.program.id == "gallery")
             self.assertEqual(gallery.built, build / "demo/GUI.Forms Gallery.exe")
+
+
+class NoticeCheckTests(unittest.TestCase):
+    """check_package_notices on a fixture package."""
+
+    def make_package(self, root: Path) -> dict[str, Any]:
+        (root / "licenses").mkdir()
+        (root / "fonts").mkdir()
+        lines = ["| Example | 1.0 | MIT | all | `licenses/Example.txt` | x |", pp.FREETYPE_CREDIT, "`fonts/OFL-Example.txt`"]
+        (root / "licenses" / pp.NOTICES_NAME).write_text("\n".join(lines) + "\n", encoding="utf-8")
+        (root / "licenses" / "Example.txt").write_text("MIT License\n", encoding="utf-8")
+        (root / "fonts" / "OFL-Example.txt").write_text("SIL Open Font License\n", encoding="utf-8")
+        licenses = {"notices": [{"name": "Example.txt", "source": "x", "component": "Example"}]}
+        return licenses
+
+    def test_a_covered_package_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            licenses = self.make_package(root)
+            pp.check_package_notices(root, "windows-x64", licenses, ["OFL-Example.txt"])
+
+    def test_the_checked_in_notices_carry_the_freetype_credit(self) -> None:
+        text = (pp.ROOT / pp.NOTICES_NAME).read_text(encoding="utf-8")
+        self.assertIn(pp.FREETYPE_CREDIT, text)
+        self.assertIsNone(pp.GPL_TITLE.search(text))
+        data = json.loads(pp.LICENSES_PATH.read_text(encoding="utf-8"))
+        for notice in data["notices"]:
+            if notice.get("component"):
+                self.assertIn(f"| {notice['component']} |", text, notice["component"])
+
+    def test_each_defect_is_refused(self) -> None:
+        cases = (
+            ("credit", "lacks the FreeType credit"),
+            ("unnamed licence", "not named"),
+            ("missing row", "has no row"),
+            ("gpl text", "General Public License text"),
+            ("gpl name", "whose name says GPL"),
+        )
+        for case, message in cases:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                licenses = self.make_package(root)
+                notices = root / "licenses" / pp.NOTICES_NAME
+                text = notices.read_text(encoding="utf-8")
+                if case == "credit":
+                    notices.write_text(text.replace(pp.FREETYPE_CREDIT, ""), encoding="utf-8")
+                elif case == "unnamed licence":
+                    (root / "licenses" / "Other.txt").write_text("BSD\n", encoding="utf-8")
+                elif case == "missing row":
+                    licenses["notices"].append({"name": "Absent.txt", "source": "y", "component": "Absent"})
+                elif case == "gpl text":
+                    (root / "README.txt").write_text("GNU GENERAL PUBLIC LICENSE\nVersion 2, June 1991\n",
+                                                     encoding="utf-8")
+                else:
+                    (root / "licenses" / "GPLv2.TXT").write_text("text\n", encoding="utf-8")
+                    notices.write_text(text + "`licenses/GPLv2.TXT`\n", encoding="utf-8")
+                with self.assertRaisesRegex(RuntimeError, message, msg=case):
+                    pp.check_package_notices(root, "windows-x64", licenses, ["OFL-Example.txt"])
 
 
 class StagingTests(unittest.TestCase):

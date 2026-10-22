@@ -10,9 +10,9 @@
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
+#include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/png_writer.hpp"
 
-#include "include/codec/SkCodec.h"
-#include "include/codec/SkPngDecoder.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkColorSpace.h"
@@ -28,7 +28,6 @@
 #include "include/core/SkRRect.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSurface.h"
-#include "include/encode/SkPngEncoder.h"
 #include "include/effects/SkShaderMaskFilter.h"
 #include "include/effects/SkGradient.h"
 
@@ -506,6 +505,8 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
     }
 
     bool synchronized = true;
+    // One shared owned decoder for the batch (src/core/image/png_pixels).
+    gui_forms::image::PngPixelDecoder decoder{};
     std::unordered_set<std::uint64_t> active;
     for (const ImageId id : registry.image_ids()) {
         active.insert(id.value);
@@ -558,23 +559,17 @@ bool SkiaRaster::synchronize_images(const ImageRegistry& registry) {
             pixel_data = SkData::MakeWithCopy(
                 (*resource).encoded.data(), (*resource).encoded.size());
         } else {
-            sk_sp<SkData> encoded = SkData::MakeWithCopy(
-                (*resource).encoded.data(), (*resource).encoded.size());
-            SkCodec::Result codec_result = SkCodec::kInternalError;
-            std::unique_ptr<SkCodec> codec =
-                SkPngDecoder::Decode(std::move(encoded), &codec_result);
-            if (!codec || codec_result != SkCodec::kSuccess ||
-                (*codec).getInfo().width() !=
-                    static_cast<int>((*resource).metadata.width) ||
-                (*codec).getInfo().height() !=
-                    static_cast<int>((*resource).metadata.height)) {
-                (*impl_).images.erase(id.value);
-                synchronized = false;
-                continue;
-            }
+            gui_forms::image::PngPixelRequest request{};
+            request.limits = gui_forms::image::png_limits_for_image((*resource).metadata.width,
+                (*resource).metadata.height, (*resource).encoded.size());
+            request.target = {gui_forms::image::PixelOrder::rgba, gui_forms::image::PixelAlpha::premultiplied};
+            request.purpose = gui_forms::image::PngPixelPurpose::resource;
             pixels.resize((*resource).metadata.decoded_byte_count);
-            if ((*codec).getPixels(output_info, pixels.data(), row_bytes) !=
-                SkCodec::kSuccess) {
+            const gui_forms::image::PngPixelResult decoded =
+                decoder.decode((*resource).encoded, request, pixels, row_bytes);
+            if (decoded.error != gui_forms::image::PngPixelError::none ||
+                decoded.width != (*resource).metadata.width ||
+                decoded.height != (*resource).metadata.height) {
                 (*impl_).images.erase(id.value);
                 synchronized = false;
                 continue;
@@ -648,14 +643,22 @@ std::vector<std::byte> SkiaRaster::encode_png() const {
         pixmap.width() <= 0 || pixmap.height() <= 0) {
         return result;
     }
-    // The front surface is premultiplied RGBA8; the encoder unpremultiplies
-    // so the file carries straight alpha as every PNG consumer expects.
-    SkDynamicMemoryWStream stream;
-    if (!SkPngEncoder::Encode(&stream, pixmap, {})) return result;
-    const sk_sp<SkData> data = stream.detachAsData();
-    if (!data || (*data).size() == 0) return result;
-    result.resize((*data).size());
-    std::memcpy(result.data(), (*data).data(), result.size());
+    // The front surface is premultiplied 8-bit RGBA or BGRA; the shared owned
+    // encoder unpremultiplies so the file carries straight alpha, as on
+    // every host.
+    const bool rgba = pixmap.colorType() == kRGBA_8888_SkColorType;
+    const bool bgra = pixmap.colorType() == kBGRA_8888_SkColorType;
+    if ((!rgba && !bgra) || pixmap.alphaType() != kPremul_SkAlphaType) return result;
+    gui_forms::image::PngEncodeInput input{};
+    input.width = static_cast<std::uint32_t>(pixmap.width());
+    input.height = static_cast<std::uint32_t>(pixmap.height());
+    input.row_bytes = pixmap.rowBytes();
+    input.pixels = std::span<const std::byte>(static_cast<const std::byte*>(pixmap.addr()),
+                                              pixmap.computeByteSize());
+    input.order = rgba ? gui_forms::image::PngChannelOrder::rgba
+                       : gui_forms::image::PngChannelOrder::bgra;
+    input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
+    if (!gui_forms::image::encode_png(input, result)) result.clear();
     return result;
 }
 
