@@ -5,8 +5,9 @@
 // exceeds the bound, and the engine then draws the built-in recipe and
 // counts the refusal; it draws a material's fills, shadows, border, edges
 // and keylines where paint_surface_material puts them, its outer shadows
-// within its outsets; image fills are resampled with Mitchell–Netravali's
-// cubic in stretch, tile and nine-patch modes, from BGRA and PNG resources;
+// within its outsets; image fills are resampled with the selected filter
+// (provisionally Mitchell–Netravali's cubic) in stretch, tile and
+// nine-patch modes, from BGRA and PNG resources;
 // the engine sizes its raster to the outsets and composites it at the
 // part's origin less them, bakes it once per state and caches it.
 //

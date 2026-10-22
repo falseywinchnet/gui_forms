@@ -321,18 +321,30 @@ the plan left a number or a form open, E3 chose:
    (`engine_primitive_refusals` in the metrics snapshot). The bound and the
    costs are set in one place, `material_bake_policy.hpp`.
 2. **Image fills are supported, never refused for being images.** No stock
-   theme uses them. Resampling is Mitchell–Netravali (B = C = 1/3),
-   separable and done in premultiplied colour. When an image is shrunk, its
-   kernel is widened by the shrink factor and the weights are normalized.
-   The filter is deterministic, has no ringing worth seeing at UI scales and
-   needs no mip chain. It is a proposal: the owner may name another.
-3. **CSS inline images** are a design question for the owner, recorded in
-   the track file; they are not built.
+   theme uses them. Resampling is separable and done in premultiplied
+   colour. When an image is shrunk, its kernel is widened by the shrink
+   factor and the weights are normalized.
+   - **The filter is an open owner decision.** The candidates are
+     Mitchell–Netravali (B = C = 1/3) and the owner's convolution method
+     from Plan Paint. The owner may write an optimized `stx_conv` for the
+     latter.
+   - The filter is one named choice, `MaterialResamplingFilter`, selected in
+     one place (`material_resampling_filter` in `material_image.hpp`), so
+     that a convolution kernel can replace it without changing the
+     material's code.
+   - Mitchell–Netravali is the provisional implementation.
+   - Nothing may be imported or copied from Plan Paint, because GUI.Forms
+     depends on no sources outside its tree.
+3. **CSS inline images are named by resource.** An image is registered
+   once as a resource (a decoded PNG), and a material layer names it. This
+   is not built yet.
 4. **Bake cost and live cost are separate.** A material is baked once per
    invalidation (state, size, scale or theme) and cached. Compositing it
    afterwards is a blit, plus a group blend where one applies. The bake is
-   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame
-   (a proposed default).
+   bounded at 4 ms on the reference machine, a quarter of a 60 Hz frame.
+   The owner has accepted that bound. Before E7r, the per-layer costs are
+   to be measured again on a quiet machine, recording the load at the time
+   of measurement.
 5. **Nothing rasterizes per frame.** The material reads no inputs. The
    retained forms of E7's animated parameters, and slicing, are phase E7r
    (after E8c, before E9).

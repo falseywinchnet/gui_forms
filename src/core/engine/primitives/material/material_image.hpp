@@ -13,27 +13,53 @@
 // stock theme): the image read from the window's resources and resampled to
 // the part's device pixels with one named, deterministic filter.
 //
-// The filter is Mitchell–Netravali's cubic with B = C = 1/3, applied
+// The filter is an open owner decision (2026-10-22): Mitchell–Netravali, or
+// the owner's own convolution method, which may arrive as an optimized
+// stx_conv. It is chosen at one point, material_resampling_filter below;
+// a replacement adds a MaterialResamplingFilter and its reach and weight,
+// and changes that selection, with no change to the material's code.
+//
+// PROVISIONAL: Mitchell–Netravali's cubic with B = C = 1/3, applied
 // separably to premultiplied colour:
 //
 //   k(x) = (7|x|³ − 12|x|² + 16/3) / 6                    for |x| < 1
 //   k(x) = (−(7/3)|x|³ + 12|x|² − 20|x| + 32/3) / 6       for 1 ≤ |x| < 2
 //   k(x) = 0                                               otherwise
 //
-// Why this one. An icon composited into a face is mostly hard edges on flat
-// ground. Bilinear blurs when it enlarges and aliases when it shrinks; a box
-// filter is blocky; Lanczos rings, leaving light and dark halos beside each
-// edge. Mitchell and Netravali chose B = C = 1/3 in their 1988 study as the
-// balance of blur, ringing and anisotropy that viewers judged best, and it
-// is a fixed piecewise polynomial: no transcendental functions, so the same
-// inputs give the same bytes on every host. When the image shrinks by a
-// factor f > 1, the kernel is widened by f (its taps at (i + 0.5 − u) / f),
-// so every source pixel contributes and nothing aliases. The weights of each
-// output pixel are normalized to sum to 1, and the result is clamped to a
-// valid premultiplied colour (each channel within [0, alpha]), since the
-// kernel's small negative lobes can overshoot.
+// Why it serves until the decision. An icon composited into a face is
+// mostly hard edges on flat ground. Bilinear blurs when it enlarges and
+// aliases when it shrinks; a box filter is blocky; Lanczos rings, leaving
+// light and dark halos beside each edge. Mitchell and Netravali chose
+// B = C = 1/3 in their 1988 study as the balance of blur, ringing and
+// anisotropy that viewers judged best, and it is a fixed piecewise
+// polynomial: no transcendental functions, so the same inputs give the same
+// bytes on every host.
+//
+// Whatever the filter: when the image shrinks by a factor f > 1, the kernel
+// is widened by f (its taps at (i + 0.5 − u) / f), so every source pixel
+// contributes and nothing aliases. The weights of each output pixel are
+// normalized to sum to 1, and the result is clamped to a valid
+// premultiplied colour (each channel within [0, alpha]), since a kernel's
+// negative lobes can overshoot.
 
 namespace gui_forms::engine_primitives {
+
+// The resampling filters an image fill may use.
+enum class MaterialResamplingFilter : std::uint8_t {
+    // Provisional (see above).
+    mitchell_netravali,
+};
+
+// The one selection point for the image fill's filter.
+inline constexpr MaterialResamplingFilter material_resampling_filter =
+    MaterialResamplingFilter::mitchell_netravali;
+
+// The filter's reach: its weight is 0 at and beyond this distance, in
+// source pixels, when the image is not shrunk.
+[[nodiscard]] double resampling_filter_reach(MaterialResamplingFilter filter) noexcept;
+
+// The filter's weight at distance `x` source pixels (unnormalized).
+[[nodiscard]] double resampling_filter_weight(MaterialResamplingFilter filter, double x) noexcept;
 
 // An image's pixels as premultiplied RGBA8, rows packed: `width` × `height`
 // × 4 live bytes.
@@ -81,8 +107,9 @@ struct ImageAxisPlacement final {
                                                       double box_length, double scale,
                                                       double source_height) noexcept;
 
-// The most taps any output pixel takes along an axis: 4 × f + 2, where f is
-// the largest shrink factor of its segments (at least 1).
+// The most taps any output pixel takes along an axis: 2 × r × f + 2, where r
+// is the selected filter's reach and f the largest shrink factor of its
+// segments (at least 1); 4 × f + 2 for Mitchell–Netravali.
 [[nodiscard]] double image_axis_taps(const ImageAxisPlacement& placement) noexcept;
 
 // One axis's resampling: the taps of output pixel o are

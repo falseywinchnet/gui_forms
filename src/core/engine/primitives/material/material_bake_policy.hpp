@@ -21,7 +21,7 @@
 namespace gui_forms::engine_primitives {
 
 // At most 4 ms of baking for one part on the reference machine: a quarter
-// of a 60 Hz frame (proposed default; the owner may change it here).
+// of a 60 Hz frame (accepted by the owner, 2026-10-22; change it here).
 inline constexpr double maximum_material_bake_nanoseconds = 4'000'000.0;
 
 // Bake costs, in nanoseconds on the reference machine.

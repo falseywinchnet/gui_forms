@@ -17,7 +17,8 @@
 namespace gui_forms::engine_primitives {
 namespace {
 
-// Mitchell–Netravali's cubic, B = C = 1/3 (see material_image.hpp).
+// Mitchell–Netravali's cubic, B = C = 1/3 (provisional; see
+// material_image.hpp).
 double mitchell_netravali(double x) noexcept {
     const double a = std::abs(x);
     if (a < 1.0) {
@@ -65,13 +66,14 @@ double shrink_factor(double source_length, double destination_length) noexcept {
 // wraps them over [0, high) instead of clamping.
 void append_taps(double u, double factor, std::uint32_t low, std::uint32_t high, bool wrap, ResampleAxis& axis) {
     const std::size_t begin = axis.weight.size();
-    const double reach = 2.0 * factor;
+    const MaterialResamplingFilter filter = material_resampling_filter;
+    const double reach = resampling_filter_reach(filter) * factor;
     const std::int64_t first = static_cast<std::int64_t>(std::floor(u - reach - 0.5));
     const std::int64_t last = static_cast<std::int64_t>(std::ceil(u + reach - 0.5));
     const std::int64_t length = static_cast<std::int64_t>(high);
     double sum = 0.0;
     for (std::int64_t position = first; position <= last; ++position) {
-        const double weight = mitchell_netravali((static_cast<double>(position) + 0.5 - u) / factor);
+        const double weight = resampling_filter_weight(filter, (static_cast<double>(position) + 0.5 - u) / factor);
         if (weight == 0.0) continue;
         std::int64_t index = position;
         if (wrap) {
@@ -204,6 +206,22 @@ ImageAxisPlacement image_placement_down(const MaterialFillLayer& fill, double bo
     return placement;
 }
 
+double resampling_filter_reach(MaterialResamplingFilter filter) noexcept {
+    switch (filter) {
+    case MaterialResamplingFilter::mitchell_netravali:
+        return 2.0;
+    }
+    return 2.0;
+}
+
+double resampling_filter_weight(MaterialResamplingFilter filter, double x) noexcept {
+    switch (filter) {
+    case MaterialResamplingFilter::mitchell_netravali:
+        return mitchell_netravali(x);
+    }
+    return 0.0;
+}
+
 double image_axis_taps(const ImageAxisPlacement& placement) noexcept {
     double factor = 1.0;
     switch (placement.mode) {
@@ -223,7 +241,8 @@ double image_axis_taps(const ImageAxisPlacement& placement) noexcept {
         break;
     }
     }
-    const double taps = 4.0 * factor + 2.0;
+    const double reach = resampling_filter_reach(material_resampling_filter);
+    const double taps = 2.0 * reach * factor + 2.0;
     return taps;
 }
 
