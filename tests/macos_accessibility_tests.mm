@@ -82,6 +82,14 @@ bool has_custom_action(id element, NSString* name) {
     return false;
 }
 
+// A range as "location+length", or "" when its location is NSNotFound.
+std::string range_text(NSRange range) {
+    if (range.location == NSNotFound) return {};
+    const std::string text = std::to_string(static_cast<unsigned long long>(range.location)) + "+" +
+                             std::to_string(static_cast<unsigned long long>(range.length));
+    return text;
+}
+
 Projection published_projection(id element) {
     Projection published;
     published.role = utf8([element accessibilityRole]);
@@ -101,6 +109,12 @@ Projection published_projection(id element) {
     published.value_settable = selector_allowed(element, @selector(setAccessibilityValue:));
     published.selected_settable = selector_allowed(element, @selector(setAccessibilitySelected:));
     published.close_action = has_custom_action(element, @"Close");
+    published.disclosure_level = static_cast<long long>([element accessibilityDisclosureLevel]);
+    published.row_range = range_text([element accessibilityRowIndexRange]);
+    published.column_range = range_text([element accessibilityColumnIndexRange]);
+    published.row_count = static_cast<long long>([element accessibilityRowCount]);
+    published.column_count = static_cast<long long>([element accessibilityColumnCount]);
+    published.modal = [element isAccessibilityModal];
     return published;
 }
 
@@ -236,6 +250,15 @@ private:
         same = compare_flag(owner, id, "AXValue settable", expected.value_settable, published.value_settable) && same;
         same = compare_flag(owner, id, "AXSelected settable", expected.selected_settable, published.selected_settable) && same;
         same = compare_flag(owner, id, "Close action", expected.close_action, published.close_action) && same;
+        same = compare_text(owner, id, "AXDisclosureLevel", std::to_string(expected.disclosure_level),
+                            std::to_string(published.disclosure_level)) && same;
+        same = compare_text(owner, id, "AXRowIndexRange", expected.row_range, published.row_range) && same;
+        same = compare_text(owner, id, "AXColumnIndexRange", expected.column_range, published.column_range) && same;
+        same = compare_text(owner, id, "AXRowCount", std::to_string(expected.row_count),
+                            std::to_string(published.row_count)) && same;
+        same = compare_text(owner, id, "AXColumnCount", std::to_string(expected.column_count),
+                            std::to_string(published.column_count)) && same;
+        same = compare_flag(owner, id, "AXModal", expected.modal, published.modal) && same;
         return same;
     }
 

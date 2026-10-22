@@ -425,8 +425,11 @@ void FontDialog::on_paint(Painter& painter, Rect) {
 
 SemanticDescriptor FontDialog::semantic_descriptor() const {
     SemanticDescriptor descriptor{};
-    // The vocabulary has no dialog role; the dialog is a named group.
-    descriptor.role = SemanticRole::group;
+    // A dialog (12.13); while open over its owner's window, its layer holds
+    // the focus and the pointer, so it blocks the rest of the window
+    // (modal). Placed in a layout directly it is not modal.
+    descriptor.role = SemanticRole::dialog;
+    descriptor.modal = open_;
     descriptor.name = accessible_name().empty() ? "Font" : accessible_name();
     const BundledFontFace& face = bundled_faces[face_index(selection_.role)];
     std::string value(face.family);

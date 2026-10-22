@@ -2045,6 +2045,7 @@ std::vector<SemanticNode> PageStrip::semantic_virtual_children() const {
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
         node.role = SemanticRole::tab;
         node.name = placed.tabs[position].label;
+        if (mnemonics_enabled_) node.access_key = mnemonic_access_key(record.title);
         if (record.pinned) node.description = "pinned";
         if (record.pinned && record.modified) node.description += ", ";
         if (record.modified) node.description += "modified";

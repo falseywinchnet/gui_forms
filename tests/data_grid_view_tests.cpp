@@ -186,7 +186,7 @@ const DataGridView::Cell* find_cell(std::vector<DataGridView::Cell>&& cells, std
 // `nodes`, as find_cell borrows from its cells; temporaries are refused.
 const SemanticNode* focused_row(const std::vector<SemanticNode>& nodes) {
     for (const SemanticNode& node : nodes) {
-        if (node.role == SemanticRole::list_item && has_semantic_state(node.states, SemanticState::focused)) {
+        if (node.role == SemanticRole::row && has_semantic_state(node.states, SemanticState::focused)) {
             return &node;
         }
     }
@@ -940,17 +940,22 @@ void semantics() {
     Window window(grid, {360.0, 160.0});
     window.perform_layout();
     const SemanticDescriptor descriptor = (*grid).semantic_descriptor();
-    require(descriptor.role == SemanticRole::list && descriptor.name == "Stations",
-            "the grid is a named list to accessibility");
+    require(descriptor.role == SemanticRole::table && descriptor.name == "Stations" &&
+                descriptor.column_count == 4U && descriptor.row_count == (*grid).row_count() &&
+                has_semantic_state(descriptor.states, SemanticState::multiselectable),
+            "the grid is a named multiple-selection table sized by its rows and columns");
     const std::vector<SemanticNode> nodes = (*grid).semantic_virtual_children();
-    require(nodes.size() == 7U && nodes[0].role == SemanticRole::button &&
-                nodes[0].stable_id == "grid.semantics.column.name",
-            "column headers are buttons before the rows");
+    require(nodes.size() == 7U && nodes[0].role == SemanticRole::column_header &&
+                nodes[0].stable_id == "grid.semantics.column.name" && nodes[0].column_index == 1U &&
+                nodes[3].column_index == 4U,
+            "column headers carry their column, before the rows");
     const SemanticNode& row = nodes[4];
-    require(row.role == SemanticRole::list_item && row.stable_id == "alpha" && row.children.size() == 4U,
-            "each row is a list item holding its cells");
+    require(row.role == SemanticRole::row && row.stable_id == "alpha" && row.children.size() == 4U &&
+                row.row_index == 1U && row.children[2].row_index == 1U && row.children[2].column_index == 3U,
+            "each row holds its cells, and each carries its row and column");
     require(row.children[0].role == SemanticRole::text_box && row.children[0].value == "Alpha" &&
                 row.children[1].role == SemanticRole::check_box &&
+                has_semantic_state(row.children[1].states, SemanticState::checkable) &&
                 has_semantic_state(row.children[1].states, SemanticState::checked) &&
                 row.children[2].role == SemanticRole::combo_box && row.children[3].role == SemanticRole::button,
             "cells take the nearest roles of their kinds");

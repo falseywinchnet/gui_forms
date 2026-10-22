@@ -2258,8 +2258,6 @@ SemanticDescriptor DockSite::semantic_descriptor() const {
     descriptor.role = SemanticRole::group;
     descriptor.name = accessible_name().empty() ? "Docking workspace" : accessible_name();
     descriptor.description = accessible_description();
-    // A drag's announcement, while one runs (no live-region vocabulary yet).
-    if (!drag_.announcement.empty()) descriptor.description = drag_.announcement;
     descriptor.actions = {SemanticAction::focus};
     descriptor.exposed = true;
     return descriptor;
@@ -2269,7 +2267,7 @@ SemanticDescriptor DockSite::semantic_descriptor() const {
 // the two sides' minimums.
 std::vector<SemanticNode> DockSite::semantic_virtual_children() const {
     std::vector<SemanticNode> nodes{};
-    nodes.reserve(seams_.size());
+    nodes.reserve(seams_.size() + 1U);
     const Rect absolute = absolute_bounds();
     const bool enabled = effectively_enabled();
     for (std::size_t seam = 0; seam < seams_.size(); ++seam) {
@@ -2291,6 +2289,19 @@ std::vector<SemanticNode> DockSite::semantic_virtual_children() const {
                         SemanticAction::set_value};
         nodes.push_back(std::move(node));
     }
+    // The move mode's announcements (DK-51): a live region, always present
+    // so that a reader knows it before it changes, named by the latest
+    // announcement (empty before the first drag). It covers the site and
+    // takes no action.
+    SemanticNode announcements{};
+    announcements.stable_id = std::string(stable_id().value()) + ".announcements";
+    announcements.runtime_id = virtual_semantic_runtime_id(announcements.stable_id);
+    announcements.role = SemanticRole::live_region;
+    announcements.name = drag_.announcement;
+    announcements.bounds = absolute;
+    announcements.states = SemanticState::visible;
+    if (enabled) announcements.states |= SemanticState::enabled;
+    nodes.push_back(std::move(announcements));
     return nodes;
 }
 
@@ -2342,7 +2353,7 @@ std::vector<SemanticNode> DockSite::caption_nodes(const StackSlot& slot, std::si
         pin.name = "Pinned";
         pin.bounds = to_window(absolute, placed.pin);
         const AnatomyStateSet pin_states = button_states(index, Zone::pin);
-        pin.states = SemanticState::visible;
+        pin.states = SemanticState::visible | SemanticState::checkable;
         if (pin_states.contains(AnatomyState::checked)) pin.states |= SemanticState::checked;
         if (!pin_states.contains(AnatomyState::disabled)) {
             pin.states |= SemanticState::enabled;

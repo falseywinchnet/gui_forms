@@ -101,8 +101,8 @@ raise `closed` without closing anything.
 
 The dialog paints its face, title and preview through the by-role paint
 path; its lists, size box and buttons are the stock controls. It publishes
-the accessibility role `group` named "Font" (the vocabulary has no dialog
-role), valued with the selection, such as ``Carlito Bold 12``.
+the accessibility role `dialog` named "Font", `modal` while open, valued
+with the selection, such as ``Carlito Bold 12``.
 
 Examples
 --------

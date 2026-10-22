@@ -257,6 +257,28 @@ MnemonicText parse_mnemonic_text(std::string_view text) {
     return result;
 }
 
+std::string mnemonic_access_key(std::string_view text) {
+    for (std::size_t offset = 0U; offset < text.size();) {
+        if (text[offset] != '&') {
+            std::size_t length{};
+            static_cast<void>(decode_utf8_scalar(text, offset, length));
+            offset += length;
+            continue;
+        }
+        if (offset + 1U < text.size() && text[offset + 1U] == '&') {
+            offset += 2U;
+            continue;
+        }
+        ++offset;
+        if (offset >= text.size()) break;
+        std::size_t length{};
+        static_cast<void>(decode_utf8_scalar(text, offset, length));
+        const std::string key(text.substr(offset, length));
+        return key;
+    }
+    return {};
+}
+
 bool is_mnemonic(char32_t character, std::string_view text) noexcept {
     if (character == U'&') return false;
     for (std::size_t offset = 0U; offset < text.size();) {

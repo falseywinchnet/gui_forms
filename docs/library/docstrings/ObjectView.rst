@@ -164,13 +164,15 @@ on_text_input
     Selects by typed prefix, as described under Notes. The window calls
     it.
 semantic_descriptor
-    Publishes the role `list`, the accessible name and description, and as
-    value the primary ID, or ``<n> selected`` when several items are
-    selected.
+    Publishes the role `table` in details mode with columns (with the item
+    count and the column count), otherwise `list`; the accessible name and
+    description; `multiselectable` with multiple selection; and as value
+    the primary ID, or ``<n> selected`` when several items are selected.
 semantic_virtual_children
-    Publishes the items in view as `list_item` children named by their
-    name, with the secondary text as value, and the `selected` and
-    `focused` states.
+    Publishes the items in view named by their name, with the secondary
+    text as value, and the `selected` and `focused` states: as `row` with
+    their row index and a `cell` per column in details mode with columns,
+    after a `column_header` per column; otherwise as `list_item`.
 on_semantic_child_action
     Handles focus, select, press and show_menu on an item: the view takes
     focus; focus moves the focus rectangle, select and press select the
@@ -222,9 +224,11 @@ name cut short in an icon cell, or in a details row without columns, is
 shown in full in a bubble while the pointer is over the item or the item
 shows the keyboard focus.
 
-The control publishes the accessibility role `list`, and each item in view
-is a virtual `list_item`. Its description is the item's description
-followed, in details mode with columns, by each column label and cell text.
+In details mode with columns the control publishes the accessibility role
+`table`: the columns are `column_header` children with their column index
+and sort direction, and each item in view is a `row` holding a `cell` per
+column with the cell text. Otherwise it publishes `list`, and each item in
+view is a virtual `list_item`. Indices count from 1.
 
 Examples
 --------

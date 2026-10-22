@@ -1586,9 +1586,17 @@ void ListView::on_focus_changed(bool focused) {
 
 SemanticDescriptor ListView::semantic_descriptor() const {
     SemanticDescriptor descriptor{};
-    // There is no table or grid role: the details view is a list whose
-    // items describe their sub-items, as ObjectView's do.
-    descriptor.role = SemanticRole::list;
+    // The details view is a table (12.13) whose rows hold a cell per
+    // column, sized by every item and every column, realized or not; the
+    // other views are lists.
+    if (view_ == ListViewView::details) {
+        descriptor.role = SemanticRole::table;
+        descriptor.row_count = item_count();
+        descriptor.column_count = columns_.size();
+    } else {
+        descriptor.role = SemanticRole::list;
+    }
+    if (multi_select_) descriptor.states |= SemanticState::multiselectable;
     descriptor.name = accessible_name();
     descriptor.description = accessible_description();
     if (selected_count_ == 1U && focused_index_ && selected_[*focused_index_] != 0U) {
@@ -1608,15 +1616,16 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
     const Rect absolute = absolute_bounds();
     const std::string list_id(stable_id().value());
     const bool enabled = effectively_enabled();
-    // Column headers first, in reading order. There is no column-header
-    // role: a header is a button that raises column_click.
+    // Column headers first, in reading order; a header's press raises
+    // column_click.
     for (std::size_t column = 0; column < columns_.size(); ++column) {
         if (!column_visible(placed, column)) continue;
         const Rect bounds = Rect::intersection(column_cell(placed, column), placed.header);
         SemanticNode node{};
         node.stable_id = column_identity(list_id, columns_[column].stable_id);
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = SemanticRole::button;
+        node.role = SemanticRole::column_header;
+        node.column_index = column + 1U;
         node.name = columns_[column].text;
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::ascending) node.value = "ascending";
         if (sort_column_ == column && sort_order_ == ListViewSortOrder::descending) node.value = "descending";
@@ -1635,15 +1644,13 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         SemanticNode node{};
         node.stable_id = item.stable_id;
         node.runtime_id = virtual_semantic_runtime_id(node.stable_id);
-        node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
         node.name = item.text;
         if (view_ == ListViewView::details) {
-            for (std::size_t column = 1; column < columns_.size(); ++column) {
-                if (!node.description.empty()) node.description.append("; ");
-                node.description.append(columns_[column].text);
-                node.description.append(": ");
-                node.description.append(column_text(item, column));
-            }
+            node.role = SemanticRole::row;
+            node.row_index = index + 1U;
+            append_row_cells(placed, index, item, node);
+        } else {
+            node.role = check_boxes_ ? SemanticRole::check_list_item : SemanticRole::list_item;
         }
         node.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
         node.states = SemanticState::visible | SemanticState::focusable;
@@ -1652,12 +1659,41 @@ std::vector<SemanticNode> ListView::semantic_virtual_children() const {
         if (focused_ && focused_index_ == index) node.states |= SemanticState::focused;
         if (check_boxes_) {
             node.value = item.checked ? "checked" : "unchecked";
+            node.states |= SemanticState::checkable;
             if (item.checked) node.states |= SemanticState::checked;
         }
         node.actions = {SemanticAction::focus, SemanticAction::select, SemanticAction::press};
         nodes.push_back(std::move(node));
     }
     return nodes;
+}
+
+// A details row's cells, one per column, for the columns whose extent meets
+// the viewport (the realized columns); the first column's cell holds the
+// item's text. A cell has no actions of its own; its row takes them.
+void ListView::append_row_cells(const Layout& placed, std::size_t index, const ListViewItem& item,
+                                SemanticNode& row_node) const {
+    const Rect absolute = absolute_bounds();
+    const Rect line = item_bounds(placed, index);
+    const bool enabled = effectively_enabled();
+    for (std::size_t column = 0; column < columns_.size(); ++column) {
+        const Rect extent = column_cell(placed, column);
+        const Rect cell_rect{extent.x, line.y, extent.width, line.height};
+        const Rect bounds = Rect::intersection(cell_rect, placed.viewport);
+        if (bounds.empty()) continue;
+        SemanticNode cell{};
+        cell.stable_id = item.stable_id + ".cell." + columns_[column].stable_id;
+        cell.runtime_id = virtual_semantic_runtime_id(cell.stable_id);
+        cell.role = SemanticRole::cell;
+        cell.name = columns_[column].text;
+        cell.value = std::string(column_text(item, column));
+        cell.row_index = index + 1U;
+        cell.column_index = column + 1U;
+        cell.bounds = {absolute.x + bounds.x, absolute.y + bounds.y, bounds.width, bounds.height};
+        cell.states = SemanticState::visible;
+        if (enabled) cell.states |= SemanticState::enabled;
+        row_node.children.push_back(std::move(cell));
+    }
 }
 
 std::optional<std::size_t> ListView::realized_index_of(std::string_view item_id) const {

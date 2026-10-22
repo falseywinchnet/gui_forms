@@ -2077,6 +2077,7 @@ void Ribbon::append_group_node(SemanticNode& parent, const Layout& placed, std::
         node.bounds = to_window(absolute, bounds);
         node.states = SemanticState::visible | SemanticState::focusable;
         if (command_enabled(item)) node.states |= SemanticState::enabled;
+        if (item.kind == RibbonCommandKind::toggle) node.states |= SemanticState::checkable;
         if (command_checked(item)) node.states |= SemanticState::checked;
         if (open_command_ == address) node.states |= SemanticState::expanded;
         const bool own_focus = focused_ && stop_ && *stop_ == stop;

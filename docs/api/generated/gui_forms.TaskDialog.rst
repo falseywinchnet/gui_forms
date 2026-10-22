@@ -157,9 +157,9 @@ gui_forms::TaskDialog
    (error) as its ``icon_glyph``, or nothing (shield); the footnote icon is drawn
    the same way at a smaller size. A custom image in ``icon_image`` replaces the
    standard icon. Text, buttons, radio buttons, the check box and the progress
-   bar are child controls, published as composed parts. The vocabulary has no
-   dialog role either: the dialog publishes the accessibility role ``group``,
-   named by its caption or heading.
+   bar are child controls, published as composed parts. The dialog publishes
+   the accessibility role ``dialog``, named by its caption or heading, and is
+   ``modal`` while shown.
 
    Not supported yet: a progress bar's paused and error states, hyperlinks in
    the text, a timer that ticks while shown, a command-link button style, and

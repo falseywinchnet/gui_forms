@@ -125,8 +125,8 @@ Text in single quotes is copied as it is, a backslash copies the next
 character, and other characters are copied unchanged.
 
 The control publishes the accessibility role `date_picker`, with the
-formatted value as its value, the state `SemanticState::checked` when the
-check box is shown and checked, and `SemanticState::expanded` while the
+formatted value as its value, the state `SemanticState::checkable` when the
+check box is shown and `SemanticState::checked` when it is also checked, and `SemanticState::expanded` while the
 calendar is open. It supports `SemanticAction::increment` and
 `SemanticAction::decrement`, which step one day;
 `SemanticAction::set_value`, which takes an ISO date such as ``2026-12-24``,

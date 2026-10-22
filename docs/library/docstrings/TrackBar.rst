@@ -65,7 +65,8 @@ Without requested bounds, a horizontal track bar measures 160 by 28 and a
 vertical one 28 by 160.
 
 The control publishes the accessibility role `slider`, with its value as
-text and as a number, and its minimum and maximum. The
+text and as a number, its minimum and maximum, and `small_change` and
+`large_change` as its steps. The
 `SemanticAction::increment` and `SemanticAction::decrement` actions step by
 `small_change`. The `SemanticAction::set_value` action takes a number as
 text, clamps it into the range and reports `scroll` with

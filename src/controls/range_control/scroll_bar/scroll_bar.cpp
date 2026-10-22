@@ -420,6 +420,9 @@ SemanticDescriptor ScrollBar::semantic_descriptor() const {
     descriptor.numeric_value = value();
     descriptor.minimum_value = minimum();
     descriptor.maximum_value = maximum();
+    // The arrow keys move by the small change, the page keys by the large.
+    descriptor.small_step = small_change();
+    descriptor.large_step = large_change();
     descriptor.actions = {SemanticAction::focus, SemanticAction::increment,
                           SemanticAction::decrement, SemanticAction::set_value};
     descriptor.exposed = true;

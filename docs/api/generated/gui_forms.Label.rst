@@ -135,7 +135,8 @@ gui_forms::Label
 
    The control publishes the accessibility role ``static_text``. Its name is the
    accessible name, or else the text without the mnemonic marker and without
-   :cpp:func:`text_case_transform <gui_forms::Label::text_case_transform>`. A label with an empty name is not exposed.
+   :cpp:func:`text_case_transform <gui_forms::Label::text_case_transform>`. The character after the mnemonic marker is its access
+   key. A label with an empty name is not exposed.
 
    .. rubric:: Examples
 

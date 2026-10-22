@@ -792,9 +792,11 @@ void TaskDialog::on_paint(Painter& painter, Rect) {
 // -- semantics and anatomy -----------------------------------------------------
 
 SemanticDescriptor TaskDialog::semantic_descriptor() const {
-    // The vocabulary has no dialog role: the dialog is a named group.
+    // A dialog (12.13); while shown, its layer takes every press outside it,
+    // so it blocks the rest of its window (modal).
     SemanticDescriptor descriptor{};
-    descriptor.role = SemanticRole::group;
+    descriptor.role = SemanticRole::dialog;
+    descriptor.modal = shown_;
     if (!accessible_name().empty()) {
         descriptor.name = accessible_name();
     } else if (!page_.caption.empty()) {

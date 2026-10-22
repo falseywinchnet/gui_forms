@@ -1077,7 +1077,11 @@ std::vector<SemanticNode> ToolStrip::semantic_virtual_children() const {
             node.has_popup = has_menu(item.kind);
             node.states |= SemanticState::focusable;
             const AnatomyStateSet states = item_states(index);
-            if (states.contains(AnatomyState::checked)) node.states |= SemanticState::checked;
+            // A check-on-click button can be checked whether or not it is
+            // now; any other button while it is checked.
+            const bool checked = states.contains(AnatomyState::checked);
+            if (item.check_on_click || checked) node.states |= SemanticState::checkable;
+            if (checked) node.states |= SemanticState::checked;
             if (states.contains(AnatomyState::open)) node.states |= SemanticState::expanded;
             if (focused_ && hot_index_ == index) node.states |= SemanticState::focused;
             node.actions = {SemanticAction::focus, SemanticAction::press};

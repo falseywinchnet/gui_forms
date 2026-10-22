@@ -298,7 +298,9 @@ none.
 The control publishes the accessibility role `text_box`. Its name is the
 accessible name only, so give every box one with `set_accessible_name`; the
 placeholder becomes the description, not the name. The value is the text, or
-empty when masked, together with the protected-content state. It reports
+empty when masked, together with the protected-content state. The box also
+publishes whether it is multiline and, unless masked, its selection as an
+anchor and a caret. It reports
 read-only when `read_only` is true, and otherwise offers a set-value action,
 which replaces the whole text as one undoable edit within `maximum_length`.
 A box that suggests also publishes that it opens a popup, and the expanded

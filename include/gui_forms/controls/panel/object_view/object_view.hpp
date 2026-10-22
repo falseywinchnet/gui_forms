@@ -306,6 +306,8 @@ private:
     void reveal_header();
     void cancel_header_interaction();
     void request_header_sort(std::size_t column);
+    void append_column_headers(std::vector<SemanticNode>& nodes) const;
+    void append_row_cells(std::size_t index, SemanticNode& row_node) const;
     struct DetailsPointerContext final {
         Window* attached{}; // Borrowed only across synchronous input delivery.
         std::uint64_t revision{};

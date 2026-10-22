@@ -204,6 +204,7 @@ std::vector<SemanticNode> CheckedListBox::semantic_virtual_children() const {
     for (std::size_t index = 0U;
          index < nodes.size() && index < check_states_.size(); ++index) {
         nodes[index].role = SemanticRole::check_list_item;
+        nodes[index].states |= SemanticState::checkable;
         if (check_states_[index] == CheckState::checked) {
             nodes[index].states |= SemanticState::checked;
             nodes[index].value = "checked";
