@@ -34,11 +34,13 @@ Values: `accent_index`, `text_orientation`, `dock_region`, `content_color`.
 
 Recipe families: `window`, `panel`, `card`, `button`, `accent_button`, `command_button`, `choice`, `editor`, `menu_item`, `selection`, `progress`, `tool_tip`.
 
-Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio_button`, `link`, `text_box`, `list`, `list_item`, `check_list_item`, `combo_box`, `slider`, `scroll_bar`, `progress_bar`, `image`, `tab_group`, `tab`, `split_pane`, `numeric_field`, `tool_tip`, `date_picker`, `calendar`, `date_cell`, `property_grid`, `property_group`, `property_row`, `menu_bar`, `menu_bar_item`, `menu`, `menu_item`, `separator`, `toolbar`, `radio_group`, `split_button`, `menu_button`, `pane`, `tab_panel`.
+Semantic roles: `generic`, `group`, `static_text`, `button`, `check_box`, `radio_button`, `link`, `text_box`, `list`, `list_item`, `check_list_item`, `combo_box`, `slider`, `scroll_bar`, `progress_bar`, `image`, `tab_group`, `tab`, `split_pane`, `numeric_field`, `tool_tip`, `date_picker`, `calendar`, `date_cell`, `property_grid`, `property_group`, `property_row`, `menu_bar`, `menu_bar_item`, `menu`, `menu_item`, `separator`, `toolbar`, `radio_group`, `split_button`, `menu_button`, `pane`, `tab_panel`, `tree`, `tree_item`, `table`, `row`, `cell`, `column_header`, `row_header`, `tree_grid`, `dialog`, `status_bar`, `live_region`.
 
 Semantic actions: `focus`, `press`, `select`, `increment`, `decrement`, `expand`, `collapse`, `show_menu`, `set_value`, `close`.
 
-Semantic node fields: `position_in_set`, `set_size`, `has_popup`, `controlled_panel`, `orientation`.
+Semantic states: `enabled`, `visible`, `focusable`, `focused`, `selected`, `checked`, `mixed`, `read_only`, `expanded`, `busy`, `protected_content`, `invalid`, `checkable`, `multiselectable`.
+
+Semantic node fields: `position_in_set`, `set_size`, `has_popup`, `controlled_panel`, `orientation`, `level`, `modal`, `row_index`, `column_index`, `row_count`, `column_count`, `access_key`, `small_step`, `large_step`, `text_selection`, `multiline`.
 
 ## Engine
 
@@ -55,10 +57,11 @@ Theme engine 0.2 (T2): the primitives a theme's rules may select, the atoms each
 | `seam_line` | 0.2 | `seam` | none | 16 | `line` |
 | `grip` | 0.2 | `grip` | none | 16 | `dot` |
 | `material` | 0.2 | `region`, `face`, `actuator`, `well`, `track`, `thumb`, `chip` | `hot`, `pressed`, `captured`, `selected`, `checked`, `current`, `open`, `active_tool`, `focus_visible`, `preselect`, `disabled`, `unavailable` | 512 | `recipe` |
+| `overlay_shadow` | 0.2 | `shadow` | none | 512 | none |
 
 Bounded expressions: at most 64 operations and a stack of 16, from `constant`, `input`, `state`, `parameter`, `negate`, `add`, `subtract`, `multiply`, `divide`, `minimum`, `maximum`, `less`, `less_equal`, `greater`, `greater_equal`, `equal`, `not_equal`, `clamp`, `mix`, `smoothstep`, `choose`.
 
-Transitions run on `opacity`, `scale` and on the primitives' animated parameters: at most 8 states a machine and 4 transitions a part. Ambient effects: at most 30 frames per second over at most 0.1 of the window on everyday surfaces.
+Transitions run on `opacity`, `scale`, `face` and on the primitives' animated parameters: at most 8 states a machine and 4 transitions a part. Ambient effects: at most 30 frames per second over at most 0.1 of the window on everyday surfaces.
 
 ## `button_base` (ButtonBase, control)
 

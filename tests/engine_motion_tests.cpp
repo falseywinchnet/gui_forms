@@ -172,8 +172,8 @@ PropertyTransition transition_on(std::string property, double target) {
 void machines_are_rule_data() {
     const CompiledThemeRules built_in =
         CompiledThemeRules::compile_with_built_in(ThemeRuleSheet{}, builtin_primitive_registry());
-    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 8U && built_in.rule_count() == 8U,
-            "the engine's eight built-in rules compile cleanly");
+    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 9U && built_in.rule_count() == 9U,
+            "the engine's nine built-in rules compile cleanly");
     const CompiledThemeRules::Resolution face =
         built_in.resolve(facts_of("ribbon", "command_face", PartRole::face));
     require(face.outcome == CompiledThemeRules::Outcome::primitive &&
@@ -381,10 +381,26 @@ std::size_t run_until_settled(RibbonFixture& fixture, BitHash& hash, std::vector
     return frames;
 }
 
+// Runs idle frames until the window has baked every queued keyframe,
+// requiring at most one bake per frame (owner A, 2026-10-22); returns the
+// frames run.
+std::size_t drain_idle_keyframes(RibbonFixture& fixture) {
+    Window& window = *fixture.window;
+    std::size_t frames = 0U;
+    for (int step = 0; step < 40 && window.engine_parts().idle_keyframes_waiting(); ++step) {
+        const std::uint64_t before = window.engine_parts().cache_statistics().bakes;
+        static_cast<void>(run_frame(window, fixture.time, fixture.painter));
+        require(window.engine_parts().cache_statistics().bakes <= before + 1U, "an idle frame bakes one keyframe");
+        frames = frames + 1U;
+    }
+    require(!window.engine_parts().idle_keyframes_waiting(), "the idle keyframes are all baked");
+    return frames;
+}
+
 // The expected hashes of the rise and the fall, recorded on Windows x64
 // and checked on every CI platform.
-constexpr std::uint64_t expected_rise_hash = 0x245cf70b59b32edcULL;
-constexpr std::uint64_t expected_fall_hash = 0x1051f2233ce0173dULL;
+constexpr std::uint64_t expected_rise_hash = 0x94265deb32d68de6ULL;
+constexpr std::uint64_t expected_fall_hash = 0x14208adee63a9a21ULL;
 
 void ribbon_rise() {
     std::unique_ptr<RibbonFixture> fixture = make_ribbon();
@@ -393,15 +409,25 @@ void ribbon_rise() {
     FaceFrame rest = face_frame(window);
     require(rest.pixels.empty() && !window.motion_clock().armed(),
             "a ribbon button is flat at rest: nothing is drawn and nothing moves");
+    // E7r (owner A): the rise's keyframes, the nine levels above the flat
+    // plane, are baked in idle frames after the first paint, one a frame.
+    require(window.engine_parts().idle_keyframes_waiting(), "the first paint queues the keyframes");
+    const std::size_t idle_frames = drain_idle_keyframes(*fixture);
+    require(idle_frames >= 9U && window.engine_parts().cache_statistics().keyframe_idle_bakes >= 9U,
+            "each keyframe takes an idle frame of its own");
 
     move_to(window, centre(face));
     repaint(window, (*fixture).painter);
     const FaceFrame start = face_frame(window);
     require(start.amplitude == 0.0 && start.pixels.empty() && window.motion_clock().armed(),
             "hot, the rise starts from the flat plane on the window's clock");
+    // With the idle bakes done, nothing is baked while the rise runs.
+    const RasterCacheStatistics started = window.engine_parts().cache_statistics();
+    require(started.keyframe_demand_bakes == 0U, "no keyframe is baked on demand");
     BitHash rise{};
     std::vector<double> rising{};
     const std::size_t rise_frames = run_until_settled(*fixture, rise, rising);
+    require(window.engine_parts().cache_statistics().bakes == started.bakes, "nothing is baked while the rise runs");
     require(rise_frames == 30U && rising.size() == 30U,
             "the rise settles within half an 8-bit step after 30 frames of 16 ms (480 ms)");
     const double first = 1.0 - std::exp(-16.0 / 75.0);
@@ -426,11 +452,21 @@ void ribbon_rise() {
     std::vector<double> falling{};
     const std::size_t fall_frames = run_until_settled(*fixture, fall, falling);
     require(fall_frames == 30U && falling.back() == 0.0, "it falls back in 30 frames and rests flat");
+    require(window.engine_parts().cache_statistics().bakes == started.bakes,
+            "nor while it falls: it steps back through the same keyframes");
     for (std::size_t index = 1; index < falling.size(); ++index) {
         require(falling[index] < falling[index - 1U], "the amplitude only falls");
     }
     require(run_frame(window, (*fixture).time, (*fixture).painter) == 0U && !window.motion_clock().armed(),
             "and then nothing is scheduled");
+    // Hovered again, the rise bakes nothing at all.
+    move_to(window, centre(face));
+    repaint(window, (*fixture).painter);
+    BitHash again{};
+    std::vector<double> rising_again{};
+    static_cast<void>(run_until_settled(*fixture, again, rising_again));
+    require(window.engine_parts().cache_statistics().bakes == started.bakes, "a second rise bakes nothing");
+    require(again.value == rise.value, "and shows the same frames");
     if (print_mode()) {
         std::cout << "ribbon rise hash 0x" << std::hex << rise.value << ", fall hash 0x" << fall.value << std::dec
                   << '\n';
@@ -438,6 +474,27 @@ void ribbon_rise() {
     }
     require(rise.value == expected_rise_hash, "the rise has the same bits on every host");
     require(fall.value == expected_fall_hash, "the fall has the same bits on every host");
+}
+
+// Before the idle frames have run, a rise bakes each keyframe the first
+// time it reaches it, one at most in a frame (owner A, 2026-10-22).
+void ribbon_rise_before_idle_bakes() {
+    std::unique_ptr<RibbonFixture> fixture = make_ribbon();
+    Window& window = *(*fixture).window;
+    const Rect face = paste_face(*(*fixture).ribbon);
+    move_to(window, centre(face));
+    repaint(window, (*fixture).painter);
+    require(window.motion_clock().armed(), "the rise starts at once");
+    std::uint64_t previous = window.engine_parts().cache_statistics().bakes;
+    for (int step = 0; step < 100 && window.motion_clock().armed(); ++step) {
+        static_cast<void>(run_frame(window, (*fixture).time, (*fixture).painter));
+        const std::uint64_t now = window.engine_parts().cache_statistics().bakes;
+        require(now <= previous + 1U, "a frame bakes at most the one keyframe it reaches first");
+        previous = now;
+    }
+    const RasterCacheStatistics ran = window.engine_parts().cache_statistics();
+    require(ran.keyframe_demand_bakes <= 10U && ran.keyframe_idle_bakes == 0U,
+            "while the rise runs no idle frame bakes, and each keyframe is baked once at most");
 }
 
 void ribbon_without_motion() {
@@ -874,6 +931,7 @@ void ambient_effects() {
 int main() {
     machines_are_rule_data();
     ribbon_rise();
+    ribbon_rise_before_idle_bakes();
     ribbon_without_motion();
     tile_fade();
     ambient_effects();

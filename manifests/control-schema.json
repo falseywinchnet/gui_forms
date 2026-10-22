@@ -12,9 +12,10 @@
     "engine_inputs": ["pointer_x", "pointer_y", "time_in_state", "display_scale", "text_scale"],
     "values": ["accent_index", "text_orientation", "dock_region", "content_color"],
     "families": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"],
-    "semantic_roles": ["generic", "group", "static_text", "button", "check_box", "radio_button", "link", "text_box", "list", "list_item", "check_list_item", "combo_box", "slider", "scroll_bar", "progress_bar", "image", "tab_group", "tab", "split_pane", "numeric_field", "tool_tip", "date_picker", "calendar", "date_cell", "property_grid", "property_group", "property_row", "menu_bar", "menu_bar_item", "menu", "menu_item", "separator", "toolbar", "radio_group", "split_button", "menu_button", "pane", "tab_panel"],
+    "semantic_roles": ["generic", "group", "static_text", "button", "check_box", "radio_button", "link", "text_box", "list", "list_item", "check_list_item", "combo_box", "slider", "scroll_bar", "progress_bar", "image", "tab_group", "tab", "split_pane", "numeric_field", "tool_tip", "date_picker", "calendar", "date_cell", "property_grid", "property_group", "property_row", "menu_bar", "menu_bar_item", "menu", "menu_item", "separator", "toolbar", "radio_group", "split_button", "menu_button", "pane", "tab_panel", "tree", "tree_item", "table", "row", "cell", "column_header", "row_header", "tree_grid", "dialog", "status_bar", "live_region"],
     "semantic_actions": ["focus", "press", "select", "increment", "decrement", "expand", "collapse", "show_menu", "set_value", "close"],
-    "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation"]
+    "semantic_states": ["enabled", "visible", "focusable", "focused", "selected", "checked", "mixed", "read_only", "expanded", "busy", "protected_content", "invalid", "checkable", "multiselectable"],
+    "semantic_fields": ["position_in_set", "set_size", "has_popup", "controlled_panel", "orientation", "level", "modal", "row_index", "column_index", "row_count", "column_count", "access_key", "small_step", "large_step", "text_selection", "multiline"]
   },
   "engine": {
     "version": "0.2",
@@ -198,11 +199,21 @@
         "parameters": [
           {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false}
         ]
+      },
+      {
+        "name": "overlay_shadow",
+        "introduced": "0.2",
+        "roles": ["shadow"],
+        "states_read": [],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [32, 32, 32, 32],
+        "parameters": []
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
     "published_values": {"maximum": 32},
-    "transitions": {"engine_properties": ["opacity", "scale"], "maximum_states": 8, "maximum_per_part": 4},
+    "transitions": {"engine_properties": ["opacity", "scale", "face"], "maximum_states": 8, "maximum_per_part": 4},
     "ambient": {"maximum_frames_per_second": 30, "maximum_window_fraction": 0.1}
   },
   "types": [

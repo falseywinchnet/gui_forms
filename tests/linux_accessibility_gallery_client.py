@@ -140,6 +140,8 @@ EXPANDED: int = 1 << 8
 BUSY: int = 1 << 9
 PROTECTED_CONTENT: int = 1 << 10
 INVALID: int = 1 << 11
+CHECKABLE: int = 1 << 12
+MULTISELECTABLE: int = 1 << 13
 
 # The semantic role and the AT-SPI role name the ATK adapter publishes it as
 # (native_role in src/host/linux/accessibility/linux_accessibility.cpp).
@@ -153,7 +155,9 @@ ROLE_NAMES: dict[str, str] = {
     'property_grid': 'LIST', 'property_group': 'GROUPING', 'property_row': 'LIST_ITEM', 'menu_bar': 'MENU_BAR',
     'menu_bar_item': 'MENU_ITEM', 'menu': 'MENU', 'menu_item': 'MENU_ITEM', 'separator': 'SEPARATOR',
     'toolbar': 'TOOL_BAR', 'radio_group': 'PANEL', 'split_button': 'PUSH_BUTTON', 'menu_button': 'PUSH_BUTTON',
-    'pane': 'PANEL', 'tab_panel': 'SCROLL_PANE',
+    'pane': 'PANEL', 'tab_panel': 'SCROLL_PANE', 'tree': 'TREE', 'tree_item': 'TREE_ITEM', 'table': 'TABLE',
+    'row': 'TABLE_ROW', 'cell': 'TABLE_CELL', 'column_header': 'COLUMN_HEADER', 'row_header': 'ROW_HEADER',
+    'tree_grid': 'TREE_TABLE', 'dialog': 'DIALOG', 'status_bar': 'STATUS_BAR', 'live_region': 'PANEL',
 }
 
 # Semantic state bits and the AT-SPI state names that publish them.
@@ -161,12 +165,13 @@ STATE_NAMES: tuple[tuple[int, str], ...] = (
     (ENABLED, 'ENABLED'), (ENABLED, 'SENSITIVE'), (VISIBLE, 'VISIBLE'), (VISIBLE, 'SHOWING'),
     (FOCUSABLE, 'FOCUSABLE'), (FOCUSED, 'FOCUSED'), (SELECTED, 'SELECTED'), (CHECKED, 'CHECKED'),
     (MIXED, 'INDETERMINATE'), (EXPANDED, 'EXPANDED'), (BUSY, 'BUSY'), (READ_ONLY, 'READ_ONLY'),
-    (INVALID, 'INVALID_ENTRY'),
+    (INVALID, 'INVALID_ENTRY'), (CHECKABLE, 'CHECKABLE'), (MULTISELECTABLE, 'MULTISELECTABLE'),
 )
 # States the adapter derives from the role and actions, and DEFUNCT; with
 # STATE_NAMES, the states a comparison checks in both directions.
 DERIVED_STATE_NAMES: tuple[str, ...] = (
     'EDITABLE', 'CHECKABLE', 'EXPANDABLE', 'SELECTABLE', 'HAS_POPUP', 'HORIZONTAL', 'VERTICAL', 'DEFUNCT',
+    'SINGLE_LINE', 'MULTI_LINE', 'MODAL',
 )
 
 
@@ -234,6 +239,8 @@ def expected_states(node: dict[str, Any]) -> set[str]:
     actions: list[str] = node['actions']
     if node['role'] == 'text_box' and (node['states'] & READ_ONLY) == 0:
         states.add('EDITABLE')
+    if node['role'] == 'text_box':
+        states.add('MULTI_LINE' if node['multiline'] else 'SINGLE_LINE')
     if node['role'] in ('check_box', 'check_list_item', 'radio_button'):
         states.add('CHECKABLE')
     if (node['states'] & EXPANDED) != 0 or 'expand' in actions or 'collapse' in actions:
@@ -242,6 +249,8 @@ def expected_states(node: dict[str, Any]) -> set[str]:
         states.add('SELECTABLE')
     if node['has_popup']:
         states.add('HAS_POPUP')
+    if node['modal']:
+        states.add('MODAL')
     if node['orientation'] == 'horizontal':
         states.add('HORIZONTAL')
     if node['orientation'] == 'vertical':
@@ -496,6 +505,23 @@ class Comparer:
                               ', expected ' + str(node['position_in_set']) + ' of ' + str(node['set_size']))
         elif 'posinset' in attributes or 'setsize' in attributes:
             self.mismatch(where, 'position published without one in the semantic tree')
+        # The stage A fields published as object attributes (attributes() in
+        # the adapter): present exactly when the node has the field.
+        field: str
+        attribute: str
+        for field, attribute in (('level', 'level'), ('row_index', 'rowindex'), ('column_index', 'colindex'),
+                                 ('row_count', 'rowcount'), ('column_count', 'colcount')):
+            wanted: str | None = None if node[field] is None else str(node[field])
+            if attributes.get(attribute) != wanted:
+                self.mismatch(where, attribute + ' ' + repr(attributes.get(attribute)) + ', expected ' + repr(wanted))
+        live: str | None = 'polite' if node['role'] == 'live_region' else None
+        if attributes.get('live') != live or attributes.get('container-live') != live:
+            self.mismatch(where, 'live ' + repr(attributes.get('live')) + ', expected ' + repr(live))
+        if 'Action' in interfaces and node['actions']:
+            binding: str = atspi.Action.get_key_binding(obj, 0) or ''
+            wanted_binding: str = '<Alt>' + node['access_key'].lower() + ';;' if node['access_key'] else ''
+            if binding != wanted_binding:
+                self.mismatch(where, 'key binding ' + repr(binding) + ', expected ' + repr(wanted_binding))
         if node['controlled_panel'] != '' and node['controlled_panel'] in ids:
             self.compare_controller(obj, node, where)
 

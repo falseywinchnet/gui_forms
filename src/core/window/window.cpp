@@ -182,6 +182,17 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.has_popup = descriptor.has_popup;
     node.controlled_panel = descriptor.controlled_panel;
     node.orientation = descriptor.orientation;
+    node.level = descriptor.level;
+    node.modal = descriptor.modal;
+    node.row_index = descriptor.row_index;
+    node.column_index = descriptor.column_index;
+    node.row_count = descriptor.row_count;
+    node.column_count = descriptor.column_count;
+    node.access_key = descriptor.access_key;
+    node.small_step = descriptor.small_step;
+    node.large_step = descriptor.large_step;
+    node.text_selection = descriptor.text_selection;
+    node.multiline = descriptor.multiline;
     node.bounds = (*control).absolute_bounds();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     node.states |= descriptor.states;
@@ -3115,7 +3126,8 @@ void Window::update_display_cache_metrics() noexcept {
 void Window::compact_frame_requests() noexcept {
     for (const std::shared_ptr<gui_forms::detail::ScheduledFrameRequest>& request : frame_requests_) {
         if ((*request).kind == detail::FrameRequestKind::ui_timer ||
-            (*request).kind == detail::FrameRequestKind::motion_clock) {
+            (*request).kind == detail::FrameRequestKind::motion_clock ||
+            (*request).kind == detail::FrameRequestKind::engine_idle) {
             continue;
         }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();

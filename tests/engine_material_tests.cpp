@@ -218,15 +218,22 @@ void refusals() {
     require(!primitive.accepts(parameters, target_for(logical, 1.0, &imaged, &registry)),
             "an image fill whose image is missing is refused");
 
-    // A plain material is accepted at a modest size and refused once its
-    // estimated bake passes the bound.
+    // A plain material is accepted at a modest size. A huge one whose
+    // whole bake passes the bound is still accepted when it slices (E7r),
+    // since only its reference is baked; one that cannot slice, such as a
+    // radial gradient, is refused.
     const SurfaceMaterial plain = solid_material(red);
     require(primitive.accepts(parameters, target_for(logical, 1.0, &plain)), "a solid material is accepted");
     const Size huge{4000.0, 4000.0};
     require(engine_primitives::material_bake_estimate(plain, target_for(huge, 1.0, &plain)) >
                 engine_primitives::maximum_material_bake_nanoseconds,
             "a 4000 by 4000 part is over the bake bound");
-    require(!primitive.accepts(parameters, target_for(huge, 1.0, &plain)), "and is refused");
+    require(primitive.accepts(parameters, target_for(huge, 1.0, &plain)), "and is accepted, since it slices");
+    SurfaceMaterial radial = plain;
+    const std::vector<GradientStop> radial_stops{GradientStop{0.0, red}, GradientStop{1.0, blue}};
+    radial.fills.clear();
+    radial.fills.push_back(MaterialFillLayer::radial(Point{0.5, 0.5}, Size{0.5, 0.5}, radial_stops));
+    require(!primitive.accepts(parameters, target_for(huge, 1.0, &radial)), "a radial one is refused");
 }
 
 // -- layers ------------------------------------------------------------------------
@@ -819,6 +826,11 @@ void measure() {
     SurfaceMaterial outer = base;
     outer.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 64.0, 0.0, black, false});
     outer.corner_radius = 8.0;
+    // A box rounded to a circle: every pixel is within the shadow's corners.
+    SurfaceMaterial round_box = base;
+    round_box.corner_radius = 120.0;
+    SurfaceMaterial outer_round = round_box;
+    outer_round.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 64.0, 0.0, black, false});
     SurfaceMaterial inset = base;
     inset.shadows.push_back(MaterialShadow{Point{0.0, 2.0}, 64.0, 0.0, black, true});
     inset.corner_radius = 8.0;
@@ -853,6 +865,8 @@ void measure() {
     const double per_pixel_radial = (median_bake_nanoseconds(radial, nullptr) - base_time) / pixels;
     const double rounded_time = median_bake_nanoseconds(rounded_base, nullptr);
     const double per_pixel_outer = (median_bake_nanoseconds(outer, nullptr) - rounded_time) / pixels;
+    const double round_time = median_bake_nanoseconds(round_box, nullptr);
+    const double per_pixel_corner = (median_bake_nanoseconds(outer_round, nullptr) - round_time) / pixels - per_pixel_outer;
     const double per_pixel_inset = (median_bake_nanoseconds(inset, nullptr) - rounded_time) / pixels;
     const double per_pixel_border = (median_bake_nanoseconds(border, nullptr) - rounded_time) / pixels;
     const double per_pixel_edge = (median_bake_nanoseconds(edge, nullptr) - base_time) / pixels;
@@ -876,6 +890,7 @@ void measure() {
     std::cout << "radial " << per_pixel_radial << '\n';
     std::cout << "gradient_stop " << (per_pixel_many - per_pixel_linear) / 30.0 << '\n';
     std::cout << "outer_shadow " << per_pixel_outer << '\n';
+    std::cout << "outer_corner " << per_pixel_corner << '\n';
     std::cout << "inset_shadow " << per_pixel_inset << '\n';
     std::cout << "border " << per_pixel_border << '\n';
     std::cout << "border_edge " << per_pixel_edge << '\n';

@@ -27,7 +27,8 @@ std::optional<FrameTime> Window::next_wake() const noexcept {
         if (occluded_) {
             continue;
         }
-        if ((*request).kind == detail::FrameRequestKind::motion_clock) {
+        if ((*request).kind == detail::FrameRequestKind::motion_clock ||
+            (*request).kind == detail::FrameRequestKind::engine_idle) {
             if (!result || (*request).deadline < *result) {
                 result = (*request).deadline;
             }
@@ -199,6 +200,15 @@ FramePollResult Window::poll_frame_schedule(FrameTime now) {
             (*request).deadline = now + (*request).interval;
             metrics_.record_callback_emitted();
             motion_clock_.advance(now);
+            continue;
+        }
+        if ((*request).kind == detail::FrameRequestKind::engine_idle) {
+            (*request).deadline = now + (*request).interval;
+            // Idle: no motion runs and nothing waits to be painted. One
+            // keyframe per idle frame, so that none stalls a frame.
+            if (motion_clock_.armed() || paint_dirty_) continue;
+            const bool waiting = engine_parts_.bake_idle_keyframe(&image_resources(), paint_leases_completed_);
+            if (!waiting) (*request).disconnect();
             continue;
         }
         const std::shared_ptr<gui_forms::Control> target = (*request).target.lock();

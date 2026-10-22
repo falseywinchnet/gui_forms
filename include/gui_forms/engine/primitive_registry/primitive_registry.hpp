@@ -194,6 +194,52 @@ struct PrimitiveTarget final {
     const ImageRegistry* images{};
 };
 
+// Slicing (E7r, owner 2026-10-22). A primitive whose raster repeats along
+// an axis away from the part's edges may be baked once, short along that
+// axis (the reference), and any longer part assembled from it by copying:
+// the reference's pixels at the start and the end of the axis (the
+// corners and edge strips) are copied as they are, and one interior pixel
+// is repeated between them (the centre). Every part of one material,
+// state and scale that differs only in its sliced lengths shares one bake.
+//
+// How one axis of a part is drawn.
+enum class SliceAxisOutcome : std::uint8_t {
+    // Assembled from the reference, which is shorter along the axis.
+    sliced,
+    // Baked at the part's own length along the axis, because a layer
+    // varies along it (such as a gradient along the axis).
+    varies,
+    // Baked at its own length: the part's box does not start and end on
+    // device-pixel boundaries along the axis, so a shorter reference would
+    // not have the same pixels at its far end.
+    fractional,
+    // Baked at its own length: the part is no longer than the reference
+    // would be, as when its blur and radius exceed half its length.
+    too_small,
+};
+
+// One axis of a slice plan. For a sliced axis, the destination's first
+// `start` and last `end` device pixels are the reference's own; every
+// pixel between them is the reference's pixel `start`.
+struct SliceAxis final {
+    SliceAxisOutcome outcome{SliceAxisOutcome::varies};
+    std::uint32_t start{};
+    std::uint32_t end{};
+};
+
+// How a part's raster may be assembled (EnginePrimitive::slice_plan).
+// `slices` is false for a primitive that never slices: its parts are baked
+// whole and nothing is counted. Otherwise, when either axis is sliced, the
+// reference is the target at `reference_size` with `reference_extent`;
+// when neither is, the part is baked whole and counted as a fallback.
+struct PrimitiveSlicePlan final {
+    bool slices{};
+    SliceAxis across{};
+    SliceAxis down{};
+    Size reference_size{};
+    DeviceExtent reference_extent{};
+};
+
 class EnginePrimitive;
 
 // What a primitive derives once from a part's geometry and fixed
@@ -291,6 +337,13 @@ public:
     [[nodiscard]] virtual std::optional<ControlVisualRole> theme_material(
         const PrimitiveParameterBlock& parameters) const noexcept;
 
+    // Whether the primitive draws the theme's overlay shadow (E9, GIVEN
+    // E1-1): the engine then lends the theme's overlay shadow layers for the
+    // part's presentation as a material of one transparent fill and those
+    // shadows, at the part's corner radius, and draws nothing when the theme
+    // casts none. False unless the primitive says otherwise.
+    [[nodiscard]] virtual bool lends_overlay_shadow() const noexcept;
+
     // Whether the primitive will draw this target with `parameters`, such as
     // a material whose bake would exceed its bound. A primitive that refuses
     // is drawn by the built-in recipe instead, and the engine counts the
@@ -298,6 +351,15 @@ public:
     // target in range and parameters that match the declarations.
     [[nodiscard]] virtual bool accepts(const PrimitiveParameterBlock& parameters,
                                        const PrimitiveTarget& target) const noexcept;
+
+    // How a raster of `extent` for this target may be assembled from a
+    // shorter reference bake (E7r slicing). A plan that slices an axis
+    // promises that assembling the reference gives the bytes a whole bake
+    // would. Never slices unless the primitive says otherwise. Called as
+    // accepts() is, with a target the primitive accepts.
+    [[nodiscard]] virtual PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters,
+                                                        const PrimitiveTarget& target,
+                                                        DeviceExtent extent) const noexcept;
 
     // Validates the target and the parameters, then derives the
     // preparation's values. Anything but `prepared` leaves `preparation`

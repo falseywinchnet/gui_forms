@@ -14,6 +14,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <optional>
 #include <string>
@@ -51,6 +52,23 @@ namespace gui_forms {
 // whole table (a theme change). A raster's transparency passes through as
 // its own premultiplied alpha when it is composited. Releasing or evicting a
 // record releases its raster.
+//
+// The shared bakes (E7r, owner 2026-10-22): rasters the table owns and
+// every part may use, keyed by the request that drew them, held within
+// shared_bake_budget_bytes with the least recently used evicted first. A
+// theme change (invalidate_rasters) drops them all; invalidating one part
+// bakes again the shared raster it uses. They are of two kinds.
+// - Slice references. A primitive that slices (EnginePrimitive::slice_plan)
+//   bakes one reference per distinct request less its sliced lengths: per
+//   material, state and scale, say, for every button of a material,
+//   whatever their widths. A part's raster is assembled from it by copying
+//   (its corners and edges as they are, its centre repeated) and cached
+//   like any other. Labels, icons and the focus ring are parts of their
+//   own, drawn over the face, so they never split a face's reference.
+// - Keyframes (PartRasterRequest::shared). A part whose animated parameters
+//   stand at keyframe levels, or whose ambient effect is at one of its loop's
+//   frames, uses the shared raster for its request as its own, with no copy;
+//   parts of the same size and state share them.
 
 // Which record a handle names: a slot of the table and the slot's
 // generation when the record was made. Releasing a record advances its
@@ -84,6 +102,10 @@ struct CachedPartRaster final {
     DeviceExtent extent{};
     std::optional<SurfaceMaterial> material{};
     std::uint64_t image_revision{};
+    // Whether `raster` is one of the table's shared bakes (a keyframe): it
+    // then counts against shared_bake_budget_bytes, not the part cache's,
+    // and is never drawn over.
+    bool shared{};
     // The record's and the table's raster generations when `raster` was
     // drawn; invalidation advances the current ones.
     std::uint64_t raster_generation{};
@@ -170,6 +192,19 @@ struct EnginePartRecord final {
     // The part's transitions (E7), made the first time it is painted with
     // one; null for a part without any.
     std::unique_ptr<PartMotion> motion{};
+    // For a part with a face cross-fade (E7r form a): the face it showed
+    // last and the states it showed it in, and while a fade runs the face
+    // it fades from. A fade starts only when the states change (a discrete
+    // change), never when a keyframe step or a scale replaces the face.
+    // The faces are shared with the raster cache and the display; they keep
+    // a replaced face alive only until its fade settles, and are released
+    // on the first paint without a face transition.
+    std::shared_ptr<const PartRaster> shown_face{};
+    std::shared_ptr<const PartRaster> fading_face{};
+    AnatomyStateSet face_states{};
+    // The states whose keyframes were last queued for idle frames (E7r):
+    // queued again when the part's states change.
+    std::optional<AnatomyStateSet> keyframe_states{};
     // Whether the part's last paint had an ambient effect, and whether that
     // effect was refused for its area (E7). An ambient part repaints when
     // ambient motion resumes; a refusal is counted once, when it begins.
@@ -203,11 +238,18 @@ inline constexpr std::size_t maximum_item_part_records = 4096;
 // the part's target, and the destination extent in device pixels (normally
 // the logical size grown by the primitive's outsets, times the scale, rounded
 // up).
+//
+// `shared` asks for the table's shared raster for the request (a keyframe,
+// E7r) in place of one of the part's own: set for a part whose animated
+// parameters stand at keyframe levels or whose ambient effect is at a frame
+// of its loop, so that its rasters are baked once and kept for every
+// transition after.
 struct PartRasterRequest final {
     const EnginePrimitive* primitive{};
     PrimitiveParameterBlock parameters{};
     PrimitiveTarget target{};
     DeviceExtent extent{};
+    bool shared{};
 };
 
 enum class PartRasterStatus : std::uint8_t {
@@ -220,6 +262,9 @@ enum class PartRasterStatus : std::uint8_t {
     // The primitive drew the part, but the raster alone exceeds the cache
     // budget, so it is returned and not kept.
     uncached,
+    // The raster is the table's shared bake for the request (a keyframe),
+    // baked now or before.
+    shared,
     // Nothing was drawn: the handle is stale.
     stale_record,
     // Nothing was drawn: no primitive, or the primitive refused the target,
@@ -246,10 +291,47 @@ struct RasterCacheStatistics final {
     std::uint64_t uncached{};
     // Rasters evicted to keep within the budget.
     std::uint64_t evictions{};
+    // Every time a primitive drew pixels: a whole part or a slice
+    // reference. Compositing a cached raster, or assembling one from a
+    // cached reference, is not a bake.
+    std::uint64_t bakes{};
+    // Slicing (E7r): references baked; parts assembled from a reference
+    // already held; parts of a slicing primitive baked whole because
+    // neither axis could be sliced, and axes kept whole, each counted per
+    // draw.
+    std::uint64_t slice_bakes{};
+    std::uint64_t slice_hits{};
+    std::uint64_t slice_whole_fallbacks{};
+    std::uint64_t slice_axis_fallbacks{};
+    // Keyframes (E7r; owner A, 2026-10-22): baked in idle frames ahead of
+    // use, baked on demand the first time a paint reached one not yet held,
+    // and taken from the shared bakes already held; and those queued for
+    // idle frames now.
+    std::uint64_t keyframe_idle_bakes{};
+    std::uint64_t keyframe_demand_bakes{};
+    std::uint64_t keyframe_hits{};
+    std::size_t idle_keyframes_queued{};
+    // The shared bakes: evicted to keep within their budget, held now, and
+    // their bytes.
+    std::uint64_t shared_evictions{};
+    std::size_t shared_rasters{};
+    std::size_t shared_bytes{};
 };
 
 // The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB).
 inline constexpr std::size_t raster_cache_budget_bytes = 8U * 1024U * 1024U;
+
+// The most bytes of shared bakes one window keeps (E7r), apart from
+// raster_cache_budget_bytes: slice references, a few kilobytes each for a
+// button at scale 2, and keyframes, ten whole rasters for each size and
+// state of a part with an animated parameter (some 200 KB for a large
+// ribbon button at scale 1.5). A proposed default.
+inline constexpr std::size_t shared_bake_budget_bytes = 4U * 1024U * 1024U;
+
+// The most keyframes queued for idle frames at once (E7r): ten levels for
+// each of about six parts. A keyframe that does not fit is baked on demand
+// when a paint first reaches it.
+inline constexpr std::size_t maximum_idle_keyframes = 64U;
 
 // What acquire() did.
 struct PartRecordAcquisition final {
@@ -322,10 +404,32 @@ public:
     [[nodiscard]] PartRasterResult raster_for(PartRecordHandle handle, const PartRasterRequest& request,
                                               std::uint64_t paint_sequence);
 
+    // Idle keyframes (E7r; owner A, 2026-10-22). queue_idle_keyframe keeps
+    // a copy of `request` (its lent material copied, its borrows cleared) to
+    // bake in an idle frame, unless the table holds or queues it already or
+    // the queue is full. bake_idle_keyframe bakes the oldest queued keyframe
+    // the table does not hold, lending it `images` (a queued material whose
+    // images changed is dropped), and returns whether any remain queued. A
+    // theme change (invalidate_rasters) empties the queue. Allocation
+    // failure propagates as std::bad_alloc, the queue then holding what it
+    // held less the keyframe taken.
+    void queue_idle_keyframe(const PartRasterRequest& request);
+    bool bake_idle_keyframe(const ImageRegistry* images, std::uint64_t paint_sequence);
+    [[nodiscard]] bool idle_keyframes_waiting() const noexcept;
+
+    // A raster for a part painted without a key, which has no record: drawn
+    // for this paint and never kept (status uncached), assembled from a
+    // slice reference when the primitive slices it, which is kept. Refused
+    // as raster_for is; allocation failure propagates as std::bad_alloc.
+    [[nodiscard]] PartRasterResult raster_without_record(const PartRasterRequest& request,
+                                                         std::uint64_t paint_sequence);
+
     // Makes one part's cached raster stale; the next raster_for draws it
-    // again. A stale handle does nothing.
+    // again, and bakes again the slice reference it is assembled from. A
+    // stale handle does nothing.
     void invalidate_raster(PartRecordHandle handle) noexcept;
-    // Makes every cached raster stale, as when the theme changes.
+    // Makes every cached raster stale and drops every slice reference, as
+    // when the theme changes.
     void invalidate_rasters() noexcept;
 
     [[nodiscard]] RasterCacheStatistics cache_statistics() const noexcept { return statistics_; }
@@ -386,6 +490,35 @@ private:
     // Whether the record's cached raster answers `request` now.
     [[nodiscard]] bool raster_current(const EnginePartRecord& record, const PartRasterRequest& request) const noexcept;
 
+    // A shared bake: the raster and what drew it (generations unused), and
+    // the paint that last used it.
+    struct SharedBake final {
+        CachedPartRaster cached{};
+        std::uint64_t last_used{};
+    };
+    enum class SharedUse : std::uint8_t {
+        slice_reference,
+        keyframe,
+        idle_keyframe,
+    };
+    // Draws `request` into `destination`: assembled from its slice
+    // reference when the primitive slices it (baking the reference when
+    // none is held, or again when `refresh`), else baked whole with
+    // `preparation`, prepared again when stale. Anything but painted or
+    // empty leaves `destination` unchanged.
+    [[nodiscard]] RasterOutcome draw(const PartRasterRequest& request, PrimitivePreparation& preparation,
+                                     const PartRasterView& destination, std::uint64_t paint_sequence, bool refresh);
+    // The held shared bake answering `request`, or one baked and held now
+    // (again in place of the held one when `refresh`); null when the
+    // primitive refuses it. `use` chooses the counters.
+    [[nodiscard]] std::shared_ptr<PartRaster> shared_bake(const PartRasterRequest& request,
+                                                          std::uint64_t paint_sequence, bool refresh, SharedUse use);
+    // Evicts the least recently used shared bakes until `incoming` more
+    // bytes fit shared_bake_budget_bytes.
+    void make_shared_room(std::size_t incoming) noexcept;
+    // Drops every shared bake.
+    void clear_shared_bakes() noexcept;
+
     std::vector<RecordSlot> slots_;
     std::vector<std::uint32_t> free_slots_;
     // Lookup text to slot, one entry per live record.
@@ -402,6 +535,12 @@ private:
     // cached a raster (raster_table_generation 0) is never current.
     std::uint64_t raster_table_generation_{1U};
     RasterCacheStatistics statistics_{};
+    // The shared bakes, in no order; a few hundred at most, and looked up
+    // only when a part's own raster is not current, so lookups scan them.
+    std::vector<SharedBake> shared_bakes_;
+    // Keyframes waiting for idle frames, oldest first; each a request kept
+    // as a cached raster's description, its raster null.
+    std::deque<CachedPartRaster> idle_keyframes_;
     // Live records reading each expression input, by position.
     std::array<std::uint32_t, maximum_expression_inputs> readers_{};
 };

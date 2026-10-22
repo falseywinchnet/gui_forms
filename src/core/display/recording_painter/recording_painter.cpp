@@ -314,6 +314,18 @@ void RecordingPainter::draw_part_raster(const std::shared_ptr<const PartRaster>&
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                               double opacity) {
+    if (!raster) return;
+    DisplayCommand command;
+    command.operation = DisplayOperation::draw_part_raster_scaled;
+    command.part_raster = raster;
+    command.first = Point{destination.x, destination.y};
+    command.rect = destination;
+    command.scalar = opacity;
+    commands_.push_back(std::move(command));
+}
+
 void RecordingPainter::draw_image_region(ImageId image, Rect source,
                                           Rect destination, double opacity) {
     DisplayCommand command;
@@ -373,6 +385,7 @@ void RecordingPainter::begin_group(const PaintGroup& group) {
     command.rect = group.bounds;
     command.scalar = group.opacity;
     command.secondary_scalar = static_cast<double>(group.composite);
+    command.tertiary_scalar = group.isolated ? 1.0 : 0.0;
     open_groups_.reserve(open_groups_.size() + 1U);
     commands_.push_back(std::move(command));
     open_groups_.push_back(opened);

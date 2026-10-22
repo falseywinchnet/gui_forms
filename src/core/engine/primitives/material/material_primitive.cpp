@@ -27,10 +27,6 @@ namespace {
 
 // -- the descriptor ----------------------------------------------------------------
 
-// How far the material draws outside the part's box, in logical units, on
-// every side: room for the outer shadows, which are clipped beyond it.
-constexpr double material_outset = 8.0;
-
 constexpr std::array<std::string_view, 12> recipe_names{
     "window", "panel", "card", "button", "accent_button", "command_button",
     "choice", "editor", "menu_item", "selection", "progress", "tool_tip"};
@@ -119,8 +115,14 @@ struct MaterialLook final {
     std::size_t outer_count{};
     std::array<ResolvedShadow, SurfaceMaterial::maximum_shadows> inset{};
     std::size_t inset_count{};
+    // The fills that draw: a solid fill of alpha 0 composites nothing and is
+    // left out (blending a zero unit over a pixel leaves its bytes as they
+    // are). Each keeps its index among the material's fills (`image`).
     std::array<ResolvedFill, SurfaceMaterial::maximum_fill_layers> fills{};
     std::size_t fill_count{};
+    // Whether any layer reads the box's coverage; when none does, the pixel
+    // loop does not compute it.
+    bool reads_inside{};
     bool border{};
     Color border_colour{};
     Rect border_inner{};
@@ -165,9 +167,9 @@ PartShape rounded(double radius) noexcept {
     return shape;
 }
 
-Rect material_box(const PrimitiveTarget& target) noexcept {
+Rect material_box(const PrimitiveTarget& target, double outset) noexcept {
     const double scale = target.scale.value;
-    const Rect box{material_outset * scale, material_outset * scale, target.logical_size.width * scale,
+    const Rect box{outset * scale, outset * scale, target.logical_size.width * scale,
                    target.logical_size.height * scale};
     return box;
 }
@@ -280,10 +282,10 @@ void add_keyline(MaterialLook& look, const MaterialKeyline& keyline, double scal
     }
 }
 
-MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept {
+MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget& target, double outset) noexcept {
     const double scale = target.scale.value;
     MaterialLook look{};
-    look.box = material_box(target);
+    look.box = material_box(target, outset);
     const double radius = material_radius(material, target);
     look.box_shape = rounded(radius);
     const Rect box = look.box;
@@ -317,10 +319,12 @@ MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget
         look.inset_count = look.inset_count + 1U;
     }
     for (std::size_t index = 0U; index < material.fills.size(); ++index) {
-        look.fills[index] = resolve_fill(material.fills[index], box, scale);
-        look.fills[index].image = index;
+        const MaterialFillLayer& layer = material.fills[index];
+        if (layer.kind == MaterialFillKind::solid && layer.color.alpha == 0U) continue;
+        look.fills[look.fill_count] = resolve_fill(layer, box, scale);
+        look.fills[look.fill_count].image = index;
+        look.fill_count = look.fill_count + 1U;
     }
-    look.fill_count = material.fills.size();
     if (material.border) {
         const double width = (*material.border).width * scale;
         look.border = true;
@@ -348,6 +352,10 @@ MaterialLook resolve_look(const SurfaceMaterial& material, const PrimitiveTarget
     }
     const bool clip_keylines = radius > 0.0;
     for (const MaterialKeyline& keyline : material.keylines) add_keyline(look, keyline, scale, clip_keylines);
+    look.reads_inside = look.fill_count > 0U || look.inset_count > 0U || look.border;
+    for (std::size_t index = 0U; index < look.band_count; ++index) {
+        if (look.bands[index].clipped) look.reads_inside = true;
+    }
     return look;
 }
 
@@ -390,19 +398,110 @@ void prepare_images(const SurfaceMaterial& material, const PrimitiveTarget& targ
 
 // -- the pixel ---------------------------------------------------------------------
 
-double blurred_coverage(const ResolvedShadow& shadow, double centre_x, double centre_y) noexcept {
+// A shadow's coverage is separable but for its rounded corners: the blurred
+// box's integral across, which depends only on the pixel's column, times
+// its integral down, which depends only on its row, bounded by the blurred
+// distance to the rounded shape.
+double across_integral(const ResolvedShadow& shadow, double centre_x) noexcept {
     const Rect& shape = shadow.shape;
     const double inverse = shadow.inverse_sigma;
     const double across =
         gaussian_integral((shape.right() - centre_x) * inverse) - gaussian_integral((shape.x - centre_x) * inverse);
+    return across;
+}
+
+double down_integral(const ResolvedShadow& shadow, double centre_y) noexcept {
+    const Rect& shape = shadow.shape;
+    const double inverse = shadow.inverse_sigma;
     const double down =
         gaussian_integral((shape.bottom() - centre_y) * inverse) - gaussian_integral((shape.y - centre_y) * inverse);
-    const double product = across * down;
-    if (shadow.radius <= 0.0) return product;
-    const double distance = shape_signed_distance(rounded(shadow.radius), shape, Point{centre_x, centre_y});
-    const double edge = gaussian_integral(-distance * inverse);
+    return down;
+}
+
+// The product bounded by the blurred distance to the rounded shape. A
+// product of zero or less is returned as it is: the bound is never
+// negative, so the minimum would be the product.
+double rounded_bound(const ResolvedShadow& shadow, double product, double centre_x, double centre_y) noexcept {
+    if (product <= 0.0) return product;
+    const double distance = shape_signed_distance(rounded(shadow.radius), shadow.shape, Point{centre_x, centre_y});
+    const double edge = gaussian_integral(-distance * shadow.inverse_sigma);
     const double coverage = std::min(product, edge);
     return coverage;
+}
+
+// An inset shadow's hole: the product, bounded everywhere when rounded.
+double blurred_coverage(const ResolvedShadow& shadow, double centre_x, double centre_y) noexcept {
+    const double product = across_integral(shadow, centre_x) * down_integral(shadow, centre_y);
+    if (shadow.radius <= 0.0) return product;
+    const double coverage = rounded_bound(shadow, product, centre_x, centre_y);
+    return coverage;
+}
+
+// Whether a centre lies beyond the straight part of the shape's edges
+// along one axis: within `radius` of its start or end, or outside it. A
+// rounded shape differs from its rectangle only where a centre is beyond
+// both axes' straight parts (its corner squares, and outward from them).
+// Elsewhere the rounded bound is the bound of the rectangle, a half-plane
+// through its nearest edge, which a blurred rectangle never exceeds; so an
+// outer shadow's coverage is the bare product there and only its corners
+// evaluate the signed distance.
+bool beyond_straight(double start, double end, double radius, double centre) noexcept {
+    const bool beyond = centre < start + radius || centre > end - radius;
+    return beyond;
+}
+
+double outer_coverage(const ResolvedShadow& shadow, double across, double down, bool corner_column, bool corner_row,
+                      double centre_x, double centre_y) noexcept {
+    const double product = across * down;
+    if (shadow.radius <= 0.0 || !corner_column || !corner_row) return product;
+    const double coverage = rounded_bound(shadow, product, centre_x, centre_y);
+    return coverage;
+}
+
+// The outer shadows' separable terms for a bake: for every column of the
+// destination (shadow-major, `width` per shadow) the integral across and
+// whether it is a corner column, filled once per bake; for the row being
+// baked the integral down and whether it is a corner row, filled once per
+// row. Empty `across` (its storage could not be allocated) makes each pixel
+// evaluate its terms itself, to the same bytes.
+struct OuterIntegrals final {
+    std::vector<double> across;
+    std::vector<std::uint8_t> corner_columns;
+    std::size_t width{};
+    std::array<double, SurfaceMaterial::maximum_shadows> down{};
+    std::array<bool, SurfaceMaterial::maximum_shadows> corner_rows{};
+};
+
+void fill_columns(const MaterialLook& look, std::size_t width, OuterIntegrals& integrals) noexcept {
+    integrals.width = width;
+    if (look.outer_count == 0U) return;
+    try {
+        integrals.across.assign(look.outer_count * width, 0.0);
+        integrals.corner_columns.assign(look.outer_count * width, std::uint8_t{0U});
+    } catch (...) {
+        integrals.across.clear();
+        integrals.corner_columns.clear();
+        return;
+    }
+    for (std::size_t index = 0U; index < look.outer_count; ++index) {
+        const ResolvedShadow& shadow = look.outer[index];
+        const std::size_t first = index * width;
+        for (std::size_t column = 0U; column < width; ++column) {
+            const double centre_x = static_cast<double>(column) + 0.5;
+            integrals.across[first + column] = across_integral(shadow, centre_x);
+            const bool corner = beyond_straight(shadow.shape.x, shadow.shape.right(), shadow.radius, centre_x);
+            integrals.corner_columns[first + column] = corner ? std::uint8_t{1U} : std::uint8_t{0U};
+        }
+    }
+}
+
+void fill_row(const MaterialLook& look, std::uint32_t row, OuterIntegrals& integrals) noexcept {
+    const double centre_y = static_cast<double>(row) + 0.5;
+    for (std::size_t index = 0U; index < look.outer_count; ++index) {
+        const ResolvedShadow& shadow = look.outer[index];
+        integrals.down[index] = down_integral(shadow, centre_y);
+        integrals.corner_rows[index] = beyond_straight(shadow.shape.y, shadow.shape.bottom(), shadow.radius, centre_y);
+    }
 }
 
 double spread_position(double t, GradientSpreadMode spread) noexcept {
@@ -486,15 +585,30 @@ double box_coverage(const MaterialLook& look, std::int64_t x, std::int64_t y, do
     return coverage;
 }
 
-Unit material_pixel(const MaterialLook& look, const MaterialImages& images, std::size_t pixel, std::int64_t x,
-                    std::int64_t y) noexcept {
+Unit material_pixel(const MaterialLook& look, const MaterialImages& images, const OuterIntegrals& integrals,
+                    std::size_t pixel, std::int64_t x, std::int64_t y) noexcept {
     Unit result{};
     const double centre_x = static_cast<double>(x) + 0.5;
     const double centre_y = static_cast<double>(y) + 0.5;
+    const bool cached = !integrals.across.empty();
     for (std::size_t index = 0U; index < look.outer_count; ++index) {
         const ResolvedShadow& shadow = look.outer[index];
-        blend_over(result, premultiply(shadow.colour, blurred_coverage(shadow, centre_x, centre_y)));
+        double coverage = 0.0;
+        if (cached) {
+            const std::size_t at = index * integrals.width + static_cast<std::size_t>(x);
+            coverage = outer_coverage(shadow, integrals.across[at], integrals.down[index],
+                                      integrals.corner_columns[at] != 0U, integrals.corner_rows[index], centre_x,
+                                      centre_y);
+        } else {
+            const Rect& shape = shadow.shape;
+            const bool corner_column = beyond_straight(shape.x, shape.right(), shadow.radius, centre_x);
+            const bool corner_row = beyond_straight(shape.y, shape.bottom(), shadow.radius, centre_y);
+            coverage = outer_coverage(shadow, across_integral(shadow, centre_x), down_integral(shadow, centre_y),
+                                      corner_column, corner_row, centre_x, centre_y);
+        }
+        blend_over(result, premultiply(shadow.colour, coverage));
     }
+    if (!look.reads_inside) return result;
     const double inside = box_coverage(look, x, y, centre_x, centre_y);
     if (inside > 0.0) {
         for (std::size_t index = 0U; index < look.fill_count; ++index) {
@@ -524,10 +638,10 @@ Unit material_pixel(const MaterialLook& look, const MaterialImages& images, std:
 
 // -- the bake estimate -------------------------------------------------------------
 
-DeviceExtent destination_extent(const PrimitiveTarget& target) noexcept {
+DeviceExtent destination_extent(const PrimitiveTarget& target, double outset) noexcept {
     const double scale = target.scale.value;
-    const double width = std::ceil((target.logical_size.width + material_outset * 2.0) * scale);
-    const double height = std::ceil((target.logical_size.height + material_outset * 2.0) * scale);
+    const double width = std::ceil((target.logical_size.width + outset * 2.0) * scale);
+    const double height = std::ceil((target.logical_size.height + outset * 2.0) * scale);
     const DeviceExtent extent{static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height)};
     return extent;
 }
@@ -539,10 +653,11 @@ double extra_stops(const MaterialFillLayer& layer) noexcept {
 }
 
 // One image fill's decode and resampling, in nanoseconds.
-double image_estimate(const MaterialFillLayer& layer, const PrimitiveTarget& target, DeviceExtent extent) noexcept {
+double image_estimate(const MaterialFillLayer& layer, const PrimitiveTarget& target, DeviceExtent extent,
+                      double outset) noexcept {
     const MaterialBakeCosts& costs = measured_material_costs;
     const double scale = target.scale.value;
-    const Rect box = material_box(target);
+    const Rect box = material_box(target, outset);
     const double source_width = layer.image_pixel_size.width;
     const double source_height = layer.image_pixel_size.height;
     const ImageAxisPlacement across = image_placement_across(layer, box.x, box.width, scale, source_width);
@@ -584,15 +699,49 @@ std::span<const std::string_view> material_recipe_names() noexcept {
     return names;
 }
 
-double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept {
+namespace {
+
+// How many of `extent` device pixels, along one axis, lie beyond the
+// straight part of a rounded outer shadow's edge and within its reach,
+// where its blur is not exactly zero: at most its reach plus its radius,
+// and a pixel for the partial one, on each side.
+double corner_span(double start, double end, const ResolvedShadow& shadow, std::uint32_t extent) noexcept {
+    const double reach = 3.5 / shadow.inverse_sigma;
+    const double length = static_cast<double>(extent);
+    const double before = std::clamp(start + shadow.radius, 0.0, length) - std::clamp(start - reach, 0.0, length);
+    const double after = std::clamp(end + reach, 0.0, length) - std::clamp(end - shadow.radius, 0.0, length);
+    const double span = std::min(length, before + after + 2.0);
+    return span;
+}
+
+// The pixels at which the rounded outer shadows evaluate their signed
+// distance (outer_coverage), summed over the shadows.
+double corner_pixels(const MaterialLook& look, DeviceExtent extent) noexcept {
+    double pixels = 0.0;
+    for (std::size_t index = 0U; index < look.outer_count; ++index) {
+        const ResolvedShadow& shadow = look.outer[index];
+        if (shadow.radius <= 0.0) continue;
+        const Rect& shape = shadow.shape;
+        const double columns = corner_span(shape.x, shape.right(), shadow, extent.width);
+        const double rows = corner_span(shape.y, shape.bottom(), shadow, extent.height);
+        pixels = pixels + columns * rows;
+    }
+    return pixels;
+}
+
+} // namespace
+
+double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                              double outset) noexcept {
     const MaterialBakeCosts& costs = measured_material_costs;
-    const DeviceExtent extent = destination_extent(target);
+    const DeviceExtent extent = destination_extent(target, outset);
     double per_pixel = costs.base;
     double images = 0.0;
     for (const MaterialFillLayer& layer : material.fills) {
         switch (layer.kind) {
         case MaterialFillKind::solid:
-            per_pixel = per_pixel + costs.solid;
+            // A solid fill of alpha 0 is not drawn (resolve_look).
+            if (layer.color.alpha != 0U) per_pixel = per_pixel + costs.solid;
             break;
         case MaterialFillKind::linear_gradient:
             per_pixel = per_pixel + costs.linear + extra_stops(layer) * costs.gradient_stop;
@@ -602,7 +751,7 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
             break;
         case MaterialFillKind::image:
             per_pixel = per_pixel + costs.image;
-            images = images + image_estimate(layer, target, extent);
+            images = images + image_estimate(layer, target, extent, outset);
             break;
         }
     }
@@ -617,8 +766,178 @@ double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTa
     per_pixel = per_pixel + edge_count * costs.border_edge;
     per_pixel = per_pixel + static_cast<double>(material.keylines.size()) * costs.keyline;
     const double pixels = static_cast<double>(extent.width) * static_cast<double>(extent.height);
-    const double estimate = pixels * per_pixel + images;
+    const double corners = corner_pixels(resolve_look(material, target, outset), extent);
+    const double estimate = pixels * per_pixel + corners * costs.outer_corner + images;
     return estimate;
+}
+
+// -- slicing (E7r) -------------------------------------------------------------------
+
+namespace {
+
+// How a material's pixels vary along one axis of its box, in device
+// pixels: how far in from the box's start and from its end they change
+// with position along the axis, and the shortest box at which every layer
+// is drawn as in a longer one (a keyline, an inset shadow's hole or the
+// border's inner edge that would vanish in a shorter box, or a radius that
+// would be clamped). `varies` when a layer changes all along the axis.
+struct AxisReach final {
+    double start{};
+    double end{};
+    double minimum_length{};
+    bool varies{};
+};
+
+// Where a blurred shadow edge changes: its shape's corner radius plus the
+// reach of Φ, which is exactly 0 or 1 from 3.5 σ' on.
+double shadow_reach(double blur, double scale, double corner) noexcept {
+    const double sigma = 1.0 / inverse_sigma_of(blur, scale);
+    const double reach = corner + 3.5 * sigma;
+    return reach;
+}
+
+void reach_at_least(AxisReach& reach, double start, double end, double minimum_length) noexcept {
+    reach.start = std::max(reach.start, start);
+    reach.end = std::max(reach.end, end);
+    reach.minimum_length = std::max(reach.minimum_length, minimum_length);
+}
+
+// A keyline's or a single edge's reach along the axis. A band on an edge
+// across the axis (top or bottom, for the across axis) spans the box less
+// its inset and changes only at its two ends; one on an edge along it (left
+// or right) lies within `inset` + `width` of that end.
+void band_reach(AxisReach& reach, MaterialEdge edge, double inset, double width, bool across) noexcept {
+    const bool at_start = across ? edge == MaterialEdge::left : edge == MaterialEdge::top;
+    const bool at_end = across ? edge == MaterialEdge::right : edge == MaterialEdge::bottom;
+    if (at_start) {
+        reach_at_least(reach, inset + width + 1.0, 0.0, inset * 2.0 + width + 1.0);
+    } else if (at_end) {
+        reach_at_least(reach, 0.0, inset + width + 1.0, inset * 2.0 + width + 1.0);
+    } else {
+        reach_at_least(reach, inset + 1.0, inset + 1.0, inset * 2.0 + 1.0);
+    }
+}
+
+AxisReach axis_reach(const SurfaceMaterial& material, const PrimitiveTarget& target, bool across,
+                     double outset) noexcept {
+    const double scale = target.scale.value;
+    const double radius = material_radius(material, target);
+    AxisReach reach{};
+    // The box's own edge, and its corners' arcs.
+    reach_at_least(reach, radius + 1.0, radius + 1.0, radius * 2.0 + 1.0);
+    const Rect box = material_box(target, outset);
+    for (const MaterialFillLayer& layer : material.fills) {
+        if (layer.kind == MaterialFillKind::solid) continue;
+        if (layer.kind != MaterialFillKind::linear_gradient) {
+            reach.varies = true;
+            continue;
+        }
+        const ResolvedFill fill = resolve_fill(layer, box, scale);
+        const double step = across ? fill.step_x : fill.step_y;
+        if (step != 0.0) reach.varies = true;
+    }
+    for (const MaterialShadow& shadow : material.shadows) {
+        const double spread = shadow.spread * scale;
+        const double offset = (across ? shadow.offset.x : shadow.offset.y) * scale;
+        if (!shadow.inset) {
+            const double corner = std::max(0.0, radius + spread);
+            const double blurred = shadow_reach(shadow.blur_radius, scale, corner);
+            reach_at_least(reach, offset - spread + blurred + 1.0, -offset - spread + blurred + 1.0,
+                           1.0 - spread * 2.0);
+            continue;
+        }
+        const double corner = std::max(0.0, radius - spread);
+        const double blurred = shadow_reach(shadow.blur_radius, scale, corner);
+        reach_at_least(reach, offset + spread + blurred + 1.0, -offset + spread + blurred + 1.0,
+                       spread * 2.0 + 1.0);
+    }
+    if (material.border) {
+        const double width = (*material.border).width * scale;
+        const double inner = std::max(radius, width) + 1.0;
+        reach_at_least(reach, inner, inner, width * 2.0 + 1.0);
+    }
+    const MaterialBorderEdges& edges = material.border_edges;
+    if (edges.top) band_reach(reach, MaterialEdge::top, 0.0, (*edges.top).width * scale, across);
+    if (edges.right) band_reach(reach, MaterialEdge::right, 0.0, (*edges.right).width * scale, across);
+    if (edges.bottom) band_reach(reach, MaterialEdge::bottom, 0.0, (*edges.bottom).width * scale, across);
+    if (edges.left) band_reach(reach, MaterialEdge::left, 0.0, (*edges.left).width * scale, across);
+    for (const MaterialKeyline& keyline : material.keylines) {
+        band_reach(reach, keyline.edge, keyline.inset * scale, keyline.width * scale, across);
+    }
+    return reach;
+}
+
+// One axis's plan, and the reference's logical length and device extent
+// along it.
+struct AxisPlan final {
+    SliceAxis axis{};
+    double reference_length{};
+    std::uint32_t reference_extent{};
+};
+
+bool whole_number(double value) noexcept {
+    const bool whole = std::isfinite(value) && std::floor(value) == value;
+    return whole;
+}
+
+// The most reference lengths tried past the shortest, looking for one whose
+// logical length times the scale gives back exactly its device length.
+constexpr std::uint32_t reference_length_tries = 8U;
+
+AxisPlan plan_axis(const AxisReach& reach, double logical, double scale, std::uint32_t extent,
+                   double logical_outset) noexcept {
+    AxisPlan plan{};
+    plan.reference_length = logical;
+    plan.reference_extent = extent;
+    if (reach.varies) return plan;
+    // Slices sit on device-pixel boundaries: the box must start and end on
+    // them, or the reference's far end would not have the part's phase.
+    const double outset = logical_outset * scale;
+    const double length = logical * scale;
+    if (!whole_number(outset) || !whole_number(length) || static_cast<double>(extent) != outset + length + outset) {
+        plan.axis.outcome = SliceAxisOutcome::fractional;
+        return plan;
+    }
+    const double start = std::ceil(reach.start);
+    const double end = std::ceil(reach.end);
+    const double shortest = std::max(start + end + 3.0, std::ceil(reach.minimum_length));
+    if (!(length > shortest)) {
+        plan.axis.outcome = SliceAxisOutcome::too_small;
+        return plan;
+    }
+    for (std::uint32_t attempt = 0U; attempt <= reference_length_tries; ++attempt) {
+        const double device = shortest + static_cast<double>(attempt);
+        if (!(device < length)) break;
+        const double reference = device / scale;
+        const double reference_extent = std::ceil((reference + logical_outset + logical_outset) * scale);
+        if (reference * scale != device || reference_extent != outset + device + outset) continue;
+        plan.axis.outcome = SliceAxisOutcome::sliced;
+        plan.axis.start = static_cast<std::uint32_t>(outset + start);
+        plan.axis.end = static_cast<std::uint32_t>(outset + end);
+        plan.reference_length = reference;
+        plan.reference_extent = static_cast<std::uint32_t>(reference_extent);
+        return plan;
+    }
+    plan.axis.outcome = SliceAxisOutcome::fractional;
+    return plan;
+}
+
+} // namespace
+
+PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                       DeviceExtent extent, double outset) noexcept {
+    const double scale = target.scale.value;
+    const AxisReach across_reach = axis_reach(material, target, true, outset);
+    const AxisReach down_reach = axis_reach(material, target, false, outset);
+    const AxisPlan across = plan_axis(across_reach, target.logical_size.width, scale, extent.width, outset);
+    const AxisPlan down = plan_axis(down_reach, target.logical_size.height, scale, extent.height, outset);
+    PrimitiveSlicePlan plan{};
+    plan.slices = true;
+    plan.across = across.axis;
+    plan.down = down.axis;
+    plan.reference_size = Size{across.reference_length, down.reference_length};
+    plan.reference_extent = DeviceExtent{across.reference_extent, down.reference_extent};
+    return plan;
 }
 
 // -- MaterialPrimitive -------------------------------------------------------------
@@ -642,9 +961,23 @@ bool MaterialPrimitive::accepts(const PrimitiveParameterBlock&, const PrimitiveT
         if (layer.kind != MaterialFillKind::image) continue;
         if (target.images == nullptr || !material_image_available(*target.images, layer)) return false;
     }
-    const double estimate = material_bake_estimate(material, target);
+    // A part assembled from slices bakes only its reference.
+    const PrimitiveSlicePlan plan =
+        material_slice_plan(material, target, destination_extent(target, material_outset), material_outset);
+    const bool sliced =
+        plan.across.outcome == SliceAxisOutcome::sliced || plan.down.outcome == SliceAxisOutcome::sliced;
+    PrimitiveTarget baked = target;
+    if (sliced) baked.logical_size = plan.reference_size;
+    const double estimate = material_bake_estimate(material, baked, material_outset);
     const bool within = estimate <= maximum_material_bake_nanoseconds;
     return within;
+}
+
+PrimitiveSlicePlan MaterialPrimitive::slice_plan(const PrimitiveParameterBlock&, const PrimitiveTarget& target,
+                                                 DeviceExtent extent) const noexcept {
+    if (target.material == nullptr) return PrimitiveSlicePlan{};
+    const PrimitiveSlicePlan plan = material_slice_plan(*target.material, target, extent, material_outset);
+    return plan;
 }
 
 void MaterialPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTarget&, std::span<double>) const noexcept {}
@@ -652,21 +985,24 @@ void MaterialPrimitive::derive(const PrimitiveParameterBlock&, const PrimitiveTa
 void MaterialPrimitive::fill(const PrimitiveParameterBlock&, const PrimitiveTarget& target, std::span<const double>,
                              const PartRasterView& destination) const noexcept {
     // accepts() has passed: the target lends a valid material.
-    bake_material(*target.material, target, destination);
+    bake_material(*target.material, target, destination, material_outset);
 }
 
 void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                   const PartRasterView& destination) noexcept {
-    const MaterialLook look = resolve_look(material, target);
+                   const PartRasterView& destination, double outset) noexcept {
+    const MaterialLook look = resolve_look(material, target, outset);
     MaterialImages images{};
     prepare_images(material, target, look, destination.extent, images);
     const std::size_t width = destination.extent.width;
+    OuterIntegrals integrals{};
+    fill_columns(look, width, integrals);
     for (std::uint32_t row = 0U; row < destination.extent.height; ++row) {
         const std::size_t start = static_cast<std::size_t>(row) * destination.row_bytes;
         const std::size_t first_pixel = static_cast<std::size_t>(row) * width;
+        fill_row(look, row, integrals);
         for (std::uint32_t column = 0U; column < destination.extent.width; ++column) {
-            const Unit pixel = material_pixel(look, images, first_pixel + column, static_cast<std::int64_t>(column),
-                                              static_cast<std::int64_t>(row));
+            const Unit pixel = material_pixel(look, images, integrals, first_pixel + column,
+                                              static_cast<std::int64_t>(column), static_cast<std::int64_t>(row));
             store(destination, start + static_cast<std::size_t>(column) * part_raster_bytes_per_pixel, pixel);
         }
     }

@@ -60,6 +60,8 @@ public:
                            Rect destination, double opacity) override;
     void draw_part_raster(const std::shared_ptr<const PartRaster>& raster, Point origin,
                           double opacity) override;
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double opacity) override;
     // Records the group. One begun deeper than maximum_paint_group_depth is
     // refused by name: it is recorded as save() and clip_rect(bounds), drawn
     // without isolation, and counted in group_refusals(). end_group throws

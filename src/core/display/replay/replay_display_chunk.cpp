@@ -106,11 +106,15 @@ void replay_command(const DisplayCommand& command, Painter& painter) {
     case DisplayOperation::draw_part_raster:
         painter.draw_part_raster(command.part_raster, command.first, command.scalar);
         return;
+    case DisplayOperation::draw_part_raster_scaled:
+        painter.draw_part_raster_scaled(command.part_raster, command.rect, command.scalar);
+        return;
     case DisplayOperation::begin_group: {
         PaintGroup group{};
         group.bounds = command.rect;
         group.opacity = command.scalar;
         group.composite = static_cast<PaintGroupComposite>(static_cast<std::uint8_t>(command.secondary_scalar));
+        group.isolated = command.tertiary_scalar != 0.0;
         painter.begin_group(group);
         return;
     }
