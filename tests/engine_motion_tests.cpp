@@ -172,8 +172,8 @@ PropertyTransition transition_on(std::string property, double target) {
 void machines_are_rule_data() {
     const CompiledThemeRules built_in =
         CompiledThemeRules::compile_with_built_in(ThemeRuleSheet{}, builtin_primitive_registry());
-    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 8U && built_in.rule_count() == 8U,
-            "the engine's eight built-in rules compile cleanly");
+    require(built_in.diagnostics().empty() && built_in.built_in_rule_count() == 9U && built_in.rule_count() == 9U,
+            "the engine's nine built-in rules compile cleanly");
     const CompiledThemeRules::Resolution face =
         built_in.resolve(facts_of("ribbon", "command_face", PartRole::face));
     require(face.outcome == CompiledThemeRules::Outcome::primitive &&

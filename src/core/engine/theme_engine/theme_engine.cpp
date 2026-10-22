@@ -757,6 +757,24 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         request.target.corner_radius = part.corner_radius;
         request.target.images = &(*window).image_resources();
     }
+    // The overlay shadow (E9, GIVEN E1-1) borrows the theme's layers for the
+    // part's presentation, as a material of one transparent fill and those
+    // shadows at the part's corner radius (its own, else its family
+    // recipe's), for this paint only. A theme that casts none draws nothing.
+    SurfaceMaterial overlay{};
+    if ((*request.primitive).lends_overlay_shadow()) {
+        const ControlVisualContext context = part_visual_context(control, part.states);
+        const Theme& theme = control.effective_theme();
+        const std::vector<MaterialShadow>& layers = theme.overlay_shadow(context.high_contrast);
+        if (layers.empty()) return;
+        const ControlVisualRecipe& recipe = theme.resolve(part.family, context);
+        overlay.fills.assign(1U, MaterialFillLayer::solid(Color::rgba(0, 0, 0, 0)));
+        overlay.shadows = layers;
+        overlay.corner_radius = recipe.material.corner_radius;
+        if (part.corner_radius) overlay.corner_radius = std::max(0.0, *part.corner_radius);
+        request.target.material = &overlay;
+        request.target.images = &(*window).image_resources();
+    }
     // A primitive that refuses the part leaves it to the built-in recipe;
     // a keyed part's refusal is counted when it begins (E8c).
     const bool accepted = (*request.primitive).accepts(request.parameters, request.target);

@@ -35,6 +35,12 @@ namespace gui_forms::engine_primitives {
 // rectangle and the integral across its rounded edge, Φ(−d / σ'), where d is
 // the pixel centre's signed distance to the rounded shadow shape and Φ the
 // polynomial normal integral of gaussian_integral (error at most 4e-4).
+// The rectangle's integral is separable, so an outer shadow evaluates it
+// once per column and once per row. The rounded edge's integral is taken
+// only within the shape's corner squares and outward from them, where a
+// centre lies within the radius of both axes' ends or beyond them:
+// elsewhere the rounded shape is its rectangle, and a blurred rectangle
+// never exceeds the integral across its nearest edge (E9).
 //
 // Outsets. The primitive draws up to 8 logical units outside the part's box
 // on every side (its descriptor's outsets): the destination covers the box
@@ -52,6 +58,13 @@ namespace gui_forms::engine_primitives {
 // material's estimated bake exceeds the bound of material_bake_policy.hpp.
 // An image fill whose pixels cannot be decoded or stored at bake time is
 // drawn as nothing; the other layers are drawn.
+// How far the material primitive draws outside the part's box, in logical
+// units, on every side: room for the outer shadows, which are clipped
+// beyond it. The kernel functions below take the outset they draw within,
+// so that the overlay shadow (overlay_shadow_primitive.hpp) can reach
+// further.
+inline constexpr double material_outset = 8.0;
+
 class MaterialPrimitive final : public EnginePrimitive {
 public:
     [[nodiscard]] const PrimitiveDescriptor& descriptor() const noexcept override;
@@ -75,8 +88,9 @@ private:
 
 // The estimated bake of `material` for `target`, in nanoseconds on the
 // reference machine (material_bake_policy.hpp), into a destination of the
-// box grown by the outsets.
-[[nodiscard]] double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept;
+// box grown by `outset` logical units on every side.
+[[nodiscard]] double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                            double outset = material_outset) noexcept;
 
 // How a raster of `extent` for `target` is assembled from slices (E7r): an
 // axis is sliced unless a gradient runs along it (varies), the box does
@@ -87,15 +101,16 @@ private:
 // single edges, and each shadow's offset, spread, arc and 3.5 σ', where Φ
 // is exactly 0 or 1.
 [[nodiscard]] PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                                                     DeviceExtent extent) noexcept;
+                                                     DeviceExtent extent, double outset = material_outset) noexcept;
 
 // The kernel alone: draws `material` for `target` into every pixel of
 // `destination`, without accepts()'s checks or bound. The caller has
 // validated the destination (validate_raster_view), the target and the
-// material (valid_surface_material); target.material is not read. The bake
-// measurement uses it to time materials past the bound.
+// material (valid_surface_material); target.material is not read. The box
+// starts `outset` logical units in. The bake measurement uses it to time
+// materials past the bound.
 void bake_material(const SurfaceMaterial& material, const PrimitiveTarget& target,
-                   const PartRasterView& destination) noexcept;
+                   const PartRasterView& destination, double outset = material_outset) noexcept;
 
 // Φ, the standard normal integral, by a polynomial: deterministic, absolute
 // error at most 4e-4, exactly 0 and 1 from ±3.5 on.

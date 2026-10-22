@@ -35,7 +35,11 @@ struct MaterialBakeCosts final {
     double radial{};
     // Per device pixel, for each gradient stop past the first two.
     double gradient_stop{};
+    // Per device pixel, for each outer shadow: its separable integrals.
     double outer_shadow{};
+    // Per device pixel within a rounded outer shadow's corners and its
+    // reach, for each such shadow: its signed distance (E9).
+    double outer_corner{};
     double inset_shadow{};
     double border{};
     double border_edge{};
@@ -61,13 +65,19 @@ struct MaterialBakeCosts final {
 // at this workload (single runs measured below zero), so they carry
 // conservative upper figures rather than measurements. The runs are
 // recorded in planning/stages/T2-engine-core/README.md, "E8c bake costs".
+// outer_shadow and outer_corner were measured again for E9's separable
+// outer shadow, on the same machine on 2026-10-22 under lighter load: each
+// is the median of seven runs scaled by 1.25 (the earlier session's inset
+// shadow cost over this one's) and rounded up; see "E9 shadow costs" there.
+// The quiet-machine re-measure replaces every figure.
 inline constexpr MaterialBakeCosts measured_material_costs{
     .base = 26.0,
     .solid = 10.0,
     .linear = 15.0,
     .radial = 22.0,
     .gradient_stop = 0.5,
-    .outer_shadow = 69.0,
+    .outer_shadow = 7.0,
+    .outer_corner = 28.0,
     .inset_shadow = 60.0,
     .border = 26.0,
     .border_edge = 11.0,

@@ -143,6 +143,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitives/relief/relief_primitives.cpp
     src/core/engine/primitives/material/material_image.cpp
     src/core/engine/primitives/material/material_primitive.cpp
+    src/core/engine/primitives/material/overlay_shadow_primitive.cpp
     src/core/engine/primitives/kernel/pixel_kernel.cpp
     src/core/engine/part_shape/part_shape.cpp
     src/core/engine/part_table/engine_part_table.cpp
@@ -2314,6 +2315,10 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_retained_tests tests/engine_retained_tests.cpp)
     target_link_libraries(gui_forms_engine_retained_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_retained_tests COMMAND gui_forms_engine_retained_tests)
+
+    add_executable(gui_forms_engine_light_tests tests/engine_light_tests.cpp)
+    target_link_libraries(gui_forms_engine_light_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_light_tests COMMAND gui_forms_engine_light_tests)
 
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)

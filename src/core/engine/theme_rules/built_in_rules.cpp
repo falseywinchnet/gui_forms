@@ -99,6 +99,15 @@ ThemeRuleSheet make_built_in_rules() {
     ThemeRule glyph = built_in_rule("dock_tile_fade:tile_glyph", "dock_site", "tile_glyph");
     glyph.transitions.push_back(tile_fade());
     sheet.rules.push_back(std::move(glyph));
+    // The overlay shadow (E9, GIVEN E1-1): every shadow part, whatever its
+    // control, is drawn by the engine's overlay shadow primitive, with the
+    // first-party blur, rather than by Painter::draw_box_shadow.
+    ThemeRule shadow{};
+    shadow.label = "overlay_shadow";
+    shadow.level = CascadeLevel::built_in;
+    shadow.selector.role = PartRole::shadow;
+    shadow.declarations.push_back(RuleDeclaration::primitive("overlay_shadow"));
+    sheet.rules.push_back(std::move(shadow));
     return sheet;
 }
 
