@@ -71,7 +71,7 @@ Related types
    * - :cpp:class:`ErrorIconSnapshot <gui_forms::ErrorIconSnapshot>`
      - ErrorIconSnapshot is a read-only diagnostic record for one target: stable identity, message, exact glyph bounds, target availability, popup presentation, blink activity, and current phase visibility.
    * - :cpp:class:`ErrorProviderChange <gui_forms::ErrorProviderChange>`
-     - ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity, current message, and whether an effective error remains.
+     - ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity and the current message, which is empty once the error is cleared.
    * - :cpp:class:`ErrorProviderSnapshot <gui_forms::ErrorProviderSnapshot>`
      - ErrorProviderSnapshot is a deterministic provider diagnostic aggregate containing every mapped icon record plus authoritative live-error and presented-overlay counts.
    * - :cpp:class:`HelpProviderSnapshot <gui_forms::HelpProviderSnapshot>`
@@ -221,13 +221,13 @@ Related types
 
    ``#include <gui_forms/components/error_provider/error_provider.hpp>``
 
-   ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity, current message, and whether an effective error remains.
+   ErrorProviderChange is the post-commit payload for a target error transition, carrying stable identity and the current message, which is empty once the error is cleared.
 
    .. cpp:member:: std::string target_stable_id
 
    .. cpp:member:: std::string error
 
-   .. cpp:member:: bool has_error
+      The target's new message; empty when its error was cleared.
 
 .. cpp:namespace:: gui_forms
 

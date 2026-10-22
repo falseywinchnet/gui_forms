@@ -172,7 +172,7 @@ void ErrorProvider::set_error(const std::shared_ptr<Control>& target,
     }
     refresh_visual(entry, true);
     const ErrorProviderChange change{
-        std::string((*target).stable_id().value()), entry.error, !entry.error.empty()};
+        std::string((*target).stable_id().value()), entry.error};
     error_changed_.emit(change);
     erase_if_empty((*target).runtime_id().value);
 }

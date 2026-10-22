@@ -267,15 +267,16 @@ void mark_hatch_pixel(std::array<SkColor, Count>& pixels,
 
 void apply_image_attributes(SkPaint& paint,
                             const ImageAttributesSnapshot& attributes) {
-    if (!attributes.has_color_matrix) return;
+    if (!attributes.color_matrix.has_value()) return;
+    const std::array<double, 25>& colors = *attributes.color_matrix;
     float matrix[20]{};
     for (std::size_t output = 0; output < 4U; ++output) {
         for (std::size_t input = 0; input < 4U; ++input) {
             matrix[output * 5U + input] = static_cast<float>(
-                attributes.color_matrix[input * 5U + output]);
+                colors[input * 5U + output]);
         }
         matrix[output * 5U + 4U] = static_cast<float>(
-            attributes.color_matrix[20U + output] * 255.0);
+            colors[20U + output] * 255.0);
     }
     paint.setColorFilter(SkColorFilters::Matrix(matrix));
 }
