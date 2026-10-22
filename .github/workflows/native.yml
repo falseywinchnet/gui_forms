@@ -93,14 +93,25 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
+      # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
+      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      - name: Name the Linux package cache
+        id: linux-image
+        run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: linux-packages
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
-        run: |
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
-          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
-          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils dbus at-spi2-core python3-gi gir1.2-atspi-2.0
-          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+        run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
+      - uses: actions/cache/save@v4
+        if: github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.linux-packages.outputs.cache-primary-key }}
       - name: Configure compiler cache
         run: |
           echo "CCACHE_DIR=$PWD/.ccache" >> "$GITHUB_ENV"
@@ -301,17 +312,28 @@ jobs:
         run: |
           brew install cmake ninja ccache llvm@22
           echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+      # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
+      # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
+      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      - name: Name the Linux package cache
+        id: linux-image
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
+        run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: linux-packages
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
-        run: |
-          # Ubuntu 24.04's default Clang 18 rejects the existing in-class
-          # friend exception specifications. Use the LLVM 22 release series.
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
-          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
-          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils dbus at-spi2-core python3-gi gir1.2-atspi-2.0
-          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+        run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
+      - uses: actions/cache/save@v4
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux') && github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.linux-packages.outputs.cache-primary-key }}
       # The MSYS2 mirrors carry only the current LLVM, so they are reached
       # only when a run dispatched with package_windows_toolchain finds no
       # published toolchain for tools/windows_toolchain.json (a deliberate
