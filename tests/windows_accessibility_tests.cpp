@@ -4,6 +4,7 @@
 #include "gui_forms/container_controls.hpp"
 #include <windows.h>
 #include <oleacc.h>
+#include "support/windows_own_window.hpp"
 #include <iostream>
 #include <stdexcept>
 namespace {
@@ -46,7 +47,7 @@ struct Ready {
     std::shared_ptr<TextBox> text;
     std::shared_ptr<TabControl> tabs;
     void operator()(gui_forms::Window& window, ApplicationWindowHandle handle) const {
-        HWND hwnd = FindWindowW(L"GUIForms.Window.v1", L"GUI.Forms accessibility fixture");
+        HWND hwnd = test_support::own_gui_forms_window(L"GUI.Forms accessibility fixture");
         require(hwnd != nullptr, "native window exists");
         AccessibleOwner root;
         require(SUCCEEDED(AccessibleObjectFromWindow(hwnd, OBJID_CLIENT, IID_IAccessible,
