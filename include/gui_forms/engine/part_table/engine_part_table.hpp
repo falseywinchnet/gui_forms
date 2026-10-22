@@ -8,6 +8,7 @@
 #include "gui_forms/engine/theme_rules/theme_rules.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/scheduler/types/scheduler_types.hpp"
+#include "gui_forms/surface_material/types/surface_material_types.hpp"
 #include "gui_forms/types/geometry/geometry.hpp"
 
 #include <array>
@@ -69,12 +70,20 @@ struct PartRecordHandle final {
 // its states restricted to those the primitive reads, and the extent. The
 // record owns it; `raster` is the cache's reference, and recorded commands
 // that composite the raster hold others.
+//
+// A material the target lent is kept as a copy, compared by value: the
+// theme's recipe that lent it may be replaced, and another recipe may later
+// occupy its address. The kept target's borrowed pointers are cleared. When
+// the material has an image fill, `image_revision` is the image registry's
+// revision it was drawn at, so any change to the registry redraws it.
 struct CachedPartRaster final {
     std::shared_ptr<PartRaster> raster{};
     const EnginePrimitive* primitive{};
     PrimitiveParameterBlock parameters{};
     PrimitiveTarget target{};
     DeviceExtent extent{};
+    std::optional<SurfaceMaterial> material{};
+    std::uint64_t image_revision{};
     // The record's and the table's raster generations when `raster` was
     // drawn; invalidation advances the current ones.
     std::uint64_t raster_generation{};
@@ -166,6 +175,10 @@ struct EnginePartRecord final {
     // ambient motion resumes; a refusal is counted once, when it begins.
     bool ambient{};
     bool ambient_refused{};
+    // Whether the part's primitive refused its last paint (E8c,
+    // EnginePrimitive::accepts), so that it was drawn by the built-in
+    // recipe; a refusal is counted once, when it begins.
+    bool primitive_refused{};
 
     // The cached raster and what drew it, made the first time a primitive
     // draws the part, so that a record no primitive draws stays small.
@@ -179,7 +192,8 @@ struct EnginePartRecord final {
 // 64-bit hosts (its preparation is about half of that); with its slot, its
 // lookup text and its index entry it takes about 1 KB, so the cap costs at
 // most about 4 MB per window. A part a primitive draws also has its
-// CachedPartRaster (about 450 bytes) and its raster, which the raster
+// CachedPartRaster (about 600 bytes, and a copy of its material when a
+// material primitive draws it) and its raster, which the raster
 // cache's budget bounds. The cap covers far more item parts than a window
 // shows at once: a record evicted while its part is still on screen is only
 // made again on the next paint. Each eviction is O(1).
@@ -187,7 +201,8 @@ inline constexpr std::size_t maximum_item_part_records = 4096;
 
 // What a part needs drawn: the primitive a rule selected, its parameters,
 // the part's target, and the destination extent in device pixels (normally
-// the logical size times the scale, rounded up).
+// the logical size grown by the primitive's outsets, times the scale, rounded
+// up).
 struct PartRasterRequest final {
     const EnginePrimitive* primitive{};
     PrimitiveParameterBlock parameters{};

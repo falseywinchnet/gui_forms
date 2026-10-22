@@ -3,6 +3,7 @@
 #include "gui_forms/control/control/control.hpp"
 #include "gui_forms/engine/part_raster/part_raster.hpp"
 #include "gui_forms/theme/part_painting/part_painting.hpp"
+#include "gui_forms/theme/theme/theme.hpp"
 #include "gui_forms/window/window.hpp"
 #include "../../theme/part_painting/built_in_recipe.hpp"
 
@@ -37,6 +38,15 @@ std::uint32_t device_side(double logical, double scale) noexcept {
     if (!(device > 0.0) || device > static_cast<double>(maximum_part_raster_side)) return 0U;
     const std::uint32_t side = static_cast<std::uint32_t>(device);
     return side;
+}
+
+// The device extent of a raster covering a part of `logical` size grown by
+// `outsets` (a primitive's), at `scale`: zero sides when it does not fit.
+DeviceExtent raster_extent(Size logical, Insets outsets, double scale) noexcept {
+    const double width = logical.width + outsets.left + outsets.right;
+    const double height = logical.height + outsets.top + outsets.bottom;
+    const DeviceExtent extent{device_side(width, scale), device_side(height, scale)};
+    return extent;
 }
 
 // A part's extent where it was recorded: its bounds moved by the painter's
@@ -421,12 +431,13 @@ ThemeEngine::PartPlan ThemeEngine::plan(const Control& control, const PartPaint&
     }
     const double scale = (*window).scale();
     result.scale = DeviceScale{scale};
-    result.extent = DeviceExtent{device_side(part.bounds.width, scale), device_side(part.bounds.height, scale)};
+    const PrimitiveDescriptor& descriptor = (*result.resolution.primitive).descriptor();
+    const Size logical{part.bounds.width, part.bounds.height};
+    result.extent = raster_extent(logical, descriptor.outsets, scale);
     if (result.extent.width == 0U || result.extent.height == 0U) {
         result.drawing = PartDrawing::not_paintable;
         return result;
     }
-    const PrimitiveDescriptor& descriptor = (*result.resolution.primitive).descriptor();
     if (animated(descriptor)) {
         const std::uint64_t pixels =
             static_cast<std::uint64_t>(result.extent.width) * static_cast<std::uint64_t>(result.extent.height);
@@ -551,7 +562,8 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     PartPaint shown = scaled_part(part, presented.scale);
     if (shown.bounds != part.bounds) {
         const double scale = decided.scale.value;
-        const DeviceExtent scaled{device_side(shown.bounds.width, scale), device_side(shown.bounds.height, scale)};
+        const Size shown_size{shown.bounds.width, shown.bounds.height};
+        const DeviceExtent scaled = raster_extent(shown_size, descriptor.outsets, scale);
         const std::uint64_t pixels =
             static_cast<std::uint64_t>(scaled.width) * static_cast<std::uint64_t>(scaled.height);
         const std::uint64_t operations =
@@ -564,6 +576,27 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         } else {
             shown = part;
         }
+    }
+    // A primitive that draws a theme material borrows the material of its
+    // recipe role for the part's state (E8-1), the part's own corner radius
+    // and the window's images, for this paint only.
+    const std::optional<ControlVisualRole> material_role = (*request.primitive).theme_material(request.parameters);
+    if (material_role) {
+        const ControlVisualContext context = part_visual_context(control, part.states);
+        const ControlVisualRecipe& recipe = control.effective_theme().resolve(*material_role, context);
+        request.target.material = &recipe.material;
+        request.target.corner_radius = part.corner_radius;
+        request.target.images = &(*window).image_resources();
+    }
+    // A primitive that refuses the part leaves it to the built-in recipe;
+    // a keyed part's refusal is counted when it begins (E8c).
+    const bool accepted = (*request.primitive).accepts(request.parameters, request.target);
+    const bool newly_refused = kept == nullptr || !(*kept).primitive_refused;
+    if (kept != nullptr) (*kept).primitive_refused = !accepted;
+    if (!accepted) {
+        if (newly_refused) (*window).metrics().record_engine_primitive_refusal();
+        paint_built_in(painter, control, shown, opacity);
+        return;
     }
     std::shared_ptr<const PartRaster> raster{};
     if (record) {
@@ -587,7 +620,9 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         paint_built_in(painter, control, shown, opacity);
         return;
     }
-    painter.draw_part_raster(raster, Point{shown.bounds.x, shown.bounds.y}, opacity);
+    // The raster covers the part grown by its primitive's outsets.
+    const Insets outsets = descriptor.outsets;
+    painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
 }
 
 double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,

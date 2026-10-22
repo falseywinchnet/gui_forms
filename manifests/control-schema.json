@@ -186,6 +186,18 @@
         "parameters": [
           {"name": "dot", "kind": "colour", "default": "#627997ff", "animated": false}
         ]
+      },
+      {
+        "name": "material",
+        "introduced": "0.2",
+        "roles": ["region", "face", "actuator", "well", "track", "thumb", "chip"],
+        "states_read": ["hot", "pressed", "captured", "selected", "checked", "current", "open", "active_tool", "focus_visible", "preselect", "disabled", "unavailable"],
+        "inputs_read": [],
+        "cost": {"per_device_pixel": 512, "fixed": 64, "preparation_per_device_pixel": 0},
+        "outsets": [8, 8, 8, 8],
+        "parameters": [
+          {"name": "recipe", "kind": "choice", "choices": ["window", "panel", "card", "button", "accent_button", "command_button", "choice", "editor", "menu_item", "selection", "progress", "tool_tip"], "default": "button", "animated": false}
+        ]
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
