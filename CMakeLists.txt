@@ -755,21 +755,7 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             gui_forms_file_manager_demoboard_model gui_forms_host_windows)
         set_target_properties(gui_forms_file_manager_demoboard_windows PROPERTIES
             OUTPUT_NAME "File Manager Demoboard")
-        add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts")
-        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
-            get_filename_component(font_name "${font_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${font_name}")
-        endforeach()
-        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
-            get_filename_component(notice_name "${notice_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_windows>/fonts/${notice_name}")
-        endforeach()
+        # Its fonts are staged with the other programs' at the end of this file.
     endif()
 
     if(GUI_FORMS_ENABLE_LINUX_HOST)
@@ -779,23 +765,7 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             gui_forms_file_manager_demoboard_model gui_forms_host_linux)
         set_target_properties(gui_forms_file_manager_demoboard_linux PROPERTIES
             OUTPUT_NAME "gui-forms-explore")
-        # The X11 host discovers bundled faces next to the executable (or under
-        # GUI_FORMS_FONT_DIR); mirror the Windows post-build copy.
-        add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts")
-        foreach(font_file IN LISTS GUI_FORMS_DEMOBOARD_FONTS)
-            get_filename_component(font_name "${font_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${font_name}")
-        endforeach()
-        foreach(notice_file IN LISTS GUI_FORMS_DEMOBOARD_FONT_NOTICES)
-            get_filename_component(notice_name "${notice_file}" NAME)
-            add_custom_command(TARGET gui_forms_file_manager_demoboard_linux POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${notice_file}"
-                    "$<TARGET_FILE_DIR:gui_forms_file_manager_demoboard_linux>/fonts/${notice_name}")
-        endforeach()
+        # Its fonts are staged with the other programs' at the end of this file.
     endif()
 
     if(GUI_FORMS_BUILD_TESTS)
@@ -1675,34 +1645,8 @@ if(GUI_FORMS_BUILD_GALLERY)
         set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
         )
-        foreach(font_target IN ITEMS
-                gui_forms_gallery_windows
-                gui_forms_vsync_lab_windows
-                gui_forms_visual_inspector_lab_windows
-                gui_forms_layered_material_lab_windows
-                gui_forms_custom_chrome_lab_windows
-                gui_forms_typography_scale_lab_windows
-                gui_forms_responsive_tracks_lab_windows
-                gui_forms_connected_controls_lab_windows
-                gui_forms_seam_proximity_lab_windows)
-            add_custom_command(TARGET ${font_target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
-            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-                get_filename_component(font_name "${font_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${font_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-            endforeach()
-            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-                get_filename_component(notice_name "${notice_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${notice_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-            endforeach()
-        endforeach()
+        # The Gallery and the labs bundle GUI_FORMS_GALLERY_FONTS beside them;
+        # the staging at the end of this file copies them.
         find_program(GUI_FORMS_WINDOWS_OBJDUMP
             NAMES x86_64-w64-mingw32-objdump
             NO_CMAKE_FIND_ROOT_PATH
@@ -1762,26 +1706,8 @@ if(GUI_FORMS_BUILD_GALLERY)
         )
 
         # The X11 host discovers bundled faces in <executable dir>/fonts (or
-        # GUI_FORMS_FONT_DIR, or ../share/GUIForms/fonts once installed).
-        foreach(font_target IN ITEMS gui_forms_gallery_linux)
-            add_custom_command(TARGET ${font_target} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                    "$<TARGET_FILE_DIR:${font_target}>/fonts")
-            foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-                get_filename_component(font_name "${font_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${font_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-            endforeach()
-            foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-                get_filename_component(notice_name "${notice_file}" NAME)
-                add_custom_command(TARGET ${font_target} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${notice_file}"
-                        "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-            endforeach()
-        endforeach()
+        # GUI_FORMS_FONT_DIR, or ../share/GUIForms/fonts once installed);
+        # they are staged at the end of this file.
     endif()
 
     include(demo/correspondence/correspondence.cmake)
@@ -3794,4 +3720,72 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         # heaviest load measured.
         set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 3600)
     endif()
+endif()
+
+# Programs that bundle fonts share one output directory, so one fonts/
+# beside them (the Windows and X11 hosts look there): the Gallery and its
+# labs and the Correspondence demonstration (GUI_FORMS_GALLERY_FONTS), and the
+# File Manager demoboard (GUI_FORMS_DEMOBOARD_FONTS), largely the same faces.
+# Each program used to copy its list there after linking, so on a cold
+# parallel build several post-build steps wrote the same files at once and
+# one could fail ("Error copying file"; seen on Windows and on Linux). One
+# target stages every file once, each through its own build rule (one writer
+# per file, recopied when the source changes), and the programs depend on it.
+# macOS bundles carry their fonts as resources instead.
+set(gui_forms_font_programs)
+set(gui_forms_font_sources)
+foreach(gallery_program IN ITEMS
+        gui_forms_gallery_windows
+        gui_forms_vsync_lab_windows
+        gui_forms_visual_inspector_lab_windows
+        gui_forms_layered_material_lab_windows
+        gui_forms_custom_chrome_lab_windows
+        gui_forms_typography_scale_lab_windows
+        gui_forms_responsive_tracks_lab_windows
+        gui_forms_connected_controls_lab_windows
+        gui_forms_seam_proximity_lab_windows
+        gui_forms_correspondence_windows
+        gui_forms_gallery_linux
+        gui_forms_correspondence_linux)
+    if(TARGET ${gallery_program})
+        list(APPEND gui_forms_font_programs ${gallery_program})
+        list(APPEND gui_forms_font_sources ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+    endif()
+endforeach()
+foreach(demoboard_program IN ITEMS gui_forms_file_manager_demoboard_windows gui_forms_file_manager_demoboard_linux)
+    if(TARGET ${demoboard_program})
+        list(APPEND gui_forms_font_programs ${demoboard_program})
+        list(APPEND gui_forms_font_sources ${GUI_FORMS_DEMOBOARD_FONTS} ${GUI_FORMS_DEMOBOARD_FONT_NOTICES})
+    endif()
+endforeach()
+if(gui_forms_font_programs)
+    set(gui_forms_program_directory "${CMAKE_CURRENT_BINARY_DIR}")
+    if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(gui_forms_program_directory "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    endif()
+    list(REMOVE_DUPLICATES gui_forms_font_sources)
+    set(gui_forms_staged_fonts)
+    set(gui_forms_staged_font_names)
+    foreach(font_file IN LISTS gui_forms_font_sources)
+        get_filename_component(font_name "${font_file}" NAME)
+        if(font_name IN_LIST gui_forms_staged_font_names)
+            message(FATAL_ERROR "Two bundled font files share the name ${font_name}")
+        endif()
+        list(APPEND gui_forms_staged_font_names "${font_name}")
+        set(staged_font "${gui_forms_program_directory}/fonts/${font_name}")
+        add_custom_command(OUTPUT "${staged_font}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${gui_forms_program_directory}/fonts"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${font_file}" "${staged_font}"
+            DEPENDS "${font_file}"
+            VERBATIM)
+        list(APPEND gui_forms_staged_fonts "${staged_font}")
+    endforeach()
+    add_custom_target(gui_forms_program_fonts DEPENDS ${gui_forms_staged_fonts})
+    foreach(font_target IN LISTS gui_forms_font_programs)
+        get_target_property(font_target_directory ${font_target} RUNTIME_OUTPUT_DIRECTORY)
+        if(font_target_directory AND NOT font_target_directory STREQUAL gui_forms_program_directory)
+            message(FATAL_ERROR "${font_target} is built outside ${gui_forms_program_directory}, where its fonts are staged")
+        endif()
+        add_dependencies(${font_target} gui_forms_program_fonts)
+    endforeach()
 endif()

@@ -71,29 +71,7 @@ if(GUI_FORMS_ENABLE_LINUX_HOST)
 endif()
 
 # The Windows and X11 hosts discover bundled faces in <executable dir>/fonts;
-# copy them post-build exactly as the Gallery targets do.
-foreach(font_target IN ITEMS gui_forms_correspondence_windows gui_forms_correspondence_linux)
-    if(NOT TARGET ${font_target})
-        continue()
-    endif()
-    add_custom_command(TARGET ${font_target} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:${font_target}>/fonts")
-    foreach(font_file IN LISTS GUI_FORMS_GALLERY_FONTS)
-        get_filename_component(font_name "${font_file}" NAME)
-        add_custom_command(TARGET ${font_target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${font_file}"
-                "$<TARGET_FILE_DIR:${font_target}>/fonts/${font_name}")
-    endforeach()
-    foreach(notice_file IN LISTS GUI_FORMS_GALLERY_FONT_NOTICES)
-        get_filename_component(notice_name "${notice_file}" NAME)
-        add_custom_command(TARGET ${font_target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${notice_file}"
-                "$<TARGET_FILE_DIR:${font_target}>/fonts/${notice_name}")
-    endforeach()
-endforeach()
+# CMakeLists.txt stages them there for every program that bundles fonts.
 
 if(GUI_FORMS_BUILD_TESTS)
     enable_testing()
