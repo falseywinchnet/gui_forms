@@ -34,6 +34,7 @@ source files carry "Copyright (C) 1996-2025".)
 | HarfBuzz | 14.6.0, `c7a7457b` | HarfBuzz licence ("Old MIT") | all | `licenses/HarfBuzz.txt` | `HarfBuzz-COPYING.txt` |
 | FreeType | 2.14.2, `f4205da1` | FreeType License (FTL), elected from FTL/GPLv2 | all | `licenses/FreeType-FTL.txt` | `FreeType-FTL.txt` |
 | SheenBidi | 2.9.0, `829d9991` | Apache-2.0 | all | `licenses/SheenBidi.txt` | `SheenBidi-LICENSE.txt` |
+| stx_zlib (the owned zlib codec) | in this repository | MIT for GUI.Forms' own code; the zlib License notices of the puff-derived inflate and the zlib-informed deflate are retained | all | `licenses/stx_zlib-puff.txt` and `licenses/stx_zlib-zlib.txt` | `share/licenses/stx_zlib/LICENSE-puff.txt` and `LICENSE-zlib.txt` |
 | Unicode Character Database (grapheme tables) | Unicode 17.0.0 | Unicode License v3 | all | `licenses/Unicode.txt` | `Unicode-LICENSE.txt` |
 | Skia | `chrome/m152`, `2a9b593b` | BSD-3-Clause | macOS, Linux | `licenses/Skia.txt` | `Skia-LICENSE.txt` |
 | libpng (inside Skia) | Skia DEPS `d5515b5b` | libpng License v2 | macOS, Linux | `licenses/libpng.txt` | `libpng-LICENSE.txt` |
