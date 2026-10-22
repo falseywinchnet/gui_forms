@@ -51,6 +51,8 @@ Theme engine 0.1 (T2): the primitives a theme's rules may select, the atoms each
 
 Bounded expressions: at most 64 operations and a stack of 16, from `constant`, `input`, `state`, `parameter`, `negate`, `add`, `subtract`, `multiply`, `divide`, `minimum`, `maximum`, `less`, `less_equal`, `greater`, `greater_equal`, `equal`, `not_equal`, `clamp`, `mix`, `smoothstep`, `choose`.
 
+Transitions run on `opacity` and on the primitives' animated parameters: at most 8 states a machine and 4 transitions a part. Ambient effects: at most 30 frames per second over at most 0.1 of the window on everyday surfaces.
+
 ## `button_base` (ButtonBase, control)
 
 | Part | Role | Reuses | Own states |

@@ -88,25 +88,64 @@ void assign_missing_virtual_runtime_ids(std::vector<SemanticNode>& nodes) {
     }
 }
 
+// Focus held by controls that the semantic tree does not publish as nodes of
+// their own and that therefore belong to the node of their nearest exposed
+// ancestor: a composite's inner editor, splitter or other part.
+struct HiddenFocus final {
+    // A hidden control that can take focus now (focusable, visible, enabled).
+    bool focusable{};
+    // The focused control is a hidden one.
+    bool focused{};
+};
+
+// Records `control` itself as a hidden control.
+void note_hidden_control(const Control::Ptr& control, const Control::Ptr& focused, HiddenFocus& hidden) {
+    if ((*control).focusable() && (*control).eligible_for_input()) hidden.focusable = true;
+    if (control == focused) hidden.focused = true;
+}
+
+// Records every visible control below `control`, all of which are hidden
+// because `control`'s node does not include its descendants.
+void note_hidden_subtree(const Control::Ptr& control, const Control::Ptr& focused, HiddenFocus& hidden) {
+    std::vector<Control::Ptr> pending((*control).children().begin(), (*control).children().end());
+    while (!pending.empty()) {
+        const Control::Ptr current = pending.back();
+        pending.pop_back();
+        if (!current || !(*current).is_alive() || !(*current).effectively_visible()) continue;
+        note_hidden_control(current, focused, hidden);
+        const std::span<const Control::Ptr> children = (*current).children();
+        for (std::size_t index = 0; index < children.size(); ++index) {
+            pending.push_back(children[index]);
+        }
+    }
+}
+
+// Appends `control`'s semantic node, or, for a control that is not exposed,
+// the nodes below it, to `destination`. `hidden` receives the focus held by
+// `control` and the controls below it when they publish no node of their
+// own, for the nearest exposed ancestor's node; an exposed control's node
+// takes the focus of its own hidden controls and reports nothing upward.
 void append_semantic_nodes(const Control::Ptr& control,
                            const Control* expected_parent,
                            const Window* owner,
                            const Control::Ptr& focused,
                            std::vector<SemanticNode>& destination,
-                           std::size_t& count) {
+                           std::size_t& count,
+                           HiddenFocus& hidden) {
     if (!current_semantic_identity(control, expected_parent, owner) ||
         !(*control).effectively_visible()) return;
     SemanticDescriptor descriptor = (*control).semantic_descriptor();
     if (!current_semantic_identity(control, expected_parent, owner)) return;
     (*control).apply_provider_semantics(descriptor);
     std::vector<SemanticNode> descendants;
+    HiddenFocus inner;
     if (!descriptor.exposed || descriptor.include_descendants) {
         const std::vector<Control::Ptr> children((*control).children().begin(),
                                                  (*control).children().end());
         for (const Control::Ptr& child : children) {
             if (!current_semantic_identity(child, control.get(), owner)) continue;
             append_semantic_nodes(child, control.get(), owner, focused,
-                                  descendants, count);
+                                  descendants, count, inner);
         }
         if (!current_semantic_identity(control, expected_parent, owner)) return;
         std::vector<SemanticNode> virtual_children =
@@ -122,8 +161,12 @@ void append_semantic_nodes(const Control::Ptr& control,
         destination.insert(destination.end(),
                            std::make_move_iterator(descendants.begin()),
                            std::make_move_iterator(descendants.end()));
+        note_hidden_control(control, focused, hidden);
+        if (inner.focusable) hidden.focusable = true;
+        if (inner.focused) hidden.focused = true;
         return;
     }
+    if (!descriptor.include_descendants) note_hidden_subtree(control, focused, inner);
     SemanticNode node;
     node.runtime_id = (*control).runtime_id().value;
     node.stable_id = std::string((*control).stable_id().value());
@@ -144,8 +187,11 @@ void append_semantic_nodes(const Control::Ptr& control,
     node.states |= descriptor.states;
     if ((*control).effectively_enabled()) node.states |= SemanticState::enabled;
     node.states |= SemanticState::visible;
-    if ((*control).focusable()) node.states |= SemanticState::focusable;
-    if (control == focused) node.states |= SemanticState::focused;
+    // A node is focusable when its control is, or when a control it hides
+    // (one that publishes no node of its own) can take focus; it is focused
+    // while focus is on its control or on such a hidden control.
+    if ((*control).focusable() || inner.focusable) node.states |= SemanticState::focusable;
+    if (control == focused || inner.focused) node.states |= SemanticState::focused;
     node.actions = descriptor.actions;
     node.children = std::move(descendants);
     destination.push_back(std::move(node));
@@ -2310,8 +2356,11 @@ SemanticSnapshot Window::semantic_snapshot() {
                 (root != scoped && (*root).parent())) {
                 continue;
             }
+            // Focus held by unexposed controls at the top of the tree has no
+            // node above it to belong to.
+            HiddenFocus unowned;
             append_semantic_nodes(root, root == scoped ? (*root).parent().get() : nullptr, this, focused, snapshot.roots,
-                                  snapshot.node_count);
+                                  snapshot.node_count, unowned);
         }
         if (generation == semantic_generation_) {
             return snapshot;
@@ -2361,7 +2410,20 @@ bool Window::perform_semantic_action(std::string_view stable_id,
     }
     if (action == SemanticAction::focus) {
         set_focus_cue_visible(true);
-        return request_focus(control);
+        if ((*control).focusable_) {
+            const bool focused = request_focus(control);
+            return focused;
+        }
+        // A control that cannot take focus itself, such as a composite over
+        // an inner editor, decides in its own on_semantic_action where focus
+        // goes. The action is performed only if focus then lies in the
+        // control's subtree, so focus is still refused where nothing there
+        // can take it.
+        const bool handled = (*control).on_semantic_action(action, value);
+        if (!handled || !(*control).is_alive() || (*control).window_ != this) return false;
+        const Control::Ptr now_focused = focused_.lock();
+        const bool inside = contains_control(control, now_focused);
+        return inside;
     }
     return (*control).on_semantic_action(action, value);
 }
@@ -2991,6 +3053,7 @@ void Window::paint_recursive(const Control::Ptr& control,
                 OwnerDecorationLayer::after_content);
             (*control).display_chunk_ = recorder.finish(++display_generation_, plane,
                                                       logical_bounds);
+            if (recorder.group_refusals() > 0U) metrics_.record_paint_group_refusals(recorder.group_refusals());
             ++chunks_rebuilt;
             consumed_invalidations += invalidated ? 1U : 0U;
         } else {

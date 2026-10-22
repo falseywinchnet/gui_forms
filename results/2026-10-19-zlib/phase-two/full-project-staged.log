@@ -1,0 +1,287 @@
+Syncing /Users/ultimussecundai/.codex/worktrees/zlib-phase-one-study/gui_forms -> m4mini:/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab
+Running on m4mini: sh build-zlib-study-sources/full-phase-two.sh
+sh /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/gui_forms/third_party/fetch_skia_cpu.sh
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/skia/.git/
+From https://github.com/google/skia
+ * branch            2a9b593bab4b2fd019fa494c8d401ff1fab0b883 -> FETCH_HEAD
+HEAD is now at 2a9b593 [M152] Address incorrect handling of a map pointer in SkRP
+Version "version:2@1.12.1.chromium.4" requested by DEPS differs from current version ""
+Fetching ninja at version:2@1.12.1.chromium.4 for platform mac-arm64
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/skia/third_party/externals/libpng/.git/
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+From https://github.com/pnggroup/libpng
+ * branch            d5515b5b8be3901aac04e5bd8bd5c89f287bcd33 -> FETCH_HEAD
+HEAD is now at d5515b5 Release libpng version 1.6.56
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/skia/third_party/externals/zlib/.git/
+From https://chromium.googlesource.com/chromium/src/third_party/zlib
+ * branch            646b7f569718921d7d4b5b8e22572ff6c76f2596 -> FETCH_HEAD
+HEAD is now at 646b7f5 [zlib][build] Remove fdopen #defines in zutil.h.
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/skia/third_party/externals/freetype/.git/
+From https://github.com/freetype/freetype
+ * branch            264b5fbf5b912b39f98d038bf75d39be0a73f21b -> FETCH_HEAD
+HEAD is now at 264b5fb Update all copyright notices.
+sh /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/gui_forms/third_party/fetch_text_stack.sh
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/harfbuzz/.git/
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+From https://github.com/harfbuzz/harfbuzz
+ * branch            c7a7457b7385f33178e8cf87615ca077a810bbe7 -> FETCH_HEAD
+HEAD is now at c7a7457 14.6.0
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/third_party/freetype/.git/
+From https://github.com/freetype/freetype
+ * branch            f4205da14867c5387cd6a329b90ee10a6df6eeff -> FETCH_HEAD
+HEAD is now at f4205da * Version 2.14.2 released. ==========================
+sh /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/gui_forms/third_party/build_skia_cpu.sh /Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/.build/native-macos-arm64/skia
+Done. Made 98 targets from 43 files in 231ms
+ninja: Entering directory `/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/.build/native-macos-arm64/skia'
+[1/587] stamp obj/third_party/zlib/zlib_common_headers.stamp
+[2/587] compile ../../../../../third_party/skia/third_party/externals/zlib/adler32_simd.c
+[3/587] compile ../../../../../third_party/skia/third_party/externals/zlib/crc32_simd.c
+[4/587] compile ../../../../../third_party/skia/third_party/externals/zlib/contrib/optimizations/inffast_chunk.c
+[5/587] compile ../../../../../third_party/skia/third_party/externals/zlib/compress.c
+[6/587] compile ../../../../../third_party/skia/third_party/externals/zlib/adler32.c
+[7/587] compile ../../../../../third_party/skia/third_party/externals/zlib/cpu_features.c
+[8/587] compile ../../../../../third_party/skia/third_party/externals/zlib/gzclose.c
+[9/587] compile ../../../../../third_party/skia/third_party/externals/zlib/crc32.c
+[10/587] compile ../../../../../third_party/skia/third_party/externals/zlib/contrib/optimizations/inflate.c
+[11/587] compile ../../../../../third_party/skia/third_party/externals/zlib/gzlib.c
+[12/587] compile ../../../../../third_party/skia/third_party/externals/zlib/gzread.c
+[13/587] compile ../../../../../third_party/skia/third_party/externals/zlib/gzwrite.c
+[14/587] compile ../../../../../third_party/skia/third_party/externals/zlib/inftrees.c
+[15/587] compile ../../../../../third_party/skia/third_party/externals/zlib/inffast.c
+[16/587] compile ../../../../../third_party/skia/third_party/externals/zlib/deflate.c
+[17/587] compile ../../../../../third_party/skia/third_party/externals/zlib/infback.c
+[18/587] stamp obj/third_party/zlib/zlib_adler32_simd.stamp
+[19/587] stamp obj/third_party/zlib/zlib_arm_crc32.stamp
+[20/587] stamp obj/third_party/zlib/zlib_inflate_chunk_simd.stamp
+[21/587] stamp obj/third_party/zlib/zlib_slide_hash_simd.stamp
+[22/587] compile ../../../../../third_party/skia/third_party/externals/zlib/uncompr.c
+[23/587] compile ../../../../../third_party/skia/third_party/externals/zlib/zutil.c
+[24/587] compile ../../../../../third_party/skia/third_party/externals/zlib/trees.c
+[25/587] compile ../../../../../third_party/skia/third_party/externals/libpng/png.c
+[26/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngerror.c
+[27/587] compile ../../../../../third_party/skia/src/codec/SkPngCompositeChunkReader.cpp
+[28/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngget.c
+[29/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngmem.c
+[30/587] compile ../../../../../third_party/skia/src/encode/SkPngEncoderBase.cpp
+[31/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngpread.c
+[32/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngrio.c
+[33/587] compile ../../../../../third_party/skia/src/codec/SkPngCodecBase.cpp
+[34/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngread.c
+[35/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngset.c
+[36/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngtrans.c
+[37/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngwio.c
+[38/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngrutil.c
+[39/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngwtran.c
+[40/587] compile ../../../../../third_party/skia/third_party/externals/libpng/arm/arm_init.c
+[41/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngwrite.c
+[42/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngrtran.c
+[43/587] compile ../../../../../third_party/skia/third_party/externals/libpng/arm/filter_neon_intrinsics.c
+[44/587] compile ../../../../../third_party/skia/third_party/externals/libpng/arm/palette_neon_intrinsics.c
+[45/587] stamp obj/png_decode_common.stamp
+[46/587] stamp obj/png_encode_common.stamp
+[47/587] link libzlib.a
+[48/587] compile ../../../../../third_party/skia/third_party/externals/libpng/pngwutil.c
+[49/587] link libpng.a
+[50/587] compile ../../../../../third_party/skia/src/capture/SkCapture.cpp
+[51/587] compile ../../../../../third_party/skia/src/capture/SkCaptureCanvas.cpp
+[52/587] compile ../../../../../third_party/skia/src/codec/SkPngCodec.cpp
+[53/587] compile ../../../../../third_party/skia/src/encode/SkPngEncoderImpl.cpp
+[54/587] compile ../../../../../third_party/skia/src/core/SkATrace.cpp
+[55/587] compile ../../../../../third_party/skia/src/core/SkAlphaRuns.cpp
+[56/587] compile ../../../../../third_party/skia/src/core/SkAnalyticEdge.cpp
+[57/587] compile ../../../../../third_party/skia/src/capture/SkCaptureManager.cpp
+[58/587] compile ../../../../../third_party/skia/src/core/SkAAClip.cpp
+[59/587] compile ../../../../../third_party/skia/src/core/SkArenaAlloc.cpp
+[60/587] compile ../../../../../third_party/skia/src/core/SkAnnotation.cpp
+[61/587] compile ../../../../../third_party/skia/src/core/SkBase64.cpp
+[62/587] compile ../../../../../third_party/skia/src/core/SkAutoPixmapStorage.cpp
+[63/587] compile ../../../../../third_party/skia/src/core/SkBBHFactory.cpp
+[64/587] compile ../../../../../third_party/skia/src/core/SkBezierCurves.cpp
+[65/587] compile ../../../../../third_party/skia/src/core/SkBigPicture.cpp
+[66/587] compile ../../../../../third_party/skia/src/core/SkBitmap.cpp
+[67/587] compile ../../../../../third_party/skia/src/core/SkBitmapCache.cpp
+[68/587] compile ../../../../../third_party/skia/src/core/SkBitmapProcState.cpp
+[69/587] compile ../../../../../third_party/skia/src/core/SkBitmapProcState_matrixProcs.cpp
+[70/587] compile ../../../../../third_party/skia/src/core/SkBitmapProcState_opts_lasx.cpp
+[71/587] compile ../../../../../third_party/skia/src/core/SkBitmapDevice.cpp
+[72/587] compile ../../../../../third_party/skia/src/core/SkBitmapProcState_opts_ssse3.cpp
+[73/587] compile ../../../../../third_party/skia/src/core/SkBitmapProcState_opts.cpp
+[74/587] compile ../../../../../third_party/skia/src/core/SkBlitMask_opts_ssse3.cpp
+[75/587] compile ../../../../../third_party/skia/src/core/SkBlitMask_opts.cpp
+[76/587] compile ../../../../../third_party/skia/src/core/SkBlendMode.cpp
+[77/587] compile ../../../../../third_party/skia/src/core/SkBlendModeBlender.cpp
+[78/587] compile ../../../../../third_party/skia/src/core/SkBlitRow_D32.cpp
+[79/587] compile ../../../../../third_party/skia/src/core/SkBlitRow_opts.cpp
+[80/587] compile ../../../../../third_party/skia/src/core/SkBlitRow_opts_ml3.cpp
+[81/587] compile ../../../../../third_party/skia/src/core/SkBlitRow_opts_lasx.cpp
+[82/587] compile ../../../../../third_party/skia/src/core/SkBlitter_A8.cpp
+[83/587] compile ../../../../../third_party/skia/src/core/SkBlitter.cpp
+[84/587] compile ../../../../../third_party/skia/src/core/SkBlitter_Sprite.cpp
+[85/587] compile ../../../../../third_party/skia/src/core/SkBlitter_ARGB32.cpp
+[86/587] compile ../../../../../third_party/skia/src/core/SkBlockAllocator.cpp
+[87/587] compile ../../../../../third_party/skia/src/core/SkBlurMask.cpp
+[88/587] compile ../../../../../third_party/skia/src/core/SkBuffer.cpp
+[89/587] compile ../../../../../third_party/skia/src/core/SkBlurMaskFilterImpl.cpp
+[90/587] compile ../../../../../third_party/skia/src/core/SkCPUContext.cpp
+[91/587] compile ../../../../../third_party/skia/src/core/SkBlurEngine.cpp
+[92/587] compile ../../../../../third_party/skia/src/core/SkCachedData.cpp
+[93/587] compile ../../../../../third_party/skia/src/core/SkCPURecorder.cpp
+[94/587] compile ../../../../../third_party/skia/src/core/SkCapabilities.cpp
+[95/587] compile ../../../../../third_party/skia/src/core/SkCanvasPriv.cpp
+[96/587] compile ../../../../../third_party/skia/src/core/SkCanvas_Raster.cpp
+[97/587] compile ../../../../../third_party/skia/src/core/SkChecksum.cpp
+[98/587] compile ../../../../../third_party/skia/src/core/SkCanvas.cpp
+[99/587] compile ../../../../../third_party/skia/src/core/SkClipStack.cpp
+[100/587] compile ../../../../../third_party/skia/src/core/SkColor.cpp
+[101/587] compile ../../../../../third_party/skia/src/core/SkClipStackDevice.cpp
+[102/587] compile ../../../../../third_party/skia/src/core/SkColorFilter.cpp
+[103/587] compile ../../../../../third_party/skia/src/core/SkColorSpace.cpp
+[104/587] compile ../../../../../third_party/skia/src/core/SkColorSpaceXformSteps.cpp
+[105/587] compile ../../../../../third_party/skia/src/core/SkContainers.cpp
+[106/587] compile ../../../../../third_party/skia/src/core/SkCompressedDataUtils.cpp
+[107/587] compile ../../../../../third_party/skia/src/core/SkColorTable.cpp
+[108/587] compile ../../../../../third_party/skia/src/core/SkCpu.cpp
+[109/587] compile ../../../../../third_party/skia/src/core/SkContourMeasure.cpp
+[110/587] compile ../../../../../third_party/skia/src/core/SkCubicClipper.cpp
+[111/587] compile ../../../../../third_party/skia/src/core/SkCubicMap.cpp
+[112/587] compile ../../../../../third_party/skia/src/core/SkConvertPixels.cpp
+[113/587] compile ../../../../../third_party/skia/src/core/SkDebug.cpp
+[114/587] compile ../../../../../third_party/skia/src/core/SkDataTable.cpp
+[115/587] compile ../../../../../third_party/skia/src/core/SkCubics.cpp
+[116/587] compile ../../../../../third_party/skia/src/core/SkDeque.cpp
+[117/587] compile ../../../../../third_party/skia/src/core/SkData.cpp
+[118/587] compile ../../../../../third_party/skia/src/core/SkDistanceFieldGen.cpp
+[119/587] compile ../../../../../third_party/skia/src/core/SkDocument.cpp
+[120/587] compile ../../../../../third_party/skia/src/core/SkDescriptor.cpp
+[121/587] compile ../../../../../third_party/skia/src/core/SkDevice.cpp
+[122/587] compile ../../../../../third_party/skia/src/core/SkDrawShadowInfo.cpp
+[123/587] compile ../../../../../third_party/skia/src/core/SkDraw_atlas.cpp
+[124/587] compile ../../../../../third_party/skia/src/core/SkDraw.cpp
+[125/587] compile ../../../../../third_party/skia/src/core/SkDraw_text.cpp
+[126/587] compile ../../../../../third_party/skia/src/core/SkDraw_vertices.cpp
+[127/587] compile ../../../../../third_party/skia/src/core/SkDrawable.cpp
+[128/587] compile ../../../../../third_party/skia/src/core/SkEdge.cpp
+[129/587] compile ../../../../../third_party/skia/src/core/SkEdgeClipper.cpp
+[130/587] compile ../../../../../third_party/skia/src/core/SkEdgeBuilder.cpp
+[131/587] compile ../../../../../third_party/skia/src/core/SkFloatingPoint.cpp
+[132/587] compile ../../../../../third_party/skia/src/core/SkFlattenable.cpp
+[133/587] compile ../../../../../third_party/skia/src/core/SkFontMetricsPriv.cpp
+FAILED: obj/src/core/core.SkFontMetricsPriv.o
+clang++ -MD -MF obj/src/core/core.SkFontMetricsPriv.o.d -DNDEBUG -DSK_ENABLE_PRECOMPILE -DSK_DISABLE_TRACING -DSK_ENABLE_API_AVAILABLE -DSK_GAMMA_APPLY_TO_A8 -DSK_ENABLE_AVX512_OPTS -DSKIA_IMPLEMENTATION=1 -DSK_CODEC_DECODES_PNG -DSK_CODEC_DECODES_PNG_WITH_LIBPNG -DSK_CODEC_ENCODES_PNG -DSK_CODEC_ENCODES_PNG_WITH_LIBPNG -I../../../../../third_party/skia -Wno-attributes -ffp-contract=off -fPIC -fvisibility=hidden -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos11 -fstrict-aliasing -O3 -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -fvisibility-inlines-hidden -std=c++20 -fno-exceptions -fno-rtti -stdlib=libc++ -nostdinc++ -isystem /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1 -c ../../../../../third_party/skia/src/core/SkFontMetricsPriv.cpp -o obj/src/core/core.SkFontMetricsPriv.o
+../../../../../third_party/skia/src/core/SkFontMetricsPriv.cpp:9:10: fatal error: 'src/core/SkFontMetricsPriv.h' file not found
+    9 | #include "src/core/SkFontMetricsPriv.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+[134/587] compile ../../../../../third_party/skia/src/core/SkFont.cpp
+FAILED: obj/src/core/core.SkFont.o
+clang++ -MD -MF obj/src/core/core.SkFont.o.d -DNDEBUG -DSK_ENABLE_PRECOMPILE -DSK_DISABLE_TRACING -DSK_ENABLE_API_AVAILABLE -DSK_GAMMA_APPLY_TO_A8 -DSK_ENABLE_AVX512_OPTS -DSKIA_IMPLEMENTATION=1 -DSK_CODEC_DECODES_PNG -DSK_CODEC_DECODES_PNG_WITH_LIBPNG -DSK_CODEC_ENCODES_PNG -DSK_CODEC_ENCODES_PNG_WITH_LIBPNG -I../../../../../third_party/skia -Wno-attributes -ffp-contract=off -fPIC -fvisibility=hidden -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos11 -fstrict-aliasing -O3 -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -fvisibility-inlines-hidden -std=c++20 -fno-exceptions -fno-rtti -stdlib=libc++ -nostdinc++ -isystem /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1 -c ../../../../../third_party/skia/src/core/SkFont.cpp -o obj/src/core/core.SkFont.o
+../../../../../third_party/skia/src/core/SkFont.cpp:10:10: fatal error: 'include/core/SkFontMetrics.h' file not found
+   10 | #include "include/core/SkFontMetrics.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+[135/587] compile ../../../../../third_party/skia/src/core/SkExecutor.cpp
+[136/587] compile ../../../../../third_party/skia/src/core/SkFontDescriptor.cpp
+FAILED: obj/src/core/core.SkFontDescriptor.o
+clang++ -MD -MF obj/src/core/core.SkFontDescriptor.o.d -DNDEBUG -DSK_ENABLE_PRECOMPILE -DSK_DISABLE_TRACING -DSK_ENABLE_API_AVAILABLE -DSK_GAMMA_APPLY_TO_A8 -DSK_ENABLE_AVX512_OPTS -DSKIA_IMPLEMENTATION=1 -DSK_CODEC_DECODES_PNG -DSK_CODEC_DECODES_PNG_WITH_LIBPNG -DSK_CODEC_ENCODES_PNG -DSK_CODEC_ENCODES_PNG_WITH_LIBPNG -I../../../../../third_party/skia -Wno-attributes -ffp-contract=off -fPIC -fvisibility=hidden -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk -target arm64-apple-macos11 -fstrict-aliasing -O3 -target arm64-apple-macos14.0 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -fvisibility-inlines-hidden -std=c++20 -fno-exceptions -fno-rtti -stdlib=libc++ -nostdinc++ -isystem /Users/joshuahkuttenkuler/Developer/PlaysuiteDependencies/toolkit-4e126d6/toolchain/llvm-22.1.8-macos14/include/c++/v1 -c ../../../../../third_party/skia/src/core/SkFontDescriptor.cpp -o obj/src/core/core.SkFontDescriptor.o
+In file included from ../../../../../third_party/skia/src/core/SkFontDescriptor.cpp:8:
+In file included from ../../../../../third_party/skia/src/core/SkFontDescriptor.h:11:
+../../../../../third_party/skia/include/core/SkFontArguments.h:12:10: fatal error: 'include/core/SkFourByteTag.h' file not found
+   12 | #include "include/core/SkFourByteTag.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+ninja: build stopped: subcommand failed.
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import sys; from pathlib import Path; sys.path.insert(0, str(Path("tools").resolve())); import ci_build; ci_build.ROOT = Path("build/full-ci").resolve(); ci_build.main()
+                                                                                                                                                              ~~~~~~~~~~~~~^^
+  File "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/tools/ci_build.py", line 180, in main
+    build_toolkit(host, build, build / 'gui-forms-sdk', args.jobs,
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                  gallery_enabled(args.gallery, dict(os.environ)), args.sanitize, args.tests)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/tools/ci_build.py", line 122, in build_toolkit
+    run('sh', ROOT / 'gui_forms/third_party/build_skia_cpu.sh', skia_out)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/tools/ci_build.py", line 19, in run
+    subprocess.run(command, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.8/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['sh', '/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/gui_forms/third_party/build_skia_cpu.sh', '/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/full-ci/.build/native-macos-arm64/skia']' returned non-zero exit status 1.

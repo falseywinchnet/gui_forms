@@ -79,7 +79,9 @@
       }
     ],
     "expressions": {"maximum_operations": 64, "maximum_stack": 16, "operations": ["constant", "input", "state", "parameter", "negate", "add", "subtract", "multiply", "divide", "minimum", "maximum", "less", "less_equal", "greater", "greater_equal", "equal", "not_equal", "clamp", "mix", "smoothstep", "choose"]},
-    "published_values": {"maximum": 32}
+    "published_values": {"maximum": 32},
+    "transitions": {"engine_properties": ["opacity"], "maximum_states": 8, "maximum_per_part": 4},
+    "ambient": {"maximum_frames_per_second": 30, "maximum_window_fraction": 0.1}
   },
   "types": [
     {

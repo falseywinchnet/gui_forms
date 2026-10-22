@@ -1,0 +1,22 @@
+{
+  "host": "macOS-26.5-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "compilers": {
+    "clang": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n",
+    "clang++": "Homebrew clang version 22.1.8\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /opt/homebrew/Cellar/llvm@22/22.1.8/bin\nConfiguration file: /opt/homebrew/Cellar/llvm@22/22.1.8/etc/clang/arm64-apple-darwin25.cfg\n"
+  },
+  "oracle_revision": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
+  "strict": false,
+  "seconds": 61.37283912487328,
+  "exit_code": 0,
+  "fuzz_command": [
+    "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/inflate-study-ordinary/inflate-fuzz",
+    "-seed=20261019",
+    "-max_total_time=60",
+    "-max_len=4096",
+    "-print_final_stats=1",
+    "-rss_limit_mb=0",
+    "-malloc_limit_mb=0",
+    "/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/build/inflate-study-ordinary/corpus"
+  ]
+}

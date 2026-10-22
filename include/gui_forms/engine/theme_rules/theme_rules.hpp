@@ -2,6 +2,7 @@
 
 #include "gui_forms/anatomy/types/anatomy_types.hpp"
 #include "gui_forms/engine/engine_expression/engine_expression.hpp"
+#include "gui_forms/engine/motion_value/motion_value.hpp"
 #include "gui_forms/engine/primitive_registry/primitive_registry.hpp"
 #include "gui_forms/engine/types/engine_types.hpp"
 #include "gui_forms/types/paint_types/paint_types.hpp"
@@ -142,19 +143,106 @@ struct RuleDeclaration final {
     }
 };
 
+// The engine's presentational property (T2 GIVEN C1-1): one multiplier,
+// from 0 to 1, on the part's whole composite. It is no vocabulary atom and
+// no primitive parameter; only a transition sets it, and a part without one
+// is opaque.
+inline constexpr std::string_view opacity_property = "opacity";
+
+// The most states one presentational state machine has, and the most
+// transitions one part runs.
+inline constexpr std::size_t maximum_presentation_states = 8;
+inline constexpr std::size_t maximum_part_transitions = 4;
+
+// One state of a part's presentational state machine (E7; design language
+// §9.6). The machine is in the first of its states whose `when` states the
+// part's published states all include (an empty `when` always matches), and
+// moves its property to `target`. A part whose states match none rests at
+// the property's own value: its cascade value, or 1 for opacity.
+//
+// When the machine enters this state from another, or the part first
+// appears in it, `enter_from`, if set, stands the property at that value
+// first; this is how a part fades in when it appears (the docking tiles,
+// T2 GIVEN C2-1). Otherwise every move starts from the value shown, so a
+// transition retargets and never restarts.
+//
+// The machine is presentational only: it reads the published states and
+// writes nothing back, so it can neither create an observable state nor
+// delay behaviour.
+struct PresentationState final {
+    std::vector<AnatomyState> when{};
+    double target{};
+    std::optional<double> enter_from{};
+
+    friend bool operator==(const PresentationState& left, const PresentationState& right) noexcept {
+        return left.when == right.when && left.target == right.target && left.enter_from == right.enter_from;
+    }
+};
+
+// A transition on one resolved property: `opacity`, or a number parameter
+// of the rule's primitive that the primitive declares animated (such as
+// the bulge's amplitude), so that its frames never remake the part's
+// preparation. It runs on the window's MotionClock with `curve`; every
+// duration is clamped to the 400 ms ceiling. Under reduced motion and in an
+// occluded or minimized window it jumps to its end (GIVEN D2-1, D4-1).
+struct PropertyTransition final {
+    std::string property{};
+    std::vector<PresentationState> states{};
+    MotionCurve curve{};
+
+    friend bool operator==(const PropertyTransition& left, const PropertyTransition& right) noexcept {
+        return left.property == right.property && left.states == right.states && left.curve == right.curve;
+    }
+};
+
+// The ambient budget (design language §9.4, the accepted starting tokens):
+// at most 30 frames per second, over a region of at most 10 % of the window
+// on everyday surfaces. A surface the application marks ceremonial
+// (Control::set_ceremonial, GIVEN B3-1) lifts the area cap for the parts on
+// it.
+inline constexpr double maximum_ambient_frames_per_second = 30.0;
+inline constexpr double maximum_ambient_window_fraction = 0.10;
+
+// An ambient effect (E7): its part repaints as time passes, at most
+// `frames_per_second`, and reads time_in_state within one `period` (it
+// wraps), so that the effect cycles. Its region is the part's extent. It
+// runs only while a primitive draws the part and the part has a record,
+// and stops in an occluded or minimized window, under reduced motion and
+// while the application's motion switch is off
+// (PresentationSettings::ambient_motion); the part then rests at `pose`,
+// the time within the period it shows when still, such as an activity
+// object's static pose.
+struct AmbientEffect final {
+    FrameInterval period{};
+    double frames_per_second{};
+    FrameInterval pose{};
+
+    friend bool operator==(const AmbientEffect& left, const AmbientEffect& right) noexcept {
+        return left.period == right.period && left.frames_per_second == right.frames_per_second &&
+               left.pose == right.pose;
+    }
+};
+
 // One rule. `label` names it in diagnostics (T3: its source position).
 // `requires_engine`, when set, is the engine version the rule needs, in
-// place of its sheet's.
+// place of its sheet's. Its transitions and its ambient effect cascade as
+// declarations do: for each property, the transition of the last matching
+// rule that declares one (for a parameter, among the rules selecting the
+// part's primitive), and the ambient effect of the last matching rule that
+// declares one.
 struct ThemeRule final {
     std::string label{};
     CascadeLevel level{CascadeLevel::theme_sheet};
     RuleSelector selector{};
     std::vector<RuleDeclaration> declarations{};
     std::optional<EngineVersion> requires_engine{};
+    std::vector<PropertyTransition> transitions{};
+    std::optional<AmbientEffect> ambient{};
 
     friend bool operator==(const ThemeRule& left, const ThemeRule& right) noexcept {
         return left.label == right.label && left.level == right.level && left.selector == right.selector &&
-               left.declarations == right.declarations && left.requires_engine == right.requires_engine;
+               left.declarations == right.declarations && left.requires_engine == right.requires_engine &&
+               left.transitions == right.transitions && left.ambient == right.ambient;
     }
 };
 
@@ -214,6 +302,20 @@ enum class RuleDiagnosticKind : std::uint8_t {
     expression_reads_colour,
     // A rule left with no declarations after the drops above is dropped.
     rule_empty,
+    // A transition (E7) is dropped: its property is neither opacity nor a
+    // parameter of the rule's primitive; the parameter is not animated or
+    // not a number; or it has no states or more than
+    // maximum_presentation_states, a state outside the vocabulary, or a
+    // target or entry value that is not finite or outside the property's
+    // range. A rule with more than maximum_part_transitions keeps the first.
+    transition_property_unknown,
+    transition_property_not_animated,
+    transition_invalid,
+    // The ambient effect is dropped: more than 30 frames per second (or
+    // none), or a period or pose that is not a positive period with the
+    // pose inside it.
+    ambient_over_frame_cap,
+    ambient_invalid,
     // A published value's name is invalid, repeats an earlier one or is
     // past maximum_published_values. The diagnostic, of the sheet rather
     // than a rule, names it in `property`; its position stays, and reads as
@@ -250,6 +352,14 @@ public:
 
     // Compiles `sheet` against `registry`, which must outlive the result.
     [[nodiscard]] static CompiledThemeRules compile(const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry);
+    // Compiles the engine's built-in rules (built_in_theme_rules, at
+    // CascadeLevel::built_in, below every authored rule) and then `sheet`.
+    // The theme engine's rules are made this way. Diagnostics name the
+    // sheet's rules by their positions in `sheet`.
+    [[nodiscard]] static CompiledThemeRules compile_with_built_in(const ThemeRuleSheet& sheet,
+                                                                  const PrimitiveRegistry& registry);
+    // How many of the rules are the engine's built-in rules.
+    [[nodiscard]] std::size_t built_in_rule_count() const noexcept { return built_in_rules_; }
 
     [[nodiscard]] bool empty() const noexcept { return rules_.empty(); }
     [[nodiscard]] std::size_t rule_count() const noexcept { return rules_.size(); }
@@ -292,6 +402,21 @@ public:
         role_mismatch,
     };
 
+    // One state of a compiled machine (see PresentationState).
+    struct CompiledPresentationState final {
+        AnatomyStateSet when{};
+        double target{};
+        std::optional<double> enter_from{};
+    };
+
+    // A checked transition: opacity, or the parameter at `parameter`.
+    struct CompiledTransition final {
+        bool opacity{};
+        std::size_t parameter{};
+        std::vector<CompiledPresentationState> states{};
+        MotionCurve curve{};
+    };
+
     struct Resolution final {
         Outcome outcome{Outcome::no_rule};
         const EnginePrimitive* primitive{};
@@ -306,6 +431,13 @@ public:
         // The inputs the part reads (E6): the primitive's declared inputs
         // and every input its expressions read, as expression input bits.
         std::uint64_t inputs_read{};
+        // The part's transitions (E7): its opacity's, whatever draws it,
+        // and its primitive's parameters', when a primitive does. They
+        // belong to the compiled rules. `transition_count` are live.
+        std::array<const CompiledTransition*, maximum_part_transitions> transitions{};
+        std::size_t transition_count{};
+        // The part's ambient effect, or null; it belongs to the rules.
+        const AmbientEffect* ambient{};
     };
 
     // The cascade for one part: the winning primitive declaration, then
@@ -341,7 +473,24 @@ private:
         bool selects{};
         const EnginePrimitive* primitive{};
         std::vector<CompiledDeclaration> parameters{};
+        std::vector<CompiledTransition> transitions{};
+        std::optional<AmbientEffect> ambient{};
     };
+
+    // Compiles `sheet`'s rules into `result` at their authored levels, or,
+    // for the engine's own table, at CascadeLevel::built_in.
+    static void add_rules(CompiledThemeRules& result, const ThemeRuleSheet& sheet, const PrimitiveRegistry& registry,
+                          bool engine_table);
+    // The winning rule's primitive and parameters into `result`.
+    void resolve_primitive(const PartFacts& facts, const CompiledRule& chosen, Resolution& result) const noexcept;
+    // The resolved transitions of the matching rules into `result`.
+    void resolve_transitions(const PartFacts& facts, Resolution& result) const noexcept;
+    // A rule's transitions and ambient effect, checked; a defect drops the
+    // one transition or the effect with a diagnostic.
+    static void add_transitions(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                                CompiledRule& compiled);
+    static void add_ambient(std::vector<RuleDiagnostic>& diagnostics, std::size_t index, const ThemeRule& rule,
+                            CompiledRule& compiled);
 
     [[nodiscard]] static bool matches(const CompiledRule& rule, const PartFacts& facts) noexcept;
 
@@ -350,6 +499,12 @@ private:
     std::vector<CompiledRule> rules_{};
     std::vector<RuleDiagnostic> diagnostics_{};
     std::vector<std::string> published_values_{};
+    std::size_t built_in_rules_{};
 };
+
+// The engine's built-in rules (E7), compiled below every theme's: the
+// docking drop tiles' fade (T2 GIVEN C2-1) and the ribbon's dithered rise
+// (D3-1, G4-1). Static storage, made once on first use.
+[[nodiscard]] const ThemeRuleSheet& built_in_theme_rules();
 
 } // namespace gui_forms

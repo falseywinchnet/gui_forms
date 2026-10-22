@@ -43,6 +43,10 @@ enum class DisplayOperation : std::uint8_t {
     draw_prepared_text = 21,
 #endif
     draw_part_raster = 22,
+    // A paint group (Painter::begin_group): `rect` its bounds, `scalar` its
+    // opacity, `secondary_scalar` its composite mode's value.
+    begin_group = 23,
+    end_group = 24,
 };
 
 struct DisplayCommand final {

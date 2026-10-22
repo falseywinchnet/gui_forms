@@ -104,6 +104,17 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
         case DisplayOperation::draw_part_raster:
             painter.draw_part_raster(command.part_raster, command.first, command.scalar);
             break;
+        case DisplayOperation::begin_group: {
+            PaintGroup group{};
+            group.bounds = command.rect;
+            group.opacity = command.scalar;
+            group.composite = static_cast<PaintGroupComposite>(static_cast<std::uint8_t>(command.secondary_scalar));
+            painter.begin_group(group);
+            break;
+        }
+        case DisplayOperation::end_group:
+            painter.end_group();
+            break;
         case DisplayOperation::draw_image_region:
             painter.draw_image_region(
                 command.image,

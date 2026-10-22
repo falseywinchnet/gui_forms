@@ -7,7 +7,16 @@ was built, imported or selected. The owner accepted all six recommendations in
 [the study](README.md#11-owner-decisions-before-implementation); this audit
 fulfils the additional requested precursor without changing those decisions.
 
-## Leak-audit filter (owner follow-up)
+## Subsequent owner direction
+
+The owner subsequently authorized using suitable material from these sources
+for both PNG and deflate and rewriting it in house style. This supersedes the
+leak-qualified shortlist as a restriction on source reuse and changes the
+retained-libpng decision to an owned PNG codec. The evidence classifications
+below remain historical findings, not certification. See the
+[implementation provenance](../../../src/core/compression/PROVENANCE.md).
+
+## Leak-audit filter (historical owner follow-up)
 
 The owner requires the adoption shortlist to contain only implementations
 properly audited for memory leaks; useful others remain references. For this

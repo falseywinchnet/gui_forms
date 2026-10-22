@@ -701,6 +701,10 @@ public:
     [[nodiscard]] std::uint64_t semantic_generation() const noexcept {
         return semantic_generation_;
     }
+    // Focus goes to a focusable control directly. For a control that is not
+    // focusable (a composite whose focus belongs to an inner editor or part)
+    // the control's own on_semantic_action decides, and the action counts as
+    // performed only when focus then lies in the control's subtree.
     bool perform_semantic_action(std::string_view stable_id,
                                  SemanticAction action,
                                  std::string_view value = {});
@@ -728,6 +732,10 @@ private:
     // calls the clock's advance; the clock disconnects the request when
     // nothing moves. Throws std::length_error at the request limit.
     [[nodiscard]] FrameRequestToken request_motion_frames(FrameTime first_deadline);
+    // Called by the motion clock while only ambient effects run (E7): its
+    // request's next frame is due at `deadline`, the earliest effect's,
+    // rather than one motion_frame_interval after the last.
+    void set_motion_frame_deadline(FrameTime deadline) noexcept;
     // Called by HostSession: seeds the window's bindings with the host's
     // defaults unless they are seeded already.
     void install_host_key_map(const KeyMap& defaults);
@@ -798,6 +806,33 @@ private:
     // Follows the pointer for the engine: a move inside the window damages
     // the hot parts reading the pointer.
     void note_engine_pointer(const PointerEvent& event);
+    friend class PartMotion;
+    // Called by PartMotion (E7): one of a part's transition values stepped.
+    // Its extent repaints on the control that recorded it; when the value
+    // settled, the record's motion_unsettled follows its other values.
+    void engine_part_moved(PartRecordHandle handle, bool settled);
+    // Called by ThemeEngine::paint: the record a handle names, to run its
+    // transitions; null when the handle is stale.
+    [[nodiscard]] EnginePartRecord* engine_part_record(PartRecordHandle handle) noexcept {
+        return engine_parts_.record(handle);
+    }
+    // Called by ThemeEngine::paint: runs a part's ambient effect on the
+    // motion clock, its frames at least `interval` apart, or stops it.
+    void run_engine_ambient(PartRecordHandle handle, FrameInterval interval);
+    void stop_engine_ambient(PartRecordHandle handle) noexcept;
+    // Called by MotionClock: one ambient frame for the record in `slot`
+    // with `generation`. Returns false, and repaints nothing, when the
+    // record is gone or the part was not repainted since the frame that
+    // saw paint `seen`, so that the effect ends; otherwise repaints the
+    // part's extent and updates `seen`.
+    bool engine_ambient_frame(std::uint32_t slot, std::uint32_t generation, std::uint64_t& seen);
+    // Called by MotionClock when ambient effects stop: the part repaints, at
+    // its static pose.
+    void repaint_engine_part(std::uint32_t slot, std::uint32_t generation);
+    // Repaints every part whose last paint had an ambient effect, so that
+    // its effect resumes: when the window is shown again, reduced motion
+    // ends or the motion switch is turned on.
+    void resume_engine_ambient();
     friend class detail::AcceleratorAttachment;
 
     using ControlList = std::vector<Control::Ptr>;

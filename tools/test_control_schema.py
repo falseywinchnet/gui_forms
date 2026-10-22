@@ -145,6 +145,20 @@ public:
         self.assertEqual(len(findings), 1)
         self.assertIn("density", findings[0])
 
+    def test_the_engine_lists_its_motion_caps(self) -> None:
+        schema = cs.load_schema()
+        engine = schema["engine"]
+        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity"])
+        self.assertEqual(engine["ambient"]["maximum_frames_per_second"], 30)
+        broken = json.loads(json.dumps(engine))
+        broken["ambient"]["maximum_frames_per_second"] = 60
+        broken["ambient"]["maximum_window_fraction"] = 0.5
+        findings = cs.validate({"types": schema["types"], "vocabulary": schema["vocabulary"], "engine": broken},
+                               cr.load_registry(), cs.scan_classes())
+        self.assertEqual(len(findings), 2)
+        self.assertIn("30", findings[0])
+        self.assertIn("10 %", findings[1])
+
     def test_the_engine_lists_its_expression_operations(self) -> None:
         schema = cs.load_schema()
         expressions = schema["engine"]["expressions"]

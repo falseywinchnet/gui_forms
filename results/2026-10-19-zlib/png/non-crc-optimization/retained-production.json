@@ -1,0 +1,17 @@
+{
+  "environment": "Apple M4, macOS arm64, LLVM 22.1.8",
+  "command": "/Users/ultimussecundai/.local/bin/m4build -- sh -c 'sh results/2026-10-19-zlib/png/full-suite-driver.sh > build/png-retained-full.log 2>&1'",
+  "passed_tests": 159,
+  "total_tests": 159,
+  "ctest_seconds": 161.32,
+  "log": "full-suite-retained.log",
+  "source_sha256": {
+    "src/core/image/png_decoder.cpp": "9a4c8777f1218e42c46c9b5a51bf2b50dcc67d81120b75ced0421da65898f4f5",
+    "src/core/image/png_decoder.hpp": "0b34e807620fdcb1c9795d46b92984ed7dacb2fd9dc7e8c62cc3f085094f0145",
+    "src/core/image/png_writer.cpp": "829cbea7fa23f556b1d108140d550447d28379cfd3f6dae1f8e7252abf0cc0c6",
+    "src/core/image/png_writer.hpp": "4f4a38e65e3a23ba801d512e1e1720be112fc8aa10207bde78b83693a4e53393",
+    "tests/png_writer_tests.cpp": "f63e8b1aa9cfe21c31aad27b270ab89a65dcef4904df5c41d83cdb17eae61bf8",
+    "tests/image/png_decoder_tests.cpp": "1acb7bf88acd2f20b6c802edf95926eba625671e4da3ffa1eb8219cc4cc30a89",
+    "results/2026-10-19-zlib/png/full-suite-driver.sh": "76385e28e1bf61a7ac88715316f83a2b839f3ba243fa89ed06d70a4aa7f01541"
+  }
+}

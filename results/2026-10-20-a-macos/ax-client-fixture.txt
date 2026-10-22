@@ -1,0 +1,85 @@
+control button instances=36 nodes=72 matched=72 default_action=press observed=yes
+control drop_down_button instances=1 nodes=2 matched=2 default_action=press observed=yes
+control link_label instances=1 nodes=2 matched=2 default_action=press observed=yes
+control command_bar instances=1 nodes=2 matched=2 default_action=press observed=yes
+control label instances=9 nodes=16 matched=16 default_action=none observed=no
+control text_box instances=13 nodes=26 matched=26 default_action=set_value observed=yes
+control token_box instances=1 nodes=6 matched=6 default_action=set_value observed=yes
+control masked_text_box instances=1 nodes=2 matched=2 default_action=set_value observed=yes
+control picture_box instances=1 nodes=2 matched=2 default_action=none observed=no
+control progress_bar instances=1 nodes=2 matched=2 default_action=none observed=no
+control card instances=1 nodes=2 matched=2 default_action=none observed=no
+control check_box instances=8 nodes=16 matched=16 default_action=press observed=yes
+control radio_button instances=1 nodes=2 matched=2 default_action=press observed=yes
+control track_bar instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control numeric_up_down instances=2 nodes=4 matched=4 default_action=increment observed=yes
+control domain_up_down instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control color_value_editor instances=2 nodes=4 matched=4 default_action=set_value observed=yes
+control flags_value_editor instances=2 nodes=4 matched=4 default_action=expand observed=yes
+control property_list instances=2 nodes=31 matched=31 default_action=set_value observed=yes
+control date_time_picker instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control month_calendar instances=1 nodes=68 matched=68 default_action=set_value observed=yes
+control instrument_rack instances=1 nodes=2 matched=2 default_action=none observed=no
+control list_box instances=3 nodes=24 matched=24 default_action=press observed=yes
+control checked_list_box instances=1 nodes=6 matched=6 default_action=press observed=yes
+control combo_box instances=5 nodes=10 matched=10 default_action=expand observed=yes
+control tree_view instances=1 nodes=8 matched=8 default_action=press observed=yes
+control object_view instances=1 nodes=6 matched=6 default_action=press observed=yes
+control list_view instances=1 nodes=10 matched=10 default_action=press observed=yes
+control tree_list_view instances=1 nodes=10 matched=10 default_action=press observed=yes
+control correspondence_view instances=1 nodes=10 matched=10 default_action=press observed=yes
+control data_grid_view instances=1 nodes=12 matched=12 default_action=press observed=yes
+control choice_group instances=1 nodes=2 matched=2 default_action=press observed=yes
+control breadcrumb_trail instances=1 nodes=8 matched=8 default_action=press observed=yes
+control panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control group_box instances=1 nodes=2 matched=2 default_action=none observed=no
+control scaled_group_box instances=1 nodes=2 matched=2 default_action=none observed=no
+control material_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control expandable_sections instances=1 nodes=2 matched=2 default_action=press observed=yes
+control container_control instances=1 nodes=2 matched=2 default_action=none observed=no
+control user_control instances=1 nodes=2 matched=2 default_action=none observed=no
+control tab_control instances=1 nodes=6 matched=6 default_action=select observed=yes
+control tab_page instances=2 nodes=2 matched=2
+control page_view instances=3 nodes=12 matched=12 default_action=select observed=yes
+control page_strip instances=3 nodes=16 matched=16 default_action=select observed=yes
+control control:page_view.panel.summary instances=1 nodes=1 matched=1
+control navigation_pane instances=1 nodes=13 matched=13 default_action=press observed=yes
+control control:navigation_pane.content instances=1 nodes=1 matched=1
+control flow_layout_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control table_layout_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control responsive_track_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control scaled_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control split_container instances=2 nodes=4 matched=4 default_action=increment observed=yes
+control splitter_panel instances=1 nodes=2 matched=2 default_action=none observed=no
+control command_overflow_panel instances=1 nodes=2 matched=2 default_action=press observed=yes
+control master_detail_view instances=1 nodes=2 matched=2 default_action=none observed=no
+control scroll_bar instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control h_scroll_bar instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control v_scroll_bar instances=1 nodes=2 matched=2 default_action=increment observed=yes
+control menu_strip instances=1 nodes=4 matched=4 default_action=press observed=yes
+control tool_strip instances=2 nodes=8 matched=8 default_action=press observed=yes
+control status_strip instances=1 nodes=4 matched=4 default_action=press observed=yes
+control quick_access_toolbar instances=1 nodes=6 matched=6 default_action=press observed=yes
+control tool_strip_container instances=1 nodes=2 matched=2 default_action=none observed=no
+control binding_navigator instances=1 nodes=20 matched=20 default_action=none observed=no
+control ribbon instances=1 nodes=14 matched=14 default_action=press observed=yes
+control backstage_view instances=1 nodes=6 matched=6 default_action=press observed=yes
+control ribbon_gallery instances=1 nodes=14 matched=14 default_action=press observed=yes
+control ribbon_font_control instances=1 nodes=2 matched=2 default_action=expand observed=yes
+control ribbon_color_picker instances=1 nodes=2 matched=2 default_action=press observed=yes
+control dock_site instances=1 nodes=4 matched=4 default_action=set_value observed=yes
+control control:dock_site.stack.2.panel.notes instances=1 nodes=2 matched=2
+control control:dock_site.stack.3.panel.toolbox instances=1 nodes=2 matched=2
+control dock_navigator instances=1 nodes=10 matched=10 default_action=press observed=yes
+control anchored_popup_layer instances=1 nodes=2 matched=2 default_action=none observed=no
+control font_dialog instances=1 nodes=2 matched=2 default_action=press observed=yes
+control task_dialog instances=1 nodes=2 matched=2 default_action=press observed=yes
+control drawing_surface instances=1 nodes=2 matched=2 default_action=none observed=no
+control raster_canvas instances=1 nodes=2 matched=2 default_action=none observed=no
+control easing_preview instances=1 nodes=2 matched=2 default_action=none observed=no
+control metrics_view instances=1 nodes=2 matched=2 default_action=none observed=no
+control typography_specimen instances=1 nodes=2 matched=2 default_action=none observed=no
+control visual_inspector_view instances=1 nodes=2 matched=2 default_action=none observed=no
+control control:page_view.panel.notes instances=1 nodes=1 matched=1
+note stale element: read role -> AX error -25202, press -> AX error -25202, app alive yes
+types=83 instances=162 nodes=585 matched=585 mismatches=0 failures=0

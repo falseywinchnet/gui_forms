@@ -1,5 +1,7 @@
 #include "gui_forms/engine/part_table/engine_part_table.hpp"
 
+#include "gui_forms/window/window.hpp"
+
 #include <cmath>
 #include <limits>
 #include <new>
@@ -61,6 +63,19 @@ std::size_t raster_bytes(DeviceExtent extent) noexcept {
 }
 
 } // namespace
+
+PartMotion::PartMotion(Window& window, PartRecordHandle record) noexcept : window_(&window), record_(record) {}
+
+bool PartMotion::moving() const noexcept {
+    for (const PartTransitionChannel& channel : channels) {
+        if (channel.value && !(*channel.value).settled()) return true;
+    }
+    return false;
+}
+
+void PartMotion::on_step(const MotionStep& step) {
+    (*window_).engine_part_moved(record_, step.settled);
+}
 
 EnginePartTable::EnginePartTable(const std::size_t item_record_cap) noexcept
     : item_record_cap_(item_record_cap == 0U ? 1U : item_record_cap) {}

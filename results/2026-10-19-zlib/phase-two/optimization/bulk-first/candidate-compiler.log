@@ -1,0 +1,46 @@
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  109 |     while (bit_count_ < count) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:135:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  135 |     while (code_.length <= tree.maximum_length) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:164:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  164 |     for (std::size_t i = 0; i < lengths.size(); ++i) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:193:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  193 |     for (std::size_t i = 0; i < lengths.size(); ++i) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:267:5: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  267 |     for (std::uint32_t i = 0; i < length; ++i) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:267:5: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:327:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  327 |         while (filled < count) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:267:5: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  267 |     for (std::uint32_t i = 0; i < length; ++i) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  109 |     while (bit_count_ < count) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:496:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  496 |         for (unsigned i = 0; i < repeat; ++i) {
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+  109 |     while (bit_count_ < count) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that vectorization is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:109:5: remark: the cost-model indicates that interleaving is not beneficial [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/compression/inflate.cpp:598:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  598 |     while (phase_ != Phase::done && phase_ != Phase::failed) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/tests/compression/inflate_benchmark.cpp:108:13: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  108 |             for (std::size_t i = 0; i < input.size(); ++i) {
+      |             ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/tests/compression/inflate_benchmark.cpp:108:13: remark: loop not vectorized [-Rpass-missed=loop-vectorize]

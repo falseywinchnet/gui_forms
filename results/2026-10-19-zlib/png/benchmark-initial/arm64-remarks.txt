@@ -1,0 +1,62 @@
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:270:17: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  270 |                 for (unsigned entry = 0; entry < plan.palette_count; ++entry) {
+      |                 ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:284:21: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  284 |                     for (unsigned entry = 0; entry < length; ++entry) {
+      |                     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:291:21: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  291 |                     for (unsigned channel = 0; channel < values; ++channel) {
+      |                     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:362:5: remark: vectorized loop (vectorization width: 16, interleaved count: 4) [-Rpass=loop-vectorize]
+  362 |     for (std::size_t index = prefix; index < row.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:336:5: remark: vectorized loop (vectorization width: 16, interleaved count: 4) [-Rpass=loop-vectorize]
+  336 |     for (std::size_t index = 0; index < row.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:362:5: remark: vectorized loop (vectorization width: 16, interleaved count: 4) [-Rpass=loop-vectorize]
+  362 |     for (std::size_t index = prefix; index < row.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:356:5: remark: vectorized loop (vectorization width: 16, interleaved count: 4) [-Rpass=loop-vectorize]
+  356 |     for (std::size_t index = 0; index < prefix; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:362:5: remark: vectorized loop (vectorization width: 16, interleaved count: 1) [-Rpass=loop-vectorize]
+  362 |     for (std::size_t index = prefix; index < row.size(); ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:356:5: remark: vectorized loop (vectorization width: 16, interleaved count: 4) [-Rpass=loop-vectorize]
+  356 |     for (std::size_t index = 0; index < prefix; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:493:33: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  493 |             if (reader.consumed < chunk.length) break;
+      |                                 ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:538:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  538 |     while (offset < encoded.size()) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:161:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  161 |     for (std::size_t index = 0; index < data.size() && index <= 79; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:199:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  199 |         while (start < data.size() && data[start] != std::byte{0}) ++start;
+      |         ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:199:9: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:131:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  131 |     for (unsigned index = 0; index < count; ++index) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+  406 |     for (std::size_t x = 0; x < pass.width; ++x) {
+      |     ^
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]
+/Users/joshuahkuttenkuler/Developer/CodexBuilds/gui_forms-429f4a1939ab/src/core/image/png_decoder.cpp:406:5: remark: loop not vectorized [-Rpass-missed=loop-vectorize]

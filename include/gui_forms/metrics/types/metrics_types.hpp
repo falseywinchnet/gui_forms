@@ -131,6 +131,14 @@ struct MetricsSnapshot {
     std::uint64_t engine_input_changes{};
     std::uint64_t engine_input_damaged_parts{};
     double engine_input_damage_area{};
+    // The theme engine's ambient effects (E7): frames that repainted an
+    // ambient part, and effects refused for covering more than 10 % of the
+    // window on an everyday surface (counted when the refusal begins).
+    std::uint64_t engine_ambient_frames{};
+    std::uint64_t engine_ambient_refusals{};
+    // Paint groups begun deeper than maximum_paint_group_depth, drawn
+    // without isolation (Painter::begin_group).
+    std::uint64_t paint_group_refusals{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

@@ -66,7 +66,23 @@ option(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD
 
 find_package(Threads REQUIRED)
 include(GNUInstallDirs)
+
+# Windows (the MSYS2 CLANG64 toolchain, a MinGW-w64 target): every executable
+# and DLL this project builds links the LLVM runtimes (libc++, libc++abi,
+# libunwind, compiler-rt) and winpthreads statically, so no build output or
+# program package imports a runtime DLL, and none can import a GCC runtime
+# (libgcc_s, libstdc++). Each DLL then holds its own copy of those runtimes;
+# the C++ boundaries between DLLs and their consumers (Threading,
+# Application) pass heap blocks, which every copy takes from the one UCRT
+# heap, and exceptions, whose propagation across the Threading boundary
+# gui_forms_threading_tests checks (a worker entry's failure is rethrown by
+# join in the test executable). tools/package_programs.py rejects a package
+# that imports a GCC or LLVM runtime DLL.
+if(WIN32 AND NOT MSVC)
+    add_link_options(-static)
+endif()
 include(CMakePackageConfigHelpers)
+add_subdirectory(stx_zlib)
 
 if(GUI_FORMS_ENABLE_MACOS_HOST AND NOT APPLE)
     message(FATAL_ERROR "GUI_FORMS_ENABLE_MACOS_HOST requires Apple AppKit")
@@ -128,6 +144,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/part_raster/part_raster.cpp
     src/core/engine/theme_engine/theme_engine.cpp
     src/core/engine/theme_rules/theme_rules.cpp
+    src/core/engine/theme_rules/built_in_rules.cpp
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
@@ -170,6 +187,10 @@ add_library(gui_forms_core STATIC
     src/core/host/image/host_image.cpp
     src/core/host/image/clipboard_image_wire.cpp
     src/core/host/image/clipboard_dib.cpp
+    src/core/host/image/clipboard_png.cpp
+    src/core/image/png_decoder.cpp
+    src/core/image/png_pixels.cpp
+    src/core/image/png_color.cpp
     src/core/image/png_writer.cpp
     src/core/host/frame_capture/frame_capture.cpp
     src/core/host/types/host_types.cpp
@@ -197,6 +218,7 @@ add_library(gui_forms_core STATIC
     src/core/window/presentation/window_presentation.cpp
     src/core/window/scheduler/window_scheduler.cpp
     src/core/window/engine_inputs/window_engine_inputs.cpp
+    src/core/window/engine_motion/window_engine_motion.cpp
     src/core/window/popup/popup_token.cpp
     src/core/window/accelerator/accelerator_token.cpp
     src/core/control/dispatcher/control_dispatcher.cpp
@@ -211,7 +233,7 @@ add_library(gui_forms_core STATIC
     src/core/window/command_route/window_command_route.cpp
     src/core/commands/command_route/command_route.cpp
 )
-target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading)
+target_link_libraries(gui_forms_core PUBLIC Threads::Threads GUIForms::Threading stx_zlib::stx_zlib)
 set_property(TARGET gui_forms_core PROPERTY INTERFACE_GUI_FORMS_CORE_LINKAGE static)
 set_property(TARGET gui_forms_core APPEND PROPERTY COMPATIBLE_INTERFACE_STRING GUI_FORMS_CORE_LINKAGE)
 # Compatibility properties alone do not traverse LINK_ONLY dependencies of
@@ -681,6 +703,8 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NotoSansGurmukhi-Regular.ttf)
     set(GUI_FORMS_DEMOBOARD_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE-PortsmouthRapids.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Noto.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
@@ -712,8 +736,6 @@ if(GUI_FORMS_BUILD_FILE_MANAGER_DEMOBOARD)
             file_manager_demoboard/src/windows_main.cpp)
         target_link_libraries(gui_forms_file_manager_demoboard_windows PRIVATE
             gui_forms_file_manager_demoboard_model gui_forms_host_windows)
-        target_link_options(gui_forms_file_manager_demoboard_windows PRIVATE
-            -static)
         set_target_properties(gui_forms_file_manager_demoboard_windows PROPERTIES
             OUTPUT_NAME "File Manager Demoboard")
         add_custom_command(TARGET gui_forms_file_manager_demoboard_windows POST_BUILD
@@ -831,7 +853,6 @@ if(GUI_FORMS_ENABLE_SKIA)
 
     add_library(gui_forms_skia STATIC
         src/render/skia/raster/skia_raster.cpp
-        src/render/skia/raster/clipboard_png.cpp
     )
     add_dependencies(gui_forms_skia gui_forms_skia_dependency)
     target_include_directories(gui_forms_skia
@@ -958,7 +979,6 @@ if(APPLE)
     find_library(GUI_FORMS_COREFOUNDATION CoreFoundation REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_CORETEXT CoreText REQUIRED)
-    find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     add_library(gui_forms_coregraphics STATIC
         src/render/coregraphics/raster/coregraphics_raster.cpp
     )
@@ -971,14 +991,12 @@ if(APPLE)
             ${GUI_FORMS_COREFOUNDATION}
             ${GUI_FORMS_COREGRAPHICS}
             ${GUI_FORMS_CORETEXT}
-            ${GUI_FORMS_IMAGEIO}
     )
 endif()
 
 if(GUI_FORMS_ENABLE_MACOS_HOST)
     enable_language(OBJCXX)
     find_library(GUI_FORMS_APPKIT AppKit REQUIRED)
-    find_library(GUI_FORMS_IMAGEIO ImageIO REQUIRED)
     find_library(GUI_FORMS_QUARTZCORE QuartzCore REQUIRED)
     find_library(GUI_FORMS_COREGRAPHICS CoreGraphics REQUIRED)
     find_library(GUI_FORMS_UNIFORMTYPEIDENTIFIERS UniformTypeIdentifiers REQUIRED)
@@ -994,7 +1012,7 @@ if(GUI_FORMS_ENABLE_MACOS_HOST)
     target_compile_options(gui_forms_host_macos PRIVATE -fobjc-arc)
     target_link_libraries(gui_forms_host_macos
         PUBLIC gui_forms_core gui_forms_skia
-        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_IMAGEIO} ${GUI_FORMS_QUARTZCORE}
+        PRIVATE ${GUI_FORMS_APPKIT} ${GUI_FORMS_QUARTZCORE}
                 ${GUI_FORMS_COREGRAPHICS}
                 ${GUI_FORMS_UNIFORMTYPEIDENTIFIERS}
     )
@@ -1144,7 +1162,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     endif()
     target_link_libraries(gui_forms_host_windows
         PUBLIC gui_forms_core
-        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32
+        PRIVATE gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid comdlg32 shell32
     )
     target_link_libraries(gui_forms_c_api PRIVATE gui_forms_host_windows)
     target_compile_definitions(gui_forms_c_api PRIVATE GF_C_API_HAS_WINDOWS_HOST=1)
@@ -1165,7 +1183,7 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
             "-Wl,--whole-archive" gui_forms_core gui_drawing_core
             gui_forms_controls gui_forms_host_windows "-Wl,--no-whole-archive"
             gui_forms_text_engine freetype harfbuzz gui_forms_bidi
-            user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid windowscodecs comdlg32 shell32)
+            user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid comdlg32 shell32)
         target_link_options(gui_forms_application PRIVATE "-Wl,--export-all-symbols")
         install(TARGETS gui_forms_application EXPORT GUIFormsApplicationTargets
             ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -1198,9 +1216,6 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     target_compile_definitions(gui_forms_windows_probe PRIVATE
         WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE _WIN32_WINNT=0x0A00 WINVER=0x0A00
     )
-    target_link_options(gui_forms_windows_probe PRIVATE
-        -static
-    )
     add_executable(gui_drawing_windows_probe
         tests/drawing_windows_probe.c
     )
@@ -1209,9 +1224,6 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
     )
     target_link_libraries(gui_drawing_windows_probe PRIVATE
         gui_drawing_c_api gdi32 user32
-    )
-    target_link_options(gui_drawing_windows_probe PRIVATE
-        -static
     )
     if(GUI_FORMS_BUILD_TESTS)
         add_executable(gui_forms_windows_live_surface_endpoint_tests
@@ -1224,9 +1236,6 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         target_link_libraries(gui_forms_windows_live_surface_endpoint_tests PRIVATE
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_windows_live_surface_endpoint_tests PRIVATE
-            -static
-        )
         add_test(NAME gui_forms_windows_live_surface_endpoint_tests
                  COMMAND gui_forms_windows_live_surface_endpoint_tests)
         add_executable(gui_forms_windows_gdi_compat_shim_tests
@@ -1238,9 +1247,6 @@ if(GUI_FORMS_ENABLE_WINDOWS_HOST)
         )
         target_link_libraries(gui_forms_windows_gdi_compat_shim_tests PRIVATE
             gui_forms_c_api gdi32 user32
-        )
-        target_link_options(gui_forms_windows_gdi_compat_shim_tests PRIVATE
-            -static
         )
         add_dependencies(gui_forms_windows_gdi_compat_shim_tests
                          gui_forms_win32_compat)
@@ -1272,6 +1278,7 @@ if(GUI_FORMS_BUILD_GALLERY OR (GUI_FORMS_BUILD_TESTS AND GUI_FORMS_ENABLE_MACOS_
     set(GUI_FORMS_GALLERY_FONT_NOTICES
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/ATTRIBUTION.md
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE-PortsmouthRapids.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Noto.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Carlito.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-Cousine.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-NotoSansCJKjp.txt
@@ -1576,9 +1583,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_gallery_model
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_gallery_windows PRIVATE
-            -static
-        )
         set_target_properties(gui_forms_gallery_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Gallery"
         )
@@ -1589,9 +1593,6 @@ if(GUI_FORMS_BUILD_GALLERY)
         target_link_libraries(gui_forms_vsync_lab_windows PRIVATE
             gui_forms_vsync_lab_model
             gui_forms_host_windows
-        )
-        target_link_options(gui_forms_vsync_lab_windows PRIVATE
-            -static
         )
         set_target_properties(gui_forms_vsync_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms VSync + Waterfall Lab"
@@ -1604,9 +1605,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_visual_inspector_lab_model
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_visual_inspector_lab_windows PRIVATE
-            -static
-        )
         set_target_properties(gui_forms_visual_inspector_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Visual Inspector Lab"
         )
@@ -1617,9 +1615,6 @@ if(GUI_FORMS_BUILD_GALLERY)
         target_link_libraries(gui_forms_layered_material_lab_windows PRIVATE
             gui_forms_layered_material_lab_model
             gui_forms_host_windows
-        )
-        target_link_options(gui_forms_layered_material_lab_windows PRIVATE
-            -static
         )
         set_target_properties(gui_forms_layered_material_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Layered Material Fidelity Lab"
@@ -1632,9 +1627,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_custom_chrome_lab_model
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_custom_chrome_lab_windows PRIVATE
-            -static
-        )
         set_target_properties(gui_forms_custom_chrome_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Custom Chrome Lab"
         )
@@ -1645,9 +1637,6 @@ if(GUI_FORMS_BUILD_GALLERY)
         target_link_libraries(gui_forms_typography_scale_lab_windows PRIVATE
             gui_forms_typography_scale_lab_model
             gui_forms_host_windows
-        )
-        target_link_options(gui_forms_typography_scale_lab_windows PRIVATE
-            -static
         )
         set_target_properties(gui_forms_typography_scale_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Typography + Scale Lab"
@@ -1660,9 +1649,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_responsive_tracks_lab_model
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_responsive_tracks_lab_windows PRIVATE
-            -static
-        )
         set_target_properties(gui_forms_responsive_tracks_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Responsive Tracks Lab"
         )
@@ -1674,9 +1660,6 @@ if(GUI_FORMS_BUILD_GALLERY)
             gui_forms_connected_controls_lab_model
             gui_forms_host_windows
         )
-        target_link_options(gui_forms_connected_controls_lab_windows PRIVATE
-            -static
-        )
         set_target_properties(gui_forms_connected_controls_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Connected Controls Lab"
         )
@@ -1687,9 +1670,6 @@ if(GUI_FORMS_BUILD_GALLERY)
         target_link_libraries(gui_forms_seam_proximity_lab_windows PRIVATE
             gui_forms_seam_proximity_lab_model
             gui_forms_host_windows
-        )
-        target_link_options(gui_forms_seam_proximity_lab_windows PRIVATE
-            -static
         )
         set_target_properties(gui_forms_seam_proximity_lab_windows PROPERTIES
             OUTPUT_NAME "GUI.Forms Physical Seam + Proximity Lab"
@@ -2034,7 +2014,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_DIB_LIFECYCLE_TEST=1)
             target_link_libraries(gui_forms_windows_dib_lifecycle_tests PRIVATE
                 gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                windowscodecs comdlg32 shell32)
+                comdlg32 shell32)
             add_test(NAME gui_forms_windows_dib_lifecycle_tests
                      COMMAND gui_forms_windows_dib_lifecycle_tests)
             set_tests_properties(gui_forms_windows_dib_lifecycle_tests PROPERTIES TIMEOUT 30)
@@ -2055,7 +2035,7 @@ if(GUI_FORMS_BUILD_TESTS)
                 GUI_FORMS_WINDOWS_TRANSACTIONAL_DIB=1 GUI_FORMS_WINDOWS_TOOLTIP_TEST=1)
             target_link_libraries(gui_forms_windows_tooltip_tests PRIVATE
                 gui_forms_core gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                windowscodecs comdlg32 shell32)
+                comdlg32 shell32)
             add_test(NAME gui_forms_windows_tooltip_tests
                      COMMAND gui_forms_windows_tooltip_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
             set_tests_properties(gui_forms_windows_tooltip_tests PROPERTIES TIMEOUT 30)
@@ -2079,7 +2059,7 @@ if(GUI_FORMS_BUILD_TESTS)
                     GUI_FORMS_WINDOWS_PREPARED_TEXT=1 GUI_FORMS_WINDOWS_PREPARED_TEXT_TEST=1)
                 target_link_libraries(gui_forms_windows_prepared_text_tests PRIVATE
                     gui_forms_prepared_text_impl gui_forms_text_engine user32 gdi32 ole32 oleaut32 oleacc uiautomationcore uuid
-                    windowscodecs comdlg32 shell32)
+                    comdlg32 shell32)
                 add_test(NAME gui_forms_windows_prepared_text_tests
                     COMMAND gui_forms_windows_prepared_text_tests "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts")
                 set_tests_properties(gui_forms_windows_prepared_text_tests PROPERTIES TIMEOUT 30)
@@ -2243,6 +2223,31 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_host_image_tests PRIVATE gui_forms_host_headless)
     add_test(NAME gui_forms_host_image_tests COMMAND gui_forms_host_image_tests)
 
+    add_executable(gui_forms_inflate_tests tests/compression/inflate_tests.cpp)
+    target_link_libraries(gui_forms_inflate_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_inflate_tests COMMAND gui_forms_inflate_tests)
+
+    add_executable(gui_forms_inflate_protocol_tests fuzz/inflate_protocol_fuzz.cpp)
+    target_link_libraries(gui_forms_inflate_protocol_tests PRIVATE gui_forms_core)
+    target_compile_definitions(gui_forms_inflate_protocol_tests PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    add_test(NAME gui_forms_inflate_protocol_tests COMMAND gui_forms_inflate_protocol_tests)
+
+    add_executable(gui_forms_png_decoder_tests tests/image/png_decoder_tests.cpp)
+    target_link_libraries(gui_forms_png_decoder_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_decoder_tests COMMAND gui_forms_png_decoder_tests)
+
+    add_executable(gui_forms_png_pixels_tests tests/image/png_pixels_tests.cpp)
+    target_link_libraries(gui_forms_png_pixels_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_pixels_tests COMMAND gui_forms_png_pixels_tests)
+
+    add_executable(gui_forms_png_color_tests tests/image/png_color_tests.cpp)
+    target_link_libraries(gui_forms_png_color_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_png_color_tests COMMAND gui_forms_png_color_tests)
+
+    # By-hand measurement of encoder size and time per level; not a test.
+    add_executable(gui_forms_png_encode_benchmark tests/image/png_encode_benchmark.cpp)
+    target_link_libraries(gui_forms_png_encode_benchmark PRIVATE gui_forms_core)
+
     add_executable(gui_forms_png_writer_tests tests/png_writer_tests.cpp)
     target_link_libraries(gui_forms_png_writer_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_png_writer_tests COMMAND gui_forms_png_writer_tests)
@@ -2282,6 +2287,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_engine_input_tests tests/engine_input_tests.cpp)
     target_link_libraries(gui_forms_engine_input_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_input_tests COMMAND gui_forms_engine_input_tests)
+    add_executable(gui_forms_engine_motion_tests tests/engine_motion_tests.cpp)
+    target_link_libraries(gui_forms_engine_motion_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_motion_tests COMMAND gui_forms_engine_motion_tests)
     add_executable(gui_forms_engine_primitive_tests tests/engine_primitive_tests.cpp)
     target_link_libraries(gui_forms_engine_primitive_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_engine_primitive_tests COMMAND gui_forms_engine_primitive_tests)
@@ -2354,6 +2362,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_composite_tests tests/part_composite_tests.cpp)
     target_link_libraries(gui_forms_part_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_composite_tests COMMAND gui_forms_part_composite_tests)
+    add_executable(gui_forms_paint_group_tests tests/paint_group_tests.cpp)
+    target_link_libraries(gui_forms_paint_group_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_paint_group_tests COMMAND gui_forms_paint_group_tests)
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)
@@ -3245,6 +3256,74 @@ if(GUI_FORMS_BUILD_TESTS)
                      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_macos_activated_test.cmake)
         set_tests_properties(gui_forms_macos_message_dialog_key_tests PROPERTIES TIMEOUT 60)
 
+        # Stage A: the NSAccessibility tree of every stock control, read in
+        # process (no Accessibility permission needed).
+        add_executable(gui_forms_macos_accessibility_tests MACOSX_BUNDLE
+            tests/macos_accessibility_tests.mm
+            tests/support/accessibility_actions.cpp
+            tests/support/macos_accessibility_contract.cpp
+            tests/support/stock_control_fixture.cpp)
+        target_compile_options(gui_forms_macos_accessibility_tests PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_tests PRIVATE
+            gui_forms_host_macos gui_forms_controls)
+        add_test(NAME gui_forms_macos_accessibility_tests
+                 COMMAND gui_forms_macos_accessibility_tests)
+        set_tests_properties(gui_forms_macos_accessibility_tests PROPERTIES TIMEOUT 60)
+
+        # Stage A: the out-of-process AX client and the app it inspects. The
+        # client needs the Accessibility permission; without it it reports
+        # unsupported and exits 77, which ctest shows as skipped.
+        add_executable(gui_forms_macos_accessibility_fixture_app MACOSX_BUNDLE
+            tests/macos_accessibility_fixture_app.mm
+            tests/support/stock_control_fixture.cpp)
+        target_compile_options(gui_forms_macos_accessibility_fixture_app PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_fixture_app PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_fixture_app PRIVATE
+            gui_forms_host_macos gui_forms_controls)
+        set_target_properties(gui_forms_macos_accessibility_fixture_app PROPERTIES
+            MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.ax-fixture")
+        find_library(GUI_FORMS_APPLICATION_SERVICES ApplicationServices REQUIRED)
+        add_executable(gui_forms_macos_accessibility_client_tests
+            tests/macos_accessibility_client_tests.mm
+            tests/support/accessibility_actions.cpp
+            tests/support/macos_accessibility_contract.cpp)
+        target_compile_options(gui_forms_macos_accessibility_client_tests PRIVATE -fobjc-arc)
+        target_include_directories(gui_forms_macos_accessibility_client_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+        target_link_libraries(gui_forms_macos_accessibility_client_tests PRIVATE
+            gui_forms_controls ${GUI_FORMS_APPKIT} ${GUI_FORMS_APPLICATION_SERVICES})
+        add_dependencies(gui_forms_macos_accessibility_client_tests gui_forms_macos_accessibility_fixture_app)
+        add_test(NAME gui_forms_macos_accessibility_client_tests
+                 COMMAND gui_forms_macos_accessibility_client_tests
+                     --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_fixture_app>
+                     --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_fixture_semantics.json)
+        set_tests_properties(gui_forms_macos_accessibility_client_tests PROPERTIES
+            SKIP_RETURN_CODE 77 TIMEOUT 300)
+        if(TARGET gui_forms_gallery_model)
+            add_executable(gui_forms_macos_accessibility_gallery_app MACOSX_BUNDLE
+                tests/macos_accessibility_fixture_app.mm
+                tests/support/stock_control_fixture.cpp
+                ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
+            target_compile_options(gui_forms_macos_accessibility_gallery_app PRIVATE -fobjc-arc)
+            target_compile_definitions(gui_forms_macos_accessibility_gallery_app PRIVATE GUI_FORMS_AX_GALLERY=1)
+            target_include_directories(gui_forms_macos_accessibility_gallery_app PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+            target_link_libraries(gui_forms_macos_accessibility_gallery_app PRIVATE
+                gui_forms_gallery_model gui_forms_host_macos)
+            set_target_properties(gui_forms_macos_accessibility_gallery_app PROPERTIES
+                MACOSX_BUNDLE_GUI_IDENTIFIER "local.guiforms.ax-gallery")
+            add_dependencies(gui_forms_macos_accessibility_client_tests gui_forms_macos_accessibility_gallery_app)
+            add_test(NAME gui_forms_macos_accessibility_client_gallery_tests
+                     COMMAND gui_forms_macos_accessibility_client_tests --gallery
+                         --app $<TARGET_BUNDLE_DIR:gui_forms_macos_accessibility_gallery_app>
+                         --dump ${CMAKE_CURRENT_BINARY_DIR}/accessibility_gallery_semantics.json)
+            set_tests_properties(gui_forms_macos_accessibility_client_gallery_tests PROPERTIES
+                SKIP_RETURN_CODE 77 TIMEOUT 600)
+        endif()
+
         add_executable(gui_forms_macos_multi_window_tests
             tests/macos_multi_window_tests.mm)
         target_compile_options(gui_forms_macos_multi_window_tests PRIVATE -fobjc-arc)
@@ -3263,7 +3342,9 @@ if(GUI_FORMS_BUILD_TESTS)
                 gui_forms_macos_exposure_tests
                 gui_forms_macos_idle_visibility_tests
                 gui_forms_macos_host_close_tests
-                gui_forms_macos_multi_window_tests)
+                gui_forms_macos_multi_window_tests
+                gui_forms_macos_accessibility_tests
+                gui_forms_macos_accessibility_fixture_app)
             set_target_properties(${native_fixture} PROPERTIES MACOSX_BUNDLE TRUE)
             target_sources(${native_fixture} PRIVATE
                 ${GUI_FORMS_GALLERY_FONTS} ${GUI_FORMS_GALLERY_FONT_NOTICES})
@@ -3332,7 +3413,8 @@ if(GUI_FORMS_BUILD_TESTS)
             GUI_DRAWING_TEST_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids.ttf"
             GUI_DRAWING_TEST_BOLD_FONT="${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PortsmouthRapids-Bold.ttf"
         )
-        target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia)
+        target_link_libraries(gui_drawing_skia_tests PRIVATE gui_drawing_skia gui_forms_core)
+        target_include_directories(gui_drawing_skia_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
         add_test(NAME gui_drawing_skia_tests COMMAND gui_drawing_skia_tests)
 
         add_executable(gui_drawing_raster_c_api_tests
@@ -3386,6 +3468,46 @@ if(GUI_FORMS_BUILD_FUZZERS)
         GUI_FORMS_HAS_LIBFUZZER_RUNTIME
     )
     unset(CMAKE_REQUIRED_FLAGS)
+    add_executable(gui_forms_inflate_fuzz
+        fuzz/inflate_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_inflate_protocol_fuzz
+        fuzz/inflate_protocol_fuzz.cpp stx_zlib/src/inflate.cpp)
+    target_include_directories(gui_forms_inflate_protocol_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_inflate_protocol_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_inflate_protocol_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
+    add_executable(gui_forms_png_decode_fuzz
+        fuzz/png_decode_fuzz.cpp src/core/image/png_decoder.cpp
+        src/core/image/png_writer.cpp stx_zlib/src/inflate.cpp stx_zlib/src/deflate.cpp)
+    target_include_directories(gui_forms_png_decode_fuzz PRIVATE include stx_zlib/include)
+    target_compile_options(gui_forms_png_decode_fuzz PRIVATE
+        -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=address,undefined)
+    if(GUI_FORMS_HAS_LIBFUZZER_RUNTIME)
+        target_compile_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+        target_link_options(gui_forms_png_decode_fuzz PRIVATE -fsanitize=fuzzer)
+    else()
+        target_compile_definitions(gui_forms_png_decode_fuzz PRIVATE GUI_FORMS_FUZZ_STANDALONE=1)
+    endif()
+
     add_executable(gui_forms_png_registry_fuzz
         fuzz/png_registry_fuzz.cpp
         src/core/resources/image_registry/image_registry.cpp
@@ -3467,7 +3589,11 @@ include(cmake/ApplicationText.cmake)
 
 install(FILES cmake/llvm22.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/GUIForms)
 install(FILES src/core/threading/atomic_pool/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME threadpool_atomic_fast-LICENSE.txt)
+install(FILES src/core/compression/LICENSE-puff.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
+# Every third-party component the SDK and the programs ship, with its licence
+# and the FreeType credit (THIRD_PARTY_NOTICES.md).
+install(FILES THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms)
 install(FILES third_party/unicode/LICENSE.txt DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME Unicode-LICENSE.txt)
 if(GUI_FORMS_ENABLE_HARFBUZZ_TEXT)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/harfbuzz/COPYING" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME HarfBuzz-COPYING.txt)
@@ -3480,6 +3606,30 @@ if(GUI_FORMS_ENABLE_SKIA)
 endif()
 
 install(FILES third_party/sheenbidi/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME SheenBidi-LICENSE.txt)
+
+# Windows: the installed DLLs embed the LLVM runtimes, winpthreads and the
+# MinGW-w64 CRT (add_link_options(-static) above). Their licences come from
+# the toolchain prefix, the directory above the compiler's bin (the CLANG64
+# tree); the LLVM exception does not require them for embedded runtime code,
+# and they are installed anyway.
+if(WIN32 AND NOT MSVC)
+    get_filename_component(_gf_toolchain_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(_gf_toolchain_prefix "${_gf_toolchain_bin}" DIRECTORY)
+    set(_gf_runtime_licence_sources
+        libc++/LICENSE libunwind/LICENSE compiler-rt/LICENSE winpthreads/COPYING
+        crt/COPYING.MinGW-w64-runtime.txt)
+    set(_gf_runtime_licence_names
+        libc++-LICENSE.txt libunwind-LICENSE.txt compiler-rt-LICENSE.txt winpthreads-COPYING.txt
+        mingw-w64-runtime-COPYING.txt)
+    foreach(_gf_source _gf_name IN ZIP_LISTS _gf_runtime_licence_sources _gf_runtime_licence_names)
+        set(_gf_licence "${_gf_toolchain_prefix}/share/licenses/${_gf_source}")
+        if(EXISTS "${_gf_licence}")
+            install(FILES "${_gf_licence}" DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/GUIForms RENAME ${_gf_name})
+        else()
+            message(WARNING "Runtime licence ${_gf_licence} not found; the installed SDK will lack ${_gf_name}")
+        endif()
+    endforeach()
+endif()
 
 # The accessibility service adapter is independently testable without a renderer.
 # Stage A on Linux: a real AT-SPI client (tests/linux_accessibility_client.py)
@@ -3588,10 +3738,12 @@ if(WIN32 AND GUI_FORMS_ENABLE_WINDOWS_HOST AND GUI_FORMS_BUILD_TESTS)
         target_link_libraries(gui_forms_windows_accessibility_uia_gallery_tests PRIVATE
             gui_forms_gallery_model gui_forms_host_windows uiautomationcore ole32 oleaut32 uuid)
         add_test(NAME gui_forms_windows_accessibility_uia_gallery_tests COMMAND gui_forms_windows_accessibility_uia_gallery_tests)
-        # About 49 s in a release tree and 741 s in the sanitizer tree
-        # (measured 2026-10-20 with other builds running): every provider
-        # call takes a fresh snapshot of the whole Gallery. The limit leaves
-        # the sanitizer run room under heavier load.
-        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 1800)
+        # About 49 s in a release tree. In the sanitizer tree it needs about
+        # 950 s of CPU time (every provider call takes a fresh snapshot of the
+        # page): 741 s and 975 s wall on a lightly loaded machine, and more
+        # than 1800 s through ctest on 2026-10-20 while other workspaces'
+        # builds left it about 55% of a core. The limit is twice the
+        # heaviest load measured.
+        set_tests_properties(gui_forms_windows_accessibility_uia_gallery_tests PROPERTIES TIMEOUT 3600)
     endif()
 endif()

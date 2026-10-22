@@ -16,6 +16,7 @@ own cross-references use that repository's layout.
 | `RIBBON_INTERVIEW_ROUND_001.md` | The ribbon framework round (stage RB), from 2026-10-14; not part of the 2026-08-10 copy |
 | `DOCKING_INTERVIEW_ROUND_001.md` | The docking and PageView round (stage DK), from 2026-10-17; not part of the 2026-08-10 copy |
 | `T2_INTERVIEW_ROUND_001.md` | The engine core round (stage T2), 2026-10-19: 26 questions, answered; not part of the 2026-08-10 copy |
+| `A_VOCABULARY_ROUND_001.md` | The accessibility vocabulary round (stage A), 2026-10-21: roles, fields and editable text, all recommended options accepted; not part of the 2026-08-10 copy |
 
 They are records: amend them by adding a dated note, not by rewriting earlier
 answers. Where a later decision record in `decisions/` or the current code

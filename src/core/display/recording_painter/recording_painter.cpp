@@ -354,6 +354,50 @@ void RecordingPainter::fill_image_pattern(
     commands_.push_back(std::move(command));
 }
 
+void RecordingPainter::begin_group(const PaintGroup& group) {
+    OpenGroup opened{};
+    opened.save_depth = save_depth_;
+    if (group_depth_ >= maximum_paint_group_depth) {
+        // Refused by name: drawn without isolation, limited to its bounds.
+        open_groups_.reserve(open_groups_.size() + 1U);
+        save();
+        clip_rect(group.bounds);
+        opened.refused = true;
+        opened.save_depth = save_depth_;
+        open_groups_.push_back(opened);
+        group_refusals_ = group_refusals_ + 1U;
+        return;
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::begin_group;
+    command.rect = group.bounds;
+    command.scalar = group.opacity;
+    command.secondary_scalar = static_cast<double>(group.composite);
+    open_groups_.reserve(open_groups_.size() + 1U);
+    commands_.push_back(std::move(command));
+    open_groups_.push_back(opened);
+    group_depth_ = group_depth_ + 1U;
+}
+
+void RecordingPainter::end_group() {
+    if (open_groups_.empty()) {
+        throw std::logic_error("GUI.Forms paint group ended without one begun");
+    }
+    const OpenGroup closing = open_groups_.back();
+    if (closing.save_depth != save_depth_) {
+        throw std::logic_error("GUI.Forms paint group has unbalanced saves inside it");
+    }
+    open_groups_.pop_back();
+    if (closing.refused) {
+        restore();
+        return;
+    }
+    DisplayCommand command;
+    command.operation = DisplayOperation::end_group;
+    commands_.push_back(std::move(command));
+    group_depth_ = group_depth_ - 1U;
+}
+
 std::shared_ptr<const DisplayChunk> RecordingPainter::finish(
     std::uint64_t generation, PaintPlane plane, Rect logical_bounds) {
 #if defined(GUI_FORMS_PREPARED_TEXT)
@@ -361,6 +405,9 @@ std::shared_ptr<const DisplayChunk> RecordingPainter::finish(
 #endif
     if (save_depth_ != 0U) {
         throw std::logic_error("GUI.Forms display chunk has an unbalanced painter save");
+    }
+    if (!open_groups_.empty()) {
+        throw std::logic_error("GUI.Forms display chunk leaves a paint group open");
     }
     return std::make_shared<const DisplayChunk>(generation, plane, logical_bounds,
                                                 std::move(commands_));

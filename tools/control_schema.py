@@ -252,6 +252,30 @@ def _engine_findings(engine: object, vocabulary: object) -> list[str]:
             if not _SNAKE.fullmatch(parameter):
                 findings.append(f"engine: {name}: parameter {parameter!r} is not snake_case")
     findings.extend(_expression_findings(engine.get("expressions")))
+    findings.extend(_motion_findings(engine.get("transitions"), engine.get("ambient")))
+    return findings
+
+
+def _motion_findings(transitions: object, ambient: object) -> list[str]:
+    """Presentational state machines and ambient effects (T2 E7): opacity is the
+    engine property, the machine bounds are positive, and the ambient caps are
+    the accepted starting tokens (at most 30 frames per second over at most 10 %
+    of the window)."""
+    findings: list[str] = []
+    if not isinstance(transitions, dict) or "opacity" not in transitions.get("engine_properties", []):
+        findings.append("engine: transitions do not list opacity as the engine property")
+    elif not all(isinstance(transitions.get(key), int) and int(transitions[key]) > 0
+                 for key in ("maximum_states", "maximum_per_part")):
+        findings.append("engine: transitions: the machine bounds are not positive")
+    if not isinstance(ambient, dict):
+        findings.append("engine: no ambient section (frame and area caps)")
+        return findings
+    rate: object = ambient.get("maximum_frames_per_second")
+    fraction: object = ambient.get("maximum_window_fraction")
+    if not isinstance(rate, (int, float)) or not 0 < float(rate) <= 30:
+        findings.append(f"engine: ambient: maximum_frames_per_second {rate!r} is not within 30")
+    if not isinstance(fraction, (int, float)) or not 0 < float(fraction) <= 0.1:
+        findings.append(f"engine: ambient: maximum_window_fraction {fraction!r} is not within 10 %")
     return findings
 
 
@@ -436,6 +460,16 @@ def render_page(schema: Mapping[str, object]) -> str:
             operations: str = ", ".join(_code(str(name)) for name in expressions.get("operations", []))
             lines.append(f"Bounded expressions: at most {expressions.get('maximum_operations')} operations and a "
                          f"stack of {expressions.get('maximum_stack')}, from {operations}.")
+            lines.append("")
+        transitions: Mapping[str, object] = engine.get("transitions", {})  # type: ignore[assignment]
+        ambient: Mapping[str, object] = engine.get("ambient", {})  # type: ignore[assignment]
+        if transitions and ambient:
+            properties: str = ", ".join(_code(str(name)) for name in transitions.get("engine_properties", []))
+            lines.append(f"Transitions run on {properties} and on the primitives' animated parameters: at most "
+                         f"{transitions.get('maximum_states')} states a machine and {transitions.get('maximum_per_part')} "
+                         f"transitions a part. Ambient effects: at most {ambient.get('maximum_frames_per_second')} "
+                         f"frames per second over at most {ambient.get('maximum_window_fraction')} of the window on "
+                         "everyday surfaces.")
             lines.append("")
     for record in types:
         identity: str = str(record["id"])

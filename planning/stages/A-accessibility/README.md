@@ -6,8 +6,14 @@ whole Gallery and performs every control's default action (A-W1,
 `results/2026-10-19-a-w1-msaa-gallery`); the UI Automation provider is in
 place (A-W2) and its client test does the same through IUIAutomation, each
 default action through its pattern (A-W3,
-`results/2026-10-20-a-w3-uia-gallery`). TextPattern (item 5) is next on
-Windows. macOS and Linux not started. Authority: `planning/FORWARD_PROGRAMME.md`
+`results/2026-10-20-a-w3-uia-gallery`). Linux: AT-SPI client tests of a
+fixture (A-L1) and of the whole Gallery (A-L2,
+`results/2026-10-20-a-l2-linux-gallery`). macOS:
+`gui_forms_macos_accessibility_tests` (in process, runs on CI) and
+`gui_forms_macos_accessibility_client_tests` (AXUIElement client; skipped as
+unsupported without the Accessibility permission) registered; gate run
+recorded in `results/2026-10-20-a-macos`. Editable text ranges (item 5) are
+next. Authority: `planning/FORWARD_PROGRAMME.md`
 §3 A; this brief adds context and does not change the gate.
 
 Read [the shared brief](../README.md) first.
@@ -44,7 +50,11 @@ is never turned off (accessibility round A3).
   (interview GF012–GF013).
 - **macOS.** NSAccessibility publication inside
   `src/host/macos/application/macos_host.mm` (`native_accessibility_role` and
-  the element classes near it). No registered test.
+  the element classes near it). Tested in process by
+  `gui_forms_macos_accessibility_tests` and through AXUIElement by
+  `gui_forms_macos_accessibility_client_tests` (and its Gallery variant),
+  against the contract in `tests/support/macos_accessibility_contract.cpp`;
+  the stock-control fixture is `tests/support/stock_control_fixture.cpp`.
 - **Windows.** MSAA (`IAccessible`) in
   `src/host/windows/accessibility/windows_accessibility.cpp`. Test
   `tests/windows_accessibility_tests.cpp`, registered in `CMakeLists.txt` as
@@ -126,6 +136,43 @@ and finds every stock control with the role, name, state and actions the
 semantic tree reports, and performs each control's default action through
 that API. Record the run (host, runner or machine, commands, per-control
 results) under `results/` with a dated name, and update the stage index.
+
+## Owner decisions, vocabulary round 001 (2026-10-21)
+
+Recorded in `planning/interview/A_VOCABULARY_ROUND_001.md`. The owner accepted
+every recommended option.
+
+### Roles
+- **GIVEN A-R1.** `tree` and `tree_item`, with a `level` field.
+- **GIVEN A-R2.** `table`, `row`, `cell`, `column_header` and `row_header`,
+  with row and column index and count fields.
+- **GIVEN A-R3.** `tree_grid`.
+- **GIVEN A-R4.** `dialog`, with a `modal` flag.
+- **GIVEN A-R5.** `status_bar`.
+- **GIVEN A-R6.** No new roles for DockNavigator or TokenBox.
+
+### Fields and states
+- **GIVEN A-F1.** A `checkable` state.
+- **GIVEN A-F2.** An `access_key` field.
+- **GIVEN A-F3.** `small_step` and `large_step` fields.
+- **GIVEN A-F4.** A `multiselectable` state.
+- **GIVEN A-F5.** The docking pin stays a check box.
+
+### Editable text
+- **GIVEN A-T1.** A `text_selection` field (UTF-8 anchor and caret, absent
+  for password boxes) and a `multiline` field. Two on-demand window
+  queries: the text layout, and setting the selection. No new action.
+- **GIVEN A-T2.** The text defaults:
+  - UTF-8 in the core;
+  - the control's own word rule;
+  - visual lines;
+  - sentences unsupported;
+  - a caret inside a combining sequence refused;
+  - no text published for password boxes;
+  - this pass covers TextBox, MaskedTextBox and TokenBox's editor.
+
+### Already decided
+- **DK-51.** The live-region role is built in the same pass.
 
 ## Open decisions (ask, do not decide)
 

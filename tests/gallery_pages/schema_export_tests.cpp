@@ -378,6 +378,36 @@ void append_engine(std::string& out) {
     append_json_string(out, "maximum");
     out += ": ";
     append_unsigned(out, maximum_published_values);
+    out += "},\n";
+    // Presentational state machines (E7): the engine property besides the
+    // primitives' animated parameters, and the bounds a machine is checked
+    // against at load.
+    append_key(out, "    ", "transitions");
+    out += '{';
+    append_json_string(out, "engine_properties");
+    out += ": ";
+    names.clear();
+    names.push_back(opacity_property);
+    append_name_list(out, names);
+    out += ", ";
+    append_json_string(out, "maximum_states");
+    out += ": ";
+    append_unsigned(out, maximum_presentation_states);
+    out += ", ";
+    append_json_string(out, "maximum_per_part");
+    out += ": ";
+    append_unsigned(out, maximum_part_transitions);
+    out += "},\n";
+    // Ambient effects (E7): the frame cap and the everyday area cap.
+    append_key(out, "    ", "ambient");
+    out += '{';
+    append_json_string(out, "maximum_frames_per_second");
+    out += ": ";
+    append_number(out, maximum_ambient_frames_per_second);
+    out += ", ";
+    append_json_string(out, "maximum_window_fraction");
+    out += ": ";
+    append_number(out, maximum_ambient_window_fraction);
     out += '}';
     out += "\n  },\n";
 }
