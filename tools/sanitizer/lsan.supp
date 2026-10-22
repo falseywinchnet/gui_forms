@@ -122,5 +122,7 @@ leak:CreateEventLoop
 # far too much. It names a frame inside QuartzCore, which LeakSanitizer
 # symbolizes from QuartzCore's own symbols, so our debug-information mode
 # (line tables drop qualifiers only for code we compile) cannot change it.
+# The owner accepted this exception on 2026-10-22: a system frame that cannot
+# be requalified.
 leak:CA::Transaction::create
 leak:CAReleaseCachedCGContext
