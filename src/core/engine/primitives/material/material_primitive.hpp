@@ -59,6 +59,9 @@ public:
         const PrimitiveParameterBlock& parameters) const noexcept override;
     [[nodiscard]] bool accepts(const PrimitiveParameterBlock& parameters,
                                const PrimitiveTarget& target) const noexcept override;
+    [[nodiscard]] PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters,
+                                                const PrimitiveTarget& target,
+                                                DeviceExtent extent) const noexcept override;
 
 private:
     void derive(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target,
@@ -74,6 +77,17 @@ private:
 // reference machine (material_bake_policy.hpp), into a destination of the
 // box grown by the outsets.
 [[nodiscard]] double material_bake_estimate(const SurfaceMaterial& material, const PrimitiveTarget& target) noexcept;
+
+// How a raster of `extent` for `target` is assembled from slices (E7r): an
+// axis is sliced unless a gradient runs along it (varies), the box does
+// not start and end on device pixels (fractional), or the part is no
+// longer than its reference (too_small). A radial gradient or an image
+// fill varies along both axes. The corners reach as far in as any layer's
+// edge changes: the box's arcs, the border's inner edge, the keylines and
+// single edges, and each shadow's offset, spread, arc and 3.5 σ', where Φ
+// is exactly 0 or 1.
+[[nodiscard]] PrimitiveSlicePlan material_slice_plan(const SurfaceMaterial& material, const PrimitiveTarget& target,
+                                                     DeviceExtent extent) noexcept;
 
 // The kernel alone: draws `material` for `target` into every pixel of
 // `destination`, without accepts()'s checks or bound. The caller has

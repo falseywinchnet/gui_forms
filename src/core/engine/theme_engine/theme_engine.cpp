@@ -166,8 +166,8 @@ std::optional<std::size_t> machine_state(const CompiledTransition& transition, A
     return std::nullopt;
 }
 
-// A property's range: [0, 1] for opacity, the presentational scale's for
-// scale, the parameter's declared range otherwise.
+// A property's range: [0, 1] for opacity and face, the presentational
+// scale's for scale, the parameter's declared range otherwise.
 struct PropertyRange final {
     double minimum{};
     double maximum{1.0};
@@ -180,7 +180,10 @@ PropertyRange property_range(const CompiledTransition& transition, const Primiti
         range.maximum = maximum_presentational_scale;
         return range;
     }
-    if (transition.property == PresentationProperty::opacity || descriptor == nullptr) return range;
+    if (transition.property == PresentationProperty::opacity || transition.property == PresentationProperty::face ||
+        descriptor == nullptr) {
+        return range;
+    }
     const PrimitiveParameterDeclaration& declared = (*descriptor).parameters[transition.parameter];
     range.minimum = declared.minimum;
     range.maximum = declared.maximum;
@@ -195,11 +198,25 @@ double rest_value(const CompiledTransition& transition, const PrimitiveParameter
     return value;
 }
 
-// The engine properties a part is shown with this paint.
+// The engine properties a part is shown with this paint, and what its
+// transitions did: whether its scale is still moving, and by parameter
+// position the bits of the parameters it transitions and of those still
+// moving.
 struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
+    bool scale_moving{false};
+    // The part's face cross-fade (E7r form a), when it has one and a
+    // record: its value, 1 when settled. The paint starts it.
+    MotionValue* face{};
+    std::uint32_t transitioned_parameters{};
+    std::uint32_t moving_parameters{};
 };
+
+std::uint32_t parameter_bit(std::size_t parameter) noexcept {
+    const std::uint32_t bit = std::uint32_t{1} << parameter;
+    return bit;
+}
 
 // Shows a transition's value: the part's opacity or scale, or its
 // parameter, clamped to the property's range.
@@ -249,6 +266,8 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
     for (std::size_t index = 0; index < resolution.transition_count; ++index) {
         const CompiledTransition& transition = *resolution.transitions[index];
         if (transition.property == PresentationProperty::parameter && descriptor == nullptr) continue;
+        // Without a record a face has nothing to fade from.
+        if (transition.property == PresentationProperty::face && motion == nullptr) continue;
         const PropertyRange range = property_range(transition, descriptor);
         const std::optional<std::size_t> state = machine_state(transition, sources.states);
         const double target = state ? transition.states[*state].target : rest_value(transition, parameters);
@@ -272,6 +291,22 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         if (chosen == maximum_part_transitions) continue;
         used[chosen] = true;
         PartTransitionChannel& channel = (*motion).channels[chosen];
+        if (transition.property == PresentationProperty::face) {
+            // Settled at 1 until the paint finds a new face.
+            if (!channel.value) {
+                channel.property = transition.property;
+                channel.parameter = 0U;
+                channel.state.reset();
+                channel.value.emplace(*sources.owner, transition.curve, 1.0);
+                MotionValue& made = *channel.value;
+                static_cast<void>(made.set_extent(settle_extent(range, (*sources.window).scale())));
+                made.set_listener(MotionListener::bind<PartMotion, &PartMotion::on_step>(*motion));
+            } else {
+                (*channel.value).set_curve(transition.curve);
+            }
+            presented.face = &*channel.value;
+            continue;
+        }
         std::optional<double> entry{};
         if (state) entry = transition.states[*state].enter_from;
         if (!channel.value) {
@@ -295,6 +330,12 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         MotionValue& value = *channel.value;
         static_cast<void>(value.animate_to(target));
         show_value(transition, value.current(), range, parameters, presented);
+        if (transition.property == PresentationProperty::scale && !value.settled()) presented.scale_moving = true;
+        if (transition.property == PresentationProperty::parameter) {
+            const std::uint32_t bit = parameter_bit(transition.parameter);
+            presented.transitioned_parameters = presented.transitioned_parameters | bit;
+            if (!value.settled()) presented.moving_parameters = presented.moving_parameters | bit;
+        }
     }
     if (motion != nullptr) {
         for (std::size_t channel = 0; channel < maximum_part_transitions; ++channel) {
@@ -308,6 +349,117 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         (*record).motion_unsettled = false;
     }
     return presented;
+}
+
+// -- face cross-fade (E7r) --------------------------------------------------------
+
+// Whether two faces may cross-fade: the same extent at the same scale.
+bool fades_between(const PartRaster& from, const PartRaster& to) noexcept {
+    const DeviceExtent first = from.extent();
+    const DeviceExtent second = to.extent();
+    const bool same = first.width == second.width && first.height == second.height &&
+                      from.scale().value == to.scale().value;
+    return same;
+}
+
+// Notes the face a part shows on this paint in `states`, starts its
+// cross-fade when its states changed and with them its face, and returns
+// the face it fades from (null when none fades). A part without a face
+// transition holds no faces.
+std::shared_ptr<const PartRaster> note_face(EnginePartRecord& part, MotionValue* face,
+                                            const std::shared_ptr<const PartRaster>& raster, AnatomyStateSet states) {
+    if (face == nullptr) {
+        part.shown_face.reset();
+        part.fading_face.reset();
+        return nullptr;
+    }
+    MotionValue& value = *face;
+    const bool discrete = part.face_states != states;
+    if (discrete && part.shown_face && part.shown_face != raster) {
+        if (fades_between(*part.shown_face, *raster)) {
+            part.fading_face = part.shown_face;
+            value.jump_to(0.0);
+            static_cast<void>(value.animate_to(1.0));
+            part.motion_unsettled = true;
+        } else {
+            part.fading_face.reset();
+            value.jump_to(1.0);
+        }
+    }
+    part.shown_face = raster;
+    part.face_states = states;
+    if (value.settled()) part.fading_face.reset();
+    std::shared_ptr<const PartRaster> from = part.fading_face;
+    return from;
+}
+
+// -- keyframes (E7r) ------------------------------------------------------------
+
+// Keyframe level `level` of a parameter's declared range, its ends exact.
+double keyframe_value(const PrimitiveParameterDeclaration& declared, std::size_t level) noexcept {
+    if (level + 1U >= animated_keyframe_levels) return declared.maximum;
+    const double span = declared.maximum - declared.minimum;
+    const double steps = static_cast<double>(animated_keyframe_levels - 1U);
+    const double value = declared.minimum + span * static_cast<double>(level) / steps;
+    return value;
+}
+
+// The keyframe level nearest `value`.
+std::size_t nearest_keyframe(const PrimitiveParameterDeclaration& declared, double value) noexcept {
+    const double span = declared.maximum - declared.minimum;
+    if (!(span > 0.0)) return 0U;
+    const double steps = static_cast<double>(animated_keyframe_levels - 1U);
+    const double position = std::clamp((value - declared.minimum) / span * steps, 0.0, steps);
+    const std::size_t level = static_cast<std::size_t>(std::round(position));
+    return level;
+}
+
+// The pointer inputs: an expression reading them moves its parameter as
+// the pointer moves.
+constexpr std::uint64_t pointer_inputs() noexcept {
+    const std::uint64_t across = expression_input_bit(engine_input_position(EngineInput::pointer_x));
+    const std::uint64_t down = expression_input_bit(engine_input_position(EngineInput::pointer_y));
+    return across | down;
+}
+
+// By parameter position, the animated parameters an expression drives
+// from the pointer (owner D, 2026-10-22: they step through the keyframes).
+std::uint32_t pointer_driven(const CompiledThemeRules::Resolution& resolution,
+                             const PrimitiveDescriptor& descriptor) noexcept {
+    std::uint32_t driven = 0U;
+    for (std::size_t index = 0; index < resolution.parameters.count; ++index) {
+        const EngineExpression* const expression = resolution.expressions[index];
+        if (!descriptor.parameters[index].animated || expression == nullptr) continue;
+        if (((*expression).dependencies().inputs & pointer_inputs()) == 0U) continue;
+        driven = driven | parameter_bit(index);
+    }
+    return driven;
+}
+
+// Steps each animated parameter in `stepped` (bits by parameter position:
+// those whose transition runs on this paint, and those the pointer
+// drives) to its nearest keyframe level, and returns whether every animated
+// parameter now stands at a level (false for a primitive with none), so
+// that its raster may be a shared keyframe. A parameter an expression
+// drives with the time in state needs no step: an ambient effect's time
+// steps through its loop's frames, and nothing else repaints a part as
+// time passes.
+bool step_to_keyframes(const PrimitiveDescriptor& descriptor, std::uint32_t stepped,
+                       PrimitiveParameterBlock& parameters) noexcept {
+    bool any = false;
+    bool all_at_levels = true;
+    for (std::size_t index = 0; index < parameters.count; ++index) {
+        const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
+        if (!declared.animated) continue;
+        any = true;
+        const bool moving = (stepped & parameter_bit(index)) != 0U;
+        double& value = parameters.values[index].number;
+        const double level = keyframe_value(declared, nearest_keyframe(declared, value));
+        if (moving) value = level;
+        if (value != level) all_at_levels = false;
+    }
+    const bool shared = any && all_at_levels;
+    return shared;
 }
 
 // Whether the part's transitions include its scale.
@@ -552,15 +704,32 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     evaluate_expressions(resolution, inputs, part.states, request.parameters);
     const PrimitiveDescriptor& descriptor = (*request.primitive).descriptor();
     const PresentedProperties presented = run_transitions(resolution, transitions, &descriptor, request.parameters);
+    // E7r: nothing bakes per frame. Moving animated parameters step through
+    // shared keyframes, and an ambient effect's loop frames are shared.
+    // Owner C and D (2026-10-22): a running transition, or the pointer,
+    // steps its parameter to the nearest of the keyframes.
+    const std::uint32_t driven = pointer_driven(resolution, descriptor);
+    const bool at_keyframes =
+        step_to_keyframes(descriptor, presented.moving_parameters | driven, request.parameters);
+    // The parameters whose keyframes are worth baking ahead: those a
+    // transition or the pointer can move.
+    const std::uint32_t movable = presented.transitioned_parameters | driven;
+    // While its scale moves, the part's raster at its own size is shown
+    // stretched (form b), so it is shared too: baked when the move starts.
+    request.shared = kept != nullptr && (at_keyframes || ambient_time.has_value() || presented.scale_moving);
     const double opacity = presented.opacity;
     // A part at opacity 0, or one its primitive draws as nothing (a flat
-    // bulge), composites nothing and needs no raster.
-    if (opacity <= 0.0 || (*request.primitive).blank(request.parameters)) return;
-    // A scaled part is drawn at its scaled size (D5-1), so that its edges
-    // stay sharp; one whose scaled raster would not fit, or would break the
-    // animated frame budget, is drawn at its own size.
+    // bulge), composites nothing and needs no raster: it only prepares the
+    // keyframes of a transition starting from it (a rise from the plane).
+    const bool invisible = opacity <= 0.0 || (*request.primitive).blank(request.parameters);
+    // A scaled part at rest is drawn at its scaled size (D5-1), so that its
+    // edges stay sharp; one whose scaled raster would not fit, or would
+    // break the animated frame budget, is drawn at its own size. While its
+    // scale moves, its raster at its own size is stretched over the scaled
+    // bounds (E7r form b), so that the move bakes nothing.
     PartPaint shown = scaled_part(part, presented.scale);
-    if (shown.bounds != part.bounds) {
+    const bool stretched = shown.bounds != part.bounds && presented.scale_moving;
+    if (shown.bounds != part.bounds && !stretched) {
         const double scale = decided.scale.value;
         const Size shown_size{shown.bounds.width, shown.bounds.height};
         const DeviceExtent scaled = raster_extent(shown_size, descriptor.outsets, scale);
@@ -591,6 +760,15 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
     // A primitive that refuses the part leaves it to the built-in recipe;
     // a keyed part's refusal is counted when it begins (E8c).
     const bool accepted = (*request.primitive).accepts(request.parameters, request.target);
+    // Owner A (2026-10-22): a part that can move its parameters has their
+    // keyframes queued for idle frames when it first paints and whenever
+    // its states change; one it reaches first is baked on demand.
+    const bool requeue = kept != nullptr && (!(*kept).keyframe_states || *(*kept).keyframe_states != part.states);
+    if (accepted && movable != 0U && requeue) {
+        (*kept).keyframe_states = part.states;
+        queue_keyframes(*window, request, movable);
+    }
+    if (invisible) return;
     const bool newly_refused = kept == nullptr || !(*kept).primitive_refused;
     if (kept != nullptr) (*kept).primitive_refused = !accepted;
     if (!accepted) {
@@ -603,26 +781,86 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         const PartRasterResult drawn = (*window).engine_part_raster(*record, request);
         raster = drawn.raster;
     } else {
-        // A part with no record: a raster of its own, for this paint only.
-        std::shared_ptr<PartRaster> own = PartRaster::create(request.extent, request.target.scale);
-        PrimitivePreparation preparation{};
-        const EnginePrimitive& primitive = *request.primitive;
-        bool painted = false;
-        if (own && primitive.prepare(request.parameters, request.target, preparation) ==
-                       PreparationOutcome::prepared) {
-            const RasterOutcome outcome =
-                primitive.rasterize(request.parameters, request.target, preparation, (*own).view());
-            painted = outcome == RasterOutcome::painted;
-        }
-        if (painted) raster = std::move(own);
+        // A part with no record: a raster of its own, for this paint only
+        // (assembled from the window's slice references when it slices).
+        const PartRasterResult drawn = (*window).engine_unkeyed_raster(request);
+        raster = drawn.raster;
     }
     if (!raster) {
         paint_built_in(painter, control, shown, opacity);
         return;
     }
-    // The raster covers the part grown by its primitive's outsets.
+    // A face that changed from one discrete state to another cross-fades
+    // (form a): the old face at 1 - t and the new one added at t, in one
+    // isolated group at the part's opacity.
+    std::shared_ptr<const PartRaster> fading_from{};
+    if (kept != nullptr) fading_from = note_face(*kept, presented.face, raster, part.states);
+    // The raster covers the part grown by its primitive's outsets; stretched,
+    // that rectangle is scaled about the part's centre as its bounds are.
     const Insets outsets = descriptor.outsets;
+    if (fading_from && !stretched) {
+        const double fade = std::clamp((*presented.face).current(), 0.0, 1.0);
+        const Point origin{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top};
+        const DeviceExtent covered = (*raster).extent();
+        const double device_scale = (*raster).scale().value;
+        const Rect bounds{origin.x, origin.y, static_cast<double>(covered.width) / device_scale,
+                          static_cast<double>(covered.height) / device_scale};
+        PaintGroup whole{};
+        whole.bounds = bounds;
+        whole.opacity = opacity;
+        whole.isolated = true;
+        PaintGroup added{};
+        added.bounds = bounds;
+        added.opacity = fade;
+        added.composite = PaintGroupComposite::plus;
+        painter.begin_group(whole);
+        painter.draw_part_raster(fading_from, origin, 1.0 - fade);
+        painter.begin_group(added);
+        painter.draw_part_raster(raster, origin, 1.0);
+        painter.end_group();
+        painter.end_group();
+        return;
+    }
+    if (stretched) {
+        const Rect covered{part.bounds.x - outsets.left, part.bounds.y - outsets.top,
+                           part.bounds.width + outsets.left + outsets.right,
+                           part.bounds.height + outsets.top + outsets.bottom};
+        const double granted = std::min(presented.scale, granted_scale(part.bounds, part.granted_overflow));
+        const Point centre{part.bounds.x + part.bounds.width * 0.5, part.bounds.y + part.bounds.height * 0.5};
+        const Rect destination{centre.x + (covered.x - centre.x) * granted, centre.y + (covered.y - centre.y) * granted,
+                               covered.width * granted, covered.height * granted};
+        painter.draw_part_raster_scaled(raster, destination, opacity);
+        return;
+    }
     painter.draw_part_raster(raster, Point{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top}, opacity);
+}
+
+// Queues every keyframe level of each animated parameter in `movable`,
+// nearest the value `request` shows first, with the part's other
+// parameters as `request` has them. Blank keyframes (a flat bulge) need
+// none.
+void ThemeEngine::queue_keyframes(Window& window, const PartRasterRequest& request, std::uint32_t movable) {
+    const EnginePrimitive& primitive = *request.primitive;
+    const PrimitiveDescriptor& descriptor = primitive.descriptor();
+    for (std::size_t index = 0; index < request.parameters.count; ++index) {
+        const PrimitiveParameterDeclaration& declared = descriptor.parameters[index];
+        if (!declared.animated || (movable & parameter_bit(index)) == 0U) continue;
+        const std::size_t shown = nearest_keyframe(declared, request.parameters.values[index].number);
+        PartRasterRequest keyframe = request;
+        keyframe.shared = true;
+        // Outward from the level shown: shown, shown + 1, shown - 1, ...
+        for (std::size_t distance = 0U; distance < animated_keyframe_levels; ++distance) {
+            for (std::size_t side = 0U; side < 2U; ++side) {
+                if (distance == 0U && side == 1U) continue;
+                if (side == 1U && distance > shown) continue;
+                const std::size_t level = side == 0U ? shown + distance : shown - distance;
+                if (level >= animated_keyframe_levels) continue;
+                keyframe.parameters.values[index].number = keyframe_value(declared, level);
+                if (primitive.blank(keyframe.parameters)) continue;
+                window.engine_queue_keyframe(keyframe);
+            }
+        }
+    }
 }
 
 double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
@@ -643,11 +881,19 @@ double ThemeEngine::ambient_seconds(Window& window, EnginePartRecord* record,
     const FrameInterval interval = std::chrono::ceil<FrameInterval>(frame);
     window.run_engine_ambient(*handle, interval);
     // The time in the part's states, wrapped to the period, so the effect
-    // cycles; exact in the clock's ticks.
+    // cycles, and stepped to the start of its loop frame (E7r), so that each
+    // frame's raster is baked once and shown again every period; exact in
+    // the clock's ticks.
     const FrameInterval elapsed = window.motion_clock().now() - part.state_entered;
     const FrameInterval forward = elapsed < FrameInterval::zero() ? FrameInterval::zero() : elapsed;
     const FrameInterval within = forward % ambient.period;
-    const double seconds = std::chrono::duration<double>(within).count();
+    const double frames_in_period = std::ceil(std::chrono::duration<double>(ambient.period).count() *
+                                              ambient.frames_per_second);
+    const double frames = std::clamp(frames_in_period, 1.0, static_cast<double>(maximum_ambient_loop_frames));
+    const FrameInterval::rep frame_ticks = ambient.period.count() / static_cast<FrameInterval::rep>(frames);
+    FrameInterval stepped = within;
+    if (frame_ticks > 0) stepped = FrameInterval(within.count() / frame_ticks * frame_ticks);
+    const double seconds = std::chrono::duration<double>(stepped).count();
     return seconds;
 }
 

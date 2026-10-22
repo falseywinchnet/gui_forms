@@ -1,6 +1,7 @@
 #include "text_composite.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 namespace gui_forms::detail {
@@ -265,6 +266,60 @@ unsigned weighted_channel(const std::uint64_t channel, const std::uint64_t weigh
     return weighted;
 }
 
+// One premultiplied source pixel blended over a target pixel at `weight`
+// (opacity 0..255 times clip coverage 0..256): see composite_part_raster.
+void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& rgba, const std::uint64_t weight,
+                      const ChannelShifts shifts, const bool opaque, const PartCompositeBlend blend) noexcept {
+    const unsigned alpha = weighted_channel(rgba[3], weight);
+    if (alpha == 0) return;
+    const unsigned red = weighted_channel(rgba[0], weight);
+    const unsigned green = weighted_channel(rgba[1], weight);
+    const unsigned blue = weighted_channel(rgba[2], weight);
+    const std::uint32_t previous = pixel;
+    if (blend == PartCompositeBlend::plus) {
+        const unsigned sum_red = std::min(255U, red + ((previous >> shifts.red) & 255U));
+        const unsigned sum_green = std::min(255U, green + ((previous >> shifts.green) & 255U));
+        const unsigned sum_blue = std::min(255U, blue + ((previous >> shifts.blue) & 255U));
+        unsigned sum_alpha = 255U;
+        if (!opaque) sum_alpha = std::min(255U, alpha + ((previous >> shifts.alpha) & 255U));
+        pixel = (sum_red << shifts.red) | (sum_green << shifts.green) | (sum_blue << shifts.blue) |
+                (sum_alpha << shifts.alpha);
+        return;
+    }
+    const unsigned remaining = 255U - alpha;
+    const unsigned out_red = std::min(255U, red + destination_share((previous >> shifts.red) & 255U, remaining));
+    const unsigned out_green = std::min(255U, green + destination_share((previous >> shifts.green) & 255U, remaining));
+    const unsigned out_blue = std::min(255U, blue + destination_share((previous >> shifts.blue) & 255U, remaining));
+    unsigned out_alpha = 255U;
+    if (!opaque) out_alpha = std::min(255U, alpha + destination_share((previous >> shifts.alpha) & 255U, remaining));
+    pixel = (out_red << shifts.red) | (out_green << shifts.green) | (out_blue << shifts.blue) |
+            (out_alpha << shifts.alpha);
+}
+
+// Where device pixel `shown` (counted from the shown edge) samples the
+// source along one axis: its centre mapped onto `source_length` pixels,
+// less half a pixel, in 1/256 of a source pixel. The first of its two
+// texels is position >> 8 and the second's weight is position & 255
+// (arithmetic shift and two's complement, as C++20 defines them).
+std::int64_t sample_position(const std::int64_t shown, const std::uint32_t source_length,
+                             const std::uint32_t shown_length) noexcept {
+    const std::int64_t numerator = (2 * shown + 1) * static_cast<std::int64_t>(source_length) * 256;
+    const std::int64_t position = numerator / (2 * static_cast<std::int64_t>(shown_length)) - 128;
+    return position;
+}
+
+// One source channel at texel (x, y): 0 beyond the source's edges.
+std::uint64_t texel_channel(const PartRasterSource& source, const std::int64_t x, const std::int64_t y,
+                            const std::size_t byte) noexcept {
+    if (x < 0 || y < 0 || x >= static_cast<std::int64_t>(source.width) ||
+        y >= static_cast<std::int64_t>(source.height)) {
+        return 0U;
+    }
+    const std::size_t offset = static_cast<std::size_t>(y) * source.row_bytes + static_cast<std::size_t>(x) * 4U + byte;
+    const std::uint64_t channel = source.pixels[offset];
+    return channel;
+}
+
 // Whether every row of the source lies inside its buffer: the last row
 // starts at (height - 1) * row_bytes and needs width * 4 bytes.
 bool part_source_fits(const PartRasterSource& source) noexcept {
@@ -284,7 +339,9 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
         target.height > target.pixels.size() / target.stride || !valid_rect(clip.rect) ||
         (clip.rounded && (!valid_rect(clip.rounded_rect) || !valid_coordinate(clip.radius) || clip.radius < 0.0)) ||
         std::abs(source.left) > static_cast<std::int64_t>(coordinate_limit) ||
-        std::abs(source.top) > static_cast<std::int64_t>(coordinate_limit)) {
+        std::abs(source.top) > static_cast<std::int64_t>(coordinate_limit) ||
+        static_cast<double>(source.shown_width) > coordinate_limit ||
+        static_cast<double>(source.shown_height) > coordinate_limit) {
         return TextCompositeStatus::invalid_geometry;
     }
     if (source.width == 0 || source.height == 0) return TextCompositeStatus::success;
@@ -298,49 +355,69 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
         limit.right = std::min(limit.right, prepared.rounded_rect.right);
         limit.bottom = std::min(limit.bottom, prepared.rounded_rect.bottom);
     }
+    const bool scaled = (source.shown_width != 0U && source.shown_width != source.width) ||
+                        (source.shown_height != 0U && source.shown_height != source.height);
+    const std::uint32_t shown_width = source.shown_width != 0U ? source.shown_width : source.width;
+    const std::uint32_t shown_height = source.shown_height != 0U ? source.shown_height : source.height;
     const std::int64_t left = std::max<std::int64_t>({0, floor_pixel(limit.left), source.left});
     const std::int64_t top = std::max<std::int64_t>({0, floor_pixel(limit.top), source.top});
     const std::int64_t right = std::min<std::int64_t>({static_cast<std::int64_t>(target.width), ceil_pixel(limit.right),
-                                                       source.left + static_cast<std::int64_t>(source.width)});
+                                                       source.left + static_cast<std::int64_t>(shown_width)});
     const std::int64_t bottom = std::min<std::int64_t>({static_cast<std::int64_t>(target.height), ceil_pixel(limit.bottom),
-                                                        source.top + static_cast<std::int64_t>(source.height)});
+                                                        source.top + static_cast<std::int64_t>(shown_height)});
     const ChannelShifts shifts = channel_shifts(target.order);
     // The source's red and blue bytes within a pixel; green and alpha are
     // the same in both orders.
     const std::size_t red_byte = source.order == TextPixelOrder::rgba ? 0U : 2U;
     const std::size_t blue_byte = source.order == TextPixelOrder::rgba ? 2U : 0U;
+    const std::array<std::size_t, 4> bytes{red_byte, 1U, blue_byte, 3U};
     const std::uint64_t opacity_weight = opacity;
+    if (!scaled) {
+        for (std::int64_t y = top; y < bottom; ++y) {
+            const std::size_t source_row = static_cast<std::size_t>(y - source.top) * source.row_bytes;
+            const std::size_t target_row = static_cast<std::size_t>(y) * target.stride;
+            for (std::int64_t x = left; x < right; ++x) {
+                const std::size_t offset = source_row + static_cast<std::size_t>(x - source.left) * 4U;
+                const std::uint64_t source_alpha = source.pixels[offset + 3U];
+                if (source_alpha == 0) continue;
+                const std::uint64_t clipped = static_cast<std::uint64_t>(prepared_clip_coverage(prepared, x, y));
+                if (clipped == 0) continue;
+                // One weight for opacity x clip (unit = 256), applied to
+                // every premultiplied channel with one rounding each.
+                const std::array<std::uint64_t, 4> rgba{source.pixels[offset + red_byte], source.pixels[offset + 1U],
+                                                        source.pixels[offset + blue_byte], source_alpha};
+                blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba,
+                                 opacity_weight * clipped, shifts, target.opaque, source.blend);
+            }
+        }
+        return TextCompositeStatus::success;
+    }
+    // Scaled: each device pixel samples its four texels bilinearly.
     for (std::int64_t y = top; y < bottom; ++y) {
-        const std::size_t source_row = static_cast<std::size_t>(y - source.top) * source.row_bytes;
+        const std::int64_t down = sample_position(y - source.top, source.height, shown_height);
+        const std::int64_t texel_y = down >> 8;
+        const std::uint64_t below = static_cast<std::uint64_t>(down & 255);
+        const std::uint64_t above = 256U - below;
         const std::size_t target_row = static_cast<std::size_t>(y) * target.stride;
         for (std::int64_t x = left; x < right; ++x) {
-            const std::size_t offset = source_row + static_cast<std::size_t>(x - source.left) * 4U;
-            const std::uint64_t source_alpha = source.pixels[offset + 3U];
-            if (source_alpha == 0) continue;
             const std::uint64_t clipped = static_cast<std::uint64_t>(prepared_clip_coverage(prepared, x, y));
             if (clipped == 0) continue;
-            // One weight for opacity x clip (unit = 256), applied to every
-            // premultiplied channel with one rounding each.
-            const std::uint64_t weight = opacity_weight * clipped;
-            const unsigned alpha = weighted_channel(source_alpha, weight);
-            if (alpha == 0) continue;
-            const unsigned red = weighted_channel(source.pixels[offset + red_byte], weight);
-            const unsigned green = weighted_channel(source.pixels[offset + 1U], weight);
-            const unsigned blue = weighted_channel(source.pixels[offset + blue_byte], weight);
-            std::uint32_t& pixel = target.pixels[target_row + static_cast<std::size_t>(x)];
-            const std::uint32_t previous = pixel;
-            const unsigned remaining = 255U - alpha;
-            const unsigned out_red = std::min(255U, red + destination_share((previous >> shifts.red) & 255U, remaining));
-            const unsigned out_green =
-                std::min(255U, green + destination_share((previous >> shifts.green) & 255U, remaining));
-            const unsigned out_blue =
-                std::min(255U, blue + destination_share((previous >> shifts.blue) & 255U, remaining));
-            unsigned out_alpha = 255U;
-            if (!target.opaque) {
-                out_alpha = std::min(255U, alpha + destination_share((previous >> shifts.alpha) & 255U, remaining));
+            const std::int64_t across = sample_position(x - source.left, source.width, shown_width);
+            const std::int64_t texel_x = across >> 8;
+            const std::uint64_t after = static_cast<std::uint64_t>(across & 255);
+            const std::uint64_t before = 256U - after;
+            std::array<std::uint64_t, 4> rgba{};
+            for (std::size_t channel = 0U; channel < 4U; ++channel) {
+                const std::size_t byte = bytes[channel];
+                const std::uint64_t upper = texel_channel(source, texel_x, texel_y, byte) * before +
+                                            texel_channel(source, texel_x + 1, texel_y, byte) * after;
+                const std::uint64_t lower = texel_channel(source, texel_x, texel_y + 1, byte) * before +
+                                            texel_channel(source, texel_x + 1, texel_y + 1, byte) * after;
+                rgba[channel] = (upper * above + lower * below + 32768U) >> 16U;
             }
-            pixel = (out_red << shifts.red) | (out_green << shifts.green) | (out_blue << shifts.blue) |
-                    (out_alpha << shifts.alpha);
+            if (rgba[3] == 0U) continue;
+            blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba, opacity_weight * clipped,
+                             shifts, target.opaque, source.blend);
         }
     }
     return TextCompositeStatus::success;

@@ -59,10 +59,23 @@ public:
         last_origin = origin;
         last_extent = (*raster).extent();
         rasters = rasters + 1U;
+        stretched = false;
+    }
+    void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination,
+                                 double) override {
+        last_destination = destination;
+        last_extent = (*raster).extent();
+        scaled_rasters = scaled_rasters + 1U;
+        stretched = true;
     }
     Point last_origin{};
     DeviceExtent last_extent{};
     std::size_t rasters{};
+    // The last scaled composite's destination, how many there were, and
+    // whether the last composite was scaled.
+    Rect last_destination{};
+    std::size_t scaled_rasters{};
+    bool stretched{};
 };
 
 // A control showing one keyed face, hot while the pointer is over it.
@@ -237,6 +250,68 @@ void scale_is_clamped_to_the_grant() {
             "a part may shrink without any grant");
 }
 
+// E7r form (b): while the scale moves, the part's raster at its own size is
+// stretched about its centre and nothing is baked; at rest it is baked
+// sharp at its scaled size.
+void scale_motion_stretches_without_baking() {
+    std::unique_ptr<Fixture> fixture = make_fixture("pill_plate", Insets{10.0, 6.0, 10.0, 6.0}, 1.5);
+    Fixture& made = *fixture;
+    Window& window = *made.window;
+    const std::uint64_t rested = window.engine_parts().cache_statistics().bakes;
+    require(rested == 1U, "the face at rest is one bake");
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{150.0, 140.0}}));
+    repaint(made);
+    require(window.motion_clock().armed(), "the scale moves");
+    // The move's start bakes the shared raster at the face's own size.
+    const std::uint64_t started = window.engine_parts().cache_statistics().bakes;
+    require(started == rested + 1U, "the move's start bakes the shared face once");
+    std::size_t moving_frames = 0U;
+    for (int step = 0; step < 40 && window.motion_clock().armed(); ++step) {
+        made.time.time += milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(made.time.time));
+        repaint(made);
+        if (!window.motion_clock().armed()) break;
+        moving_frames = moving_frames + 1U;
+        require(made.painter.stretched, "a moving scale stretches the raster");
+        require(made.painter.last_extent.width == 40U && made.painter.last_extent.height == 24U,
+                "the stretched raster is the face at its own size");
+        const Rect destination = made.painter.last_destination;
+        require(std::abs(destination.x + destination.width * 0.5 - 40.0) < 1e-9 &&
+                    std::abs(destination.y + destination.height * 0.5 - 32.0) < 1e-9,
+                "about the face's centre");
+        require(destination.width > 40.0 && destination.width < 60.0, "between its own and its scaled size");
+        require(window.engine_parts().cache_statistics().bakes == started, "nothing is baked while it moves");
+    }
+    require(moving_frames >= 3U, "the move spans frames");
+    require(!made.painter.stretched && made.painter.last_extent.width == 60U && made.painter.last_extent.height == 36U,
+            "at rest the face is drawn sharp at its scaled size");
+    require(window.engine_parts().cache_statistics().bakes == started + 1U, "baked once, at rest");
+
+    // Leaving: the shrink's start bakes the face in its new state once.
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{390.0, 290.0}}));
+    repaint(made);
+    const std::uint64_t leaving = window.engine_parts().cache_statistics().bakes;
+    require(leaving == started + 2U, "the shrink's start bakes the face's new state once");
+    for (int step = 0; step < 40 && window.motion_clock().armed(); ++step) {
+        made.time.time += milliseconds(16);
+        static_cast<void>(window.poll_frame_schedule(made.time.time));
+        repaint(made);
+        if (!window.motion_clock().armed()) break;
+        require(made.painter.stretched, "the shrink stretches the raster too");
+        require(window.engine_parts().cache_statistics().bakes == leaving, "nothing is baked while it shrinks");
+    }
+    require(!made.painter.stretched && made.painter.last_extent.width == 40U, "at rest it is at its own size");
+
+    // Hovered again, both shared faces are held: the move's start bakes
+    // nothing, and only the sharp rest does.
+    const std::uint64_t again = window.engine_parts().cache_statistics().bakes;
+    static_cast<void>(window.dispatch_pointer({PointerAction::move, PointerButton::none, Point{150.0, 140.0}}));
+    repaint(made);
+    require(window.engine_parts().cache_statistics().bakes == again, "a second grow's start bakes nothing");
+    hover_and_settle(made);
+    require(window.engine_parts().cache_statistics().bakes == again + 1U, "only its rest is baked");
+}
+
 // -- text slots ----------------------------------------------------------------
 
 bool inside_shape(PartShape shape, Rect plate, Point point) {
@@ -330,6 +405,7 @@ int main() {
     scale_is_checked_at_load();
     scale_grows_within_granted_overflow();
     scale_is_clamped_to_the_grant();
+    scale_motion_stretches_without_baking();
     slots_lie_inside_the_shape();
     engine_slots_shrink_to_the_centre();
     std::cout << "engine scale and text slot tests passed\n";

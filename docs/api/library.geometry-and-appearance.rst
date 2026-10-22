@@ -162,6 +162,8 @@ Types
      - What a primitive derives once from a part's geometry and fixed parameters, and reuses for every rasterization in which only animated parameters change.
    * - :cpp:class:`PrimitiveRegistry <gui_forms::PrimitiveRegistry>`
      - A fixed table of primitives, in registration order.
+   * - :cpp:class:`PrimitiveSlicePlan <gui_forms::PrimitiveSlicePlan>`
+     - How a part's raster may be assembled (EnginePrimitive::slice_plan).
    * - :cpp:class:`PrimitiveTarget <gui_forms::PrimitiveTarget>`
      - The part a primitive draws: its size in logical units (the box the primitive's geometry is measured in), the display scale, its published states, and the engine inputs' values for it, by EngineInput (NaN for an input that is not published, such as the pointer of a part that is not hot).
    * - :cpp:class:`PropertyTransition <gui_forms::PropertyTransition>`
@@ -184,6 +186,8 @@ Types
      - A selector's specificity: the stable ID, the classes, the control type, the part (its name or role, one each) and the states, compared in that order (T2 plan, E4).
    * - :cpp:class:`Size <gui_forms::Size>`
      - Size is a renderer-neutral logical width and height.
+   * - :cpp:class:`SliceAxis <gui_forms::SliceAxis>`
+     - One axis of a slice plan.
    * - :cpp:class:`SurfaceMaterial <gui_forms::SurfaceMaterial>`
      - SurfaceMaterial is a bounded ordered fill stack plus optional border, bounded shadow stack, and shared corner radius.
    * - :cpp:class:`Theme <gui_forms::Theme>`
@@ -300,6 +304,10 @@ Types
    .. cpp:member:: std::optional<SurfaceMaterial> material
 
    .. cpp:member:: std::uint64_t image_revision
+
+   .. cpp:member:: bool shared
+
+      Whether ``raster`` is one of the table's shared bakes (a keyframe): it then counts against shared_bake_budget_bytes, not the part cache's, and is never drawn over.
 
    .. cpp:member:: std::uint64_t raster_generation
 
@@ -817,6 +825,18 @@ Types
 
       The part's transitions (E7), made the first time it is painted with one; null for a part without any.
 
+   .. cpp:member:: std::shared_ptr<const PartRaster> shown_face
+
+      For a part with a face cross-fade (E7r form a): the face it showed last and the states it showed it in, and while a fade runs the face it fades from. A fade starts only when the states change (a discrete change), never when a keyframe step or a scale replaces the face. The faces are shared with the raster cache and the display; they keep a replaced face alive only until its fade settles, and are released on the first paint without a face transition.
+
+   .. cpp:member:: std::shared_ptr<const PartRaster> fading_face
+
+   .. cpp:member:: AnatomyStateSet face_states
+
+   .. cpp:member:: std::optional<AnatomyStateSet> keyframe_states
+
+      The states whose keyframes were last queued for idle frames (E7r): queued again when the part's states change.
+
    .. cpp:member:: bool ambient
 
       Whether the part's last paint had an ambient effect, and whether that effect was refused for its area (E7). An ambient part repaints when ambient motion resumes; a refusal is counted once, when it begins.
@@ -863,6 +883,8 @@ Types
 
       Record storage allocated, live or free: released and evicted slots are reused before it grows, so it stays near the most records live at once.
 
+   .. cpp:function:: bool idle_keyframes_waiting() const noexcept
+
    .. cpp:function:: RasterCacheStatistics cache_statistics() const noexcept
 
 
@@ -890,13 +912,23 @@ Types
 
       The part's raster for ``request``, painted on window paint ``paint_sequence`` (the record's new last_painted). - The cached raster is returned unchanged while its primitive, parameters, target, read states and extent are the request's and neither generation has advanced. - Otherwise the primitive draws the part. It draws into the cached raster's storage when the extent and scale are unchanged and no recorded command still holds that raster (a held raster is never rewritten, since a recording shows it), and into new storage otherwise. - New storage is made room for by evicting other parts' rasters, least recently painted first, until the cache fits its budget. A raster larger than the whole budget is drawn and returned but not kept. - The record's preparation is remade when the primitive refuses it as stale. If the primitive refuses, nothing is evicted and the record keeps its cached raster. Allocation failure propagates as std::bad_alloc, with the record unchanged.
 
+   .. cpp:function:: void queue_idle_keyframe(const PartRasterRequest& request)
+
+      Idle keyframes (E7r; owner A, 2026-10-22). queue_idle_keyframe keeps a copy of ``request`` (its lent material copied, its borrows cleared) to bake in an idle frame, unless the table holds or queues it already or the queue is full. bake_idle_keyframe bakes the oldest queued keyframe the table does not hold, lending it ``images`` (a queued material whose images changed is dropped), and returns whether any remain queued. A theme change (invalidate_rasters) empties the queue. Allocation failure propagates as std::bad_alloc, the queue then holding what it held less the keyframe taken.
+
+   .. cpp:function:: bool bake_idle_keyframe(const ImageRegistry* images, std::uint64_t paint_sequence)
+
+   .. cpp:function:: PartRasterResult raster_without_record(const PartRasterRequest& request, std::uint64_t paint_sequence)
+
+      A raster for a part painted without a key, which has no record: drawn for this paint and never kept (status uncached), assembled from a slice reference when the primitive slices it, which is kept. Refused as raster_for is; allocation failure propagates as std::bad_alloc.
+
    .. cpp:function:: void invalidate_raster(PartRecordHandle handle) noexcept
 
-      Makes one part's cached raster stale; the next raster_for draws it again. A stale handle does nothing.
+      Makes one part's cached raster stale; the next raster_for draws it again, and bakes again the slice reference it is assembled from. A stale handle does nothing.
 
    .. cpp:function:: void invalidate_rasters() noexcept
 
-      Makes every cached raster stale, as when the theme changes.
+      Makes every cached raster stale and drops every slice reference, as when the theme changes.
 
    .. cpp:function:: void note_paint(PartRecordHandle handle, std::uint64_t inputs_read, std::string_view painted_by, Rect extent)
 
@@ -953,6 +985,10 @@ Types
    .. cpp:function:: virtual bool accepts(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target) const noexcept
 
       Whether the primitive will draw this target with ``parameters``, such as a material whose bake would exceed its bound. A primitive that refuses is drawn by the built-in recipe instead, and the engine counts the refusal. True unless the primitive says otherwise. Called only with a target in range and parameters that match the declarations.
+
+   .. cpp:function:: virtual PrimitiveSlicePlan slice_plan(const PrimitiveParameterBlock& parameters, const PrimitiveTarget& target, DeviceExtent extent) const noexcept
+
+      How a raster of ``extent`` for this target may be assembled from a shorter reference bake (E7r slicing). A plan that slices an axis promises that assembling the reference gives the bytes a whole bake would. Never slices unless the primitive says otherwise. Called as accepts() is, with a target the primitive accepts.
 
 .. cpp:namespace:: gui_forms
 
@@ -1662,6 +1698,10 @@ Types
 
       Composites one of the theme engine's part rasters (T2 plan, E2; GIVEN A2-2 and C1-1). ``origin`` is the raster's top-left corner in logical units; the painter places the raster's first pixel on the device pixel nearest to it, one raster pixel per device pixel, so the part is device-aligned and never resampled. ``opacity`` in [0, 1] is the part's opacity, one multiplier on its whole composite. The blend is the shared premultiplied source-over (detail::composite_part_raster) under the current clip, so every host writes the same bytes. A raster made for another display scale than the painter's is not drawn: the engine rasterizes a part for the scale it is shown at. The base implementation draws nothing; the recording, Skia and Windows DIB painters override it. A null raster draws nothing.
 
+   .. cpp:function:: virtual void draw_part_raster_scaled(const std::shared_ptr<const PartRaster>& raster, Rect destination, double opacity = 1.0)
+
+      Composites a part raster shown at another size (E7r): the raster is stretched over ``destination``, in logical units, whose corners the painter places on the device pixels nearest them. Each device pixel samples the raster bilinearly through the same shared blend, so every host writes the same bytes. The engine shows a part this way while its presentational scale moves, and bakes it sharp at its size once the scale rests. Otherwise as draw_part_raster; the base implementation draws nothing.
+
    .. cpp:function:: virtual void draw_image_region(ImageId image, Rect source, Rect destination, double opacity = 1.0)
 
       Source-region replay is the renderer-neutral primitive behind image strips, texture fills, and nine-patch materials. ``source`` is expressed in source-image pixels. Minimal painters may preserve coherence by falling back to whole-image scaling; production painters override it.
@@ -1678,7 +1718,7 @@ Types
 
    ``#include <gui_forms/types/painter/painter.hpp>``
 
-   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn.
+   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn. - A group whose ``composite`` is not source-over, or that sets ``isolated``, is isolated at any opacity: a group holding a plus group must be, so that the sum is formed before it meets what lies beneath. A painter that cannot isolate (no storage) draws the group directly.
 
    .. cpp:member:: Rect bounds
 
@@ -1689,6 +1729,10 @@ Types
    .. cpp:member:: PaintGroupComposite composite
 
       Default: ``{PaintGroupComposite::source_over}``.
+
+   .. cpp:member:: bool isolated
+
+      Default: ``{false}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -1862,7 +1906,7 @@ Types
 
    ``#include <gui_forms/engine/part_table/engine_part_table.hpp>``
 
-   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size grown by the primitive's outsets, times the scale, rounded up).
+   What a part needs drawn: the primitive a rule selected, its parameters, the part's target, and the destination extent in device pixels (normally the logical size grown by the primitive's outsets, times the scale, rounded up). ``shared`` asks for the table's shared raster for the request (a keyframe, E7r) in place of one of the part's own: set for a part whose animated parameters stand at keyframe levels or whose ambient effect is at a frame of its loop, so that its rasters are baked once and kept for every transition after.
 
    .. cpp:member:: const EnginePrimitive* primitive
 
@@ -1871,6 +1915,8 @@ Types
    .. cpp:member:: PrimitiveTarget target
 
    .. cpp:member:: DeviceExtent extent
+
+   .. cpp:member:: bool shared
 
 .. cpp:namespace:: gui_forms
 
@@ -2152,6 +2198,24 @@ Types
 
 .. cpp:namespace:: gui_forms
 
+.. cpp:struct:: PrimitiveSlicePlan final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   How a part's raster may be assembled (EnginePrimitive::slice_plan). ``slices`` is false for a primitive that never slices: its parts are baked whole and nothing is counted. Otherwise, when either axis is sliced, the reference is the target at ``reference_size`` with ``reference_extent``; when neither is, the part is baked whole and counted as a fallback.
+
+   .. cpp:member:: bool slices
+
+   .. cpp:member:: SliceAxis across
+
+   .. cpp:member:: SliceAxis down
+
+   .. cpp:member:: Size reference_size
+
+   .. cpp:member:: DeviceExtent reference_extent
+
+.. cpp:namespace:: gui_forms
+
 .. cpp:struct:: PrimitiveTarget final
 
    ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -2213,6 +2277,38 @@ Types
    .. cpp:member:: std::uint64_t evictions
 
       Rasters evicted to keep within the budget.
+
+   .. cpp:member:: std::uint64_t bakes
+
+      Every time a primitive drew pixels: a whole part or a slice reference. Compositing a cached raster, or assembling one from a cached reference, is not a bake.
+
+   .. cpp:member:: std::uint64_t slice_bakes
+
+      Slicing (E7r): references baked; parts assembled from a reference already held; parts of a slicing primitive baked whole because neither axis could be sliced, and axes kept whole, each counted per draw.
+
+   .. cpp:member:: std::uint64_t slice_hits
+
+   .. cpp:member:: std::uint64_t slice_whole_fallbacks
+
+   .. cpp:member:: std::uint64_t slice_axis_fallbacks
+
+   .. cpp:member:: std::uint64_t keyframe_idle_bakes
+
+      Keyframes (E7r; owner A, 2026-10-22): baked in idle frames ahead of use, baked on demand the first time a paint reached one not yet held, and taken from the shared bakes already held; and those queued for idle frames now.
+
+   .. cpp:member:: std::uint64_t keyframe_demand_bakes
+
+   .. cpp:member:: std::uint64_t keyframe_hits
+
+   .. cpp:member:: std::size_t idle_keyframes_queued
+
+   .. cpp:member:: std::uint64_t shared_evictions
+
+      The shared bakes: evicted to keep within their budget, held now, and their bytes.
+
+   .. cpp:member:: std::size_t shared_rasters
+
+   .. cpp:member:: std::size_t shared_bytes
 
 .. cpp:namespace:: gui_forms
 
@@ -2384,6 +2480,22 @@ Types
    .. cpp:member:: double width
 
    .. cpp:member:: double height
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: SliceAxis final
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   One axis of a slice plan. For a sliced axis, the destination's first ``start`` and last ``end`` device pixels are the reference's own; every pixel between them is the reference's pixel ``start``.
+
+   .. cpp:member:: SliceAxisOutcome outcome
+
+      Default: ``{SliceAxisOutcome::varies}``.
+
+   .. cpp:member:: std::uint32_t start
+
+   .. cpp:member:: std::uint32_t end
 
 .. cpp:namespace:: gui_forms
 
@@ -3204,6 +3316,8 @@ Enumerations
 
    .. cpp:enumerator:: source_over
 
+   .. cpp:enumerator:: plus
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: ParameterAssignment
@@ -3296,6 +3410,8 @@ Enumerations
 
    .. cpp:enumerator:: uncached
 
+   .. cpp:enumerator:: shared
+
    .. cpp:enumerator:: stale_record
 
    .. cpp:enumerator:: refused
@@ -3353,6 +3469,8 @@ Enumerations
    .. cpp:enumerator:: opacity
 
    .. cpp:enumerator:: scale
+
+   .. cpp:enumerator:: face
 
 .. cpp:namespace:: gui_forms
 
@@ -3505,6 +3623,20 @@ Enumerations
    .. cpp:enumerator:: colour
 
    .. cpp:enumerator:: expression
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: SliceAxisOutcome
+
+   ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
+
+   .. cpp:enumerator:: sliced
+
+   .. cpp:enumerator:: varies
+
+   .. cpp:enumerator:: fractional
+
+   .. cpp:enumerator:: too_small
 
 .. cpp:namespace:: gui_forms
 
@@ -3723,6 +3855,14 @@ Functions, constants and aliases
 
    The most bytes of cached rasters one window keeps (GIVEN F2-1: 8 MB). Value: ``8U * 1024U * 1024U``.
 
+.. cpp:var:: constexpr std::size_t shared_bake_budget_bytes
+
+   The most bytes of shared bakes one window keeps (E7r), apart from raster_cache_budget_bytes: slice references, a few kilobytes each for a button at scale 2, and keyframes, ten whole rasters for each size and state of a part with an animated parameter (some 200 KB for a large ribbon button at scale 1.5). A proposed default. Value: ``4U * 1024U * 1024U``.
+
+.. cpp:var:: constexpr std::size_t maximum_idle_keyframes
+
+   The most keyframes queued for idle frames at once (E7r): ten levels for each of about six parts. A keyframe that does not fit is baked on demand when a paint first reaches it. Value: ``64U``.
+
 .. cpp:namespace:: gui_forms
 
 ``#include <gui_forms/engine/primitive_registry/primitive_registry.hpp>``
@@ -3811,6 +3951,10 @@ Functions, constants and aliases
 
    Value: ``2.0``.
 
+.. cpp:var:: constexpr std::string_view face_property
+
+   The engine's face cross-fade (E7r form a): when a primitive-drawn part's face changes between discrete states (its raster is replaced), the old face fades into the new over the transition's curve, each baked once and blended through a paint group (old at 1 - t, new at t, added). The transition names no states: it runs on every change of face. A change while a fade runs fades from the face shown last to the new one; a face of another size or scale does not fade. Like scale, no built-in rule uses it. Value: ``"face"``.
+
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 
    The most states one presentational state machine has, and the most transitions one part runs. Value: ``8``.
@@ -3834,6 +3978,14 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::uint64_t maximum_animated_operations_per_frame
 
    Value: ``4'000'000U``.
+
+.. cpp:var:: constexpr std::size_t animated_keyframe_levels
+
+   Keyframes (E7r, owner 2026-10-22: 8 to 12). While an animated parameter's transition runs, the part shows the nearest of this many levels evenly spaced over the parameter's declared range, each baked once and shared; settled, it shows its exact value. When a transition starts, the levels it will pass are baked at once: at most this many bakes, each within the animated budget above, so that none is baked while it runs. Value: ``10U``.
+
+.. cpp:var:: constexpr std::size_t maximum_ambient_loop_frames
+
+   The most frames in an ambient effect's loop (E7r): its time in the period steps through at most this many, or its frame rate's count for one period if fewer, each baked once, the first time it is shown, and shared. Value: ``24U``.
 
 .. cpp:var:: constexpr std::size_t sheet_diagnostic
 

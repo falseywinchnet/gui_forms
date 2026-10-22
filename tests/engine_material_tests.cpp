@@ -218,15 +218,22 @@ void refusals() {
     require(!primitive.accepts(parameters, target_for(logical, 1.0, &imaged, &registry)),
             "an image fill whose image is missing is refused");
 
-    // A plain material is accepted at a modest size and refused once its
-    // estimated bake passes the bound.
+    // A plain material is accepted at a modest size. A huge one whose
+    // whole bake passes the bound is still accepted when it slices (E7r),
+    // since only its reference is baked; one that cannot slice, such as a
+    // radial gradient, is refused.
     const SurfaceMaterial plain = solid_material(red);
     require(primitive.accepts(parameters, target_for(logical, 1.0, &plain)), "a solid material is accepted");
     const Size huge{4000.0, 4000.0};
     require(engine_primitives::material_bake_estimate(plain, target_for(huge, 1.0, &plain)) >
                 engine_primitives::maximum_material_bake_nanoseconds,
             "a 4000 by 4000 part is over the bake bound");
-    require(!primitive.accepts(parameters, target_for(huge, 1.0, &plain)), "and is refused");
+    require(primitive.accepts(parameters, target_for(huge, 1.0, &plain)), "and is accepted, since it slices");
+    SurfaceMaterial radial = plain;
+    const std::vector<GradientStop> radial_stops{GradientStop{0.0, red}, GradientStop{1.0, blue}};
+    radial.fills.clear();
+    radial.fills.push_back(MaterialFillLayer::radial(Point{0.5, 0.5}, Size{0.5, 0.5}, radial_stops));
+    require(!primitive.accepts(parameters, target_for(huge, 1.0, &radial)), "a radial one is refused");
 }
 
 // -- layers ------------------------------------------------------------------------

@@ -162,12 +162,23 @@ inline constexpr std::string_view scale_property = "scale";
 inline constexpr double minimum_presentational_scale = 0.5;
 inline constexpr double maximum_presentational_scale = 2.0;
 
+// The engine's face cross-fade (E7r form a): when a primitive-drawn part's
+// face changes between discrete states (its raster is replaced), the old
+// face fades into the new over the transition's curve, each baked once and
+// blended through a paint group (old at 1 - t, new at t, added). The
+// transition names no states: it runs on every change of face. A change
+// while a fade runs fades from the face shown last to the new one; a face
+// of another size or scale does not fade. Like scale, no built-in rule
+// uses it.
+inline constexpr std::string_view face_property = "face";
+
 // What a transition moves: a primitive parameter, or one of the engine's
 // presentational properties.
 enum class PresentationProperty : std::uint8_t {
     parameter,
     opacity,
     scale,
+    face,
 };
 
 // The most states one presentational state machine has, and the most
@@ -291,6 +302,18 @@ struct ThemeRuleSheet final {
 // be bounded and is refused too.
 inline constexpr std::uint32_t maximum_operations_per_device_pixel = 512U;
 inline constexpr std::uint64_t maximum_animated_operations_per_frame = 4'000'000U;
+
+// Keyframes (E7r, owner 2026-10-22: 8 to 12). While an animated parameter's
+// transition runs, the part shows the nearest of this many levels evenly spaced
+// over the parameter's declared range, each baked once and shared; settled,
+// it shows its exact value. When a transition starts, the levels it will
+// pass are baked at once: at most this many bakes, each within the animated
+// budget above, so that none is baked while it runs.
+inline constexpr std::size_t animated_keyframe_levels = 10U;
+// The most frames in an ambient effect's loop (E7r): its time in the period
+// steps through at most this many, or its frame rate's count for one
+// period if fewer, each baked once, the first time it is shown, and shared.
+inline constexpr std::size_t maximum_ambient_loop_frames = 24U;
 
 enum class RuleDiagnosticKind : std::uint8_t {
     // The rule is set aside: it needs a newer engine than this one. Its
