@@ -44,6 +44,10 @@ public:
     void notify(double scale) noexcept;
 
 private:
+    // Keeps the calling thread's COM apartment for the rest of the thread's
+    // life (see windows_accessibility.cpp).
+    static void pin_automation_apartment() noexcept;
+
     std::shared_ptr<SemanticSource> source_;
 };
 

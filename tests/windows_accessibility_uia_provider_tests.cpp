@@ -219,6 +219,15 @@ struct ClientContext final {
     // How many windows with the fixture's class and title the desktop held
     // when the client started, in every process.
     std::size_t desktop_windows{};
+    // The first window's element, which its client keeps (one reference)
+    // past that window's end and the end of the UI thread's COM apartment,
+    // as a long-lived client does; the second window's client checks it and
+    // releases it. Both clients live in the multithreaded apartment, which
+    // main keeps alive between them.
+    IUIAutomationElement* kept{};
+    // True for the second fixture window, whose client runs
+    // run_second_window_checks.
+    bool second_window{};
 };
 
 ModelState read_model(ClientContext& context) {
@@ -505,8 +514,7 @@ void run_client_checks(ClientContext& context) {
     const HRESULT found = (*automation.get()).ElementFromHandle(context.hwnd, window.receive());
     require(SUCCEEDED(found) && window.get() != nullptr, "the window has a UI Automation element");
     // The window's provider answers FrameworkId GUI.Forms; an element UI
-    // Automation built from the system proxies (it does so for a window
-    // Windows reports hung) answers none.
+    // Automation built from the system proxies answers "Win32".
     BstrText root_framework;
     const HRESULT framework_read = (*window.get()).get_CurrentFrameworkId(root_framework.receive());
     require(SUCCEEDED(framework_read) && root_framework.text() == L"GUI.Forms",
@@ -527,6 +535,40 @@ void run_client_checks(ClientContext& context) {
     check_selection(context, *automation.get(), *window.get());
     check_expand(context, *automation.get(), *window.get());
     check_stale_element(context, *automation.get(), *window.get());
+    context.kept = window.get();
+    (*context.kept).AddRef();
+}
+
+// A second window on the same UI thread, after the first window's run
+// ended its COM apartment while the first client still held an element.
+// UI Automation then refused the new window's provider
+// (UiaReturnRawElementProvider answered E_INVALIDARG) and served the window
+// from the system proxies, until the host released its providers before the
+// apartment ended.
+void run_second_window_checks(ClientContext& context) {
+    ComReference<IUIAutomation> automation;
+    const HRESULT created = CoCreateInstance(CLSID_CUIAutomation, nullptr, CLSCTX_INPROC_SERVER,
+                                             __uuidof(IUIAutomation),
+                                             reinterpret_cast<void**>(automation.receive()));
+    require(SUCCEEDED(created) && automation.get() != nullptr, "IUIAutomation is created again");
+    ComReference<IUIAutomationElement> window;
+    const HRESULT found = (*automation.get()).ElementFromHandle(context.hwnd, window.receive());
+    require(SUCCEEDED(found) && window.get() != nullptr, "the second window has a UI Automation element");
+    BstrText framework;
+    const HRESULT read = (*window.get()).get_CurrentFrameworkId(framework.receive());
+    expect(context, SUCCEEDED(read) && framework.text() == L"GUI.Forms",
+           "UI Automation uses the second window's provider");
+    ComReference<IUIAutomationElement> button;
+    expect(context, find_element(*automation.get(), *window.get(), "uia.button", button) &&
+                        element_name(*button.get()) == "Press me",
+           "the second window's button is found by its stable ID");
+    if (context.kept != nullptr) {
+        BstrText name;
+        const HRESULT stale = (*context.kept).get_CurrentName(name.receive());
+        expect(context, FAILED(stale), "the first window's kept element answers an error");
+        (*context.kept).Release();
+        context.kept = nullptr;
+    }
 }
 
 // The client thread: the multithreaded apartment, the checks, then the
@@ -537,7 +579,11 @@ struct ClientThread final {
         const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         try {
             if (FAILED(initialized)) throw std::runtime_error("the client thread has no COM apartment");
-            run_client_checks(*context);
+            if ((*context).second_window) {
+                run_second_window_checks(*context);
+            } else {
+                run_client_checks(*context);
+            }
         } catch (const std::exception& error) {
             (*context).failures.push_back(error.what());
         }
@@ -721,35 +767,56 @@ Decoy::~Decoy() {
     CloseHandle(process_.hProcess);
 }
 
+// Runs one fixture window through host::run_windows, which begins and ends
+// the UI thread's COM apartment, with its client.
+void run_fixture_window(ClientContext& context) {
+    Fixture fixture;
+    std::unique_ptr<Window> window = make_fixture(fixture);
+    SubscriptionToken clicked = (*fixture.button).clicked().subscribe(CountClick{&fixture.clicks});
+    context.window = window.get();
+    context.fixture = &fixture;
+    std::thread client;
+    host::WindowsHostOptions options;
+    options.title = std::string(fixture_title_utf8);
+    options.initial_size = Size{420.0, 240.0};
+    options.print_metrics_on_close = false;
+    options.host_ready = HostReady{&context, &client};
+    const int exit_code = host::run_windows(std::move(window), std::move(options));
+    if (client.joinable()) client.join();
+    context.window = nullptr;
+    context.fixture = nullptr;
+    require(exit_code == 0, "the fixture window did not run");
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     if (argc == 3 && std::string_view(argv[1]) == "--decoy") return run_decoy(argv[2]);
     try {
+        // The multithreaded apartment outlives both clients, so the element
+        // the first keeps stays valid for the second to check and release.
+        CO_MTA_USAGE_COOKIE mta{};
+        require(SUCCEEDED(CoIncrementMTAUsage(&mta)), "the multithreaded apartment is kept");
         Decoy decoy;
-        Fixture fixture;
-        std::unique_ptr<Window> window = make_fixture(fixture);
-        SubscriptionToken clicked = (*fixture.button).clicked().subscribe(CountClick{&fixture.clicks});
         ClientContext context;
-        context.window = window.get();
-        context.fixture = &fixture;
-        std::thread client;
-        host::WindowsHostOptions options;
-        options.title = std::string(fixture_title_utf8);
-        options.initial_size = Size{420.0, 240.0};
-        options.print_metrics_on_close = false;
-        options.host_ready = HostReady{&context, &client};
-        const int exit_code = host::run_windows(std::move(window), std::move(options));
-        if (client.joinable()) client.join();
-        require(exit_code == 0, "the fixture window did not run");
+        run_fixture_window(context);
+        ClientContext second;
+        second.second_window = true;
+        second.kept = context.kept;
+        context.kept = nullptr;
+        run_fixture_window(second);
+        if (second.kept != nullptr) (*second.kept).Release();
         require(decoy.stop() == 0, "the decoy process closes its window and exits cleanly");
-        if (!context.failures.empty()) {
-            for (const std::string& failure : context.failures) {
+        static_cast<void>(CoDecrementMTAUsage(mta));
+        std::vector<std::string> failures = context.failures;
+        failures.insert(failures.end(), second.failures.begin(), second.failures.end());
+        if (!failures.empty()) {
+            for (const std::string& failure : failures) {
                 std::cerr << "gui_forms_windows_accessibility_uia_provider_tests: " << failure << '\n';
             }
             return EXIT_FAILURE;
         }
-        std::cout << "gui_forms_windows_accessibility_uia_provider_tests: " << context.checks
+        std::cout << "gui_forms_windows_accessibility_uia_provider_tests: " << context.checks + second.checks
                   << " checks passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
