@@ -217,4 +217,36 @@ inline Bytes icc_profile_payload() {
     return profile;
 }
 
+// The file with every chunk of type `name` removed. Requires a well-formed
+// file (every chunk envelope inside the span).
+inline Bytes without_chunk(const Bytes& png, const char* name) {
+    Bytes result(png.begin(), png.begin() + 8);
+    std::size_t offset = 8;
+    while (offset + 12U <= png.size()) {
+        const std::size_t length = (std::to_integer<std::size_t>(png[offset]) << 24U) |
+            (std::to_integer<std::size_t>(png[offset + 1U]) << 16U) |
+            (std::to_integer<std::size_t>(png[offset + 2U]) << 8U) |
+            std::to_integer<std::size_t>(png[offset + 3U]);
+        bool same = true;
+        for (std::size_t index = 0; index < 4U; ++index) {
+            same = same && png[offset + 4U + index] == static_cast<std::byte>(name[index]);
+        }
+        const std::size_t next = offset + length + 12U;
+        if (!same) {
+            result.insert(result.end(), png.begin() + static_cast<std::ptrdiff_t>(offset),
+                          png.begin() + static_cast<std::ptrdiff_t>(next));
+        }
+        offset = next;
+    }
+    return result;
+}
+
+// The file with one chunk inserted straight after IHDR (8 + 25 bytes).
+inline Bytes with_chunk_after_header(const Bytes& png, const char* name, const Bytes& payload) {
+    Bytes result(png.begin(), png.begin() + 33);
+    chunk(result, name, payload);
+    result.insert(result.end(), png.begin() + 33, png.end());
+    return result;
+}
+
 } // namespace gui_forms_png_files
