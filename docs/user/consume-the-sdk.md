@@ -110,7 +110,7 @@ program and use the same copy for every component:
 |---|---|---|
 | macOS | `libgui_forms_threading.0.dylib`, `libgui_forms_application.0.dylib` and their versioned targets, plus `libc++.1.dylib`, `libc++abi.1.dylib`, `libunwind.1.dylib` from the runtime prefix | `Your.app/Contents/Frameworks`, with `@executable_path/../Frameworks` rpaths; sign the libraries before the bundle |
 | Linux | `libgui_forms_threading.so.0`, `libgui_forms_application.so.0` and the versioned files those symlinks resolve to | the application's runtime library directory |
-| Windows | `libgui_forms_threading.dll`, `libgui_forms_application.dll`, `libwinpthread-1.dll` and the compiler runtime DLLs | beside the executable |
+| Windows | `libgui_forms_threading.dll` and `libgui_forms_application.dll`; they embed the LLVM runtimes and winpthreads, so no runtime DLL comes with them. Your own program needs runtime DLLs only if you link it dynamically (link it with `-static`, as GUI.Forms' programs are, to need none) | beside the executable |
 
 The reference examples stage Windows DLLs with `$<TARGET_RUNTIME_DLLS:...>`
 in a post-build step; copy that pattern rather than listing DLL names.

@@ -1,17 +1,24 @@
 #include "png_writer.hpp"
 
+#include "stx_zlib/deflate.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <limits>
+#include <memory>
+#include <new>
+#include <stdexcept>
 
 namespace gui_forms::image {
 namespace {
 
 constexpr std::array<std::uint8_t, 8> png_signature{
     0x89U, 0x50U, 0x4eU, 0x47U, 0x0dU, 0x0aU, 0x1aU, 0x0aU};
-// Largest stored deflate block payload (16-bit LEN field).
-constexpr std::size_t stored_block_limit = 65535U;
+// Compressed output grows in steps of this many bytes.
+constexpr std::size_t output_step = 65536U;
+// Largest PNG chunk length.
+constexpr std::size_t chunk_limit = 0x7fffffffU;
 // Matches the renderer core's registry ceiling so a capture never exceeds
 // what the toolkit's own PNG validator will accept.
 constexpr std::uint32_t dimension_limit = 16384U;
@@ -104,6 +111,117 @@ std::uint32_t png_adler32(std::span<const std::byte> bytes) noexcept {
     return (b << 16U) | a;
 }
 
+namespace {
+
+// One source row as straight 8-bit RGB or RGBA, in PNG channel order.
+void gather_row(const PngEncodeInput& input, std::uint32_t row, std::span<std::byte> line) noexcept {
+    const std::size_t red = input.order == PngChannelOrder::rgba ? 0U : 2U;
+    const std::size_t blue = input.order == PngChannelOrder::rgba ? 2U : 0U;
+    const std::byte* source = input.pixels.data() + static_cast<std::size_t>(input.row_bytes) * row;
+    std::size_t at = 0;
+    for (std::uint32_t column = 0; column < input.width; ++column) {
+        const std::byte* pixel = source + static_cast<std::size_t>(column) * 4U;
+        if (input.alpha == PngSourceAlpha::opaque) {
+            line[at] = pixel[red];
+            line[at + 1U] = pixel[1];
+            line[at + 2U] = pixel[blue];
+            at += 3U;
+            continue;
+        }
+        const unsigned alpha = std::to_integer<unsigned>(pixel[3]);
+        std::array<std::byte, 3> colour{pixel[red], pixel[1], pixel[blue]};
+        if (input.alpha == PngSourceAlpha::premultiplied) {
+            for (std::size_t channel = 0; channel < 3U; ++channel) {
+                const unsigned value = std::to_integer<unsigned>(colour[channel]);
+                unsigned straight = 0U;
+                if (alpha != 0U) straight = std::min(255U, (value * 255U + alpha / 2U) / alpha);
+                colour[channel] = static_cast<std::byte>(straight);
+            }
+        }
+        line[at] = colour[0];
+        line[at + 1U] = colour[1];
+        line[at + 2U] = colour[2];
+        line[at + 3U] = pixel[3];
+        at += 4U;
+    }
+}
+
+unsigned distance(int first, int second) noexcept {
+    const int difference = first - second;
+    const unsigned result = static_cast<unsigned>(difference < 0 ? -difference : difference);
+    return result;
+}
+
+unsigned paeth_predictor(unsigned left, unsigned above, unsigned corner) noexcept {
+    const int p = static_cast<int>(left) + static_cast<int>(above) - static_cast<int>(corner);
+    const unsigned a = distance(p, static_cast<int>(left));
+    const unsigned b = distance(p, static_cast<int>(above));
+    const unsigned c = distance(p, static_cast<int>(corner));
+    if (a <= b && a <= c) return left;
+    if (b <= c) return above;
+    return corner;
+}
+
+// Writes filter type `filter` of line (previous row `above`, zero for the
+// first) into output, whose first byte is the filter type.
+void filter_row(unsigned filter, std::span<const std::byte> line, std::span<const std::byte> above,
+                std::size_t stride, std::span<std::byte> output) noexcept {
+    output[0] = static_cast<std::byte>(filter);
+    for (std::size_t index = 0; index < line.size(); ++index) {
+        const unsigned value = std::to_integer<unsigned>(line[index]);
+        const unsigned up = std::to_integer<unsigned>(above[index]);
+        const unsigned left = index < stride ? 0U : std::to_integer<unsigned>(line[index - stride]);
+        const unsigned corner = index < stride ? 0U : std::to_integer<unsigned>(above[index - stride]);
+        unsigned predicted = 0U;
+        if (filter == 1U) predicted = left;
+        if (filter == 2U) predicted = up;
+        if (filter == 3U) predicted = (left + up) / 2U;
+        if (filter == 4U) predicted = paeth_predictor(left, up, corner);
+        output[1U + index] = static_cast<std::byte>((value - predicted) & 255U);
+    }
+}
+
+// Sum of |signed byte| over the filtered bytes (the filter type excluded).
+std::uint64_t filter_cost(std::span<const std::byte> filtered) noexcept {
+    std::uint64_t cost = 0;
+    for (std::size_t index = 1; index < filtered.size(); ++index) {
+        const unsigned value = std::to_integer<unsigned>(filtered[index]);
+        const unsigned magnitude = value < 128U ? value : 256U - value;
+        cost += magnitude;
+    }
+    return cost;
+}
+
+// Feeds all of input to the stream with flush, growing output by fixed
+// steps; for finish, drains until stream end. Returns false on an encoder
+// error or a stalled stream.
+bool deflate_into(stx_zlib::DeflateStream& stream, std::span<const std::byte> input,
+                  stx_zlib::DeflateFlush flush, std::vector<std::byte>& output,
+                  std::size_t& produced) {
+    std::size_t consumed = 0;
+    for (;;) {
+        if (output.size() - produced < output_step) output.resize(produced + output_step);
+        const std::span<const std::byte> pending = input.subspan(consumed);
+        const std::span<std::byte> space(output.data() + produced, output.size() - produced);
+        const stx_zlib::DeflateResult step = stream.process(pending, space, flush);
+        if (step.status == stx_zlib::DeflateStatus::error) return false;
+        consumed += step.input_consumed;
+        produced += step.output_produced;
+        if (step.status == stx_zlib::DeflateStatus::stream_end) return true;
+        const bool input_done = consumed == input.size();
+        if (flush == stx_zlib::DeflateFlush::none && input_done &&
+            step.status == stx_zlib::DeflateStatus::need_input) {
+            return true;
+        }
+        if (step.input_consumed == 0U && step.output_produced == 0U &&
+            step.status == stx_zlib::DeflateStatus::need_input) {
+            return false;
+        }
+    }
+}
+
+} // namespace
+
 bool encode_png(const PngEncodeInput& input, std::vector<std::byte>& output) {
     // Check the borrow before clearing its possible owner. Address differences
     // avoid overflowing an end-address calculation for either live range.
@@ -117,6 +235,11 @@ bool encode_png(const PngEncodeInput& input, std::vector<std::byte>& output) {
     output.clear();
     if (aliased) return false;
     if (input.order != PngChannelOrder::rgba && input.order != PngChannelOrder::bgra) return false;
+    if (input.alpha != PngSourceAlpha::straight && input.alpha != PngSourceAlpha::premultiplied &&
+        input.alpha != PngSourceAlpha::opaque) {
+        return false;
+    }
+    if (input.compression_level < 0 || input.compression_level > 9) return false;
     if (input.width == 0U || input.height == 0U || input.width > dimension_limit ||
         input.height > dimension_limit) {
         return false;
@@ -130,75 +253,88 @@ bool encode_png(const PngEncodeInput& input, std::vector<std::byte>& output) {
     const std::uint64_t available = input.pixels.size() - tight_row;
     if (preceding_rows != 0 && input.row_bytes > available / preceding_rows) return false;
 
-    const std::size_t channels = input.opaque ? 3U : 4U;
-    const std::size_t scanline = 1U + static_cast<std::size_t>(input.width) * channels;
-    const std::size_t raw_size = scanline * static_cast<std::size_t>(input.height);
-    if (raw_size / scanline != input.height) return false;
+    // Dimensions are at most 16384, so these sizes fit easily in 64 bits.
+    const std::size_t channels = input.alpha == PngSourceAlpha::opaque ? 3U : 4U;
+    const std::size_t line_bytes = static_cast<std::size_t>(input.width) * channels;
+    const std::size_t candidate_bytes = line_bytes + 1U;
+    const std::uint64_t raw_size = static_cast<std::uint64_t>(candidate_bytes) * input.height;
 
-    std::vector<std::byte> raw;
-    raw.reserve(raw_size);
-    const std::size_t red = input.order == PngChannelOrder::rgba ? 0U : 2U;
-    const std::size_t blue = input.order == PngChannelOrder::rgba ? 2U : 0U;
-    for (std::uint32_t row = 0; row < input.height; ++row) {
-        raw.push_back(std::byte{0}); // filter type: none
-        const std::byte* source = input.pixels.data() +
-            static_cast<std::size_t>(input.row_bytes) * row;
-        for (std::uint32_t column = 0; column < input.width; ++column) {
-            const std::byte* pixel = source + static_cast<std::size_t>(column) * 4U;
-            raw.push_back(pixel[red]);
-            raw.push_back(pixel[1]);
-            raw.push_back(pixel[blue]);
-            if (!input.opaque) raw.push_back(pixel[3]);
+    try {
+        // Two source lines (current and previous, zero before the first row)
+        // and one candidate row per filter type.
+        std::vector<std::byte> lines(2U * line_bytes, std::byte{0});
+        std::vector<std::byte> candidates(5U * candidate_bytes);
+        std::span<std::byte> line(lines.data(), line_bytes);
+        std::span<std::byte> above(lines.data() + line_bytes, line_bytes);
+
+        std::unique_ptr<stx_zlib::DeflateStream> stream = std::make_unique<stx_zlib::DeflateStream>();
+        stx_zlib::DeflateOptions options{};
+        options.level = input.compression_level;
+        options.input_limit.value = raw_size;
+        // Stored blocks bound the output: five header bytes per 32 KiB block
+        // beyond the raw bytes, plus the zlib header and trailer.
+        options.output_limit.value = raw_size + (raw_size / 16384U + 1U) * 5U + 64U;
+        // Generous and finite: 2^16 effort units per input byte.
+        options.work_limit.value = (raw_size + 1U) * 65536U;
+        if ((*stream).reset(options) != stx_zlib::DeflateError::none) return false;
+
+        std::vector<std::byte> zlib;
+        std::size_t produced = 0;
+        for (std::uint32_t row = 0; row < input.height; ++row) {
+            gather_row(input, row, line);
+            unsigned chosen = 0U;
+            if (input.compression_level == 0) {
+                filter_row(0U, line, above, channels, std::span<std::byte>(candidates.data(), candidate_bytes));
+            } else {
+                std::uint64_t best = std::numeric_limits<std::uint64_t>::max();
+                for (unsigned filter = 0; filter < 5U; ++filter) {
+                    const std::span<std::byte> candidate(candidates.data() + filter * candidate_bytes,
+                                                         candidate_bytes);
+                    filter_row(filter, line, above, channels, candidate);
+                    const std::uint64_t cost = filter_cost(candidate);
+                    if (cost < best) {
+                        best = cost;
+                        chosen = filter;
+                    }
+                }
+            }
+            const std::span<const std::byte> filtered(candidates.data() + chosen * candidate_bytes,
+                                                      candidate_bytes);
+            if (!deflate_into(*stream, filtered, stx_zlib::DeflateFlush::none, zlib, produced)) return false;
+            std::swap(line, above);
         }
+        if (!deflate_into(*stream, {}, stx_zlib::DeflateFlush::finish, zlib, produced)) return false;
+        zlib.resize(produced);
+        if (zlib.size() > chunk_limit) return false;
+
+        output.reserve(png_signature.size() + 25U + 13U + zlib.size() + 12U + 12U);
+        for (const std::uint8_t value : png_signature) output.push_back(std::byte{value});
+        std::array<std::byte, 13> header{};
+        header[0] = static_cast<std::byte>((input.width >> 24U) & 0xffU);
+        header[1] = static_cast<std::byte>((input.width >> 16U) & 0xffU);
+        header[2] = static_cast<std::byte>((input.width >> 8U) & 0xffU);
+        header[3] = static_cast<std::byte>(input.width & 0xffU);
+        header[4] = static_cast<std::byte>((input.height >> 24U) & 0xffU);
+        header[5] = static_cast<std::byte>((input.height >> 16U) & 0xffU);
+        header[6] = static_cast<std::byte>((input.height >> 8U) & 0xffU);
+        header[7] = static_cast<std::byte>(input.height & 0xffU);
+        header[8] = std::byte{8};                                   // bit depth
+        header[9] = std::byte{channels == 3U ? std::uint8_t{2} : std::uint8_t{6}}; // colour type
+        header[10] = std::byte{0};                                  // compression
+        header[11] = std::byte{0};                                  // filter method
+        header[12] = std::byte{0};                                  // no interlace
+        append_chunk(output, "IHDR", header);
+        const std::array<std::byte, 1> srgb{std::byte{0}}; // perceptual intent
+        append_chunk(output, "sRGB", srgb);
+        append_chunk(output, "IDAT", zlib);
+        append_chunk(output, "IEND", {});
+    } catch (const std::bad_alloc&) {
+        output.clear();
+        return false;
+    } catch (const std::length_error&) {
+        output.clear();
+        return false;
     }
-
-    // zlib header: CM=8 (deflate), CINFO=7 (32K window), no dictionary,
-    // FLEVEL=0; FCHECK makes the 16-bit header a multiple of 31.
-    std::vector<std::byte> zlib;
-    const std::size_t block_count = (raw.size() + stored_block_limit - 1U) / stored_block_limit;
-    zlib.reserve(2U + raw.size() + block_count * 5U + 4U);
-    zlib.push_back(std::byte{0x78});
-    zlib.push_back(std::byte{0x01});
-    std::size_t offset = 0;
-    do {
-        const std::size_t length = std::min(stored_block_limit, raw.size() - offset);
-        const bool final_block = offset + length >= raw.size();
-        zlib.push_back(std::byte{final_block ? std::uint8_t{1} : std::uint8_t{0}});
-        const std::uint16_t len = static_cast<std::uint16_t>(length);
-        const std::uint16_t nlen = static_cast<std::uint16_t>(~len);
-        zlib.push_back(static_cast<std::byte>(len & 0xffU));
-        zlib.push_back(static_cast<std::byte>(len >> 8U));
-        zlib.push_back(static_cast<std::byte>(nlen & 0xffU));
-        zlib.push_back(static_cast<std::byte>(nlen >> 8U));
-        zlib.insert(zlib.end(), raw.begin() + static_cast<std::ptrdiff_t>(offset),
-                    raw.begin() + static_cast<std::ptrdiff_t>(offset + length));
-        offset += length;
-    } while (offset < raw.size());
-    append_u32_big_endian(zlib, png_adler32(raw));
-    if (zlib.size() > 0x7fffffffU) return false;
-
-    output.reserve(png_signature.size() + 25U + zlib.size() + 12U + 12U);
-    for (const std::uint8_t value : png_signature) output.push_back(std::byte{value});
-
-    std::array<std::byte, 13> header{};
-    header[0] = static_cast<std::byte>((input.width >> 24U) & 0xffU);
-    header[1] = static_cast<std::byte>((input.width >> 16U) & 0xffU);
-    header[2] = static_cast<std::byte>((input.width >> 8U) & 0xffU);
-    header[3] = static_cast<std::byte>(input.width & 0xffU);
-    header[4] = static_cast<std::byte>((input.height >> 24U) & 0xffU);
-    header[5] = static_cast<std::byte>((input.height >> 16U) & 0xffU);
-    header[6] = static_cast<std::byte>((input.height >> 8U) & 0xffU);
-    header[7] = static_cast<std::byte>(input.height & 0xffU);
-    header[8] = std::byte{8};                                  // bit depth
-    header[9] = std::byte{input.opaque ? std::uint8_t{2} : std::uint8_t{6}}; // color type
-    header[10] = std::byte{0};                                 // compression
-    header[11] = std::byte{0};                                 // filter method
-    header[12] = std::byte{0};                                 // no interlace
-    append_chunk(output, "IHDR", header);
-    const std::array<std::byte, 1> srgb{std::byte{0}}; // perceptual intent
-    append_chunk(output, "sRGB", srgb);
-    append_chunk(output, "IDAT", zlib);
-    append_chunk(output, "IEND", {});
     return true;
 }
 
