@@ -17,12 +17,12 @@
 #include "include/effects/SkColorMatrixFilter.h"
 #include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkGradient.h"
-#include "include/encode/SkPngEncoder.h"
 #if defined(__APPLE__)
 #include "core_text_font_bytes.hpp"
 #endif
 
 #include "../../../core/image/png_pixels.hpp"
+#include "../../../core/image/png_writer.hpp"
 #include "../../../core/text/composite/text_composite.hpp"
 #include "../../text/glyph_run/glyph_run_raster.hpp"
 #include "../../text/harfbuzz/harfbuzz_font_engine.hpp"
@@ -1113,23 +1113,26 @@ std::vector<std::byte> SkiaExecutor::encode_png(
             assign_raster_error(error, RasterError::dimension_limit_exceeded);
             return {};
         }
-        const SkPixmap pixmap(image_info(snapshot.width, snapshot.height,
-                                         snapshot.pixel_format),
-                              snapshot.pixels().data(), snapshot.row_bytes());
-        SkPngEncoder::Options options;
-        options.fFilterFlags = SkPngEncoder::FilterFlag::kAll;
-        options.fZLibLevel = 6;
-        sk_sp<SkData> encoded = SkPngEncoder::Encode(pixmap, options);
-        if (!encoded || (*encoded).size() == 0U) {
+        // The shared owned encoder, as on every host; level 6 matches the
+        // former SkPngEncoder setting and the encoder's default.
+        gui_forms::image::PngEncodeInput input{};
+        input.width = snapshot.width;
+        input.height = snapshot.height;
+        input.row_bytes = snapshot.row_bytes();
+        input.pixels = snapshot.pixels();
+        input.order = snapshot.pixel_format == PixelFormat::bgra32_premultiplied
+            ? gui_forms::image::PngChannelOrder::bgra : gui_forms::image::PngChannelOrder::rgba;
+        input.alpha = gui_forms::image::PngSourceAlpha::premultiplied;
+        input.compression_level = gui_forms::image::default_png_compression_level;
+        std::vector<std::byte> result;
+        if (!gui_forms::image::encode_png(input, result) || result.empty()) {
             assign_raster_error(error, RasterError::encode_failed);
             return {};
         }
-        if ((*encoded).size() > limits.maximum_encoded_bytes) {
+        if (result.size() > limits.maximum_encoded_bytes) {
             assign_raster_error(error, RasterError::encoded_limit_exceeded);
             return {};
         }
-        std::vector<std::byte> result((*encoded).size());
-        std::memcpy(result.data(), (*encoded).data(), (*encoded).size());
         assign_raster_error(error, RasterError::none);
         return result;
     } catch (const std::logic_error&) {

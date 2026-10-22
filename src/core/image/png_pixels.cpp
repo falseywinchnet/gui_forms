@@ -267,6 +267,30 @@ PngPixelResult PngPixelDecoder::decode(std::span<const std::byte> encoded,
         result = decode_failure(decoded);
         return result;
     }
+    // Stage I6: resolve the colour chunks by precedence and convert to sRGB.
+    const bool icc_ignored = icc_profile_rule(request.purpose) == IccProfileRule::ignore;
+    const PngColorResolution colour = resolve_png_color(encoded, records_, icc_ignored);
+    if (colour.error == PngColorError::unsupported_color_profile) {
+        result.error = PngPixelError::unsupported_color_profile;
+        return result;
+    }
+    if (colour.error != PngColorError::none) {
+        result.error = PngPixelError::invalid_color_metadata;
+        return result;
+    }
+    if (colour.encoding.converts()) {
+        try {
+            const bool color_converted = convert_png_samples_to_srgb(colour.encoding,
+                layout.depth, samples_, color_work_);
+            if (!color_converted) {
+                result.error = PngPixelError::invalid_color_metadata;
+                return result;
+            }
+        } catch (const std::bad_alloc&) {
+            result.error = PngPixelError::allocation_failed;
+            return result;
+        }
+    }
     const bool converted = convert_rgba16_samples(samples_, result.width, result.height,
                                                   request.target, pixels, row_bytes);
     if (!converted) {
@@ -282,6 +306,7 @@ void PngPixelDecoder::release() noexcept {
     samples_ = {};
     scratch_ = {};
     records_ = {};
+    color_work_ = {};
 }
 
 } // namespace gui_forms::image
