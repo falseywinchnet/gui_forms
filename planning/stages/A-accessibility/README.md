@@ -137,6 +137,43 @@ semantic tree reports, and performs each control's default action through
 that API. Record the run (host, runner or machine, commands, per-control
 results) under `results/` with a dated name, and update the stage index.
 
+## Owner decisions, vocabulary round 001 (2026-10-21)
+
+Recorded in `planning/interview/A_VOCABULARY_ROUND_001.md`. The owner accepted
+every recommended option.
+
+### Roles
+- **GIVEN A-R1.** `tree` and `tree_item`, with a `level` field.
+- **GIVEN A-R2.** `table`, `row`, `cell`, `column_header` and `row_header`,
+  with row and column index and count fields.
+- **GIVEN A-R3.** `tree_grid`.
+- **GIVEN A-R4.** `dialog`, with a `modal` flag.
+- **GIVEN A-R5.** `status_bar`.
+- **GIVEN A-R6.** No new roles for DockNavigator or TokenBox.
+
+### Fields and states
+- **GIVEN A-F1.** A `checkable` state.
+- **GIVEN A-F2.** An `access_key` field.
+- **GIVEN A-F3.** `small_step` and `large_step` fields.
+- **GIVEN A-F4.** A `multiselectable` state.
+- **GIVEN A-F5.** The docking pin stays a check box.
+
+### Editable text
+- **GIVEN A-T1.** A `text_selection` field (UTF-8 anchor and caret, absent
+  for password boxes) and a `multiline` field. Two on-demand window
+  queries: the text layout, and setting the selection. No new action.
+- **GIVEN A-T2.** The text defaults:
+  - UTF-8 in the core;
+  - the control's own word rule;
+  - visual lines;
+  - sentences unsupported;
+  - a caret inside a combining sequence refused;
+  - no text published for password boxes;
+  - this pass covers TextBox, MaskedTextBox and TokenBox's editor.
+
+### Already decided
+- **DK-51.** The live-region role is built in the same pass.
+
 ## Open decisions (ask, do not decide)
 
 None recorded. If the macOS permission issue limits what CI can prove, that
