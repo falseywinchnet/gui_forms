@@ -78,7 +78,8 @@ def main():
         executable = output / ('deflate-memory-review.exe' if os.name == 'nt' else 'deflate-memory-review')
         command = ['clang++', *cxx_flags, *flags, '-fsanitize=fuzzer', '-Wall', '-Wextra', '-Wpedantic',
                    '-I' + str(ROOT / 'stx_zlib/include'), '-I' + str(oracle),
-                   str(ROOT / 'stx_zlib/src/deflate.cpp'), str(ROOT / 'tests/compression/deflate_memory_review.cpp'),
+                   str(ROOT / 'stx_zlib/src/deflate.cpp'), str(ROOT / 'stx_zlib/src/checksum.cpp'),
+                   str(ROOT / 'tests/compression/deflate_memory_review.cpp'),
                    *objects, *link_flags, '-o', str(executable)]
         commands.append(command)
         with (output / 'compiler.log').open('a') as log:

@@ -36,12 +36,14 @@ protected:
     HostDialogResult show_dialog_impl(const HostDialogRequest&) override { return {}; }
     HostServiceStatus play_sound_cue_impl(const HostSoundCueRequest&) override { return {}; }
     HostClipboardImageResult read_clipboard_image_impl() override {
+        // Malformed on purpose: two rows of eight bytes over four bytes.
+        HostImage image{};
+        image.width = 2;
+        image.height = 2;
+        image.row_bytes = 8;
+        image.pixels.resize(4);
         HostClipboardImageResult result;
-        result.has_image = true;
-        result.image.width = 2;
-        result.image.height = 2;
-        result.image.row_bytes = 8;
-        result.image.pixels.resize(4);
+        result.image = image;
         return result;
     }
 };
@@ -55,9 +57,9 @@ void validation_and_wire() {
     const std::vector<std::byte> encoded = detail::encode_clipboard_image(image);
     require(encoded.size() == 24U, "wire format included row padding");
     const HostClipboardImageResult decoded = detail::decode_clipboard_image(encoded);
-    require(decoded.status.accepted() && decoded.has_image && decoded.image.row_bytes == 4U &&
-            decoded.image.pixels[0] == std::byte{231} && decoded.image.pixels[3] == std::byte{0} &&
-            decoded.image.pixels[4] == std::byte{200} && decoded.image.pixels[7] == std::byte{128},
+    require(decoded.status.accepted() && decoded.image.has_value() && (*decoded.image).row_bytes == 4U &&
+            (*decoded.image).pixels[0] == std::byte{231} && (*decoded.image).pixels[3] == std::byte{0} &&
+            (*decoded.image).pixels[4] == std::byte{200} && (*decoded.image).pixels[7] == std::byte{128},
             "lossless wire representation changed alpha or hidden RGB");
     for (std::size_t length = 0; length < encoded.size(); ++length) {
         require(!detail::decode_clipboard_image(std::span<const std::byte>(encoded).first(length)).status.accepted(),
@@ -85,8 +87,8 @@ void native_dib_interchange() {
                                       std::byte{101}, std::byte{42}, std::byte{13}, std::byte{128}};
     const std::vector<std::byte> dib = detail::encode_clipboard_dib({1, 2, 4, pixels});
     HostClipboardImageResult result = detail::decode_clipboard_dib(dib);
-    require(result.status.accepted() && result.has_image &&
-            result.image.pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
+    require(result.status.accepted() && result.image.has_value() &&
+            (*result.image).pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
             "DIBV5 changed straight alpha or row order");
     for (std::size_t length = 0; length < dib.size(); ++length) {
         require(!detail::decode_clipboard_dib(std::span<const std::byte>(dib).first(length)).status.accepted(),
@@ -96,7 +98,8 @@ void native_dib_interchange() {
     bottom_up[8] = std::byte{2}; bottom_up[9] = bottom_up[10] = bottom_up[11] = std::byte{0};
     for (std::size_t channel = 0; channel < 4; ++channel) std::swap(bottom_up[124 + channel], bottom_up[128 + channel]);
     result = detail::decode_clipboard_dib(bottom_up);
-    require(result.status.accepted() && result.image.pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
+    require(result.status.accepted() && result.image.has_value() &&
+            (*result.image).pixels == std::vector<std::byte>(pixels.begin(), pixels.end()),
             "bottom-up DIB was inverted");
     std::vector<std::byte> rgb24(48U);
     rgb24[0] = std::byte{40}; rgb24[4] = std::byte{1}; rgb24[8] = std::byte{2};
@@ -104,8 +107,8 @@ void native_dib_interchange() {
     rgb24[40] = std::byte{13}; rgb24[41] = std::byte{42}; rgb24[42] = std::byte{101};
     rgb24[44] = std::byte{7}; rgb24[45] = std::byte{33}; rgb24[46] = std::byte{201};
     result = detail::decode_clipboard_dib(rgb24);
-    require(result.status.accepted() && result.image.pixels[0] == std::byte{201} &&
-            result.image.pixels[3] == std::byte{255} && result.image.pixels[4] == std::byte{101},
+    require(result.status.accepted() && result.image.has_value() && (*result.image).pixels[0] == std::byte{201} &&
+            (*result.image).pixels[3] == std::byte{255} && (*result.image).pixels[4] == std::byte{101},
             "padded 24-bit native DIB was not converted");
     std::vector<std::byte> invalid = dib;
     invalid[40] = std::byte{1};
@@ -116,15 +119,15 @@ void native_dib_interchange() {
 void service_ownership_and_failures() {
     host::HeadlessHostServices services;
     std::array<std::byte, 4> pixel{std::byte{211}, std::byte{33}, std::byte{9}, std::byte{0}};
-    require(services.read_clipboard_image().status.accepted() && !services.read_clipboard_image().has_image,
+    require(services.read_clipboard_image().status.accepted() && !services.read_clipboard_image().image.has_value(),
             "empty clipboard was reported as an error or image");
     require(services.write_clipboard_image({1, 1, 4, pixel}).accepted(), "image write failed");
     pixel[0] = std::byte{0};
     HostClipboardImageResult first = services.read_clipboard_image();
-    require(first.has_image && first.image.pixels[0] == std::byte{211}, "service borrowed caller pixels");
-    first.image.pixels[0] = std::byte{0};
+    require(first.image.has_value() && (*first.image).pixels[0] == std::byte{211}, "service borrowed caller pixels");
+    (*first.image).pixels[0] = std::byte{0};
     const HostClipboardImageResult second = services.read_clipboard_image();
-    require(second.image.pixels[0] == std::byte{211}, "read result shared mutable clipboard storage");
+    require(second.image.has_value() && (*second.image).pixels[0] == std::byte{211}, "read result shared mutable clipboard storage");
     require(services.write_clipboard_image({1, 1, 3, pixel}).error == HostServiceError::invalid_argument,
             "invalid write accepted");
     require(services.read_clipboard_image().generation == second.generation,
@@ -133,7 +136,7 @@ void service_ownership_and_failures() {
     std::thread worker(WorkerRead(services, worker_error));
     worker.join();
     require(worker_error == HostServiceError::wrong_thread, "worker accessed clipboard service");
-    require(services.write_clipboard_text("text").accepted() && !services.read_clipboard_image().has_image,
+    require(services.write_clipboard_text("text").accepted() && !services.read_clipboard_image().image.has_value(),
             "text publication retained the previous image");
     require(services.write_clipboard_image({1, 1, 4, pixel}).accepted() && !services.read_clipboard_text().has_text,
             "image publication retained the previous text");
@@ -145,7 +148,7 @@ void service_ownership_and_failures() {
             "missing image capability was ignored");
     MalformedServices malformed(true);
     const HostClipboardImageResult invalid = malformed.read_clipboard_image();
-    require(invalid.status.error == HostServiceError::backend_failure && !invalid.has_image && invalid.image.pixels.empty(),
+    require(invalid.status.error == HostServiceError::backend_failure && !invalid.image.has_value(),
             "malformed backend pixels reached the consumer");
 }
 } // namespace

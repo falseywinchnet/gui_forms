@@ -577,46 +577,10 @@ Size TableLayoutPanel::layout_children(Size available, bool assign) {
             column_offsets[item.position.column] + item.margin.left;
         const double cell_y = inset.top +
             row_offsets[item.position.row] + item.margin.top;
-        double child_width = std::min(item.desired.width, available_width);
-        double child_height = std::min(item.desired.height, available_height);
-        double child_x = cell_x;
-        double child_y = cell_y;
-        switch ((*item.control).dock()) {
-        case DockStyle::fill:
-            child_width = available_width;
-            child_height = available_height;
-            break;
-        case DockStyle::top:
-            child_width = available_width;
-            break;
-        case DockStyle::bottom:
-            child_width = available_width;
-            child_y += available_height - child_height;
-            break;
-        case DockStyle::left:
-            child_height = available_height;
-            break;
-        case DockStyle::right:
-            child_x += available_width - child_width;
-            child_height = available_height;
-            break;
-        case DockStyle::none: {
-            const AnchorStyles anchor = (*item.control).anchor();
-            const bool left = has_anchor(anchor, AnchorStyles::left);
-            const bool right = has_anchor(anchor, AnchorStyles::right);
-            const bool top = has_anchor(anchor, AnchorStyles::top);
-            const bool bottom = has_anchor(anchor, AnchorStyles::bottom);
-            if (left && right) child_width = available_width;
-            else if (right) child_x += available_width - child_width;
-            else if (!left) child_x += (available_width - child_width) * 0.5;
-            if (top && bottom) child_height = available_height;
-            else if (bottom) child_y += available_height - child_height;
-            else if (!top) child_y += (available_height - child_height) * 0.5;
-            break;
-        }
-        }
-        set_child_layout(item.control,
-                         {child_x, child_y, child_width, child_height});
+        const Rect area{cell_x, cell_y, available_width, available_height};
+        const Rect placed = place_in_cell((*item.control).dock(), (*item.control).anchor(),
+                                          area, item.desired);
+        set_child_layout(item.control, placed);
     }
     layout_overflowed_ = !overflow.empty();
     if (assign) {

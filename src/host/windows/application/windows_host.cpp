@@ -281,22 +281,36 @@ HostDialogResult native_folder_dialog(HWND owner, std::uint64_t request_id,
     return {{}, request_id, std::move(value)};
 }
 
+// The MessageBox style flags for a button set.
+UINT message_button_style(HostMessageButtons buttons) noexcept {
+    switch (buttons) {
+    case HostMessageButtons::ok: return MB_OK;
+    case HostMessageButtons::ok_cancel: return MB_OKCANCEL;
+    case HostMessageButtons::yes_no: return MB_YESNO;
+    case HostMessageButtons::yes_no_cancel: return MB_YESNOCANCEL;
+    case HostMessageButtons::retry_cancel: return MB_RETRYCANCEL;
+    }
+    // A button set outside the enumeration shows OK alone.
+    return MB_OK;
+}
+
+// The MessageBox style flags for an icon; none for no icon.
+UINT message_icon_style(HostMessageIcon icon) noexcept {
+    switch (icon) {
+    case HostMessageIcon::information: return MB_ICONINFORMATION;
+    case HostMessageIcon::warning: return MB_ICONWARNING;
+    case HostMessageIcon::error: return MB_ICONERROR;
+    case HostMessageIcon::question: return MB_ICONQUESTION;
+    case HostMessageIcon::none: return 0U;
+    }
+    // An icon outside the enumeration shows none.
+    return 0U;
+}
+
 UINT native_message_style(const HostMessageDialogRequest& request) noexcept {
     UINT style = MB_APPLMODAL;
-    switch (request.buttons) {
-    case HostMessageButtons::ok: style |= MB_OK; break;
-    case HostMessageButtons::ok_cancel: style |= MB_OKCANCEL; break;
-    case HostMessageButtons::yes_no: style |= MB_YESNO; break;
-    case HostMessageButtons::yes_no_cancel: style |= MB_YESNOCANCEL; break;
-    case HostMessageButtons::retry_cancel: style |= MB_RETRYCANCEL; break;
-    }
-    switch (request.icon) {
-    case HostMessageIcon::information: style |= MB_ICONINFORMATION; break;
-    case HostMessageIcon::warning: style |= MB_ICONWARNING; break;
-    case HostMessageIcon::error: style |= MB_ICONERROR; break;
-    case HostMessageIcon::question: style |= MB_ICONQUESTION; break;
-    case HostMessageIcon::none: break;
-    }
+    style |= message_button_style(request.buttons);
+    style |= message_icon_style(request.icon);
     const bool second =
         (request.buttons == HostMessageButtons::ok_cancel &&
          request.default_choice == HostDialogChoice::cancel) ||
@@ -2968,7 +2982,7 @@ public:
             services_.shutdown();
             if (options_.quit_thread_on_close) PostQuitMessage(0);
             return 0;
-        default: break;
+        default: break; // Every other message takes the default handling below.
         }
         return DefWindowProcW(hwnd_, message, wparam, lparam);
     }

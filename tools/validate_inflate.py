@@ -78,7 +78,7 @@ def main() -> None:
     candidate = str(ROOT / 'stx_zlib/src/inflate.cpp')
     arguments = [cxx, '-std=c++20', *common, '-DGUI_FORMS_INFLATE_ORACLE=1',
                  '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'stx_zlib/include'),
-                 '-I' + str(oracle), candidate]
+                 '-I' + str(oracle), candidate, str(ROOT / 'stx_zlib/src/checksum.cpp')]
     run([*arguments, '-Wall', '-Wextra', '-Wpedantic', '-fstack-usage',
          str(ROOT / 'tests/compression/inflate_tests.cpp'), *objects, '-o', str(test)], output, environment)
     with (output / 'tests.log').open('w') as log:

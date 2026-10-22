@@ -49,6 +49,7 @@ BasicControlStyle module_style(InstrumentModuleState state) {
     result.disabled_text = Color::rgba(111, 126, 137);
     result.accent = Color::rgba(61, 96, 138);
     result.accent_light = Color::rgba(219, 232, 242);
+    // A live module keeps these colours.
     if (state == InstrumentModuleState::staged) {
         result.face = Color::rgba(238, 229, 241);
         result.border = Color::rgba(138, 106, 152);

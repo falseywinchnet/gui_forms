@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 from pathlib import Path, PurePosixPath
 import subprocess
 import tarfile
@@ -142,13 +143,61 @@ def lookup(identity: dict[str, Any], wait_seconds: int) -> bool:
         time.sleep(min(30, max(0, deadline - time.monotonic())))
 
 
+ARCHIVE_DOWNLOADS: int = 2
+
+
+def download_archive(artifact_id: int, archive: Path) -> None:
+    """Fetch an artifact's zip with gh and extract its one cache archive over archive.
+
+    actions/download-artifact@v4 can end its step successfully with the file
+    cut short: on 2026-10-22 a macOS job's step stopped 65 s into a 696 MB
+    download without its digest and completion lines and still passed, and
+    the archive then failed its digest. The zip goes to a file next to the
+    archive, never into memory, and is removed afterwards.
+    """
+    repository: str = os.environ['GITHUB_REPOSITORY']
+    zipped: Path = archive.with_name(archive.name + '.zip')
+    stream: BinaryIO
+    with zipped.open('wb') as stream:
+        subprocess.run(['gh', 'api', 'repos/' + repository + '/actions/artifacts/' + str(artifact_id) + '/zip'],
+                       check=True, stdout=stream)
+    try:
+        bundle: zipfile.ZipFile
+        with zipfile.ZipFile(zipped) as bundle:
+            if bundle.namelist() != [archive.name]:
+                raise ValueError('Unexpected cache artifact members: ' + ', '.join(bundle.namelist()))
+            source: BinaryIO
+            target: BinaryIO
+            with bundle.open(archive.name) as source, archive.open('wb') as target:
+                shutil.copyfileobj(source, target, 1024 * 1024)
+    finally:
+        zipped.unlink(missing_ok=True)
+
+
+def verified_archive(archive: Path, receipt: dict[str, Any]) -> None:
+    """Make archive match the receipt's digest, downloading it again when it does not.
+
+    A mismatch with a receipt that names its artifact is retried from the
+    artifact itself up to ARCHIVE_DOWNLOADS times; a mismatch that remains
+    (or a receipt without an artifact) raises, leaving nothing extracted.
+    """
+    attempts: int = 0
+    while not archive.is_file() or file_digest(archive) != receipt['archive_sha256']:
+        artifact_id: Any = receipt.get('artifact_id')
+        if attempts == ARCHIVE_DOWNLOADS or type(artifact_id) is not int or 'GITHUB_REPOSITORY' not in os.environ:
+            raise ValueError('Reused cache archive digest mismatch')
+        attempts += 1
+        print('Cache archive digest mismatch; downloading artifact ' + str(artifact_id) + ' again (attempt '
+              + str(attempts) + ')', flush=True)
+        download_archive(artifact_id, archive)
+
+
 def restore_archive(identity: dict[str, Any], receipt_path: Path | None = None) -> None:
     if receipt_path is None:
         receipt_path = STATE / 'reused.json'
     receipt: dict[str, Any] = json.loads(receipt_path.read_text())
     archive: Path = STATE / 'download' / ('gui-forms-cache-' + identity['platform'] + '.tar.gz')
-    if file_digest(archive) != receipt['archive_sha256']:
-        raise ValueError('Reused cache archive digest mismatch')
+    verified_archive(archive, receipt)
     with tarfile.open(archive) as payload:
         entry: tarfile.TarInfo
         for entry in payload.getmembers():

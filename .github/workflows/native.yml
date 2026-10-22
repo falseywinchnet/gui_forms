@@ -9,6 +9,10 @@ on:
         description: Run native validation even if an identical successful receipt exists
         type: boolean
         default: false
+      package_windows_toolchain:
+        description: Install and package a new Windows toolchain when none is published for tools/windows_toolchain.json
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -29,6 +33,7 @@ jobs:
           python3 -B -m unittest discover -s tools -p test_macos_runtime_manifest.py
           python3 -B -m unittest discover -s tools -p test_ci_reuse.py
           python3 -B -m unittest discover -s tools -p test_ci_promote.py
+          python3 -B -m unittest discover -s tools -p test_ci_sanitizer_seed.py
           python3 -B -m unittest discover -s tools -p test_publish_cache.py
           python3 -B -m unittest discover -s tools -p test_windows_toolchain.py
           python3 -B -m unittest discover -s tools -p test_control_registry.py
@@ -39,11 +44,13 @@ jobs:
           python3 tools/control_schema.py render --check
           python3 -B -m unittest discover -s tools -p test_generate_library_docs.py
           python3 tools/generate_library_docs.py --check
-          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib
+          python3 -B tools/check_house_style.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
           python3 -B -m unittest discover -s tools -p test_lifetime_rules.py
+          python3 -B -m unittest discover -s tools -p test_state_machines.py
           python3 -B -m unittest discover -s tools -p test_ci_build.py
-          python3 -B -m unittest discover -s tools -p test_inflate_campaign.py
-          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib
+          python3 -B -m unittest discover -s tools -p test_change_selection.py
+          python3 -B -m unittest discover -s tools -p test_native_tests.py
+          python3 -B tools/check_lifetime_rules.py include src demo tests examples tools file_manager_demoboard stx_vorbis stx_zlib stx_png fuzz
   docs:
     runs-on: ubuntu-24.04
     steps:
@@ -61,9 +68,10 @@ jobs:
           path: docs/_build/html
           retention-days: 30
   # House style section 5: memory errors and undefined behaviour are defects,
-  # tests included. The whole suite runs under AddressSanitizer,
-  # UndefinedBehaviorSanitizer and LeakSanitizer; any report stops its test
-  # and fails the job. Make it a required check on main (branch protection).
+  # tests included. The suite (on a pull request, the tests its changes can
+  # affect) runs under AddressSanitizer, UndefinedBehaviorSanitizer and
+  # LeakSanitizer; any report stops its test and fails the job. Make it a
+  # required check on main (branch protection).
   sanitizers:
     name: Sanitizers (Linux, ASan + UBSan + LSan)
     needs: house-style
@@ -75,28 +83,66 @@ jobs:
       CMAKE_C_COMPILER_LAUNCHER: ccache
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
     steps:
+      # The whole history, so a pull request's changed paths are taken from its
+      # merge base (tools/change_selection.py).
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: gui_forms
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
+      # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
+      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      - name: Name the Linux package cache
+        id: linux-image
+        run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: linux-packages
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
-        run: |
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
-          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
-          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils dbus at-spi2-core python3-gi gir1.2-atspi-2.0
-          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+        run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
+      - uses: actions/cache/save@v4
+        if: github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.linux-packages.outputs.cache-primary-key }}
       - name: Configure compiler cache
         run: |
           echo "CCACHE_DIR=$PWD/.ccache" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$PWD" >> "$GITHUB_ENV"
           echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
-      - uses: actions/cache@v4
+      # Line tables by default; [sanitizer-full-g] in the head commit's message
+      # selects -g for a hunt (tools/ci_build.py --debug-info). The checkout is
+      # the head commit itself (the pushed commit, or a pull request's head
+      # rather than its merge commit), so `git log -1` reads that message on
+      # push and pull_request events alike.
+      - name: Choose the sanitizer debug information
+        id: debug-info
+        run: |
+          mode=lines
+          if git -C gui_forms log -1 --format=%B | grep -qF '[sanitizer-full-g]'; then
+            mode=full
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "GUI_FORMS_SANITIZER_DEBUG_INFO=$mode" >> "$GITHUB_ENV"
+          echo "Sanitizer debug information: $mode"
+      # Pull requests restore main's cache and never save one: a new 600 MB
+      # entry per run evicted the dependency and object caches from the
+      # repository's 10 GB. Objects of a branch's own earlier push, of the
+      # branch a pull request is stacked on, or (on main) of the merged pull
+      # request come from the seed artifact below instead. The debug-information
+      # mode is in the key, so line-table and full objects never share an entry,
+      # and only line-table runs find or pack a seed: a full -g hunt starts from
+      # main's cache and leaves no seed behind for a line-table run to restore.
+      - uses: actions/cache/restore@v4
+        id: sanitizer-cache
         with:
           path: |
             .ccache
@@ -104,11 +150,67 @@ jobs:
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             .build/native-linux-x64/skia
-          key: gui-sanitize-v1-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
+          key: gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
           restore-keys: |
-            gui-sanitize-v1-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
-      - name: Build and test the whole suite under the sanitizers
-        run: xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize
+            gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
+      - name: Find sanitizer objects of the nearest branch
+        id: seed
+        if: steps.debug-info.outputs.mode == 'lines'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_sanitizer_seed.py find
+      - uses: actions/download-artifact@v4
+        if: steps.seed.outputs.seeded == 'true'
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.seed.outputs.producer-run }}
+          artifact-ids: ${{ steps.seed.outputs.artifact-id }}
+          path: .ci/sanitizer-seed
+          merge-multiple: true
+      - name: Replace the restored objects with the seed (every test still runs)
+        if: steps.seed.outputs.seeded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python gui_forms/tools/ci_sanitizer_seed.py restore --artifact-id "${{ steps.seed.outputs.artifact-id }}"
+      # A pull request builds and runs only the tests its changed paths can
+      # affect (the areas of tools/test_areas.json; every test when it touches
+      # CMake, the toolchain, the core headers or this workflow). A push to
+      # main runs the whole suite.
+      - name: Build and test under the sanitizers
+        env:
+          CHANGED_FROM: ${{ github.event.pull_request.base.sha }}
+        run: |
+          ccache --zero-stats
+          selection=""
+          if [ -n "$CHANGED_FROM" ]; then
+            selection="--changed-from $CHANGED_FROM"
+          fi
+          xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize $selection
+      - name: Report cache statistics
+        if: always()
+        run: ccache --show-stats --verbose
+      - name: Pack the sanitizer objects as the next run's seed
+        if: success() && steps.debug-info.outputs.mode == 'lines'
+        run: python gui_forms/tools/ci_sanitizer_seed.py pack
+      - uses: actions/upload-artifact@v4
+        if: success() && steps.debug-info.outputs.mode == 'lines'
+        with:
+          name: gui-sanitize-ccache-linux-x64
+          path: |
+            gui-sanitize-ccache.tar
+            gui-sanitize-ccache.tar.sha256
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/cache/save@v4
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          path: |
+            .ccache
+            gui_forms/third_party/skia
+            gui_forms/third_party/harfbuzz
+            gui_forms/third_party/freetype
+            .build/native-linux-x64/skia
+          key: ${{ steps.sanitizer-cache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -200,6 +302,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TOOLCHAIN_PYTHON: ${{ steps.toolchain-python.outputs.python-path }}
+          GUI_FORMS_PACKAGE_WINDOWS_TOOLCHAIN: ${{ inputs.package_windows_toolchain }}
         run: '"$TOOLCHAIN_PYTHON" gui_forms/tools/windows_toolchain.py restore'
       - name: Install macOS dependencies
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'macOS')
@@ -209,19 +312,33 @@ jobs:
         run: |
           brew install cmake ninja ccache llvm@22
           echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+      # The Ubuntu mirror is sometimes slow (7-11 minutes for 30 MB), so the
+      # downloaded Ubuntu packages are kept in an Actions cache, refreshed once
+      # per runner image; only main saves it (tools/install_linux_ci_packages.sh).
+      - name: Name the Linux package cache
+        id: linux-image
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
+        run: echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: linux-packages
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-${{ steps.linux-image.outputs.image }}
+          restore-keys: linux-debs-v1-toolkit-${{ runner.arch }}-${{ hashFiles('gui_forms/tools/install_linux_ci_packages.sh') }}-
       - name: Install Linux dependencies
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux')
-        run: |
-          # Ubuntu 24.04's default Clang 18 rejects the existing in-class
-          # friend exception specifications. Use the LLVM 22 release series.
-          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm-key.asc"
-          sudo install -m 0644 "$RUNNER_TEMP/llvm-key.asc" /usr/share/keyrings/apt-llvm.asc
-          echo 'deb [signed-by=/usr/share/keyrings/apt-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-22 main' | sudo tee /etc/apt/sources.list.d/llvm-22.list
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build ccache clang-22 generate-ninja pkg-config libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libatk1.0-dev libatk-bridge2.0-dev xvfb xauth xdg-utils dbus at-spi2-core python3-gi gir1.2-atspi-2.0
-          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
-      # Only a changed tools/windows_toolchain.json (an LLVM bump) or an
-      # unpublished specification reaches the MSYS2 mirrors.
+        run: sh gui_forms/tools/install_linux_ci_packages.sh toolkit "$RUNNER_TEMP/apt-archives"
+      - uses: actions/cache/save@v4
+        if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Linux') && github.event_name != 'pull_request' && steps.linux-packages.outputs.cache-hit != 'true'
+        with:
+          path: ${{ runner.temp }}/apt-archives
+          key: ${{ steps.linux-packages.outputs.cache-primary-key }}
+      # The MSYS2 mirrors carry only the current LLVM, so they are reached
+      # only when a run dispatched with package_windows_toolchain finds no
+      # published toolchain for tools/windows_toolchain.json (a deliberate
+      # specification change). Otherwise the restore step above fails with
+      # ToolchainUnavailable, and packing refuses an LLVM the spec does not pin.
       - uses: msys2/setup-msys2@v2
         id: msys2
         if: steps.promotion.outputs.reused != 'true' && runner.os == 'Windows' && steps.toolchain.outputs.restored != 'true'
@@ -366,6 +483,17 @@ jobs:
           else
             python gui_forms/tools/ci_build.py --jobs 4
           fi
+      - name: Prove one compression and PNG implementation in the link map
+        if: steps.promotion.outputs.reused != 'true' && (steps.reuse.outputs.reused != 'true')
+        run: |
+          # Every static archive the toolkit links, plus Skia's: no C zlib,
+          # FreeType gzip or libpng may remain (Z-stage I5, decision 3A).
+          build=.build/native-${{ matrix.platform }}
+          archives=$(find "$build/gui-forms" -name '*.a' -not -path '*/_deps/*' -not -name '*.dll.a')
+          skia=$(find "$build/skia" -maxdepth 1 -name '*.a' 2>/dev/null || true)
+          python gui_forms/tools/audit_link_map.py --forbid-foreign $archives $skia
+          # Archive sizes for third_party/SKIA_BUILD_EVIDENCE.md.
+          if [ -n "$skia" ]; then ls -l $skia; fi
       - name: Test development text-mask ownership on Windows
         if: steps.promotion.outputs.reused != 'true' && (runner.os == 'Windows' && steps.reuse.outputs.reused != 'true')
         shell: msys2 {0}
@@ -427,8 +555,11 @@ jobs:
       - name: Report cache statistics
         if: steps.promotion.outputs.reused != 'true' && (always())
         run: ccache --show-stats --verbose
+      # Only main saves object caches: pull requests seed from validated
+      # archives (ci_promote.py seed), and their per-tree entries evicted the
+      # dependency caches from the repository's 10 GB.
       - uses: actions/cache/save@v4
-        if: steps.promotion.outputs.reused != 'true' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
+        if: steps.promotion.outputs.reused != 'true' && github.event_name != 'pull_request' && (always() && (steps.reuse.outputs.reused == 'true' || (steps.objects.outputs.cache-primary-key != '' && steps.objects.outputs.cache-hit != 'true')))
         with:
           path: .ccache
           key: gui-objects-v2-${{ matrix.platform }}-${{ steps.compiler.outputs.identity }}-${{ steps.inputs.outputs.tree }}
@@ -478,3 +609,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python gui_forms/tools/publish_cache.py --platform "${{ matrix.platform }}"
+
+  # The demonstration programs, their tests, packages and (on main) the tested
+  # release, built after the native jobs from their objects. One failed native
+  # platform skips the programs of all four, as a release needs all four.
+  programs:
+    needs: native
+    uses: ./.github/workflows/release.yml
+    with:
+      from_native: true
+    permissions:
+      contents: write
+      actions: read

@@ -253,6 +253,7 @@ struct PropertyList::Impl final {
                 state.group_index = group_index;
                 state.row_index = row_index;
                 state.committed_value = row.value;
+                // Read-only and custom rows have no built-in editor.
                 if (row.editor == PropertyEditorKind::text) {
                     std::shared_ptr<gui_forms::TextBox> editor = make_control<TextBox>(
                         StableId(row.stable_id + ".editor"), row.value);
