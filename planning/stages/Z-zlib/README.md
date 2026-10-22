@@ -538,9 +538,10 @@ sanitized corpus replay on Linux, macOS and Windows. This is a proposed
 minimum, not a safety proof. Record actual hours/execs/edges/features and
 source region/branch coverage; inspect unvisited parser/error branches and
 add targeted vectors. Phase 1 hours: **0**; coverage: **not measured**.
-The [source-locked sustained campaign](INFLATE_CAMPAIGN.md) now defines the
-initial x64/arm64 shard execution and accounting; planned hours are not completed
-hours and its scope does not replace the remaining corpus/API-sequence gates.
+**Superseded (owner, 2026-10-20):** no sustained campaigns run. See §11's
+revisions: deterministic sweeps, differential checks and sanitizers replace
+them, and the [fuzz smoke workflow](../../../.github/workflows/fuzz-smoke.yml)
+is a short build check. The [campaign record](INFLATE_CAMPAIGN.md) is history.
 
 Use the repository's pinned LLVM 22.1.8 and build helpers. Required targeted
 command once tests exist:
@@ -636,7 +637,7 @@ verification or licence/provenance requirements.
 Five A answers remain accepted; choice 2 is superseded by the owned-PNG
 rewrite direction. Phase 2 now contains a bounded streaming inflate derived
 from the pinned upstream puff canonical-Huffman algorithm, with new ownership,
-quota and streaming state. [Provenance](../../../src/core/compression/PROVENANCE.md)
+quota and streaming state. [Provenance](../../../stx_zlib/PROVENANCE.md)
 and [phase-2 evidence](../../../results/2026-10-19-zlib/phase-two/README.md)
 record the source decision and open gate. House style is mandatory; it is not
 a substitute for the accepted executable verification.
