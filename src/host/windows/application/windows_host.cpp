@@ -2254,6 +2254,11 @@ private:
         static_cast<void>(gui_forms::detail::composite_part_raster(source, target, clip, byte));
     }
 public:
+    // The shared blend for a group's composite.
+    static gui_forms::detail::PartCompositeBlend part_blend(const PaintGroupComposite composite) noexcept {
+        if (composite == PaintGroupComposite::plus) return gui_forms::detail::PartCompositeBlend::plus;
+        return gui_forms::detail::PartCompositeBlend::source_over;
+    }
     // Paint groups (Painter::begin_group). An isolated group draws into its
     // level's scratch rows (the group's clipped rows across the target's full
     // width), premultiplied and cleared to transparent, then composites them
@@ -2271,13 +2276,16 @@ public:
         GroupLevel& level = groups_[group_depth_];
         level.isolated = false;
         level.opacity = group.opacity;
+        level.composite = group.composite;
         save();
         clip_rect(group.bounds);
         const bool visible = group.opacity > 0.0;
         if (!visible) states_.back().clip = Rect{};
         level.state_depth = states_.size();
         group_depth_ = group_depth_ + 1U;
-        if (!visible || group.opacity >= 1.0 || pixels_ == nullptr || width_ <= 0) return;
+        const bool isolate =
+            group.opacity < 1.0 || group.isolated || group.composite != PaintGroupComposite::source_over;
+        if (!visible || !isolate || pixels_ == nullptr || width_ <= 0) return;
         const Rect clip = state().clip;
         const PixelRect area{std::clamp(static_cast<int>(std::floor(clip.x * scale_)), 0, width_),
                              std::clamp(static_cast<int>(std::floor(clip.y * scale_)), row_origin_, row_end_),
@@ -2338,7 +2346,8 @@ public:
         const gui_forms::detail::PartRasterSource source{.pixels = bytes,
             .width = static_cast<std::uint32_t>(columns), .height = static_cast<std::uint32_t>(rows),
             .row_bytes = static_cast<std::size_t>(width_) * 4U, .left = area.left,
-            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra};
+            .top = area.top - row_origin_, .order = gui_forms::detail::TextPixelOrder::bgra,
+            .blend = part_blend(level.composite)};
         const gui_forms::detail::TextCompositeTarget target = shared_composite_target();
         const gui_forms::detail::TextCompositeClip clip = shared_composite_clip();
         const std::uint8_t byte = gui_forms::detail::part_composite_opacity(level.opacity);
@@ -2431,6 +2440,7 @@ private:
         bool isolated{};
         PixelRect device{};
         double opacity{};
+        PaintGroupComposite composite{PaintGroupComposite::source_over};
         std::size_t state_depth{};
         std::uint32_t* parent_pixels{};
         int parent_row_origin{};

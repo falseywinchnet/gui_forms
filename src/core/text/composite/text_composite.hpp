@@ -69,6 +69,11 @@ enum class TextCompositeMode : std::uint8_t { source_over, source };
 // Clip coverage of one device pixel, 0..256. Exposed for tests.
 [[nodiscard]] std::uint32_t text_clip_coverage(TextCompositeClip clip, std::int64_t x, std::int64_t y) noexcept;
 
+// How composite_part_raster joins a weighted source pixel to the target
+// pixel: premultiplied source-over, or plus (each channel added, clamped at
+// 255; PaintGroupComposite::plus).
+enum class PartCompositeBlend : std::uint8_t { source_over, plus };
+
 // The same blend for the theme engine's part rasters (T2 plan, "One blend";
 // GIVEN A2-2 and C1-1). A part raster is premultiplied RGBA8, memory order
 // red, green, blue, alpha (PartRasterView), placed with its top-left pixel
@@ -93,6 +98,9 @@ struct PartRasterSource final {
     // beyond the source's edges.
     std::uint32_t shown_width{};
     std::uint32_t shown_height{};
+    // How the weighted source joins the target: source-over, or added
+    // channel by channel (a plus paint group, E7r).
+    PartCompositeBlend blend{PartCompositeBlend::source_over};
 };
 
 // A part opacity in [0, 1] as the byte the blend reads: floor(o * 255 + 0.5),
@@ -106,7 +114,7 @@ struct PartRasterSource final {
 //   s' = (s * w + 32640) / 65280
 //   out = s' + (destination * (255 - alpha') + 127) / 255
 // where alpha' is s' of the source alpha; an opaque target is written with
-// alpha 255. A fully opaque raster at full opacity and full coverage is
+// alpha 255. The plus blend writes min(255, s' + destination) instead. A fully opaque raster at full opacity and full coverage is
 // copied exactly. The result never exceeds 255 for a premultiplied source,
 // and is clamped for one that is not. Validates everything before writing;
 // no allocation, no partial write on failure. Source and target must not

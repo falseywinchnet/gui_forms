@@ -166,8 +166,8 @@ std::optional<std::size_t> machine_state(const CompiledTransition& transition, A
     return std::nullopt;
 }
 
-// A property's range: [0, 1] for opacity, the presentational scale's for
-// scale, the parameter's declared range otherwise.
+// A property's range: [0, 1] for opacity and face, the presentational
+// scale's for scale, the parameter's declared range otherwise.
 struct PropertyRange final {
     double minimum{};
     double maximum{1.0};
@@ -180,7 +180,10 @@ PropertyRange property_range(const CompiledTransition& transition, const Primiti
         range.maximum = maximum_presentational_scale;
         return range;
     }
-    if (transition.property == PresentationProperty::opacity || descriptor == nullptr) return range;
+    if (transition.property == PresentationProperty::opacity || transition.property == PresentationProperty::face ||
+        descriptor == nullptr) {
+        return range;
+    }
     const PrimitiveParameterDeclaration& declared = (*descriptor).parameters[transition.parameter];
     range.minimum = declared.minimum;
     range.maximum = declared.maximum;
@@ -203,6 +206,9 @@ struct PresentedProperties final {
     double opacity{1.0};
     double scale{1.0};
     bool scale_moving{false};
+    // The part's face cross-fade (E7r form a), when it has one and a
+    // record: its value, 1 when settled. The paint starts it.
+    MotionValue* face{};
     std::uint32_t moving_parameters{};
     std::uint32_t started_parameters{};
     std::array<double, maximum_primitive_parameters> targets{};
@@ -261,6 +267,8 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
     for (std::size_t index = 0; index < resolution.transition_count; ++index) {
         const CompiledTransition& transition = *resolution.transitions[index];
         if (transition.property == PresentationProperty::parameter && descriptor == nullptr) continue;
+        // Without a record a face has nothing to fade from.
+        if (transition.property == PresentationProperty::face && motion == nullptr) continue;
         const PropertyRange range = property_range(transition, descriptor);
         const std::optional<std::size_t> state = machine_state(transition, sources.states);
         const double target = state ? transition.states[*state].target : rest_value(transition, parameters);
@@ -284,6 +292,22 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         if (chosen == maximum_part_transitions) continue;
         used[chosen] = true;
         PartTransitionChannel& channel = (*motion).channels[chosen];
+        if (transition.property == PresentationProperty::face) {
+            // Settled at 1 until the paint finds a new face.
+            if (!channel.value) {
+                channel.property = transition.property;
+                channel.parameter = 0U;
+                channel.state.reset();
+                channel.value.emplace(*sources.owner, transition.curve, 1.0);
+                MotionValue& made = *channel.value;
+                static_cast<void>(made.set_extent(settle_extent(range, (*sources.window).scale())));
+                made.set_listener(MotionListener::bind<PartMotion, &PartMotion::on_step>(*motion));
+            } else {
+                (*channel.value).set_curve(transition.curve);
+            }
+            presented.face = &*channel.value;
+            continue;
+        }
         std::optional<double> entry{};
         if (state) entry = transition.states[*state].enter_from;
         if (!channel.value) {
@@ -329,6 +353,45 @@ PresentedProperties run_transitions(const CompiledThemeRules::Resolution& resolu
         (*record).motion_unsettled = false;
     }
     return presented;
+}
+
+// -- face cross-fade (E7r) --------------------------------------------------------
+
+// Whether two faces may cross-fade: the same extent at the same scale.
+bool fades_between(const PartRaster& from, const PartRaster& to) noexcept {
+    const DeviceExtent first = from.extent();
+    const DeviceExtent second = to.extent();
+    const bool same = first.width == second.width && first.height == second.height &&
+                      from.scale().value == to.scale().value;
+    return same;
+}
+
+// Notes the face a part shows on this paint and starts its cross-fade
+// when the face changed, and returns the face it fades from (null when
+// none fades). A part without a face transition holds no faces.
+std::shared_ptr<const PartRaster> note_face(EnginePartRecord& part, MotionValue* face,
+                                            const std::shared_ptr<const PartRaster>& raster) {
+    if (face == nullptr) {
+        part.shown_face.reset();
+        part.fading_face.reset();
+        return nullptr;
+    }
+    MotionValue& value = *face;
+    if (part.shown_face && part.shown_face != raster) {
+        if (fades_between(*part.shown_face, *raster)) {
+            part.fading_face = part.shown_face;
+            value.jump_to(0.0);
+            static_cast<void>(value.animate_to(1.0));
+            part.motion_unsettled = true;
+        } else {
+            part.fading_face.reset();
+            value.jump_to(1.0);
+        }
+    }
+    part.shown_face = raster;
+    if (value.settled()) part.fading_face.reset();
+    std::shared_ptr<const PartRaster> from = part.fading_face;
+    return from;
 }
 
 // -- keyframes (E7r) ------------------------------------------------------------
@@ -695,9 +758,37 @@ void ThemeEngine::paint(Painter& painter, const Control& control, const PartPain
         paint_built_in(painter, control, shown, opacity);
         return;
     }
+    // A face that changed from one discrete state to another cross-fades
+    // (form a): the old face at 1 - t and the new one added at t, in one
+    // isolated group at the part's opacity.
+    std::shared_ptr<const PartRaster> fading_from{};
+    if (kept != nullptr) fading_from = note_face(*kept, presented.face, raster);
     // The raster covers the part grown by its primitive's outsets; stretched,
     // that rectangle is scaled about the part's centre as its bounds are.
     const Insets outsets = descriptor.outsets;
+    if (fading_from && !stretched) {
+        const double fade = std::clamp((*presented.face).current(), 0.0, 1.0);
+        const Point origin{shown.bounds.x - outsets.left, shown.bounds.y - outsets.top};
+        const DeviceExtent covered = (*raster).extent();
+        const double device_scale = (*raster).scale().value;
+        const Rect bounds{origin.x, origin.y, static_cast<double>(covered.width) / device_scale,
+                          static_cast<double>(covered.height) / device_scale};
+        PaintGroup whole{};
+        whole.bounds = bounds;
+        whole.opacity = opacity;
+        whole.isolated = true;
+        PaintGroup added{};
+        added.bounds = bounds;
+        added.opacity = fade;
+        added.composite = PaintGroupComposite::plus;
+        painter.begin_group(whole);
+        painter.draw_part_raster(fading_from, origin, 1.0 - fade);
+        painter.begin_group(added);
+        painter.draw_part_raster(raster, origin, 1.0);
+        painter.end_group();
+        painter.end_group();
+        return;
+    }
     if (stretched) {
         const Rect covered{part.bounds.x - outsets.left, part.bounds.y - outsets.top,
                            part.bounds.width + outsets.left + outsets.right,

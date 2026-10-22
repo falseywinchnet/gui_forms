@@ -191,6 +191,13 @@ struct EnginePartRecord final {
     // The part's transitions (E7), made the first time it is painted with
     // one; null for a part without any.
     std::unique_ptr<PartMotion> motion{};
+    // For a part with a face cross-fade (E7r form a): the face it showed
+    // last, and while a fade runs the face it fades from. Both are shared
+    // with the raster cache and the display; they keep a replaced face
+    // alive only until its fade settles, and are released on the first
+    // paint without a face transition.
+    std::shared_ptr<const PartRaster> shown_face{};
+    std::shared_ptr<const PartRaster> fading_face{};
     // Whether the part's last paint had an ambient effect, and whether that
     // effect was refused for its area (E7). An ambient part repaints when
     // ambient motion resumes; a refusal is counted once, when it begins.

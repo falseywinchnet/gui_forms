@@ -269,13 +269,23 @@ unsigned weighted_channel(const std::uint64_t channel, const std::uint64_t weigh
 // One premultiplied source pixel blended over a target pixel at `weight`
 // (opacity 0..255 times clip coverage 0..256): see composite_part_raster.
 void blend_part_pixel(std::uint32_t& pixel, const std::array<std::uint64_t, 4>& rgba, const std::uint64_t weight,
-                      const ChannelShifts shifts, const bool opaque) noexcept {
+                      const ChannelShifts shifts, const bool opaque, const PartCompositeBlend blend) noexcept {
     const unsigned alpha = weighted_channel(rgba[3], weight);
     if (alpha == 0) return;
     const unsigned red = weighted_channel(rgba[0], weight);
     const unsigned green = weighted_channel(rgba[1], weight);
     const unsigned blue = weighted_channel(rgba[2], weight);
     const std::uint32_t previous = pixel;
+    if (blend == PartCompositeBlend::plus) {
+        const unsigned sum_red = std::min(255U, red + ((previous >> shifts.red) & 255U));
+        const unsigned sum_green = std::min(255U, green + ((previous >> shifts.green) & 255U));
+        const unsigned sum_blue = std::min(255U, blue + ((previous >> shifts.blue) & 255U));
+        unsigned sum_alpha = 255U;
+        if (!opaque) sum_alpha = std::min(255U, alpha + ((previous >> shifts.alpha) & 255U));
+        pixel = (sum_red << shifts.red) | (sum_green << shifts.green) | (sum_blue << shifts.blue) |
+                (sum_alpha << shifts.alpha);
+        return;
+    }
     const unsigned remaining = 255U - alpha;
     const unsigned out_red = std::min(255U, red + destination_share((previous >> shifts.red) & 255U, remaining));
     const unsigned out_green = std::min(255U, green + destination_share((previous >> shifts.green) & 255U, remaining));
@@ -377,7 +387,7 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
                 const std::array<std::uint64_t, 4> rgba{source.pixels[offset + red_byte], source.pixels[offset + 1U],
                                                         source.pixels[offset + blue_byte], source_alpha};
                 blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba,
-                                 opacity_weight * clipped, shifts, target.opaque);
+                                 opacity_weight * clipped, shifts, target.opaque, source.blend);
             }
         }
         return TextCompositeStatus::success;
@@ -407,7 +417,7 @@ TextCompositeStatus composite_part_raster(const PartRasterSource source, const T
             }
             if (rgba[3] == 0U) continue;
             blend_part_pixel(target.pixels[target_row + static_cast<std::size_t>(x)], rgba, opacity_weight * clipped,
-                             shifts, target.opaque);
+                             shifts, target.opaque, source.blend);
         }
     }
     return TextCompositeStatus::success;

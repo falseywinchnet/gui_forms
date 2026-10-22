@@ -385,6 +385,7 @@ void RecordingPainter::begin_group(const PaintGroup& group) {
     command.rect = group.bounds;
     command.scalar = group.opacity;
     command.secondary_scalar = static_cast<double>(group.composite);
+    command.tertiary_scalar = group.isolated ? 1.0 : 0.0;
     open_groups_.reserve(open_groups_.size() + 1U);
     commands_.push_back(std::move(command));
     open_groups_.push_back(opened);

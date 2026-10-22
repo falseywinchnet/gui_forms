@@ -273,6 +273,39 @@ void test_scaled_sampling() {
             "an unbounded shown size is refused");
 }
 
+PartRasterSource added_face(const std::vector<std::uint8_t>& bytes) {
+    PartRasterSource source = source_of(bytes, 1U, 1U, 0, 0);
+    source.blend = detail::PartCompositeBlend::plus;
+    return source;
+}
+
+// The plus blend (E7r cross-fade): each weighted channel added, clamped.
+// An old face at 1 - t and a new one added at t sum to one face.
+void test_plus_blend() {
+    const std::vector<std::uint8_t> half{100U, 50U, 0U, 128U};
+    PartRasterSource added = source_of(half, 1U, 1U, 0, 0);
+    added.blend = detail::PartCompositeBlend::plus;
+    TestTarget sum = make_target(1U, 1U, pack(TextPixelOrder::rgba, 200U, 10U, 5U, 200U), TextPixelOrder::rgba, false);
+    require(detail::composite_part_raster(added, sum.target, whole(1U, 1U), 255U) ==
+                detail::TextCompositeStatus::success,
+            "a plus source composites");
+    require(sum.pixels[0] == pack(TextPixelOrder::rgba, 255U, 60U, 5U, 255U), "channels add and clamp at 255");
+
+    // The same opaque face faded out and in sums to itself within a step.
+    const std::vector<std::uint8_t> face{90U, 140U, 200U, 255U};
+    for (unsigned share = 0U; share <= 255U; share = share + 15U) {
+        TestTarget group = make_target(1U, 1U, 0U, TextPixelOrder::rgba, false);
+        static_cast<void>(detail::composite_part_raster(source_of(face, 1U, 1U, 0, 0), group.target, whole(1U, 1U),
+                                                        static_cast<std::uint8_t>(255U - share)));
+        static_cast<void>(detail::composite_part_raster(added_face(face), group.target, whole(1U, 1U),
+                                                        static_cast<std::uint8_t>(share)));
+        const std::uint32_t pixel = group.pixels[0];
+        const unsigned red = pixel & 255U;
+        const unsigned alpha = pixel >> 24U;
+        require(red + 1U >= 90U && red <= 91U && alpha + 1U >= 255U, "a face faded into itself stays itself");
+    }
+}
+
 void test_part_raster() {
     const std::shared_ptr<PartRaster> raster = PartRaster::create(DeviceExtent{3U, 2U}, DeviceScale{1.5});
     require(raster != nullptr, "a raster is made");
@@ -413,6 +446,7 @@ int main() {
     test_refusals_write_nothing();
     test_premultiplied_sources_never_overflow();
     test_scaled_sampling();
+    test_plus_blend();
     test_part_raster();
     test_command_is_recorded_replayed_and_inspected();
     std::cout << "part composite tests passed\n";

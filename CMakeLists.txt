@@ -2311,6 +2311,10 @@ if(GUI_FORMS_BUILD_TESTS)
     target_link_libraries(gui_forms_engine_slice_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_engine_slice_tests COMMAND gui_forms_engine_slice_tests)
 
+    add_executable(gui_forms_engine_retained_tests tests/engine_retained_tests.cpp)
+    target_link_libraries(gui_forms_engine_retained_tests PRIVATE gui_forms_controls)
+    add_test(NAME gui_forms_engine_retained_tests COMMAND gui_forms_engine_retained_tests)
+
     add_executable(gui_forms_damage_clip_tests tests/damage_clip_tests.cpp)
     target_link_libraries(gui_forms_damage_clip_tests PRIVATE gui_forms_controls)
     add_test(NAME gui_forms_damage_clip_tests COMMAND gui_forms_damage_clip_tests)

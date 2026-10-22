@@ -825,6 +825,12 @@ Types
 
       The part's transitions (E7), made the first time it is painted with one; null for a part without any.
 
+   .. cpp:member:: std::shared_ptr<const PartRaster> shown_face
+
+      For a part with a face cross-fade (E7r form a): the face it showed last, and while a fade runs the face it fades from. Both are shared with the raster cache and the display; they keep a replaced face alive only until its fade settles, and are released on the first paint without a face transition.
+
+   .. cpp:member:: std::shared_ptr<const PartRaster> fading_face
+
    .. cpp:member:: bool ambient
 
       Whether the part's last paint had an ambient effect, and whether that effect was refused for its area (E7). An ambient part repaints when ambient motion resumes; a refusal is counted once, when it begins.
@@ -1702,7 +1708,7 @@ Types
 
    ``#include <gui_forms/types/painter/painter.hpp>``
 
-   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn.
+   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn. - A group whose ``composite`` is not source-over, or that sets ``isolated``, is isolated at any opacity: a group holding a plus group must be, so that the sum is formed before it meets what lies beneath. A painter that cannot isolate (no storage) draws the group directly.
 
    .. cpp:member:: Rect bounds
 
@@ -1713,6 +1719,10 @@ Types
    .. cpp:member:: PaintGroupComposite composite
 
       Default: ``{PaintGroupComposite::source_over}``.
+
+   .. cpp:member:: bool isolated
+
+      Default: ``{false}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -3292,6 +3302,8 @@ Enumerations
 
    .. cpp:enumerator:: source_over
 
+   .. cpp:enumerator:: plus
+
 .. cpp:namespace:: gui_forms
 
 .. cpp:enum-class:: ParameterAssignment
@@ -3443,6 +3455,8 @@ Enumerations
    .. cpp:enumerator:: opacity
 
    .. cpp:enumerator:: scale
+
+   .. cpp:enumerator:: face
 
 .. cpp:namespace:: gui_forms
 
@@ -3918,6 +3932,10 @@ Functions, constants and aliases
 .. cpp:var:: constexpr double maximum_presentational_scale
 
    Value: ``2.0``.
+
+.. cpp:var:: constexpr std::string_view face_property
+
+   The engine's face cross-fade (E7r form a): when a primitive-drawn part's face changes between discrete states (its raster is replaced), the old face fades into the new over the transition's curve, each baked once and blended through a paint group (old at 1 - t, new at t, added). The transition names no states: it runs on every change of face. A change while a fade runs fades from the face shown last to the new one; a face of another size or scale does not fade. Like scale, no built-in rule uses it. Value: ``"face"``.
 
 .. cpp:var:: constexpr std::size_t maximum_presentation_states
 

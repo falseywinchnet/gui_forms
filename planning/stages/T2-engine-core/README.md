@@ -397,6 +397,32 @@ What the bound admits:
   slice cache bakes a reference box once and composes larger parts from
   its corners, edges and centre.
 
+## Decisions for E7r, the retained forms (owner, 2026-10-22)
+
+Nothing in the engine bakes per frame. The forms are: (a) a state change
+cross-fades its two baked faces through a group; (b) a moving scale stretches
+the cached raster and bakes sharp at rest; (c) animated parameters step
+through baked keyframes; (d) pointer and time inputs reuse those keyframes,
+and ambient effects loop through a bounded set of baked frames. Slicing
+assembles any size of a sliceable material from one reference bake.
+
+- **A. When keyframes bake: in idle time, and on demand.** The 10 keyframes
+  of an animated parameter bake in idle frames after the part first paints,
+  never all at once in one frame (first paint included). A transition or a
+  pointer move that reaches a keyframe not yet baked bakes only that one, the
+  first time it is reached. Idle bakes and on-demand bakes are counted
+  separately. The proof: once the idle bakes are done, a running transition
+  bakes nothing; before that, it bakes at most one keyframe per keyframe it
+  reaches for the first time.
+- **B. Where they are held: a shared 4 MB cache** for slice references and
+  keyframes, beside the 8 MB part cache.
+- **C. Stepping: to the nearest keyframe** (10 levels evenly spaced over the
+  parameter's declared range, the ends exact).
+- **D. Pointer inputs: option 1.** An animated parameter driven by the
+  pointer steps through the same 10 shared keyframes, so moving the pointer
+  bakes nothing once they are baked. No overlay seam is built until a real
+  primitive needs one.
+
 ## Open decisions (ask, do not decide)
 
 The proposed numbers (light angle 135°, overshoot 8 %, blur cap 8 px,

@@ -238,6 +238,7 @@ public:
         bool isolated{};
         SkIRect device{};
         double opacity{};
+        PaintGroupComposite composite{PaintGroupComposite::source_over};
         std::vector<TextClipState> parent_text_clips;
         int parent_text_clip_base{};
         int parent_save_floor{};
@@ -1346,13 +1347,15 @@ void SkiaRaster::begin_group(const PaintGroup& group) {
     Impl::GroupLevel& level = impl.groups[impl.group_depth];
     level.isolated = false;
     level.opacity = group.opacity;
+    level.composite = group.composite;
     save();
     clip_rect(group.bounds);
     const bool visible = group.opacity > 0.0;
     if (!visible) clip_rect(Rect{});
     impl.group_depth = impl.group_depth + 1U;
     SkCanvas* const parent = impl.canvas();
-    if (!visible || group.opacity >= 1.0 || parent == nullptr) return;
+    const bool isolate = group.opacity < 1.0 || group.isolated || group.composite != PaintGroupComposite::source_over;
+    if (!visible || !isolate || parent == nullptr) return;
     // The group covers the recorded clip, which now includes its bounds, in
     // the parent's device pixels. A parent whose clips or pixels are unknown
     // draws the group directly.
@@ -1429,7 +1432,10 @@ void SkiaRaster::end_group() {
     const detail::PartRasterSource source{.pixels = bytes, .width = static_cast<std::uint32_t>(width),
                                           .height = static_cast<std::uint32_t>(height),
                                           .row_bytes = pixmap.rowBytes(), .left = level.device.left(),
-                                          .top = level.device.top(), .order = detail::TextPixelOrder::rgba};
+                                          .top = level.device.top(), .order = detail::TextPixelOrder::rgba,
+                                          .blend = level.composite == PaintGroupComposite::plus
+                                                       ? detail::PartCompositeBlend::plus
+                                                       : detail::PartCompositeBlend::source_over};
     static_cast<void>(impl.composite_source(*parent, source, level.opacity));
 }
 

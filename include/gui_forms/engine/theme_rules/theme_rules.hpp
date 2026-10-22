@@ -162,12 +162,23 @@ inline constexpr std::string_view scale_property = "scale";
 inline constexpr double minimum_presentational_scale = 0.5;
 inline constexpr double maximum_presentational_scale = 2.0;
 
+// The engine's face cross-fade (E7r form a): when a primitive-drawn part's
+// face changes between discrete states (its raster is replaced), the old
+// face fades into the new over the transition's curve, each baked once and
+// blended through a paint group (old at 1 - t, new at t, added). The
+// transition names no states: it runs on every change of face. A change
+// while a fade runs fades from the face shown last to the new one; a face
+// of another size or scale does not fade. Like scale, no built-in rule
+// uses it.
+inline constexpr std::string_view face_property = "face";
+
 // What a transition moves: a primitive parameter, or one of the engine's
 // presentational properties.
 enum class PresentationProperty : std::uint8_t {
     parameter,
     opacity,
     scale,
+    face,
 };
 
 // The most states one presentational state machine has, and the most

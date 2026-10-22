@@ -161,7 +161,7 @@ public:
     def test_the_engine_lists_its_motion_caps(self) -> None:
         schema = cs.load_schema()
         engine = schema["engine"]
-        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity", "scale"])
+        self.assertEqual(engine["transitions"]["engine_properties"], ["opacity", "scale", "face"])
         self.assertEqual(engine["ambient"]["maximum_frames_per_second"], 30)
         broken = json.loads(json.dumps(engine))
         broken["ambient"]["maximum_frames_per_second"] = 60

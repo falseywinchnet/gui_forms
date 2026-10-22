@@ -44,7 +44,8 @@ enum class DisplayOperation : std::uint8_t {
 #endif
     draw_part_raster = 22,
     // A paint group (Painter::begin_group): `rect` its bounds, `scalar` its
-    // opacity, `secondary_scalar` its composite mode's value.
+    // opacity, `secondary_scalar` its composite mode's value,
+    // `tertiary_scalar` 1 when it is isolated at any opacity.
     begin_group = 23,
     end_group = 24,
     // A part raster shown scaled (Painter::draw_part_raster_scaled): `rect`

@@ -112,6 +112,7 @@ std::uint64_t replay_display_chunk(const DisplayChunk& chunk, Painter& painter) 
             group.bounds = command.rect;
             group.opacity = command.scalar;
             group.composite = static_cast<PaintGroupComposite>(static_cast<std::uint8_t>(command.secondary_scalar));
+            group.isolated = command.tertiary_scalar != 0.0;
             painter.begin_group(group);
             break;
         }
