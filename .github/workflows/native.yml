@@ -96,6 +96,22 @@ jobs:
           echo "CCACHE_BASEDIR=$PWD" >> "$GITHUB_ENV"
           echo "CCACHE_COMPILERCHECK=content" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=1G" >> "$GITHUB_ENV"
+      # Line tables by default; [sanitizer-full-g] in the head commit's message
+      # selects -g for a hunt (tools/ci_build.py --debug-info). The checkout is
+      # the head commit itself (the pushed commit, or a pull request's head
+      # rather than its merge commit), so `git log -1` reads that message on
+      # push and pull_request events alike.
+      - name: Choose the sanitizer debug information
+        id: debug-info
+        run: |
+          mode=lines
+          if git -C gui_forms log -1 --format=%B | grep -qF '[sanitizer-full-g]'; then
+            mode=full
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "GUI_FORMS_SANITIZER_DEBUG_INFO=$mode" >> "$GITHUB_ENV"
+          echo "Sanitizer debug information: $mode"
+      # The mode is in the key, so line-table and full objects never share an entry.
       - uses: actions/cache@v4
         with:
           path: |
@@ -104,9 +120,9 @@ jobs:
             gui_forms/third_party/harfbuzz
             gui_forms/third_party/freetype
             .build/native-linux-x64/skia
-          key: gui-sanitize-v1-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
+          key: gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-${{ github.sha }}
           restore-keys: |
-            gui-sanitize-v1-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
+            gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-${{ hashFiles('gui_forms/third_party/*.sh', 'gui_forms/third_party/*.patch', 'gui_forms/third_party/*.gn') }}-
       - name: Build and test the whole suite under the sanitizers
         run: xvfb-run -a -s "-screen 0 1280x1024x24 -noreset" python gui_forms/tools/ci_build.py --jobs 4 --sanitize
       - uses: actions/upload-artifact@v4
