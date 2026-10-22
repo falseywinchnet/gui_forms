@@ -210,6 +210,11 @@ class DebugInfoTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             ci_build.debug_info_mode('', {ci_build.DEBUG_INFO_VARIABLE: 'some'})
 
+    def test_the_sanitizer_job_sets_the_variable_this_tool_reads(self) -> None:
+        workflow: str = (CHECKOUT / '.github/workflows/native.yml').read_text(encoding='utf-8')
+        self.assertIn(ci_build.DEBUG_INFO_VARIABLE + '=$mode', workflow)
+        self.assertIn('gui-sanitize-v1-${{ steps.debug-info.outputs.mode }}-', workflow)
+
 
 class LeakSuppressionTests(unittest.TestCase):
     def test_no_function_rule_can_match_a_first_party_frame(self) -> None:
