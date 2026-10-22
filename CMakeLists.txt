@@ -141,6 +141,7 @@ add_library(gui_forms_core STATIC
     src/core/engine/primitive_registry/primitive_registry.cpp
     src/core/engine/primitives/bulge/bulge_primitives.cpp
     src/core/engine/primitives/relief/relief_primitives.cpp
+    src/core/engine/primitives/kernel/pixel_kernel.cpp
     src/core/engine/part_shape/part_shape.cpp
     src/core/engine/part_table/engine_part_table.cpp
     src/core/engine/part_raster/part_raster.cpp
