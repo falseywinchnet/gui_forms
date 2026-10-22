@@ -81,4 +81,155 @@ inline void paint_scene(Painter& painter, const Case kind, const double scale) {
     painter.restore();
 }
 
+// Paint groups (Painter::begin_group; T2 E7, owner decision E7-1): engine
+// rasters and opaque fills drawn inside groups, composited through the
+// shared blend, so every host writes the same bytes.
+enum class GroupCase : std::uint8_t {
+    isolated,
+    nested,
+    empty,
+    clipped,
+    opacity_zero,
+    opacity_one,
+    refused,
+    translated,
+    overlap,
+};
+
+inline constexpr std::array<GroupCase, 9> group_cases{GroupCase::isolated,     GroupCase::nested,
+                                                      GroupCase::empty,        GroupCase::clipped,
+                                                      GroupCase::opacity_zero, GroupCase::opacity_one,
+                                                      GroupCase::refused,      GroupCase::translated,
+                                                      GroupCase::overlap};
+inline constexpr std::array<const char*, 9> group_case_names{"isolated",     "nested",      "empty",
+                                                             "clipped",      "opacity_zero", "opacity_one",
+                                                             "refused",      "translated",  "overlap"};
+
+// Expected FNV-1a hashes of the raster's rows in RGBA order, [case][scale],
+// produced by the Windows DIB painter (Windows x64, clang 22), 2026-10-21.
+// GUI_FORMS_PART_COMPOSITE_PRINT=1 prints the observed table instead.
+inline constexpr std::array<std::array<std::uint64_t, 3>, 9> expected_groups{{
+    {0xbbdc19788bd13499ULL, 0x6c3059a7826c9bb9ULL, 0x776795552a69caadULL},
+    {0xc183a2164b45b65bULL, 0xec6594a4e86abc22ULL, 0x25f850baee2383daULL},
+    {0x71f66f11bdc74903ULL, 0xf3ace0f9d5950c23ULL, 0xf99dba7b260b4d83ULL},
+    {0xb7e1be8974d909b7ULL, 0xfbda12fc24dd18d1ULL, 0xd88aee9b15622aadULL},
+    {0x71f66f11bdc74903ULL, 0xf3ace0f9d5950c23ULL, 0xf99dba7b260b4d83ULL},
+    {0x76930cce6775bc50ULL, 0xf84b6b81bb71753bULL, 0x8909e0d61d0afca7ULL},
+    {0x507848af44929242ULL, 0x8a75fbb0401ef37bULL, 0x94620dda471017e3ULL},
+    {0x6176d49fd632bb53ULL, 0x1c331be338c312e7ULL, 0xb9433b8e76ee884fULL},
+    {0x11c0cf9a2220aba3ULL, 0x693153d5a2a435ebULL, 0x585ca9bcec2ded03ULL},
+}};
+
+inline constexpr Rect whole_scene{0.0, 0.0, scene_size.width, scene_size.height};
+// The overlap case's two fills, red then blue, overlapping over x 30 to 50.
+inline constexpr Rect overlap_red{10.0, 8.0, 40.0, 20.0};
+inline constexpr Rect overlap_blue{30.0, 8.0, 40.0, 20.0};
+
+inline void paint_background(Painter& painter) {
+    painter.fill_rect(whole_scene, Color::rgba(222, 232, 246, 255));
+    painter.fill_rect({0.0, 24.0, scene_size.width, 24.0}, Color::rgba(40, 70, 110, 255));
+}
+
+inline PaintGroup group_of(Rect bounds, double opacity) {
+    PaintGroup group{};
+    group.bounds = bounds;
+    group.opacity = opacity;
+    return group;
+}
+
+// Paints the group scene after the frame has begun, at the painter's
+// `scale`. Opacity 1 draws the plain case's rasters, so it must equal
+// drawing them without a group.
+inline void paint_group_scene(Painter& painter, const GroupCase kind, const double scale) {
+    paint_background(painter);
+    const std::shared_ptr<const PartRaster> dithered = make_part("dithered_bulge", false, scale);
+    const std::shared_ptr<const PartRaster> smooth = make_part("bulge", true, scale);
+    switch (kind) {
+    case GroupCase::isolated:
+        painter.begin_group(group_of(whole_scene, 0.5));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.draw_part_raster(smooth, Point{20.0, 10.0}, 1.0);
+        painter.end_group();
+        break;
+    case GroupCase::nested:
+        painter.begin_group(group_of({2.0, 2.0, 110.0, 40.0}, 0.75));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.begin_group(group_of({30.0, 4.0, 60.0, 36.0}, 0.5));
+        painter.draw_part_raster(smooth, Point{40.0, 8.0}, 1.0);
+        painter.end_group();
+        painter.end_group();
+        break;
+    case GroupCase::empty:
+        painter.begin_group(group_of(whole_scene, 0.5));
+        painter.end_group();
+        break;
+    case GroupCase::clipped:
+        painter.save();
+        painter.clip_rect({9.3, 3.4, 70.5, 33.75});
+        painter.begin_group(group_of(whole_scene, 0.5));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.draw_part_raster(smooth, Point{58.0, 12.0}, 1.0);
+        painter.end_group();
+        painter.restore();
+        break;
+    case GroupCase::opacity_zero:
+        painter.begin_group(group_of(whole_scene, 0.0));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.end_group();
+        break;
+    case GroupCase::opacity_one:
+        painter.begin_group(group_of(whole_scene, 1.0));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.draw_part_raster(smooth, Point{58.0, 12.0}, 1.0);
+        painter.end_group();
+        break;
+    case GroupCase::refused:
+        // Five deep: the fifth is refused and draws without isolation.
+        for (std::size_t level = 0U; level < maximum_paint_group_depth + 1U; ++level) {
+            painter.begin_group(group_of(whole_scene, 0.875));
+        }
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        for (std::size_t level = 0U; level < maximum_paint_group_depth + 1U; ++level) painter.end_group();
+        break;
+    case GroupCase::translated:
+        painter.save();
+        painter.translate({2.0, 4.0});
+        painter.begin_group(group_of({4.0, 2.0, 60.0, 30.0}, 0.625));
+        painter.draw_part_raster(dithered, Point{6.0, 6.0}, 1.0);
+        painter.draw_part_raster(smooth, Point{30.0, 4.0}, 1.0);
+        painter.end_group();
+        painter.restore();
+        break;
+    case GroupCase::overlap:
+        painter.begin_group(group_of(whole_scene, 0.5));
+        painter.fill_rect(overlap_red, Color::rgba(200, 30, 40, 255));
+        painter.fill_rect(overlap_blue, Color::rgba(20, 60, 210, 255));
+        painter.end_group();
+        break;
+    }
+}
+
+// The pixel at logical (x, y) of a scene raster at `scale`, as RGBA.
+inline std::array<std::uint8_t, 4> scene_pixel(const std::uint8_t* bytes, std::size_t row_bytes,
+                                               text_identity::Order order, double scale, double x, double y) {
+    const std::size_t column = static_cast<std::size_t>(std::floor(x * scale));
+    const std::size_t row = static_cast<std::size_t>(std::floor(y * scale));
+    const std::uint8_t* const pixel = bytes + row * row_bytes + column * 4U;
+    std::array<std::uint8_t, 4> rgba{pixel[0], pixel[1], pixel[2], pixel[3]};
+    if (order == text_identity::Order::bgra) rgba = {pixel[2], pixel[1], pixel[0], pixel[3]};
+    return rgba;
+}
+
+// The overlap case composites as one image: where blue covers red inside
+// the group, the result is blue over the plane at half opacity, exactly as
+// where blue is alone; red shows nowhere under it.
+inline bool overlap_is_one_image(const std::uint8_t* bytes, std::size_t row_bytes, text_identity::Order order,
+                                 double scale) {
+    const std::array<std::uint8_t, 4> both = scene_pixel(bytes, row_bytes, order, scale, 40.5, 18.5);
+    const std::array<std::uint8_t, 4> blue = scene_pixel(bytes, row_bytes, order, scale, 60.5, 18.5);
+    const std::array<std::uint8_t, 4> red = scene_pixel(bytes, row_bytes, order, scale, 20.5, 18.5);
+    const bool one_image = both == blue && both != red;
+    return one_image;
+}
+
 } // namespace gui_forms::part_composite_identity

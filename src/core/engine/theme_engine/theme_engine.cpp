@@ -5,7 +5,6 @@
 #include "gui_forms/theme/part_painting/part_painting.hpp"
 #include "gui_forms/window/window.hpp"
 #include "../../theme/part_painting/built_in_recipe.hpp"
-#include "opacity_painter.hpp"
 
 #include <algorithm>
 #include <array>
@@ -283,16 +282,30 @@ double run_transitions(const CompiledThemeRules::Resolution& resolution, const P
     return opacity;
 }
 
-// Paints a part with the built-in recipe at `opacity`: not at all at 0,
-// through an OpacityPainter between 0 and 1.
+// How far past its bounds the built-in recipe may draw a part that is not
+// a shadow: its one-pixel contact shadow, default ring and focus outsets.
+constexpr double built_in_group_margin = 4.0;
+
+// Paints a part with the built-in recipe at `opacity`: not at all at 0, and
+// between 0 and 1 as one paint group, so that the recipe's overlapping
+// commands composite as one image (owner, E7-1). The group covers the
+// part's bounds and what the recipe draws around them: the overlay
+// shadow's outsets for a shadow part, built_in_group_margin otherwise.
 void paint_built_in(Painter& painter, const Control& control, const PartPaint& part, double opacity) {
     if (opacity <= 0.0) return;
     if (opacity >= 1.0) {
         paint_part_with_built_in_recipe(painter, control, part);
         return;
     }
-    detail::OpacityPainter faded(painter, opacity);
-    paint_part_with_built_in_recipe(faded, control, part);
+    Insets reach{built_in_group_margin, built_in_group_margin, built_in_group_margin, built_in_group_margin};
+    if (part.role == PartRole::shadow) reach = overlay_shadow_outsets(control);
+    PaintGroup group{};
+    group.bounds = Rect{part.bounds.x - reach.left, part.bounds.y - reach.top,
+                        part.bounds.width + reach.left + reach.right, part.bounds.height + reach.top + reach.bottom};
+    group.opacity = opacity;
+    painter.begin_group(group);
+    paint_part_with_built_in_recipe(painter, control, part);
+    painter.end_group();
 }
 
 } // namespace

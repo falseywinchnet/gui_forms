@@ -33,6 +33,7 @@
 #include "include/effects/SkGradient.h"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <cmath>
 #include <limits>
@@ -224,6 +225,50 @@ public:
     // when the canvas is not a uniform scale and translation equal to the
     // raster's scale, or cannot be addressed.
     bool composite_part(SkCanvas& target, const PartRaster& raster, Point origin, double opacity);
+    // The shared step alone: premultiplied pixels placed in the canvas's
+    // device pixels, composited under the recorded clips. False when the
+    // canvas cannot be addressed or its clips are unknown.
+    bool composite_source(SkCanvas& target, const detail::PartRasterSource& source, double opacity);
+
+    // Paint groups: one level per open group. An isolated level keeps the
+    // parent canvas's recorded clips and save floor while its own surface
+    // is drawn.
+    struct GroupLevel final {
+        sk_sp<SkSurface> surface;
+        bool isolated{};
+        SkIRect device{};
+        double opacity{};
+        std::vector<TextClipState> parent_text_clips;
+        int parent_text_clip_base{};
+        int parent_save_floor{};
+    };
+    std::array<GroupLevel, maximum_paint_group_depth> groups{};
+    std::size_t group_depth{};
+    std::size_t refused_open{};
+    std::uint64_t group_refusals{};
+
+    // The canvas of the innermost isolated group, or null.
+    [[nodiscard]] SkCanvas* group_canvas() const noexcept {
+        for (std::size_t level = group_depth; level > 0U; --level) {
+            const GroupLevel& open = groups[level - 1U];
+            if (open.isolated) return (*open.surface).getCanvas();
+        }
+        return nullptr;
+    }
+    // Ends every open group without compositing (a frame's start or end).
+    void close_groups() noexcept {
+        for (std::size_t level = group_depth; level > 0U; --level) {
+            GroupLevel& open = groups[level - 1U];
+            if (!open.isolated) continue;
+            (*(*open.surface).getCanvas()).restoreToCount(1);
+            text_clips = std::move(open.parent_text_clips);
+            text_clip_base = open.parent_text_clip_base;
+            save_floor = open.parent_save_floor;
+            open.isolated = false;
+        }
+        group_depth = 0U;
+        refused_open = 0U;
+    }
 
 #if defined(GUI_FORMS_PREPARED_TEXT)
     // Lets prepared text composite through composite_coverage.
@@ -262,7 +307,8 @@ public:
     }
 
     [[nodiscard]] SkCanvas* canvas() const noexcept {
-        SkCanvas* result = nullptr;
+        SkCanvas* result = group_canvas();
+        if (result != nullptr) return result;
 #if defined(GUI_FORMS_PREPARED_TEXT)
         if (prepared_mode) {
             result = prepared_frame.canvas();
@@ -391,6 +437,7 @@ bool SkiaRaster::resize(Size logical_size, double scale) {
 }
 
 void SkiaRaster::begin_frame(const DamageRegion& damage) {
+    (*impl_).close_groups();
     SkCanvas* canvas = (*impl_).canvas();
     if (!canvas) {
         return;
@@ -447,6 +494,7 @@ void SkiaRaster::clip_damage(const DamageRegion& damage) {
 }
 
 void SkiaRaster::end_frame() {
+    (*impl_).close_groups();
     if (SkCanvas* canvas = (*impl_).canvas()) {
         (*canvas).restoreToCount(1);
     }
@@ -1162,10 +1210,6 @@ bool SkiaRaster::Impl::composite_part(SkCanvas& target, const PartRaster& raster
     if (!matrix.isScaleTranslate() || matrix.getScaleX() != raster_scale || matrix.getScaleY() != raster_scale) {
         return false;
     }
-    const std::optional<SharedComposite> shared = shared_composite(target);
-    if (!shared) return false;
-    const TextClipState* const state = (*shared).state;
-    if ((*state).rect.isEmpty()) return true;
     // The raster's first pixel goes on the device pixel nearest its origin.
     const SkPoint device = matrix.mapPoint(SkPoint::Make(static_cast<SkScalar>(origin.x), static_cast<SkScalar>(origin.y)));
     const DeviceExtent extent = raster.extent();
@@ -1173,6 +1217,16 @@ bool SkiaRaster::Impl::composite_part(SkCanvas& target, const PartRaster& raster
                                           .row_bytes = raster.row_bytes(),
                                           .left = std::llround(static_cast<double>(device.x())),
                                           .top = std::llround(static_cast<double>(device.y()))};
+    const bool composited = composite_source(target, source, opacity);
+    return composited;
+}
+
+bool SkiaRaster::Impl::composite_source(SkCanvas& target, const detail::PartRasterSource& source,
+                                        const double opacity) {
+    const std::optional<SharedComposite> shared = shared_composite(target);
+    if (!shared) return false;
+    const TextClipState* const state = (*shared).state;
+    if ((*state).rect.isEmpty()) return true;
     const std::uint8_t byte = detail::part_composite_opacity(opacity);
     const detail::TextCompositeTarget composite_target = (*shared).target;
     const detail::TextCompositeClip clip = (*shared).clip;
@@ -1246,6 +1300,110 @@ void SkiaRaster::draw_image(ImageId image, Rect destination, double opacity) {
         (*canvas).drawImageRect((*found).second.image.get(), to_sk_rect(destination),
                               SkSamplingOptions(SkFilterMode::kLinear), &paint);
     }
+}
+
+void SkiaRaster::begin_group(const PaintGroup& group) {
+    Impl& impl = *impl_;
+    if (impl.group_depth >= maximum_paint_group_depth) {
+        // Refused by name: drawn without isolation, limited to its bounds.
+        save();
+        clip_rect(group.bounds);
+        impl.refused_open = impl.refused_open + 1U;
+        impl.group_refusals = impl.group_refusals + 1U;
+        return;
+    }
+    Impl::GroupLevel& level = impl.groups[impl.group_depth];
+    level.isolated = false;
+    level.opacity = group.opacity;
+    save();
+    clip_rect(group.bounds);
+    const bool visible = group.opacity > 0.0;
+    if (!visible) clip_rect(Rect{});
+    impl.group_depth = impl.group_depth + 1U;
+    SkCanvas* const parent = impl.canvas();
+    if (!visible || group.opacity >= 1.0 || parent == nullptr) return;
+    // The group covers the recorded clip, which now includes its bounds, in
+    // the parent's device pixels. A parent whose clips or pixels are unknown
+    // draws the group directly.
+    const Impl::TextClipState* const state = impl.current_text_clip(*parent);
+    SkPixmap parent_pixels{};
+    if (state == nullptr || !(*parent).peekPixels(&parent_pixels)) return;
+    SkIRect device = (*state).rect.roundOut();
+    if (!device.intersect(SkIRect::MakeWH(parent_pixels.width(), parent_pixels.height()))) return;
+    const int width = device.width();
+    const int height = device.height();
+    if (!level.surface || (*level.surface).width() < width || (*level.surface).height() < height) {
+        const int grown_width = level.surface ? std::max(width, (*level.surface).width()) : width;
+        const int grown_height = level.surface ? std::max(height, (*level.surface).height()) : height;
+        const SkImageInfo info = SkImageInfo::Make(grown_width, grown_height, kRGBA_8888_SkColorType,
+                                                   kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+        sk_sp<SkSurface> grown = SkSurfaces::Raster(info);
+        if (!grown) return;
+        level.surface = std::move(grown);
+    }
+    SkCanvas& canvas = *(*level.surface).getCanvas();
+    canvas.restoreToCount(1);
+    canvas.resetMatrix();
+    canvas.save();
+    canvas.clipRect(SkRect::MakeIWH(width, height), SkClipOp::kIntersect, false);
+    canvas.clear(SK_ColorTRANSPARENT);
+    SkMatrix matrix = (*parent).getTotalMatrix();
+    matrix.postTranslate(static_cast<SkScalar>(-device.left()), static_cast<SkScalar>(-device.top()));
+    canvas.setMatrix(matrix);
+    // The group's own recorded clips: its whole surface region. The
+    // parent's rounded clip and damage region apply when it composites.
+    level.parent_text_clips = std::move(impl.text_clips);
+    level.parent_text_clip_base = impl.text_clip_base;
+    level.parent_save_floor = impl.save_floor;
+    impl.text_clips.clear();
+    Impl::TextClipState base{};
+    base.rect = SkRect::MakeIWH(width, height);
+    impl.text_clips.push_back(std::move(base));
+    impl.text_clip_base = canvas.getSaveCount();
+    impl.save_floor = canvas.getSaveCount();
+    level.device = device;
+    level.isolated = true;
+}
+
+void SkiaRaster::end_group() {
+    Impl& impl = *impl_;
+    if (impl.refused_open > 0U) {
+        impl.refused_open = impl.refused_open - 1U;
+        restore();
+        return;
+    }
+    if (impl.group_depth == 0U) return;
+    Impl::GroupLevel& level = impl.groups[impl.group_depth - 1U];
+    if (!level.isolated) {
+        impl.group_depth = impl.group_depth - 1U;
+        restore();
+        return;
+    }
+    SkCanvas& canvas = *(*level.surface).getCanvas();
+    canvas.restoreToCount(1);
+    impl.text_clips = std::move(level.parent_text_clips);
+    impl.text_clip_base = level.parent_text_clip_base;
+    impl.save_floor = level.parent_save_floor;
+    level.isolated = false;
+    impl.group_depth = impl.group_depth - 1U;
+    // Back on the parent: its clip as the group began, then the composite.
+    restore();
+    SkCanvas* const parent = impl.canvas();
+    SkPixmap pixmap{};
+    if (parent == nullptr || !(*level.surface).peekPixels(&pixmap)) return;
+    const std::size_t width = static_cast<std::size_t>(level.device.width());
+    const std::size_t height = static_cast<std::size_t>(level.device.height());
+    const std::size_t length = (height - 1U) * pixmap.rowBytes() + width * 4U;
+    const std::span<const std::uint8_t> bytes(static_cast<const std::uint8_t*>(pixmap.addr()), length);
+    const detail::PartRasterSource source{.pixels = bytes, .width = static_cast<std::uint32_t>(width),
+                                          .height = static_cast<std::uint32_t>(height),
+                                          .row_bytes = pixmap.rowBytes(), .left = level.device.left(),
+                                          .top = level.device.top(), .order = detail::TextPixelOrder::rgba};
+    static_cast<void>(impl.composite_source(*parent, source, level.opacity));
+}
+
+std::uint64_t SkiaRaster::group_refusals() const noexcept {
+    return (*impl_).group_refusals;
 }
 
 void SkiaRaster::draw_part_raster(const std::shared_ptr<const PartRaster>& raster, const Point origin,

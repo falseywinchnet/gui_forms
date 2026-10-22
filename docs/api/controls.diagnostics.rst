@@ -291,6 +291,8 @@ Related types
 
    .. cpp:function:: void record_engine_ambient_refusal() noexcept
 
+   .. cpp:function:: void record_paint_group_refusals(std::uint64_t refusals) noexcept
+
    .. cpp:function:: void record_frame_callback_fault() noexcept
 
       Counts a contained frame callback exception.
@@ -553,6 +555,10 @@ Related types
       The theme engine's ambient effects (E7): frames that repainted an ambient part, and effects refused for covering more than 10 % of the window on an everyday surface (counted when the refusal begins).
 
    .. cpp:member:: std::uint64_t engine_ambient_refusals
+
+   .. cpp:member:: std::uint64_t paint_group_refusals
+
+      Paint groups begun deeper than maximum_paint_group_depth, drawn without isolation (Painter::begin_group).
 
    .. cpp:member:: std::string renderer_name
 
@@ -1024,6 +1030,10 @@ Enumerations
    .. cpp:enumerator:: draw_live_surface
 
    .. cpp:enumerator:: draw_part_raster
+
+   .. cpp:enumerator:: begin_group
+
+   .. cpp:enumerator:: end_group
 
 Functions, constants and aliases
 --------------------------------

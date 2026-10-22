@@ -3053,6 +3053,7 @@ void Window::paint_recursive(const Control::Ptr& control,
                 OwnerDecorationLayer::after_content);
             (*control).display_chunk_ = recorder.finish(++display_generation_, plane,
                                                       logical_bounds);
+            if (recorder.group_refusals() > 0U) metrics_.record_paint_group_refusals(recorder.group_refusals());
             ++chunks_rebuilt;
             consumed_invalidations += invalidated ? 1U : 0U;
         } else {

@@ -120,6 +120,7 @@ std::string MetricsSnapshot::to_json() const {
            << "\"engine_input_damage_area\":" << engine_input_damage_area << ','
            << "\"engine_ambient_frames\":" << engine_ambient_frames << ','
            << "\"engine_ambient_refusals\":" << engine_ambient_refusals << ','
+           << "\"paint_group_refusals\":" << paint_group_refusals << ','
            << "\"renderer_name\":\"" << escaped_json(renderer_name) << "\","
            << "\"cpu_only\":" << (cpu_only ? "true" : "false")
            << '}';

@@ -136,6 +136,9 @@ struct MetricsSnapshot {
     // window on an everyday surface (counted when the refusal begins).
     std::uint64_t engine_ambient_frames{};
     std::uint64_t engine_ambient_refusals{};
+    // Paint groups begun deeper than maximum_paint_group_depth, drawn
+    // without isolation (Painter::begin_group).
+    std::uint64_t paint_group_refusals{};
     std::string renderer_name{"unbound"};
     bool cpu_only{true};
 

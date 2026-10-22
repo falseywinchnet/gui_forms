@@ -548,6 +548,8 @@ struct TileFrame final {
     std::vector<double> opacities{};
     std::vector<double> edge_opacities{};
     std::uint64_t drawn{};
+    // Paint groups at a partial opacity around the cross's tiles.
+    std::size_t fading_groups{};
 };
 
 bool inside(Rect outer, Rect inner) {
@@ -567,6 +569,8 @@ void hash_operation(BitHash& hash, const VisualPaintOperationSnapshot& operation
     hash.add_length(operation.first.y);
     hash.add_length(operation.second.x);
     hash.add_length(operation.second.y);
+    // A paint group's opacity (the fade), exact.
+    hash.add_number(operation.scalar);
     const std::array<std::uint8_t, 4> colour{operation.color.red, operation.color.green, operation.color.blue,
                                              operation.color.alpha};
     hash.add_bytes(colour);
@@ -608,15 +612,22 @@ TileFrame tile_frame(Window& window, const DockSite& site) {
                               std::fabs(operation.second.y - operation.first.y)};
             const bool rect_inside = !operation.rect.empty() && inside(cross, operation.rect);
             const bool line_inside = operation.operation == VisualPaintOperation::draw_line && inside(cross, points);
-            if (rect_inside || line_inside) within = true;
+            // A fading tile is one paint group around it (owner, E7-1).
+            const bool group_around = operation.operation == VisualPaintOperation::begin_group &&
+                                      inside(operation.rect, cross);
+            const bool group_end = operation.operation == VisualPaintOperation::end_group;
+            if (rect_inside || line_inside || group_around || group_end) within = true;
         }
         if (within) hash_operation(hash, operation);
+        const bool fading = operation.operation == VisualPaintOperation::begin_group && operation.scalar > 0.0 &&
+                            operation.scalar < 1.0;
+        if (fading) frame.fading_groups = frame.fading_groups + 1U;
     }
     frame.drawn = hash.value;
     return frame;
 }
 
-constexpr std::uint64_t expected_fade_hash = 0x49da0d94050e9a94ULL;
+constexpr std::uint64_t expected_fade_hash = 0x131aa7a1b417e8e4ULL;
 
 void tile_fade() {
     std::unique_ptr<DockFixture> fixture = make_dock();
@@ -645,6 +656,10 @@ void tile_fade() {
         }
         fade.add_number(frame.opacities[0]);
         fade.add_word(frame.drawn);
+        if (step < 7) {
+            require(frame.fading_groups == 10U,
+                    "mid-fade, each tile and glyph is one paint group, composited once at its opacity");
+        }
     }
     for (int step = 0; step < 6; ++step) {
         require(std::fabs(steps[static_cast<std::size_t>(step)] - 0.16 * static_cast<double>(step + 1)) < 1e-12,

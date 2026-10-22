@@ -116,6 +116,8 @@ Types
      - One value.
    * - :cpp:class:`Painter <gui_forms::Painter>`
      - Painter is the renderer-neutral command vocabulary for transforms, clips, solids, rounded geometry, gradients, shadows, text, registered images, live surfaces, sampled regions, and bounded patterns; rich operations provide coherent minimal-host fallbacks.
+   * - :cpp:class:`PaintGroup <gui_forms::PaintGroup>`
+     - A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once.
    * - :cpp:class:`ParameterValidation <gui_forms::ParameterValidation>`
      - The first defect found and the index of the parameter it concerns.
    * - :cpp:class:`PartKey <gui_forms::PartKey>`
@@ -1550,6 +1552,12 @@ Types
 
    .. rubric:: Extension points
 
+   .. cpp:function:: virtual void begin_group(const PaintGroup& group)
+
+      Paint groups (see PaintGroup). begin_group and end_group pair like save and restore and nest like them, up to maximum_paint_group_depth: the state in force at end_group (transform, clips, saves) must be the one at its begin_group. Within a retained display chunk every group ends in the chunk that begins it; the recorder refuses a chunk left unbalanced. The recording, Skia and Windows DIB painters isolate; each keeps one reusable scratch image per nesting level, grown to the largest clipped bounds it has met and released with the painter. The base implementation is a minimal painter's fallback without isolation: save() and clip_rect(bounds), then restore().
+
+   .. cpp:function:: virtual void end_group()
+
    .. cpp:function:: virtual std::unique_ptr<PaintFramebuffer> create_framebuffer(Size logical_size, double scale)
 
       Native renderers preserve their fonts and drawing semantics offscreen. Recording/headless painters explicitly report this facility unavailable.
@@ -1633,6 +1641,24 @@ Types
    .. cpp:function:: virtual void fill_image_pattern(ImageId image, Size source_pixel_size, Rect destination, Size logical_tile_size, ImagePatternWrap wrap = ImagePatternWrap::tile, double opacity = 1.0)
 
       One retained command regardless of repetition count. Production painters realize the pattern exactly; the base implementation is a bounded compatibility fallback for deliberately minimal hosts.
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:struct:: PaintGroup final
+
+   ``#include <gui_forms/types/painter/painter.hpp>``
+
+   A paint group (T2 plan, E7; owner, 2026-10-21: "there are other things that group layer may be needed for"): commands drawn as one image, then composited once. - ``bounds``, in the current coordinates when the group begins, limits the group. It is given up front so that a painter sizes its storage once: nothing the group draws outside ``bounds`` (or outside the clip in force at its beginning) is shown. - ``opacity`` in [0, 1] multiplies the group's whole image. Below 1 the group is isolated: its commands draw into a transparent premultiplied image the size of its clipped bounds, which is composited once at ``opacity`` by ``composite``, so overlapping commands never show through one another. At 1 (or above) the commands draw directly under clip_rect(bounds), which is exactly what isolation would give for source-over. At 0 (or NaN) nothing is drawn.
+
+   .. cpp:member:: Rect bounds
+
+   .. cpp:member:: double opacity
+
+      Default: ``{1.0}``.
+
+   .. cpp:member:: PaintGroupComposite composite
+
+      Default: ``{PaintGroupComposite::source_over}``.
 
 .. cpp:namespace:: gui_forms
 
@@ -2416,7 +2442,7 @@ Types
 
    ``#include <gui_forms/engine/theme_engine/theme_engine.hpp>``
 
-   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4), below them the engine's own built-in rules (built_in_theme_rules, E7), and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable and MotionClock. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules of its own draws every part with the built-in recipe except those the built-in rules address: the ribbon's command faces and group buttons, which take the dithered bulge and its rise, and the docking tiles, which fade in. A keyed part's transitions run on its window's motion clock (E7): the part's states select each machine's state, the property moves toward it, and the part repaints within its extent as it moves. Its opacity multiplies a primitive's composite in the shared blend; for a part the built-in recipe draws, each of the recipe's commands is drawn at that opacity (detail::OpacityPainter). A part painted without a key stands at its machines' targets and its ambient effect's pose.
+   The theme engine's entry point (T2 plan, ThemeEngine). paint_part hands it every part; controls never call it directly. Ownership: a Theme owns its engine, and every window showing the theme shares it. An application's windows share one theme (ApplicationResources), so they share one engine. The engine is immutable once its theme is made: it holds the theme's compiled rules (the cascade, E4), below them the engine's own built-in rules (built_in_theme_rules, E7), and borrows the built-in primitive registry. What changes from frame to frame belongs to each window's EnginePartTable and MotionClock. The engine draws a part with a primitive only when the cascade selects a registered primitive for the part, its parameters validate, the cost is within budget (GIVEN F1-1) and the presentation is not forced high contrast. In every other case the built-in recipe draws it: the body paint_part had before the engine existed. A theme with no rules of its own draws every part with the built-in recipe except those the built-in rules address: the ribbon's command faces and group buttons, which take the dithered bulge and its rise, and the docking tiles, which fade in. A keyed part's transitions run on its window's motion clock (E7): the part's states select each machine's state, the property moves toward it, and the part repaints within its extent as it moves. Its opacity multiplies a primitive's composite in the shared blend; a part the built-in recipe draws is drawn as one paint group (Painter::begin_group) composited once at that opacity. A part painted without a key stands at its machines' targets and its ambient effect's pose.
 
 
    .. rubric:: Construction
@@ -3087,6 +3113,14 @@ Enumerations
    .. cpp:enumerator:: reduced_motion
 
    .. cpp:enumerator:: occluded
+
+.. cpp:namespace:: gui_forms
+
+.. cpp:enum-class:: PaintGroupComposite
+
+   ``#include <gui_forms/types/painter/painter.hpp>``
+
+   .. cpp:enumerator:: source_over
 
 .. cpp:namespace:: gui_forms
 
@@ -3770,3 +3804,11 @@ Functions, constants and aliases
 .. cpp:var:: constexpr std::size_t maximum_gradient_stops
 
    Value: ``32U``.
+
+.. cpp:namespace:: gui_forms
+
+``#include <gui_forms/types/painter/painter.hpp>``
+
+.. cpp:var:: constexpr std::size_t maximum_paint_group_depth
+
+   The deepest groups nest (T2, coordinator decision Q2/Q3). A group begun deeper is refused by name: it draws without isolation (as clip_rect(bounds) under a save), and the refusal is counted. Value: ``4``.

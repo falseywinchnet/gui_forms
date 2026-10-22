@@ -130,7 +130,6 @@ add_library(gui_forms_core STATIC
     src/core/engine/theme_engine/theme_engine.cpp
     src/core/engine/theme_rules/theme_rules.cpp
     src/core/engine/theme_rules/built_in_rules.cpp
-    src/core/engine/theme_engine/opacity_painter.cpp
     src/core/engine/motion_value/motion_value.cpp
     src/core/engine/motion_clock/motion_clock.cpp
     src/core/surface_material/material_fill_layer/material_fill_layer.cpp
@@ -2375,6 +2374,9 @@ if(GUI_FORMS_BUILD_TESTS)
     add_executable(gui_forms_part_composite_tests tests/part_composite_tests.cpp)
     target_link_libraries(gui_forms_part_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_part_composite_tests COMMAND gui_forms_part_composite_tests)
+    add_executable(gui_forms_paint_group_tests tests/paint_group_tests.cpp)
+    target_link_libraries(gui_forms_paint_group_tests PRIVATE gui_forms_core)
+    add_test(NAME gui_forms_paint_group_tests COMMAND gui_forms_paint_group_tests)
     add_executable(gui_forms_text_composite_tests tests/text_composite_tests.cpp)
     target_link_libraries(gui_forms_text_composite_tests PRIVATE gui_forms_core)
     add_test(NAME gui_forms_text_composite_tests COMMAND gui_forms_text_composite_tests)

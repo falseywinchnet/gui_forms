@@ -38,9 +38,9 @@ struct PartPaint;
 // A keyed part's transitions run on its window's motion clock (E7): the
 // part's states select each machine's state, the property moves toward it,
 // and the part repaints within its extent as it moves. Its opacity
-// multiplies a primitive's composite in the shared blend; for a part the
-// built-in recipe draws, each of the recipe's commands is drawn at that
-// opacity (detail::OpacityPainter). A part painted without a key stands at
+// multiplies a primitive's composite in the shared blend; a part the
+// built-in recipe draws is drawn as one paint group (Painter::begin_group)
+// composited once at that opacity. A part painted without a key stands at
 // its machines' targets and its ambient effect's pose.
 class ThemeEngine final {
 public:
