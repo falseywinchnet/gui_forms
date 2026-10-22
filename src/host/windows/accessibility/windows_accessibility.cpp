@@ -112,6 +112,20 @@ LONG msaa_role(SemanticRole role) noexcept {
     // are published through UI Automation.
     case SemanticRole::pane: return ROLE_SYSTEM_PANE;
     case SemanticRole::tab_panel: return ROLE_SYSTEM_PROPERTYPAGE;
+    // The stage A vocabulary (12.13). MSAA has no tree-grid or live-region
+    // role: a tree grid is an outline, as Chromium publishes one, and a live
+    // region a grouping (UI Automation carries its live setting).
+    case SemanticRole::tree: return ROLE_SYSTEM_OUTLINE;
+    case SemanticRole::tree_item: return ROLE_SYSTEM_OUTLINEITEM;
+    case SemanticRole::table: return ROLE_SYSTEM_TABLE;
+    case SemanticRole::row: return ROLE_SYSTEM_ROW;
+    case SemanticRole::cell: return ROLE_SYSTEM_CELL;
+    case SemanticRole::column_header: return ROLE_SYSTEM_COLUMNHEADER;
+    case SemanticRole::row_header: return ROLE_SYSTEM_ROWHEADER;
+    case SemanticRole::tree_grid: return ROLE_SYSTEM_OUTLINE;
+    case SemanticRole::dialog: return ROLE_SYSTEM_DIALOG;
+    case SemanticRole::status_bar: return ROLE_SYSTEM_STATUSBAR;
+    case SemanticRole::live_region: return ROLE_SYSTEM_GROUPING;
     case SemanticRole::count: return ROLE_SYSTEM_GROUPING;
     }
     return ROLE_SYSTEM_GROUPING;
@@ -145,6 +159,9 @@ LONG msaa_state(const SemanticNode& node) noexcept {
     // Automation carries PositionInSet and SizeOfSet. It has no invalid
     // state either.
     if (node.has_popup) bits |= STATE_SYSTEM_HASPOPUP;
+    // MSAA has no checkable or modal state (the role says it); it has a
+    // multiple-selection state.
+    if (has_semantic_state(states, SemanticState::multiselectable)) bits |= STATE_SYSTEM_MULTISELECTABLE;
     if (node.role == SemanticRole::link) bits |= STATE_SYSTEM_LINKED;
     return bits;
 }
@@ -217,7 +234,7 @@ void publish_automation_tree(const std::shared_ptr<SemanticSource>& source) noex
 }
 
 // Which text property a text getter reads.
-enum class TextProperty : std::uint8_t { name, value, description };
+enum class TextProperty : std::uint8_t { name, value, description, keyboard_shortcut };
 
 class MsaaElement final : public IAccessible {
 public:
@@ -338,6 +355,12 @@ HRESULT MsaaElement::text_property(const VARIANT& child, BSTR* out,
     case TextProperty::name: return utf8_to_bstr(node.name, out);
     case TextProperty::value: return utf8_to_bstr(node.value, out);
     case TextProperty::description: return utf8_to_bstr(node.description, out);
+    case TextProperty::keyboard_shortcut: {
+        // A mnemonic is reached with Alt, as Win32 menus and dialogs publish it.
+        if (node.access_key.empty()) return S_FALSE;
+        const std::string shortcut = "Alt+" + node.access_key;
+        return utf8_to_bstr(shortcut, out);
+    }
     }
     return S_FALSE;
 }
@@ -469,11 +492,8 @@ HRESULT STDMETHODCALLTYPE MsaaElement::get_accHelpTopic(BSTR* file, VARIANT, LON
     return S_FALSE;
 }
 
-HRESULT STDMETHODCALLTYPE MsaaElement::get_accKeyboardShortcut(VARIANT, BSTR* out) {
-    if (out == nullptr) return E_POINTER;
-    // The semantic tree carries no access key (stage A gap list).
-    *out = nullptr;
-    return S_FALSE;
+HRESULT STDMETHODCALLTYPE MsaaElement::get_accKeyboardShortcut(VARIANT child, BSTR* out) {
+    return text_property(child, out, TextProperty::keyboard_shortcut);
 }
 
 HRESULT STDMETHODCALLTYPE MsaaElement::get_accFocus(VARIANT* out) {
